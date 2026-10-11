@@ -23,6 +23,16 @@ struct IOSConversationExecution: ConversationExecution {
 
 @MainActor
 struct IOSConversationFeedback: ConversationFeedback {
+    var isBackground: Bool { UIApplication.shared.applicationState == .background }
+
+    func notifyAttention(identifier: String, title: String, body: String, isCurrent: @escaping @MainActor () -> Bool) async throws -> Bool {
+        try await NotificationProvider.shared.deliverIfAuthorized(identifier: identifier, title: title, body: body, isCurrent: isCurrent)
+    }
+
+    func dismissAttention(identifier: String) {
+        NotificationProvider.shared.dismiss(identifier: identifier)
+    }
+
     func receivedAgentDelta() {
         Haptics.impact(.agentDeltaReceived)
     }

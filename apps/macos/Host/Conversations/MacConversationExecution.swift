@@ -18,6 +18,14 @@ struct MacConversationExecution: ConversationExecution {
 
 @MainActor
 struct MacConversationFeedback: ConversationFeedback {
+    var isBackground: Bool { false }
+
+    func notifyAttention(identifier: String, title: String, body: String, isCurrent: @escaping @MainActor () -> Bool) async throws -> Bool {
+        false
+    }
+
+    func dismissAttention(identifier: String) {}
+
     func receivedAgentDelta() {}
 
     func notifyCompletion(id: UUID, title: String, body: String) {

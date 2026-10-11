@@ -1354,6 +1354,22 @@ struct ConversationPage: View {
                             mount: WebPageMount(page: page, ownerID: ownerID, coordinator: browserPageMount)
                         )
                     }
+                    if let session = serviceAuthPresenter.session,
+                       let ownerID = serviceAuthPresenter.pageMount.inlineOwnerID(for: session.page),
+                       let anchor = anchors[ownerID] {
+                        InlineServicePageHost(
+                            anchor: anchor,
+                            mount: WebPageMount(page: session.page, ownerID: ownerID, coordinator: serviceAuthPresenter.pageMount)
+                        )
+                    }
+                    if let session = botControlPresenter.session,
+                       let ownerID = botControlPresenter.pageMount.inlineOwnerID(for: session.page),
+                       let anchor = anchors[ownerID] {
+                        InlineServicePageHost(
+                            anchor: anchor,
+                            mount: WebPageMount(page: session.page, ownerID: ownerID, coordinator: botControlPresenter.pageMount)
+                        )
+                    }
                 }
                 .contentMargins(.bottom, dockClearance, for: .scrollContent)
                 .onScrollGeometryChange(for: ConversationViewportController.Frame?.self) { geo in

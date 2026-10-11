@@ -51,10 +51,10 @@ final class NotificationProvider {
         return Scheduled(id: id, fireAt: iso)
     }
 
-    func deliverIfAuthorized(identifier: String, title: String, body: String) async throws -> Bool {
+    func deliverIfAuthorized(identifier: String, title: String, body: String, isCurrent: () -> Bool = { true }) async throws -> Bool {
         let status = await center.notificationSettings().authorizationStatus
-        let authorized = status == .authorized || status == .provisional || status == .ephemeral
-        guard authorized else {
+        guard isCurrent() else { return false }
+        guard status == .authorized || status == .provisional || status == .ephemeral else {
             return false
         }
         let content = UNMutableNotificationContent()
@@ -62,7 +62,16 @@ final class NotificationProvider {
         content.body = body
         content.sound = .default
         try await center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+        guard isCurrent() else {
+            dismiss(identifier: identifier)
+            return false
+        }
         return true
+    }
+
+    func dismiss(identifier: String) {
+        center.removePendingNotificationRequests(withIdentifiers: [identifier])
+        center.removeDeliveredNotifications(withIdentifiers: [identifier])
     }
 
     func cancel(id: String) {

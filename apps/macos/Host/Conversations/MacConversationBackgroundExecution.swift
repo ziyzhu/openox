@@ -24,7 +24,7 @@ final class MacConversationBackgroundExecution: ConversationBackgroundExecution 
     func updateStep(_ text: String) {
     }
 
-    func finish(success: Bool) {
-        Log.session.info("ConversationBackground.finish chat=\(conversationID) run=\(runID.rawValue) success=\(success) mode=process")
+    func finish(_ outcome: ConversationBackgroundOutcome) {
+        Log.session.info("ConversationBackground.finish chat=\(conversationID) run=\(runID.rawValue) outcome=\(outcome.logLabel) success=\(outcome.succeeded) mode=process")
     }
 }

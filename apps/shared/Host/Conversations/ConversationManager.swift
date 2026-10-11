@@ -646,6 +646,11 @@ final class ConversationManager {
         return meta
     }
 
+    func notifyPendingInteractions() {
+        for record in records.values { record.hydration.conversation?.notifyPendingInteraction() }
+        current?.notifyPendingInteraction()
+    }
+
     func flushAll() {
         execution.protectPersistence { [weak self] in
             guard let self else { return }

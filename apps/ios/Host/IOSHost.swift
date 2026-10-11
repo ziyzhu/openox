@@ -38,7 +38,10 @@ final class IOSHost: OxHost {
                 MainActor.assumeIsolated { self?.runtime.executionAvailabilityChanged() }
             },
             NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.runtime.executionAvailabilityChanged() }
+                MainActor.assumeIsolated {
+                    self?.runtime.executionAvailabilityChanged()
+                    self?.conversations.notifyPendingInteractions()
+                }
             },
         ]
     }

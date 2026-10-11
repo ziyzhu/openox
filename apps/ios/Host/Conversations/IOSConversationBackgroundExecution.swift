@@ -4,13 +4,14 @@ import Foundation
 @MainActor
 final class IOSConversationBackgroundExecution: ConversationBackgroundExecution {
     private static var title: String { String(localized: "Ox is on it") }
-    private static let activityPulseInterval = Duration.seconds(15)
 
     private final class CompletionState {
-        var result: Bool?
+        var outcome: Outcome?
     }
 
     typealias Phase = ConversationBackgroundPhase
+
+    typealias Outcome = ConversationBackgroundOutcome
 
     private let identifier: String
     private let conversationID: UUID
@@ -22,7 +23,6 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
     private let completion = CompletionState()
     private var completedUnits: Int64 = 0
     private var lastProgressAt: Date?
-    private var activityPulse: Task<Void, Never>?
     private var onExpiration: (() -> Void)?
 
     init(conversationID: UUID, runID: RunID, onExpiration: @escaping () -> Void) {
@@ -34,7 +34,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
     }
 
     func submit() {
-        guard completion.result == nil else { return }
+        guard completion.outcome == nil else { return }
         let completion = self.completion
         let identifier = self.identifier
         let registered = BGTaskScheduler.shared.register(
@@ -43,7 +43,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         ) { [weak self] task in
             MainActor.assumeIsolated {
                 guard let self else {
-                    let result = completion.result ?? false
+                    let result = completion.outcome?.succeeded ?? false
                     task.setTaskCompleted(success: result)
                     Log.session.info("ConversationBackground.receive detached task=\(identifier) success=\(result)")
                     return
@@ -52,7 +52,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
             }
         }
         guard registered else {
-            completion.result = false
+            completion.outcome = .failed
             onExpiration = nil
             Log.session.error("ConversationBackground.register rejected chat=\(conversationID) run=\(runID.rawValue) task=\(identifier)")
             return
@@ -68,7 +68,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
             try BGTaskScheduler.shared.submit(request)
             Log.session.info("ConversationBackground.submit chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) strategy=queue")
         } catch {
-            completion.result = false
+            completion.outcome = .failed
             onExpiration = nil
             let failure = error as NSError
             Log.session.error("ConversationBackground.submit failed chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) domain=\(failure.domain) code=\(failure.code) error=\(failure.localizedDescription)")
@@ -76,7 +76,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
     }
 
     func advance() {
-        guard completion.result == nil else { return }
+        guard completion.outcome == nil else { return }
         let now = Date()
         if let lastProgressAt, now.timeIntervalSince(lastProgressAt) < 1 { return }
         lastProgressAt = now
@@ -90,35 +90,36 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         self.phase = phase
         stepSubtitle = nil
         Log.session.info("ConversationBackground.phase chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) phase=\(phase.rawValue) presented=\(task != nil)")
-        guard completion.result == nil else { return }
+        guard completion.outcome == nil else { return }
         task?.updateTitle(Self.title, subtitle: subtitle)
     }
 
     func updateStep(_ text: String) {
         let value = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        guard !value.isEmpty, completion.result == nil else { return }
+        guard !value.isEmpty, completion.outcome == nil else { return }
         let subtitle = value.count > 120 ? String(value.prefix(119)) + "…" : value
         guard stepSubtitle != subtitle else { return }
         stepSubtitle = subtitle
         task?.updateTitle(Self.title, subtitle: subtitle)
     }
 
-    func finish(success: Bool) {
-        guard completion.result == nil else { return }
-        completion.result = success
+    func finish(_ outcome: Outcome) {
+        guard completion.outcome == nil else { return }
+        if let phase = outcome.phase { updatePhase(phase) }
+        completion.outcome = outcome
         onExpiration = nil
-        activityPulse?.cancel()
-        activityPulse = nil
         if let task {
-            let total = max(completedUnits + 1, 1)
-            task.progress.totalUnitCount = total
-            task.progress.completedUnitCount = total
-            task.setTaskCompleted(success: success)
+            if case .completed = outcome {
+                let total = max(completedUnits + 1, 1)
+                task.progress.totalUnitCount = total
+                task.progress.completedUnitCount = total
+            }
+            task.setTaskCompleted(success: outcome.succeeded)
             self.task = nil
         } else {
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
         }
-        Log.session.info("ConversationBackground.finish chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) success=\(success)")
+        Log.session.info("ConversationBackground.finish chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) outcome=\(outcome.logLabel) success=\(outcome.succeeded)")
     }
 
     private func receive(_ rawTask: BGTask) {
@@ -126,26 +127,14 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
             rawTask.setTaskCompleted(success: false)
             return
         }
-        if let result = completion.result {
-            task.setTaskCompleted(success: result)
+        if let outcome = completion.outcome {
+            task.setTaskCompleted(success: outcome.succeeded)
             return
         }
         self.task = task
-        activityPulse = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                do {
-                    try await Task.sleep(for: Self.activityPulseInterval)
-                } catch {
-                    return
-                }
-                guard let self else { return }
-                self.advance()
-            }
-        }
         task.updateTitle(Self.title, subtitle: subtitle)
         task.progress.totalUnitCount = max(completedUnits + 1, 1)
         task.progress.completedUnitCount = completedUnits
-        advance()
         task.expirationHandler = { [weak self] in
             Task { @MainActor in
                 self?.expire()
@@ -156,17 +145,13 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
     }
 
     private func expire() {
-        guard completion.result == nil else { return }
-        completion.result = false
-        activityPulse?.cancel()
-        activityPulse = nil
+        guard completion.outcome == nil else { return }
+        let interruptedPhase = phase
         let expiration = onExpiration
-        onExpiration = nil
+        finish(.expired)
         expiration?()
-        task?.setTaskCompleted(success: false)
-        task = nil
         let elapsedMs = submittedAt.map { Int(Date().timeIntervalSince($0) * 1_000) } ?? -1
-        Log.session.warning("ConversationBackground.expire chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) phase=\(phase.rawValue) elapsedMs=\(elapsedMs) completedUnits=\(completedUnits)")
+        Log.session.warning("ConversationBackground.expire chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) phase=\(interruptedPhase.rawValue) elapsedMs=\(elapsedMs) completedUnits=\(completedUnits)")
     }
 
     private var subtitle: String { stepSubtitle ?? phase.subtitle }
