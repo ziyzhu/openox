@@ -54,6 +54,11 @@ nonisolated enum OxWeb {
                                     "additionalProperties": .bool(false),
                                 ]),
                             ]),
+                            "serviceSuggestions": .object([
+                                "type": .array([.string("array"), .string("null")]),
+                                "items": .object(["type": .string("object")]),
+                                "description": .string("Relevant service snapshots in ox.service.find format, best match first. Null when the service catalog is unavailable; an empty array means no matches. Suggestions do not attach or invoke services."),
+                            ]),
                             "provider": .object(["type": .string("string")]),
                             "providers": .object([
                                 "type": .string("array"),
@@ -61,7 +66,7 @@ nonisolated enum OxWeb {
                             ]),
                         ]),
                         "required": .array([
-                            .string("query"), .string("items"), .string("provider"), .string("providers"),
+                            .string("query"), .string("items"), .string("provider"), .string("providers"), .string("serviceSuggestions"),
                         ]),
                         "additionalProperties": .bool(false),
                     ]),

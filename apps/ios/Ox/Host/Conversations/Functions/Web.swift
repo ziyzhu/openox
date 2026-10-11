@@ -47,7 +47,13 @@ extension Conversation {
     public func searchWeb(query: String, purpose: String) async throws -> JSONValue? {
         let request = try WebSearchRequest(query: query)
         return try await tracked(Actions.webSearch, .object(["query": .string(request.query)]), purpose: purpose) {
-            try await WebSearchEngine.shared.search(request).json
+            async let page = WebSearchEngine.shared.search(request)
+            let suggestions = try await serviceOperations.serviceSuggestions(query: request.query)
+            guard case .object(var result) = try await page.json else {
+                throw RuntimeError.bridge("ox.web.search: invalid search response")
+            }
+            result["serviceSuggestions"] = suggestions
+            return .object(result)
         }
     }
 

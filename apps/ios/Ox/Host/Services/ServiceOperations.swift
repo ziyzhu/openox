@@ -687,18 +687,26 @@ final class ServiceOperations {
                 Log.session.info("bridge.service.find unavailable monoRepository=loading chars=\(query.count)")
                 throw RuntimeError.bridge("ox.service.find: Ox Server is still loading services. Continue without service discovery or try again later.")
             }
-            let matches = await serviceManager.search(query, filter: .all).prefix(Self.maximumFindResults)
-            let attached = attachedDomains()
-            let results = matches.map {
-                ServiceFindResult(
-                    match: $0,
-                    attached: attached.contains($0.service.domain),
-                    kind: serviceKind($0.service)
-                )
-            }
-            Log.session.info("bridge.service.find chars=\(query.count) hits=\(results.count)")
-            return try Self.encodeToJSON(results)
+            return try await serviceSuggestions(query: query)
         }
+    }
+
+    func serviceSuggestions(query: String) async throws -> JSONValue {
+        guard serviceManager.monoRepositoryState == .ready else {
+            Log.session.info("bridge.service.suggestions unavailable monoRepository=loading chars=\(query.count)")
+            return .null
+        }
+        let matches = await serviceManager.search(query, filter: .all).prefix(Self.maximumFindResults)
+        let attached = attachedDomains()
+        let results = matches.map {
+            ServiceFindResult(
+                match: $0,
+                attached: attached.contains($0.service.domain),
+                kind: serviceKind($0.service)
+            )
+        }
+        Log.session.info("bridge.service.suggestions chars=\(query.count) hits=\(results.count)")
+        return try Self.encodeToJSON(results)
     }
 
     func signInService(domain: String, purpose: String) async throws -> JSONValue? {
