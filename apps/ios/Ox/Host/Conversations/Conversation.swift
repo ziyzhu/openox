@@ -418,7 +418,6 @@ final class Conversation: Identifiable {
         browserRestoreTask = nil
         browserURLToRestore = serviceManager.browserActionSessions.existingSession(for: id)?.webPage?.url
             ?? browserURLToRestore
-        bluetooth.close()
         modelPreparationTask?.cancel()
         modelPreparationTask = nil
         outputDelivery.setVisibility(.hidden)
@@ -427,7 +426,6 @@ final class Conversation: Identifiable {
     }
 
     func release(cancelling: Bool = true) {
-        bluetooth.close()
         onPersistableChange = nil
         onPrivateDataTemporaryContinuation = nil
         modelPreparationIntent = false
@@ -632,13 +630,10 @@ final class Conversation: Identifiable {
         catch { return .failure(error) }
     }
 
-    @ObservationIgnored private let bluetooth = BluetoothProvider()
-
     var nativeServiceOperations: NativeServiceOperations {
         NativeServiceOperations(
             id: id,
             serviceManager: serviceManager,
-            bluetooth: bluetooth,
             presentations: presentations,
             requireActive: { [unowned self] in
                 guard isSelected else { throw RuntimeError.bridge("This device service requires the active conversation.") }
@@ -2145,7 +2140,6 @@ final class Conversation: Identifiable {
 
     func cancelAll() {
         cancelModelSelectionChange()
-        bluetooth.close()
         botControlSource.release()
         let cancelled = drainSubmissions()
         for submission in cancelled {
@@ -2758,7 +2752,6 @@ final class Conversation: Identifiable {
         let removed = attachedServices.filter { candidate in
             !services.contains { $0 === candidate }
         }
-        if removed.contains(where: { $0.domain == "ios:bluetooth" }) { bluetooth.close() }
         cancelServiceInteractions(domains: Set(removed.map(\.domain)))
         attachedServices = services
         Log.session.info("Conversation.setAttachedServices id=\(id) attached=\(services.map(\.domain).joined(separator: ",")) selected=\(isSelected)")

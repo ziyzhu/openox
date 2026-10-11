@@ -11,7 +11,6 @@ final class NativeServiceOperations {
 
     let id: UUID
     let serviceManager: ServiceManager
-    let bluetooth: BluetoothProvider
     let presentations: AppPresentations
     let requireActive: () throws -> Void
     let showBrowser: (Service, UUID) -> Void
@@ -22,7 +21,6 @@ final class NativeServiceOperations {
     init(
         id: UUID,
         serviceManager: ServiceManager,
-        bluetooth: BluetoothProvider,
         presentations: AppPresentations,
         requireActive: @escaping () throws -> Void,
         showBrowser: @escaping (Service, UUID) -> Void,
@@ -32,7 +30,6 @@ final class NativeServiceOperations {
     ) {
         self.id = id
         self.serviceManager = serviceManager
-        self.bluetooth = bluetooth
         self.presentations = presentations
         self.requireActive = requireActive
         self.showBrowser = showBrowser
@@ -55,10 +52,6 @@ final class NativeServiceOperations {
     ) async throws -> JSONValue? {
         let browser = service
         let serviceID = service.domain
-        if serviceID == "ios:bluetooth" {
-            if actionID != "status" { try requireActive() }
-            return try await bluetooth.invoke(actionID, fields: args.objectValue ?? [:])
-        }
         let fields = args.objectValue ?? [:]
         switch (serviceID, actionID) {
         case ("ios:browser", "navigate"):

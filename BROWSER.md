@@ -15,39 +15,40 @@ Benefits:
 Costs and limitations:
 - Apple-managed entitlement approval has uncertain eligibility and timing.
 - Native photo-library search and album organization are removed; user-selected photo attachments remain available.
-- Current Bluetooth permission key conflicts with the published requirements; retaining foreground CoreBluetooth functionality needs Apple clarification.
+- Native BLE/GATT device control is removed to avoid the prohibited Bluetooth permission key.
 - General browsing, external-link handling, and broader compatibility testing become ongoing responsibilities.
 - Passkeys still require user participation and do not resolve embedded OAuth rejection, CAPTCHAs, or anti-bot checks.
 
 ## 1. Confirm eligibility and permission compatibility
 
 - [ ] Ask Apple about eligibility for an AI app with user-controlled general browsing, or submit an entitlement request describing Ox honestly.
-- [ ] Clarify whether foreground CoreBluetooth functionality can coexist with the browser entitlement.
+- [x] Remove the native Bluetooth service, provider/helpers, session ownership, permission requests, usage key, and translations with maintainer approval.
 - [x] Remove the read/write Photos provider, native actions, bundled service, permission key, and permission translations with maintainer approval.
 - [x] Preserve and simulator-verify picker-based photo attachments without Photos library authorization. Add-only image saving is not implemented.
 - [x] Audit declared capabilities and permission keys against Apple's published browser requirements; findings below do not establish Apple approval.
-- [x] Remove Photos authorization requests together with `apps/ios/Info.plist` declarations; keep Bluetooth unchanged pending clarification.
+- [x] Remove Photos and Bluetooth authorization requests together with `apps/ios/Info.plist` declarations.
 
 Gate: obtain maintainer agreement on feature trade-offs and clarify eligibility before undertaking a large redesign.
 
 Audit findings:
-- `NSPhotoLibraryUsageDescription` is removed from the built app; the explicitly prohibited `NSBluetoothAlwaysUsageDescription` remains unresolved.
+- Both `NSPhotoLibraryUsageDescription` and `NSBluetoothAlwaysUsageDescription` are removed from the app.
 - The removed `PhotoLibraryProvider.swift` requested `.readWrite` authorization for library search and album operations. Limited-library authorization was not a compliance workaround and cannot create or fetch user albums.
 - Conversation attachments already use SwiftUI's system Photos picker. Preserve this path. Add-only access is not a replacement for searching existing assets or organizing existing albums.
-- `BluetoothProvider.swift` rejects operations unless the app is active and closes its session when backgrounded. `UIBackgroundModes` declares processing, not Bluetooth modes. Nevertheless, the prohibited key remains present.
-- Apple's current Bluetooth-key documentation says `NSBluetoothAlwaysUsageDescription` is required when using the device's Bluetooth interface. Its browser guide instead recommends `NSBluetoothWhileInUseUsageDescription`. Treat this documentation conflict as unresolved; do not substitute keys without a supported solution from Apple.
+- The removed Bluetooth provider supported foreground-only scanning and BLE/GATT interactions. System-managed Bluetooth accessories are not disabled.
+- The published service-manifest Bluetooth permission token remains accepted but always denied without prompting; the manifest schema is unchanged.
+- Apple's modern CoreBluetooth key requirement conflicts with its browser guidance. Any future reintroduction of native Bluetooth requires Apple clarification, not an unverified usage-key substitution.
 - No always-on location, HomeKit, or Health usage keys are declared. Location access is while-in-use. Contacts, calendar, reminders, camera, microphone, local-network access, background processing, and iCloud capabilities are not explicitly forbidden by this browser guide, but that is not approval for their use in Ox.
 - No associated-domain entitlement claims are present. Adding the browser entitlement would prevent Ox from claiming Universal Links for specific domains, so account for that in future authentication and linking decisions.
 - HTTP/HTTPS scheme declarations are implemented; the browser entitlement remains absent. Launch-time browser accessibility and physical-device external-link behavior still require later UX/navigation audits.
 
 Questions to submit to Apple after maintainer review:
 1. Can Ox qualify for `com.apple.developer.web-browser` as an AI assistant with a user-controlled general WebKit browser, if it meets launch-time browsing and external HTTP/HTTPS navigation requirements?
-2. Can Ox retain foreground-only CoreBluetooth operations? The app closes Bluetooth sessions on backgrounding and does not declare Bluetooth background modes. How should it satisfy both the browser prohibition and the modern Bluetooth usage-key requirement?
+2. Ox has removed native CoreBluetooth functionality. If foreground-only BLE support is reconsidered later, what supported configuration would satisfy both the browser prohibition and the modern Bluetooth usage-key requirement?
 3. Ox has removed PhotoKit `.readWrite` features and retained system-picker attachments. Are there additional Photos restrictions beyond avoiding library access and using add-only authorization for any future saving?
 4. Are there additional restrictions on Ox's user-authorized Contacts, calendar, reminders, camera, microphone, local-network, background-processing, or iCloud features?
 5. What build and review evidence should accompany the request, and how can external-link behavior be demonstrated before production entitlement approval?
 
-No inquiry has been submitted. Photos removal is approved and implemented; Bluetooth feature removal still requires maintainer approval. Do not represent the remaining compliance plan as implemented or Apple-approved.
+No inquiry has been submitted. Photos and Bluetooth removals are approved and implemented. Do not represent the remaining compliance plan as implemented or Apple-approved.
 
 ## 2. Complete the minimum browser experience
 
