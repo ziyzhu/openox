@@ -50,6 +50,8 @@ Questions to submit to Apple after maintainer review:
 
 No inquiry has been submitted. Photos and Bluetooth removals are approved and implemented. Do not represent the remaining compliance plan as implemented or Apple-approved.
 
+Apple's public guidance does not specify whether entitlement assessment uses the published version or the latest uploaded build; the request form requires sign-in and its evidence fields have not been inspected. Identify the intended candidate version/build and any available TestFlight access, distinguish it from the published version, and ask Apple which build to assess. Do not assume the latest upload is automatically assessed or that the changes must be published first. Managed-capability approval does not replace App Review of the submitted entitled build.
+
 ## 2. Complete the minimum browser experience
 
 Build on `apps/ios/Ox/Client/UI/WebBrowserView.swift`.
@@ -128,6 +130,10 @@ Adding an entitlement locally without approval and matching provisioning is insu
 
 Gate: reproduce the current failure and demonstrate the same flow succeeding in an entitled physical-device build before claiming the restriction is resolved.
 
+Apple documents automatic WebAuthn handling in WebKit browser apps. Its separate `com.apple.developer.web-browser.public-key-credential` entitlement explicitly allows passkey registration and assertion for "any relying party identifier", but is documented for macOS and Mac Catalyst, not iOS/iPadOS. Do not add that desktop entitlement to the iPhone app or treat its wording alone as proof of the iOS configuration. WebKit's iOS test-runner change adding `com.apple.developer.web-browser`, with reported WebAuthn availability-test results, corroborates the iOS entitlement's relevance but does not establish successful passkey ceremonies in Ox.
+
+The retrieved sources support the browser route for third-party domains without individual website associations, but do not explicitly establish the entire iOS entitlement-to-associated-domain-exemption chain or passkey behavior when Ox is not selected as default. Ask Apple to confirm both. Verify registration and sign-in on unrelated domains absent from Ox's associated domains, with Ox selected and not selected as default. Normal origin/relying-party protections, user consent, website policies, and compatibility limitations remain; browser-wide support is not a guarantee that every website works.
+
 ## 8. Prepare verification and Apple review
 
 - [ ] Run E2E verification on physical iPhone and supported iPad layouts, including accessibility.
@@ -149,6 +155,9 @@ Apple requirements and APIs:
 - [Passkey use in web browsers](https://developer.apple.com/documentation/authenticationservices/passkey-use-in-web-browsers)
 - [Supporting passkeys](https://developer.apple.com/documentation/authenticationservices/supporting-passkeys)
 - [Browser credential manager](https://developer.apple.com/documentation/authenticationservices/asauthorizationwebbrowserpublickeycredentialmanager)
+- [macOS/Mac Catalyst browser passkey entitlement](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.web-browser.public-key-credential): explicitly permits requests for any relying party identifier; not an iOS entitlement.
+- [WebKit iOS test-runner entitlement change](https://github.com/WebKit/WebKit/pull/22913): implementation corroboration, not Ox passkey verification.
+- [WebKit App-Bound Domains](https://webkit.org/blog/10882/app-bound-domains/): describes all-domain API access for entitled browsers, not a passkey-specific guarantee. App-bound domains and associated domains are distinct mechanisms.
 - [Bluetooth usage-key requirement](https://developer.apple.com/documentation/bundleresources/information-property-list/nsbluetoothalwaysusagedescription)
 - [Older Bluetooth usage-key guidance](https://developer.apple.com/documentation/bundleresources/information-property-list/nsbluetoothperipheralusagedescription)
 
