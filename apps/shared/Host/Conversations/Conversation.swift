@@ -1,6 +1,5 @@
 import Foundation
 import WebKit
-import UIKit
 import Observation
 
 enum ConversationRetention: Equatable {
@@ -898,7 +897,7 @@ final class Conversation: Identifiable {
         var phase: RunPhase
         var activeSubmission: Submission?
         var backgroundExecutionExpired: Bool
-        var backgroundExecution: ConversationBackgroundExecution?
+        var backgroundExecution: (any ConversationBackgroundExecution)?
         var completionNotification: CompletionNotification?
     }
 
@@ -938,10 +937,12 @@ final class Conversation: Identifiable {
     @ObservationIgnored private var submissionWaiters: [SubmissionID: CheckedContinuation<ConversationSubmissionOutcome, Never>] = [:]
     @ObservationIgnored private let executionLease: ExecutionLease
 
+    private let execution: any ConversationExecution
+    private let feedback: any ConversationFeedback
     private let outputDelivery = OutputDelivery()
     @ObservationIgnored private var streamingDeliveryContinuation: CheckedContinuation<Void, Never>?
     @ObservationIgnored private var streamingTurnDelivered = true
-    @ObservationIgnored private lazy var streamFrameDriver = StreamFrameDriver(handler: { [weak self] timestamp in self?.onStreamFrame(at: timestamp) })
+    @ObservationIgnored private lazy var streamFrameDriver = execution.frameDriver(handler: { [weak self] timestamp in self?.onStreamFrame(at: timestamp) })
 
     static func userFacingError(_ raw: String, kind: LLMFailureKind?) -> String {
         if kind == .rateLimited {
@@ -963,6 +964,8 @@ final class Conversation: Identifiable {
          scope: ProfileScope,
          virtualMachine: VirtualMachine,
          presentations: AppPresentations,
+         execution: any ConversationExecution,
+         feedback: any ConversationFeedback,
          serviceManager: ServiceManager,
          retention: ConversationRetention = .persisted,
          executionLease: ExecutionLease = .userInitiated,
@@ -981,6 +984,8 @@ final class Conversation: Identifiable {
         self.scope = scope
         self.virtualMachine = virtualMachine
         self.presentations = presentations
+        self.execution = execution
+        self.feedback = feedback
         self.serviceManager = serviceManager
         self.retention = retention
         self.executionLease = executionLease
@@ -1050,6 +1055,8 @@ final class Conversation: Identifiable {
         scope: ProfileScope,
         virtualMachine: VirtualMachine,
         presentations: AppPresentations,
+        execution: any ConversationExecution,
+        feedback: any ConversationFeedback,
         serviceManager: ServiceManager,
         retention: ConversationRetention = .persisted,
         executionLease: ExecutionLease = .userInitiated
@@ -1064,6 +1071,8 @@ final class Conversation: Identifiable {
             scope: scope,
             virtualMachine: virtualMachine,
             presentations: presentations,
+            execution: execution,
+            feedback: feedback,
             serviceManager: serviceManager,
             retention: retention,
             executionLease: executionLease,
@@ -1600,7 +1609,7 @@ final class Conversation: Identifiable {
     private func registerAgentDelta() {
         guard agentHapticPhase == .waitingForDelta else { return }
         agentHapticPhase = .deltaReceived
-        if isSelected { Haptics.impact(.agentDeltaReceived) }
+        if isSelected { feedback.receivedAgentDelta() }
     }
 
     private func applyAssistantFinal(_ assistant: AssistantMessage) {
@@ -2183,26 +2192,6 @@ final class Conversation: Identifiable {
         activeRun?.completionNotification = CompletionNotification(title: title, body: body)
     }
 
-    private func deliverCompletionNotification(_ notification: CompletionNotification) {
-        let chatId = id.uuidString
-        Task {
-            do {
-                let delivered = try await NotificationProvider.shared.deliverIfAuthorized(
-                    identifier: "chat.\(chatId)",
-                    title: notification.title,
-                    body: notification.body
-                )
-                if delivered {
-                    Log.session.info("Conversation.notify posted id=\(chatId) bodyChars=\(notification.body.count)")
-                } else {
-                    Log.session.info("Conversation.notify skipped id=\(chatId) reason=notAuthorized")
-                }
-            } catch {
-                Log.session.error("Conversation.notify add failed id=\(chatId) err=\(error.localizedDescription)")
-            }
-        }
-    }
-
     // MARK: - Streaming
 
     private func startStreamLink() {
@@ -2404,11 +2393,7 @@ final class Conversation: Identifiable {
         }
         Log.session.info("Conversation.worker finish id=\(id) run=\(runID.rawValue.uuidString.prefix(8)) conversationFailed=\(conversationFailed) conversationSucceeded=\(conversationSucceeded) leaseSucceeded=\(leaseSucceeded)")
         guard let completionNotification else { return }
-        guard UIApplication.shared.applicationState != .active else {
-            Log.session.info("Conversation.notify skipped id=\(id) reason=active")
-            return
-        }
-        deliverCompletionNotification(completionNotification)
+        feedback.notifyCompletion(id: id, title: completionNotification.title, body: completionNotification.body)
     }
 
     private func setRunPhase(_ phase: RunPhase) {
@@ -2462,7 +2447,7 @@ final class Conversation: Identifiable {
         guard executionLease == .userInitiated,
               let runID = activeRun?.id,
               activeRun?.backgroundExecution == nil else { return }
-        let execution = ConversationBackgroundExecution(conversationID: id, runID: runID) { [weak self] in
+        let execution = self.execution.backgroundExecution(conversationID: id, runID: runID) { [weak self] in
             self?.expireBackgroundExecution(runID: runID)
         }
         activeRun?.backgroundExecution = execution

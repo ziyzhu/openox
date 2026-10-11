@@ -1,27 +1,7 @@
 import Foundation
 
 @MainActor
-final class ConversationBackgroundExecution {
-    enum Phase: String {
-        case thinking
-        case working
-        case responding
-        case finishing
-        case permissionNeeded
-        case failed
-
-        var subtitle: String {
-            switch self {
-            case .thinking: String(localized: "Plowing…")
-            case .working: String(localized: "Plowing on a step…")
-            case .responding: String(localized: "Writing a response…")
-            case .finishing: String(localized: "Finishing up…")
-            case .permissionNeeded: String(localized: "Permission needed")
-            case .failed: String(localized: "Something went wrong")
-            }
-        }
-    }
-
+final class MacConversationBackgroundExecution: ConversationBackgroundExecution {
     private let conversationID: UUID
     private let runID: RunID
 
@@ -37,7 +17,7 @@ final class ConversationBackgroundExecution {
     func advance() {
     }
 
-    func updatePhase(_ phase: Phase) {
+    func updatePhase(_ phase: ConversationBackgroundPhase) {
         Log.session.info("ConversationBackground.phase chat=\(conversationID) run=\(runID.rawValue) phase=\(phase.rawValue) mode=process")
     }
 

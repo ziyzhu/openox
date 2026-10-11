@@ -12,7 +12,7 @@ private final class InlineCanvasSession {
     }
 
     let page: WebPage
-    let canvas: OxCanvas
+    let canvas: HTMLView
     let presentations: AppPresentationCoordinator
     let source: FilePreviewSource
     private(set) var phase: Phase = .loading
@@ -21,7 +21,7 @@ private final class InlineCanvasSession {
         let artifact = source.artifact
         self.source = source
         let presentations = AppPresentationCoordinator()
-        let canvas = OxCanvas(title: artifact.userFacingName, serviceManager: serviceManager, presentations: presentations)
+        let canvas = HTMLView(title: artifact.userFacingName, serviceManager: serviceManager, presentations: presentations, messages: AppPresentations.live.messages)
         self.presentations = presentations
         self.canvas = canvas
         page = HTMLFilePage.make(scope: source.scope, canvas: canvas, documentURL: HTMLFilePage.documentURL(for: source))
@@ -165,7 +165,7 @@ private struct InlineCanvasPageCard: View {
     let rowID: UUID
     let pageMount: WebPageMountCoordinator
     let expand: () -> Void
-    @Bindable private var canvas: OxCanvas
+    @Bindable private var canvas: HTMLView
 
     init(artifact: FileItem, session: InlineCanvasSession, rowID: UUID, pageMount: WebPageMountCoordinator, expand: @escaping () -> Void) {
         self.artifact = artifact
@@ -220,7 +220,7 @@ private struct InlineCanvasExpandedView: View {
     let artifact: FileItem
     let session: InlineCanvasSession
     let dismiss: () -> Void
-    @Bindable private var canvas: OxCanvas
+    @Bindable private var canvas: HTMLView
 
     init(artifact: FileItem, session: InlineCanvasSession, dismiss: @escaping () -> Void) {
         self.artifact = artifact

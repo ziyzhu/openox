@@ -2,7 +2,7 @@
 import Foundation
 
 @MainActor
-final class IOSConversationBackgroundExecution {
+final class IOSConversationBackgroundExecution: ConversationBackgroundExecution {
     private static var title: String { String(localized: "Ox is on it") }
     private static let activityPulseInterval = Duration.seconds(15)
 
@@ -10,7 +10,7 @@ final class IOSConversationBackgroundExecution {
         var result: Bool?
     }
 
-    typealias Phase = ConversationBackgroundExecution.Phase
+    typealias Phase = ConversationBackgroundPhase
 
     private let identifier: String
     private let conversationID: UUID

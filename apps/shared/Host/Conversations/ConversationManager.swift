@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import UIKit
 
 @MainActor
 @Observable
@@ -94,6 +93,8 @@ final class ConversationManager {
     @ObservationIgnored private let providerRegistry: ProviderRegistry
     @ObservationIgnored private let serviceManager: ServiceManager
     @ObservationIgnored private var repositoryScope: ProfileScope
+    @ObservationIgnored private let execution: any ConversationExecution
+    @ObservationIgnored private let feedback: any ConversationFeedback
     @ObservationIgnored private let presentations: AppPresentations
     @ObservationIgnored var profilePreparation: @MainActor () async -> Void = {}
     @ObservationIgnored private let debugRepositorySaveGate: ProfileRepositorySaveGate
@@ -105,7 +106,9 @@ final class ConversationManager {
         storage: StorageRoot,
         providerRegistry: ProviderRegistry,
         serviceManager: ServiceManager,
-        presentations: AppPresentations
+        presentations: AppPresentations,
+        execution: any ConversationExecution,
+        feedback: any ConversationFeedback
     ) {
         repositoryScope = storage.scope
         self.repository = repository
@@ -114,6 +117,8 @@ final class ConversationManager {
         self.serviceManager = serviceManager
         debugRepositorySaveGate = repository.debugSaveGate
         self.presentations = presentations
+        self.execution = execution
+        self.feedback = feedback
     }
 
     var summaries: [ConversationMeta] {
@@ -374,6 +379,8 @@ final class ConversationManager {
             scope: repositoryScope,
             virtualMachine: VirtualMachine(),
             presentations: presentations,
+            execution: execution,
+            feedback: feedback,
             serviceManager: serviceManager,
             retention: .temporary
         )
@@ -496,6 +503,8 @@ final class ConversationManager {
             scope: repositoryScope,
             virtualMachine: VirtualMachine(),
             presentations: presentations,
+            execution: execution,
+            feedback: feedback,
             serviceManager: serviceManager
         )
         branched.durableForkSource = (reference, result.turns.filter { if case .user = $0 { return true }; return false }.count)
@@ -638,11 +647,9 @@ final class ConversationManager {
     }
 
     func flushAll() {
-        let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "ConversationManager.flushAll", expirationHandler: nil)
-        Task { [weak self] in
+        execution.protectPersistence { [weak self] in
             guard let self else { return }
             _ = await self.flushAllNow()
-            if backgroundTask != .invalid { UIApplication.shared.endBackgroundTask(backgroundTask) }
             Log.session.info("ConversationManager.flushAll remaining=\(self.records.values.filter { $0.persistence.isDirty }.count)")
         }
     }
@@ -722,6 +729,8 @@ final class ConversationManager {
             scope: repositoryScope,
             virtualMachine: VirtualMachine(),
             presentations: presentations,
+            execution: execution,
+            feedback: feedback,
             serviceManager: serviceManager,
             retention: retention,
             executionLease: executionLease,
@@ -747,6 +756,8 @@ final class ConversationManager {
             scope: scope,
             virtualMachine: VirtualMachine(),
             presentations: presentations,
+            execution: execution,
+            feedback: feedback,
             serviceManager: serviceManager
         )
         attachPersistence(conversation)

@@ -12,10 +12,10 @@ final class CanvasWebBridge: NSObject, WKScriptMessageHandlerWithReply {
         return components.url == expected
     }
 
-    private let canvas: OxCanvas
+    private let canvas: HTMLView
     private let expectedURL: URL
 
-    init(canvas: OxCanvas, documentURL: URL = CanvasWebBridge.documentURL) {
+    init(canvas: HTMLView, documentURL: URL = CanvasWebBridge.documentURL) {
         self.canvas = canvas
         expectedURL = documentURL
     }

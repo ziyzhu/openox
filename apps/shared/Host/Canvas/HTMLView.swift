@@ -3,7 +3,7 @@ import Observation
 
 @MainActor
 @Observable
-final class OxCanvas {
+final class HTMLView {
     enum State {
         case running, closed
     }
@@ -30,6 +30,7 @@ final class OxCanvas {
     let title: String
     let serviceManager: ServiceManager
     let presentations: AppPresentationCoordinator
+    let messages: any MessageComposing
     private var state: State = .running
     private var outputs: [FileItem] = []
     private(set) var interaction: Interaction?
@@ -48,10 +49,11 @@ final class OxCanvas {
     @ObservationIgnored private var outputBytes = 0
     @ObservationIgnored private var repositoryRevision: UInt64
 
-    init(title: String, serviceManager: ServiceManager, presentations: AppPresentationCoordinator) {
+    init(title: String, serviceManager: ServiceManager, presentations: AppPresentationCoordinator, messages: any MessageComposing) {
         self.title = title
         self.serviceManager = serviceManager
         self.presentations = presentations
+        self.messages = messages
         repositoryRevision = serviceManager.monoRepositoryRevision
     }
 
@@ -294,7 +296,7 @@ final class OxCanvas {
         let presentationID = UUID()
         messagePresentationID = presentationID
         defer { if messagePresentationID == presentationID { messagePresentationID = nil } }
-        return try await AppPresentations.live.messages.present(recipients: recipients, body: body)
+        return try await messages.present(recipients: recipients, body: body)
     }
 
     private func receiveFiles(_ artifacts: [RemoteMCPFile]) throws {
@@ -317,7 +319,7 @@ final class OxCanvas {
 
 @MainActor
 private struct CanvasAuthPresenter: ServiceAuthPresenting {
-    let canvas: OxCanvas
+    let canvas: HTMLView
     func present(session: ServiceAuthSession) async -> ServiceAuthSession.Outcome {
         await canvas.presentAuth(session)
     }
@@ -325,7 +327,7 @@ private struct CanvasAuthPresenter: ServiceAuthPresenting {
 
 @MainActor
 private struct CanvasHandoffPresenter: ServiceHandoffPresenting {
-    let canvas: OxCanvas
+    let canvas: HTMLView
     func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
         await canvas.presentHandoff(session)
     }
@@ -333,9 +335,9 @@ private struct CanvasHandoffPresenter: ServiceHandoffPresenting {
 
 @MainActor
 private struct CanvasMessagePresenter: MessageComposing {
-    let canvas: OxCanvas
+    let canvas: HTMLView
     var canSend: Bool {
-        AppPresentations.live.messages.canSend
+        canvas.messages.canSend
     }
     func present(recipients: [String], body: String?) async throws -> MessageDisposition {
         try await canvas.presentMessages(recipients: recipients, body: body)

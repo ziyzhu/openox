@@ -28,6 +28,8 @@ final class IOSHost: OxHost {
         runtime = HostRuntime(
             serviceManager: preparedServices,
             presentations: presentations,
+            conversationExecution: IOSConversationExecution(),
+            conversationFeedback: IOSConversationFeedback(),
             executionPolicy: { UIApplication.shared.applicationState == .active },
             activateSchedules: { try ScheduledSkillScheduler.shared.activate() }
         )

@@ -2,7 +2,6 @@ import CoreGraphics
 import Foundation
 import ImageIO
 import Synchronization
-import UIKit
 import UniformTypeIdentifiers
 
 extension Notification.Name {
@@ -918,7 +917,7 @@ nonisolated enum ImagePreparationError: Error {
     case encode
 }
 
-nonisolated enum ImagePreparer {
+nonisolated enum ImagePreparer: ImageEncoding {
     struct Inspection {
         let mimeType: String
         let type: UTType
@@ -963,7 +962,7 @@ nonisolated enum ImagePreparer {
         let lossless = inspection.type.conforms(to: .png)
             || inspection.type.conforms(to: .gif)
             || hasAlpha(image)
-        return try encode(UIImage(cgImage: image), lossless: lossless)
+        return try encode(image, lossless: lossless)
     }
 
     static func preparePreservingResolution(_ data: Data) throws -> PreparedImage {
@@ -977,37 +976,7 @@ nonisolated enum ImagePreparer {
         throw ImagePreparationError.invalid
     }
 
-    static func prepare(_ image: UIImage, suggestedName: String?) throws -> PreparedImage {
-        let width = Int(image.size.width * image.scale)
-        let height = Int(image.size.height * image.scale)
-        guard width > 0, height > 0 else { throw ImagePreparationError.invalid }
-        let lossless = URL(fileURLWithPath: suggestedName ?? "").pathExtension.lowercased() == "png"
-            || image.cgImage.map(hasAlpha) == true
-        let longest = max(width, height)
-        let scale = min(1, FileLimits.imageMaxDimension / CGFloat(max(1, longest)))
-        let target = CGSize(width: max(1, CGFloat(width) * scale), height: max(1, CGFloat(height) * scale))
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        format.opaque = !lossless
-        let rendered = UIGraphicsImageRenderer(size: target, format: format).image { _ in
-            image.draw(in: CGRect(origin: .zero, size: target))
-        }
-        return try encode(rendered, lossless: lossless)
-    }
-
-    private static func encode(_ image: UIImage, lossless: Bool) throws -> PreparedImage {
-        if lossless {
-            guard let data = image.pngData() else { throw ImagePreparationError.encode }
-            return PreparedImage(data: data, mimeType: "image/png", fileExtension: "png")
-        }
-        guard let data = image.jpegData(compressionQuality: FileLimits.imageJPEGQuality) else {
-            throw ImagePreparationError.encode
-        }
-        return PreparedImage(data: data, mimeType: "image/jpeg", fileExtension: "jpg")
-    }
-
-
-    private static func hasAlpha(_ image: CGImage) -> Bool {
+    static func hasAlpha(_ image: CGImage) -> Bool {
         switch image.alphaInfo {
         case .alphaOnly, .first, .last, .premultipliedFirst, .premultipliedLast: true
         case .none, .noneSkipFirst, .noneSkipLast: false
@@ -1017,27 +986,10 @@ nonisolated enum ImagePreparer {
 }
 
 nonisolated public enum FileImporter {
-    private struct Draft: Sendable {
+    struct Draft: Sendable {
         let data: Data
         let fileName: String
     }
-
-    public static func importImageAsync(_ image: UIImage, suggestedName: String?) async throws -> FileItem {
-        guard let scope = StorageRoot.currentScope else { throw CocoaError(.fileNoSuchFile) }
-        return try await importImageAsync(image, suggestedName: suggestedName, in: scope)
-    }
-
-    static func importImageAsync(
-        _ image: UIImage,
-        suggestedName: String?,
-        in scope: ProfileScope
-    ) async throws -> FileItem {
-        let draft = try await Task.detached(priority: .userInitiated) {
-            try imageDraft(image, suggestedName: suggestedName)
-        }.value
-        return try await write(draft, in: scope)
-    }
-
 
     public static func importImageDataAsync(_ data: Data, suggestedName: String?) async throws -> FileItem {
         guard let scope = StorageRoot.currentScope else { throw CocoaError(.fileNoSuchFile) }
@@ -1084,18 +1036,6 @@ nonisolated public enum FileImporter {
         }.value
         return try await write(draft, in: scope)
     }
-
-    private static func imageDraft(_ image: UIImage, suggestedName: String?) throws -> Draft {
-        do {
-            let prepared = try ImagePreparer.prepare(image, suggestedName: suggestedName)
-            return Draft(data: prepared.data, fileName: prepared.filename(from: suggestedName))
-        } catch ImagePreparationError.encode {
-            throw FileError.imageEncodeFailed
-        } catch {
-            throw FileError.imageDecodeFailed
-        }
-    }
-
 
     private static func imageDataDraft(_ data: Data, suggestedName: String?) throws -> Draft {
         do {
@@ -1145,7 +1085,7 @@ nonisolated public enum FileImporter {
         return Draft(data: data, fileName: fileName)
     }
 
-    private static func write(_ draft: Draft, in scope: ProfileScope, conversation: DurableConversationReference? = nil) async throws -> FileItem {
+    static func write(_ draft: Draft, in scope: ProfileScope, conversation: DurableConversationReference? = nil) async throws -> FileItem {
         try await ProfileRepository.shared.importFile(data: draft.data, suggestedName: draft.fileName, in: scope, conversation: conversation)
     }
 

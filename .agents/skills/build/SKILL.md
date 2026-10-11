@@ -36,7 +36,7 @@ service manifest changes require maintainer approval. Provider selection changes
 follow the `providers` skill rather than a second catalog-management workflow.
 
 `apps/shared/Resources/OxServices.bundle/` is the single built-in repository source.
-Both native targets compile `apps/shared` and their own platform sources; neither compiles the other app. `typecheck` enforces this boundary and rejects OS conditionals in native Swift sources.
+Both native targets compile `apps/shared` and their own platform sources; neither compiles the other app. `typecheck` enforces this boundary and rejects OS conditionals in native Swift sources. Keep shared/platform Swift filenames distinct: localization extraction writes their `.stringsdata` outputs into the same target directory.
 `build:services` validates it, refreshes its content hash without rewriting service
 files, and creates a deterministic Local Git seed and model-action resources.
 Package builds copy this source; hosted icon artwork lives in `assets/services/`.

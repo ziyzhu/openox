@@ -21,6 +21,8 @@ final class HostRuntime: OxHost {
     init(
         serviceManager: ServiceManager,
         presentations: AppPresentations,
+        conversationExecution: any ConversationExecution,
+        conversationFeedback: any ConversationFeedback,
         executionPolicy: @escaping @MainActor () -> Bool,
         activateSchedules: @escaping @MainActor () throws -> Void
     ) {
@@ -32,7 +34,9 @@ final class HostRuntime: OxHost {
             storage: .shared,
             providerRegistry: .shared,
             serviceManager: serviceManager,
-            presentations: presentations
+            presentations: presentations,
+            execution: conversationExecution,
+            feedback: conversationFeedback
         )
         conversations.profilePreparation = { [weak self] in
             _ = try? await self?.preparation?.profile.value

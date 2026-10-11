@@ -27,8 +27,10 @@ final class MacHostApplication: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         StorageMigrator.migrateApplicationStorage()
         let host = HostRuntime(
-            serviceManager: ServiceManager(),
+            serviceManager: ServiceManager(nativeServices: MacNativeServiceCatalog()),
             presentations: .unavailable,
+            conversationExecution: MacConversationExecution(),
+            conversationFeedback: MacConversationFeedback(),
             executionPolicy: { true },
             activateSchedules: {
                 try ScheduledSkills.shared.load()

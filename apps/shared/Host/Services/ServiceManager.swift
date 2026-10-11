@@ -82,6 +82,7 @@ final class ServiceManager {
     @ObservationIgnored private var semanticState: SemanticState = .unavailable
     @ObservationIgnored private var repositoryLoadActive = false
     @ObservationIgnored private var repositoryLoadWaiters: [CheckedContinuation<Void, Never>] = []
+    @ObservationIgnored private let nativeServices: any NativeServiceCatalog
     @ObservationIgnored private var memoryWarningObserver: NSObjectProtocol?
     @ObservationIgnored let actionScheduler = ServiceActionScheduler(capacity: 5)
     @ObservationIgnored let sessionCoordinator = ServiceSessionCoordinator()
@@ -181,11 +182,25 @@ final class ServiceManager {
 
     var serverURL: URL { Self.defaultServerURL }
 
-    init() {
+    init(nativeServices: any NativeServiceCatalog, memoryWarningNotification: Notification.Name? = nil) {
+        self.nativeServices = nativeServices
         repository = Repository(developmentRemote: Self.launchServerURL)
         savedDomains = Set(UserDefaults.standard.stringArray(forKey: Self.savedKey) ?? [])
         actionPolicies = Self.loadActionPolicies()
         persistedRemoteMCPServers = Self.loadPersistedRemoteMCPServers()
+        if let memoryWarningNotification {
+            memoryWarningObserver = NotificationCenter.default.addObserver(
+                forName: memoryWarningNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.actionScheduler.releaseIdle(reason: .memoryWarning)
+                    self.closeWebConversations()
+                }
+            }
+        }
     }
 
     private static func loadActionPolicies(defaults: UserDefaults = .standard) -> ActionPolicyConfiguration {
@@ -1288,7 +1303,7 @@ final class ServiceManager {
     }
 
     private func listIOSServiceDefinitions(locale: String?) async -> [ServiceDefinition] {
-        return []
+        nativeServices.definitions(files: monoRepository?.iOSManifests ?? [], locale: locale)
     }
 
     private func listMCPServiceDefinitions(locale: String?) async -> [ServiceDefinition] {

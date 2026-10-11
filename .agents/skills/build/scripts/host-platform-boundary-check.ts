@@ -11,7 +11,7 @@ export async function check(): Promise<string> {
     if (/^\s*#(?:if|elseif).*\bos\(/m.test(source)) {
       failures.push(`${file}: select platform implementations through source ownership, not OS conditionals`);
     }
-    if (file.startsWith("apps/shared/") && /\b(?:import (?:UIKit|AppKit|BackgroundTasks|MessageUI)|IOSHost|MacHostApplication)\b/.test(source)) {
+    if (file.startsWith("apps/shared/") && /\b(?:import (?:UIKit|AppKit|BackgroundTasks|MessageUI)|IOSHost|MacHostApplication|IOSConversationExecution|MacConversationExecution|IOSConversationFeedback|MacConversationFeedback|IOSNativeServiceCatalog|MacNativeServiceCatalog|IOSStreamFrameDriver|MacStreamFrameDriver)\b/.test(source)) {
       failures.push(`${file}: shared runtime must not depend on a platform adapter`);
     }
   }

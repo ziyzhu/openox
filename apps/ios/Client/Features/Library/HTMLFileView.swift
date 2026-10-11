@@ -190,7 +190,7 @@ private struct HTMLFileWebView: View {
     let isReady: Bool
     let onNavigation: (HTMLFileNavigation) -> Void
     @State private var page: WebPage
-    @State private var canvas: OxCanvas
+    @State private var canvas: HTMLView
     @State private var presentations: AppPresentationCoordinator
 
     init(
@@ -206,7 +206,7 @@ private struct HTMLFileWebView: View {
         self.isReady = isReady
         self.onNavigation = onNavigation
         let presentations = AppPresentationCoordinator()
-        let canvas = OxCanvas(title: title, serviceManager: serviceManager, presentations: presentations)
+        let canvas = HTMLView(title: title, serviceManager: serviceManager, presentations: presentations, messages: AppPresentations.live.messages)
         _presentations = State(initialValue: presentations)
         _canvas = State(initialValue: canvas)
         _page = State(initialValue: HTMLFilePage.make(scope: document.scope, canvas: canvas, documentURL: document.baseURL))
@@ -306,7 +306,7 @@ enum HTMLFilePage {
         })();
         """#
 
-    static func make(scope: ProfileScope?, canvas: OxCanvas, documentURL: URL) -> WebPage {
+    static func make(scope: ProfileScope?, canvas: HTMLView, documentURL: URL) -> WebPage {
         let mapHandler = FileMapHandler()
         let contentController = WKUserContentController()
         contentController.addScriptMessageHandler(CanvasWebBridge(canvas: canvas, documentURL: documentURL), contentWorld: .page, name: "oxCanvas")

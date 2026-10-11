@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct CanvasInteractionView: View {
-    let canvas: OxCanvas
+    let canvas: HTMLView
 
     var body: some View {
         if let interaction = canvas.interaction {
