@@ -11,6 +11,8 @@ nonisolated struct HostChatSummary: Sendable {
 
 @MainActor
 protocol OxHost: AnyObject {
+    var state: HostState { get }
+    var executionAvailable: Bool { get }
     var conversations: ConversationManager { get }
     var services: ServiceManager { get }
 

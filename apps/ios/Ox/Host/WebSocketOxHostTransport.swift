@@ -1,6 +1,5 @@
 import Foundation
 import Network
-import UIKit
 
 @MainActor
 final class WebSocketOxHostTransport {
@@ -23,7 +22,6 @@ final class WebSocketOxHostTransport {
 
     private let host: any OxHost
     private let access: HostAccess
-    private var prepared = false
     let port: NWEndpoint.Port
     private let queue = DispatchQueue(label: "ox-host-websocket")
     private var monitor: NWPathMonitor?
@@ -39,19 +37,21 @@ final class WebSocketOxHostTransport {
         self.host = host
         self.access = access
         self.port = port
-        access.onEnabledChange = { [weak self] enabled in
-            if enabled { self?.start() } else { self?.stop() }
+        access.onEnabledChange = { [weak self] _ in
+            self?.reconcile()
         }
     }
 
-    func activate() {
-        prepared = true
-        start()
+    private var available: Bool {
+        access.enabled && host.state == .running && host.executionAvailable
+    }
+
+    func reconcile() {
+        if available { start() } else if monitor != nil { stop() }
     }
 
     private func start() {
-        guard access.enabled, prepared, UIApplication.shared.applicationState == .active,
-              monitor == nil else { return }
+        guard available, monitor == nil else { return }
         let monitor = HostTransportIngress.pathMonitor()
         self.monitor = monitor
         monitor.pathUpdateHandler = { [weak self, weak monitor] path in
@@ -62,7 +62,6 @@ final class WebSocketOxHostTransport {
                 self.refreshIngress()
             }
         }
-        // Address changes on an existing VPN do not always change the default path.
         let poll = DispatchSource.makeTimerSource(queue: queue)
         poll.schedule(deadline: .now() + 1, repeating: 1, leeway: .milliseconds(250))
         poll.setEventHandler { [weak self, weak monitor] in
@@ -78,7 +77,7 @@ final class WebSocketOxHostTransport {
     }
 
     private func refreshIngress() {
-        guard access.enabled, prepared, let path, UIApplication.shared.applicationState == .active else { return }
+        guard available, let path else { return }
         let next = HostTransportIngress.current(on: path)
         if next == ingress {
             guard next != nil, listeners.isEmpty, Date() >= listenerRetryAt else { return }
@@ -99,7 +98,6 @@ final class WebSocketOxHostTransport {
         let webSocket = NWProtocolWebSocket.Options()
         webSocket.autoReplyPing = true
         webSocket.maximumMessageSize = 96 * 1024 * 1024
-        // CLI/native Clients omit Origin. Do not let a website use a trusted node's access.
         webSocket.setClientRequestHandler(queue) { _, headers in
             let browser = headers.contains { $0.name.caseInsensitiveCompare("Origin") == .orderedSame }
             if browser { Log.app.warning("WebSocketOxHostTransport rejected browser origin") }
@@ -170,14 +168,13 @@ final class WebSocketOxHostTransport {
     }
 
     private func hasCurrentIngress(_ client: Client) -> Bool {
-        guard access.enabled, let path, ingress == client.ingress,
+        guard available, let path, ingress == client.ingress,
               HostTransportIngress.current(on: path) == client.ingress else { return false }
         return client.ingress.accepts(client.connection.currentPath, address: client.address, port: port)
     }
 
     private func accept(_ connection: NWConnection, ingress: HostTransportIngress, address: String) {
-        guard access.enabled, self.ingress == ingress, !listeners.isEmpty, connections.count < 8,
-              UIApplication.shared.applicationState == .active else { connection.cancel(); return }
+        guard available, self.ingress == ingress, !listeners.isEmpty, connections.count < 8 else { connection.cancel(); return }
         let key = ObjectIdentifier(connection)
         connections[key] = Client(connection: connection, scope: StorageRoot.currentScope, ingress: ingress, address: address)
         connection.stateUpdateHandler = { [weak self, weak connection] state in
@@ -212,7 +209,6 @@ final class WebSocketOxHostTransport {
                 let key = ObjectIdentifier(connection)
                 guard var client = self.connections[key] else { connection.cancel(); return }
                 if let data, !data.isEmpty {
-                    // Website-state transfers are already bounded at 64 MiB before base64.
                     guard data.count <= 96 * 1024 * 1024, client.pending < 16 else {
                         Log.app.warning("WebSocketOxHostTransport request limit exceeded")
                         connection.cancel()
@@ -222,7 +218,6 @@ final class WebSocketOxHostTransport {
                     self.connections[key] = client
                     OxHostProtocol.handle(data, host: self.host, admit: {
                         guard self.connections[key] != nil,
-                              UIApplication.shared.applicationState == .active,
                               self.hasCurrentIngress(client) else {
                             return "Host unavailable; verify Host access, open Ox and reconnect"
                         }

@@ -98,15 +98,12 @@ private struct OxApplicationView: View {
             }
             .task { await AppRegion.shared.refresh() }
             .onChange(of: scenePhase, initial: true) { _, phase in
-                guard phase == .active else {
-                    webSocketTransport.stop()
-                    return
-                }
+                webSocketTransport.reconcile()
+                guard phase == .active else { return }
                 Task {
                     do {
                         try await client.prepare()
-                        guard UIApplication.shared.applicationState == .active else { return }
-                        webSocketTransport.activate()
+                        webSocketTransport.reconcile()
                     } catch {
                         Log.app.warning("OxHost transport unavailable: preparation failed")
                     }
