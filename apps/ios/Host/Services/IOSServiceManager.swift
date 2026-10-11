@@ -7,9 +7,9 @@ extension ServiceManager {
     }
 }
 
-@MainActor
-struct IOSNativeServiceCatalog: NativeServiceCatalog {
-    func definitions(files: [Repository.RepositoryManifestFile], locale: String?) -> [ServiceDefinition] {
+nonisolated struct IOSNativeServiceCatalog: NativeServiceCatalog {
+    @concurrent
+    func definitions(files: [Repository.RepositoryManifestFile], locale: String?) async -> [ServiceDefinition] {
         let version = ProcessInfo.processInfo.operatingSystemVersion
         let definitions = files.compactMap { file -> ServiceDefinition? in
             let manifest: IOSCatalogManifest

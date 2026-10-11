@@ -12,7 +12,7 @@ enum OxHostProtocol {
             defer { finished() }
             let response = await OxHostRPC.handle(data, host: host, admit: admit)
             guard let response else { return }
-            do { reply(try JSONEncoder().encode(response)) }
+            do { reply(try await response.encoded()) }
             catch { Log.app.error("OxHostRPC response encoding failed error=\(error.localizedDescription)") }
         }
     }

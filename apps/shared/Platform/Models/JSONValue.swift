@@ -101,6 +101,16 @@ nonisolated public indirect enum JSONValue: Codable, Equatable, Sendable {
         return string
     }
 
+    @concurrent
+    public static func decode(_ data: Data) async throws -> JSONValue {
+        try JSONDecoder().decode(Self.self, from: data)
+    }
+
+    @concurrent
+    public func encoded() async throws -> Data {
+        try JSONEncoder().encode(self)
+    }
+
     public static func parse(jsonString: String) -> JSONValue? {
         guard let data = jsonString.data(using: .utf8),
               let any = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else {

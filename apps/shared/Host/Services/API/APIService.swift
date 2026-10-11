@@ -11,6 +11,7 @@ nonisolated final class APIServiceHTTP: NSObject, URLSessionTaskDelegate, Sendab
         completionHandler(nil)
     }
 
+    @concurrent
     static func send(_ request: URLRequest, maximumBytes: Int = 2_000_000) async throws -> Response {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieStorage = nil
@@ -128,7 +129,7 @@ final class APIService {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let json = raw["json"] {
             guard !["GET", "HEAD"].contains(method) else { throw APIServiceError.invalidRequest }
-            request.httpBody = try JSONEncoder().encode(json)
+            request.httpBody = try await json.encoded()
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
         if authenticated { request = try await authorization.prepare(request) }
@@ -140,7 +141,7 @@ final class APIService {
         }
         guard (200..<300).contains(response.status) else { throw APIServiceError.http(response.status) }
         if response.data.isEmpty { return .null }
-        guard let value = try? JSONDecoder().decode(JSONValue.self, from: response.data) else { throw APIServiceError.invalidResponse }
+        guard let value = try? await JSONValue.decode(response.data) else { throw APIServiceError.invalidResponse }
         return value
     }
 

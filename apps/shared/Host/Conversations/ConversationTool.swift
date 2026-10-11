@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
-    private struct ModelOutput {
+    private struct ModelOutput: Sendable {
         let text: String
         let truncated: Bool
     }
@@ -92,12 +92,12 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
             failure = "\(error)\n\n\(try Self.failureReceipt(invocations, omittedCalls: session.executionOmittedInvocations()))"
         }
         do {
-            output = try modelOutput(logs: logs, error: failure, store: session.javaScriptOutputs)
+            output = try await modelOutput(logs: logs, error: failure, store: session.javaScriptOutputs)
         } catch {
             failure = error.localizedDescription
             output = ModelOutput(text: "[error] \(error.localizedDescription)\n\n\(try Self.failureReceipt(invocations, omittedCalls: session.executionOmittedInvocations()))", truncated: true)
         }
-        diagnosticContent = output.truncated ? nil : logOutput(logs: logs, error: failure)
+        diagnosticContent = output.truncated ? nil : await logOutput(logs: logs, error: failure)
         let failed = failure != nil
         Log.session.info("tool.output maxBytes=\(JavaScriptOutputLimits.maxBytes) maxLines=\(JavaScriptOutputLimits.maxLines) outputBytes=\(output.text.utf8.count) truncated=\(output.truncated)")
         session.finishExecution(output: output.text, isError: failed)
@@ -123,8 +123,8 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
         return try ModelPromptRenderer.shared.render(.failureReceipt, input: .object(["invocations": .array(facts), "omittedCalls": .int(omittedCalls)]))
     }
 
-    @MainActor
-    private func modelOutput(logs: [VirtualMachineLog], error: String?, store: JavaScriptOutputStore) throws -> ModelOutput {
+    @concurrent
+    private func modelOutput(logs: [VirtualMachineLog], error: String?, store: JavaScriptOutputStore) async throws -> ModelOutput {
         var lines = logs.map { log in
             log.level == "log" ? log.message : "[\(log.level)] \(log.message)"
         }
@@ -135,14 +135,15 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
         guard preview != output else {
             return ModelOutput(text: output, truncated: false)
         }
-        let id = try store.save(output)
+        let id = try await store.save(output)
         let marker = try ModelPromptRenderer.shared.render(.outputTruncation, input: .object([
             "id": .string(id), "maxLines": .int(JavaScriptOutputLimits.maxLines), "maxBytes": .int(JavaScriptOutputLimits.maxBytes),
         ]))
         return ModelOutput(text: preview + marker, truncated: true)
     }
 
-    private func logOutput(logs: [VirtualMachineLog], error: String?) -> JSONValue {
+    @concurrent
+    private func logOutput(logs: [VirtualMachineLog], error: String?) async -> JSONValue {
         var entries = logs.map { log in
             JSONValue.object([
                 "level": .string(log.level),

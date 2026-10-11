@@ -5,108 +5,115 @@ import Observation
 struct StreamingMarkdownText: View {
     let source: String
     var isStreaming = true
-    @State private var splitter = StreamSplitter()
+    @Environment(ServiceManager.self) private var serviceManager
+    @Environment(\.conversationLinkHandler) private var conversationLinkHandler
+    @State private var availableWidth: CGFloat = 0
+    @State private var buffer = Buffer()
 
     var body: some View {
-        let split = splitter.absorb(source, isStreaming: isStreaming)
+        let snapshot = buffer.snapshot
         VStack(alignment: .leading, spacing: 0) {
-            if !split.settled.isEmpty {
-                MarkdownText(split.settled)
-            }
-            if !split.tail.isEmpty {
-                StreamingMarkdownTail(
-                    source: split.tail,
-                    resetKey: split.generation,
-                    previousBlock: split.lastSettledBlock,
-                    insideCodeFence: split.inFence
+            ForEach(Array(snapshot.blocks.enumerated()), id: \.offset) { index, block in
+                MarkdownBlockView(
+                    block: block,
+                    textColor: Theme.Colors.onSurface,
+                    subtleColor: Theme.Colors.onSurfaceMuted,
+                    availableWidth: availableWidth,
+                    fadeKey: snapshot.fadeKey,
+                    isStreaming: snapshot.input.isStreaming
                 )
+                .id(snapshot.generation)
+                .padding(.top, MarkdownText.spacing(
+                    before: block,
+                    after: index == 0 ? nil : snapshot.blocks[index - 1]
+                ))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .environment(\.openURL, OpenURLAction { url in
+            if let conversationLinkHandler { conversationLinkHandler(url) }
+            else { LinkOpener.open(url: url, serviceManager: serviceManager) }
+            return .handled
+        })
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
+        .onChange(of: Input(source: source, isStreaming: isStreaming), initial: true) { _, input in
+            buffer.update(input)
+        }
+        .onDisappear { buffer.cancel() }
     }
 
-    // The stream only ever appends, so the settled/tail boundary is advanced
-    // incrementally: each absorb re-splits just the unsettled tail instead of
-    // the whole accumulated message. Settled text always ends right after a
-    // blank line outside a code fence, so every tail re-scan starts fence-free.
-    final class StreamSplitter {
-        private var settled = ""
-        private var tail = ""
-        private var consumedUTF8 = 0
-        private var generation = 0
-        private var lastSettledBlock: MarkdownBlock?
-        private var scannedUTF8 = 0
-        private var currentLine = ""
-        private var inFence = false
-        private var boundaryUTF8 = 0
+    nonisolated fileprivate struct Input: Equatable, Sendable {
+        let source: String
+        let isStreaming: Bool
+    }
 
-        func absorb(_ source: String, isStreaming: Bool) -> (
-            settled: String,
-            tail: String,
-            generation: Int,
-            lastSettledBlock: MarkdownBlock?,
-            inFence: Bool
-        ) {
-            guard isStreaming else {
-                reset()
-                return (source, "", generation, nil, false)
-            }
-            let total = source.utf8.count
-            if total < consumedUTF8 {
-                reset()
-            }
-            if total > consumedUTF8 {
-                let delta = String(decoding: source.utf8.suffix(total - consumedUTF8), as: UTF8.self)
-                tail += delta
-                consumedUTF8 = total
-                scan(delta)
-                if boundaryUTF8 > 0 {
-                    let settledLength = boundaryUTF8 - 1
-                    let nextSettled = String(decoding: tail.utf8.prefix(settledLength), as: UTF8.self)
-                    settled = settled.isEmpty ? nextSettled : settled + "\n" + nextSettled
-                    tail = String(decoding: tail.utf8.suffix(tail.utf8.count - boundaryUTF8), as: UTF8.self)
-                    generation &+= 1
-                    lastSettledBlock = MarkdownBlock.parse(nextSettled).last ?? lastSettledBlock
-                    resetScanner()
-                    scan(tail)
-                }
-            }
-            return (settled, tail, generation, lastSettledBlock, inFence)
+    @MainActor
+    @Observable
+    fileprivate final class Buffer {
+        struct Snapshot {
+            let input: Input
+            let blocks: [MarkdownBlock]
+            let generation: Int
+            let fadeKey: Int?
         }
 
-        private func scan(_ delta: String) {
-            for character in delta {
-                scannedUTF8 += String(character).utf8.count
-                if character == "\n" {
-                    let trimmed = currentLine.trimmingCharacters(in: .whitespaces)
-                    if trimmed.hasPrefix("```") {
-                        inFence.toggle()
-                    } else if !inFence && currentLine.isEmpty {
-                        boundaryUTF8 = scannedUTF8
+        private(set) var snapshot = Snapshot(
+            input: Input(source: "", isStreaming: false), blocks: [], generation: 0, fadeKey: nil
+        )
+        @ObservationIgnored private var latest: Input?
+        @ObservationIgnored private var pending: (input: Input, generation: Int, fadeKey: Int?)?
+        @ObservationIgnored private var generation = 0
+        @ObservationIgnored private var fadeKey: Int?
+        @ObservationIgnored private var scheduled: Task<Void, Never>?
+
+        func update(_ input: Input) {
+            guard latest != input else { return }
+            let previous = latest?.source ?? snapshot.input.source
+            if !input.source.hasPrefix(previous) {
+                generation &+= 1
+                fadeKey = nil
+            }
+            if input.isStreaming { fadeKey = generation }
+            latest = input
+            pending = (input, generation, fadeKey)
+            scheduleIfNeeded()
+        }
+
+        private func scheduleIfNeeded() {
+            guard scheduled == nil, let pending else { return }
+            let interval = snapshot.blocks.isEmpty || !pending.input.isStreaming ? 0
+                : pending.input.source.utf8.count > 2_048 ? 0.1 : 1.0 / 30.0
+            scheduled = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(interval))
+                guard let self, !Task.isCancelled, let request = self.pending else { return }
+                self.pending = nil
+                let blocks = try? await MarkdownParser.shared.snapshot(
+                    source: request.input.source, isStreaming: request.input.isStreaming
+                )
+                guard !Task.isCancelled else { return }
+                scheduled = nil
+                if let blocks, request.generation == generation {
+                    if !request.input.isStreaming, snapshot.input.isStreaming {
+                        Log.ui.debug("StreamingMarkdown.settled generation=\(generation) bytes=\(request.input.source.utf8.count) blocks=\(blocks.count)")
                     }
-                    currentLine = ""
-                } else {
-                    currentLine.append(character)
+                    snapshot = Snapshot(input: request.input, blocks: blocks,
+                                        generation: request.generation, fadeKey: request.fadeKey)
                 }
+                scheduleIfNeeded()
             }
         }
 
-        private func reset() {
-            (settled, tail, consumedUTF8) = ("", "", 0)
-            generation &+= 1
-            lastSettledBlock = nil
-            resetScanner()
+        func cancel() {
+            scheduled?.cancel()
+            scheduled = nil
+            pending = nil
+            latest = nil
         }
 
-        private func resetScanner() {
-            scannedUTF8 = 0
-            currentLine = ""
-            inFence = false
-            boundaryUTF8 = 0
-        }
+        deinit { scheduled?.cancel() }
     }
 
-    static func split(_ source: String) -> (settled: String, tail: String) {
+    nonisolated static func split(_ source: String) -> (settled: String, tail: String, inFence: Bool) {
         let lines = source.components(separatedBy: "\n")
         var inFence = false
         var boundary = 0
@@ -118,7 +125,7 @@ struct StreamingMarkdownText: View {
             }
         }
         return (lines[0..<boundary].joined(separator: "\n"),
-                lines[boundary...].joined(separator: "\n"))
+                lines[boundary...].joined(separator: "\n"), inFence)
     }
 
     static func balanced(_ source: String) -> String {
@@ -136,7 +143,7 @@ struct StreamingMarkdownText: View {
         return out
     }
 
-    static func stableWords(_ source: String) -> String {
+    nonisolated static func stableWords(_ source: String) -> String {
         guard let last = source.last, !last.isWhitespace,
               !canBreakBefore(last) else { return source }
         let pending = source.reversed().prefix { character in
@@ -145,14 +152,14 @@ struct StreamingMarkdownText: View {
         return String(source.dropLast(pending.count))
     }
 
-    private static func canBreakBefore(_ character: Character) -> Bool {
+    nonisolated private static func canBreakBefore(_ character: Character) -> Bool {
         character.unicodeScalars.contains { scalar in
             scalar.properties.isIdeographic || scalar.properties.isEmojiPresentation
                 || (0x3000...0xD7FF).contains(scalar.value)
         }
     }
 
-    static func gateInlineLinks(_ source: String) -> String {
+    nonisolated static func gateInlineLinks(_ source: String) -> String {
         enum State {
             case text
             case label(start: String.Index, depth: Int)
@@ -249,62 +256,8 @@ struct StreamingMarkdownText: View {
     }
 }
 
-private struct StreamingMarkdownTail: View {
-    let source: String
-    let resetKey: Int
-    let previousBlock: MarkdownBlock?
-    let insideCodeFence: Bool
-    @Environment(ServiceManager.self) private var serviceManager
-    @Environment(\.conversationLinkHandler) private var conversationLinkHandler
-    @State private var availableWidth: CGFloat = 0
-    @State private var classifier = PlainParagraphClassifier()
-    @State private var formattedBuffer = FormattedTailBuffer()
-    #if DEBUG
-    @State private var stability = StabilityProbe()
-    #endif
-
-    var body: some View {
-        let visibleSource = insideCodeFence ? source : StreamingMarkdownText.stableWords(source)
-        let plain = classifier.isPlain(visibleSource, reset: resetKey)
-        let _ = formattedBuffer.revision
-        let blocks: [MarkdownBlock] = visibleSource.isEmpty ? [] : plain
-            ? [MarkdownBlock.paragraph(visibleSource)]
-            : formattedBuffer.blocks(for: visibleSource, reset: resetKey)
-        #if DEBUG
-        let _ = stability.check(blocks)
-        #endif
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { i, block in
-                MarkdownBlockView(block: block, textColor: Theme.Colors.onSurface,
-                                  subtleColor: Theme.Colors.onSurfaceMuted,
-                                  availableWidth: availableWidth,
-                                  fadeKey: i == blocks.count - 1 ? resetKey : nil)
-                    .padding(
-                        .top,
-                        MarkdownText.spacing(
-                            before: block,
-                            after: i == 0 ? previousBlock : blocks[i - 1]
-                        )
-                    )
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .environment(\.openURL, OpenURLAction { url in
-            open(url)
-            return .handled
-        })
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
-    }
-
-    private func open(_ url: URL) {
-        if let conversationLinkHandler {
-            conversationLinkHandler(url)
-        } else {
-            LinkOpener.open(url: url, serviceManager: serviceManager)
-        }
-    }
-
-    static func gate(_ source: String) -> String {
+nonisolated private enum StreamingMarkdownTail {
+    nonisolated static func gate(_ source: String) -> String {
         var lines = source.components(separatedBy: "\n")
         while let last = lines.last {
             let trimmed = last.trimmingCharacters(in: .whitespaces)
@@ -319,7 +272,7 @@ private struct StreamingMarkdownTail: View {
         return StreamingMarkdownText.gateInlineLinks(lines.joined(separator: "\n"))
     }
 
-    private static func endsInConfirmedTable(_ lines: [String]) -> Bool {
+    nonisolated private static func endsInConfirmedTable(_ lines: [String]) -> Bool {
         var start = lines.count - 1
         while start > 0, lines[start - 1].trimmingCharacters(in: .whitespaces).hasPrefix("|") {
             start -= 1
@@ -328,7 +281,7 @@ private struct StreamingMarkdownTail: View {
         return MarkdownBlock.isTableSeparator(lines[start + 1].trimmingCharacters(in: .whitespaces))
     }
 
-    static func isAmbiguousLineStart(_ line: String) -> Bool {
+    nonisolated static func isAmbiguousLineStart(_ line: String) -> Bool {
         if line.isEmpty { return true }
         guard line.count <= 7 else { return false }
         if line.allSatisfy({ $0 == "#" }) && line.count <= 6 { return true }
@@ -340,92 +293,6 @@ private struct StreamingMarkdownTail: View {
         if line == "**" || line == "***" { return true }
         return false
     }
-
-    private final class PlainParagraphClassifier {
-        private var consumedUTF8 = 0
-        private var plain = true
-        private var leadingResolved = false
-        private var reset = Int.min
-
-        func isPlain(_ source: String, reset nextReset: Int) -> Bool {
-            let total = source.utf8.count
-            if reset != nextReset || total < consumedUTF8 {
-                reset = nextReset
-                consumedUTF8 = 0
-                plain = true
-                leadingResolved = false
-            }
-            if !leadingResolved,
-               let first = source.first(where: { !$0.isWhitespace }) {
-                leadingResolved = true
-                if "#>-+|".contains(first) || first.isNumber { plain = false }
-            }
-            guard plain, total > consumedUTF8 else { return plain }
-            let delta = String(decoding: source.utf8.suffix(total - consumedUTF8), as: UTF8.self)
-            consumedUTF8 = total
-            plain = !delta.contains { "\r\n*_`[\\<>".contains($0) }
-            return plain
-        }
-    }
-
-    @MainActor
-    @Observable
-    final class FormattedTailBuffer {
-        private(set) var revision = 0
-        @ObservationIgnored private var reset = Int.min
-        @ObservationIgnored private var current = ""
-        @ObservationIgnored private var pending = ""
-        @ObservationIgnored private var rendered: [MarkdownBlock] = []
-        @ObservationIgnored private var scheduled: Task<Void, Never>?
-
-        func blocks(for source: String, reset nextReset: Int) -> [MarkdownBlock] {
-            if reset != nextReset {
-                reset = nextReset
-                current = source
-                pending = source
-                rendered = MarkdownBlock.parseTail(StreamingMarkdownTail.gate(source))
-                scheduled?.cancel()
-                scheduled = nil
-                return rendered
-            }
-            pending = source
-            scheduleIfNeeded(byteCount: source.utf8.count)
-            return rendered
-        }
-
-        private func scheduleIfNeeded(byteCount: Int) {
-            guard scheduled == nil, pending != current else { return }
-            let interval = byteCount > 2_048 ? 0.1 : 1.0 / 30.0
-            scheduled = Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .seconds(interval))
-                guard let self, !Task.isCancelled else { return }
-                current = pending
-                rendered = MarkdownBlock.parseTail(StreamingMarkdownTail.gate(current))
-                scheduled = nil
-                revision &+= 1
-            }
-        }
-
-        deinit {
-            scheduled?.cancel()
-        }
-    }
-
-    #if DEBUG
-    private final class StabilityProbe {
-        private var previous: [MarkdownBlock] = []
-
-        func check(_ current: [MarkdownBlock]) {
-            defer { previous = current }
-            guard previous.count > 1, current.count >= previous.count, current.first == previous.first else { return }
-            let settled = Array(previous.dropLast())
-            let currentSettled = Array(current.prefix(settled.count))
-            guard settled != currentSettled else { return }
-            let changed = zip(settled, currentSettled).enumerated().first { $0.element.0 != $0.element.1 }
-            Log.ui.error("StreamingMarkdownTail.reflow index=\(changed?.offset ?? -1) before=\(changed?.element.0.logShape ?? "unknown") after=\(changed?.element.1.logShape ?? "unknown") previous=\(settled.count) current=\(currentSettled.count)")
-        }
-    }
-    #endif
 }
 
 struct MarkdownText: View {
@@ -445,6 +312,7 @@ struct MarkdownText: View {
     @Environment(\.conversationLinkHandler) private var conversationLinkHandler
     static let bodyFont = UIFont.preferredFont(forTextStyle: .body)
     @State private var availableWidth: CGFloat = 0
+    @State private var blocks: [MarkdownRenderBlock] = []
 
     init(
         _ source: String,
@@ -457,7 +325,6 @@ struct MarkdownText: View {
     }
 
     var body: some View {
-        let blocks = MarkdownRenderBlock.group(MarkdownBlock.parse(source))
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
                 MarkdownRenderBlockView(block: block, textColor: textColor,
@@ -476,6 +343,10 @@ struct MarkdownText: View {
             return .handled
         })
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
+        .task(id: source) {
+            guard let rendered = try? await MarkdownParser.shared.render(source), !Task.isCancelled else { return }
+            blocks = rendered
+        }
     }
 
     private func open(_ url: URL) {
@@ -487,7 +358,7 @@ struct MarkdownText: View {
     }
 }
 
-private enum MarkdownRenderBlock: Equatable {
+nonisolated private enum MarkdownRenderBlock: Equatable, Sendable {
     case paragraphs([String])
     case block(MarkdownBlock)
 
@@ -557,6 +428,7 @@ private struct MarkdownBlockView: View {
     let subtleColor: DynamicColor
     let availableWidth: CGFloat
     var fadeKey: Int? = nil
+    var isStreaming = false
 
     private static let tableCellMinWidth: CGFloat = 88
     private static let tableCellMaxWidth: CGFloat = 220
@@ -573,7 +445,8 @@ private struct MarkdownBlockView: View {
                 lists: lists,
                 textColor: textColor,
                 subtleColor: subtleColor,
-                fadeKey: fadeKey
+                fadeKey: fadeKey,
+                isStreaming: isStreaming
             )
         case .code(let language, let body):
             VStack(alignment: .leading, spacing: 0) {
@@ -652,7 +525,7 @@ private struct MarkdownBlockView: View {
     private func prose(_ text: String, font: UIFont, color: DynamicColor,
                        lineSpacing: CGFloat, fades: Bool) -> some View {
         if let fadeKey, fades {
-            StreamingFadeSelectableText(markdown: StreamingMarkdownText.balanced(text), resetKey: fadeKey,
+            StreamingFadeSelectableText(markdown: isStreaming ? StreamingMarkdownText.balanced(text) : text, resetKey: fadeKey,
                                         font: font, color: color.uiColor, lineSpacing: lineSpacing)
         } else {
             SelectableText(markdown: text, font: font, color: color.uiColor, lineSpacing: lineSpacing)
@@ -729,6 +602,7 @@ private struct MarkdownListsView: View {
     let textColor: DynamicColor
     let subtleColor: DynamicColor
     let fadeKey: Int?
+    let isStreaming: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -737,7 +611,8 @@ private struct MarkdownListsView: View {
                     list: list,
                     textColor: textColor,
                     subtleColor: subtleColor,
-                    fadeKey: index == lists.count - 1 ? fadeKey : nil
+                    fadeKey: fadeKey,
+                    isStreaming: isStreaming
                 )
             }
         }
@@ -749,6 +624,7 @@ private struct MarkdownListView: View {
     let textColor: DynamicColor
     let subtleColor: DynamicColor
     let fadeKey: Int?
+    let isStreaming: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -761,17 +637,15 @@ private struct MarkdownListView: View {
                             .foregroundStyle(textColor)
                             .fixedSize(horizontal: true, vertical: false)
                             .frame(width: markerColumnWidth, alignment: .trailing)
-                        prose(
-                            item.text,
-                            fades: index == list.items.count - 1 && item.children.isEmpty
-                        )
+                        prose(item.text)
                     }
                     if !item.children.isEmpty {
                         MarkdownListsView(
                             lists: item.children,
                             textColor: textColor,
                             subtleColor: subtleColor,
-                            fadeKey: index == list.items.count - 1 ? fadeKey : nil
+                            fadeKey: fadeKey,
+                            isStreaming: isStreaming
                         )
                         .padding(.leading, Theme.Spacing.lg)
                     }
@@ -801,10 +675,10 @@ private struct MarkdownListView: View {
     }
 
     @ViewBuilder
-    private func prose(_ text: String, fades: Bool) -> some View {
-        if let fadeKey, fades {
+    private func prose(_ text: String) -> some View {
+        if let fadeKey {
             StreamingFadeSelectableText(
-                markdown: StreamingMarkdownText.balanced(text),
+                markdown: isStreaming ? StreamingMarkdownText.balanced(text) : text,
                 resetKey: fadeKey,
                 font: MarkdownText.bodyFont,
                 color: textColor.uiColor,
@@ -841,22 +715,61 @@ private struct CodeBlockCopyButton: View {
     }
 }
 
-enum MarkdownListKind: Equatable {
+nonisolated enum MarkdownListKind: Equatable, Sendable {
     case bullets
     case ordered
 }
 
-struct MarkdownListItem: Equatable {
+nonisolated struct MarkdownListItem: Equatable, Sendable {
     let text: String
     let children: [MarkdownList]
 }
 
-struct MarkdownList: Equatable {
+nonisolated struct MarkdownList: Equatable, Sendable {
     let kind: MarkdownListKind
     let items: [MarkdownListItem]
 }
 
-enum MarkdownBlock: Equatable {
+private actor MarkdownParser {
+    static let shared = MarkdownParser()
+
+    nonisolated private final class Cached: Sendable {
+        let blocks: [MarkdownBlock]
+        init(_ blocks: [MarkdownBlock]) { self.blocks = blocks }
+    }
+
+    private let cache: NSCache<NSString, Cached> = {
+        let cache = NSCache<NSString, Cached>()
+        cache.countLimit = 256
+        cache.totalCostLimit = TextRenderCachePolicy.parsedLimit
+        return cache
+    }()
+
+    func parse(_ source: String) throws -> [MarkdownBlock] {
+        try Task.checkCancellation()
+        let key = TextRenderCachePolicy.key(source)
+        if let hit = cache.object(forKey: key) { return hit.blocks }
+        let blocks = MarkdownBlock.parse(source)
+        let cost = TextRenderCachePolicy.parsedCost(sourceByteCount: source.utf8.count, blockCount: blocks.count)
+        if cost <= cache.totalCostLimit {
+            cache.setObject(Cached(blocks), forKey: key, cost: cost)
+        }
+        return blocks
+    }
+
+    func snapshot(source: String, isStreaming: Bool) throws -> [MarkdownBlock] {
+        guard isStreaming else { return try parse(source) }
+        let split = StreamingMarkdownText.split(source)
+        let tail = split.inFence ? split.tail : StreamingMarkdownText.stableWords(split.tail)
+        return try parse(split.settled) + MarkdownBlock.parse(StreamingMarkdownTail.gate(tail))
+    }
+
+    func render(_ source: String) throws -> [MarkdownRenderBlock] {
+        MarkdownRenderBlock.group(try parse(source))
+    }
+}
+
+nonisolated enum MarkdownBlock: Equatable, Sendable {
     case paragraph(String)
     case heading(Int, String)
     case lists([MarkdownList])
@@ -877,33 +790,7 @@ enum MarkdownBlock: Equatable {
         }
     }
 
-    private final class Cached { let blocks: [MarkdownBlock]; init(_ blocks: [MarkdownBlock]) { self.blocks = blocks } }
-    private static let cache: NSCache<NSString, Cached> = {
-        let c = NSCache<NSString, Cached>()
-        c.countLimit = 256
-        c.totalCostLimit = TextRenderCachePolicy.parsedLimit
-        return c
-    }()
-
     static func parse(_ source: String) -> [MarkdownBlock] {
-        let key = TextRenderCachePolicy.key(source)
-        if let hit = cache.object(forKey: key) { return hit.blocks }
-        let blocks = parseUncached(source)
-        let cost = TextRenderCachePolicy.parsedCost(
-            sourceByteCount: source.utf8.count,
-            blockCount: blocks.count
-        )
-        if cost <= cache.totalCostLimit {
-            cache.setObject(Cached(blocks), forKey: key, cost: cost)
-        }
-        return blocks
-    }
-
-    static func parseTail(_ source: String) -> [MarkdownBlock] {
-        return parseUncached(source)
-    }
-
-    private static func parseUncached(_ source: String) -> [MarkdownBlock] {
         var out: [MarkdownBlock] = []
         let normalized = source.replacingOccurrences(of: "\r\n", with: "\n")
         let lines = normalized.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
@@ -1116,7 +1003,7 @@ enum MarkdownBlock: Equatable {
     }
 }
 
-private extension Array where Element == MarkdownList {
+nonisolated private extension Array where Element == MarkdownList {
     var itemCount: Int {
         reduce(0) { count, list in
             count + list.items.reduce(0) { $0 + 1 + $1.children.itemCount }

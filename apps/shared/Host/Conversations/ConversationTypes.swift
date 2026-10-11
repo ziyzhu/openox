@@ -146,11 +146,25 @@ nonisolated struct ConversationState: Equatable, Sendable {
 nonisolated struct ConversationLoadResult: Sendable {
     let state: ConversationState
     let needsPersistence: Bool
+    let document: ConversationDocument?
+
+    init(state: ConversationState, needsPersistence: Bool, document: ConversationDocument? = nil) {
+        self.state = state
+        self.needsPersistence = needsPersistence
+        self.document = document
+    }
+
+    @concurrent
+    func preparingDocument() async -> Self {
+        Self(state: state, needsPersistence: needsPersistence,
+             document: document ?? ConversationDocument.restoring(state.turns))
+    }
 
     func replacingMeta(_ meta: ConversationMeta) -> Self {
         Self(
             state: ConversationState(meta: meta, turns: state.turns, context: state.context),
-            needsPersistence: needsPersistence
+            needsPersistence: needsPersistence,
+            document: document
         )
     }
 }

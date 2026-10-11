@@ -1303,11 +1303,18 @@ final class ServiceManager {
     }
 
     private func listIOSServiceDefinitions(locale: String?) async -> [ServiceDefinition] {
-        nativeServices.definitions(files: monoRepository?.iOSManifests ?? [], locale: locale)
+        await nativeServices.definitions(files: monoRepository?.iOSManifests ?? [], locale: locale)
     }
 
     private func listMCPServiceDefinitions(locale: String?) async -> [ServiceDefinition] {
         guard let files = monoRepository?.mcpManifests else { return [] }
+        return await Self.decodeMCPDefinitions(files, locale: locale)
+    }
+
+    @concurrent
+    nonisolated private static func decodeMCPDefinitions(
+        _ files: [Repository.RepositoryManifestFile], locale: String?
+    ) async -> [ServiceDefinition] {
         let definitions = files.compactMap { file -> ServiceDefinition? in
             guard let manifest = try? JSONDecoder().decode(MCPCatalogManifest.self, from: file.data),
                   manifest.id == file.id,

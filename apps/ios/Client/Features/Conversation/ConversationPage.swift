@@ -2069,7 +2069,12 @@ struct ConversationPage: View {
     private func ingestPastedImages(_ images: [PastedComposerImage]) {
         for image in images {
             importAttachment(named: image.suggestedName, source: "pastedImage") {
-                try await FileImporter.importImageDataAsync(image.data, suggestedName: image.suggestedName)
+                switch image.content {
+                case .data(let data):
+                    try await FileImporter.importImageDataAsync(data, suggestedName: image.suggestedName)
+                case .image(let value):
+                    try await FileImporter.importImageAsync(value, suggestedName: image.suggestedName)
+                }
             }
         }
     }

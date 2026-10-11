@@ -1062,6 +1062,7 @@ final class Conversation: Identifiable {
         meta: ConversationMeta,
         turns: [Turn],
         context: AgentContextCheckpoint? = nil,
+        restoredDocument: ConversationDocument? = nil,
         client: any ProviderClient,
         model: ProviderModel,
         selection: ModelSelection,
@@ -1095,8 +1096,7 @@ final class Conversation: Identifiable {
         monoRepositoryHash = meta.monoRepositoryHash
         customTitle = meta.title
         isFavorite = meta.isFavorite
-        document = ConversationDocument(turns: turns)
-        document.apply(.sealAllTurns)
+        document = restoredDocument ?? ConversationDocument.restoring(turns)
         let recovered = document.turns != turns
         attachedServiceDomains = Self.uniqueServiceDomains(meta.attachedServiceDomains)
         if attachedServiceDomains.count != meta.attachedServiceDomains.count {

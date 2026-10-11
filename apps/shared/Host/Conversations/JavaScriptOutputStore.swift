@@ -30,12 +30,15 @@ nonisolated enum JavaScriptOutputLimits {
     }
 }
 
-final class JavaScriptOutputStore {
+actor JavaScriptOutputStore {
     private let directory = FileManager.default.temporaryDirectory.appendingPathComponent("ox-output-\(UUID().uuidString)")
     private var storedBytes = 0
 
     deinit {
-        try? FileManager.default.removeItem(at: directory)
+        let directory = directory
+        Task.detached(priority: .utility) {
+            try? FileManager.default.removeItem(at: directory)
+        }
     }
 
     func save(_ text: String) throws -> String {
@@ -63,7 +66,7 @@ final class JavaScriptOutputStore {
 extension Conversation {
     public func readJavaScriptOutput(id: String, purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.outputRead, .object(["id": .string(id)]), purpose: purpose) {
-            return .string(try javaScriptOutputs.read(id))
+            return .string(try await javaScriptOutputs.read(id))
         }
     }
 }

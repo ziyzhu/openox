@@ -25,6 +25,8 @@ WAL/SHM; they are diagnostics, not Profile exports or power-loss evidence.
 Verify behavior or independent effects, not just taps, queued sends, or idle status.
 For transcript comparisons, use immutable historical turns: VM calls append receipts.
 
+Verify streaming-rendering changes in video across paragraph/fence boundaries and completion; content assertions and settled screenshots do not establish visual continuity.
+
 Measure Client–Host latency over a warmed persistent RPC connection using identical fresh
 fixtures for A/B runs. Report stop acknowledgement separately from observed idle state,
 and inspection snapshots separately from embedded presentation reads. Use physical

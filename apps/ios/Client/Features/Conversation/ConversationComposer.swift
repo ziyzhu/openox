@@ -4,8 +4,13 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-struct PastedComposerImage {
-    let data: Data
+nonisolated struct PastedComposerImage: Sendable {
+    enum Content: Sendable {
+        case data(Data)
+        case image(UIImage)
+    }
+
+    let content: Content
     let suggestedName: String
 }
 
@@ -1016,27 +1021,26 @@ struct ConversationComposer: View, Equatable {
 
     private func pastedImages(in value: AttributedString) -> [PastedComposerImage] {
         let attributed = NSAttributedString(value)
-        var images: [(Data, String?)] = []
+        var images: [(PastedComposerImage.Content, String?)] = []
         attributed.enumerateAttributes(
             in: NSRange(location: 0, length: attributed.length)
         ) { attributes, _, _ in
             if let attachment = attributes[.attachment] as? NSTextAttachment {
                 let original = attachment.contents ?? attachment.fileWrapper?.regularFileContents
-                if let data = attachment.image?.pngData() ?? original,
-                   UIImage(data: data) != nil {
-                    images.append((data, attachment.fileWrapper?.preferredFilename))
+                let content = attachment.image.map(PastedComposerImage.Content.image)
+                    ?? original.map(PastedComposerImage.Content.data)
+                if let content {
+                    images.append((content, attachment.fileWrapper?.preferredFilename))
                 }
             } else if let glyph = attributes[.adaptiveImageGlyph] as? NSAdaptiveImageGlyph {
                 let data = glyph.imageContent
-                if UIImage(data: data) != nil {
-                    let suffix = NSAdaptiveImageGlyph.contentType.preferredFilenameExtension ?? "heic"
-                    images.append((data, "Pasted Image.\(suffix)"))
-                }
+                let suffix = NSAdaptiveImageGlyph.contentType.preferredFilenameExtension ?? "heic"
+                images.append((.data(data), "Pasted Image.\(suffix)"))
             }
         }
         let resolved = if images.isEmpty, value.characters.contains("\u{FFFC}") {
-            (UIPasteboard.general.images ?? []).compactMap { image in
-                image.pngData().map { ($0, nil as String?) }
+            (UIPasteboard.general.images ?? []).map { image in
+                (PastedComposerImage.Content.image(image), nil as String?)
             }
         } else {
             images
@@ -1045,7 +1049,7 @@ struct ConversationComposer: View, Equatable {
               composer.claimPasteboardChange(UIPasteboard.general.changeCount) else { return [] }
         return resolved.enumerated().map { index, image in
             let fallback = resolved.count == 1 ? "Pasted Image.png" : "Pasted Image \(index + 1).png"
-            return PastedComposerImage(data: image.0, suggestedName: image.1 ?? fallback)
+            return PastedComposerImage(content: image.0, suggestedName: image.1 ?? fallback)
         }
     }
 

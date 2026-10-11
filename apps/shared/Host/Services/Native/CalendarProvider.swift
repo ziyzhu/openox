@@ -1,24 +1,23 @@
 import EventKit
 import Foundation
 
-@MainActor
-final class CalendarProvider {
+actor CalendarProvider {
     static let shared = CalendarProvider()
 
-    struct SavedEvent: Encodable {
+    nonisolated struct SavedEvent: Encodable, Sendable {
         let id: String
         let title: String
         let start: String
         let end: String
     }
 
-    struct SavedReminder: Encodable {
+    nonisolated struct SavedReminder: Encodable, Sendable {
         let id: String
         let title: String
         let due: String?
     }
 
-    enum CalendarError: LocalizedError {
+    nonisolated enum CalendarError: LocalizedError {
         case eventsDenied
         case remindersDenied
         case noEventCalendar

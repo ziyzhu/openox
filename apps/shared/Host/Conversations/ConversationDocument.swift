@@ -37,7 +37,7 @@ nonisolated enum ConversationDocumentEvent {
     case truncate(beforeTurn: Int)
 }
 
-nonisolated struct ConversationDocument {
+nonisolated struct ConversationDocument: Sendable {
     private(set) var turns: [Turn]
     private(set) var projection: [Block]
     private(set) var sourceTurnIDs: [RenderBlockID: TurnID]
@@ -55,6 +55,12 @@ nonisolated struct ConversationDocument {
         })
         nextBlockOrdinal = projection.count
         validateIDs()
+    }
+
+    static func restoring(_ turns: [Turn]) -> ConversationDocument {
+        var document = ConversationDocument(turns: turns)
+        document.apply(.sealAllTurns)
+        return document
     }
 
     static func replaying(_ turns: [Turn]) -> ConversationDocument {

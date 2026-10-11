@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-enum TextRenderCachePolicy {
+nonisolated enum TextRenderCachePolicy {
     static let attributedLimit = 2 * 1_024 * 1_024
     static let parsedLimit = 1 * 1_024 * 1_024
     private static let attributedBytesPerUTF16Unit = 32

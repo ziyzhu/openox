@@ -1,8 +1,8 @@
 import Foundation
 
-@MainActor
-struct MacNativeServiceCatalog: NativeServiceCatalog {
-    func definitions(files: [Repository.RepositoryManifestFile], locale: String?) -> [ServiceDefinition] {
+nonisolated struct MacNativeServiceCatalog: NativeServiceCatalog {
+    @concurrent
+    func definitions(files: [Repository.RepositoryManifestFile], locale: String?) async -> [ServiceDefinition] {
         let definitions = files.compactMap { file -> ServiceDefinition? in
             guard ["ios:notifications", "ios:calendar", "ios:reminders", "ios:contacts", "ios:location"].contains(file.id) else { return nil }
             do {

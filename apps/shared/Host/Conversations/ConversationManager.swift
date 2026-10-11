@@ -231,7 +231,9 @@ final class ConversationManager {
                     guard let loaded = await repository.loadConversation(reference.compatibilityID, in: scope) else {
                         throw RuntimeError.bridge("Recovered conversation is unavailable; Profile progress remains paused")
                     }
-                    conversation = restoredConversation(from: loaded, in: scope)
+                    let prepared = await loaded.preparingDocument()
+                    guard repositoryScope == scope else { throw CancellationError() }
+                    conversation = restoredConversation(from: prepared, in: scope)
                     register(conversation)
                 }
                 try await conversation.prepareDurableRecovery()
@@ -298,9 +300,10 @@ final class ConversationManager {
         ensureRepositoryScope()
         let scope = repositoryScope
         let state = try await repository.importConversationPackage(payload, in: scope)
+        let prepared = await ConversationLoadResult(state: state, needsPersistence: false).preparingDocument()
         guard repositoryScope == scope else { throw ConversationPackageError.invalidArchive }
         let conversation = restoredConversation(
-            from: ConversationLoadResult(state: state, needsPersistence: false),
+            from: prepared,
             in: scope
         )
         register(conversation)
@@ -453,7 +456,8 @@ final class ConversationManager {
         records[id] = record
         Log.session.info("ConversationManager.hydrate id=\(id) generation=\(generation.rawValue)")
         let task = Task { [weak self, repository] () -> Conversation? in
-            let loaded = await repository.loadConversation(id, in: scope)
+            let state = await repository.loadConversation(id, in: scope)
+            let loaded = await state?.preparingDocument()
             guard let self, self.repositoryScope == scope,
                   var record = self.records[id], self.contains(id.rawValue),
                   case .loading(_, let activeGeneration) = record.hydration,
@@ -754,6 +758,7 @@ final class ConversationManager {
             meta: loaded.state.meta,
             turns: loaded.state.turns,
             context: loaded.state.context,
+            restoredDocument: loaded.document,
             client: client,
             model: model,
             selection: selection,

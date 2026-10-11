@@ -1,22 +1,21 @@
 import Contacts
 import Foundation
 
-@MainActor
-final class ContactsProvider {
+actor ContactsProvider {
     static let shared = ContactsProvider()
 
-    struct Match {
+    nonisolated struct Match: Sendable {
         let name: String
         let number: String
     }
 
-    struct Card: Encodable {
+    nonisolated struct Card: Encodable, Sendable {
         let name: String
         let phones: [String]
         let emails: [String]
     }
 
-    enum ContactsError: LocalizedError {
+    nonisolated enum ContactsError: LocalizedError {
         case denied
         var errorDescription: String? {
             switch self {

@@ -27,7 +27,7 @@ enum OxHostRPC {
         _ data: Data, host: any OxHost,
         admit: @MainActor () -> String? = { nil }
     ) async -> JSONValue? {
-        guard let value = try? JSONDecoder().decode(JSONValue.self, from: data) else {
+        guard let value = try? await JSONValue.decode(data) else {
             return failure(id: .null, code: -32700, message: "Parse error")
         }
         if case .array(let requests) = value {
