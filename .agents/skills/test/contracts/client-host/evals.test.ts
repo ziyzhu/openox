@@ -188,8 +188,8 @@ test("eval runner uses real CLI chat commands, isolates repetitions, and preserv
   } finally { await fixture.close(); }
 }, 30000);
 
-test("bundled skill grading uses independent contents and actual receipts, including aliased calls", async () => {
-  for (const scenario of ["pass", "alias-guidance", "fake-guidance", "tool-error", "forged-guidance"] as const) {
+for (const scenario of ["pass", "alias-guidance", "fake-guidance", "tool-error", "forged-guidance"] as const) {
+  test(`bundled skill grading uses independent contents and actual receipts, including aliased calls: ${scenario}`, async () => {
     const fixture = await exercise(scenario);
     try {
       const result = await fixture.run("--case", "guidance-canvas");
@@ -202,8 +202,8 @@ test("bundled skill grading uses independent contents and actual receipts, inclu
       expect(attempt.response?.before?.chatId).not.toBe(attempt.response?.chatId);
       expect(attempt.response?.after?.chatId).not.toBe(attempt.response?.before?.chatId);
     } finally { await fixture.close(); }
-  }
-}, 20000);
+  }, 20000);
+}
 
 test("state mutation stops the cohort without repair, and missing observations are errors", async () => {
   for (const scenario of ["mutated-state", "missing-observation", "missing-settings", "truncated-receipts"] as const) {
@@ -240,8 +240,8 @@ test("skill workflow verifies persisted state, fresh-chat behavior, and only own
   } finally { await fixture.close(); }
 }, 15000);
 
-test("skill claims, incorrect files, and failed behavior cannot pass; cleanup cannot hide collateral changes", async () => {
-  for (const scenario of ["skill-claim", "skill-corrupt", "skill-probe-fail", "probe-mutation", "skill-extra-action", "cleanup-error"] as const) {
+for (const scenario of ["skill-claim", "skill-corrupt", "skill-probe-fail", "probe-mutation", "skill-extra-action", "cleanup-error"] as const) {
+  test(`skill claims, incorrect files, and failed behavior cannot pass; cleanup cannot hide collateral changes: ${scenario}`, async () => {
     const fixture = await exercise(scenario);
     try {
       const result = await fixture.run(...workflowArgs);
@@ -252,8 +252,8 @@ test("skill claims, incorrect files, and failed behavior cannot pass; cleanup ca
       if (scenario === "skill-extra-action") expect(result.report?.results[0]?.response?.continuation).toBe("stop");
       expect(fixture.requests.some(request => request.method === "chats.respond")).toBe(false);
     } finally { await fixture.close(); }
-  }
-}, 30000);
+  }, 30000);
+}
 
 test("workflows require opt-in, the named QA Profile, and existing cleanup permission before mutation", async () => {
   for (const args of [["--case", "create-skill"], [...workflowArgs.slice(0, 3)], [...workflowArgs.slice(0, 3), "--qa-profile", "WrongQA"]]) {
