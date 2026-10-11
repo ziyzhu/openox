@@ -2,8 +2,8 @@ import { expect, test } from "bun:test";
 
 const cli = new URL("../../../../../apps/cli/src/ox.ts", import.meta.url).pathname;
 
-async function command(args: string[]) {
-  const child = Bun.spawn(["bun", cli, ...args], {
+async function command(args: string[], entry = cli) {
+  const child = Bun.spawn(["bun", entry, ...args], {
     stdout: "pipe", stderr: "pipe", stdin: "ignore",
     env: { ...process.env, OX_REPOSITORY: "", OX_HOST_ENDPOINT: "ws://127.0.0.1:1", OX_QA_DEVICE: "" },
   });
@@ -13,10 +13,26 @@ async function command(args: string[]) {
   return { stdout, stderr, code };
 }
 
-// Invokes real CLI processes. Help and argument rejection must work without a Host.
+test("QA conversation flags and documented runner paths work without a target", async () => {
+  for (const name of ["image-widget", "profile-files", "ox-errors", "local-repository", "service-icons", "bundled-skills"]) {
+    const entry = new URL(`../ios/${name}.ts`, import.meta.url).pathname;
+    for (const flag of ["--conversation", "--chat"]) {
+      const args = [`${flag}=saved`, ...(name === "bundled-skills" ? ["--temporary-conversation=temporary"] : [])];
+      const help = await command([...args, "--help"], entry);
+      expect(help.code).toBe(0);
+      expect(help.stdout).toContain("--conversation");
+      const missingTarget = await command(args, entry);
+      expect(missingTarget.code).toBe(1);
+      expect(missingTarget.stderr).toContain("Pass --device");
+    }
+  }
+  const durable = new URL("../ios/durable-conversation.ts", import.meta.url).pathname;
+  expect((await command(["--help"], durable)).code).toBe(0);
+});
+
 test("CLI help and service argument validation do not connect to a Host", async () => {
   for (const args of [["vm", "inspect"], ["vm", "functions"], ["vm", "help"],
-    ["chat", "open"], ["chat", "respond"], ["host", "list"], ["host", "discover"], ["host", "service", "refresh-auth"]]) {
+    ["conversation", "open"], ["conversation", "respond"], ["host", "list"], ["host", "discover"], ["host", "service", "refresh-auth"]]) {
     const result = await command([...args, "--help"]);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("Usage:");

@@ -204,7 +204,7 @@
       },
       "additionalProperties": true
     },
-    "NewChatRequest": {
+    "NewConversationRequest": {
       "type": "object",
       "properties": {
         "temporary": {
@@ -240,7 +240,7 @@
       },
       "additionalProperties": true
     },
-    "SendChatRequest": {
+    "SendConversationRequest": {
       "type": "object",
       "required": [
         "text"
@@ -272,7 +272,7 @@
       },
       "additionalProperties": true
     },
-    "RespondChatRequest": {
+    "RespondConversationRequest": {
       "type": "object",
       "required": [
         "promptId",
@@ -619,7 +619,7 @@
       },
       "additionalProperties": true
     },
-    "ChatRow": {
+    "ConversationRow": {
       "type": "object",
       "required": [
         "id",
@@ -665,7 +665,7 @@
       },
       "additionalProperties": true
     },
-    "ListChatsResult": {
+    "ListConversationsResult": {
       "type": "object",
       "required": [
         "chats"
@@ -674,13 +674,13 @@
         "chats": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/ChatRow"
+            "$ref": "#/definitions/ConversationRow"
           }
         }
       },
       "additionalProperties": true
     },
-    "ChatTool": {
+    "ConversationTool": {
       "type": "object",
       "required": [
         "name",
@@ -702,7 +702,7 @@
       },
       "additionalProperties": true
     },
-    "ChatSnapshot": {
+    "ConversationSnapshot": {
       "type": "object",
       "required": [
         "id",
@@ -737,7 +737,7 @@
         "tools": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/ChatTool"
+            "$ref": "#/definitions/ConversationTool"
           }
         },
         "messages": {
@@ -756,12 +756,12 @@
           "type": "boolean"
         },
         "pendingPrompt": {
-          "$ref": "#/definitions/PendingChatPrompt"
+          "$ref": "#/definitions/PendingConversationPrompt"
         }
       },
       "additionalProperties": true
     },
-    "PendingChatPrompt": {
+    "PendingConversationPrompt": {
       "type": "object",
       "required": [
         "id",
@@ -792,7 +792,7 @@
       },
       "additionalProperties": true
     },
-    "RespondChatResult": {
+    "RespondConversationResult": {
       "type": "object",
       "required": [
         "chatId",
@@ -808,16 +808,16 @@
       },
       "additionalProperties": true
     },
-    "GetChatResult": {
+    "GetConversationResult": {
       "type": "object",
       "properties": {
         "data": {
-          "$ref": "#/definitions/ChatSnapshot"
+          "$ref": "#/definitions/ConversationSnapshot"
         }
       },
       "additionalProperties": true
     },
-    "NewChatResult": {
+    "NewConversationResult": {
       "type": "object",
       "required": [
         "chatId",
@@ -837,7 +837,7 @@
       },
       "additionalProperties": true
     },
-    "SendChatResult": {
+    "SendConversationResult": {
       "type": "object",
       "required": [
         "chatId",
@@ -859,7 +859,7 @@
       },
       "additionalProperties": true
     },
-    "StopChatResult": {
+    "StopConversationResult": {
       "type": "object",
       "required": [
         "chatId",

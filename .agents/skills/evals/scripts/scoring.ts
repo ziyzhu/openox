@@ -1,6 +1,6 @@
 import * as ts from "typescript";
 import { actions, ownedSkillWrite, skillMatches } from "./observations.ts";
-import type { ChatEvidence, Check, EvalCase, EvalResponse, EvalSnapshot } from "./types.ts";
+import type { ConversationEvidence, Check, EvalCase, EvalResponse, EvalSnapshot } from "./types.ts";
 
 function history(snapshot: EvalSnapshot | undefined) {
   const messages = snapshot?.messages ?? [];
@@ -13,11 +13,11 @@ function history(snapshot: EvalSnapshot | undefined) {
   return { assistants, tools, results, last, answer, output };
 }
 
-function chatChecks(evidence: ChatEvidence, turns: number): Check[] {
+function conversationChecks(evidence: ConversationEvidence, turns: number): Check[] {
   const { assistants, tools, results, last } = history(evidence.snapshot);
   const checks: Check[] = [
     { detail: "Every user turn completed", passed: evidence.outcomes.length === turns && evidence.outcomes.every(turn => turn.outcome === "completed") },
-    { detail: "Chat is idle with no pending approval", passed: evidence.snapshot?.isBusy === false && !evidence.snapshot.pendingPrompt },
+    { detail: "Conversation is idle with no pending approval", passed: evidence.snapshot?.isBusy === false && !evidence.snapshot.pendingPrompt },
     { detail: "Received a complete assistant response", passed: last?.stopReason === "stop" },
     { detail: "No failed, aborted, or truncated model response", passed: assistants.every(message => !["error", "aborted", "length", "pending"].includes(message.stopReason)) },
     { detail: "Every tool call has one successful matching real result", passed: tools.every(call => {
@@ -42,7 +42,7 @@ export function score(test: EvalCase, response: EvalResponse): Check[] {
   const checks: Check[] = [
     ...response.observationChecks,
     { detail: "Evidence captured without CLI or transport errors", passed: response.errors.length === 0 },
-    ...chatChecks(response, test.prompts.length),
+    ...conversationChecks(response, test.prompts.length),
   ];
   for (const rule of test.rules) {
     switch (rule.kind) {
@@ -67,8 +67,8 @@ export function score(test: EvalCase, response: EvalResponse): Check[] {
         const name = response.fixture?.name ?? "";
         checks.push({ detail: "Task executed an authorized write to the run-owned skill", passed: !!name && invocations.some(call => ownedSkillWrite(call, name) && "succeeded" in call.outcome) });
         checks.push({ detail: "Independently read skill has the requested metadata, instructions, and no extra resources", passed: skillMatches(test, response) });
-        if (probe) checks.push(...chatChecks(probe, 1).map(check => ({ ...check, detail: `Probe: ${check.detail}` })));
-        checks.push({ detail: "Fresh-chat skill probe returned the run-specific answer", passed: !!probe && !!response.fixture && history(probe.snapshot).answer === response.fixture.answer });
+        if (probe) checks.push(...conversationChecks(probe, 1).map(check => ({ ...check, detail: `Probe: ${check.detail}` })));
+        checks.push({ detail: "Fresh-conversation skill probe returned the run-specific answer", passed: !!probe && !!response.fixture && history(probe.snapshot).answer === response.fixture.answer });
         checks.push({ detail: "Probe actually read the created skill", passed: actions(probe?.snapshot).some(call => call.name === "ox.fs.read" && call.args.path === `skills/${name}/SKILL.md` && "succeeded" in call.outcome) });
         break;
       }

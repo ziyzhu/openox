@@ -142,7 +142,7 @@ struct SkillsListView: View {
         LibraryEmptyNote(
             destination: .skills,
             title: "No skills yet",
-            detail: "Add a skill, then type / in a chat to drop its instructions into the message."
+            detail: "Add a skill, then type / in a conversation to drop its instructions into the message."
         )
     }
 
@@ -353,7 +353,7 @@ struct SkillEditorView: View {
                     .accessibilityIdentifier(A11yID.Settings.skillDescription)
                     .disabled(!owner.isWritable)
 
-                Text("These instructions drop into the message box when you pick the skill in a chat.")
+                Text("These instructions drop into the message box when you pick the skill in a conversation.")
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .padding(.horizontal, Theme.Spacing.sm)
@@ -407,7 +407,7 @@ struct SkillEditorView: View {
 
     private var serviceSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("Picking this skill auto-attaches these services to the chat.")
+            Text("Picking this skill auto-attaches these services to the conversation.")
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .padding(.horizontal, Theme.Spacing.sm)

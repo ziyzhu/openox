@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct ConversationImportView: View {
-    let proposal: ChatImportProposal
-    let coordinator: ChatImportCoordinator
+    let proposal: ConversationImportProposal
+    let coordinator: ConversationImportCoordinator
     let conversations: ConversationManager
 
     private var artifactBytes: Int {
@@ -47,7 +47,7 @@ struct ConversationImportView: View {
                         Label("Includes compacted context", systemImage: "text.badge.checkmark")
                             .font(Theme.Fonts.labelMd)
                             .foregroundStyle(Theme.Colors.onSurface)
-                        Text("Compacted context can contain details that aren't visible in the chat.")
+                        Text("Compacted context can contain details that aren't visible in the conversation.")
                             .font(Theme.Fonts.bodySm)
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     }
@@ -69,7 +69,7 @@ struct ConversationImportView: View {
 
                 Spacer(minLength: 0)
 
-                Button("Add Chat") { coordinator.install(using: conversations) }
+                Button("Add Conversation") { coordinator.install(using: conversations) }
                     .buttonStyle(.borderedProminent)
                     .frame(maxWidth: .infinity)
                     .disabled(coordinator.isSaving)
@@ -77,7 +77,7 @@ struct ConversationImportView: View {
             }
             .padding(Theme.Spacing.lg)
             .background(Theme.Colors.background)
-            .navigationTitle("Add Chat")
+            .navigationTitle("Add Conversation")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

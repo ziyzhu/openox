@@ -19,9 +19,9 @@ extension OxHostProtocol {
         let bytes: Int?
     }
 
-    static func chatRows(_ summaries: [HostChatSummary]) -> [ChatRow] {
+    static func conversationRows(_ summaries: [HostConversationSummary]) -> [ConversationRow] {
         summaries.map { summary in
-            ChatRow(
+            ConversationRow(
                 id: summary.id.uuidString,
                 title: summary.title,
                 model: summary.model.map(JSONValue.string) ?? .null,
@@ -32,7 +32,7 @@ extension OxHostProtocol {
         }
     }
 
-    struct ChatRow: Encodable {
+    struct ConversationRow: Encodable {
         let id: String
         let title: String
         let model: JSONValue
@@ -41,8 +41,12 @@ extension OxHostProtocol {
         let active: Bool
     }
 
-    struct ListChatsResult: Encodable {
-        let chats: [ChatRow]?
+    struct ListConversationsResult: Encodable {
+        let conversations: [ConversationRow]?
+
+        private enum CodingKeys: String, CodingKey {
+            case conversations = "chats"
+        }
     }
 
     struct ModelRow: Encodable {

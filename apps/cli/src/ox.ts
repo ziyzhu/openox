@@ -4,7 +4,7 @@ import { PROFILE_COMMANDS } from "./ox-content.ts";
 import { REPOSITORY_COMMANDS } from "./repositories.ts";
 import { REPOSITORY_SERVICE_COMMANDS } from "./repository-services.ts";
 import { HOST_COMMANDS } from "./host.ts";
-import { SUBS as chatCommands } from "./chat.ts";
+import { SUBS as conversationCommands } from "./conversation.ts";
 import { SUBS as vmCommands } from "./vm.ts";
 import packageMetadata from "../package.json";
 
@@ -15,8 +15,8 @@ const groups: Record<string, CommandGroup> = {
     ...REPOSITORY_SERVICE_COMMANDS,
   }),
   host: group("host", "Inspect and operate an Ox Host (--host <ws-url>).", HOST_COMMANDS),
-  chat: group("chat", "Drive and inspect chats on the Host (--chat <chat-id>).", chatCommands),
-  vm: group("vm", "Use a chat-bound VM on the Host (--chat <chat-id>).", vmCommands),
+  conversation: group("conversation", "Drive and inspect conversations on the Host (--conversation <conversation-id>).", conversationCommands),
+  vm: group("vm", "Use a conversation-bound VM on the Host (--conversation <conversation-id>).", vmCommands),
 };
 
-await runCli("ox", packageMetadata.version, "Use Ox Profiles, repositories, Hosts, chats, and VMs", groups, process.argv.slice(2));
+await runCli("ox", packageMetadata.version, "Use Ox Profiles, repositories, Hosts, conversations, and VMs", groups, process.argv.slice(2));

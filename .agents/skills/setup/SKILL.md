@@ -64,7 +64,7 @@ Resolve `BASELINE_UDID` and, after cloning, `OX1_UDID` from the inventory before
 - Use bundled services normally. Only when testing repository installation or sync, start `ox --repository examples/repository repository serve --port <registry-port>`, verify `curl -fsS http://127.0.0.1:<registry-port>/health`, and relaunch with `SIMCTL_CHILD_OX_SERVICES_ENDPOINT=http://localhost:<registry-port>/repository.git` in the launch environment.
 - Inspect and drive UI with `idb`; verify the expected normal UI using the shared skill's AX/capture loop, not just launch success. When installed apps share a display name, launch by bundle identifier rather than tapping the first matching Home Screen icon.
 - For CLI access, enable **Settings > Host > Allow connections** and keep Ox foreground. Physical-device and Release Hosts require Tailscale on both devices. A Debug Simulator launch can explicitly opt into localhost with `SIMCTL_CHILD_OX_HOST_LOOPBACK=1` in the simctl launch environment; it binds only `127.0.0.1` on the assigned port and uses the same ordinary Host API. This flag is compiled out on physical devices and Release builds; a normal relaunch restores Tailscale-only access. `OX_DEBUG_ENDPOINT` selects the port, not the ingress mode. Verify `ox --host ws://127.0.0.1:<debug-port> host describe` for loopback, or use `ox host list`/the tailnet address for Tailscale. A `starting` log is not readiness. Preserve failure logs, never add unrestricted listeners or bypass approvals, and restore temporary settings afterward.
-- Use Mock for a no-cost smoke test; real provider calls require authorization. Enter provider credentials through Ox's secure UI when needed. The ignored `secrets/API_KEYS.json` is only for local test bootstrap; never request a key in chat or pass it on a command line.
+- Use Mock for a no-cost smoke test; real provider calls require authorization. Enter provider credentials through Ox's secure UI when needed. The ignored `secrets/API_KEYS.json` is only for local test bootstrap; never request a key in conversation or pass it on a command line.
 
 ## Device templates
 
@@ -81,13 +81,13 @@ is a runnable example. `--schema` prints JSON Schema directly from that contract
 `--validate --template <json>` checks references and external
 inputs without a simulator. Omitted fields remain unchanged. Profiles get a
 run-owned name suffix; each application creates new Profiles rather than merging
-into existing data. Result manifests map template-local Profile/chat IDs to actual
+into existing data. Result manifests map template-local Profile/conversation IDs to actual
 IDs. Settings support the existing Ox themes, not an invented system theme.
 
 UserDefaults supports strings, booleans, numbers, arrays, `{ "dictionary": {...} }`,
 `{ "data": "<base64>" }`, and `{ "date": "<UTC ISO timestamp>" }`; explicit `remove`
 clears keys. Typed settings and raw preferences cannot conflict. Profile files can
-populate nested skills as well as shared content; chat files own attachment bytes.
+populate nested skills as well as shared content; conversation files own attachment bytes.
 Messages support user text/attachments and assistant text/reasoning; `packageFrom`
 imports an existing `.chat` package instead of `messages` for richer historical tool
 results and presentation. Neither path runs historical tools or calls a model.
@@ -150,7 +150,7 @@ asc auth login --key-id <key-id> --issuer-id <issuer-id> \
   --private-key /absolute/path/to/AuthKey.p8 --name <account>
 ```
 
-Never paste private-key contents into chat, command arguments, or tracked files. Do not create or revoke API keys or signing certificates as a routine setup step. Missing credentials block App Store release work, not local builds or commits. Follow `AGENTS.md` for commit requirements; committing requires no App Store queries or version checks.
+Never paste private-key contents into conversation, command arguments, or tracked files. Do not create or revoke API keys or signing certificates as a routine setup step. Missing credentials block App Store release work, not local builds or commits. Follow `AGENTS.md` for commit requirements; committing requires no App Store queries or version checks.
 
 ## Pi and portable agent skills
 

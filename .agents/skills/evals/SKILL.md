@@ -1,6 +1,6 @@
 ---
 name: evals
-description: Run, compare, diagnose, and extend Ox's real-model behavioral evals through ordinary Ox CLI chats, including answer, tool-use, and independently observed workflow outcomes. Use for repeatable agent-quality measurement; use Ox Gym for exploratory user simulation.
+description: Run, compare, diagnose, and extend Ox's real-model behavioral evals through ordinary Ox CLI conversations, including answer, tool-use, and independently observed workflow outcomes. Use for repeatable agent-quality measurement; use Ox Gym for exploratory user simulation.
 ---
 
 # Ox evals
@@ -18,10 +18,10 @@ establish prompt quality.
 Follow Simulator Setup ownership and baseline rules in `AGENTS.md`; use `ios-simulator`
 and `ox-cli` to prepare a numbered simulator. Build/install the current checkout,
 use bundled services and a sanitized QA Profile, and preserve simulator settings.
-The runner creates ordinary chats through this checkout's CLI. Read-only cases,
-observers, and probes are temporary; state-changing tasks use saved chats.
+The runner creates ordinary conversations through this checkout's CLI. Read-only cases,
+observers, and probes are temporary; state-changing tasks use saved conversations.
 Workflows require `--allow-profile-writes --qa-profile <local-QA-name>` and existing
-creation/cleanup permissions. It changes the active chat; never target personal
+creation/cleanup permissions. It changes the active conversation; never target personal
 or shared state. It never responds to
 approvals, imports credentials, reconfigures the simulator, or adds eval-only app
 hooks. No repository server is needed.
@@ -37,7 +37,7 @@ changes are descriptive, not established statistical improvements.
 Turn reproducible failures into sanitized cases with observable assertions.
 Use real, bounded, read-only tasks by default. Observe resulting state independently,
 probe before cleanup without repair, and treat missing evidence as unverified.
-Use independent random expected values, never expose answers in fresh-chat probes,
+Use independent random expected values, never expose answers in fresh-conversation probes,
 and stop the cohort on collateral mutations or uncertain cleanup. Do not force tool results or model
 responses through eval-only handling. Controlled failure or injection coverage
 requires an ordinary test input/service and explicit authorization for its effects.

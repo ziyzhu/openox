@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct HostChatSummary: Sendable {
+nonisolated struct HostConversationSummary: Sendable {
     let id: UUID
     let title: String
     let model: String?
@@ -16,7 +16,7 @@ protocol OxHost: AnyObject {
     var conversations: ConversationManager { get }
     var services: ServiceManager { get }
 
-    func listChats() -> [HostChatSummary]
+    func listConversations() -> [HostConversationSummary]
     func prepareStorage() async throws
     func prepare() async throws
 }

@@ -6,20 +6,20 @@ extension OxHostProtocol {
     enum Method: String, CaseIterable {
         case describe = "host.describe"
         case durableStorage = "debug.durable.storage"
-        case durableChat = "debug.durable.chat"
+        case durableConversation = "debug.durable.chat"
         case invokeAction = "services.invoke"
         case evaluate = "services.evaluate"
         case reloadService = "services.reload"
         case refreshServiceAuth = "services.refreshAuth"
         case listServices = "services.list"
         case syncServices = "services.sync"
-        case listChats = "chats.list"
-        case getChat = "chats.get"
-        case openChat = "chats.open"
-        case respondChat = "chats.respond"
-        case newChat = "chats.new"
-        case sendChat = "chats.send"
-        case stopChat = "chats.stop"
+        case listConversations = "chats.list"
+        case getConversation = "chats.get"
+        case openConversation = "chats.open"
+        case respondConversation = "chats.respond"
+        case newConversation = "chats.new"
+        case sendConversation = "chats.send"
+        case stopConversation = "chats.stop"
         case listProviders = "providers.list"
         case getLogs = "logs.list"
         case getComposerFormatting = "debug.composer.formatting"
@@ -70,19 +70,19 @@ extension OxHostProtocol {
         let sessionId: String?
     }
 
-    struct RespondChatRequest: Decodable {
+    struct RespondConversationRequest: Decodable {
         let sessionId: String?
         let promptId: String
         let answer: String
     }
 
-    struct NewChatRequest: Decodable {
+    struct NewConversationRequest: Decodable {
         let temporary: Bool?
         let providerId: String?
         let modelId: String?
     }
 
-    struct SendChatRequest: Decodable {
+    struct SendConversationRequest: Decodable {
         let sessionId: String?
         let text: String
         let wait: Bool?

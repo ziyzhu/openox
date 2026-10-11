@@ -21,7 +21,7 @@ struct HTMLFileScreen: View {
                 safeAreaInsets: geometry.safeAreaInsets
             )
         }
-        .background(Theme.Colors.chatSurface)
+        .background(Theme.Colors.conversationSurface)
         .navigationTitle(artifact.userFacingName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
@@ -99,7 +99,7 @@ struct HTMLFileView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Colors.chatSurface)
+        .background(Theme.Colors.conversationSurface)
         .task(id: modifiedAt) { await load() }
     }
 

@@ -562,7 +562,7 @@ extension Scenario {
     static let defaultModelSelection = Scenario(name: "default-model-selection") { ctx in
         if ctx.turn == 0 {
             return [execute("""
-            const purpose = "Verify and restore new-chat model preferences";
+            const purpose = "Verify and restore new-conversation model preferences";
             const baseline = await ox.app.defaultModel({ purpose });
             const current = await ox.conversation.model({ purpose });
             if (baseline.configured && baseline.provider.id !== "mock") throw Error("Use automatic or Mock defaults for this fixture");
@@ -584,7 +584,7 @@ extension Scenario {
                 }
               }
               const unchanged = await ox.conversation.model({ purpose });
-              if (unchanged.model.id !== current.model.id) throw Error("Default changes affected the current chat");
+              if (unchanged.model.id !== current.model.id) throw Error("Default changes affected the current conversation");
               const noop = await ox.conversation.setModel({ selection: { provider: current.provider.id, model: current.model.id }, purpose });
               if (noop.changed || noop.status !== "applied") throw Error("Current model no-op failed");
             } finally {
@@ -680,12 +680,12 @@ extension Scenario {
     static let binaryChoiceFlow = Scenario(name: "binary-choice") { ctx in
         guard let result = ctx.resultText("execute") else {
             return [
-                .say("This will permanently delete 3 archived chats.\n"),
-                execute("console.log({ choice: await ox.user.choose({ body: \"Delete 3 archived chats? This can't be undone.\", options: [\"Yes\", \"No\"], purpose: \"Confirm deletion\" }) });"),
+                .say("This will permanently delete 3 archived conversations.\n"),
+                execute("console.log({ choice: await ox.user.choose({ body: \"Delete 3 archived conversations? This can't be undone.\", options: [\"Yes\", \"No\"], purpose: \"Confirm deletion\" }) });"),
             ]
         }
         if result.contains("\"choice\":\"Yes\"") {
-            return [.say("Done — 3 archived chats deleted."), .stop(.stop)]
+            return [.say("Done — 3 archived conversations deleted."), .stop(.stop)]
         }
         return [.say("Cancelled — nothing was deleted."), .stop(.stop)]
     }
@@ -718,7 +718,7 @@ extension Scenario {
         }
         let domain = "github.com"
         return [
-            .say("You'll need to sign in first — use the sign-in card in this chat.\n"),
+            .say("You'll need to sign in first — use the sign-in card in this conversation.\n"),
             execute("console.log(await ox.service.signIn({ domain: \"\(domain)\", purpose: \"Sign in to service\" }));"),
         ]
     }
@@ -730,7 +730,7 @@ extension Scenario {
         }
         let domain = "archive.ph"
         return [
-            .say("Complete the human-verification card in this chat.\n"),
+            .say("Complete the human-verification card in this conversation.\n"),
             execute("await ox.service.solve({ domain: \"\(domain)\", args: { url: \"https://example.com/\" }, purpose: \"Complete verification\" }); console.log({ verified: true });"),
         ]
     }
@@ -746,7 +746,7 @@ extension Scenario {
         let domain = "oftendining.com"
         #endif
         return [
-            .say("Review and complete checkout using the payment card in this chat.\n"),
+            .say("Review and complete checkout using the payment card in this conversation.\n"),
             execute("console.log(await ox.service.pay({ domain: \"\(domain)\", args: {}, purpose: \"Review checkout\" }));"),
         ]
     }
@@ -955,8 +955,8 @@ extension Scenario {
         guard let output = ctx.resultText("execute") else {
             return [execute("""
             try {
-              const result = await ox.app.logs({ level: "info", category: "Session", query: "Chat.", limit: 3, purpose: "Read diagnostic logs" });
-              const valid = result.entries.length > 0 && result.entries.length <= 3 && result.entries.every((entry, index, entries) => entry.category === "Session" && ["info", "warning", "error"].includes(entry.level) && entry.message.toLowerCase().includes("chat.") && (index === 0 || entry.timestamp <= entries[index - 1].timestamp));
+              const result = await ox.app.logs({ level: "info", category: "Session", query: "Conversation.", limit: 3, purpose: "Read diagnostic logs" });
+              const valid = result.entries.length > 0 && result.entries.length <= 3 && result.entries.every((entry, index, entries) => entry.category === "Session" && ["info", "warning", "error"].includes(entry.level) && entry.message.toLowerCase().includes("conversation.") && (index === 0 || entry.timestamp <= entries[index - 1].timestamp));
               console.log(JSON.stringify({ valid, count: result.entries.length, truncated: result.truncated }));
             } catch (error) {
               console.log(JSON.stringify({ error: String(error) }));

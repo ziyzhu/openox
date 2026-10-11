@@ -1,6 +1,6 @@
 ---
 name: ox-cli
-description: Use the terminal as an Ox Client. Connect to an Ox Host; discover, drive, inspect, or watch chats; list model providers; read structured logs; inspect or call a VM; administer Profiles; inspect or verify service repositories; and invoke live services.
+description: Use the terminal as an Ox Client. Connect to an Ox Host; discover, drive, inspect, or watch conversations; list model providers; read structured logs; inspect or call a VM; administer Profiles; inspect or verify service repositories; and invoke live services.
 ---
 
 # Ox CLI
@@ -14,7 +14,7 @@ selector flag:
 - `ox profile` with `--profile <path>`: a Profile directory on disk.
 - `ox repository` with `--repository <path-or-url>`: a service repository.
 - `ox host` with `--host <ws-url>`: an Ox Host.
-- `ox chat` and `ox vm` with `--host` and `--chat <chat-id>`: a chat on that
+- `ox conversation` and `ox vm` with `--host` and `--conversation <conversation-id>`: a conversation on that
   Host and its VM.
 
 Do not select or infer a web-page runtime. The Host owns service adapters and
@@ -26,8 +26,8 @@ or tab session IDs; a live service is addressed by its domain.
 - Use `ox host list` to find reachable simulator Hosts and online iOS Tailscale peers; use `--all` to include unavailable candidates.
 - Use `ox host logs`, `ox host providers`, and `ox host describe` for Host introspection.
 - For agent-loop diagnostics, filter logs by `AgentLatency.summary`, `AgentModel.end`, or `AgentCall.`. Correlate `conversation`, `submission`, and `turn`; `tools` counts model-tool executions, while `functions` counts nested `ox.*` invocations. Token totals cover reported model usage, including compaction; check `usageComplete`, `missingUsage`, and `unfinishedCalls` before treating a summary as complete. All-zero provider usage is conservatively reported as unknown, not measured zero.
-- Use `ox chat` to create, open, drive, respond to, stop, inspect, and watch chats; `ox chat send`
-  runs the real chat turn, including tools, services, and compaction.
+- Use `ox conversation` to create, open, drive, respond to, stop, inspect, and watch conversations; `ox conversation send`
+  runs the real conversation turn, including tools, services, and compaction.
 - Use `ox vm` for VM functions, VM-visible skills, and execution through the
   agent's actual capability boundary.
 - Use `ox profile` for direct Profile file reads.
@@ -36,8 +36,8 @@ or tab session IDs; a live service is addressed by its domain.
 - Use `ox host services` and `ox host service` for live service operations.
 - Skills come from three sources: `ox profile skills` (a Profile's files),
   `ox repository skills` (a repository's files), and `ox vm skills` (what the
-  agent in a chat actually sees).
-- Use `idb` with the `ios-simulator` skill to verify chat projection changes; the repository has no dedicated chat projection fixture command.
+  agent in a conversation actually sees).
+- Use `idb` with the `ios-simulator` skill to verify conversation projection changes; the repository has no dedicated conversation projection fixture command.
 - Use the agent-independent `ios-simulator` skill and native tools for iOS Simulator interaction.
 
 ## Connect to a Host and VM
@@ -46,8 +46,8 @@ Target the default DEBUG iOS Simulator Host with `ox vm`. Pass
 `--host <ws-url>` or set `OX_HOST_ENDPOINT` for another Host.
 
 ```sh
-ox chat list
-ox chat inspect
+ox conversation list
+ox conversation inspect
 ox host logs --level warning
 ox host logs --all --level warning --grep timeout
 ox host logs --page --limit 100 --json
@@ -59,17 +59,17 @@ ox vm skills
 ox vm skills <name>
 ```
 
-Use `--chat <chat-id>` when the active chat is not the intended VM:
+Use `--conversation <conversation-id>` when the active conversation is not the intended VM:
 
 ```sh
-ox --chat <chat-id> chat inspect
-ox --chat <chat-id> vm inspect
-ox --chat <chat-id> vm call ox.fs.read --args '<json>'
+ox --conversation <conversation-id> conversation inspect
+ox --conversation <conversation-id> vm inspect
+ox --conversation <conversation-id> vm call ox.fs.read --args '<json>'
 ```
 
-A saved chat may be listed before it is hydrated. Run `ox --chat <full-id> chat open` before inspecting or sending to an unloaded chat. This selects it and discards an outgoing temporary chat. For a pending choice or authorized approval, inspect with `ox --chat <id> chat inspect --pending --json`, then use `ox --chat <id> chat respond <answer> --prompt <prompt-id>`. Use a returned option label or an allowed custom answer; never infer approval. Stale IDs are rejected. Credential entry and app-only interactions remain in Ox. Older Hosts without `chats.open` or `chats.respond` require the app sidebar and prompt UI; in the idb accessibility tree, `chat.confirm.Approve` is active while `chat.confirm.receipt.Approve` records an approval already completed.
+A saved conversation may be listed before it is hydrated. Run `ox --conversation <full-id> conversation open` before inspecting or sending to an unloaded conversation. This selects it and discards an outgoing temporary conversation. For a pending choice or authorized approval, inspect with `ox --conversation <id> conversation inspect --pending --json`, then use `ox --conversation <id> conversation respond <answer> --prompt <prompt-id>`. Use a returned option label or an allowed custom answer; never infer approval. Stale IDs are rejected. Credential entry and app-only interactions remain in Ox. Older Hosts without `conversations.open` or `conversations.respond` require the app sidebar and prompt UI; in the idb accessibility tree, `conversation.confirm.Approve` is active while `conversation.confirm.receipt.Approve` records an approval already completed.
 
-First-time `ox.service.attach` from an idle chat can return a stopped outcome because interactive prompts require an active agent run. Inspect the app and logs before retrying; do not treat this as proof the user declined. For an authorized development task, attach through the app's Services picker, then use `ox.service.attach` to reload validated Local edits. Preserve genuine declined or blocked decisions.
+First-time `ox.service.attach` from an idle conversation can return a stopped outcome because interactive prompts require an active agent run. Inspect the app and logs before retrying; do not treat this as proof the user declined. For an authorized development task, attach through the app's Services picker, then use `ox.service.attach` to reload validated Local edits. Preserve genuine declined or blocked decisions.
 
 Prefer `ox vm call <ox.function> --args <json>` for normal operations. It
 preserves the Host's schemas, permissions, approvals, and service attachments.
@@ -86,9 +86,9 @@ ox vm help <ox.function>
 ## Delegate service authoring to Ox
 
 Use the `develop-services` skill for the service evolution and developer-feedback loop.
-Drive an Ox chat on the user-selected simulator through the built-in
+Drive an Ox conversation on the user-selected simulator through the built-in
 `skills/evolve/SKILL.md` System skill for service exploration, authoring, repair, and live
-verification. While observing the run, use chat history and structured logs to
+verification. While observing the run, use conversation history and structured logs to
 identify friction, repeated failures, and missing capabilities. Fix the underlying
 harness issues and improve tools, instructions, diagnostics, or verification
 where the evidence supports a reusable improvement. Exercise the affected flow
@@ -105,7 +105,7 @@ ox --profile <path> profile memory
 ox --profile <path> profile soul
 ox --profile <path> profile skills [name] [--json]
 ox --profile <path> profile artifacts [filename] [--json]
-ox --profile <path> profile chats [id] [--json]
+ox --profile <path> profile conversations [id] [--json]
 ```
 
 Profile inspection is read-only. Reading iCloud Drive may require Files & Folders
@@ -143,8 +143,8 @@ effect. Treat `host service eval` as arbitrary code on a Host-managed service pa
 and keep it narrowly scoped.
 
 Native iOS actions also require their service to be attached to the selected
-chat. A catalog search result alone is insufficient. Attach through the app's
-Services picker or the authorized chat workflow before invoking
+conversation. A catalog search result alone is insufficient. Attach through the app's
+Services picker or the authorized conversation workflow before invoking
 `ios:<service>:<action>`; an unattached native service may report an unknown
 action even when it appears in the catalog.
 

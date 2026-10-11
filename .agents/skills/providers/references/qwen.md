@@ -14,7 +14,7 @@
 
 Ox exposes Qwen API access and Qwen Coding Plan in Global and China. Each product keeps distinct credentials, and each product's Global and China credentials are also separate. Do not collapse these account boundaries because their APIs are protocol-compatible.
 
-Qwen Website remains an ordinary service using the signed-in Ox browser session for `chat.qwen.ai`, separate from Model Studio and Coding Plan keys. It can be consulted through explicit service Actions, but cannot supply the Ox agent model.
+Qwen Website remains an ordinary service using the signed-in Ox browser session for `conversation.qwen.ai`, separate from Model Studio and Coding Plan keys. It can be consulted through explicit service Actions, but cannot supply the Ox agent model.
 
 The China general API is a first-run trial option because new Model Studio accounts receive time-limited model quotas. Qwen OAuth is not an Ox onboarding option; its free tier was discontinued in 2026. Verified users must enable the provider's stop-at-quota setting to prevent paid overage.
 

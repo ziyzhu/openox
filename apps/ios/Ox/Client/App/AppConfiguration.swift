@@ -6,7 +6,7 @@ nonisolated enum AppConfiguration {
     static let keychainService = required("OXKeychainService")
     static let websiteDataNamespace = required("OXWebsiteDataNamespace")
     static let agentSkillTypeIdentifier = required("OXAgentSkillTypeIdentifier")
-    static let chatTypeIdentifier = required("OXChatTypeIdentifier")
+    static let conversationTypeIdentifier = required("OXChatTypeIdentifier")
     static let serviceTypeIdentifier = required("OXServiceTypeIdentifier")
 
     private static func required(_ key: String) -> String {

@@ -33,7 +33,7 @@ digraph OpenOx {
     color="#222222";
     margin=20;
 
-    host_api [label="Ox Host API\nChats · Services · Lifecycle"];
+    host_api [label="Ox Host API\nConversations · Services · Lifecycle"];
     agent [label="Ox Agent\nReasoning · Tool use"];
     model_adapter [label="Model adapter\nProvider-neutral agent loop"];
     profile [label="Ox Profile\nIdentity · Memory · Skills\nFiles · Conversations"];

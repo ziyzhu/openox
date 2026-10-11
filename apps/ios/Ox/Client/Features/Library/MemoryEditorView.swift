@@ -6,7 +6,7 @@ struct MemoryEditorView: View {
     var body: some View {
         PersonalContextEditor(
             title: "Memory",
-            guidance: "Ox reads this before every chat. Keep it short and durable - preferences, who you are, standing instructions. Markdown is fine.",
+            guidance: "Ox reads this before every conversation. Keep it short and durable - preferences, who you are, standing instructions. Markdown is fine.",
             editorIdentifier: A11yID.Settings.memoryEditor,
             saveIdentifier: A11yID.Settings.memorySave,
             copyIdentifier: A11yID.Settings.memoryCopy,

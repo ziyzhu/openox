@@ -7,7 +7,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox transcribes your speech on this device. Hold the input area to talk and release to send the text to your chat."
+            "value" : "Ox transcribes your speech on this device. Hold the input area to talk and release to send the text to your conversation."
           }
         },
         "zh-Hans" : {
@@ -106,7 +106,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Ox uses the camera to capture photos to attach to your chat."
+            "value" : "Ox uses the camera to capture photos to attach to your conversation."
           }
         },
         "zh-Hans" : {
@@ -211,7 +211,7 @@
         }
       }
     },
-    "Ox Chat" : {
+    "Ox Conversation" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

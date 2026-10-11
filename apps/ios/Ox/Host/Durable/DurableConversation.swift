@@ -32,13 +32,13 @@ extension Conversation {
         try virtualMachine.fileSystem.location(path, defaultRoot: defaultRoot, resources: await resourceFiles())
     }
 
-    func renderPrompt(configuration: AgentConfiguration) async throws -> RenderedChatPrompt {
+    func renderPrompt(configuration: AgentConfiguration) async throws -> RenderedConversationPrompt {
         try await durablePreparation?.value
         guard let route = durableRoute else { throw RuntimeError.bridge("Pi conversation preparation has not completed") }
         let value = try await route.session.runtime.command(.object([
             "action": .string("composePrompt"), "promptState": configuration.promptState,
         ]))
-        return try JSONDecoder().decode(RenderedChatPrompt.self, from: Data(value.jsonString().utf8))
+        return try JSONDecoder().decode(RenderedConversationPrompt.self, from: Data(value.jsonString().utf8))
     }
 
     func prepareDurableConversation(configuration: AgentConfiguration) async throws -> JSONValue {

@@ -2,7 +2,7 @@
 
 Use this guide whenever a change affects persisted filenames, directory layouts,
 Codable schemas, UserDefaults, Keychain metadata, service repositories, Profiles,
-chats, indexes, or legacy formats. It applies during development, not only release
+conversations, indexes, or legacy formats. It applies during development, not only release
 preparation; transient in-memory state with no persisted representation is excluded.
 
 Preserve user data across app upgrades. Treat a clean install as insufficient evidence whenever code changes a persisted path, name, identifier, encoding, ownership boundary, or input to derived indexing.
@@ -13,7 +13,7 @@ Read [storage.md](storage.md) before changing or reviewing storage. Update it in
 
 Use `StorageMigrator` as the ordered startup and recovery coordinator. Keep compatibility transforms in `ProfileMigrator`, `ApplicationStorageMigrator`, `CredentialMigrator`, and `RepositoryMigrator` under `apps/ios/Ox/Host/Profile/`; share stateless conversion and verified-copy helpers through `StorageMigrationSupport`. Profile activation must pass through `ProfileMigrator` before publishing its scope; repositories and schedules must pass through their scoped preparation before loading. Runtime consumers must not infer legacy formats or read potentially old state before preparation completes.
 
-Run application-wide migration before constructing storage consumers. Resolve and migrate the active Profile before publishing it to chats, skills, artifacts, or other readers. Prepare the Local service repository before service discovery and search indexing. Apply the same gate before activating another Profile. Keep upgrades lazy: discovery must not migrate inactive Profiles, and their settings must not open old-format content before activation. Existing interrupted-publication recovery remains an application-wide prerequisite.
+Run application-wide migration before constructing storage consumers. Resolve and migrate the active Profile before publishing it to conversations, skills, artifacts, or other readers. Prepare the Local service repository before service discovery and search indexing. Apply the same gate before activating another Profile. Keep upgrades lazy: discovery must not migrate inactive Profiles, and their settings must not open old-format content before activation. Existing interrupted-publication recovery remains an application-wide prerequisite.
 
 Do not expect runtime code to infer arbitrary incompatibilities. Every incompatible change needs an explicit version milestone or an unambiguous structural probe for formats that predate versioning. Reject unknown future versions rather than interpreting them as current data.
 
@@ -95,7 +95,7 @@ Exercise an upgrade fixture produced by the oldest supported shipped representat
 - an older build is never installed over data stamped by a newer build during upgrade testing unless the downgrade path is explicitly under test;
 - fresh install still works, but is not the only tested path.
 
-Include oversized predecessor transcripts and individual JSONL records when verifying chat migrations. A generic file-read cap is not a format incompatibility, and line-by-line processing is not bounded if one record contains huge invocation results. Hash and archive source bytes incrementally; validate checkpoints against the original representation before changing payloads to references.
+Include oversized predecessor transcripts and individual JSONL records when verifying conversation migrations. A generic file-read cap is not a format incompatibility, and line-by-line processing is not bounded if one record contains huge invocation results. Hash and archive source bytes incrementally; validate checkpoints against the original representation before changing payloads to references.
 Also bound aggregate Profile imports: stage and verify conversations individually, and pass bridge payloads as data instead of compiling them into JavaScript source. A fresh or small Profile cannot expose whole-history allocation failures.
 
 Keep sanitized predecessor snapshots and upgrade evidence outside the repository. For Local services, include dirty and clean Git states when relevant. Run the relevant repository checks and exercise the installed iOS build through the startup flow before calling the migration verified.
@@ -115,4 +115,4 @@ and `setup` for OpenOx's scheme, bundle identity, and assigned launch port.
 Use task-specific DerivedData outside the repository. Installing the new app must
 preserve the predecessor container; do not uninstall or erase as upgrade setup.
 
-For every newly added ordered Profile milestone, compare complete before/after trees from an actual predecessor build and verify second-run stability. Sanitize snapshots without changing their encoded shape and retain them outside the repository. The former storage-replay RPC and committed fixture suite are no longer available; do not claim automated migration coverage from the iOS chat smoke.
+For every newly added ordered Profile milestone, compare complete before/after trees from an actual predecessor build and verify second-run stability. Sanitize snapshots without changing their encoded shape and retain them outside the repository. The former storage-replay RPC and committed fixture suite are no longer available; do not claim automated migration coverage from the iOS conversation smoke.

@@ -218,10 +218,10 @@ final class OxCanvas {
                 requireActive: { [unowned self] in try requireRunning() },
                 showBrowser: { [unowned self] service, owner in browser = Browser(id: owner, service: service) },
                 attachTransient: { _ in
-                    throw RuntimeError.bridge("Browser exports are available only to chat agents.")
+                    throw RuntimeError.bridge("Browser exports are available only to conversation agents.")
                 },
                 importFile: { _, _ in
-                    throw RuntimeError.bridge("Browser export files are available only to chat agents.")
+                    throw RuntimeError.bridge("Browser export files are available only to conversation agents.")
                 },
                 choose: { [unowned self] prompt in
                     await waitForInteraction(.choice(UUID(), prompt.body, prompt.options))?.stringValue

@@ -7,7 +7,7 @@ enum ServiceDetailPrimaryAction {
 
     func label(isAttached: Bool) -> LocalizedStringKey {
         switch self {
-        case .startConversation: "Start chat"
+        case .startConversation: "Start conversation"
         case .attach: isAttached ? "Remove" : "Attach"
         }
     }
@@ -21,11 +21,11 @@ enum ServiceDetailPrimaryAction {
 
     func accessibilityIdentifier(_ domain: String, isAttached: Bool) -> String {
         switch self {
-        case .startConversation: A11yID.Chat.Attach.startConversation(domain)
+        case .startConversation: A11yID.ConversationControls.Attach.startConversation(domain)
         case .attach:
             isAttached
-                ? A11yID.Chat.Attach.remove(domain)
-                : A11yID.Chat.Attach.attach(domain)
+                ? A11yID.ConversationControls.Attach.remove(domain)
+                : A11yID.ConversationControls.Attach.attach(domain)
         }
     }
 }
@@ -110,7 +110,7 @@ struct ServiceDetailView: View {
                         Label(saved ? "Saved" : "Save",
                               systemImage: saved ? "bookmark.fill" : "bookmark")
                     }
-                    .accessibilityIdentifier(A11yID.Chat.Attach.save(service.domain))
+                    .accessibilityIdentifier(A11yID.ConversationControls.Attach.save(service.domain))
 
                     if let primaryAction, let onPrimaryAction {
                         Button {
@@ -213,7 +213,7 @@ struct ServiceDetailView: View {
         case .service:
             if signInRequestActive || service.auth == .unknown || service.auth.isChecking {
                 signInButton(signingIn: true)
-                    .accessibilityIdentifier(A11yID.Chat.Attach.signInProgress(service.domain))
+                    .accessibilityIdentifier(A11yID.ConversationControls.Attach.signInProgress(service.domain))
             } else {
                 switch service.signInState {
                 case .signedOut, .notAuthorized, .unknown:
@@ -221,8 +221,8 @@ struct ServiceDetailView: View {
                     signInButton(signingIn: signingIn)
                         .accessibilityIdentifier(
                             signingIn
-                                ? A11yID.Chat.Attach.signInProgress(service.domain)
-                                : A11yID.Chat.Attach.signIn(service.domain)
+                                ? A11yID.ConversationControls.Attach.signInProgress(service.domain)
+                                : A11yID.ConversationControls.Attach.signIn(service.domain)
                         )
                 case .signedIn, .authorized:
                     if signingOut {
@@ -233,11 +233,11 @@ struct ServiceDetailView: View {
                             action: {}
                         )
                         .accessibilityLabel(String(localized: "Signing out…"))
-                        .accessibilityIdentifier(A11yID.Chat.Attach.signOutProgress(service.domain))
+                        .accessibilityIdentifier(A11yID.ConversationControls.Attach.signOutProgress(service.domain))
                     } else {
                         Button("Sign out") { Task { await signOut() } }
                             .buttonStyle(OxChipButton(filled: false))
-                            .accessibilityIdentifier(A11yID.Chat.Attach.signOut(service.domain))
+                            .accessibilityIdentifier(A11yID.ConversationControls.Attach.signOut(service.domain))
                     }
                 case .notRequired:
                     EmptyView()
@@ -263,7 +263,7 @@ struct ServiceDetailView: View {
                 }
                 .buttonStyle(OxChipButton(filled: true))
                 .disabled(authorizingMCP)
-                .accessibilityIdentifier(A11yID.Chat.Attach.signIn(service.domain))
+                .accessibilityIdentifier(A11yID.ConversationControls.Attach.signIn(service.domain))
             }
         case .none:
             EmptyView()
@@ -377,7 +377,7 @@ struct ServiceDetailView: View {
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityIdentifier(A11yID.Chat.Attach.domain(service.domain))
+                    .accessibilityIdentifier(A11yID.ConversationControls.Attach.domain(service.domain))
             }
         }
     }
@@ -414,7 +414,7 @@ struct ServiceDetailView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier(A11yID.Chat.Attach.repository(service.domain))
+                .accessibilityIdentifier(A11yID.ConversationControls.Attach.repository(service.domain))
             }
         }
     }
@@ -497,7 +497,7 @@ struct ServiceDetailView: View {
     private var attachActionContent: some View {
         actionCard {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Attach to a chat")
+                Text("Attach to a conversation")
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
                 Text(attachPermissionDescription)
@@ -511,9 +511,9 @@ struct ServiceDetailView: View {
 
     private var attachPermissionDescription: LocalizedStringKey {
         switch capabilities.attachmentData {
-        case .signedIn: "Adds this service to a chat, giving Ox its actions and your signed-in data."
-        case .onDevice: "Its actions and permitted device data become available to this chat."
-        case .remote: "Its remote Actions can receive arguments from this chat and return data to Ox."
+        case .signedIn: "Adds this service to a conversation, giving Ox its actions and your signed-in data."
+        case .onDevice: "Its actions and permitted device data become available to this conversation."
+        case .remote: "Its remote Actions can receive arguments from this conversation and return data to Ox."
         }
     }
 
@@ -544,7 +544,7 @@ struct ServiceDetailView: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier(A11yID.Chat.Attach.deviceFilesAdd)
+        .accessibilityIdentifier(A11yID.ConversationControls.Attach.deviceFilesAdd)
     }
 
     private func folderGrantChip(_ grant: DeviceFolderStore.Grant) -> some View {
@@ -570,7 +570,7 @@ struct ServiceDetailView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Remove \(grant.name)")
-            .accessibilityIdentifier(A11yID.Chat.Attach.deviceFilesRemove(grant.id))
+            .accessibilityIdentifier(A11yID.ConversationControls.Attach.deviceFilesRemove(grant.id))
         }
     }
 
@@ -580,7 +580,7 @@ struct ServiceDetailView: View {
         }
         .buttonStyle(OxChipButton(filled: service.auth == .authorizationRequired))
         .disabled(service.auth == .unknown || service.auth.isUnavailable)
-        .accessibilityIdentifier(A11yID.Chat.Attach.devicePermission(service.domain))
+        .accessibilityIdentifier(A11yID.ConversationControls.Attach.devicePermission(service.domain))
     }
 
     @ViewBuilder
@@ -592,7 +592,7 @@ struct ServiceDetailView: View {
                         manageRow("Inspect service page", tint: AnyShapeStyle(Theme.Colors.onSurface)) {
                             inspectPage()
                         }
-                        .accessibilityIdentifier(A11yID.Chat.Attach.inspectPage(service.domain))
+                        .accessibilityIdentifier(A11yID.ConversationControls.Attach.inspectPage(service.domain))
                     }
                     if capabilities.supportsWebsiteDataManagement {
                         if canInspectPage {
@@ -601,13 +601,13 @@ struct ServiceDetailView: View {
                         manageRow("Clear website data", tint: AnyShapeStyle(Theme.Colors.error)) {
                             confirmClearWebData = true
                         }
-                        .accessibilityIdentifier(A11yID.Chat.Attach.clearWebData(service.domain))
+                        .accessibilityIdentifier(A11yID.ConversationControls.Attach.clearWebData(service.domain))
                     }
                     if capabilities.supportsRemoteManagement {
                         manageRow("Remove MCP server", tint: AnyShapeStyle(Theme.Colors.error)) {
                             confirmRemoveMCP = true
                         }
-                        .accessibilityIdentifier(A11yID.Chat.Attach.disconnectMCP(service.domain))
+                        .accessibilityIdentifier(A11yID.ConversationControls.Attach.disconnectMCP(service.domain))
                     }
                     if service.isLocalService {
                         if canInspectPage || capabilities.supportsWebsiteDataManagement || capabilities.supportsRemoteManagement {
@@ -625,12 +625,12 @@ struct ServiceDetailView: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityIdentifier(A11yID.Chat.Attach.shareLocalService(service.domain))
+                        .accessibilityIdentifier(A11yID.ConversationControls.Attach.shareLocalService(service.domain))
                         Divider().settingsContentInset()
                         manageRow("Delete Local service", tint: AnyShapeStyle(Theme.Colors.error)) {
                             confirmDeleteLocalService = true
                         }
-                        .accessibilityIdentifier(A11yID.Chat.Attach.deleteLocalService(service.domain))
+                        .accessibilityIdentifier(A11yID.ConversationControls.Attach.deleteLocalService(service.domain))
                     }
                 }
             }
@@ -665,7 +665,7 @@ struct ServiceDetailView: View {
                     Text(action.label)
                         .font(Theme.Fonts.bodyMd)
                         .foregroundStyle(Theme.Colors.onSurface)
-                        .accessibilityIdentifier(A11yID.Chat.Attach.action(action.id))
+                        .accessibilityIdentifier(A11yID.ConversationControls.Attach.action(action.id))
                     Spacer(minLength: 0)
                     if isStandard { chip("Standard") }
                     if action.requireAuth { chip("Authenticated") }
@@ -692,7 +692,7 @@ struct ServiceDetailView: View {
                 Text(Actions.label(for: action) ?? action)
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
-                    .accessibilityIdentifier(A11yID.Chat.Attach.action(action))
+                    .accessibilityIdentifier(A11yID.ConversationControls.Attach.action(action))
                 approvalControl(actionID: action, defaultPolicy: Actions.defaultPolicy(for: action))
             }
         }
@@ -709,7 +709,7 @@ struct ServiceDetailView: View {
             inheritLabel: "Use Service Default",
             onChange: { serviceManager.setActionPolicy($0, for: actionID) }
         )
-        .accessibilityIdentifier(A11yID.Chat.Attach.actionApproval(actionID))
+        .accessibilityIdentifier(A11yID.ConversationControls.Attach.actionApproval(actionID))
     }
 
     private func actionCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {

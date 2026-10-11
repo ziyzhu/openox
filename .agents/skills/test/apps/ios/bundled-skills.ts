@@ -8,10 +8,10 @@ import { iosTarget } from "../../../setup/scripts/ios.ts";
 import { bundledSkills } from "../../../../../packages/agent/src/core/bundled-skills.ts";
 
 const qa = qaCommand({
-  usage: "bun .agents/skills/test/apps/ios/bundled-skills.ts --device ox-N --host ws://<assigned-host> --chat <seeded-saved-QA-chat> --temporary-chat <empty-temporary-QA-chat> [--ui-cleanup] [--output /tmp/directory]\nFor --ui-cleanup, leave the app on this Profile's Skills screen. Otherwise deletion policy must allow cleanup. Seed the saved Mock chat with `QA bundled skill verification seed. Reply QA only.` before creating the temporary chat. Copies/removes one run-owned Profile skill. Provider probes never save configuration.",
+  usage: "bun .agents/skills/test/apps/ios/bundled-skills.ts --device ox-N --host ws://<assigned-host> --conversation <seeded-saved-QA-conversation> --temporary-conversation <empty-temporary-QA-conversation> [--ui-cleanup] [--output /tmp/directory]\nFor --ui-cleanup, leave the app on this Profile's Skills screen. Otherwise deletion policy must allow cleanup. Seed the saved Mock conversation with `QA bundled skill verification seed. Reply QA only.` before creating the temporary conversation. Copies/removes one run-owned Profile skill. Provider probes never save configuration.",
   options: { host: { type: "string" }, chat: { type: "string" }, "temporary-chat": { type: "string" }, "ui-cleanup": { type: "boolean" }, output: { type: "string" } },
 });
-if (!qa.values.host || !qa.values.chat || !qa.values["temporary-chat"]) throw new Error("Pass explicit saved and temporary QA chats");
+if (!qa.values.host || !qa.values.chat || !qa.values["temporary-chat"]) throw new Error("Pass explicit saved and temporary QA conversations");
 assert.equal(Number(new URL(qa.values.host).port), qa.debugPort);
 const directory = resolve(qa.values.output ?? `/tmp/ox-bundled-skills-${Date.now()}`);
 assert(!directory.startsWith(ROOT + "/") && directory !== ROOT);
@@ -33,7 +33,7 @@ async function rejected(name: string, args: Record<string, unknown>, message: Re
 async function providerProbe(expected: string) {
   const { stdout } = await run(["ox", "--host", qa.values.host!, "--chat", qa.values["temporary-chat"]!, "vm", "eval", "--script", `
     const provider = (await ox.provider.default({ purpose: "Inspect the bundled provider schema" }))[0];
-    try { await ox.provider.save({ provider, purpose: "Verify the temporary-chat boundary" }); throw Error("Unexpected save"); }
+    try { await ox.provider.save({ provider, purpose: "Verify the temporary-conversation boundary" }); throw Error("Unexpected save"); }
     catch (error) { if (!String(error).includes(${JSON.stringify(expected)})) throw error; console.log("Expected refusal"); }
   `, "--json"], { capture: true });
   assert(JSON.stringify(JSON.parse(stdout).logs).includes("Expected refusal"));
@@ -44,11 +44,11 @@ const release = claimSimulator(qa.device);
 try {
   await mkdir(directory, { recursive: true });
   for (const [chat, temporary] of [[qa.values.chat, false], [qa.values["temporary-chat"], true]] as const) {
-    const { stdout } = await run(["ox", "--host", qa.values.host, "--chat", chat, "chat", "inspect", "--json"], { capture: true });
+    const { stdout } = await run(["ox", "--host", qa.values.host, "--chat", chat, "conversation", "inspect", "--json"], { capture: true });
     const state = JSON.parse(stdout);
-    assert(state && state.isBusy === false, "Use idle QA chats");
+    assert(state && state.isBusy === false, "Use idle QA conversations");
     const users = state.messages.filter((message: { type: string }) => message.type === "user");
-    assert(temporary ? users.length === 0 : users.length === 1 && JSON.stringify(users[0]).includes("QA bundled skill verification seed."), "Use the seeded saved QA chat and an empty temporary chat");
+    assert(temporary ? users.length === 0 : users.length === 1 && JSON.stringify(users[0]).includes("QA bundled skill verification seed."), "Use the seeded saved QA conversation and an empty temporary conversation");
     const inspected = await run(["ox", "--host", qa.values.host, "--chat", chat, "vm", "inspect", "--json"], { capture: true });
     assert.equal(JSON.parse(inspected.stdout).value.session.temporary, temporary);
   }
@@ -168,12 +168,12 @@ try {
   await rejected("ox.fs.read", { path: "state.sqlite" }, /Invalid Profile file path/);
   await rejected("ox.fs.read", { path: `conversations/${qa.values.chat}/context.json` }, /Invalid Profile file path/);
   await call("ox.fs.grep", { path: "skills/manage-providers", pattern: "Manage" }, qa.values["temporary-chat"]);
-  await providerProbe("Temporary chats can't save changes");
+  await providerProbe("Temporary conversations can't save changes");
   await call("ox.fs.read", { path: copyPath }, qa.values["temporary-chat"]);
   await rejected("ox.fs.write", { path: pagePath, content: "Temporary mutation must fail" }, /Temporary chats can't save changes/, qa.values["temporary-chat"]);
-  await providerProbe("Temporary chats can't save changes");
+  await providerProbe("Temporary conversations can't save changes");
   await call("ox.fs.read", { path: "skills/manage-providers/SKILL.md" }, qa.values["temporary-chat"]);
-  await providerProbe("Temporary chats can't save changes");
+  await providerProbe("Temporary conversations can't save changes");
 } finally {
   try {
     if (created) {
@@ -183,9 +183,9 @@ try {
         await ios.wait({ label: `Delete /${copied}?` }, { timeout: 3000 });
         await ios.tap({ label: "Delete" }, { timeout: 5000, stable: 200 });
       } else await call("ox.skill.delete", { name: copied });
-      await run(["ox", "--host", qa.values.host, "--chat", qa.values.chat, "chat", "open", "--json"], { capture: true });
-      await run(["ox", "--host", qa.values.host, "chat", "new", "--temporary", "--provider", "mock", "--model", "mock", "--json"], { capture: true });
-      const fresh = await run(["ox", "--host", qa.values.host, "chat", "inspect", "--json"], { capture: true });
+      await run(["ox", "--host", qa.values.host, "--chat", qa.values.chat, "conversation", "open", "--json"], { capture: true });
+      await run(["ox", "--host", qa.values.host, "conversation", "new", "--temporary", "--provider", "mock", "--model", "mock", "--json"], { capture: true });
+      const fresh = await run(["ox", "--host", qa.values.host, "conversation", "inspect", "--json"], { capture: true });
       const freshID = JSON.parse(fresh.stdout).id as string;
       let removed = false;
       for (let attempt = 0; attempt < 30 && !removed; attempt++) {

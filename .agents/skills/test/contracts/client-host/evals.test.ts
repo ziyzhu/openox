@@ -10,7 +10,7 @@ import { SYSTEM_SKILL_NAMES } from "../../../../../packages/protocol/src/skills.
 type Scenario = "pass" | "wrong" | "attention" | "timeout" | "provider-error" | "busy" | "fake-guidance" | "tool-error"
   | "forged-guidance" | "alias-guidance" | "mutated-state" | "missing-observation" | "skill-claim" | "skill-corrupt"
   | "skill-probe-fail" | "cleanup-error" | "cleanup-policy" | "probe-mutation" | "truncated-receipts" | "missing-settings" | "skill-extra-action";
-type Chat = { messages: EvalMessage[]; blocks: EvalBlock[]; isBusy: boolean; temporary: boolean; pendingPrompt?: { id: string; prompt: string; options: string[]; allowsCustomAnswer: boolean; requiresApp: boolean } };
+type Conversation = { messages: EvalMessage[]; blocks: EvalBlock[]; isBusy: boolean; temporary: boolean; pendingPrompt?: { id: string; prompt: string; options: string[]; allowsCustomAnswer: boolean; requiresApp: boolean } };
 const guide = "# Workflow guide\n\nRead the task, inspect existing state, propose the work, and verify its result before reporting completion.\n";
 const skillInstructions = (answer: string) => `Reply with exactly ${answer} and nothing else. Do not use external services or modify files.`;
 const skillFile = (name: string, answer: string) => `---\nname: ${name}\ndescription: Return a QA verification token.\n---\n\n${skillInstructions(answer)}\n`;
@@ -23,12 +23,12 @@ async function exercise(scenario: Scenario = "pass") {
   const providers = [{ id: "example", displayName: "Example", regions: ["global"], supportsTools: true,
     reasoningPolicy: "none", credentialID: "example", models: [model] }];
   const files: Record<string, string> = { "MEMORY.md": "Preserve my memory.", "SOUL.md": "Preserve my preferences.", "skills/existing/SKILL.md": skillFile("existing", "EXISTING") };
-  const chats = new Map<string, Chat>();
+  const chats = new Map<string, Conversation>();
   let active = "";
   let language = "en";
   const snapshot = (id: string) => ({ id, model, systemPrompt: scenario === "wrong" ? "Candidate prompt" : "E2E fixture", renderedSystemPrompt: "E2E fixture",
     soul: "", memory: "", tools: [{ name: "execute", description: "E2E tool", parameters: {}, strict: true }], ...chats.get(id) });
-  function executed(chat: Chat, source: string, name: string, args: Record<string, unknown>, text: string, failed = false) {
+  function executed(chat: Conversation, source: string, name: string, args: Record<string, unknown>, text: string, failed = false) {
     const id = `tool-${chat.messages.length}`;
     chat.messages.push({ type: "assistant", assistant: { content: [{ type: "toolCall", toolCall: { id, name: "execute", arguments: { source } } }], stopReason: "toolUse" } },
       { type: "toolResult", toolResult: { toolCallId: id, toolName: "execute", content: [{ type: "text", text: { text } }], isError: failed } });
@@ -61,14 +61,14 @@ async function exercise(scenario: Scenario = "pass") {
             result = { chatId: active, temporary: request.params.temporary === true, model: "example:example" };
             break;
           case "chats.open":
-            if (!chat || chat.temporary) return reject("Saved chat not found");
+            if (!chat || chat.temporary) return reject("Saved conversation not found");
             active = id;
             result = { data: snapshot(id) };
             break;
           case "chats.get": result = chat ? { data: snapshot(id) } : scenario === "busy"
             ? { data: { ...snapshot("other-agent"), messages: [], blocks: [], isBusy: true } } : {}; break;
           case "chats.send": {
-            if (!chat) return reject("Unknown chat");
+            if (!chat) return reject("Unknown conversation");
             chat.isBusy = scenario === "timeout" || scenario === "attention";
             if (scenario === "timeout") return;
             if (scenario === "provider-error") return reject("Provider unavailable");
@@ -114,13 +114,13 @@ async function exercise(scenario: Scenario = "pass") {
             break;
           }
           case "chats.stop":
-            if (!chat) return reject("Unknown chat");
+            if (!chat) return reject("Unknown conversation");
             result = { chatId: id, wasRunning: chat.isBusy };
             chat.isBusy = false;
             delete chat.pendingPrompt;
             break;
           case "vm.call": {
-            if (!chat) return reject("Unknown observer chat");
+            if (!chat) return reject("Unknown observer conversation");
             const args = request.params.arguments;
             let value: unknown;
             if (scenario === "missing-observation") { result = {}; break; }
@@ -136,7 +136,7 @@ async function exercise(scenario: Scenario = "pass") {
               case "ox.fs.read": value = { path: args.path, text: (SYSTEM_SKILL_NAMES as readonly string[]).some(name => args.path === `skills/${name}/SKILL.md`) ? guide : files[args.path], truncated: false, unsupported: null }; break;
               case "ox.skill.delete":
                 if (scenario === "cleanup-error") return reject("Cleanup unavailable");
-                if (chat.temporary) return reject("Temporary chats cannot delete Profile skills");
+                if (chat.temporary) return reject("Temporary conversations cannot delete Profile skills");
                 if (!args.name.startsWith("ox-eval-")) return reject("Not a run-owned skill");
                 for (const path of Object.keys(files)) if (path.startsWith(`skills/${args.name}/`)) delete files[path];
                 value = { name: args.name, deleted: true };
@@ -171,7 +171,7 @@ async function exercise(scenario: Scenario = "pass") {
 
 const workflowArgs = ["--case", "create-skill", "--allow-profile-writes", "--qa-profile", "EvalQA"];
 
-test("eval runner uses real CLI chat commands, isolates repetitions, and preserves paginated diagnostics", async () => {
+test("eval runner uses real CLI conversation commands, isolates repetitions, and preserves paginated diagnostics", async () => {
   const fixture = await exercise();
   try {
     const result = await fixture.run("--suite", "quick", "--repeat", "2");
@@ -219,7 +219,7 @@ test("state mutation stops the cohort without repair, and missing observations a
   }
 }, 15000);
 
-test("skill workflow verifies persisted state, fresh-chat behavior, and only owned cleanup", async () => {
+test("skill workflow verifies persisted state, fresh-conversation behavior, and only owned cleanup", async () => {
   const fixture = await exercise();
   try {
     const result = await fixture.run(...workflowArgs);
@@ -291,7 +291,7 @@ test("eval runner never approves pending prompts or retries errored submissions"
   }
 }, 15000);
 
-test("eval runner leaves an already busy chat untouched", async () => {
+test("eval runner leaves an already busy conversation untouched", async () => {
   const fixture = await exercise("busy");
   try {
     const result = await fixture.run("--case", "brief-answer");

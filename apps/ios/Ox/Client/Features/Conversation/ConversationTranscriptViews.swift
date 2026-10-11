@@ -1,0 +1,1471 @@
+import SwiftUI
+import Observation
+import WebKit
+
+private struct AttachmentThumb: View {
+    let attachment: FileItem
+    let sourceID: String
+    let onOpen: (FileItem, String) -> Void
+
+    var body: some View {
+        FileThumbnail(
+            attachment: attachment,
+            style: .transcript,
+            previewSourceID: sourceID
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .onTapGesture { onOpen(attachment, sourceID) }
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+private struct ConversationFileRow: View {
+    let artifact: FileItem
+    var previewSourceID: String? = nil
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            if artifact.exists {
+                FileThumbnail(
+                    attachment: artifact,
+                    style: .row,
+                    previewSourceID: previewSourceID
+                )
+            } else {
+                Image(systemName: "trash")
+                    .font(.title3)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .frame(width: 44, height: 44)
+                    .background(Theme.Colors.background, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            }
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                Text(artifact.userFacingName)
+                    .font(Theme.Fonts.bodyMd)
+                    .foregroundStyle(artifact.exists ? Theme.Colors.onSurface : Theme.Colors.onSurfaceMuted)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                if let typeName = artifact.userFacingTypeName, artifact.exists {
+                    Text(typeName)
+                        .font(Theme.Fonts.caption)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                } else if !artifact.exists {
+                    Text("Deleted file")
+                        .font(Theme.Fonts.caption)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                }
+            }
+            Spacer(minLength: Theme.Spacing.sm)
+            if artifact.exists {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+}
+
+private struct ConversationInteractiveRowSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+        content
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.vertical, Theme.Spacing.md)
+            .frame(minHeight: Theme.Size.minimumTouchTarget)
+            .conversationCardOutline()
+            .contentShape(shape)
+    }
+}
+
+struct StoppedTurnDivider: View {
+    var body: some View {
+        TranscriptStatusDivider(
+            label: Text("Stopped"),
+            systemImage: "stop.circle.fill",
+            accessibilityIdentifier: "chat.stopped"
+        )
+    }
+}
+
+private struct TranscriptStatusDivider: View {
+    let label: Text
+    let systemImage: String
+    let accessibilityIdentifier: String
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            line
+            Label { label } icon: { Image(systemName: systemImage) }
+                .fixedSize()
+            line
+        }
+        .font(Theme.Fonts.caption)
+        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private var line: some View {
+        Rectangle()
+            .fill(Theme.Colors.onSurfaceMuted.opacity(0.2))
+            .frame(height: 1)
+    }
+}
+
+private struct ServiceInspectorRow: View {
+    let link: ServiceInspectorLink
+    let conversationID: UUID
+    let rowID: UUID
+    let pageMount: WebPageMountCoordinator
+    @Environment(ServiceManager.self) private var serviceManager
+    @State private var isPresented = false
+
+    private var service: Service? { serviceManager.inspectionService(domain: link.domain) }
+    private var browserSession: ServiceBrowserActionSession? {
+        guard let service, service.domain == BrowserFunctionCatalog.internalDomain else { return nil }
+        return serviceManager.browserActionSessions.existingSession(for: conversationID, service: service)
+    }
+    private var canInspect: Bool {
+        guard let service else { return false }
+        guard service.domain == BrowserFunctionCatalog.internalDomain else { return true }
+        return browserSession != nil
+    }
+    private var page: WebPage? {
+        browserSession?.webPage
+    }
+    private var isInline: Bool {
+        pageMount.isInline(page: page, ownerID: rowID)
+    }
+    private var subtitle: String {
+        if let host = page?.url?.host(percentEncoded: false) { return host }
+        return canInspect ? String(localized: "View live page") : String(localized: "Page unavailable")
+    }
+    private var placeholder: LivePageCard.Placeholder {
+        if canInspect { return .invitation(String(localized: "Open to view the live page")) }
+        return .unavailable(String(localized: "Page unavailable"))
+    }
+    private var inlinePage: WebPage? {
+        isInline ? page : nil
+    }
+    private var activatePage: (() -> Void)? {
+        guard canInspect, !isInline else { return nil }
+        guard let page else { return nil }
+        return { pageMount.activate(page: page, ownerID: rowID) }
+    }
+    private var expandPageAction: (() -> Void)? {
+        canInspect ? { expandPage() } : nil
+    }
+
+    var body: some View {
+        LivePageCard(
+            service: service,
+            fallbackSystemImage: "safari",
+            title: link.serviceName,
+            subtitle: subtitle,
+            mount: nil,
+            inlinePageAnchorID: inlinePage == nil ? nil : rowID,
+            isPresented: false,
+            placeholder: placeholder,
+            activate: activatePage,
+            expand: expandPageAction,
+            cancel: nil,
+            accessibilityIdentifier: A11yID.ConversationControls.Message.serviceInspector(link.domain),
+            expandAccessibilityIdentifier: A11yID.ServiceInspector.open,
+            cancelAccessibilityIdentifier: ""
+        )
+        .fullScreenCover(isPresented: $isPresented, onDismiss: {
+            if let page { pageMount.restore(page: page, ownerID: rowID) }
+        }) {
+            if let service {
+                NavigationStack {
+                    ServicePageInspector(service: service, browserSessionID: conversationID)
+                }
+            }
+        }
+        .onAppear {
+            logInlineState(reason: "appear")
+        }
+        .onChange(of: isInline) { _, _ in
+            logInlineState(reason: "placement")
+        }
+    }
+
+    private func expandPage() {
+        Task { @MainActor in
+            if let page {
+                guard await pageMount.detach(page: page, ownerID: rowID) else { return }
+            }
+            isPresented = true
+        }
+    }
+
+    private func logInlineState(reason: String) {
+        Log.webView.info("ServiceInspectorRow.inline reason=\(reason) row=\(rowID) mounted=\(isInline) session=\(browserSession != nil) page=\(page != nil)")
+    }
+}
+
+struct ActivityBubble: View {
+    private let label = L10n.string("Plowing…")
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            CellularAutomatonLoader.small
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(A11yID.ConversationControls.activity)
+    }
+}
+
+struct ThinkingRow: View {
+    private let singleLineHeight = ConversationTranscriptMetrics.thinkingRowHeight
+    let trace: ThinkingTrace
+    let sourceInvocations: [Invocation]
+    let startedAt: Date
+    let isLive: Bool
+    @Environment(ServiceManager.self) private var serviceManager
+
+    private struct LiveAnimation {
+        var label: String
+        var pending: [String]
+        var appearedAt: Date
+        var lastAdvance: Date
+        var sourceLive: Bool
+    }
+    private enum AnimationPhase {
+        case settled(String)
+        case live(LiveAnimation)
+
+        var label: String {
+            switch self {
+            case .settled(let label): label
+            case .live(let animation): animation.label
+            }
+        }
+
+    }
+
+    @State private var isExpanded = false
+    @State private var seenEntries = 0
+    @State private var animationPhase = AnimationPhase.settled("")
+    @State private var animationTask: Task<Void, Never>?
+
+    private var liveTargetLabel: String {
+        if trace.completedAt != nil { return String(localized: "Plowing…") }
+        guard let last = trace.entries.last else {
+            return L10n.string("Plowing…")
+        }
+        return previewLabel(last)
+    }
+
+    private var settledTargetLabel: String {
+        guard let last = trace.entries.last else {
+            return ThinkingFormat.thoughtFor(startedAt, trace.completedAt)
+        }
+        if case .reasoning = last {
+            return ThinkingFormat.thoughtFor(startedAt, trace.completedAt)
+        }
+        return previewLabel(last)
+    }
+
+    private var targetLabel: String { isLive ? liveTargetLabel : settledTargetLabel }
+    private var sources: [InvocationFormat.Source] {
+        guard !isLive else { return [] }
+        var seen: Set<String> = []
+        return sourceInvocations.flatMap {
+            InvocationFormat.sources($0, serviceManager: serviceManager) ?? []
+        }.filter { seen.insert($0.id).inserted }
+    }
+    private func previewLabel(_ entry: TraceEntry) -> String {
+        switch entry {
+        case let .reasoning(reasoning):
+            return reasoning.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        case let .invocation(invocation):
+            return InvocationFormat.humanLabel(invocation)
+        }
+    }
+
+    private var label: String { animationPhase.label.isEmpty ? targetLabel : animationPhase.label }
+    private var showsLoader: Bool {
+        isLive && label == L10n.string("Plowing…")
+    }
+
+    var body: some View {
+        Group {
+            if trace.isEmpty {
+                rowHeader
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(label)
+                    .accessibilityIdentifier(A11yID.ConversationControls.activity)
+            } else {
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    Button { isExpanded = true } label: {
+                        rowHeader
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(label)
+                    if !sources.isEmpty {
+                        SourceChipList(sources: sources) { source in
+                            SourceChipButton(source: source) {
+                                if let url = source.url {
+                                    LinkOpener.open(url: url, serviceManager: serviceManager)
+                                } else {
+                                    isExpanded = true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $isExpanded) {
+            ThinkingSheet(trace: trace, startedAt: startedAt)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.Colors.background)
+        }
+        .animation(Theme.Animation.standard, value: isLive)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear {
+            let now = Date()
+            if isLive {
+                let labels = trace.entries.map(previewLabel)
+                animationPhase = .live(LiveAnimation(
+                    label: labels.first ?? liveTargetLabel,
+                    pending: Array(labels.dropFirst()),
+                    appearedAt: now,
+                    lastAdvance: now,
+                    sourceLive: true
+                ))
+                scheduleAnimation()
+            } else {
+                animationPhase = .settled(settledTargetLabel)
+            }
+            seenEntries = trace.entries.count
+        }
+        .onChange(of: trace.entries.count) { _, count in
+            for entry in trace.entries.suffix(max(0, count - seenEntries)) {
+                route(previewLabel(entry))
+            }
+            seenEntries = count
+        }
+        .onChange(of: targetLabel) { _, next in route(next) }
+        .onChange(of: isLive) { _, live in transitionSource(to: live) }
+        .onDisappear {
+            animationTask?.cancel()
+            animationTask = nil
+        }
+    }
+
+    private var rowHeader: some View {
+        HStack(alignment: .top, spacing: Theme.Spacing.sm) {
+            if showsLoader {
+                CellularAutomatonLoader.small
+                    .frame(height: singleLineHeight)
+                    .transition(.opacity)
+            } else if !label.isEmpty {
+                if isLive {
+                    ShimmerText(text: AttributedString(label), lineLimit: 1)
+                        .transition(.opacity)
+                } else {
+                    Text(label)
+                        .font(Theme.Fonts.bodyMd)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .contentTransition(.opacity)
+                        .transition(.opacity)
+                }
+            }
+            if !isLive {
+                Image(systemName: "chevron.right")
+                    .font(Theme.Icons.sm)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .frame(height: singleLineHeight)
+                    .transition(.opacity)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: singleLineHeight, alignment: .leading)
+        .contentShape(
+            Rectangle().inset(
+                by: -(Theme.Size.minimumTouchTarget - singleLineHeight) / 2
+            )
+        )
+    }
+
+    private func route(_ next: String) {
+        guard !next.isEmpty else { return }
+        switch animationPhase {
+        case .settled(let label):
+            guard label != next else { return }
+            withAnimation(Theme.Animation.quick) { animationPhase = .settled(next) }
+        case .live(var animation):
+            guard next != animation.label, next != animation.pending.last else { return }
+            if animation.label == L10n.string("Plowing…"), animation.pending.isEmpty {
+                withAnimation(Theme.Animation.quick) {
+                    animation.label = next
+                    animation.lastAdvance = Date()
+                    animationPhase = .live(animation)
+                }
+                return
+            }
+            animation.pending.append(next)
+            animationPhase = .live(animation)
+            scheduleAnimation()
+        }
+    }
+
+    private func transitionSource(to live: Bool) {
+        switch animationPhase {
+        case .settled(let label):
+            guard live else { return }
+            let now = Date()
+            animationPhase = .live(LiveAnimation(
+                label: label.isEmpty ? liveTargetLabel : label,
+                pending: [],
+                appearedAt: now,
+                lastAdvance: now,
+                sourceLive: true
+            ))
+        case .live(var animation):
+            animation.sourceLive = live
+            if !live { animation.pending.removeAll() }
+            animationPhase = .live(animation)
+            scheduleAnimation()
+        }
+    }
+
+    private func scheduleAnimation() {
+        guard animationTask == nil else { return }
+        animationTask = Task { @MainActor in
+            defer { animationTask = nil }
+            while !Task.isCancelled {
+                guard case .live(let snapshot) = animationPhase else { return }
+                if !snapshot.pending.isEmpty {
+                    let wait = Theme.Animation.sequenceHold - Date().timeIntervalSince(snapshot.lastAdvance)
+                    if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+                    guard !Task.isCancelled, case .live(var current) = animationPhase else { return }
+                    guard !current.pending.isEmpty else { continue }
+                    withAnimation(Theme.Animation.quick) {
+                        current.label = current.pending.removeFirst()
+                        current.lastAdvance = Date()
+                        animationPhase = .live(current)
+                    }
+                    continue
+                }
+                guard !snapshot.sourceLive else { return }
+                let minRemain = Theme.Animation.thinkingHold - Date().timeIntervalSince(snapshot.appearedAt)
+                let seqRemain = Theme.Animation.sequenceHold - Date().timeIntervalSince(snapshot.lastAdvance)
+                let wait = max(minRemain, seqRemain)
+                if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+                guard !Task.isCancelled, case .live(let current) = animationPhase else { return }
+                guard !current.sourceLive, current.pending.isEmpty else { continue }
+                withAnimation(Theme.Animation.standard) {
+                    animationPhase = .settled(settledTargetLabel)
+                }
+                return
+            }
+        }
+    }
+}
+
+private struct ThinkingSheet: View {
+    let trace: ThinkingTrace
+    let startedAt: Date
+
+    @State private var displayedEntries: [TraceEntry] = []
+    @State private var revealTask: Task<Void, Never>?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if let omitted = trace.omittedInvocations, omitted > 0 {
+                        Text("Details omitted for \(omitted) additional Actions.")
+                            .font(Theme.Fonts.captionMd)
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, Theme.Spacing.md)
+                            .accessibilityIdentifier("chat.trace.omitted")
+                    }
+                    ForEach(Array(displayedEntries.enumerated()), id: \.element.id) { idx, entry in
+                        TraceRow(entry: entry, isLast: idx == displayedEntries.count - 1)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+                }
+                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.vertical, Theme.Spacing.md)
+            }
+            .scrollIndicators(.hidden)
+            .background(Theme.Colors.background)
+            .navigationTitle(Text("Steps", comment: "Title of the sheet showing the agent's reasoning and the actions it took."))
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: Invocation.self) { InvocationDetailView(invocation: $0) }
+        }
+        .onAppear { syncDisplayedEntries(immediate: true) }
+        .onChange(of: trace.entries) { _, _ in syncDisplayedEntries(immediate: false) }
+        .onDisappear { revealTask?.cancel() }
+    }
+
+    private func syncDisplayedEntries(immediate: Bool) {
+        revealTask?.cancel()
+        let incoming = trace.entries
+        guard !immediate, !displayedEntries.isEmpty else {
+            displayedEntries = incoming
+            return
+        }
+
+        let displayedIds = Set(displayedEntries.map(\.id))
+        var updated = displayedEntries
+        for idx in updated.indices {
+            if let latest = incoming.first(where: { $0.id == updated[idx].id }) {
+                updated[idx] = latest
+            }
+        }
+        withAnimation(Theme.Animation.quick) {
+            displayedEntries = updated
+        }
+
+        let pending = incoming.filter { !displayedIds.contains($0.id) }
+        guard !pending.isEmpty else { return }
+        revealTask = Task { @MainActor in
+            for entry in pending {
+                try? await Task.sleep(for: .milliseconds(90))
+                guard !Task.isCancelled else { return }
+                withAnimation(Theme.Animation.standard) {
+                    displayedEntries.append(entry)
+                }
+            }
+        }
+    }
+}
+
+private struct TraceRow: View {
+    let entry: TraceEntry
+    let isLast: Bool
+    @Environment(\.dismiss) private var dismiss
+    @Environment(ServiceManager.self) private var serviceManager
+
+    var body: some View {
+        switch entry {
+        case let .reasoning(reasoning):
+            railed(node: { ReasoningNode() }) {
+                SelectableText(
+                    plain: reasoning.text,
+                    font: MarkdownText.bodyFont,
+                    color: Theme.Colors.onSurfaceMuted.uiColor,
+                    lineSpacing: 1
+                )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        case let .invocation(invocation):
+            railed(node: { InvocationNode(invocation: invocation) }) {
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    NavigationLink(value: invocation) {
+                        HStack(alignment: .center, spacing: Theme.Spacing.sm) {
+                            Text(InvocationFormat.humanLabel(invocation))
+                                .font(Theme.Fonts.bodyMd)
+                                .foregroundStyle(Theme.Colors.onSurface)
+                                .lineLimit(3)
+                                .truncationMode(.tail)
+                                .contentTransition(.opacity)
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(Theme.Icons.sm)
+                                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        }
+                        .frame(minHeight: 22)
+                        .contentShape(
+                            Rectangle().inset(
+                                by: -(Theme.Size.minimumTouchTarget - 22) / 2
+                            )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    if let sources = InvocationFormat.sources(invocation, serviceManager: serviceManager) {
+                        SourceChipList(sources: sources) { source in
+                            if let url = source.url {
+                                SourceChipButton(source: source) {
+                                    open(url)
+                                }
+                            } else {
+                                NavigationLink(value: invocation) {
+                                    SourceChip(source: source)
+                                }
+                                .buttonStyle(.plain)
+                                .frame(minHeight: Theme.Size.minimumTouchTarget)
+                                .contentShape(Rectangle())
+                                .accessibilityLabel(source.accessibilityLabel)
+                            }
+                        }
+                    }
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: isLast ? Theme.Size.minimumTouchTarget : nil,
+                    alignment: .topLeading
+                )
+                .animation(Theme.Animation.quick, value: invocation)
+            }
+            .accessibilityIdentifier(A11yID.ConversationControls.step(InvocationFormat.iconKind(invocation).rawValue))
+        }
+    }
+
+    private func open(_ url: URL) {
+        dismiss()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            LinkOpener.open(url: url, serviceManager: serviceManager)
+        }
+    }
+
+    private func railed<Node: View, Content: View>(
+        @ViewBuilder node: () -> Node,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(alignment: .top, spacing: Theme.Spacing.md) {
+            VStack(spacing: Theme.Spacing.xs) {
+                node()
+                if !isLast {
+                    Rectangle()
+                        .fill(Theme.Colors.onSurfaceMuted.dynamic.opacity(0.25))
+                        .frame(width: 2)
+                        .frame(maxHeight: .infinity)
+                        .padding(.bottom, Theme.Spacing.xs)
+                }
+            }
+            .frame(width: 22)
+            content()
+                .padding(.bottom, isLast ? 0 : Theme.Spacing.xl)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+}
+
+private struct ReasoningNode: View {
+    var body: some View {
+        Circle()
+            .fill(Theme.Colors.onSurfaceMuted.dynamic.opacity(0.5))
+            .frame(width: 8, height: 8)
+            .frame(width: 22, height: 22)
+    }
+}
+
+private struct InvocationNode: View {
+    let invocation: Invocation
+
+    private var tint: Color { invocation.isFailed ? Theme.Colors.error.dynamic : Theme.Colors.onSurfaceMuted.dynamic }
+
+    var body: some View {
+        Group {
+            if invocation.isRunning {
+                CellularAutomatonLoader(size: 14, tint: Theme.Colors.onSurfaceMuted.dynamic)
+            } else {
+                OxActionIcon(InvocationFormat.iconKind(invocation), size: 15)
+                    .foregroundStyle(tint)
+            }
+        }
+        .frame(width: 22, height: 22)
+        .contentTransition(.opacity)
+        .animation(Theme.Animation.quick, value: invocation)
+    }
+}
+
+private struct SourceChip: View {
+    let source: InvocationFormat.Source
+
+    var body: some View {
+        HStack(spacing: 6) {
+            switch source.icon {
+            case .none:
+                EmptyView()
+            case .domain(let domain):
+                DomainFavicon(domain: domain, size: 16)
+            case .service(let service):
+                ServiceAvatar(service: service, size: 20, shape: .roundedRect(4))
+            }
+            Text(source.label)
+                .font(Theme.Fonts.caption)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, 10)
+        .chipSurface(Theme.Colors.onSurfaceMuted.opacity(0.1))
+    }
+}
+
+private struct SourceChipButton: View {
+    let source: InvocationFormat.Source
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            SourceChip(source: source)
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: Theme.Size.minimumTouchTarget)
+        .contentShape(Rectangle())
+        .accessibilityLabel(source.accessibilityLabel)
+    }
+}
+
+private struct SourceChipList<Chip: View>: View {
+    let sources: [InvocationFormat.Source]
+    let chip: (InvocationFormat.Source) -> Chip
+
+    init(
+        sources: [InvocationFormat.Source],
+        @ViewBuilder chip: @escaping (InvocationFormat.Source) -> Chip
+    ) {
+        self.sources = sources
+        self.chip = chip
+    }
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: Theme.Spacing.xs) {
+                ForEach(sources.indices, id: \.self) { index in
+                    chip(sources[index])
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+            }
+        }
+        .scrollIndicators(.hidden)
+        .excludesCompactPageSwitch()
+    }
+}
+
+private enum ThinkingFormat {
+    static func thoughtFor(_ startedAt: Date, _ completedAt: Date?) -> String {
+        thoughtFor((completedAt ?? Date()).timeIntervalSince(startedAt))
+    }
+
+    static func thoughtFor(_ duration: TimeInterval) -> String {
+        let secs = max(1, Int(duration.rounded()))
+        if secs < 60 { return String(format: L10n.string("Thought for %lld seconds"), secs) }
+        let m = secs / 60, s = secs % 60
+        return String(format: L10n.string("Thought for %lld min %lld seconds"), m, s)
+    }
+}
+
+private struct InvocationDetailView: View {
+    let invocation: Invocation
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                section(invocation.preview?.argumentsTruncated == true ? "Input preview" : "Input") {
+                    Text(verbatim: invocation.name)
+                        .font(Theme.Fonts.captionMd)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("chat.invocation.function")
+                    if invocation.preview?.argumentsTruncated == true { previewNotice }
+                    inputValue
+                }
+                section(invocation.preview?.resultTruncated == true ? "Output preview" : "Output") {
+                    if invocation.preview?.resultTruncated == true { previewNotice }
+                    outputValue
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Theme.Spacing.lg)
+        }
+        .scrollIndicators(.hidden)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.Colors.background)
+        .navigationTitle(InvocationFormat.humanLabel(invocation))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func section(_ title: LocalizedStringKey, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            Text(title)
+                .font(Theme.Fonts.captionMd)
+                .foregroundStyle(.secondary)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var inputValue: some View {
+        if InvocationFormat.isEmpty(invocation.args) {
+            if invocation.preview?.argumentsTruncated == true {
+                Text("Input not retained.")
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(.secondary)
+            } else {
+                emptyValue
+            }
+        } else {
+            CodeBlockView(code: InvocationFormat.clamp(InvocationFormat.prettyJSON(invocation.args)), language: "json")
+        }
+    }
+
+    @ViewBuilder
+    private var outputValue: some View {
+        switch invocation.outcome {
+        case let .succeeded(result?):
+            CodeBlockView(code: InvocationFormat.clamp(InvocationFormat.prettyJSON(result)), language: "json")
+        case .succeeded(nil):
+            if invocation.preview?.resultTruncated == true {
+                Text("Result not retained.")
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(.secondary)
+            } else {
+                emptyValue
+            }
+        case let .failed(error):
+            CodeBlockView(code: InvocationFormat.clamp(error))
+        case .running:
+            HStack(spacing: Theme.Spacing.sm) {
+                CellularAutomatonLoader.small
+                Text("Running…", comment: "Shown in a step's detail while the action is still in flight.")
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            }
+        }
+    }
+
+    private var previewNotice: some View {
+        Text("This value was shortened or omitted. Its complete contents were not saved.")
+            .font(Theme.Fonts.captionMd)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("chat.invocation.previewNotice")
+    }
+
+    private var emptyValue: some View {
+        Text("Empty", comment: "Placeholder for a step that took no input or produced no output.")
+            .font(Theme.Fonts.bodySm)
+            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+    }
+}
+
+private enum InvocationFormat {
+    static func humanLabel(_ invocation: Invocation) -> String { invocation.purpose }
+
+    private static func displayName(_ name: String) -> String {
+        let prefix = "ox.service.invoke("
+        if name.hasPrefix(prefix), name.hasSuffix(")") {
+            return String(name.dropFirst(prefix.count).dropLast())
+        }
+        return name
+    }
+
+    static func iconKind(_ invocation: Invocation) -> OxActionIconKind {
+        OxActionIconKind(actionName: invocation.name)
+    }
+
+    struct Source {
+        enum Icon {
+            case none
+            case domain(String)
+            case service(Service)
+        }
+
+        let label: String
+        let icon: Icon
+        let url: URL?
+        let accessibilityLabel: String
+
+        var id: String {
+            switch icon {
+            case .service(let service): "service:\(service.domain)"
+            case .domain(let domain): "domain:\(url?.absoluteString ?? domain)"
+            case .none: "label:\(label)"
+            }
+        }
+
+        init(label: String, icon: Icon, url: URL? = nil, accessibilityLabel: String? = nil) {
+            self.label = label
+            self.icon = icon
+            self.url = url
+            self.accessibilityLabel = accessibilityLabel ?? label
+        }
+    }
+
+    static func sources(_ invocation: Invocation, serviceManager: ServiceManager) -> [Source]? {
+        let args = invocation.preview == nil ? invocation.args.objectValue : nil
+        switch invocation.name {
+        case Actions.webSearch:
+            if let sources = searchSources(invocation), !sources.isEmpty {
+                return sources
+            }
+            let query = invocation.sources?.query ?? args?["query"]?.stringValue ?? ""
+            return query.isEmpty ? nil : [Source(label: query, icon: .none)]
+        case Actions.webFetch:
+            guard let source = fetchSource(invocation) else { return nil }
+            return [source]
+        case Actions.serviceFind:
+            let query = invocation.sources?.query ?? args?["query"]?.stringValue ?? ""
+            return query.isEmpty ? nil : [Source(label: query, icon: .none)]
+        case Actions.serviceAttach, Actions.serviceValidate, Actions.serviceSignIn, Actions.serviceSolve, Actions.servicePayment, Actions.serviceDetach:
+            guard let domain = invocation.sources?.domain ?? args?["domain"]?.stringValue, !domain.isEmpty else { return nil }
+            let service = serviceManager.service(domain: domain)
+            return [Source(label: service?.title ?? domain, icon: service.map(Source.Icon.service) ?? .none)]
+        default:
+            guard let domain = invokeDomain(invocation.name) else { return nil }
+            let service = serviceManager.service(domain: domain)
+            return [Source(label: service?.title ?? domain, icon: service.map(Source.Icon.service) ?? .none)]
+        }
+    }
+
+    private static func searchSources(_ invocation: Invocation) -> [Source]? {
+        if invocation.preview != nil {
+            return (invocation.sources?.links ?? []).compactMap { link in
+                guard let url = URL(string: link.url), let domain = domain(url) else { return nil }
+                let title = link.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+                return Source(label: domain, icon: .domain(domain), url: url,
+                              accessibilityLabel: title.flatMap { $0.isEmpty ? nil : "\(domain), \($0)" })
+            }
+        }
+        guard case .succeeded(let result?) = invocation.outcome,
+              let items = result.objectValue?["items"]?.arrayValue else { return nil }
+        return items.compactMap { item in
+            guard let value = item.objectValue?["url"]?.stringValue,
+                  let url = URL(string: value),
+                  let domain = domain(url) else { return nil }
+            let title = item.objectValue?["title"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let accessibilityLabel = title.flatMap { $0.isEmpty ? nil : "\(domain), \($0)" }
+            return Source(label: domain, icon: .domain(domain), url: url, accessibilityLabel: accessibilityLabel)
+        }
+    }
+
+    private static func fetchSource(_ invocation: Invocation) -> Source? {
+        let argsURL = invocation.preview == nil ? invocation.args.objectValue?["url"]?.stringValue : invocation.sources?.links.first?.url
+        let finalURL: String? = if invocation.preview == nil, case .succeeded(let result?) = invocation.outcome {
+            result.objectValue?["url"]?.stringValue
+        } else {
+            nil
+        }
+        guard let value = finalURL ?? argsURL,
+              let url = URL(string: value),
+              let domain = domain(url) else { return nil }
+        return Source(label: domain, icon: .domain(domain), url: url)
+    }
+
+    private static func domain(_ url: URL) -> String? {
+        guard let domain = url.host(percentEncoded: false)?.lowercased(),
+              !domain.isEmpty else { return nil }
+        return domain
+    }
+
+    private static func invokeDomain(_ name: String) -> String? {
+        let qualified = displayName(name)
+        guard qualified != name else { return nil }
+        let parts = qualified.split(separator: ":", maxSplits: 2).map(String.init)
+        guard parts.count == 3 else { return nil }
+        return parts[0] == "ios" ? "ios:\(parts[1])" : parts[1]
+    }
+
+    static func isEmpty(_ v: JSONValue) -> Bool {
+        switch v {
+        case .null: return true
+        case .object(let o): return o.isEmpty
+        case .array(let a): return a.isEmpty
+        default: return false
+        }
+    }
+
+    static func clamp(_ code: String, maxLines: Int = 60, maxChars: Int = 4000) -> String {
+        var text = code
+        var truncated = false
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        if lines.count > maxLines {
+            text = lines.prefix(maxLines).joined(separator: "\n")
+            truncated = true
+        }
+        if text.count > maxChars {
+            text = String(text.prefix(maxChars))
+            truncated = true
+        }
+        return truncated ? text + "\n…" : text
+    }
+
+    static func prettyJSON(_ v: JSONValue) -> String {
+        guard let data = try? JSONEncoder().encode(v),
+              let obj = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]),
+              let pretty = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes, .fragmentsAllowed]),
+              let str = String(data: pretty, encoding: .utf8) else {
+            return String(describing: v)
+        }
+        return str
+    }
+}
+
+struct MessageControls {
+    let onCopy: (String) -> Void
+    let isCopied: Bool
+    let canMutate: Bool
+    let onBranch: () -> Void
+    let onRetry: () -> Void
+    let onEdit: () -> Void
+}
+
+struct FileControls {
+    let revision: Int
+    let canMutate: Bool
+    let onRename: (FileItem) -> Void
+    let onDelete: (FileItem) -> Void
+}
+
+struct UserBubble: View {
+    let text: String
+    let attachments: [FileItem]
+    let sourcePrefix: String
+    let onOpenAttachment: (FileItem, String) -> Void
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            if attachments.count == 1 {
+                attachmentThumb(at: 0)
+            } else if attachments.count > 1 {
+                Grid(alignment: .trailing, horizontalSpacing: 6, verticalSpacing: 6) {
+                    ForEach(Array(stride(from: 0, to: attachments.count, by: 2)), id: \.self) { index in
+                        GridRow {
+                            attachmentThumb(at: index)
+                            if index + 1 < attachments.count {
+                                attachmentThumb(at: index + 1)
+                            }
+                        }
+                    }
+                }
+            }
+            if !text.isEmpty {
+                Text(text)
+                    .font(Theme.Fonts.bodyMd)
+                    .foregroundStyle(Theme.Colors.onSurface)
+                    // Body font metrics add vertical whitespace around glyphs, so 12 pt reads like 14 pt horizontally.
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, Theme.Spacing.md)
+                    .background(Theme.Colors.bubble, in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
+            }
+        }
+    }
+
+    private func attachmentThumb(at index: Int) -> some View {
+        let attachment = attachments[index]
+        return AttachmentThumb(
+            attachment: attachment,
+            sourceID: "\(sourcePrefix):\(index):\(attachment.id)",
+            onOpen: onOpenAttachment
+        )
+    }
+}
+
+private struct UserSkillBubble: View {
+    let invocation: UserSkillInvocation
+    let attachments: [FileItem]
+    let sourcePrefix: String
+    let onOpenAttachment: (FileItem, String) -> Void
+    let onOpenSkill: (Skill) -> Void
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            Button { onOpenSkill(invocation.skill) } label: {
+                SkillLibraryRow(skill: invocation.skill)
+            }
+            .buttonStyle(.plain)
+            .modifier(ConversationInteractiveRowSurface())
+            .accessibilityLabel("/\(invocation.skill.displayName), \(invocation.skill.description)")
+            .accessibilityIdentifier(A11yID.ConversationControls.Message.skill(invocation.skill.name))
+
+            if !invocation.argument.isEmpty || !attachments.isEmpty {
+                UserBubble(
+                    text: invocation.argument,
+                    attachments: attachments,
+                    sourcePrefix: sourcePrefix,
+                    onOpenAttachment: onOpenAttachment
+                )
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier(A11yID.ConversationControls.Message.user)
+            }
+        }
+    }
+}
+
+struct QueuedBubble: View {
+    let message: Conversation.QueuedMessage
+    let onOpenAttachment: (FileItem, String) -> Void
+    let onOpenSkill: (Skill) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            HStack {
+                Spacer(minLength: 40)
+                if let invocation = message.skillInvocation {
+                    UserSkillBubble(
+                        invocation: invocation,
+                        attachments: message.attachments,
+                        sourcePrefix: "queued:\(message.id.uuidString)",
+                        onOpenAttachment: onOpenAttachment,
+                        onOpenSkill: onOpenSkill
+                    )
+                    .opacity(0.55)
+                } else {
+                    UserBubble(
+                        text: message.text,
+                        attachments: message.attachments,
+                        sourcePrefix: "queued:\(message.id.uuidString)",
+                        onOpenAttachment: onOpenAttachment
+                    )
+                    .opacity(0.55)
+                }
+            }
+            Button {
+                Haptics.impact(.queuedMessageCancelled)
+                onCancel()
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "clock")
+                    Text("Queued", comment: "Tag on a conversation message the user sent while the agent was still working; it is delivered when the current turn finishes. Tapping cancels it.")
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .font(Theme.Fonts.caption)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 4)
+            .accessibilityLabel(L10n.string("Cancel queued message", comment: "Accessibility label for the button that cancels a message queued while the agent is working."))
+        }
+        .accessibilityElement(children: message.skillInvocation == nil ? .combine : .contain)
+        .accessibilityIdentifier(A11yID.ConversationControls.Message.user)
+    }
+}
+
+struct BlockView: View, Equatable {
+    let block: ConversationBlock
+    let isLatestCanvas: Bool
+    let isStreamingTail: Bool
+    let conversationID: UUID
+    let browserPageMount: WebPageMountCoordinator
+    let isThinkingTail: Bool
+    let controls: MessageControls
+    let artifactControls: FileControls
+    let onOpenAttachment: (FileItem, String) -> Void
+    let onOpenSkill: (Skill) -> Void
+    let onOpenLink: (URL) -> Void
+
+    static func == (lhs: BlockView, rhs: BlockView) -> Bool {
+        lhs.block == rhs.block
+            && lhs.isLatestCanvas == rhs.isLatestCanvas
+            && lhs.isStreamingTail == rhs.isStreamingTail
+            && lhs.isThinkingTail == rhs.isThinkingTail
+            && lhs.controls.isCopied == rhs.controls.isCopied
+            && lhs.editMenuCanMutate == rhs.editMenuCanMutate
+            && lhs.artifactControls.revision == rhs.artifactControls.revision
+            && lhs.artifactControls.canMutate == rhs.artifactControls.canMutate
+    }
+
+    private var editMenuCanMutate: Bool? {
+        if case .userText = block.kind { controls.canMutate } else { nil }
+    }
+
+    @ViewBuilder
+    var body: some View {
+        switch block.kind {
+        case .userText(let s, let atts):
+            userTextBubble(s, attachments: atts, createdAt: block.createdAt)
+        case .userSkill(let invocation, let atts):
+            userSkillBubble(invocation, attachments: atts, createdAt: block.createdAt)
+        case .agentContent(let item):
+            agentContentBubble([item])
+        case let .thinking(trace):
+            ThinkingRow(
+                trace: trace,
+                sourceInvocations: block.sourceInvocations,
+                startedAt: block.createdAt,
+                isLive: isThinkingTail
+            )
+            .padding(.horizontal, 4)
+        case .contextCompaction:
+            contextCompactionDivider
+        case .serviceControl, .responseFooter:
+            EmptyView()
+        }
+    }
+
+    private var contextCompactionDivider: some View {
+        TranscriptStatusDivider(
+            label: Text("Context compacted", comment: "Divider shown in a conversation where earlier model context was summarized."),
+            systemImage: "arrow.down.right.and.arrow.up.left",
+            accessibilityIdentifier: A11yID.ConversationControls.Message.contextCompaction
+        )
+    }
+
+    private func userTextBubble(_ text: String, attachments: [FileItem], createdAt: Date) -> some View {
+        HStack {
+            Spacer(minLength: 40)
+            UserBubble(
+                text: text,
+                attachments: attachments,
+                sourcePrefix: "block:\(block.id.uuidString)",
+                onOpenAttachment: onOpenAttachment
+            )
+                .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
+                .contextMenu {
+                    Section(Self.timestampFormatter.string(from: createdAt)) {
+                        Button {
+                            controls.onCopy(text)
+                        } label: {
+                            Label(L10n.string("Copy", comment: "Context menu action on a sent message that copies its text to the clipboard."), systemImage: "doc.on.doc")
+                        }
+                        if controls.canMutate {
+                            Button {
+                                controls.onEdit()
+                            } label: {
+                                Label(L10n.string("Edit message", comment: "Context menu action on a sent message that loads its text back into the composer to edit and regenerate the reply."), systemImage: "pencil")
+                            }
+                        }
+                    }
+                } preview: {
+                    MessageContextMenuPreview(
+                        title: nil,
+                        text: text,
+                        attachments: attachments
+                    )
+                }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(A11yID.ConversationControls.Message.user)
+    }
+
+    private func userSkillBubble(
+        _ invocation: UserSkillInvocation,
+        attachments: [FileItem],
+        createdAt: Date
+    ) -> some View {
+        HStack {
+            Spacer(minLength: 40)
+            UserSkillBubble(
+                invocation: invocation,
+                attachments: attachments,
+                sourcePrefix: "block:\(block.id.uuidString)",
+                onOpenAttachment: onOpenAttachment,
+                onOpenSkill: onOpenSkill
+            )
+            .contextMenuPreviewShape()
+            .contextMenu {
+                Section(Self.timestampFormatter.string(from: createdAt)) {
+                    Button {
+                        controls.onCopy(invocation.argument.isEmpty ? "/\(invocation.skill.name)" : invocation.argument)
+                    } label: {
+                        Label(L10n.string("Copy", comment: "Context menu action on a sent message that copies its text to the clipboard."), systemImage: "doc.on.doc")
+                    }
+                }
+            } preview: {
+                MessageContextMenuPreview(
+                    title: "/\(invocation.skill.displayName)",
+                    text: invocation.argument,
+                    attachments: attachments
+                )
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private static let timestampFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.doesRelativeDateFormatting = true
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f
+    }()
+
+    @ViewBuilder
+    private func agentContentBubble(_ items: [ContentItem]) -> some View {
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    switch item {
+                    case let .text(text), let .progress(text):
+                        if !text.isEmpty {
+                            agentText(text)
+                                .font(Theme.Fonts.bodyMd)
+                                .foregroundStyle(Theme.Colors.onSurface)
+                                .padding(.horizontal, 4)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                        }
+                    case .serviceControl:
+                        EmptyView()
+                    case let .serviceInspector(link):
+                        ServiceInspectorRow(
+                            link: link,
+                            conversationID: conversationID,
+                            rowID: block.id,
+                            pageMount: browserPageMount
+                        )
+                            .padding(.horizontal, 4)
+                    case let .shoveler(shoveler):
+                        ShovelerView(
+                            shoveler: shoveler,
+                            accessibilityPrefix: A11yID.ConversationControls.Message.shoveler(block.id.uuidString),
+                            onOpenFile: onOpenAttachment
+                        )
+                    case let .video(video):
+                        VideoWidgetView(video: video)
+                            .padding(.horizontal, 4)
+                    case let .image(image):
+                        ImageWidgetView(image: image)
+                            .padding(.horizontal, 4)
+                    case let .artifact(artifact):
+                        if artifact.exists {
+                            let sourceID = "block:\(block.id.uuidString):\(index):\(artifact.id)"
+                            Group {
+                                if artifact.kind == .html && isLatestCanvas {
+                                    InlineCanvasCard(artifact: artifact, rowID: block.id)
+                                } else {
+                                    artifactRow(artifact, sourceID: sourceID)
+                                }
+                            }
+                            .padding(.horizontal, 4)
+                            .contextMenuPreviewShape()
+                            .contextMenu {
+                                FileContextMenu(artifact: artifact, canMutate: artifactControls.canMutate) {
+                                    artifactControls.onRename(artifact)
+                                } onDelete: {
+                                    artifactControls.onDelete(artifact)
+                                }
+                            } preview: {
+                                FileContextMenuPreview(artifact: artifact)
+                            }
+                        } else {
+                            ConversationFileRow(artifact: artifact)
+                                .padding(.horizontal, 4)
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(String(
+                                    format: L10n.string("Deleted file: %@"),
+                                    artifact.userFacingName
+                                ))
+                                .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(artifact.id))
+                        }
+                    case let .skill(skill):
+                        Button { onOpenSkill(skill) } label: {
+                            SkillLibraryRow(skill: skill)
+                        }
+                        .buttonStyle(.plain)
+                        .modifier(ConversationInteractiveRowSurface())
+                        .padding(.horizontal, 4)
+                        .accessibilityLabel("/\(skill.displayName), \(skill.description)")
+                        .accessibilityIdentifier(A11yID.ConversationControls.Message.skill(skill.name))
+                    }
+                }
+            }
+            .animation(Theme.Animation.standard, value: isStreamingTail)
+        }
+    }
+
+    private func artifactRow(_ artifact: FileItem, sourceID: String) -> some View {
+        Button { onOpenAttachment(artifact, sourceID) } label: {
+            ConversationFileRow(artifact: artifact, previewSourceID: sourceID)
+        }
+        .buttonStyle(.plain)
+        .modifier(ConversationInteractiveRowSurface())
+        .accessibilityLabel(artifact.userFacingAccessibilityLabel)
+        .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(artifact.id))
+    }
+
+    private func agentText(_ text: String) -> some View {
+        StreamingMarkdownText(source: text, isStreaming: isStreamingTail)
+            .environment(\.conversationLinkHandler, onOpenLink)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(text, isEnabled: !isStreamingTail)
+            .accessibilityIdentifier(A11yID.ConversationControls.Message.agent)
+    }
+
+}
+
+struct ResponseFooterBlockView: View, Equatable {
+    let id: UUID
+    let text: String
+    let isVisible: Bool
+    let controls: MessageControls
+
+    static func == (lhs: ResponseFooterBlockView, rhs: ResponseFooterBlockView) -> Bool {
+        lhs.id == rhs.id
+            && lhs.text == rhs.text
+            && lhs.isVisible == rhs.isVisible
+            && lhs.controls.isCopied == rhs.controls.isCopied
+            && lhs.controls.canMutate == rhs.controls.canMutate
+    }
+
+    var body: some View {
+        HStack(spacing: 1) {
+            iconButton(
+                systemName: controls.isCopied ? "checkmark" : "doc.on.doc",
+                label: A11yLabel.copyMessage,
+                id: actionIdentifier(A11yID.ConversationControls.Message.copy),
+                disabled: controls.isCopied
+            ) {
+                controls.onCopy(text)
+            }
+            ShareLink(item: text) {
+                controlIcon(systemName: "square.and.arrow.up")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(A11yLabel.shareMessage)
+            .accessibilityIdentifier(actionIdentifier(A11yID.ConversationControls.Message.share))
+            if controls.canMutate {
+                iconButton(
+                    systemName: "arrow.branch",
+                    label: A11yLabel.branchMessage,
+                    id: actionIdentifier(A11yID.ConversationControls.Message.branch)
+                ) {
+                    controls.onBranch()
+                }
+                iconButton(
+                    systemName: "arrow.clockwise",
+                    label: A11yLabel.retryMessage,
+                    id: actionIdentifier(A11yID.ConversationControls.Message.retry)
+                ) {
+                    controls.onRetry()
+                }
+            }
+        }
+        .padding(.horizontal, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(isVisible ? 1 : 0)
+        .allowsHitTesting(isVisible)
+        .accessibilityHidden(!isVisible)
+    }
+
+    private func actionIdentifier(_ action: String) -> String {
+        "\(action).\(id.uuidString)"
+    }
+
+    private func iconButton(
+        systemName: String,
+        label: String,
+        id: String,
+        disabled: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            controlIcon(systemName: systemName)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(id)
+    }
+
+    private func controlIcon(systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            .frame(width: 18, height: 28)
+            .frame(width: 28, height: Theme.Size.minimumTouchTarget, alignment: .leading)
+            .contentShape(Rectangle())
+    }
+}

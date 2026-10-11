@@ -6,12 +6,12 @@ nonisolated struct DurableConversationReference: Hashable, Codable, Sendable {
 
     var value: JSONValue { .object(["profileID": .string(profileID.uuidString), "conversationID": .int(conversationID)]) }
 
-    var compatibilityID: ChatID {
+    var compatibilityID: ConversationID {
         let prefix = profileID.uuidString.replacingOccurrences(of: "-", with: "").prefix(16)
         let compact = String(prefix) + String(format: "%016llx", UInt64(conversationID))
         let bytes = Array(compact)
         let text = [String(bytes[0..<8]), String(bytes[8..<12]), String(bytes[12..<16]), String(bytes[16..<20]), String(bytes[20..<32])].joined(separator: "-")
-        return ChatID(UUID(uuidString: text)!)
+        return ConversationID(UUID(uuidString: text)!)
     }
 
     init(profileID: UUID, conversationID: Int) {
@@ -28,7 +28,7 @@ nonisolated struct DurableConversationReference: Hashable, Codable, Sendable {
         }
     }
 
-    init?(compatibilityID: ChatID, profileID: UUID) {
+    init?(compatibilityID: ConversationID, profileID: UUID) {
         let text = compatibilityID.rawValue.uuidString.replacingOccurrences(of: "-", with: "")
         guard text.prefix(16) == profileID.uuidString.replacingOccurrences(of: "-", with: "").prefix(16),
               let number = UInt64(text.suffix(16), radix: 16), number <= 9_007_199_254_740_991 else { return nil }
@@ -150,7 +150,7 @@ actor DurableProfileStore {
         return try JSONDecoder().decode(DurableConversationReference.self, from: Data(reference.jsonString().utf8))
     }
 
-    nonisolated func reference(for id: ChatID, in scope: ProfileScope) throws -> DurableConversationReference {
+    nonisolated func reference(for id: ConversationID, in scope: ProfileScope) throws -> DurableConversationReference {
         guard let profileID = scope.profileID else { throw RuntimeError.bridge("No Profile identity") }
         if let reference = DurableConversationReference(compatibilityID: id, profileID: profileID) { return reference }
         guard let reference = try ProfileMigrator.durableConversationReference(for: id.rawValue, in: scope) else {

@@ -10,11 +10,11 @@ struct ModelPickerSheet: View {
     var body: some View {
         NavigationStack {
             ModelPickerContent(
-                title: isChoosingInitialDefault ? "Choose default model" : "Model for this chat",
+                title: isChoosingInitialDefault ? "Choose default model" : "Model for this conversation",
                 activeSelection: conversation.modelSelection,
                 scopeDescription: isChoosingInitialDefault
-                    ? "Your choice will be used for this chat and future chats."
-                    : "Changes apply immediately and stay with this chat.",
+                    ? "Your choice will be used for this conversation and future conversations."
+                    : "Changes apply immediately and stay with this conversation.",
                 onClose: { dismiss() }
             ) { client, model, selection in
                 Log.ui.info("ModelPicker.select conversation=\(conversation.id) client=\(client.id) model=\(model.id) region=\(selection.region.rawValue)")
@@ -80,7 +80,7 @@ struct SettingsSheet: View {
                 VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                     SettingsSection(
                         "Profiles",
-                        footer: "Profiles hold chats, files, character, and memory. Keep several, switch anytime, and store locally or sync with iCloud.",
+                        footer: "Profiles hold conversations, files, character, and memory. Keep several, switch anytime, and store locally or sync with iCloud.",
                         layout: .group
                     ) {
                         VStack(spacing: 0) {
@@ -134,14 +134,14 @@ struct SettingsSheet: View {
 
                     SettingsSection(
                         "Models",
-                        footer: "Used for new chats. Existing chats keep their model.",
+                        footer: "Used for new conversations. Existing conversations keep their model.",
                         layout: .group
                     ) {
                         NavigationLink {
                             ModelPickerContent(
                                 title: "Default model",
                                 activeSelection: registry.sessionModel,
-                                scopeDescription: "Changes apply immediately to new chats. Existing chats keep their model."
+                                scopeDescription: "Changes apply immediately to new conversations. Existing conversations keep their model."
                             ) { client, model, selection in
                                 Log.ui.info("Settings.defaultModel client=\(client.id) model=\(model.id) region=\(selection.region.rawValue)")
                                 registry.select(model, in: client.id, region: selection.region)
@@ -624,7 +624,7 @@ struct ModelPickerContent: View {
                     }
                 } else if let onClose {
                     ToolbarItem(placement: .topBarLeading) {
-                        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.Chat.modelClose, action: onClose)
+                        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ConversationControls.modelClose, action: onClose)
                     }
                 }
             }
@@ -705,7 +705,7 @@ struct ModelPickerContent: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Region")
         .accessibilityValue(selectedRegion.displayName)
-        .accessibilityIdentifier(A11yID.Chat.modelRegion)
+        .accessibilityIdentifier(A11yID.ConversationControls.modelRegion)
     }
 
     private var providerMenu: some View {
@@ -720,7 +720,7 @@ struct ModelPickerContent: View {
         .accessibilityValue(providerSelection == .custom
             ? "Custom provider"
             : selectedClient?.displayName ?? "")
-        .accessibilityIdentifier(A11yID.Chat.modelProvider)
+        .accessibilityIdentifier(A11yID.ConversationControls.modelProvider)
         .navigationDestination(isPresented: $choosingProvider) {
             ProviderPickerView(
                 clients: displayedClients,
@@ -746,7 +746,7 @@ struct ModelPickerContent: View {
                         id: model.id,
                         value: model.id,
                         title: model.displayName,
-                        accessibilityIdentifier: A11yID.Chat.modelOption(model.id)
+                        accessibilityIdentifier: A11yID.ConversationControls.modelOption(model.id)
                     )
                 },
                 selection: Binding(
@@ -788,7 +788,7 @@ struct ModelPickerContent: View {
         .disabled(selectedClient?.models.isEmpty != false && selectedClient?.canLoadModels != true)
         .accessibilityLabel("Model")
         .accessibilityValue(selectedModel?.displayName ?? "")
-        .accessibilityIdentifier(A11yID.Chat.modelSelection)
+        .accessibilityIdentifier(A11yID.ConversationControls.modelSelection)
     }
 
     private var reasoningEffortMenu: some View {
@@ -800,7 +800,7 @@ struct ModelPickerContent: View {
                         id: effort,
                         value: effort,
                         title: reasoningEffortName(effort),
-                        accessibilityIdentifier: A11yID.Chat.modelThinkingLevelOption(effort)
+                        accessibilityIdentifier: A11yID.ConversationControls.modelThinkingLevelOption(effort)
                     )
                 },
                 selection: Binding(
@@ -817,7 +817,7 @@ struct ModelPickerContent: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Thinking level")
         .accessibilityValue(reasoningEffortName(selectedReasoningEffort))
-        .accessibilityIdentifier(A11yID.Chat.modelThinkingLevel)
+        .accessibilityIdentifier(A11yID.ConversationControls.modelThinkingLevel)
     }
 
     private var customConnectionSection: some View {
@@ -894,7 +894,7 @@ struct ModelPickerContent: View {
             }
             .buttonStyle(.plain)
             .disabled(!customModelsCanLoad)
-            .accessibilityIdentifier(A11yID.Chat.modelSelection)
+            .accessibilityIdentifier(A11yID.ConversationControls.modelSelection)
         } else {
             NavigationLink {
                 SettingsSelectionPickerView(
@@ -904,7 +904,7 @@ struct ModelPickerContent: View {
                             id: model.id,
                             value: model.id,
                             title: model.displayName,
-                            accessibilityIdentifier: A11yID.Chat.modelOption(model.id)
+                            accessibilityIdentifier: A11yID.ConversationControls.modelOption(model.id)
                         )
                     },
                     selection: Binding(
@@ -924,7 +924,7 @@ struct ModelPickerContent: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Model")
             .accessibilityValue(customModels.first { $0.id == customModelID }?.displayName ?? "")
-            .accessibilityIdentifier(A11yID.Chat.modelSelection)
+            .accessibilityIdentifier(A11yID.ConversationControls.modelSelection)
         }
 
     }
@@ -1195,7 +1195,7 @@ private struct ProviderPickerView: View {
             value: nil,
             title: L10n.string("API provider"),
             systemImage: "plus",
-            accessibilityIdentifier: A11yID.Chat.modelAPIProviders,
+            accessibilityIdentifier: A11yID.ConversationControls.modelAPIProviders,
             children: apiClients.map { providerOption($0, showsSubtitle: true) }
         )
         let customOption = SettingsSelectionOption<String?>(
@@ -1203,7 +1203,7 @@ private struct ProviderPickerView: View {
             value: nil,
             title: L10n.string("Custom provider"),
             systemImage: "plus",
-            accessibilityIdentifier: A11yID.Chat.modelCustomProviders
+            accessibilityIdentifier: A11yID.ConversationControls.modelCustomProviders
         )
 
         SettingsSelectionPickerView(
@@ -1226,7 +1226,7 @@ private struct ProviderPickerView: View {
             faviconDomain: client.website?.host,
             faviconURL: client.iconURL,
             subtitle: showsSubtitle ? subtitle(for: client) : nil,
-            accessibilityIdentifier: A11yID.Chat.modelProviderOption(client.id)
+            accessibilityIdentifier: A11yID.ConversationControls.modelProviderOption(client.id)
         )
     }
 

@@ -32,9 +32,9 @@ export const Schemas = {
   ActionRequest: object("ActionRequest", { domain: S(), action: S(), args: nullable(json()), approve: nullable(B()) }),
   EvaluateRequest: object("EvaluateRequest", { domain: S(), script: S() }),
   ServiceRequest: object("ServiceRequest", { domain: S() }),
-  NewChatRequest: object("NewChatRequest", { temporary: nullable(B()), providerId: nullable(S()), modelId: nullable(S()) }),
-  SendChatRequest: object("SendChatRequest", { sessionId: nullable(S()), text: S(), wait: nullable(B()) }),
-  RespondChatRequest: object("RespondChatRequest", { sessionId: nullable(S()), promptId: S(), answer: S() }),
+  NewConversationRequest: object("NewConversationRequest", { temporary: nullable(B()), providerId: nullable(S()), modelId: nullable(S()) }),
+  SendConversationRequest: object("SendConversationRequest", { sessionId: nullable(S()), text: S(), wait: nullable(B()) }),
+  RespondConversationRequest: object("RespondConversationRequest", { sessionId: nullable(S()), promptId: S(), answer: S() }),
   SetKeyRequest: object("SetKeyRequest", {
     providerId: S(), key: nullable(S()), region: nullable(swift(Type.Union([Type.Literal("global"), Type.Literal("china")]), "LLMRegion")),
   }),
@@ -58,25 +58,25 @@ export const Schemas = {
     implementation: Type.Object({ name: S(), version: S(), build: S() }),
     protocols: Type.Record(S({ pattern: "^(.*)$" }), A(I({ minimum: 1 }))), methods: A(S()),
   }),
-  ChatRow: object("ChatRow", {
+  ConversationRow: object("ConversationRow", {
     id: S(), title: S(), model: Type.Union([S(), Type.Null()]), createdAt: S(),
     lastActivity: Type.Union([S(), Type.Null()]), active: B(),
   }),
-  ListChatsResult: object("ListChatsResult", { chats: A(R("ChatRow")) }),
-  ChatTool: object("ChatTool", { name: S(), description: S(), parameters: Type.Unknown(), strict: B() }),
-  ChatSnapshot: object("ChatSnapshot", {
+  ListConversationsResult: object("ListConversationsResult", { chats: A(R("ConversationRow")) }),
+  ConversationTool: object("ConversationTool", { name: S(), description: S(), parameters: Type.Unknown(), strict: B() }),
+  ConversationSnapshot: object("ConversationSnapshot", {
     id: S(), model: R("ProviderModel"), systemPrompt: S(), renderedSystemPrompt: S(), soul: S(), memory: S(),
-    tools: A(R("ChatTool")), messages: A(R("Message")), blocks: A(R("Block")),
-    isBusy: optional(B()), pendingPrompt: optional(R("PendingChatPrompt")),
+    tools: A(R("ConversationTool")), messages: A(R("Message")), blocks: A(R("Block")),
+    isBusy: optional(B()), pendingPrompt: optional(R("PendingConversationPrompt")),
   }),
-  PendingChatPrompt: object("PendingChatPrompt", {
+  PendingConversationPrompt: object("PendingConversationPrompt", {
     id: S(), prompt: S(), options: A(S()), allowsCustomAnswer: B(), requiresApp: B(),
   }),
-  RespondChatResult: object("RespondChatResult", { chatId: S(), promptId: S() }),
-  GetChatResult: object("GetChatResult", { data: optional(R("ChatSnapshot")) }),
-  NewChatResult: object("NewChatResult", { chatId: S(), temporary: B(), model: S() }),
-  SendChatResult: object("SendChatResult", { chatId: S(), outcome: S(), text: optional(S()), error: optional(S()) }),
-  StopChatResult: object("StopChatResult", { chatId: S(), wasRunning: B() }),
+  RespondConversationResult: object("RespondConversationResult", { chatId: S(), promptId: S() }),
+  GetConversationResult: object("GetConversationResult", { data: optional(R("ConversationSnapshot")) }),
+  NewConversationResult: object("NewConversationResult", { chatId: S(), temporary: B(), model: S() }),
+  SendConversationResult: object("SendConversationResult", { chatId: S(), outcome: S(), text: optional(S()), error: optional(S()) }),
+  StopConversationResult: object("StopConversationResult", { chatId: S(), wasRunning: B() }),
   ValueResult: object("ValueResult", { value: Type.Unknown() }),
   VMLog: object("VMLog", { level: S(), message: S() }),
   VMControlResult: object("VMControlResult", { value: optional(Type.Unknown()), logs: optional(A(R("VMLog"))) }),
@@ -112,20 +112,20 @@ const method = (swiftCase: string, params: SchemaName, result: SchemaName) => ({
 export const Methods = {
   "host.describe": method("describe", "EmptyRequest", "HostDescription"),
   "debug.durable.storage": method("durableStorage", "DurableCommandParameters", "DurableCommandResult"),
-  "debug.durable.chat": method("durableChat", "DurableCommandParameters", "DurableCommandResult"),
+  "debug.durable.chat": method("durableConversation", "DurableCommandParameters", "DurableCommandResult"),
   "services.invoke": method("invokeAction", "ActionRequest", "ValueResult"),
   "services.evaluate": method("evaluate", "EvaluateRequest", "ValueResult"),
   "services.reload": method("reloadService", "ServiceRequest", "ValueResult"),
   "services.refreshAuth": method("refreshServiceAuth", "ServiceRequest", "ValueResult"),
   "services.list": method("listServices", "EmptyRequest", "ListServicesResult"),
   "services.sync": method("syncServices", "EmptyRequest", "SyncServicesResult"),
-  "chats.list": method("listChats", "EmptyRequest", "ListChatsResult"),
-  "chats.get": method("getChat", "SessionRequest", "GetChatResult"),
-  "chats.open": method("openChat", "SessionRequest", "GetChatResult"),
-  "chats.respond": method("respondChat", "RespondChatRequest", "RespondChatResult"),
-  "chats.new": method("newChat", "NewChatRequest", "NewChatResult"),
-  "chats.send": method("sendChat", "SendChatRequest", "SendChatResult"),
-  "chats.stop": method("stopChat", "SessionRequest", "StopChatResult"),
+  "chats.list": method("listConversations", "EmptyRequest", "ListConversationsResult"),
+  "chats.get": method("getConversation", "SessionRequest", "GetConversationResult"),
+  "chats.open": method("openConversation", "SessionRequest", "GetConversationResult"),
+  "chats.respond": method("respondConversation", "RespondConversationRequest", "RespondConversationResult"),
+  "chats.new": method("newConversation", "NewConversationRequest", "NewConversationResult"),
+  "chats.send": method("sendConversation", "SendConversationRequest", "SendConversationResult"),
+  "chats.stop": method("stopConversation", "SessionRequest", "StopConversationResult"),
   "providers.list": method("listProviders", "EmptyRequest", "ListProvidersResult"),
   "logs.list": method("getLogs", "GetLogsRequest", "GetLogsResult"),
   "debug.composer.formatting": method("getComposerFormatting", "EmptyRequest", "ComposerFormattingResult"),
@@ -164,4 +164,4 @@ export const ResponseBatchSchema = A(ResponseSchema, { $id: "ResponseBatch", min
 
 export type MethodName = keyof typeof Methods;
 export type HostDescription = Static<typeof Schemas.HostDescription>;
-export type HostChatRow = Static<typeof Schemas.ChatRow>;
+export type HostConversationRow = Static<typeof Schemas.ConversationRow>;

@@ -1,7 +1,7 @@
-import { RPC_VERSION, validateParams, validateResult, type HostDescription, type HostChatRow } from "@openox/protocol";
+import { RPC_VERSION, validateParams, validateResult, type HostDescription, type HostConversationRow } from "@openox/protocol";
 import { HostConnection, isObject } from "./host-connection.ts";
 
-export type { HostDescription, HostChatRow } from "@openox/protocol";
+export type { HostDescription, HostConversationRow } from "@openox/protocol";
 
 export class HostRPCClient {
   private readonly connection: HostConnection;
@@ -19,7 +19,7 @@ export class HostRPCClient {
     if (remaining <= 0) throw new Error(`Timeout before ${method}; request not sent`);
     const result = await this.connection.request(method, params, remaining);
     if (!isObject(result) || !validateResult(method, result)) {
-      const label = method === "chats.list" ? "chat list" : `${method} result`;
+      const label = method === "chats.list" ? "conversation list" : `${method} result`;
       throw new Error(`Host returned an invalid ${label}; request was sent, inspect Host state before retrying. This request was not automatically resent.`);
     }
     return result;
@@ -42,8 +42,8 @@ export class HostRPCClient {
     return await this.call("host.describe", timeoutMs) as HostDescription;
   }
 
-  async listChats(timeoutMs: number): Promise<HostChatRow[]> {
-    return (await this.call("chats.list", timeoutMs)).chats as HostChatRow[];
+  async listConversations(timeoutMs: number): Promise<HostConversationRow[]> {
+    return (await this.call("chats.list", timeoutMs)).chats as HostConversationRow[];
   }
 
   close(): void { this.connection.close(); }

@@ -126,7 +126,7 @@ final class Service: NSObject, Identifiable {
 
     enum SignInProbeReason: String {
         case attach
-        case chatOpen
+        case conversationOpen
         case modelSignIn
         case pendingSignIn
         case serviceDetail
@@ -217,9 +217,9 @@ final class Service: NSObject, Identifiable {
     }
 
     enum AuthSignInSource: String {
-        case chatCard
+        case conversationCard
         case canvas
-        case chatChip
+        case conversationChip
         case serviceDetail
     }
 

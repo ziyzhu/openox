@@ -82,14 +82,14 @@ exec '${Bun.which("curl")!.replaceAll("'", "'\\''")}' "$@"
     host.endpoint === `ws://127.0.0.1:${server.port}` && host.reachable)) {
     throw new Error("Standalone Host discovery missed the reachable fixture");
   }
-  const chats = JSON.parse(await run([executable, "--host", `ws://127.0.0.1:${server.port}`, "chat", "list", "--json"]));
+  const chats = JSON.parse(await run([executable, "--host", `ws://127.0.0.1:${server.port}`, "conversation", "list", "--json"]));
   if (chats[0]?.id !== "standalone-smoke") throw new Error("Standalone Host request failed");
   const hostArgs = [executable, "--host", `ws://127.0.0.1:${server.port}`];
-  const created = JSON.parse(await run([...hostArgs, "chat", "new", "--temporary", "--provider", "mock", "--model", "mock", "--json"]));
-  const outcome = JSON.parse(await run([...hostArgs, "--chat", created.chatId, "chat", "send", "hello", "--json"]));
-  if (outcome.outcome !== "completed" || outcome.text !== "Hello from the fixture.") throw new Error("Standalone chat send failed");
-  const snapshot = JSON.parse(await run([...hostArgs, "--chat", created.chatId, "chat", "inspect", "--json"]));
-  if (snapshot.id !== created.chatId || snapshot.isBusy || !snapshot.messages.length) throw new Error("Standalone chat inspection failed");
+  const created = JSON.parse(await run([...hostArgs, "conversation", "new", "--temporary", "--provider", "mock", "--model", "mock", "--json"]));
+  const outcome = JSON.parse(await run([...hostArgs, "--chat", created.chatId, "conversation", "send", "hello", "--json"]));
+  if (outcome.outcome !== "completed" || outcome.text !== "Hello from the fixture.") throw new Error("Standalone conversation send failed");
+  const snapshot = JSON.parse(await run([...hostArgs, "--chat", created.chatId, "conversation", "inspect", "--json"]));
+  if (snapshot.id !== created.chatId || snapshot.isBusy || !snapshot.messages.length) throw new Error("Standalone conversation inspection failed");
   console.log(`PASS standalone ${nativePlatform}: download, install, version, help, repository validation, discovery, chat create/send/inspect; no Bun or Node on PATH`);
 } finally {
   server.stop(true);

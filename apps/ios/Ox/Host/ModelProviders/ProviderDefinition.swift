@@ -147,7 +147,7 @@ nonisolated struct ProviderDefinition: Codable, Equatable, Identifiable, Sendabl
                 throw RuntimeError.bridge("Invalid provider: adaptiveThinking requires anthropic-messages")
             }
             if model.options?.replayReasoning != nil, api != .openAIChatCompletions {
-                throw RuntimeError.bridge("Invalid provider: replayReasoning requires openai-chat-completions")
+                throw RuntimeError.bridge("Invalid provider: replayReasoning requires openai-conversation-completions")
             }
         }
         if auth.kind == .oauth {

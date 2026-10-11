@@ -77,7 +77,7 @@ struct MarkdownFileView: View {
                         .padding(.horizontal, Theme.Spacing.lg)
                         .padding(.vertical, Theme.Spacing.md)
                         .accessibilityLabel(artifact.userFacingName)
-                        .accessibilityIdentifier(A11yID.Chat.MarkdownFile.editor)
+                        .accessibilityIdentifier(A11yID.ConversationControls.MarkdownFile.editor)
                 }
             case .failed(let message):
                 ContentUnavailableView(
@@ -89,18 +89,18 @@ struct MarkdownFileView: View {
         }
         .interactiveDismissDisabled(mode == .editing)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Colors.chatSurface)
+        .background(Theme.Colors.conversationSurface)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if case .ready(let document) = phase {
                     switch mode {
                     case .viewing:
                         Button("Edit") { edit(document) }
-                            .accessibilityIdentifier(A11yID.Chat.MarkdownFile.edit)
+                            .accessibilityIdentifier(A11yID.ConversationControls.MarkdownFile.edit)
                     case .editing:
                         Button("Save") { save() }
                             .disabled(isSaving)
-                            .accessibilityIdentifier(A11yID.Chat.MarkdownFile.save)
+                            .accessibilityIdentifier(A11yID.ConversationControls.MarkdownFile.save)
                     }
                 }
             }

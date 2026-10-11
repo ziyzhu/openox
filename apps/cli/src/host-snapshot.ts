@@ -1,6 +1,6 @@
 export type ToolDeclaration = { name: string; description: string; parameters: unknown };
 
-export type ChatSnapshot = {
+export type ConversationSnapshot = {
   id: string;
   model: { id: string; maxTokens: number; maxContext: number };
   systemPrompt: string;
@@ -102,7 +102,7 @@ function realUsage(messages: any[]): Usage | undefined {
   }
 }
 
-export function usageBreakdown(snapshot: ChatSnapshot): UsageBreakdown {
+export function usageBreakdown(snapshot: ConversationSnapshot): UsageBreakdown {
   const rawToolTokens = (snapshot.tools ?? []).map(tool => estimateTokens(JSON.stringify(tool)));
   const raw = {
     system: estimateTokens(snapshot.systemPrompt) + estimateTokens(snapshot.soul) + estimateTokens(snapshot.memory),

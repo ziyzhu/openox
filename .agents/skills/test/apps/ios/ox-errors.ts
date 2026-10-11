@@ -7,10 +7,10 @@ import { qaCommand } from "../../../setup/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulator.ts";
 
 const config = qaCommand({
-  usage: "Usage: bun .agents/skills/test/apps/ios/ox-errors.ts --device ox-N --host <ws-url> --chat <idle-QA-chat>\nRequires an installed build and enabled Host. Verifies structured ox errors without changing files, settings, or policies.",
+  usage: "Usage: bun .agents/skills/test/apps/ios/ox-errors.ts --device ox-N --host <ws-url> --conversation <idle-QA-conversation>\nRequires an installed build and enabled Host. Verifies structured ox errors without changing files, settings, or policies.",
   options: { host: { type: "string" }, chat: { type: "string" } },
 });
-if (!config.values.device || !config.values.host || !config.values.chat) throw new Error("Pass --device, --host, and --chat explicitly");
+if (!config.values.device || !config.values.host || !config.values.chat) throw new Error("Pass --device, --host, and --conversation explicitly");
 const endpoint = new URL(config.values.host);
 if (!["ws:", "wss:"].includes(endpoint.protocol) || Number(endpoint.port) !== config.debugPort) throw new Error(`Use the selected simulator's Host on port ${config.debugPort}`);
 const evidence = await mkdtemp(join(tmpdir(), "openox-errors-"));
@@ -18,8 +18,8 @@ const release = claimSimulator(config.device);
 const cli = ["bun", "apps/cli/src/ox.ts", "--host", endpoint.href, "--chat", config.values.chat];
 try {
   assert.ok(await requireSimulator(config.device), "Boot the reserved simulator before testing");
-  const inspected = await run([...cli, "chat", "inspect", "--json"], { capture: true });
-  assert.equal(JSON.parse(inspected.stdout).isBusy, false, "Do not interrupt a running chat");
+  const inspected = await run([...cli, "conversation", "inspect", "--json"], { capture: true });
+  assert.equal(JSON.parse(inspected.stdout).isBusy, false, "Do not interrupt a running conversation");
   const source = `
     const failures = [];
     const calls = [

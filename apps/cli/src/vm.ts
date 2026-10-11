@@ -10,12 +10,12 @@ type VMResult = {
 };
 
 export const SUBS: Record<string, SubCommand> = {
-  inspect: { desc: "Inspect the selected Host, chat-bound VM, and VFS roots (--json)", fn: inspect },
+  inspect: { desc: "Inspect the selected Host, conversation-bound VM, and VFS roots (--json)", fn: inspect },
   functions: { desc: "List the ox.* functions exposed by the VM (--json)", fn: functions },
   help: { desc: "Print the complete contract for one ox.* function", fn: help },
   call: { desc: "Call one ox.* function with structured JSON arguments", fn: call },
-  eval: { desc: "Run arbitrary JavaScript in the selected chat-bound VM", fn: evaluate },
-  skills: { desc: "List the skills visible to the selected chat-bound VM, or print one", fn: skills },
+  eval: { desc: "Run arbitrary JavaScript in the selected conversation-bound VM", fn: evaluate },
+  skills: { desc: "List the skills visible to the selected conversation-bound VM, or print one", fn: skills },
 };
 
 
@@ -30,11 +30,11 @@ async function inspect(args: string[], context: CliContext): Promise<void> {
   const value = valueObject(result);
   const host = object(value.host);
   const runtime = object(value.vm);
-  const chat = value.session === null ? undefined : object(value.session);
+  const conversation = value.session === null ? undefined : object(value.session);
   console.log(`${terminalText("Host", [C.sky])}       ${host.kind ?? "unknown"} ${host.mode ?? ""} via ${host.transport ?? "unknown"}`.trimEnd());
   console.log(`${terminalText("VM", [C.sky])}         ${runtime.contract ?? "unknown"} on ${runtime.engine ?? "unknown"}`);
   console.log(`${terminalText("Lifetime", [C.sky])}   ${runtime.lifetime ?? "unknown"}; ${runtime.sessionBinding ?? "unknown"}-bound execution`);
-  console.log(`${terminalText("Chat", [C.sky])}       ${chat?.id ?? "none"}${chat?.temporary === true ? " (temporary)" : ""}`);
+  console.log(`${terminalText("Conversation", [C.sky])}       ${conversation?.id ?? "none"}${conversation?.temporary === true ? " (temporary)" : ""}`);
   console.log(`${terminalText("Functions", [C.sky])}  ${runtime.functionCount ?? 0}`);
   console.log(`${terminalText("VFS", [C.sky])}        ${Array.isArray(value.vfsRoots) ? value.vfsRoots.join(", ") : "unavailable"}`);
 }
@@ -140,7 +140,7 @@ async function skills(args: string[], context: CliContext): Promise<void> {
   const name = args[0]?.startsWith("-") ? undefined : args[0];
   const rest = name ? args.slice(1) : args;
   if (rest.includes("-h") || rest.includes("--help")) {
-    console.log("Usage: ox [--chat <id>] vm skills [name] [--json] [--timeout 60000]");
+    console.log("Usage: ox [--conversation <id>] vm skills [name] [--json] [--timeout 60000]");
     return;
   }
   const options = parseOutputOptions(rest, 60000);
@@ -169,7 +169,7 @@ async function request(
   fields: Record<string, unknown> = {},
 ): Promise<VMResult> {
   const params = {
-    ...(context.chat && method !== "vm.functions" ? { sessionId: context.chat } : {}),
+    ...(context.conversation && method !== "vm.functions" ? { sessionId: context.conversation } : {}),
     ...fields,
   };
   if (!Value.Check(VMParamsSchemas[method], params)) fail(`invalid ${method} parameters`);
@@ -199,7 +199,7 @@ function printVMJSON(result: VMResult): void {
 
 function printHelp(args: string[], usage: string): boolean {
   if (!args.includes("--help") && !args.includes("-h")) return false;
-  console.log(`Usage: ox [--host <url>] [--chat <id>] vm ${usage}`);
+  console.log(`Usage: ox [--host <url>] [--conversation <id>] vm ${usage}`);
   return true;
 }
 

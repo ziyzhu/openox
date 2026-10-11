@@ -32,7 +32,7 @@ export const fail = (message: string): never => {
   process.exit(1);
 };
 
-export type CliContext = { host?: string; profile?: string; chat?: string; repository?: string };
+export type CliContext = { host?: string; profile?: string; conversation?: string; repository?: string };
 export type SubCommand = { fn: (args: string[], context: CliContext) => Promise<void>; desc: string };
 export type CommandGroup = {
   fn: (args: string[], context: CliContext) => Promise<void> | void;
@@ -43,7 +43,7 @@ export type CommandGroup = {
 function printUsage(program: string, description: string, groups: Record<string, CommandGroup>): void {
   console.log(terminalText(CLI_LOGO, [C.bold, C.harvest]));
   console.log(`${description}\n`);
-  console.log(`Usage: ${program} [--host <ws-url>] [--chat <chat-id>] [--profile <path>] [--repository <path-or-url>] <command> [...flags] [...args]\n`);
+  console.log(`Usage: ${program} [--host <ws-url>] [--conversation <conversation-id>] [--profile <path>] [--repository <path-or-url>] <command> [...flags] [...args]\n`);
   console.log("Commands:");
   const rows = Object.entries(groups).flatMap(([name, group]) => {
     const subs = Object.entries(group.subs ?? {});
@@ -59,7 +59,7 @@ function printUsage(program: string, description: string, groups: Record<string,
   console.log("\nFlags:");
   const flags = [
     ["--host <ws-url>", "Ox Host WebSocket endpoint"],
-    ["--chat <chat-id>", "Chat-bound VM on the Host"],
+    ["--conversation <conversation-id>", "Conversation-bound VM on the Host"],
     ["--profile <path>", "Profile directory for direct administration"],
     ["--repository <origin>", "Repository path or Git URL"],
     ["-v, --version", "Display the installed version and exit"],
@@ -76,13 +76,14 @@ export function parseGlobalOptions(args: string[]): { context: CliContext; rest:
   const options = new Map<string, { key: keyof CliContext; requirement: string }>([
     ["--host", { key: "host", requirement: "a WebSocket URL" }],
     ["--profile", { key: "profile", requirement: "a path" }],
-    ["--chat", { key: "chat", requirement: "a chat id" }],
+    ["--conversation", { key: "conversation", requirement: "a conversation id" }],
+    ["--chat", { key: "conversation", requirement: "a conversation id" }],
     ["--repository", { key: "repository", requirement: "a path or URL" }],
   ]);
   const removedOptions = new Map([
     ["--runtime", "--runtime was removed; the selected Host owns service page implementation"],
-    ["--session", "--session was removed; use --chat for ox vm"],
-    ["--vm-session", "--vm-session was renamed to --chat"],
+    ["--session", "--session was removed; use --conversation for ox vm"],
+    ["--vm-session", "--vm-session was renamed to --conversation"],
     ["--root", "--root was renamed to --profile"],
   ]);
   const context: CliContext = process.env.OX_REPOSITORY ? { repository: process.env.OX_REPOSITORY } : {};
@@ -99,12 +100,12 @@ export function parseGlobalOptions(args: string[]): { context: CliContext; rest:
       rest.push(argument);
       continue;
     }
-    if (seen.has(flag)) throw new Error(`${flag} may only be specified once`);
+    if (seen.has(option.key)) throw new Error(`${flag} may only be specified once`);
     const value = assignment === -1 ? args[++index] : argument.slice(assignment + 1);
     if (!value || (assignment === -1 && value.startsWith("-"))) {
       throw new Error(`${flag} requires ${option.requirement}`);
     }
-    seen.add(flag);
+    seen.add(option.key);
     context[option.key] = value;
   }
   return { context, rest };
@@ -129,7 +130,8 @@ export async function runCli(
     console.log(version);
     return;
   }
-  const [name, ...rest] = parsed.rest;
+  const [requestedName, ...rest] = parsed.rest;
+  const name = requestedName === "chat" ? "conversation" : requestedName;
   if (!name || name === "help" || name === "-h" || name === "--help") {
     printUsage(program, description, groups);
     return;
@@ -165,7 +167,7 @@ const MOVED_COMMANDS: Record<string, string> = {
   soul: "ox profile soul",
   skills: "ox profile skills, ox repository skills, or ox vm skills",
   artifacts: "ox profile artifacts",
-  chats: "ox profile chats",
+  chats: "ox profile conversations",
   discover: "ox host list",
   logs: "ox host logs",
   providers: "ox host providers",
@@ -173,14 +175,14 @@ const MOVED_COMMANDS: Record<string, string> = {
 };
 
 function validateContext(command: string, subcommand: string | undefined, context: CliContext): void {
-  if (context.chat && command !== "chat" && command !== "vm") throw new Error("--chat applies only to ox chat and ox vm");
-  if (context.chat && command === "chat" && (subcommand === "list" || subcommand === "new")) {
-    throw new Error(`--chat does not apply to ox chat ${subcommand}`);
+  if (context.conversation && command !== "conversation" && command !== "vm") throw new Error("--conversation applies only to ox conversation and ox vm");
+  if (context.conversation && command === "conversation" && (subcommand === "list" || subcommand === "new")) {
+    throw new Error(`--conversation does not apply to ox conversation ${subcommand}`);
   }
   if (context.profile && command !== "profile") throw new Error("--profile applies only to ox profile");
   if (context.repository && command !== "repository") throw new Error("--repository applies only to ox repository");
-  const usesHost = command === "host" || command === "chat" || command === "vm";
-  if (context.host && !usesHost) throw new Error("--host applies only to ox host, ox chat, and ox vm");
+  const usesHost = command === "host" || command === "conversation" || command === "vm";
+  if (context.host && !usesHost) throw new Error("--host applies only to ox host, ox conversation, and ox vm");
 }
 
 export function group(name: string, desc: string, subs: Record<string, SubCommand>): CommandGroup {
@@ -195,7 +197,8 @@ export async function dispatch(
   context: CliContext,
   footer?: () => void,
 ): Promise<void> {
-  const [sub, ...rest] = args;
+  const [requestedSub, ...rest] = args;
+  const sub = name === "profile" && requestedSub === "chats" ? "conversations" : requestedSub;
   if (!sub || sub === "-h" || sub === "--help") {
     console.log(`Usage: ox ${name} <subcommand> [...flags] [...args]`);
     console.log(`       ${terminalText(desc, [C.dim])}\n`);

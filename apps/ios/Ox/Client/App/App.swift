@@ -43,7 +43,7 @@ private struct OxApplicationView: View {
     @AppStorage("app.hasCompletedOnboarding") private var onboarded = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var skillImports = SkillImportCoordinator()
-    @State private var chatImports = ChatImportCoordinator()
+    @State private var conversationImports = ConversationImportCoordinator()
     @State private var serviceImports = ServiceImportCoordinator(manager: IOSHost.shared.services)
     @State private var presentations = AppPresentationCoordinator.shared
     @State private var hostAccess: HostAccess
@@ -79,7 +79,7 @@ private struct OxApplicationView: View {
                 }
                 switch url.pathExtension.lowercased() {
                 case "skill": skillImports.receive(url)
-                case "chat": chatImports.receive(url)
+                case "chat": conversationImports.receive(url)
                 case "service": serviceImports.receive(url)
                 default: Log.ui.info("DocumentImport.ignored source=\(url.lastPathComponent)")
                 }
@@ -161,7 +161,7 @@ private struct OxApplicationView: View {
               serviceImports.proposal == nil, serviceImports.errorMessage == nil,
               serviceImports.importedDomain == nil,
               skillImports.proposal == nil, skillImports.errorMessage == nil,
-              chatImports.proposal == nil, chatImports.errorMessage == nil,
+              conversationImports.proposal == nil, conversationImports.errorMessage == nil,
               case .pending(let url) = incomingWebLink else { return nil }
         return url
     }
@@ -169,7 +169,7 @@ private struct OxApplicationView: View {
     @ViewBuilder
     private var appContent: some View {
         if onboarded {
-            RootView(client: client, skillImports: skillImports, chatImports: chatImports)
+            RootView(client: client, skillImports: skillImports, conversationImports: conversationImports)
         } else {
             OnboardingView { onboarded = true }
         }

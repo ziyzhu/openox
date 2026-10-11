@@ -23,7 +23,7 @@ type FileEntry = {
   availability: "local" | "cloudOnly";
 };
 
-type ChatSummary = {
+type ConversationSummary = {
   schemaVersion: number;
   id: string;
   createdAt: number;
@@ -152,8 +152,8 @@ function displayDate(value: number): string {
   return new Date((value + 978307200) * 1000).toISOString();
 }
 
-function chatTitle(chat: ChatSummary): string {
-  return chat.title?.trim() || chat.preview?.trim() || "New chat";
+function conversationTitle(conversation: ConversationSummary): string {
+  return conversation.title?.trim() || conversation.preview?.trim() || "New conversation";
 }
 
 export function listFiles(root: string): FileEntry[] {
@@ -187,21 +187,21 @@ function fileAvailability(path: string): FileEntry["availability"] {
   }
 }
 
-export function listChats(root: string): ChatSummary[] {
+export function listConversations(root: string): ConversationSummary[] {
   const directory = join(root, "chats");
   if (!existsSync(directory)) return [];
-  const chats: ChatSummary[] = [];
+  const conversations: ConversationSummary[] = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     try {
-      const value = JSON.parse(readFileSync(join(directory, entry.name, "chat.json"), "utf8")) as Partial<ChatSummary>;
+      const value = JSON.parse(readFileSync(join(directory, entry.name, "chat.json"), "utf8")) as Partial<ConversationSummary>;
       if (typeof value.schemaVersion !== "number" || !UUID.test(value.id ?? "") || typeof value.createdAt !== "number") continue;
-      chats.push(value as ChatSummary);
+      conversations.push(value as ConversationSummary);
     } catch (error) {
       process.stderr.write(`warning: skipped ${entry.name}: ${(error as Error).message}\n`);
     }
   }
-  return chats.sort((left, right) => (right.lastActivity ?? right.createdAt) - (left.lastActivity ?? left.createdAt));
+  return conversations.sort((left, right) => (right.lastActivity ?? right.createdAt) - (left.lastActivity ?? left.createdAt));
 }
 
 async function memory(args: string[], context: CliContext): Promise<void> {
@@ -298,18 +298,18 @@ async function artifacts(args: string[], context: CliContext): Promise<void> {
   }
 }
 
-async function chats(args: string[], context: CliContext): Promise<void> {
+async function conversations(args: string[], context: CliContext): Promise<void> {
   const parsed = request(args);
   if (parsed.help) {
-    console.log("Usage: ox --profile <path> profile chats [id] [--json]");
+    console.log("Usage: ox --profile <path> profile conversations [id] [--json]");
     return;
   }
   const root = profileRoot(context);
   if (parsed.value) {
-    if (!UUID.test(parsed.value)) fail(`invalid chat id: ${parsed.value}`);
-    const chat = listChats(root).find((entry) => entry.id.toLowerCase() === parsed.value!.toLowerCase());
-    const path = join(root, "chats", chat?.id ?? parsed.value, "turns.jsonl");
-    if (!existsSync(path)) fail(`chat transcript not found: ${parsed.value}`);
+    if (!UUID.test(parsed.value)) fail(`invalid conversation id: ${parsed.value}`);
+    const conversation = listConversations(root).find((entry) => entry.id.toLowerCase() === parsed.value!.toLowerCase());
+    const path = join(root, "chats", conversation?.id ?? parsed.value, "turns.jsonl");
+    if (!existsSync(path)) fail(`conversation transcript not found: ${parsed.value}`);
     const text = readFileSync(path, "utf8");
     if (!parsed.json) {
       process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
@@ -325,14 +325,14 @@ async function chats(args: string[], context: CliContext): Promise<void> {
     writeJson(turns);
     return;
   }
-  const entries = listChats(root);
+  const entries = listConversations(root);
   if (parsed.json) {
     writeJson(entries);
     return;
   }
   for (const entry of entries) {
     const favorite = entry.isFavorite ? "★ " : "";
-    console.log(`${terminalText(entry.id, [C.sky])}  ${favorite}${chatTitle(entry)}  ${terminalText(displayDate(entry.lastActivity ?? entry.createdAt), [C.dim])}`);
+    console.log(`${terminalText(entry.id, [C.sky])}  ${favorite}${conversationTitle(entry)}  ${terminalText(displayDate(entry.lastActivity ?? entry.createdAt), [C.dim])}`);
   }
 }
 
@@ -342,6 +342,6 @@ export const PROFILE_COMMANDS: Record<string, SubCommand> = {
   soul: { desc: "Print the Profile's SOUL.md", fn: soul },
   skills: { desc: "List the Profile's skills, or print one", fn: skills },
   artifacts: { desc: "List the Profile's artifacts, or print one", fn: artifacts },
-  chats: { desc: "List the Profile's saved chats, or print one transcript", fn: chats },
+  conversations: { desc: "List the Profile's saved conversations, or print one transcript", fn: conversations },
 };
 

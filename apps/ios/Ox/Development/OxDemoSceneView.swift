@@ -54,13 +54,13 @@ struct OxDemoSceneView: View {
             providerList
                 .transition(.opacity)
         } else {
-            chat
+            conversation
                 .id(playback.scene)
                 .transition(.opacity)
         }
     }
 
-    private var chat: some View {
+    private var conversation: some View {
         VStack(spacing: 0) {
             ConversationHeader(
                 modelTitle: playback.sent ? nil : "GPT-6 Sol · Fast",
@@ -75,7 +75,7 @@ struct OxDemoSceneView: View {
                         }
                     }
                 } else {
-                    TemporaryChatButton(isActive: false, size: iconButtonSize, action: {})
+                    TemporaryConversationButton(isActive: false, size: iconButtonSize, action: {})
                 }
             }
             ScrollView {
@@ -89,7 +89,7 @@ struct OxDemoSceneView: View {
                                 sourcePrefix: "demo",
                                 onOpenAttachment: { _, _ in }
                             )
-                            .accessibilityIdentifier(A11yID.Chat.Message.user)
+                            .accessibilityIdentifier(A11yID.ConversationControls.Message.user)
                         }
                     }
                     if let thinking = playback.thinking {
@@ -141,11 +141,11 @@ struct OxDemoSceneView: View {
             editDraft: $editDraft,
             speech: playback.speech,
             attachedServices: playback.attachedServices,
-            chatFiles: [],
+            conversationFiles: [],
             fieldFocused: $composerFocused,
             isFieldFocused: composerFocused,
             sessionID: playback.sessionID,
-            isChatEmpty: false,
+            isConversationEmpty: false,
             isTemporary: false,
             isBusy: playback.isStreaming,
             followIntents: [],
@@ -154,7 +154,7 @@ struct OxDemoSceneView: View {
             iconButtonSize: iconButtonSize,
             composerButtonSize: composerButtonSize,
             onOpenAttachment: { _, _ in },
-            onOpenChatFile: { _ in },
+            onOpenConversationFile: { _ in },
             onPasteImages: { _ in },
             onOpenService: { _ in },
             onRemoveService: { _ in },

@@ -1,4 +1,4 @@
-import type { ChatSnapshot } from "../../../../apps/cli/src/host-snapshot.ts";
+import type { ConversationSnapshot } from "../../../../apps/cli/src/host-snapshot.ts";
 
 export type Rule =
   | { kind: "answerIncludes" | "answerExcludes" | "answerEquals"; value: string }
@@ -38,10 +38,10 @@ export type Invocation = {
 export type EvalBlock = {
   kind: { type: string; trace?: { entries: Array<{ invocation?: Invocation }>; omittedInvocations?: number } };
 };
-export type EvalSnapshot = Omit<ChatSnapshot, "messages" | "blocks"> & { messages: EvalMessage[]; blocks: EvalBlock[] };
+export type EvalSnapshot = Omit<ConversationSnapshot, "messages" | "blocks"> & { messages: EvalMessage[]; blocks: EvalBlock[] };
 export type TurnOutcome = { chatId: string; outcome: string; text?: string; error?: string };
 export type LogRow = { time: string; level: string; category: string; message: string; [key: string]: unknown };
-export type ChatEvidence = {
+export type ConversationEvidence = {
   chatId: string;
   initial?: EvalSnapshot;
   attention?: EvalSnapshot;
@@ -54,14 +54,14 @@ export type ObservedState = {
   files: Record<string, string>;
   guide?: string;
 };
-export type EvalResponse = ChatEvidence & {
+export type EvalResponse = ConversationEvidence & {
   startedAt: string;
   totalMs: number;
   before?: ObservedState;
   after?: ObservedState;
   restored?: ObservedState;
   fixture?: { name: string; answer: string };
-  probe?: { status: "ran"; evidence: ChatEvidence } | { status: "skipped"; reason: string };
+  probe?: { status: "ran"; evidence: ConversationEvidence } | { status: "skipped"; reason: string };
   observationChecks: Check[];
   continuation: "safe" | "stop";
   logs: LogRow[];

@@ -1,0 +1,272 @@
+import { Database } from "bun:sqlite";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { ROOT, killChildren } from "../../../../lib.ts";
+import { qaCommand } from "../../../setup/scripts/qa-config.ts";
+import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulator.ts";
+import { iosTarget, elements as nodes } from "../../../setup/scripts/ios.ts";
+
+const qa = qaCommand({
+  usage: "bun run test:agent-ui-ios --device ox-N --app /absolute/Ox.app --evidence /tmp/directory [--bundle id] [--models]\nActual temporary-conversation UI, native Mock, Pi SQLite and process reopen. Requires an idle conversation and Mock already selected. No Host transport or credential changes.",
+  options: { app: { type: "string" }, evidence: { type: "string" }, bundle: { type: "string" }, models: { type: "boolean" } },
+});
+if (!qa.values.device || !qa.values.app) throw new Error("Pass --device and --app from a fresh DEBUG build");
+const directory = qa.values.evidence ?? `/tmp/ox-durable-ui-${Date.now()}`;
+if (!/^\/tmp\/[^/]+$/.test(directory) || directory.endsWith("/..")) throw new Error("Use a fresh direct child directory of /tmp");
+const localConfig = await Bun.file(join(ROOT, "apps/ios/Local.xcconfig")).text().catch(() => "");
+const bundle = qa.values.bundle ?? Bun.env.OX_BUNDLE_ID
+  ?? /^OX_BUNDLE_IDENTIFIER\s*=\s*([^\s/]+)/m.exec(localConfig)?.[1] ?? "ai.openox.local";
+const caseID = crypto.randomUUID().toUpperCase();
+const evidence: Record<string, unknown> = { device: qa.device, bundle, caseID, productionActivated: false, hostTransportUsed: false };
+const check = (value: unknown, message: string) => { if (!value) throw new Error(message); };
+let interrupted = false;
+const interrupt = (signal: NodeJS.Signals) => { interrupted = true; killChildren(signal); };
+process.once("SIGINT", () => interrupt("SIGINT"));
+process.once("SIGTERM", () => interrupt("SIGTERM"));
+const ios = iosTarget(qa.device);
+async function launch(enabled: boolean) {
+  evidence.launch = await ios.launch(bundle, qa.values.app!, { OX_DEBUG_ENDPOINT: qa.debugEndpoint, OX_DURABLE_TEMPORARY_SESSION: enabled ? caseID : "" });
+  await ios.wait({ id: "chat.temporaryToggle" }, { timeout: 20_000, stable: 1000 });
+  const tree = await ios.describe();
+  check(nodes(tree).some(node => node.AXUniqueId === "chat.modelPicker" && node.AXLabel === "Model: Mock"), "Select native Mock before the campaign; provider state is not changed automatically");
+}
+async function logs(): Promise<string[]> {
+  await ios.pull(bundle, "Library/Application Support/logs.jsonl", `${directory}/logs`);
+  return (await Bun.file(`${directory}/logs/logs.jsonl`).text()).split("\n").filter(Boolean).map(line => JSON.parse(line).msg ?? "");
+}
+async function waitForLog<T>(find: (messages: string[]) => T | undefined): Promise<T> {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    if (interrupted) throw new Error("Replay interrupted; no uncertain send will be retried");
+    const found = find(await logs());
+    if (found !== undefined) return found;
+    await Bun.sleep(200);
+  }
+  throw new Error("Actual conversation did not settle; inspect retained native logs before retrying");
+}
+async function attach() {
+  const attached = (messages: string[]) => messages.map(message => /PiDurable rollout attached temporary=([A-F0-9-]+) case=([A-F0-9-]+)/.exec(message))
+    .filter(match => match?.[2] === caseID);
+  const count = attached(await logs()).length;
+  await ios.tap({ id: "chat.temporaryToggle" }, { timeout: 5000, stable: 200 });
+  return waitForLog(messages => {
+    const matches = attached(messages);
+    return matches.length > count ? matches.at(-1)?.[1] : undefined;
+  });
+}
+async function post(text: string) {
+  await ios.tap({ id: "chat.input" }, { timeout: 5000, stable: 1000 });
+  await ios.wait({ id: "chat.input" }, { stable: 1000 });
+  await ios.text(text);
+  const draft = nodes(await ios.describe()).find(node => node.AXUniqueId === "chat.input");
+  check(draft?.AXValue === text, "Composer did not receive exact input; never retry an uncertain send");
+  await ios.tap({ id: "chat.send" }, { timeout: 5000, stable: 200 });
+}
+function metricFields(message: string) {
+  return Object.fromEntries([...message.matchAll(/\b([A-Za-z]+)=([^\s]+)/g)].map(match => [match[1]!, match[2]!]));
+}
+function verifyTelemetry(messages: string[], conversationID: string, prompt: string, aborted: boolean) {
+  const summary = messages.findLast(message => message.includes(`AgentLatency.summary conversation=${conversationID}`));
+  check(summary, "Every submitted conversation produces a correlated agent summary");
+  const fields = metricFields(summary!);
+  const correlated = messages.filter(message => message.includes(`submission=${fields.submission}`));
+  const models = correlated.filter(message => message.includes("AgentModel.end "));
+  check(models.length === Number(fields.modelTurns), "Every model invocation, including cancellation, has one terminal diagnostic");
+  const knownUsage = models.map(metricFields).filter(model => model.usageKnown === "true");
+  check(Number(fields.usageSamples) === knownUsage.length && Number(fields.missingUsage) === models.length - knownUsage.length, "Known and unavailable usage are counted exactly once per model invocation");
+  check(fields.usageComplete === String(knownUsage.length === models.length), "Usage completeness reflects missing provider reports");
+  for (const key of ["tokens", "input", "output", "cached"]) {
+    check(knownUsage.length ? Number(fields[key]) === knownUsage.reduce((sum, usage) => sum + Number(usage[key]), 0) : fields[key] === "n/a", `Aggregate ${key} equals reported model consumption or is explicitly unknown`);
+  }
+  const toolStarts = correlated.filter(message => message.includes("AgentCall.start ") && message.includes("kind=tool"));
+  const toolEnds = correlated.filter(message => message.includes("AgentCall.end ") && message.includes("kind=tool"));
+  check(toolStarts.length === Number(fields.toolCalls), "Tool count reflects actual executions, not offered tools");
+  if (!aborted) {
+    check(Number(fields.modelTurns) > 0 && Number(fields.output) > 0, "Completed native model turns aggregate reported output usage");
+    check(fields.prepareMs !== "n/a" && fields.ttftMs !== "n/a" && fields.firstTextMs !== "n/a", "Model and first-token milestones cross the durable bridge");
+    check(Number(fields.unfinishedCalls) === 0 && toolStarts.length === toolEnds.length, "Completed calls have matched lifecycle diagnostics");
+    check([...models, ...toolStarts, ...toolEnds].every(message => message.includes("conversation=") && message.includes("turn=")), "Model and tool diagnostics carry conversation, submission and turn correlation");
+    check(models.every(message => metricFields(message).tokensPerSecond !== undefined), "Every provider exposes throughput availability in its terminal diagnostic");
+  }
+  if (prompt === "22") {
+    check(Number(fields.modelTurns) === 2 && Number(fields.toolCalls) === 2 && fields.tools === "[execute:2]", "Two native tools and the synthesis round appear in the summary");
+    check(Number(fields.functionCalls) === 0, "Console-only snippets do not count as ox function invocations");
+    check(Number(fields.toolWallMs) <= Number(fields.toolMs), "Parallel tool wall time does not double-count overlapping calls");
+  }
+  if (prompt === "29") {
+    const compactions = models.filter(message => message.includes("purpose=compaction"));
+    check(Number(fields.compactionTurns) === compactions.length, "Compaction count reflects actual summarization requests, not a scenario label");
+    check(Number(fields.input) >= 900_000, "Explicit provider input usage is aggregated across the long tool loop");
+  }
+  if (prompt === "53") {
+    check(Number(fields.toolFailures) === 1 && Number(fields.toolCalls) === 2, "A recovered tool failure remains visible in the completed run summary");
+  }
+  if (prompt === "80" || prompt === "23 defaults") {
+    check(Number(fields.functionCalls) > 0 && fields.functions?.includes("ox.app."), "Nested ox function usage is distinct from model tools");
+    const functions = correlated.filter(message => message.includes("AgentCall.end ") && message.includes("kind=function"));
+    check(functions.every(message => message.includes("turn=")), "Nested function diagnostics preserve turn identity across VM callbacks");
+    if (prompt === "23 defaults") check(Number(fields.functionFailures) > 0, "Expected validation failures are counted even when the snippet handles them");
+  }
+  const telemetry = (evidence.telemetry ??= []) as unknown[];
+  telemetry.push({ prompt, ...fields, modelDiagnostics: models.length, toolStarts: toolStarts.length, toolEnds: toolEnds.length });
+}
+async function send(conversationID: string, text: string, stop = false) {
+  const outcome = stop ? "aborted" : "completed";
+  const summaries = (messages: string[]) => messages.filter(message => message.includes(`AgentLatency.summary conversation=${conversationID}`));
+  const previous = new Set(summaries(await logs()).map(message => metricFields(message).submission));
+  await post(text);
+  if (stop) {
+    await ios.wait({ id: "chat.stop" }, { timeout: 10_000 });
+    await ios.tap({ id: "chat.stop" });
+  }
+  await waitForLog(messages => summaries(messages).some(message => !previous.has(metricFields(message).submission) && metricFields(message).outcome === outcome) ? true : undefined);
+  await ios.wait({ id: "chat.stop" }, { missing: true, timeout: 10_000, stable: 1000 });
+  verifyTelemetry(await logs(), conversationID, text, stop);
+}
+function nativeModelStarts(messages: string[], temporaryID: string) {
+  const attachment = messages.map(message => /PiDurable rollout attached temporary=([A-F0-9-]+) case=([A-F0-9-]+) conversation=(\d+)/.exec(message))
+    .find(match => match?.[1] === temporaryID && match?.[2] === caseID);
+  return attachment ? messages.filter(message => message.includes(`PiDurable native model start conversation=${attachment[3]} profile=${caseID} `)) : [];
+}
+async function stopWithQueuedInput(conversationID: string) {
+  const count = (messages: string[], outcome: string) => messages.filter(message => message.includes(`Conversation.runOne end id=${conversationID} outcome=${outcome}`)).length;
+  const before = await logs();
+  const started = nativeModelStarts(before, conversationID).length;
+  await post("13");
+  await waitForLog(messages => nativeModelStarts(messages, conversationID).length > started ? true : undefined);
+  await post("2");
+  await ios.tap({ id: "chat.stop" }, { timeout: 5000 });
+  await waitForLog(messages => count(messages, "aborted") > count(before, "aborted") && count(messages, "completed") > count(before, "completed") ? true : undefined);
+  await ios.wait({ id: "chat.stop" }, { missing: true, timeout: 10_000, stable: 1000 });
+  check(JSON.stringify(await ios.describe()).includes("Sorry that took a moment."), "Queued input completes after Stop without a late abort or presentation race");
+  const after = (await logs()).slice(before.length);
+  const workers = after.filter(message => message.includes(`Conversation.worker start id=${conversationID}`));
+  check(workers.length === 2, "Stopped and queued submissions have separate worker owners");
+  const stoppedRun = /run=([A-F0-9]+)/.exec(workers[0]!)?.[1];
+  const nextRun = /run=([A-F0-9]+)/.exec(workers[1]!)?.[1];
+  check(stoppedRun && nextRun && stoppedRun !== nextRun, "Queued input cannot reuse a cancelled worker");
+  const finished = after.findIndex(message => message.includes(`Conversation.worker finish id=${conversationID} run=${stoppedRun}`));
+  const restarted = after.findIndex(message => message === workers[1]);
+  check(finished >= 0 && finished < restarted, "The cancelled worker drains before queued input starts");
+}
+async function verifyModelChanges(conversationID: string) {
+  const matches = (messages: string[], text: string) => messages.filter(message => message.includes(text) && message.includes(`id=${conversationID}`)).length;
+  for (const [prompt, stop, outcome] of [["23", true, "aborted"], ["23 error", false, "error"]] as const) {
+    const baseline = await logs();
+    await post(prompt);
+    await waitForLog(messages => matches(messages, "Conversation.modelChange pending") > matches(baseline, "Conversation.modelChange pending") ? true : undefined);
+    if (stop) await ios.tap({ id: "chat.stop" }, { timeout: 5000 });
+    await waitForLog(messages => matches(messages, `Conversation.runOne end`) > matches(baseline, "Conversation.runOne end")
+      && messages.some(message => message.includes(`Conversation.runOne end id=${conversationID} outcome=${outcome}`)) ? true : undefined);
+    const after = await logs();
+    check(matches(after, "Conversation.modelChange cancelled") > matches(baseline, "Conversation.modelChange cancelled"), "Stop or failure cancels the pending selection");
+    check(matches(after, "Conversation.modelChange applied") === matches(baseline, "Conversation.modelChange applied"), "Cancelled selections never apply");
+    await ios.wait({ id: "chat.stop" }, { missing: true, timeout: 10_000, stable: 500 });
+    await ios.screenshot(`${directory}/model-${outcome}.png`);
+  }
+  const baseline = await logs();
+  await post("23");
+  await waitForLog(messages => matches(messages, "Conversation.modelChange pending") > matches(baseline, "Conversation.modelChange pending") ? true : undefined);
+  await post("2");
+  await waitForLog(messages => matches(messages, "Conversation.runOne end") >= matches(baseline, "Conversation.runOne end") + 2 ? true : undefined);
+  const after = await logs();
+  const applied = after.findIndex(message => message.includes(`Conversation.modelChange applied id=${conversationID}`));
+  check(applied >= 0, "Successful submission applies the pending model");
+  const starts = new Set(nativeModelStarts(after, conversationID));
+  check(after.slice(applied + 1).some(message => starts.has(message) && message.includes("model=mock-text-only")), "Next queued turn uses the requested native model");
+  check(after.slice(0, applied).filter(message => starts.has(message)).every(message => message.includes("model=mock ")), "The switching submission and cancelled requests retain the original model");
+  await ios.screenshot(`${directory}/model-applied.png`);
+  await send(conversationID, "23 defaults");
+  check(JSON.stringify(await ios.describe()).includes("Default model preferences were verified and restored."), "Default mutations, reset, validation, and restoration succeed through native Actions");
+  await ios.screenshot(`${directory}/model-defaults.png`);
+  Object.assign(evidence, { passed: true, firstConversation: conversationID, modelChanges: ["pending", "no-op", "cancelled", "failed-submission", "applied", "queued-turn", "default-selection", "automatic-reset", "validation", "restoration"] });
+  console.log(`PASS actual native model APIs, deferred selection, no-op, Stop/failure cancellation, next queued turn, defaults, reset, validation and restoration; evidence ${directory}`);
+}
+async function inspect(name: string) {
+  const root = `${directory}/${name}`;
+  await ios.pull(bundle, `Library/Caches/PiDurableProof/NativeFiles/${caseID}`, root);
+  const db = new Database(`${root}/state.sqlite`, { readonly: true });
+  try {
+    check((db.query("PRAGMA integrity_check").get() as any)?.integrity_check === "ok", "Recovered stopped-process SQLite integrity");
+    check((db.query("SELECT count(*) AS n FROM tasks WHERE status != 'terminal'").get() as any).n === 0, "No unfinished Pi tasks");
+    check((db.query("SELECT count(*) AS n FROM submissions WHERE status IN ('queued','placed')").get() as any).n === 0, "No pending Pi submissions");
+    check(db.query("SELECT name FROM sqlite_master WHERE name IN ('ox_blobs','ox_blob_chunks','ox_chats')").all().length === 0, "Physical backend must not create shadow/binary tables");
+    const entries = (db.query("SELECT id, record FROM entries ORDER BY id").all() as { id: number; record: string }[])
+      .map(row => ({ id: row.id, record: JSON.parse(row.record) }));
+    const conversations = db.query("SELECT id FROM conversations ORDER BY id").all() as { id: number }[];
+    return { integrity: "ok", entries, references: conversations.map(row => ({ profileID: caseID, conversationID: row.id })) };
+  } finally { db.close(); }
+}
+const release = claimSimulator(qa.device);
+let launched = false;
+try {
+  check(await requireSimulator(qa.device), "Boot the reserved simulator before replay; no provisioning is performed");
+  await mkdir(directory, { recursive: false, mode: 0o700 });
+  launched = true;
+  await launch(true);
+  const firstConversation = await attach();
+  if (qa.values.models) {
+    await verifyModelChanges(firstConversation);
+  } else {
+    await send(firstConversation, "12");
+    check(JSON.stringify(await ios.describe()).includes("Done."), "Native reasoning reply is visible");
+    await ios.screenshot(`${directory}/reasoning.png`);
+    await send(firstConversation, "74");
+    const progressTree = nodes(await ios.describe());
+    const progressTurn = progressTree.slice(progressTree.findIndex(node => node.AXUniqueId === "chat.message.user" && node.AXLabel === "74"));
+    const answerIndex = progressTurn.findIndex(node => node.AXUniqueId === "chat.message.agent" && node.AXLabel === "The progress update stayed in order.");
+    check(answerIndex >= 0, "Reasoning cannot split the final answer into separate transcript rows");
+    const thinkingRows = progressTurn.filter(node => node.type === "Button" && /^(Thought for|Share progress|List artifacts)/.test(node.AXLabel ?? ""));
+    check(thinkingRows.length === 2 && thinkingRows.every(node => progressTurn.indexOf(node) < answerIndex), "Each progress phase has one thinking row before the final answer, with no late duplicate");
+    await ios.screenshot(`${directory}/progress-reasoning.png`);
+    await send(firstConversation, "10");
+    check(JSON.stringify(await ios.describe()).includes("Mock markdown"), "Native markdown reply is visible");
+    await ios.screenshot(`${directory}/two-turns.png`);
+    await send(firstConversation, "22");
+    check(JSON.stringify(await ios.describe()).includes("Both reads are back"), "Native snippet tools return to the Pi model loop");
+    await ios.screenshot(`${directory}/tools.png`);
+    await send(firstConversation, "13", true);
+    await ios.screenshot(`${directory}/cancelled.png`);
+    await stopWithQueuedInput(firstConversation);
+    await ios.screenshot(`${directory}/queued-after-stop.png`);
+    await launch(true);
+    const before = await inspect("before-reopen");
+    check(before.references.length === 1, "One Pi conversation before reopen");
+    const firstModels = before.entries.flatMap(entry => entry.record.model ?? []);
+    check(firstModels.filter(message => message.role === "user").length === 7, "All initial and queued user turns committed exactly once");
+    check(firstModels.filter(message => message.role === "toolResult").length === 3, "All native tool results retained in Pi history");
+    check(firstModels.some(message => message.role === "assistant" && message.content.some((block: any) => block.type === "thinking")), "Committed reasoning retained");
+    check(firstModels.some(message => message.role === "assistant" && message.content.some((block: any) => block.type === "text" && block.text.includes("# Mock markdown"))), "Full markdown retained in Pi history");
+    const secondConversation = await attach();
+    check(secondConversation !== firstConversation, "Temporary UI conversation identity must not survive process loss");
+    await send(secondConversation, "12");
+    await send(secondConversation, "80");
+    await send(secondConversation, "53");
+    check(JSON.stringify(await ios.describe()).includes("Recovered via the cached mirror"), "A failed native tool recovers without hiding its diagnostic outcome");
+    await send(secondConversation, "29");
+    await ios.screenshot(`${directory}/reopened-session.png`);
+    await launch(false);
+    const after = await inspect("after-reopen");
+    check(after.references.length === 2, "New temporary conversation routes to another Pi conversation in reopened Session");
+    check(JSON.stringify(after.entries.slice(0, before.entries.length)) === JSON.stringify(before.entries), "Reopening preserves full prior ledger without reseeding");
+    check(after.entries.flatMap(entry => entry.record.model ?? []).filter(message => message.role === "user").length === 11, "All actual user turns, no duplicates");
+    Object.assign(evidence, { passed: true, firstConversation, secondConversation, before, after });
+    console.log(`PASS actual native UI, reasoning/markdown, native tools, cancellation with queued input, qualified identities, physical backend, process reopen and preserved ledger; evidence ${directory}`);
+  }
+} catch (error) {
+  Object.assign(evidence, { passed: false, error: String(error) });
+  if (launched) await ios.screenshot(`${directory}/failure.png`).catch(() => {});
+  throw error;
+} finally {
+  try {
+    if (launched) {
+      try {
+        await ios.launch(bundle, qa.values.app!, { OX_DEBUG_ENDPOINT: qa.debugEndpoint, OX_DURABLE_TEMPORARY_SESSION: "" });
+        evidence.optInCleared = true;
+      } catch (error) {
+        Object.assign(evidence, { optInCleared: false, restoreError: String(error) });
+        process.exitCode ||= 1;
+      }
+      await Bun.write(`${directory}/report.json`, JSON.stringify(evidence, null, 2));
+    }
+  } finally { release(); }
+}

@@ -15,12 +15,12 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── actionApprovalPolicies           versioned Automatic, Ask, Allow, or Block policies for Actions
 │   │   ├── remoteMCPServers                  directly connected MCP URLs, transports, and optional favicon URLs
 │   │   ├── api.url                          Ox service API override
-│   │   ├── llm.defaultModel                 new-chat provider/model/thinking selection
+│   │   ├── llm.defaultModel                 new-conversation provider/model/thinking selection
 │   │   ├── llm.providerCatalog              added provider definitions and bundled overrides
 │   │   ├── app.region                       last detected network region
 │   │   ├── app.language                     UI and agent language override
 │   │   ├── host.allowConnections             app-wide Host access toggle; absent means off
-│   │   ├── chat.importMemoryIntentDisplays   app-wide count of starter intent displays, capped at three
+│   │   ├── conversation.importMemoryIntentDisplays   app-wide count of starter intent displays, capped at three
 │   │   ├── speech.voice.identifier          legacy read-aloud voice preference, ignored and retained
 │   │   ├── storage.activeProfile            active profile UUID
 │   │   └── chatgpt.installationId           per-install Codex client ID
@@ -42,8 +42,8 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── StorageMigration/PiProfiles/<uuid>/source-<uuid>/ retained native source Profile
 │   │   └── logs.jsonl                       capped structured diagnostics
 │   ├── Caches/
-│   │   ├── PiDurableProof/Native/<uuid>/session.sqlite  Opt-in temporary-chat cache Session; WAL sidecars
-│   │   ├── PiDurableProof/NativeFiles/<uuid>/state.sqlite + conversation/shared files  Temporary-chat filesystem
+│   │   ├── PiDurableProof/Native/<uuid>/session.sqlite  Opt-in temporary-conversation cache Session; WAL sidecars
+│   │   ├── PiDurableProof/NativeFiles/<uuid>/state.sqlite + conversation/shared files  Temporary-conversation filesystem
 │   │   ├── PiDurableDiagnostics/<action>/<uuid>/session.sqlite  Upstream storage conformance/benchmarks; removed after each request
 │   │   ├── DeviceTemplates/<run UUID>/input.json Debug Simulator-only transient setup input
 │   │   ├── DeviceTemplates/<run UUID>/result.json redacted application result
@@ -78,7 +78,7 @@ types remain authoritative in their `Codable` implementations.
 The ignored `apps/ios/Local.xcconfig` supplies the development team and application
 bundle identifier. Build settings, property lists, and entitlements derive the Share
 Extension bundle identifier, app group, iCloud container, Keychain service, and
-website-data namespace directly from that bundle identifier. Agent skill and chat
+website-data namespace directly from that bundle identifier. Agent skill and conversation
 packages use canonical OpenOx type identifiers; the app continues importing the
 legacy bundle-derived identifiers.
 
@@ -87,11 +87,11 @@ that provider when it was the saved default.
 
 Primary owners:
 
-Choice, approval, and secret-entry prompts are transient `Conversation` interactions, not new persisted presentation steps. Resolving one returns its answer to the waiting operation without recording a separate prompt receipt. Older prompt steps remain readable but are omitted from chat display. Model-facing tool results and explicit Always allow policies retain their existing persistence.
+Choice, approval, and secret-entry prompts are transient `Conversation` interactions, not new persisted presentation steps. Resolving one returns its answer to the waiting operation without recording a separate prompt receipt. Older prompt steps remain readable but are omitted from conversation display. Model-facing tool results and explicit Always allow policies retain their existing persistence.
 
 - UserDefaults onboarding state — owner: App.swift
 - UserDefaults Host access toggle — owner: Platform/Models/HostAccess.swift; app-wide, retained across Profile switches, follows device backup policy, removed with app preferences. Additive Boolean key with no predecessor representation or migration; missing state defaults off, including upgrades from builds that listened automatically.
-- UserDefaults import-memory starter count — owner: Client/Features/Chat/ChatComposer.swift
+- UserDefaults import-memory starter count — owner: Client/Features/Conversation/ConversationComposer.swift
 - UserDefaults service state — owner: Services/ServiceManager.swift
 - UserDefaults model state — owner: Host/ModelProviders/ProviderRegistry.swift
 - Keychain credentials — owner: Host/Profile/Credentials.swift
@@ -99,7 +99,7 @@ Choice, approval, and secret-entry prompts are transient `Conversation` interact
 - App-group theme — current value owners: Theme.swift and ShareExtension; legacy migration owner: Host/Profile/ApplicationStorageMigrator.swift
 - Fixed app-storage paths and backup policy — owner: Host/Profile/AppStoragePaths.swift
 - Active and saved profiles — owners: Host/Profile/StorageRoot.swift and Host/Profile/ProfileStore.swift
-- Profile execution/history/documents — owner: Pi Durable; host-neutral open runtime: packages/agent/src/profile/runtime.ts (`ProfileRuntime`, formerly `OxAgentSession`; persisted formats unchanged); native Session/owner lifetime: Host/Durable/DurableProfileStore.swift; native conversation/presentation: Host/Chats/Conversation.swift and ConversationManager.swift; application facade: Host/Profile/ProfileRepository.swift. Native type renames do not change persisted ChatMeta, Turn, RPC, or compatibility-ID formats.
+- Profile execution/history/documents — owner: Pi Durable; host-neutral open runtime: packages/agent/src/profile/runtime.ts (`ProfileRuntime`, formerly `OxAgentSession`; persisted formats unchanged); native Session/owner lifetime: Host/Durable/DurableProfileStore.swift; native conversation/presentation: Host/Conversations/Conversation.swift and ConversationManager.swift; application facade: Host/Profile/ProfileRepository.swift. Native type renames do not change persisted ConversationMeta, Turn, RPC, or compatibility-ID formats.
 - Compatibility startup/recovery ordering — owner: Host/Profile/StorageMigration.swift
 - Profile milestones, conversion, and publication recovery — owner: Host/Profile/ProfileMigrator.swift
 - App-wide preferences, catalogs, bookmarks, and schedules — owner: Host/Profile/ApplicationStorageMigrator.swift
@@ -112,7 +112,7 @@ Choice, approval, and secret-entry prompts are transient `Conversation` interact
 - Service-search vector cache — owner: Services/Repository/ServiceSearchIndex.swift
 - App log file — owner: Diagnostics/LogFile.swift
 - Shared note inbox — owner: Host/Profile/SharedNoteInbox.swift and ShareExtension
-- Scheduled skill definitions and run state — owners: Host/Profile/ScheduledSkills.swift and Host/Chats/ScheduledSkillScheduler.swift
+- Scheduled skill definitions and run state — owners: Host/Profile/ScheduledSkills.swift and Host/Conversations/ScheduledSkillScheduler.swift
 - Developer bootstrap credentials — owner: .agents/skills/setup/scripts/bootstrap.ts
 - Debug Simulator device templates — schema/launcher: .agents/skills/setup/scripts/template-schema.ts and template.ts; native startup importer: Development/DeviceTemplate.swift. Control files live under Library/Caches/DeviceTemplates, are excluded from normal startup without explicit launch opt-in, and never become Profiles. Loaded input is removed and private credentials are released after application. Result/previous-preference files are purgeable QA artifacts; evidence copies stay outside Git. Template-created Profiles use ordinary production storage and remain until explicitly removed.
 
@@ -128,14 +128,14 @@ Profile discovery reads manifests only. Startup migrates the selected Profile; i
 
 `StorageMigrator` appends `2026-10-10-profile-filesystem`, `2026-10-10-workspace-binding`, and `2026-10-10-profile-files` after the Pi milestone. Trusted preparation inventories predecessor metadata, preserves legacy aliases in the normalized file index, removes artifact entries from the text-document index, retires the predecessor lock, and binds `ox.filesystem` to `profile-files-v1`. The gate alone resumes the prototype journal format. Ambiguous/shared/saved predecessor files remain Profile-owned. Private generated archives receive conversation ownership only from matching canonical source descriptors and their producing entry IDs; ambiguous producers remain Profile-owned. Existing artifact UI, wire fields, and user-authored helpers are compatibility facades over the filesystem, not another store; artifact helpers are excluded from normal discovery. `2026-10-11-public-profile-files` adds a fingerprint-verified, recoverably published split: public `Documents/Profiles/<name>` and private `Application Support/Profiles/<UUID>`. The private manifest registers the public folder; backups and abandoned stages remain private. Hidden source payloads move to private `payloads/` with legacy aliases; preparation binds `public-profile-files-v1`. This is local-only and does not change the existing refusal of live Pi cloud/external activation. Public Profile folder relocation outside Ox is not followed automatically. A full file-manager UI remains deferred; current viewers resolve nested Profile files and refresh deleted references.
 
-Chat export verifies live metadata and bytes, maps references to current file types, and includes referenced local dependencies in the existing portable package format. Import first creates an empty conversation, publishes files directly into its final working directory, rewrites references and sibling dependencies, then populates turns. Failures attempt conversation-owned cleanup and log cleanup failures; this is not an atomic package transaction. Retained migration source backups remain private recovery material outside the active Profile, not attachment history.
+Conversation export verifies live metadata and bytes, maps references to current file types, and includes referenced local dependencies in the existing portable package format. Import first creates an empty conversation, publishes files directly into its final working directory, rewrites references and sibling dependencies, then populates turns. Failures attempt conversation-owned cleanup and log cleanup failures; this is not an atomic package transaction. Retained migration source backups remain private recovery material outside the active Profile, not attachment history.
 
 ## Pi Durable Sessions and upstream diagnostics
 
-The legacy cache and physical-publication formats below are predecessor representations consumed through `StorageMigrator`; ordinary temporary chats now use the same filesystem in their isolated `NativeFiles` cache. SQLite-blob caches remain explicit diagnostic fixtures only.
+The legacy cache and physical-publication formats below are predecessor representations consumed through `StorageMigrator`; ordinary temporary conversations now use the same filesystem in their isolated `NativeFiles` cache. SQLite-blob caches remain explicit diagnostic fixtures only.
 
-`DurableChatController` owns opt-in temporary-chat Sessions under
-`Library/Caches/PiDurableProof/Native/<uuid>/`. Several temporary chats share each
+`DurableConversationController` owns opt-in temporary-conversation Sessions under
+`Library/Caches/PiDurableProof/Native/<uuid>/`. Several temporary conversations share each
 Session. These private caches are purgeable, outside backup/sync/export, and never
 opened by normal startup or Profile activation. They have no credentials or
 website state. Native Sessions add `ox.profile`/`ox.file` documents and
@@ -148,12 +148,12 @@ Blob commits precede document-reference commits; orphan reclamation is serialize
 against readers/writers. This is not one combined document/blob transaction.
 Submitted messages, contextual snapshots, model replies and native diagnostics
 can be present: these are private user-owned scratch data, not anonymous fixtures.
-The controller handles temporary chats only; normal Profile activation never opens these caches. Ordinary temporary chats now attach automatically, while the explicit launch flag retains a chosen QA cache identity.
-An explicit launch with `OX_DURABLE_TEMPORARY_SESSION=<UUID>` allows an idle chat
+The controller handles temporary conversations only; normal Profile activation never opens these caches. Ordinary temporary conversations now attach automatically, while the explicit launch flag retains a chosen QA cache identity.
+An explicit launch with `OX_DURABLE_TEMPORARY_SESSION=<UUID>` allows an idle conversation
 switched to temporary in the actual UI to attach to `NativeFiles`, including
 Release builds on physical devices. Diagnostic RPCs remain DEBUG Simulator-only.
 Admission waits for attachment and rejects preparation failure without selecting
-the legacy loop. Preparing/attached chats cannot become persisted. The test
+the legacy loop. Preparing/attached conversations cannot become persisted. The test
 skill's actual UI replay verifies reasoning, Markdown, native tools, Stop and
 history retained across process reopen. Its stopped-process cache copies include
 WAL/SHM and are private diagnostics, never Profile export/import or activation.
@@ -223,20 +223,20 @@ staged manifest receives `2026-10-05-pi-durable`. This appended milestone is now
 
 The predecessor Pi Profile was `profile.json`, `state.sqlite`, and immutable files at `artifacts/<filename>`. `profile.json` alone owns identity, creation date, and migration milestone; database bindings are integrity checks. Production identity is `(Profile ID, Pi conversation ID)`. Native UUIDs are deterministic presentation projections, not a registry. Source UUID conversion mappings remain in `StorageMigrator` journals.
 
-`ox.native.presentation` entries retain immutable current rich UI decorations without contributing model context. `ox.conversation.metadata` stores `nativeProviderID` for credential routing and native-only reasoning options; Pi AgentDoc owns model/thinking choices. Canonical Pi models override decoration text/calls/results. New migration entries retain exact source JSON through `{path,size,sha256}` file references; older inline `sourceJSON` entries remain readable without rewriting. Runtime presentation never decodes the source archive. Legacy invocation arguments and results larger than 16 KiB use `oxPayload: {format:1,source,offset,length}` plus a bounded omission notice instead of embedding their full bytes. Existing archive descriptors remain available to migration readers. These content-addressed immutable `artifacts/payload-<sha256>.json` archives are committed as `ox.artifact` metadata without entering the visible `ox.profile` file index. They share the native artifact owner, are retained with history, and have no automatic reclamation. `ox.output.read` reads only chat-local captured JavaScript output; model-facing archive retrieval is retired. Existing archives and migration readers are retained without a storage-format change. Publication and streaming digest verification precede migration references; no raw payload SQL blobs are introduced. New Actions do not create diagnostic archives. Whole skill package and selection changes use one Pi document/index commit. File edits/renames choose new immutable filenames and retain prior metadata/bytes.
+`ox.native.presentation` entries retain immutable current rich UI decorations without contributing model context. `ox.conversation.metadata` stores `nativeProviderID` for credential routing and native-only reasoning options; Pi AgentDoc owns model/thinking choices. Canonical Pi models override decoration text/calls/results. New migration entries retain exact source JSON through `{path,size,sha256}` file references; older inline `sourceJSON` entries remain readable without rewriting. Runtime presentation never decodes the source archive. Legacy invocation arguments and results larger than 16 KiB use `oxPayload: {format:1,source,offset,length}` plus a bounded omission notice instead of embedding their full bytes. Existing archive descriptors remain available to migration readers. These content-addressed immutable `artifacts/payload-<sha256>.json` archives are committed as `ox.artifact` metadata without entering the visible `ox.profile` file index. They share the native artifact owner, are retained with history, and have no automatic reclamation. `ox.output.read` reads only conversation-local captured JavaScript output; model-facing archive retrieval is retired. Existing archives and migration readers are retained without a storage-format change. Publication and streaming digest verification precede migration references; no raw payload SQL blobs are introduced. New Actions do not create diagnostic archives. Whole skill package and selection changes use one Pi document/index commit. File edits/renames choose new immutable filenames and retain prior metadata/bytes.
 
-New native Action traces retain bounded JSON previews rather than complete inner results. `Invocation.preview` records argument, result, and purpose clipping; optional `sources` retains bounded query/domain/link metadata for source chips. `Execution.invocationTrace` counts retained and omitted calls and preview bytes. Each execution retains at most 256 Actions and a 64 KiB combined preview/source budget, with 8 KiB arguments and 4 KiB results per call. Preview traversal also limits depth, nodes, keys, and array items. Purpose/error text is limited to 500 Unicode scalars. `ThinkingTrace.omittedInvocations` projects omissions into the inspector. These optional fields are additive; older records, canonical Pi context, source archives, and artifact effects are unchanged. Recording is synchronous and nonthrowing; approvals, Actions, and JavaScript receive complete original values. Temporary chats use the same preview policy. Actual artifact effects keep their existing byte-retention policy; diagnostic previews do not publish artifacts.
+New native Action traces retain bounded JSON previews rather than complete inner results. `Invocation.preview` records argument, result, and purpose clipping; optional `sources` retains bounded query/domain/link metadata for source chips. `Execution.invocationTrace` counts retained and omitted calls and preview bytes. Each execution retains at most 256 Actions and a 64 KiB combined preview/source budget, with 8 KiB arguments and 4 KiB results per call. Preview traversal also limits depth, nodes, keys, and array items. Purpose/error text is limited to 500 Unicode scalars. `ThinkingTrace.omittedInvocations` projects omissions into the inspector. These optional fields are additive; older records, canonical Pi context, source archives, and artifact effects are unchanged. Recording is synchronous and nonthrowing; approvals, Actions, and JavaScript receive complete original values. Temporary conversations use the same preview policy. Actual artifact effects keep their existing byte-retention policy; diagnostic previews do not publish artifacts.
 
 Pi scheduling is global to a Session. Before any progress, every recovered task/submission conversation must have its qualified native route and saved model/transport configuration installed. Recovery uses existing durable submissions and waits for both settlement and committed native-event delivery; it never resubmits user input. Cold native tools hydrate from actual Pi task/assistant/context proof without model re-stream or native hook replay. Unsafe interrupted tool intents are not rerun. Storage admission failure can poison a Pi Session even after SQLite rolls back: report failure and explicitly close/reacquire; never blindly retry effects through the failed Session.
 
-Provider media uses request-owned verified bytes, and preview/share/HTML sibling readers use pinned bytes or owned immutable snapshots. An ordinary file URL is routing metadata, not snapshot proof. No live SQLite sync, external in-place edits, unsafe artifact garbage collection, or adoption of old debug caches is authorized. Native migration/normal-chat/process-recovery evidence is simulator-specific; released-predecessor and physical-power-loss acceptance remain separate gates.
+Provider media uses request-owned verified bytes, and preview/share/HTML sibling readers use pinned bytes or owned immutable snapshots. An ordinary file URL is routing metadata, not snapshot proof. No live SQLite sync, external in-place edits, unsafe artifact garbage collection, or adoption of old debug caches is authorized. Native migration/normal-conversation/process-recovery evidence is simulator-specific; released-predecessor and physical-power-loss acceptance remain separate gates.
 
 ## Compatibility gate
 
 `StorageMigrator` coordinates startup and recovery. App-wide structural
 migrations run before the Host and its storage consumers are constructed. Host
 preparation then validates application storage, migrates the selected Profile,
-and prepares the Local service repository before chats, service discovery, or
+and prepares the Local service repository before conversations, service discovery, or
 search indexing load persisted state. Selecting or opening another Profile also
 migrates it before publishing its `ProfileScope`.
 
@@ -329,22 +329,22 @@ moved in Files rather than by Ox.
 `ProfileRepository` is the sole application writer for Profile content. It serializes
 filesystem coordination per immutable scope and rejects stale results after a
 Profile switch. While foregrounded, file presentation reconciles external changes
-to soul, memory, skills, visible artifacts, and chat summaries. Hydrated chats
+to soul, memory, skills, visible artifacts, and conversation summaries. Hydrated conversations
 remain authoritative in memory and are not blindly replaced.
 
-Multi-writer conflict preservation for a chat simultaneously edited on more than
+Multi-writer conflict preservation for a conversation simultaneously edited on more than
 one device remains undefined. Current ordering guarantees apply to one running
 app's writes.
 
-## Chats
+## Conversations
 
-Each persisted chat owns one directory:
+Each persisted conversation owns one directory:
 
-- `chat.json` contains `ChatMeta`: schema version, identity, dates, title,
+- `chat.json` contains `ConversationMeta` in the predecessor disk format: schema version, identity, dates, title,
   favorite state, one provider/model/thinking `ModelSelection`, MonoRepository hash, attached
   services, sidebar preview, and whether the latest completed response is
-  unread. Chats created by a scheduled skill execution also retain that
-  schedule's identifier so clients can group them separately from recent chats.
+  unread. Conversations created by a scheduled skill execution also retain that
+  schedule's identifier so clients can group them separately from recent conversations.
 - `turns.jsonl` contains one semantic `Turn` per line. Stable IDs and tagged
   outcomes represent user turns, agent generations, reasoning, text, executions,
   prompts, tool calls, and effects. UI blocks and provider wire messages are
@@ -366,42 +366,42 @@ presentation does not write every token. A save writes the transcript, writes or
 removes the optional compacted context, then atomically publishes metadata, so
 the sidebar never advances beyond the durable payload.
 
-`ChatManager` retains the selected chat and up to four inactive chats in memory.
-Each chat has one save pump: one immutable request may be in flight, and newer
+`ConversationManager` retains the selected conversation and up to four inactive conversations in memory.
+Each conversation has one save pump: one immutable request may be in flight, and newer
 complete state replaces one pending-latest slot. Exact save IDs prevent an old
 completion from acknowledging newer state.
 
 Hydrating interrupted work converts running turns, executions, and invocations,
 plus pending prompts, to terminal cancelled or failed states and persists the
-repair. Backgrounding flushes all chats while active workers continue under
+repair. Backgrounding flushes all conversations while active workers continue under
 their execution leases. Submissions not yet posted to the transcript are not
 durable.
 
-A temporary chat has no directory, summary, persistence callback, or
+A temporary conversation has no directory, summary, persistence callback, or
 notification preview. It is discarded when left or when the process ends and
 cannot mutate Profile-owned content.
 
 The Browser-to-built-in-function migration removes the retired `ios:browser`
-domain from persisted chat attachments. Existing Browser inspector transcript
+domain from persisted conversation attachments. Existing Browser inspector transcript
 rows remain readable and resolve to the intrinsic Browser runtime.
 
-Chat sharing creates a transient `.chat` ZIP package whose `chat.json` stores
+Conversation sharing creates a transient `.chat` ZIP package whose `chat.json` stores
 the package and transcript schema versions, source metadata, content counts,
 service-domain disclosure, and SHA-256 inventory. `turns.jsonl` retains the
-semantic transcript; `context.json` is included only for compacted chats so
+semantic transcript; `context.json` is included only for compacted conversations so
 continuation state is not lost. Legacy packages with redundant uncompacted
 context remain readable and normalize to transcript-only storage on import. The
 package also contains transcript- or
 checkpoint-referenced artifacts and supported sibling media dependencies.
 Import validates ZIP paths, compression, CRCs, declared hashes, transcript
 state, checkpoint digests, compaction completeness, and artifact references
-before presentation. Confirmation stages a new chat identity and collision-safe
+before presentation. Confirmation stages a new conversation identity and collision-safe
 artifact filenames, rewrites both transcript and checkpoint references, rebuilds
 checkpoint digests, and installs the files as one repository transaction. It
 does not restore provider selection, service attachments, pending work, or any
 state outside the package.
 
-Legacy chat and artifact layouts migrate through retry-safe Profile schema
+Legacy conversation and artifact layouts migrate through retry-safe Profile schema
 milestones. A milestone is stamped only after every required operation succeeds;
 an interrupted migration preserves a recoverable source or equivalent
 destination and resumes on the next activation.
@@ -418,27 +418,27 @@ limited to 200 KB, other files to 32 MB, and imported images are bounded before
 storage. File rename and deletion keep the saved index aligned with the
 user-visible file operation.
 
-Chats persist live filename references. Editing changes what an old chat opens.
+Conversations persist live filename references. Editing changes what an old conversation opens.
 Deleting or externally renaming a file leaves a missing reference. Profile-owned
-renames rewrite persisted chat references and canonicalize later saves from
-already-hydrated chats.
+renames rewrite persisted conversation references and canonicalize later saves from
+already-hydrated conversations.
 
 Remote MCP image and embedded-resource tool content is imported into the active
-Profile before it is presented in chat. The MCP server retains its source copy;
-Ox stores a collision-safe artifact file and the chat stores the same live
+Profile before it is presented in conversation. The MCP server retains its source copy;
+Ox stores a collision-safe artifact file and the conversation stores the same live
 filename reference used by locally created artifacts. Local, iCloud, and
 external Profile locations therefore keep their existing artifact persistence
 and synchronization behavior.
 
 Browser full-page PDF exports remain transient unless the action supplies an
 artifact filename. Named exports use the same validation, collision-safe import
-path, Profile ownership, live chat reference, and synchronization behavior as
+path, Profile ownership, live conversation reference, and synchronization behavior as
 other PDF artifact imports.
 
 The model accesses files only through `execute` → `ox.fs.*`. Agent-owned mount routing, pagination, exact-edit preflight/diffs, serialized mutations, and bounded traversal/search live in `packages/agent/src/core/filesystem.ts`. iOS supplies operation-scoped backing-store capabilities and retains `StorageMigrator` aliases, native approval, source permissions, Files grants, media conversion, and immutable physical publication. Read/write/edit inputs follow pinned Pi, with optional `purpose`; reads return at most 2,000 lines or 50 KiB with continuation offsets. No persisted path, encoding, milestone, or retention policy changes for this routing consolidation.
 
 The agent sees a virtual filesystem containing `MEMORY.md`, `SOUL.md`,
-`artifacts/<filename>`, persisted chat history, and source-aware skill and service
+`artifacts/<filename>`, persisted conversation history, and source-aware skill and service
 mounts:
 
 ```text
@@ -452,15 +452,15 @@ services/
     ├── service.json                            read-only except Local
     └── ...                                      visible and editable only for Local
 
-chats/
-└── <chat-uuid>/
-    ├── chat.json                                read-only, current or stored metadata
+conversations/
+└── <conversation-uuid>/
+    ├── conversation.json                                read-only, current or stored metadata
     └── turns.jsonl                              read-only, current or stored transcript
 ```
 
 Bundled System packages are owned by `packages/agent/skills/` and exported through
 the same skills catalog and `skills/<name>/SKILL.md` namespace as other packages.
-They are available before attachment and in temporary chats, remain read-only,
+They are available before attachment and in temporary conversations, remain read-only,
 and copy into a distinct-name Profile package for customization. Relative resource
 links preserve customization; custom copies do not authorize System-gated effects.
 The trusted runtime supplies scoped packages and activation requirements to hosts.
@@ -481,10 +481,10 @@ its manifest for discovery. Bundled, Remote, and Development source files remain
 hidden and read-only; Local exposes its additional source files at the same
 `services/<kind>/<id>/` path. Repository host paths, markers,
 `chats/<chat-uuid>/context.json`, and unrelated secret contents are not
-addressable. The chat mount returns a current snapshot for loaded persisted chats and the saved
-files for unloaded chats. `ProfileRepository` encodes both with the same metadata
+addressable. The conversation mount returns a current snapshot for loaded persisted conversations and the saved
+files for unloaded conversations. `ProfileRepository` encodes both with the same metadata
 and transcript format; reads do not write snapshots or change storage checkpoints.
-Temporary chats remain excluded. `ox.chat.start` creates a normal persisted chat
+Temporary conversations remain excluded. `ox.conversation.start` creates a normal persisted conversation
 without selecting it, and its ID is immediately readable through this mount.
 Built-in JavaScript guidance is readable as source, but is not installed,
 importable, or resolvable from a service action runtime. `StorageMigrator` owns
@@ -495,7 +495,7 @@ bytes are unchanged. No persisted format or milestone changes for this move.
 Retired workflows are excluded from catalog/root skill listings. Named Pi system
 sections replace the old `ox` section through Pi's normal transcript patching;
 memory remains frozen per conversation and turn-state facts remain per-message.
-Unscoped root grep excludes chat files, while an explicit `chats` path searches
+Unscoped root grep excludes conversation files, while an explicit `conversations` path searches
 JSONL records with a separate bounded byte budget and match-centered excerpts.
 Reads and searches are bounded; writes are atomic; writes and edits to the same
 file are serialized; edits require exact non-overlapping matches.
@@ -508,8 +508,8 @@ bounded image snapshots from these folders for on-device OCR and classification.
 `ox.fs.attach` explicitly attaches file byte snapshots through the existing
 immutable native media publication path; binary format support depends on the selected
 provider, and original external paths are never durable
-attachment references. Saved chats retain published bytes in their Profile;
-temporary chats use their purgeable Session. No new storage format is introduced.
+attachment references. Saved conversations retain published bytes in their Profile;
+temporary conversations use their purgeable Session. No new storage format is introduced.
 Writes, edits, and deletes require the attached Files service and existing folder grant. Built-in
 writes and edits default to Allow, while delete defaults to Ask. File import
 and rename default to Allow; artifact and filesystem deletion default to Ask.
@@ -518,17 +518,17 @@ HTML artifacts remain ordinary UTF-8 files. Presentation creates a fresh
 non-persistent WebKit store and reads the current artifact plus bounded sibling
 media through `ox-artifact:` URLs. Maps use `<ox-map>` and `<ox-marker>`. The
 renderer itself does not add durable website state. Canvas service calls use the
-Host's existing service accounts. Canvas owns no chat, attachment list, or permission
+Host's existing service accounts. Canvas owns no conversation, attachment list, or permission
 store. Service-produced files live in a presentation-owned temporary directory,
 are bounded by the Host, and are deleted on close.
 
-Shoveler cards persist an optional artifact filename in the chat transcript.
+Shoveler cards persist an optional artifact filename in the conversation transcript.
 Opening a card resolves that reference in the active Profile and uses the same
-native artifact preview as other chat artifact references. Chat package export
+native artifact preview as other conversation artifact references. Conversation package export
 includes artifacts referenced only by Shoveler cards.
 
 Video and image widgets persist a public HTTPS source or an artifact filename in
-the chat transcript. File-backed widgets participate in rename, package export,
+the conversation transcript. File-backed widgets participate in rename, package export,
 and collision rewriting like other artifact references. Image widgets add an
 `image` execution effect and content item using the same tagged source encoding as
 video; existing records are unchanged and require no transform. Older builds cannot
@@ -545,9 +545,9 @@ after its artifact succeeds. Failed copies remain pending for a later retry.
 
 `SOUL.md` and `MEMORY.md` are plain UTF-8 text. They are seeded when absent,
 cached for presentation, and written atomically. Both reload after Profile switches;
-only `SOUL.md` reloads after relevant external changes. Each chat snapshots the
+only `SOUL.md` reloads after relevant external changes. Each conversation snapshots the
 loaded memory into its system prompt so later memory changes do not invalidate the
-chat's prompt cache. An existing unreadable or cloud-evicted file is not overwritten.
+conversation's prompt cache. An existing unreadable or cloud-evicted file is not overwritten.
 The default SOUL seed is defined in TypeScript and generated into the signed app's
 `PiDurable.bundle/default-soul.md`. Native loading requests it only after confirming
 that the Profile document is absent; missing resources fail without seeding empty
@@ -612,15 +612,15 @@ catalog storage and credential ownership are unchanged.
 containing at most 100 scheduled invocations. Each record binds to one Profile UUID
 and stores a frozen complete skill-package snapshot, optional argument, one-time/daily/weekly
 recurrence, time zone, next occurrence, enabled state, and bounded last-run outcome
-with its result chat UUID. The file is prepared and validated by `StorageMigrator` when schedules load;
+with its result conversation UUID. The file is prepared and validated by `StorageMigrator` when schedules load;
 unknown versions and malformed or duplicate records disable scheduling and edits,
-retain the file, and defer to automatic recovery without blocking ordinary chats.
+retain the file, and defer to automatic recovery without blocking ordinary conversations.
 It follows Application Support's normal device-backup policy and never syncs through
 the Profile, preventing one iCloud Profile from executing on several devices.
 
 Only schedules bound to the active Profile execute. A due record for another
 Profile advances once as a failed occurrence and notifies when authorized. Each run
-uses the saved skill snapshot, creates an unselected persisted chat in the bound
+uses the saved skill snapshot, creates an unselected persisted conversation in the bound
 Profile, and advances to the next future occurrence after completion, failure, or
 cancellation. Missed recurring occurrences coalesce into one run rather than being
 replayed. One-time schedules disable after their occurrence. iOS background
@@ -692,8 +692,8 @@ single-argument installers instead of interpreting them.
 manifest, action registration, and service size limits. Root skill packages are
 validated separately with the shared package loader. The same
 validator runs before Save and before loading Local source for a caller. Failed
-validation leaves the draft untouched and cannot replace a chat's running
-attachment. `ox.service.attach` validates and replaces that chat's attachment when
+validation leaves the draft untouched and cannot replace a conversation's running
+attachment. `ox.service.attach` validates and replaces that conversation's attachment when
 the draft is ready to test. No validation result is persisted.
 
 Only Local exposes Git status, history, diff, checkout, commit, revert, and
@@ -725,7 +725,7 @@ pages with the same persistent store but separate DOM, history, and
 `sessionStorage`.
 
 Website conversations use owned pages separate from the ordinary Action pool.
-`WebConversation` routes the shared `conversation` Action for chat-tool,
+`WebConversation` routes the shared `conversation` Action for conversation-tool,
 Canvas, and direct Client owners. Websites cannot run the Ox agent's model loop.
 Owners share the persistent website
 account store, but not pages, DOM, history, session storage, or conversation IDs.
@@ -752,9 +752,9 @@ bootstrap therefore leaves target IndexedDB data unchanged.
 
 ## Provider configuration and credentials
 
-New-chat provider/model defaults, provider additions and overrides, region,
-and language are stored in UserDefaults. Each chat persists its own
-provider/model selection. Chat saves write the existing `nativeReasoningEffort`
+New-conversation provider/model defaults, provider additions and overrides, region,
+and language are stored in UserDefaults. Each conversation persists its own
+provider/model selection. Conversation saves write the existing `nativeReasoningEffort`
 metadata field for non-Pi effort values; null defers to Pi thinking. They explicitly
 clear Pi thinking when the selected model has no compatible effort; a switch must not retain
 its predecessor's reasoning choice. `llm.providerCatalog` contains a format-2 JSON envelope
@@ -766,7 +766,7 @@ with no models disables that provider for model selection. An empty saved catalo
 uses bundled defaults. `ox.provider.default` returns a fresh copy of
 bundled definitions without changing storage. Provider JSON excludes credentials.
 Providers use API transports; website services never enter the provider catalog.
-Existing website defaults and chat selections remain stored as unavailable choices
+Existing website defaults and conversation selections remain stored as unavailable choices
 until the user explicitly selects a replacement. They cannot silently fall back to
 another provider. History, credentials, website state, service sources, and approvals
 are retained; no new persisted format or Profile milestone is introduced. Catalog format compatibility, conversion from the earlier format-1 overlay
@@ -811,7 +811,7 @@ to OpenOx's GitHub API destination. `StorageMigrator` moves the predecessor
 `pat:service-repository:github` item after verifying the new entry. The account
 login is fetched from GitHub, not persisted. Invalid or revoked saved tokens and tokens missing
 public-repository scope are removed before prompting for replacement. Transient
-network failures preserve the token. Tokens never enter chat transcripts or
+network failures preserve the token. Tokens never enter conversation transcripts or
 model inputs. Users can revoke the token in GitHub Settings.
 
 The application compatibility gate deletes the former
@@ -853,7 +853,7 @@ needed for diagnosis but never credentials or reusable secrets.
 | Local Profile state | Application Support/Profiles/<UUID> | No device backup or Files exposure | Delete the Profile |
 | Profile migration recovery | Application Support/StorageMigration | Private retained source/stage material | Explicit recovery/diagnostic cleanup |
 | iCloud Profile content | iCloud Documents | iCloud Drive | Delete or move the Profile |
-| Temporary chat | Memory and isolated filesystem cache | None; cache is purgeable | Leave chat; private cache by eviction, app deletion, or explicit QA cleanup after close |
+| Temporary conversation | Memory and isolated filesystem cache | None; cache is purgeable | Leave conversation; private cache by eviction, app deletion, or explicit QA cleanup after close |
 | Conversation-owned files | Profile directory | Profile policy | Delete owner conversation or delete file |
 | Shared files | Profile directory | Profile policy | Delete file, folder, or Profile |
 | Active provider catalog | UserDefaults | Device backup policy | Delete provider or app |
@@ -867,7 +867,7 @@ needed for diagnosis but never credentials or reusable secrets.
 | Service repository configuration | Application Support | Device backup policy | Remove repository or reset choices |
 | Local repository and service snapshots | Application Support | Excluded from backup | Remove repository or replace snapshot |
 | Service-search vectors | Caches | Purgeable local cache | System eviction or MonoRepository rebuild |
-| Pi Durable temporary-chat caches | Caches (explicit launch opt-in) | Purgeable; no backup/sync/export | System eviction, app deletion, or explicit QA cleanup after close |
+| Pi Durable temporary-conversation caches | Caches (explicit launch opt-in) | Purgeable; no backup/sync/export | System eviction, app deletion, or explicit QA cleanup after close |
 | Pi Durable upstream storage diagnostics | Caches (DEBUG Simulator only) | Purgeable; no backup/sync/export | Removed after each request; crash remnants by system eviction or QA cleanup |
 | Folder grants | Application Support | Excluded from backup | Remove or replace grant |
 | App logs | Application Support | Excluded from backup | Retention compaction |

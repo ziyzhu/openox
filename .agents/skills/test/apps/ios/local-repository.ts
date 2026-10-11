@@ -8,12 +8,12 @@ import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulat
 import { iosTarget } from "../../../setup/scripts/ios.ts";
 
 const qa = qaCommand({
-  usage: "bun .agents/skills/test/apps/ios/local-repository.ts --device ox-N --host <ws-url> --chat <saved-QA-chat> --bundle <bundle-id> --domain <qa-draft-domain> [--output /tmp/directory]\nRequires enabled Local and an existing empty run-owned qa- web draft. Temporarily disables Local, verifies mutation refusals and unchanged source/configuration/Git bytes, then reenables and writes identical source. Restores enablement; creates no drafts or commits.",
+  usage: "bun .agents/skills/test/apps/ios/local-repository.ts --device ox-N --host <ws-url> --conversation <saved-QA-conversation> --bundle <bundle-id> --domain <qa-draft-domain> [--output /tmp/directory]\nRequires enabled Local and an existing empty run-owned qa- web draft. Temporarily disables Local, verifies mutation refusals and unchanged source/configuration/Git bytes, then reenables and writes identical source. Restores enablement; creates no drafts or commits.",
   options: { host: { type: "string" }, chat: { type: "string" }, bundle: { type: "string" }, domain: { type: "string" }, output: { type: "string" } },
 });
 const ios = iosTarget(qa.device);
 const { host, chat, bundle, domain } = qa.values;
-assert(host && chat && bundle && domain?.startsWith("qa-"), "Pass an explicit Host, saved QA chat, bundle, and run-owned qa- domain");
+assert(host && chat && bundle && domain?.startsWith("qa-"), "Pass an explicit Host, saved QA conversation, bundle, and run-owned qa- domain");
 assert.equal(Number(new URL(host).port), qa.debugPort);
 const directory = resolve(qa.values.output ?? `/tmp/ox-local-repository-${Date.now()}`);
 assert(directory !== ROOT && !directory.startsWith(ROOT + "/"), "Keep evidence outside the repository");
@@ -63,10 +63,10 @@ assert(await requireSimulator(qa.device), "Boot the reserved simulator before te
 const release = claimSimulator(qa.device);
 try {
   await mkdir(directory, { recursive: true });
-  const inspected = await run(["ox", "--host", host, "--chat", chat, "chat", "inspect", "--json"], { capture: true });
+  const inspected = await run(["ox", "--host", host, "--chat", chat, "conversation", "inspect", "--json"], { capture: true });
   const state = JSON.parse(inspected.stdout);
-  assert.equal(state.isBusy, false, "Use an idle saved QA chat");
-  assert(JSON.stringify(state.messages).includes("QA Local repository enablement regression"), "Use a dedicated regression chat");
+  assert.equal(state.isBusy, false, "Use an idle saved QA conversation");
+  assert(JSON.stringify(state.messages).includes("QA Local repository enablement regression"), "Use a dedicated regression conversation");
   const session = await run(["ox", "--host", host, "--chat", chat, "vm", "inspect", "--json"], { capture: true });
   assert.equal(JSON.parse(session.stdout).value.session.temporary, false);
   const local = (await call("ox.repository.list")).repositories.find((row: { id: string }) => row.id === "local");

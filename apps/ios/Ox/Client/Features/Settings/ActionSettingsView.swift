@@ -160,7 +160,7 @@ private enum BuiltInActionGroup: String, CaseIterable, Identifiable {
 
     var title: LocalizedStringKey {
         switch self {
-        case .conversations: "Chats"
+        case .conversations: "Conversations"
         case .models: "Models & secrets"
         case .web: "Web & browser"
         case .artifacts: "Files & images"
@@ -180,7 +180,7 @@ private enum BuiltInActionGroup: String, CaseIterable, Identifiable {
 
     private static func group(for action: String) -> Self {
         switch action {
-        case Actions.appRenameChat: return .conversations
+        case Actions.appRenameConversation: return .conversations
         case Actions.appModel, Actions.appDefaultModel, Actions.appSetModel, Actions.appSetDefaultModel: return .models
         case Actions.appRepositories: return .repositories
         case Actions.outputRead: return .artifacts
@@ -308,7 +308,7 @@ struct ServiceActionSettingsView: View {
                 SettingsSection("Actions", layout: .group) {
                     VStack(spacing: 0) {
                         serviceActionRow(
-                            title: String(localized: "Attach to a chat"),
+                            title: String(localized: "Attach to a conversation"),
                             actionID: Conversation.attachApproveKey(service.domain),
                             defaultPolicy: Actions.defaultPolicy(for: Actions.serviceAttach)
                         )

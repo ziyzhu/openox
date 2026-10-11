@@ -1,14 +1,14 @@
 import { isDeepStrictEqual } from "node:util";
 import { parseSkill } from "../../../../packages/protocol/src/skills.ts";
-import { newChat, ox, vmCall } from "./cli.ts";
-import type { ChatEvidence, Check, EvalCase, EvalResponse, EvalSnapshot, Invocation, ObservedState } from "./types.ts";
+import { newConversation, ox, vmCall } from "./cli.ts";
+import type { ConversationEvidence, Check, EvalCase, EvalResponse, EvalSnapshot, Invocation, ObservedState } from "./types.ts";
 
 export function render(value: string, fixture: EvalResponse["fixture"]): string {
   return fixture ? value.replaceAll("{{name}}", fixture.name).replaceAll("{{answer}}", fixture.answer) : value;
 }
 
 export async function observeState(host: string, provider: string, model: string, test: EvalCase, remaining: () => number, qaProfile?: string): Promise<ObservedState> {
-  const chatId = await newChat(host, provider, model, true, remaining());
+  const chatId = await newConversation(host, provider, model, true, remaining());
   const state: ObservedState = { chatId, values: {}, files: {} };
   const fields = {
     profile: ["name", "storage"], defaultModel: ["configured", "region", "provider", "model", "thinkingLevel", "supportsTools", "authentication"],
@@ -80,7 +80,7 @@ export function ownedSkillWrite(call: Invocation, name: string): boolean {
     || ["ox.fs.write", "ox.fs.edit"].includes(call.name) && typeof call.args.path === "string" && call.args.path.startsWith(`skills/${name}/`);
 }
 
-export function permittedActions(evidence: ChatEvidence, fixture?: EvalResponse["fixture"]): Check[] {
+export function permittedActions(evidence: ConversationEvidence, fixture?: EvalResponse["fixture"]): Check[] {
   return [{ detail: "Only read-only/diagnostic Actions or authorized run-owned skill writes executed", passed: actions(evidence.snapshot).every(call => readActions.has(call.name) || !!fixture && ownedSkillWrite(call, fixture.name)) }];
 }
 

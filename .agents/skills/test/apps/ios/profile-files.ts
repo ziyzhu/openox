@@ -8,10 +8,10 @@ import { iosTarget } from "../../../setup/scripts/ios.ts";
 import { waitForHost } from "./host.ts";
 
 const qa = qaCommand({
-  usage: "bun .agents/skills/test/apps/ios/profile-files.ts --device ox-N --chat <seeded-saved-Mock-QA-chat> --app /absolute/Ox.app [--bundle id] [--profile-folder name] [--output /tmp/directory]\nWrites run-owned files, creates/deletes a run-owned chat, relaunches, and approves deletion of only its fixtures through ordinary chat approval. Never changes policies or credentials.",
+  usage: "bun .agents/skills/test/apps/ios/profile-files.ts --device ox-N --conversation <seeded-saved-Mock-QA-conversation> --app /absolute/Ox.app [--bundle id] [--profile-folder name] [--output /tmp/directory]\nWrites run-owned files, creates/deletes a run-owned conversation, relaunches, and approves deletion of only its fixtures through ordinary conversation approval. Never changes policies or credentials.",
   options: { chat: { type: "string" }, app: { type: "string" }, bundle: { type: "string" }, "profile-folder": { type: "string" }, output: { type: "string" } },
 });
-if (!qa.values.chat || !qa.values.app) throw new Error("Pass an idle saved Mock QA chat and the freshly built app");
+if (!qa.values.chat || !qa.values.app) throw new Error("Pass an idle saved Mock QA conversation and the freshly built app");
 const localConfig = await readFile(join(ROOT, "apps/ios/Local.xcconfig"), "utf8").catch(() => "");
 const bundle = qa.values.bundle ?? Bun.env.OX_BUNDLE_ID
   ?? /^OX_BUNDLE_IDENTIFIER\s*=\s*([^\s/]+)/m.exec(localConfig)?.[1] ?? "ai.openox.local";
@@ -42,13 +42,13 @@ async function rejected(name: string, args: Record<string, unknown>) {
 const ready = () => waitForHost(qa.debugEndpoint,
   () => json(["ox", "--host", qa.debugEndpoint, "host", "describe", "--timeout", "1000", "--json"]), 10_000);
 async function approve(script: string, purpose: string) {
-  await json([...target, "chat", "send", `execute\n${script}`, "--no-wait", "--json"]);
+  await json([...target, "conversation", "send", `execute\n${script}`, "--no-wait", "--json"]);
   for (let attempt = 0; attempt < 100; attempt++) {
-    const state = await json([...target, "chat", "inspect", "--pending", "--json"]);
+    const state = await json([...target, "conversation", "inspect", "--pending", "--json"]);
     if (state.pendingPrompt) {
       assert(state.pendingPrompt.prompt.includes(purpose));
       assert(state.pendingPrompt.options.includes("Approve"));
-      await json([...target, "chat", "respond", "Approve", "--prompt", state.pendingPrompt.id, "--json"]);
+      await json([...target, "conversation", "respond", "Approve", "--prompt", state.pendingPrompt.id, "--json"]);
     } else if (!state.isBusy) return;
     await Bun.sleep(100);
   }
@@ -59,8 +59,8 @@ const release = claimSimulator(qa.device);
 try {
   await mkdir(directory, { recursive: true });
   await ready();
-  await json([...target, "chat", "open", "--json"]);
-  const initial = await json([...target, "chat", "inspect", "--json"]);
+  await json([...target, "conversation", "open", "--json"]);
+  const initial = await json([...target, "conversation", "inspect", "--json"]);
   assert.equal(initial.isBusy, false);
   assert.equal(initial.model.id, "mock");
   assert(initial.messages[0]?.user?.content[0]?.text?.text.startsWith("QA filesystem backend verification seed."));
@@ -163,7 +163,7 @@ try {
   }
   await ios.launch(bundle, resolve(qa.values.app), { OX_HOST_LOOPBACK: "1", OX_DEBUG_ENDPOINT: qa.debugEndpoint });
   await ready();
-  await json([...target, "chat", "open", "--json"]);
+  await json([...target, "conversation", "open", "--json"]);
   assert.equal((await call("ox.fs.read", { path: `${shared}/nested/current.html` })).text, "<h1>Current HTML</h1>\n");
   assert.equal((await inspectFile(current.filename)).filename, current.filename);
   await assert.rejects(() => inspectFile(original.filename));
@@ -176,9 +176,9 @@ try {
   await rejected("ox.fs.read", { path: `${shared}/nested/current.html` });
   checks.push("ordinary approval deletes the run-owned directory recursively and makes live references unavailable");
   const host = ["ox", "--host", qa.debugEndpoint];
-  await json([...host, "chat", "new", "--provider", "mock", "--model", "mock", "--json"]);
-  await json([...host, "chat", "send", `QA filesystem ownership ${prefix}. Reply QA only.`, "--json"]);
-  const child = await json([...host, "chat", "inspect", "--json"]);
+  await json([...host, "conversation", "new", "--provider", "mock", "--model", "mock", "--json"]);
+  await json([...host, "conversation", "send", `QA filesystem ownership ${prefix}. Reply QA only.`, "--json"]);
+  const child = await json([...host, "conversation", "inspect", "--json"]);
   assert.notEqual(child.id, qa.values.chat);
   const childFile = (await json([...host, "--chat", child.id, "vm", "call", "ox.fs.write", "--args",
     JSON.stringify({ path: `${prefix}/owned.md`, content: "Conversation-owned content\n", purpose: "Verify conversation ownership" }), "--json"])).value;
@@ -188,7 +188,7 @@ try {
   await call("ox.fs.move", { from: `/${childFile.path}`, to: `${ownershipRoot}/shared.md` });
   await call("ox.fs.copy", { from: `${ownershipRoot}/shared.md`, to: `${ownershipRoot}/survivor.md` });
   await call("ox.fs.move", { from: `${ownershipRoot}/shared.md`, to: `/${childRoot}/returned.md` });
-  await json([...target, "chat", "open", "--json"]);
+  await json([...target, "conversation", "open", "--json"]);
   const deletionPurpose = `Delete ${prefix} chat`;
   await approve(`return await ox.conversation.delete({id:${JSON.stringify(child.id)},purpose:${JSON.stringify(deletionPurpose)}})`, deletionPurpose);
   assert(!(await call("ox.fs.list", { path: "/conversations" })).items.some((item: { path: string }) => item.path === childRoot));

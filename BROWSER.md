@@ -33,7 +33,7 @@ Gate: obtain maintainer agreement on feature trade-offs and clarify eligibility 
 Audit findings:
 - `NSPhotoLibraryUsageDescription` is removed from the built app; the explicitly prohibited `NSBluetoothAlwaysUsageDescription` remains unresolved.
 - The removed `PhotoLibraryProvider.swift` requested `.readWrite` authorization for library search and album operations. Limited-library authorization was not a compliance workaround and cannot create or fetch user albums.
-- Chat attachments already use SwiftUI's system Photos picker. Preserve this path. Add-only access is not a replacement for searching existing assets or organizing existing albums.
+- Conversation attachments already use SwiftUI's system Photos picker. Preserve this path. Add-only access is not a replacement for searching existing assets or organizing existing albums.
 - `BluetoothProvider.swift` rejects operations unless the app is active and closes its session when backgrounded. `UIBackgroundModes` declares processing, not Bluetooth modes. Nevertheless, the prohibited key remains present.
 - Apple's current Bluetooth-key documentation says `NSBluetoothAlwaysUsageDescription` is required when using the device's Bluetooth interface. Its browser guide instead recommends `NSBluetoothWhileInUseUsageDescription`. Treat this documentation conflict as unresolved; do not substitute keys without a supported solution from Apple.
 - No always-on location, HomeKit, or Health usage keys are declared. Location access is while-in-use. Contacts, calendar, reminders, camera, microphone, local-network access, background processing, and iCloud capabilities are not explicitly forbidden by this browser guide, but that is not approval for their use in Ox.
@@ -63,7 +63,7 @@ Build on `apps/ios/Ox/Client/UI/WebBrowserView.swift`.
 ## 3. Handle links opened by other apps
 
 - [x] Declare `http` and `https` URL schemes in `apps/ios/Info.plist`.
-- [x] Route web URLs before document imports into the existing Browser, without creating an agent chat or falling back to external opening.
+- [x] Route web URLs before document imports into the existing Browser, without creating an agent conversation or falling back to external opening.
 - [x] Use the selected Profile; retain the latest incoming link until onboarding, foreground activity, Profile preparation, and conflicting presentations allow opening. Offer retry or cancellation if preparation fails.
 - [x] Verify targeted simulator delivery for cold launch with delayed preparation, warm launch, and an existing Browser.
 - [x] Verify HTTP paths, query strings, fragments, redirects, and a `.chat` website path without importing it.

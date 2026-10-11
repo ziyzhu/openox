@@ -41,15 +41,15 @@ nonisolated enum ProfileSchema {
         { try ProfileMigrator.migrateLegacySkills(at: $0) },
         { _ in },
         { try ProfileMigrator.renameLibraryToFiles(at: $0) },
-        { try ProfileMigrator.moveChatsIntoDirectories(at: $0) },
+        { try ProfileMigrator.moveConversationsIntoDirectories(at: $0) },
         { try ProfileMigrator.repairStorage(at: $0) },
         { try ProfileMigrator.migrateAgentContexts(at: $0) },
         { try ProfileMigrator.namespaceUserSkills(at: $0) },
         { try ProfileMigrator.removeUserSkillNamespace(at: $0) },
         { _ in },
         { try ProfileMigrator.removeRedundantAgentContexts(at: $0) },
-        { try ProfileMigrator.migrateChatModelSelections(at: $0) },
-        { try ProfileMigrator.migrateChatProviderDefinitions(at: $0) },
+        { try ProfileMigrator.migrateConversationModelSelections(at: $0) },
+        { try ProfileMigrator.migrateConversationProviderDefinitions(at: $0) },
         { try ProfileMigrator.removeBrowserServiceAttachments(at: $0) },
         { try ProfileMigrator.migrateProfileSkillCatalog(at: $0) },
         { try ProfileMigrator.migrateReservedImportMemorySkill(at: $0) },
@@ -64,7 +64,7 @@ nonisolated enum ProfileMigrator {
         try recoverPublicProfilePublications()
     }
 
-    private static let legacyChatSchemaVersion = 6
+    private static let legacyConversationSchemaVersion = 6
 
     static let durableProfileVersion = "2026-10-05-pi-durable"
 
@@ -503,18 +503,18 @@ nonisolated enum ProfileMigrator {
         }
         let names = Set(artifacts.compactMap { $0["path"] as? String }.map { String($0.dropFirst("artifacts/".count)).lowercased() })
         guard saved.allSatisfy({ names.contains($0.lowercased()) }) else { throw StorageMigrationError.invalidFile(savedPath) }
-        let chatFiles = inventory.keys.filter { $0.hasPrefix("chats/") }
-        guard chatFiles.allSatisfy({ path in
+        let conversationFiles = inventory.keys.filter { $0.hasPrefix("chats/") }
+        guard conversationFiles.allSatisfy({ path in
             let parts = path.split(separator: "/")
-            return parts.count == 3 && UUID(uuidString: String(parts[1])) != nil && inventory["\(parts[0])/\(parts[1])/chat.json"] != nil
+            return parts.count == 3 && UUID(uuidString: String(parts[1])) != nil && inventory["\(parts[0])/\(parts[1])/conversation.json"] != nil
         }) else { throw StorageMigrationError.invalidApplicationStorage("chats") }
-        let chatPaths = chatFiles.filter { $0.hasSuffix("/chat.json") }.sorted()
-        for (ordinal, path) in chatPaths.enumerated() {
+        let conversationPaths = conversationFiles.filter { $0.hasSuffix("/chat.json") }.sorted()
+        for (ordinal, path) in conversationPaths.enumerated() {
             try autoreleasepool {
                 let prefix = String(path.dropLast("chat.json".count))
                 let data = try durableSourceFile(path, at: profile.url)
-                let metadata = try decodeMigrationValue(ChatMeta.self, from: data, decoder: decoder, path: path)
-                guard metadata.schemaVersion == ChatFormat.currentSchemaVersion,
+                let metadata = try decodeMigrationValue(ConversationMeta.self, from: data, decoder: decoder, path: path)
+                guard metadata.schemaVersion == ConversationFormat.currentSchemaVersion,
                       UUID(uuidString: String(prefix.split(separator: "/")[1])) == metadata.id else {
                     throw StorageMigrationError.invalidApplicationStorage(path)
                 }
@@ -543,7 +543,7 @@ nonisolated enum ProfileMigrator {
                     Log.app.info("StorageMigrator.pi transcript archived path=\(transcriptPath) turns=\(records.count) externalized=\(reader.externalized) legacyPurposes=\(missingPurposes) bytes=\(reader.position)")
                 }
                 let turns = records.map(\.turn)
-                var document = ChatDocument(turns: turns)
+                var document = ConversationDocument(turns: turns)
                 guard document.turns.map(\.id) == turns.map(\.id) else { throw StorageMigrationError.invalidApplicationStorage(transcriptPath) }
                 document.apply(.sealAllTurns)
                 let sealed = document.turns
@@ -580,7 +580,7 @@ nonisolated enum ProfileMigrator {
                 var expected: [Any] = []
                 for (index, turn) in sealed.enumerated() {
                     let canonical = try JSONSerialization.jsonObject(with: JSONEncoder().encode(turn))
-                    let model = messages(ChatProjection.makeWireMessages(from: [turn])).map { $0.toAny() }
+                    let model = messages(ConversationProjection.makeWireMessages(from: [turn])).map { $0.toAny() }
                     expected.append(contentsOf: model)
                     entries.append(["kind": "ox.native.turn", "model": model, "data": ["turn": canonical, "source": records[index].source.toAny()]])
                     if index == boundary, let checkpoint {
@@ -606,12 +606,12 @@ nonisolated enum ProfileMigrator {
                     "unread": metadata.hasUnreadResponse, "agent": agent, "metadata": applicationMetadata, "entries": entries, "expectedContext": try durableExpectedContext(expected)]
                 let encoded = try JSONSerialization.data(withJSONObject: conversation, options: [.sortedKeys])
                 try encoded.write(to: conversationDirectory.appendingPathComponent("\(ordinal).json"), options: .withoutOverwriting)
-                Log.app.info("StorageMigrator.pi conversation staged ordinal=\(ordinal + 1)/\(chatPaths.count) bytes=\(encoded.count)")
+                Log.app.info("StorageMigrator.pi conversation staged ordinal=\(ordinal + 1)/\(conversationPaths.count) bytes=\(encoded.count)")
             }
         }
         return DurableProfileDraft(draft: .from(["format": 1, "profileID": profile.id.uuidString, "documents": documents,
             "artifacts": artifacts, "payloads": payloads.values.map { $0.toAny() }, "conversations": []]), manifest: manifest, inventory: inventory,
-            conversationDirectory: conversationDirectory, conversationCount: chatPaths.count)
+            conversationDirectory: conversationDirectory, conversationCount: conversationPaths.count)
     }
 
     private static func decodeMigrationValue<T: Decodable>(_ type: T.Type, from data: Data, decoder: JSONDecoder, path: String) throws -> T {
@@ -1375,11 +1375,11 @@ nonisolated enum ProfileMigrator {
         Log.app.info("StorageMigrator.renameLibraryToFiles root=\(root.lastPathComponent) moved=\(items.count)")
     }
 
-    static func moveChatsIntoDirectories(at root: URL) throws {
+    static func moveConversationsIntoDirectories(at root: URL) throws {
         let fm = FileManager.default
-        let chats = root.appendingPathComponent("chats", isDirectory: true)
-        guard fm.fileExists(atPath: chats.path) else { return }
-        let entries = try fm.contentsOfDirectory(at: chats, includingPropertiesForKeys: [.isRegularFileKey])
+        let conversations = root.appendingPathComponent("chats", isDirectory: true)
+        guard fm.fileExists(atPath: conversations.path) else { return }
+        let entries = try fm.contentsOfDirectory(at: conversations, includingPropertiesForKeys: [.isRegularFileKey])
         let legacy = try entries.filter { item in
             guard ["json", "jsonl"].contains(item.pathExtension),
                   UUID(uuidString: item.deletingPathExtension().lastPathComponent) != nil else { return false }
@@ -1390,7 +1390,7 @@ nonisolated enum ProfileMigrator {
         }
         var moved = 0
         for (id, files) in grouped {
-            let directory = chats.appendingPathComponent(id.uuidString, isDirectory: true)
+            let directory = conversations.appendingPathComponent(id.uuidString, isDirectory: true)
             try fm.createDirectory(at: directory, withIntermediateDirectories: true)
             for source in files {
                 let name = source.pathExtension == "json" ? "chat.json" : "turns.jsonl"
@@ -1406,7 +1406,7 @@ nonisolated enum ProfileMigrator {
                 moved += 1
             }
         }
-        Log.app.info("StorageMigrator.moveChatsIntoDirectories root=\(root.lastPathComponent) chats=\(grouped.count) files=\(moved)")
+        Log.app.info("StorageMigrator.moveConversationsIntoDirectories root=\(root.lastPathComponent) conversations=\(grouped.count) files=\(moved)")
     }
 
     static func repairStorage(at root: URL) throws {
@@ -1414,7 +1414,7 @@ nonisolated enum ProfileMigrator {
         try renameLibraryToFiles(at: root)
         try flattenLegacyFiles(at: root)
         try migrateLegacySkills(at: root)
-        try moveChatsIntoDirectories(at: root)
+        try moveConversationsIntoDirectories(at: root)
     }
 
     private static func legacyTurn(from data: Data, decoder: JSONDecoder) throws -> Turn {
@@ -1495,15 +1495,15 @@ nonisolated enum ProfileMigrator {
 
     static func migrateAgentContexts(at root: URL) throws {
         let fm = FileManager.default
-        let chats = root.appendingPathComponent("chats", isDirectory: true)
-        guard fm.fileExists(atPath: chats.path) else { return }
+        let conversations = root.appendingPathComponent("chats", isDirectory: true)
+        guard fm.fileExists(atPath: conversations.path) else { return }
         guard let config = ProfileIO.readConfig(at: root) else { throw StorageMigrationError.missingConfig }
         let scope = ProfileScope(profileID: config.id, root: root, location: .local)
         let decoder = JSONDecoder()
         decoder.userInfo[.profileScope] = scope
         let encoder = JSONEncoder()
         let directories = try fm.contentsOfDirectory(
-            at: chats,
+            at: conversations,
             includingPropertiesForKeys: [.isDirectoryKey]
         ).filter {
             try $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true
@@ -1513,25 +1513,25 @@ nonisolated enum ProfileMigrator {
         for directory in directories {
             let metadataURL = directory.appendingPathComponent("chat.json", isDirectory: false)
             guard fm.fileExists(atPath: metadataURL.path) else { continue }
-            var metadata = try decoder.decode(ChatMeta.self, from: Data(contentsOf: metadataURL))
-            guard [ChatFormat.currentSchemaVersion, legacyChatSchemaVersion].contains(metadata.schemaVersion) else {
+            var metadata = try decoder.decode(ConversationMeta.self, from: Data(contentsOf: metadataURL))
+            guard [ConversationFormat.currentSchemaVersion, legacyConversationSchemaVersion].contains(metadata.schemaVersion) else {
                 Log.app.warning("StorageMigrator.agentContext skipped=\(directory.lastPathComponent) schema=\(metadata.schemaVersion)")
                 continue
             }
             let transcriptURL = directory.appendingPathComponent("turns.jsonl", isDirectory: false)
             let lines = fm.fileExists(atPath: transcriptURL.path) ? try transcriptLines(transcriptURL) : []
-            let legacy = metadata.schemaVersion == legacyChatSchemaVersion
+            let legacy = metadata.schemaVersion == legacyConversationSchemaVersion
             let decoded = try lines.map {
                 legacy
                     ? try legacyTurn(from: $0, decoder: decoder)
                     : try decoder.decode(Turn.self, from: $0)
             }
-            let turns = ChatFormat.normalize(decoded)
+            let turns = ConversationFormat.normalize(decoded)
             if legacy || turns != decoded {
                 try blob(turns, encoder: encoder).write(to: transcriptURL, options: .atomic)
             }
             if legacy {
-                metadata.schemaVersion = ChatFormat.currentSchemaVersion
+                metadata.schemaVersion = ConversationFormat.currentSchemaVersion
                 try encoder.encode(metadata).write(to: metadataURL, options: .atomic)
                 upgraded += 1
             }
@@ -1549,11 +1549,11 @@ nonisolated enum ProfileMigrator {
             if !legacy, let stored, let boundary = stored.boundary(in: turns), boundary <= lastAgent {
                 let tail = boundary == lastAgent
                     ? []
-                    : ChatProjection.makeWireMessages(from: Array(turns[(boundary + 1)...lastAgent]))
+                    : ConversationProjection.makeWireMessages(from: Array(turns[(boundary + 1)...lastAgent]))
                 messages = stored.messages + tail
                 tokensBefore = stored.tokensBefore
             } else {
-                messages = ChatProjection.makeWireMessages(from: Array(turns[...lastAgent]))
+                messages = ConversationProjection.makeWireMessages(from: Array(turns[...lastAgent]))
                 tokensBefore = 0
             }
             let context = AgentContextCheckpoint(
@@ -1565,19 +1565,19 @@ nonisolated enum ProfileMigrator {
             try encoder.encode(context).write(to: contextURL, options: .atomic)
             refreshed += 1
         }
-        Log.app.info("StorageMigrator.agentContexts root=\(root.lastPathComponent) chats=\(directories.count) refreshed=\(refreshed) upgraded=\(upgraded)")
+        Log.app.info("StorageMigrator.agentContexts root=\(root.lastPathComponent) conversations=\(directories.count) refreshed=\(refreshed) upgraded=\(upgraded)")
     }
 
     static func removeRedundantAgentContexts(at root: URL) throws {
         let fm = FileManager.default
-        let chats = root.appendingPathComponent("chats", isDirectory: true)
-        guard fm.fileExists(atPath: chats.path) else { return }
+        let conversations = root.appendingPathComponent("chats", isDirectory: true)
+        guard fm.fileExists(atPath: conversations.path) else { return }
         guard let config = ProfileIO.readConfig(at: root) else { throw StorageMigrationError.missingConfig }
         let scope = ProfileScope(profileID: config.id, root: root, location: .local)
         let decoder = JSONDecoder()
         decoder.userInfo[.profileScope] = scope
         let directories = try fm.contentsOfDirectory(
-            at: chats,
+            at: conversations,
             includingPropertiesForKeys: [.isDirectoryKey]
         ).filter {
             try $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true
@@ -1615,10 +1615,10 @@ nonisolated enum ProfileMigrator {
         Log.app.info("StorageMigrator.redundantAgentContexts root=\(root.lastPathComponent) scanned=\(scanned) removed=\(removed) retained=\(retained) unreadable=\(unreadable)")
     }
 
-    static func migrateChatProviderDefinitions(at root: URL) throws {
-        let chats = root.appendingPathComponent("chats", isDirectory: true)
-        guard FileManager.default.fileExists(atPath: chats.path) else { return }
-        let directories = try FileManager.default.contentsOfDirectory(at: chats, includingPropertiesForKeys: [.isDirectoryKey])
+    static func migrateConversationProviderDefinitions(at root: URL) throws {
+        let conversations = root.appendingPathComponent("chats", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: conversations.path) else { return }
+        let directories = try FileManager.default.contentsOfDirectory(at: conversations, includingPropertiesForKeys: [.isDirectoryKey])
         var count = 0
         for directory in directories {
             guard try directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true else { continue }
@@ -1639,22 +1639,22 @@ nonisolated enum ProfileMigrator {
             try data.write(to: file, options: .atomic)
             count += 1
         }
-        Log.app.info("StorageMigrator.chatProviders migrated=\(count)")
+        Log.app.info("StorageMigrator.conversationProviders migrated=\(count)")
     }
 
     static func removeBrowserServiceAttachments(at root: URL) throws {
         let manager = FileManager.default
-        let chats = root.appendingPathComponent("chats", isDirectory: true)
-        guard manager.fileExists(atPath: chats.path) else { return }
+        let conversations = root.appendingPathComponent("chats", isDirectory: true)
+        guard manager.fileExists(atPath: conversations.path) else { return }
         let directories = try manager.contentsOfDirectory(
-            at: chats,
+            at: conversations,
             includingPropertiesForKeys: [.isDirectoryKey]
         ).filter {
             try $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        var chatsChanged = 0
+        var conversationsChanged = 0
         var attachmentsRemoved = 0
         for directory in directories {
             let file = directory.appendingPathComponent("chat.json", isDirectory: false)
@@ -1667,18 +1667,18 @@ nonisolated enum ProfileMigrator {
             var data = try encoder.encode(object)
             data.append(0x0A)
             try data.write(to: file, options: .atomic)
-            chatsChanged += 1
+            conversationsChanged += 1
             attachmentsRemoved += domains.count - retained.count
         }
-        Log.app.info("StorageMigrator.browserAttachments chats=\(chatsChanged) removed=\(attachmentsRemoved)")
+        Log.app.info("StorageMigrator.browserAttachments chats=\(conversationsChanged) removed=\(attachmentsRemoved)")
     }
 
-    static func migrateChatModelSelections(at root: URL) throws {
+    static func migrateConversationModelSelections(at root: URL) throws {
         let manager = FileManager.default
-        let chats = root.appendingPathComponent("chats", isDirectory: true)
-        guard manager.fileExists(atPath: chats.path) else { return }
+        let conversations = root.appendingPathComponent("chats", isDirectory: true)
+        guard manager.fileExists(atPath: conversations.path) else { return }
         let directories = try manager.contentsOfDirectory(
-            at: chats,
+            at: conversations,
             includingPropertiesForKeys: [.isDirectoryKey]
         ).filter {
             try $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true
@@ -1718,7 +1718,7 @@ nonisolated enum ProfileMigrator {
             encoded.append(0x0A)
             try encoded.write(to: metadataURL, options: .atomic)
         }
-        Log.app.info("StorageMigrator.chatModelSelections root=\(root.lastPathComponent) migrated=\(migrated) incomplete=\(incomplete)")
+        Log.app.info("StorageMigrator.conversationModelSelections root=\(root.lastPathComponent) migrated=\(migrated) incomplete=\(incomplete)")
     }
 
     private static func modelMigrationFallbackRegion(defaults: UserDefaults = .standard) -> LLMRegion {
@@ -2094,9 +2094,9 @@ nonisolated enum ProfileMigrator {
 
     private static func transcriptURLs(at root: URL) throws -> [URL] {
         let fm = FileManager.default
-        let chats = root.appendingPathComponent("chats", isDirectory: true)
-        guard fm.fileExists(atPath: chats.path) else { return [] }
-        let entries = try fm.contentsOfDirectory(at: chats, includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey])
+        let conversations = root.appendingPathComponent("chats", isDirectory: true)
+        guard fm.fileExists(atPath: conversations.path) else { return [] }
+        let entries = try fm.contentsOfDirectory(at: conversations, includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey])
         var transcripts: [URL] = []
         for entry in entries {
             let values = try entry.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey])

@@ -1,11 +1,11 @@
 ---
 name: visualize
-description: "Create or revise HTML files for visual results, explorable explanations, simulations, interactive tools, and small apps. Keep ordinary answers, lists, and small tables in chat."
+description: "Create or revise HTML files for visual results, explorable explanations, simulations, interactive tools, and small apps. Keep ordinary answers, lists, and small tables in conversation."
 ---
 
 # Visualize
 
-Create an HTML file when the user wants a visual result, an interactive experience, or a small app. Choose the simplest composition that serves the task; explanations are one option, not a requirement. Keep ordinary answers, lists, and small tables in chat. Ordinary Markdown and file operations use `ox.fs` directly.
+Create an HTML file when the user wants a visual result, an interactive experience, or a small app. Choose the simplest composition that serves the task; explanations are one option, not a requirement. Keep ordinary answers, lists, and small tables in conversation. Ordinary Markdown and file operations use `ox.fs` directly.
 
 ## Choose the experience
 
@@ -78,7 +78,7 @@ This minimal binding example uses an illustrative 50 calories per cookie, not nu
 
 ## Design for iPhone and iPad
 
-- HTML appears inline in Ox chat, with an option to expand it. Design the bounded inline card first: make its first screen useful at phone width, with the main content and primary control visible. Let the same content grow naturally when expanded; do not rely on expansion, hover, or a desktop-sized viewport to reveal the main result.
+- HTML appears inline in Ox conversation, with an option to expand it. Design the bounded inline card first: make its first screen useful at phone width, with the main content and primary control visible. Let the same content grow naturally when expanded; do not rely on expansion, hover, or a desktop-sized viewport to reveal the main result.
 - Make the HTML feel like part of Ox. Default to its existing theme rather than inventing a dashboard skin, custom font, gradient, or decorative chrome. Follow a different style only when the user requests it.
 - Use one readable column with equal outer-edge padding, normally 16 px. Favor a few large, legible elements over dense layouts. Keep the outer background transparent to blend into the Host surface; use tonal fills only where content needs grouping.
 - Define root-scoped CSS variables for the Ox palette: `surface: #FFFDF7`, `surface-sunken: #FBE9C7`, `background: #FFF6E6`, `on-surface: #3A2410`, `on-surface-muted: #7A5A3A`, `primary: #FFA500`, `primary-pressed: #D87A0A`, and `error: #B8422E`. Reuse them throughout HTML and SVG rather than scattering color literals.
@@ -102,11 +102,11 @@ Read an existing HTML file before revising it, following `ox.fs.read` continuati
 
 The Host injects `window.ox.service` before HTML scripts run. Use inspected service action contracts, the same options objects, `purpose`, and synchronous `.help()` methods as in the agent VM. Only the service namespace is available; do not call `ox.fs`, `ox.web`, `ox.user`, or other VM namespaces from an HTML page.
 
-An HTML page runs independently of its creating chat. It is an HTML app surface, not a full agent VM or a Local service implementation. Services resolve and initialize on demand. Do not call `attach`, `detach`, or `listAttached`; these methods are chat-only. Use `find` for discovery and `inspect` for action contracts. Always use a qualified `web:<domain>:<action>`, `ios:<app>:<action>`, or `mcp:<server>:<action>` name. Discovery and inspection report `attached: false` because an HTML page has no chat attachments.
+An HTML page runs independently of its creating conversation. It is an HTML app surface, not a full agent VM or a Local service implementation. Services resolve and initialize on demand. Do not call `attach`, `detach`, or `listAttached`; these methods are conversation-only. Use `find` for discovery and `inspect` for action contracts. Always use a qualified `web:<domain>:<action>`, `ios:<app>:<action>`, or `mcp:<server>:<action>` name. Discovery and inspection report `attached: false` because an HTML page has no conversation attachments.
 
-Invoke a known action with `await ox.service.invoke({ name, input, purpose })`. Host authentication, Action policies, sign-in, verification, payment, and existing Always allow settings work as they do in chat. Do not implement a second approval form in HTML or claim an action succeeded before the promise resolves. Disabling a button while its operation is pending prevents accidental duplicate actions. Show loading, failure, and success states; never retry mutations automatically. Render returned text with `textContent`, not interpolated HTML.
+Invoke a known action with `await ox.service.invoke({ name, input, purpose })`. Host authentication, Action policies, sign-in, verification, payment, and existing Always allow settings work as they do in conversation. Do not implement a second approval form in HTML or claim an action succeeded before the promise resolves. Disabling a button while its operation is pending prevents accidental duplicate actions. Show loading, failure, and success states; never retry mutations automatically. Render returned text with `textContent`, not interpolated HTML.
 
-Closing or replacing an HTML page cancels pending calls and releases its service resources. Keep interactive state in the page; do not depend on chat state or a Profile filesystem. Service-produced files are temporary and closing the page removes them.
+Closing or replacing an HTML page cancels pending calls and releases its service resources. Keep interactive state in the page; do not depend on conversation state or a Profile filesystem. Service-produced files are temporary and closing the page removes them.
 
 Calls are serialized per HTML page, with at most 16 pending calls, 120 admissions per minute, 1 MiB request arguments, and an 8 MiB response. Cancellation is requested after 60 seconds of active execution; time waiting for page prompts and handoffs does not count. Cancellation cannot undo service requests already sent or dismiss operating-system permission alerts. Temporary outputs are limited to 32 files and 20 MiB. Surface limit errors instead of retrying in a loop.
 
@@ -124,4 +124,4 @@ Reference sibling image, audio, or video file paths directly in `src`; never emb
 
 Use semantic headings, lists, tables, buttons, and labeled native controls. Keep the native tab order and retain focus while updating results. Pair color with labels, shapes, or line styles. Give SVG a concise accessible name and provide a text alternative for any relationship that cannot be understood from its labels. Announce changing results with a restrained `aria-live` region. Avoid animation unless it explains a state change; honor `prefers-reduced-motion` when motion is useful.
 
-After writing, read the file back and verify its path, size, content-policy constraints, responsive structure, control labels, element IDs, and default state. Test the baseline and reset, both extremes of every adjustable value, invalid or missing inputs, and values on either side of any threshold that changes the conclusion. Check units, calculations, and agreement between labels, results, prose, and graphics; show an unavailable result rather than NaN, infinity, or stale data. For apps, exercise the primary workflow, navigation, draft preservation, pending and failed operations, duplicate-action prevention, and closing or reopening without assuming unsaved state persists. Verify service-backed changes through the actual returned or re-read state, not just a success label. Keep the chat response brief because the HTML file carries the result.
+After writing, read the file back and verify its path, size, content-policy constraints, responsive structure, control labels, element IDs, and default state. Test the baseline and reset, both extremes of every adjustable value, invalid or missing inputs, and values on either side of any threshold that changes the conclusion. Check units, calculations, and agreement between labels, results, prose, and graphics; show an unavailable result rather than NaN, infinity, or stale data. For apps, exercise the primary workflow, navigation, draft preservation, pending and failed operations, duplicate-action prevention, and closing or reopening without assuming unsaved state persists. Verify service-backed changes through the actual returned or re-read state, not just a success label. Keep the conversation response brief because the HTML file carries the result.

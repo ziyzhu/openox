@@ -335,7 +335,7 @@ actor DurableAgentHost {
         binding.providerInputs = generation.inputs
         bindings[conversationID] = binding
         guard let owner = binding.configuration.tools.first(where: { $0 is ConversationTool }) as? ConversationTool,
-              let conversation = owner.chat else { throw RuntimeError.bridge("Recovered tool conversation is no longer available") }
+              let conversation = owner.conversation else { throw RuntimeError.bridge("Recovered tool conversation is no longer available") }
         await conversation.presentDurableToolAssistant(generation.committedAssistant)
         let media = generation.inputs.footprint
         Log.agent.info("PiDurable native tool generation restored conversation=\(conversationID) assistantEntry=\(assistantEntryID) mediaFiles=\(media.files) mediaBytes=\(media.bytes) presentation=committed")

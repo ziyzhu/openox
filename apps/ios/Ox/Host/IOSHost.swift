@@ -50,7 +50,7 @@ final class IOSHost: OxHost {
         for observer in recoveryObservers { NotificationCenter.default.removeObserver(observer) }
     }
 
-    func listChats() -> [HostChatSummary] { runtime.listChats() }
+    func listConversations() -> [HostConversationSummary] { runtime.listConversations() }
 
     func prepareStorage() async throws {
         try await runtime.prepareStorage()

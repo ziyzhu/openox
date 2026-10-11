@@ -1,6 +1,6 @@
 ---
 name: develop-services
-description: Build or update Ox services through an Ox chat on a simulator, improve the shared authoring loop, notify developers of improvement opportunities, and promote verified Local web services into the built-in repository when requested. Use for development-driven service evolution and dogfooding the workflow users run directly in Ox.
+description: Build or update Ox services through an Ox conversation on a simulator, improve the shared authoring loop, notify developers of improvement opportunities, and promote verified Local web services into the built-in repository when requested. Use for development-driven service evolution and dogfooding the workflow users run directly in Ox.
 ---
 
 # Develop services
@@ -15,11 +15,11 @@ Both paths use the same Ox authoring workflow. Built-in services usually evolve 
 
 ## Drive the development loop
 
-Read the `ios-simulator` and `ox-cli` skills for simulator operation and chat control. Use the user-selected simulator and its assigned Host endpoint; follow the repository's simulator setup and data-preservation rules.
+Read the `ios-simulator` and `ox-cli` skills for simulator operation and conversation control. Use the user-selected simulator and its assigned Host endpoint; follow the repository's simulator setup and data-preservation rules.
 
 1. Establish the requested service outcome and whether delivery is Local or built-in. A request to add or update a built-in service authorizes preparing its promotion after live verification; a Local-only request does not authorize publication.
-2. Build, install, and launch the app as needed. Drive a real Ox chat through `skills/evolve/SKILL.md` for discovery, exploration, action design, implementation, repair, and live verification. Follow its current planning, authentication, attachment, mutation, and Save boundaries.
-3. Observe the user-visible flow with `idb` and inspect chat history and structured logs with `ox`. Look for unclear prompts, repeated failures, missing capabilities, unnecessary confirmations, poor recovery, and gaps in diagnostics or verification.
+2. Build, install, and launch the app as needed. Drive a real Ox conversation through `skills/evolve/SKILL.md` for discovery, exploration, action design, implementation, repair, and live verification. Follow its current planning, authentication, attachment, mutation, and Save boundaries.
+3. Observe the user-visible flow with `idb` and inspect conversation history and structured logs with `ox`. Look for unclear prompts, repeated failures, missing capabilities, unnecessary confirmations, poor recovery, and gaps in diagnostics or verification.
 4. Notify developers of actionable findings as they emerge. Fix supported harness issues within the task's scope, rebuild as needed, and exercise the affected flow through Ox again. Return service defects and compiler diagnostics to Ox for repair and a newly verified saved revision.
 5. Verify the requested outcome through actual service actions, including applicable authentication and handoff boundaries. Browser success alone does not verify a handler. Preserve evidence outside the repository and disclose unexecuted or partially verified actions.
 
@@ -27,7 +27,7 @@ Keep service behavior authored inside Ox. Do not substitute direct service sourc
 
 ## Notify developers and improve the loop
 
-Report actionable improvement opportunities promptly in the current developer session, including those already fixed. Give the triggering request or step, observed versus expected behavior, user impact, bounded sanitized evidence, and the proposed improvement. Include a chat or diagnostic reference when useful; exclude credentials and private user content.
+Report actionable improvement opportunities promptly in the current developer session, including those already fixed. Give the triggering request or step, observed versus expected behavior, user impact, bounded sanitized evidence, and the proposed improvement. Include a conversation or diagnostic reference when useful; exclude credentials and private user content.
 
 Distinguish service-specific defects from reusable authoring-loop issues. Prefer fixing the shared cause over adding a one-off workaround. Update existing skills or steering files when the finding changes how future runs should work, and add the smallest meaningful regression coverage when warranted.
 

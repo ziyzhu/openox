@@ -4,7 +4,7 @@ import { HostRPCError } from "./host-connection.ts";
 
 export async function requireHost(method: string, context: CliContext, timeoutMs: number, params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
   try {
-    return await callHost(method, { ...(context.chat ? { sessionId: context.chat } : {}), ...params }, timeoutMs, context.host);
+    return await callHost(method, { ...(context.conversation ? { sessionId: context.conversation } : {}), ...params }, timeoutMs, context.host);
   } catch (error) {
     const message = error instanceof HostRPCError && error.code === -32601
       ? `Host does not support ${method}; update Ox on the Host device`
@@ -17,7 +17,7 @@ export function connectHost(context: CliContext) {
   const client = new HostRPCClient(context.host);
   return {
     request(method: string, timeoutMs: number, params: Record<string, unknown> = {}) {
-      return client.call(method, timeoutMs, { ...(context.chat ? { sessionId: context.chat } : {}), ...params });
+      return client.call(method, timeoutMs, { ...(context.conversation ? { sessionId: context.conversation } : {}), ...params });
     },
     close() { client.close(); },
   };

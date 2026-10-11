@@ -1,0 +1,418 @@
+import SwiftUI
+
+struct ConversationSidebar: View {
+    enum ContentState {
+        case loading
+        case unavailable
+        case ready
+    }
+
+    let contentState: ContentState
+    let summaries: [ConversationMeta]
+    let activities: [UUID: Conversation.Activity]
+    let currentId: UUID?
+    let showsCloseButton: Bool
+    let onClose: () -> Void
+    let onNewConversation: () -> Void
+    let onOpen: (ConversationMeta) -> Void
+    let onDelete: (ConversationMeta) -> Void
+    let onRename: (ConversationMeta, String) -> Void
+    let onToggleFavorite: (ConversationMeta) -> Void
+    let onSettings: () -> Void
+
+    private let edgeInset = Theme.Spacing.lg
+    @ScaledMetric(relativeTo: .title3) private var iconButtonSize: CGFloat = 44
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    @State private var renaming: ConversationMeta?
+    @State private var pendingDelete: ConversationMeta?
+    @State private var titleDraft = ""
+    @State private var searchQuery = ""
+    @State private var searchPresented = false
+    @State private var visibleCount = 20
+
+    private let pageSize = 20
+
+    var body: some View {
+        NavigationStack {
+            list
+                .accessibilityIdentifier(A11yID.Sidebar.panel)
+                .safeAreaBar(edge: .top, alignment: .leading, spacing: 0) { header }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .toolbar {
+                    DefaultToolbarItem(kind: .search, placement: .bottomBar)
+                    ToolbarSpacer(.fixed, placement: .bottomBar)
+                    ToolbarItem(placement: .bottomBar) { settingsButton }
+                    ToolbarSpacer(.fixed, placement: .bottomBar)
+                    ToolbarItem(placement: .bottomBar) { newConversationButton }
+                }
+                .toolbarVisibility(horizontalSizeClass == .compact ? .hidden : .automatic, for: .navigationBar)
+        }
+        .oxSearchable(
+            text: $searchQuery,
+            isPresented: $searchPresented,
+            placement: .toolbar,
+            prompt: Text(A11yLabel.searchConversations),
+            accessibilityIdentifier: A11yID.Sidebar.search
+        )
+        .background(Theme.Colors.surface, ignoresSafeAreaEdges: .all)
+        .onChange(of: searchQuery) { _, _ in visibleCount = pageSize }
+        .alert(A11yLabel.renameConversation, isPresented: Binding(
+            get: { renaming != nil },
+            set: { if !$0 { renaming = nil } }
+        )) {
+            TextField("Name", text: $titleDraft)
+            Button("Cancel", role: .cancel) { renaming = nil }
+            Button("Rename") {
+                guard let meta = renaming else { return }
+                renaming = nil
+                onRename(meta, titleDraft)
+            }
+        }
+        .alert("Delete this conversation?", isPresented: Binding(
+            get: { pendingDelete != nil },
+            set: { if !$0 { pendingDelete = nil } }
+        )) {
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+            Button("Delete Conversation", role: .destructive) {
+                guard let meta = pendingDelete else { return }
+                pendingDelete = nil
+                onDelete(meta)
+            }
+        } message: {
+            Text("This removes the conversation from your history. This can't be undone.")
+        }
+    }
+
+    private var newConversationButton: some View {
+        Button {
+            searchPresented = false
+            onNewConversation()
+        } label: {
+            Image(systemName: "square.and.pencil")
+                .font(.system(.body, weight: .semibold))
+        }
+        .accessibilityLabel(A11yLabel.newConversation)
+        .accessibilityIdentifier(A11yID.Sidebar.newConversation)
+        .disabled(contentState != .ready)
+    }
+
+    private var settingsButton: some View {
+        Button {
+            searchPresented = false
+            onSettings()
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(.body, weight: .semibold))
+        }
+        .accessibilityLabel(A11yLabel.settings)
+        .accessibilityIdentifier(A11yID.Sidebar.settings)
+        .disabled(contentState != .ready)
+    }
+
+    private var header: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Text("Ox")
+                .font(Theme.Fonts.headline)
+                .foregroundStyle(Theme.Colors.onSurface)
+            previewChip
+            Spacer(minLength: Theme.Spacing.md)
+            if showsCloseButton {
+                closeButton
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, edgeInset)
+        .padding(.bottom, Theme.Spacing.sm)
+    }
+
+    private var closeButton: some View {
+        Button {
+            searchPresented = false
+            onClose()
+        } label: {
+            Image(systemName: "chevron.right")
+                .font(.system(.body, weight: .semibold))
+                .foregroundStyle(Theme.Colors.onSurface)
+                .frame(width: iconButtonSize, height: iconButtonSize)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Circle())
+        .accessibilityLabel(A11yLabel.closeConversationHistory)
+        .accessibilityIdentifier(A11yID.Sidebar.close)
+    }
+
+    private var previewChip: some View {
+        Text("Preview")
+            .font(Theme.Fonts.captionSm)
+            .foregroundStyle(Theme.Colors.primary)
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, 2)
+            .background(Theme.Colors.primary.opacity(0.12), in: Capsule())
+    }
+
+    private var list: some View {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let matching = query.isEmpty
+            ? summaries
+            : summaries.filter { $0.displayTitle.localizedStandardContains(query) }
+        let sorted = matching.sorted { $0.activityDate > $1.activityDate }
+        let ordered = sorted.filter(\.isFavorite) + sorted.filter { !$0.isFavorite }
+        return ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                if contentState == .ready, ordered.isEmpty {
+                    Text(LocalizedStringKey(query.isEmpty ? "Empty" : "No conversations found"))
+                        .font(Theme.Fonts.bodyMd)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .padding(.horizontal, edgeInset)
+                        .padding(.vertical, 11)
+                } else if contentState == .ready {
+                    ForEach(ordered.prefix(visibleCount)) { row($0) }
+                    if ordered.count > visibleCount {
+                        CellularAutomatonLoader.small
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Theme.Spacing.md)
+                            .accessibilityLabel("Loading your chats…")
+                            .task {
+                                await Task.yield()
+                                guard !Task.isCancelled else { return }
+                                visibleCount = min(visibleCount + pageSize, ordered.count)
+                            }
+                            .id("\(query):\(visibleCount)")
+                    }
+                }
+                Color.clear.frame(height: Theme.Spacing.md)
+            }
+            .padding(.top, Theme.Spacing.xs)
+        }
+        .scrollIndicators(.hidden)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .overlay {
+            if contentState == .loading {
+                CellularAutomatonLoader()
+                    .accessibilityLabel("Loading your conversations…")
+            }
+        }
+    }
+
+    private func row(_ meta: ConversationMeta) -> some View {
+        SidebarRow(
+            meta: meta,
+            activity: activities[meta.id] ?? .idle(.read),
+            isActive: meta.id == currentId,
+            edgeInset: edgeInset
+        ) {
+            searchPresented = false
+            onOpen(meta)
+        }
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets())
+            .contextMenuPreviewShape()
+            .contextMenu {
+                Button {
+                    onToggleFavorite(meta)
+                } label: {
+                    Label(
+                        meta.isFavorite ? A11yLabel.unpin : A11yLabel.pin,
+                        systemImage: meta.isFavorite ? "pin.slash" : "pin")
+                }
+                .accessibilityIdentifier(A11yID.Sidebar.favoriteRow(meta.id.uuidString))
+                Button {
+                    titleDraft = meta.displayTitle
+                    renaming = meta
+                } label: {
+                    Label(A11yLabel.renameConversation, systemImage: "pencil")
+                }
+                .accessibilityIdentifier(A11yID.Sidebar.renameRow(meta.id.uuidString))
+                Button(role: .destructive) {
+                    pendingDelete = meta
+                } label: {
+                    Label(A11yLabel.deleteConversation, systemImage: "trash")
+                }
+                .accessibilityIdentifier(A11yID.Sidebar.deleteRow(meta.id.uuidString))
+            } preview: {
+                ConversationContextMenuPreview(meta: meta)
+            }
+            .id(meta.id.uuidString)
+    }
+
+}
+
+private struct SidebarRow: View {
+    let meta: ConversationMeta
+    let activity: Conversation.Activity
+    let isActive: Bool
+    let edgeInset: CGFloat
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Theme.Spacing.sm) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(meta.displayTitle)
+                        .font(Theme.Fonts.bodyMd)
+                        .foregroundStyle(Theme.Colors.onSurface)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    TimelineView(.periodic(from: .now, by: 60)) { context in
+                        Text(lastModifiedText(relativeTo: context.date))
+                            .font(Theme.Fonts.captionSm)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: Theme.Spacing.sm) {
+                    activityIndicator
+                    if meta.scheduledSkillID != nil {
+                        Image(systemName: "clock")
+                            .font(.system(.body, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                    if meta.isFavorite {
+                        Image(systemName: "pin.fill")
+                            .font(.system(.caption, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                }
+            }
+        }
+        .buttonStyle(SidebarRowButtonStyle(isActive: isActive, edgeInset: edgeInset))
+        .accessibilityLabel(meta.displayTitle)
+        .accessibilityValue(accessibilityValue)
+        .accessibilityIdentifier(A11yID.Sidebar.row(meta.id.uuidString))
+    }
+
+    private func lastModifiedText(relativeTo now: Date) -> String {
+        let minute: TimeInterval = 60
+        let hour = 60 * minute
+        let day = 24 * hour
+        let week = 7 * day
+        let month = 30 * day
+        let elapsed = max(0, now.timeIntervalSince(meta.activityDate))
+        guard elapsed >= minute else { return L10n.string("Just now") }
+
+        let components: DateComponents
+        switch elapsed {
+        case ..<hour:
+            components = DateComponents(minute: -Int(elapsed / minute))
+        case ..<day:
+            components = DateComponents(hour: -Int(elapsed / hour))
+        case ..<week:
+            components = DateComponents(day: -Int(elapsed / day))
+        case ..<month:
+            components = DateComponents(weekOfMonth: -Int(elapsed / week))
+        default:
+            components = DateComponents(month: -Int(elapsed / month))
+        }
+
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = AppLocale.resolvedLocale
+        formatter.unitsStyle = .full
+        return formatter.localizedString(from: components)
+    }
+
+    private var accessibilityValue: String {
+        let activity = activityAccessibilityValue
+        let lastModified = lastModifiedText(relativeTo: Date())
+        return [favoriteAccessibilityValue, lastModified, scheduledAccessibilityValue, activity]
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
+    }
+
+    private var favoriteAccessibilityValue: String {
+        meta.isFavorite ? L10n.string("Pinned") : ""
+    }
+
+    private var scheduledAccessibilityValue: String {
+        meta.scheduledSkillID == nil ? "" : L10n.string("Scheduled")
+    }
+
+    @ViewBuilder
+    private var activityIndicator: some View {
+        switch activity {
+        case .idle(.read):
+            EmptyView()
+        case .idle(.unread):
+            Circle()
+                .fill(Theme.Colors.primary)
+                .frame(width: 8, height: 8)
+                .padding(.horizontal, Theme.Spacing.sm - 2)
+                .accessibilityHidden(true)
+        case .idle(.stopped):
+            Text("Stopped")
+                .font(Theme.Fonts.captionSm)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .accessibilityHidden(true)
+        case .running(.thinking), .running(.streaming):
+            CellularAutomatonLoader.small
+                .frame(width: 20, height: 20)
+                .accessibilityHidden(true)
+        case .running(.awaiting(let action)):
+            Text(action.badgeText)
+                .font(Theme.Fonts.captionSm)
+                .foregroundStyle(Theme.Colors.primary)
+                .lineLimit(1)
+                .padding(.horizontal, Theme.Spacing.sm)
+                .padding(.vertical, 3)
+                .background(Theme.Colors.primary.opacity(0.12), in: Capsule())
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var activityAccessibilityValue: String {
+        switch activity {
+        case .idle(.read): ""
+        case .idle(.unread): L10n.string("Unread")
+        case .idle(.stopped): L10n.string("Stopped")
+        case .running(.thinking), .running(.streaming): L10n.string("Plowing")
+        case .running(.awaiting(let action)): action.accessibilityValue
+        }
+    }
+}
+
+private extension Conversation.Activity.AwaitingAction {
+    var badgeText: String {
+        switch self {
+        case .approval: L10n.string("Approve")
+        case .reply: L10n.string("Reply")
+        case .signIn: L10n.string("Sign in")
+        case .verification: L10n.string("Verify")
+        case .payment: L10n.string("Pay")
+        }
+    }
+
+    var accessibilityValue: String {
+        switch self {
+        case .approval: L10n.string("Awaiting approval")
+        case .reply: L10n.string("Awaiting reply")
+        case .signIn: L10n.string("Awaiting sign in")
+        case .verification: L10n.string("Awaiting verification")
+        case .payment: L10n.string("Awaiting payment")
+        }
+    }
+}
+
+private struct SidebarRowButtonStyle: ButtonStyle {
+    let isActive: Bool
+    let edgeInset: CGFloat
+
+    func makeBody(configuration: Configuration) -> some View {
+        let tinted = isActive || configuration.isPressed
+        return configuration.label
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, 9)
+            .background {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Theme.Colors.onSurface.opacity(tinted ? 0.08 : 0))
+            }
+            .padding(.horizontal, edgeInset - Theme.Spacing.sm)
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
+    }
+}

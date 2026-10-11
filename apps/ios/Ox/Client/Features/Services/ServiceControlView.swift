@@ -37,9 +37,9 @@ struct InlineBotControlView: View {
             activate: nil,
             expand: session.map { session in { expand(session) } },
             cancel: session.map { session in { cancel(session) } },
-            accessibilityIdentifier: A11yID.Chat.Attach.botControl(domain),
-            expandAccessibilityIdentifier: A11yID.Chat.Attach.botControlExpand(domain),
-            cancelAccessibilityIdentifier: A11yID.Chat.Attach.botControlCancel(domain)
+            accessibilityIdentifier: A11yID.ConversationControls.Attach.botControl(domain),
+            expandAccessibilityIdentifier: A11yID.ConversationControls.Attach.botControlExpand(domain),
+            cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.botControlCancel(domain)
         )
     }
 }
@@ -80,9 +80,9 @@ struct InlineServiceAuthView: View {
             activate: nil,
             expand: session.map { session in { expand(session) } },
             cancel: cancel,
-            accessibilityIdentifier: A11yID.Chat.Attach.signIn(domain),
-            expandAccessibilityIdentifier: A11yID.Chat.Attach.signIn(domain) + ".expand",
-            cancelAccessibilityIdentifier: A11yID.Chat.Attach.signInDismiss(domain)
+            accessibilityIdentifier: A11yID.ConversationControls.Attach.signIn(domain),
+            expandAccessibilityIdentifier: A11yID.ConversationControls.Attach.signIn(domain) + ".expand",
+            cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.signInDismiss(domain)
         )
     }
 }
@@ -136,7 +136,7 @@ struct ServiceControlView: View {
                     RequestPillButton(title: String(localized: "Dismiss"), isPrimary: false) {
                         onResolved(nil)
                     }
-                    .accessibilityIdentifier(A11yID.Chat.Attach.signInDismiss(domain))
+                    .accessibilityIdentifier(A11yID.ConversationControls.Attach.signInDismiss(domain))
                 }
                 if case .signIn = control {
                     action
@@ -246,7 +246,7 @@ struct ServiceControlView: View {
             )
             .accessibilityIdentifier(
                 phase == .working
-                    ? A11yID.Chat.Attach.signInProgress(domain)
+                    ? A11yID.ConversationControls.Attach.signInProgress(domain)
                     : accessibilityIdentifier
             )
         } else {
@@ -272,9 +272,9 @@ struct ServiceControlView: View {
 
     private var accessibilityIdentifier: String {
         switch control {
-        case .signIn: A11yID.Chat.Attach.signIn(domain)
-        case .botControl: A11yID.Chat.Attach.botControl(domain)
-        case .payment: A11yID.Chat.Attach.payment(domain)
+        case .signIn: A11yID.ConversationControls.Attach.signIn(domain)
+        case .botControl: A11yID.ConversationControls.Attach.botControl(domain)
+        case .payment: A11yID.ConversationControls.Attach.payment(domain)
         }
     }
 

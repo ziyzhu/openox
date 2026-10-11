@@ -18,7 +18,7 @@ export const cases: EvalCase[] = [
     rules: [{ kind: "answerEquals", value: "42" }, { kind: "noTools" }], rubric: "Correct result, no unnecessary lookup.",
   },
   {
-    id: "latest-instruction", suite: "quick", description: "Follow a correction across real chat turns",
+    id: "latest-instruction", suite: "quick", description: "Follow a correction across real conversation turns",
     prompts: ["For this conversation my preferred city is Paris. Reply only OK, without tools.", "Correction: my preferred city is Tokyo. Reply only with my current preferred city, without tools."],
     rules: [{ kind: "answerEquals", value: "Tokyo" }, { kind: "noTools" }], rubric: "Uses the latest correction.",
   },
@@ -40,17 +40,17 @@ export const cases: EvalCase[] = [
     { id: "guidance-memory-import", path: "import-memory", task: "bringing durable personal context from another AI app into Ox memory" },
     { id: "guidance-service-authoring", path: "evolve", task: "creating and verifying a Local API service" },
   ].map(({ id, path, task }): EvalCase => ({
-    id, suite: "tasks", description: `Read bundled ${path} skill through a real chat`,
+    id, suite: "tasks", description: `Read bundled ${path} skill through a real conversation`,
     prompts: [`Help me prepare for ${task}. Start by reading and printing the matching bundled workflow skill, then briefly summarize the next steps. Only read skills in this turn; do not create or edit files, change settings, attach services, or start the workflow.`],
     rules: [{ kind: "readsSkill", path: `skills/${path}/SKILL.md` }],
     workflow: { kind: "readSkill", path: `skills/${path}/SKILL.md` },
     rubric: "Check the summary against the independently read skill. Successful Action receipts and matching output establish loading; monitored state must remain unchanged. This is discovery, not full workflow verification.",
   })),
   {
-    id: "create-skill", suite: "workflows", description: "Create a real Profile skill and use it in a fresh chat",
+    id: "create-skill", suite: "workflows", description: "Create a real Profile skill and use it in a fresh conversation",
     prompts: [`Create a Profile-owned skill named {{name}}. Its description must be exactly ${JSON.stringify(createSkill.description)}. Its instructions must be exactly ${JSON.stringify(createSkill.instructions)}. Do not add service dependencies or extra resources. Read the bundled skills/manage-skills/SKILL.md authoring skill first. Create only this skill; preserve all other Profile content and settings. Do not invoke it yet.`],
     workflow: createSkill,
     rules: [{ kind: "skillWorks" }],
-    rubric: "Independent file reads must show the requested skill, a fresh chat must actually load it and return its unique token, unrelated monitored state must remain unchanged, and cleanup must remove only the run-owned skill. No state repair is performed.",
+    rubric: "Independent file reads must show the requested skill, a fresh conversation must actually load it and return its unique token, unrelated monitored state must remain unchanged, and cleanup must remove only the run-owned skill. No state repair is performed.",
   },
 ];

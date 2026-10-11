@@ -20,7 +20,7 @@ nonisolated extension BuiltInProviders {
         entries.append(custom(GitHubCopilotProvider(models: modelLookup("github-copilot", .global)), url: GitHubCopilotOAuth.apiURL, api: .openAIResponses))
         entries += profiles(planProfiles, modelLookup: modelLookup)
         let router = OpenRouterProvider.client(models: modelLookup("openrouter", .global))
-        entries.append(custom(router, url: OpenRouterOAuth.apiBaseURL, api: .openAIChatCompletions, options: chatOptions(router), models: chatModels(router)))
+        entries.append(custom(router, url: OpenRouterOAuth.apiBaseURL, api: .openAIChatCompletions, options: conversationOptions(router), models: conversationModels(router)))
         entries += profiles([ModelArkProvider.profile], modelLookup: modelLookup)
         let openai = OpenAIProvider.client(models: modelLookup("openai", .global))
         entries.append(entry(openai, url: (openai.auth as! OpenAIAPIKeyAuth).baseURL, api: .openAIResponses,
@@ -78,7 +78,7 @@ nonisolated extension BuiltInProviders {
                 case .optionalBearer: auth = .init(kind: .bearer, optional: true)
                 }
                 var value = entry(client, url: profile.endpoint.value(for: region), api: .openAIChatCompletions,
-                                  auth: auth, options: chatOptions(client), models: chatModels(client))
+                                  auth: auth, options: conversationOptions(client), models: conversationModels(client))
                 if split {
                     value.definition.id = "\(profile.id):\(region.rawValue)"
                     value.presentation.regions = [region]
@@ -115,13 +115,13 @@ nonisolated extension BuiltInProviders {
                              offer: client.gettingStartedOffer, credentialKind: client.credentialKind, inferenceLocation: client.inferenceLocation)
     }
 
-    private static func chatModels(_ client: OpenAIChatTransport) -> [ProviderDefinition.Model] {
+    private static func conversationModels(_ client: OpenAIChatTransport) -> [ProviderDefinition.Model] {
         client.models.filter { client.supportsTools(for: $0) }.map {
             .init($0, options: client.reasoningReplayModelIDs.contains($0.wireID) ? .init(replayReasoning: true) : nil)
         }
     }
 
-    private static func chatOptions(_ client: OpenAIChatTransport) -> ProviderDefinition.Options {
+    private static func conversationOptions(_ client: OpenAIChatTransport) -> ProviderDefinition.Options {
         let format: String
         var effort: String?
         switch client.reasoningControl {

@@ -11,7 +11,7 @@ Changes affect this installation's active provider catalog across Profiles, not 
 
 ## Inspect and plan
 
-Change durable configuration only when requested. For questions or audits, remain read-only. Use a persisted chat for catalog saves or deletion; temporary chats cannot perform these mutations.
+Change durable configuration only when requested. For questions or audits, remain read-only. Use a persisted conversation for catalog saves or deletion; temporary conversations cannot perform these mutations.
 
 1. Use `ox.provider.list` for sources, regions, availability, authentication, and capabilities. Use `ox.provider.get({ id, purpose })` for complete active definitions and `ox.provider.default({ purpose })` for read-only bundled definitions.
 2. Establish the provider, account type/region, and requested models or outcome. Distinguish native API, subscription, custom compatible endpoint, and website service providers. Do not assume an upstream model is available through a reseller or subscription.
@@ -32,18 +32,18 @@ Use available `ox.web` research functions and normal service Actions to verify u
 
 Start from `get` for an existing provider, or a compatible bundled definition as a structural example for a requested new provider. Use only fields and protocols accepted by the current `ox.provider.validate` contract. Do not reuse another provider's custom adapter identity or OAuth registration to simulate unsupported native behavior. OAuth functionality must use apps registered as OpenOx.
 
-1. Build the complete candidate with only the requested changes; never put credential values in the document, headers, options, files, or chat.
+1. Build the complete candidate with only the requested changes; never put credential values in the document, headers, options, files, or conversation.
 2. Call `ox.provider.validate({ provider: candidate, purpose })`. This checks structure/runtime compatibility without network requests; it does not verify credentials, availability, or model capability.
 3. Re-read the active definition before saving. If it changed since inspection, reconcile against fresh state rather than overwriting another edit.
 4. Call `ox.provider.save({ provider: candidate, purpose })`, then `get` and `list` to verify the intended definition/source and availability. Save models explicitly; saving does not perform discovery.
 
-Updating the catalog is not a request to switch the current chat or new-chat default. Explain any selected model that would become unavailable and resolve the user's intent before removing it. A model-list update alone should not require reconnecting unchanged credentials.
+Updating the catalog is not a request to switch the current conversation or new-conversation default. Explain any selected model that would become unavailable and resolve the user's intent before removing it. A model-list update alone should not require reconnecting unchanged credentials.
 
 ## Connect and verify
 
-Use `ox.provider.authenticate` for native user-entered setup, or `ox.provider.connect` for an existing Secret reference or managed OAuth flow. The agent never receives credential values. Honor destination confirmation, cancellation, and denied approvals; never collect API keys in chat or extract them from website state.
+Use `ox.provider.authenticate` for native user-entered setup, or `ox.provider.connect` for an existing Secret reference or managed OAuth flow. The agent never receives credential values. Honor destination confirmation, cancellation, and denied approvals; never collect API keys in conversation or extract them from website state.
 
-For requested live verification, explain any billable inference or attachment upload and stay within the authorized scope. Exercise the actual configured model through a supported Ox chat/model selection path, not an invented provider-test API. Verify tools or attachments only when claimed: upload success alone does not prove the model can read a file. Authentication status and schema validation are not successful inference. Preserve drafts, existing chats, and the user's working provider.
+For requested live verification, explain any billable inference or attachment upload and stay within the authorized scope. Exercise the actual configured model through a supported Ox conversation/model selection path, not an invented provider-test API. Verify tools or attachments only when claimed: upload success alone does not prove the model can read a file. Authentication status and schema validation are not successful inference. Preserve drafts, existing conversations, and the user's working provider.
 
 Model providers use API transports, including API-backed subscription and OAuth accounts. Websites are services, never model providers. An AI website may be consulted through an explicit service Action; it receives only that Action's supplied inputs, not automatic Ox history, system instructions, or tool declarations. Read `skills/evolve/SKILL.md` when website behavior needs repair.
 

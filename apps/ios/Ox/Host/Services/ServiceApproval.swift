@@ -86,7 +86,7 @@ struct ActionApproval {
         var title = overridePresentation?.title ?? display
         var disclosure = overridePresentation?.message
         if override == nil, action == Actions.appLogs {
-            disclosure = L10n.string("Logs may include private data from other chats and Profiles and become available to the current model. Always allow applies to all app logs.")
+            disclosure = L10n.string("Logs may include private data from other conversations and Profiles and become available to the current model. Always allow applies to all app logs.")
         } else if override == nil, action == "ox.web.browser.exportPdf" {
             let page = serviceManager.browserActionSessions.existingSession(for: ownerID)?.webPage
             let destination = page?.url?.host(percentEncoded: false) ?? L10n.string("Current page")

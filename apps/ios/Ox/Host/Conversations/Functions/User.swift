@@ -1,0 +1,46 @@
+import Foundation
+
+extension Conversation {
+    public func followUser(intents: JSONValue, purpose: String) async throws -> JSONValue? {
+        let parsed = try FollowIntent.parse(intents)
+        try await requireApproval(
+            action: Actions.userFollow,
+            defaultPolicy: Actions.defaultPolicy(for: Actions.userFollow),
+            args: ["count": parsed.count],
+            purpose: purpose
+        )
+        publishFollowIntents(parsed)
+        Log.session.info("Conversation.follow id=\(id) count=\(parsed.count) purposeChars=\(purpose.count)")
+        return nil
+    }
+
+    public func chooseUser(body: String, options: [String], purpose: String) async throws -> JSONValue? {
+        guard (2...4).contains(options.count),
+              options.allSatisfy({ !$0.isEmpty && $0.count <= 80 }),
+              Set(options).count == options.count else {
+            throw RuntimeError.bridge("ox.user.choose: options must contain 2-4 unique labels")
+        }
+        return try await tracked(Actions.userChoose, .object([
+            "body": .string(body),
+            "options": .array(options.map(JSONValue.string)),
+        ]), purpose: purpose) {
+            let answer = await awaitPrompt(prompt: body, options: options, allowsCustomAnswer: true)
+            guard answer != Self.abortedAnswer else {
+                throw OxFunctionError(code: "cancelled", message: "ox.user.choose: the user stopped before answering.", recovery: "Stop. Do not reopen the choice unless the user asks.")
+            }
+            return .string(answer)
+        }
+    }
+
+    public func reportProgress(message: String, purpose: String) async throws -> JSONValue? {
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= 2_000 else {
+            throw RuntimeError.bridge("ox.user.reportProgress: message must contain 1-2000 characters")
+        }
+        return try await tracked(Actions.userReportProgress, .object(["message": .string(trimmed)]), purpose: purpose) {
+            try appendReportedProgress(trimmed)
+            Log.session.info("Conversation.reportProgress id=\(id) chars=\(trimmed.count)")
+            return nil
+        }
+    }
+}

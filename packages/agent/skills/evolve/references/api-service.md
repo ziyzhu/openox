@@ -15,7 +15,7 @@ Authentication configurations:
 - `{ "type": "http", "scheme": "basic" }`, or `scheme: "bearer"`
 - `{ "type": "oauth2", "flow": "authorizationCode", "authorizationURL": "https://accounts.example.com/authorize", "tokenURL": "https://accounts.example.com/token", "clientID": "registered-public-client", "redirectURI": "com.example.app:/callback", "scopes": ["read"], "pkce": "S256" }`
 
-OAuth requires an existing registered public client and its application callback URI. Do not invent a working client ID, use a desktop loopback redirect for an iOS client, or put client secrets in source. Authorization and token URLs must be HTTPS without credentials, query, or fragment. The Host opens the system sign-in flow and refreshes tokens. The user enters API keys, passwords, and bearer tokens through the service sign-in interface; never request them in chat, action inputs, or files.
+OAuth requires an existing registered public client and its application callback URI. Do not invent a working client ID, use a desktop loopback redirect for an iOS client, or put client secrets in source. Authorization and token URLs must be HTTPS without credentials, query, or fragment. The Host opens the system sign-in flow and refreshes tokens. The user enters API keys, passwords, and bearer tokens through the service sign-in interface; never request them in conversation, action inputs, or files.
 
 Mark authenticated capabilities `requireAuth: true`; public capabilities can use false. For authentication use `ox.service.signIn`. Changing the API base URL or authentication configuration requires setup again. Setting credentials does not prove the API accepts them; verify a small authenticated read.
 

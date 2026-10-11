@@ -80,7 +80,7 @@ nonisolated enum OxConversations {
             }
             context.setObject(setModel, forKeyedSubscript: "__nativeConversationSetModel" as NSString)
             let rename: @convention(block) (String, String) -> JSValue = { title, purpose in
-                environment.call { try await $0.renameChat(title: title, purpose: purpose) }
+                environment.call { try await $0.renameConversation(title: title, purpose: purpose) }
             }
             context.setObject(rename, forKeyedSubscript: "__nativeConversationRename" as NSString)
             let start: @convention(block) (String, String, String) -> JSValue = { prompt, title, purpose in

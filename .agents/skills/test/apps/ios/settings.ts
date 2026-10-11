@@ -9,7 +9,7 @@ import { iosTarget } from "../../../setup/scripts/ios.ts";
 import { waitForHost } from "./host.ts";
 
 const config = qaCommand({
-  usage: "Usage: bun .agents/skills/test/apps/ios/settings.ts --device ox-N --host <ws-url> --app <Ox.app> [--output <directory>]\nRequires an idle, booted, reserved simulator with Host access already enabled. Exercises settings through ox, relaunches the installed build, and restores preferences and the previous saved chat.",
+  usage: "Usage: bun .agents/skills/test/apps/ios/settings.ts --device ox-N --host <ws-url> --app <Ox.app> [--output <directory>]\nRequires an idle, booted, reserved simulator with Host access already enabled. Exercises settings through ox, relaunches the installed build, and restores preferences and the previous saved conversation.",
   options: { host: { type: "string" }, app: { type: "string" }, output: { type: "string" } },
 });
 if (!config.values.device || !config.values.host || !config.values.app) throw new Error("Pass --device, --host, and --app explicitly");
@@ -33,7 +33,7 @@ type Selection = { selection: string };
 type Repository = { id: string; enabled: boolean; state: string };
 type DefaultModel = { configured: boolean; provider: { id: string }; model: { id: string }; thinkingLevel: string | null; authentication: { status: string } };
 let chat: string | undefined;
-let previousChat: string | undefined;
+let previousConversation: string | undefined;
 let baseline: { language: Selection; theme: Selection; repository: Repository; defaultModel: DefaultModel } | undefined;
 const results: unknown[] = [];
 
@@ -43,7 +43,7 @@ async function ox(...args: string[]): Promise<any> {
 }
 
 async function call(name: string, args: Record<string, unknown> = {}): Promise<any> {
-  assert.ok(chat, "A temporary QA chat is required");
+  assert.ok(chat, "A temporary QA conversation is required");
   const result = await ox("--chat", chat!, "vm", "call", name, "--args", JSON.stringify({ ...args, purpose: "Verify settings controls" }));
   results.push({ name, args, value: result.value });
   return result.value;
@@ -72,8 +72,8 @@ async function waitForSavedDefaultModel(): Promise<void> {
   throw new Error("Default model has not reached on-device preferences; do not terminate before persistence");
 }
 
-async function newChat(): Promise<void> {
-  const created = await ox("chat", "new", "--temporary", "--provider", "mock", "--model", "mock");
+async function newConversation(): Promise<void> {
+  const created = await ox("conversation", "new", "--temporary", "--provider", "mock", "--model", "mock");
   assert.equal(typeof created.chatId, "string");
   chat = created.chatId;
 }
@@ -82,25 +82,25 @@ const release = claimSimulator(config.device);
 try {
   assert.ok(await requireSimulator(config.device), "Boot the reserved simulator before testing");
   await ox("host", "describe", "--timeout", "3000");
-  const active = await ox("chat", "list", "--active");
-  previousChat = active[0]?.id;
-  if (previousChat) {
-    const snapshot = await ox("--chat", previousChat, "chat", "inspect");
-    assert.equal(snapshot.isBusy, false, "Do not interrupt a running chat");
-    const inspected = await ox("--chat", previousChat, "vm", "inspect");
-    assert.equal(inspected.value.session.temporary, false, "Preserve or close the temporary chat before testing");
+  const active = await ox("conversation", "list", "--active");
+  previousConversation = active[0]?.id;
+  if (previousConversation) {
+    const snapshot = await ox("--chat", previousConversation, "conversation", "inspect");
+    assert.equal(snapshot.isBusy, false, "Do not interrupt a running conversation");
+    const inspected = await ox("--chat", previousConversation, "vm", "inspect");
+    assert.equal(inspected.value.session.temporary, false, "Preserve or close the temporary conversation before testing");
   }
   for (const name of ["ox.app.setLanguage", "ox.app.setTheme", "ox.repository.enable", "ox.app.setDefaultModel", "ox.conversation.setModel", "ox.conversation.model", "ox.conversation.rename", "ox.repository.list"]) {
     const help = await ox("vm", "help", name);
     assert.equal(help.name, name);
   }
-  await newChat();
+  await newConversation();
   const language = await call("ox.app.language");
   const theme = await call("ox.app.theme");
   const aliases = await ox("--chat", chat!, "vm", "eval", "--script", `return [
     [ox.app.model, ox.conversation.model],
     [ox.app.setModel, ox.conversation.setModel],
-    [ox.app.renameChat, ox.conversation.rename],
+    [ox.app.renameConversation, ox.conversation.rename],
     [ox.app.repositories, ox.repository.list],
   ].every(([previous, current]) => previous === current && previous.help() === current.help())
     && !["model", "setModel", "renameChat", "repositories"].some(name => Object.keys(ox.app).includes(name));`);
@@ -174,7 +174,7 @@ try {
   await ios.launch(bundle, app, { OX_DEBUG_ENDPOINT: config.debugEndpoint, OX_HOST_LOOPBACK: endpoint.hostname === "127.0.0.1" ? "1" : "0" });
   await ios.wait({ id: "chat.temporaryToggle" }, { timeout: 30_000, stable: 1000 });
   await waitForHost(endpoint.href, () => ox("host", "describe", "--timeout", "1000"));
-  await newChat();
+  await newConversation();
   assert.equal((await call("ox.app.defaultModel")).model.id, "mock-text-only");
   assert.equal((await call("ox.app.language")).selection, "zh-Hans");
   assert.equal((await call("ox.app.theme")).selection, "dark");
@@ -185,7 +185,7 @@ try {
   process.exitCode = 1;
 } finally {
   if (baseline) {
-    if (!chat) await newChat().catch(error => { console.error(`Cleanup chat unavailable: ${error}`); process.exitCode = 1; });
+    if (!chat) await newConversation().catch(error => { console.error(`Cleanup chat unavailable: ${error}`); process.exitCode = 1; });
     for (const [name, args, reader, expected] of [
       ["ox.app.setLanguage", { selection: baseline.language.selection }, "ox.app.language", baseline.language.selection],
       ["ox.app.setTheme", { selection: baseline.theme.selection }, "ox.app.theme", baseline.theme.selection],
@@ -205,8 +205,8 @@ try {
     }
   }
   if (chat) {
-    const restore = previousChat ? ["--chat", previousChat, "chat", "open"] : ["chat", "new", "--temporary"];
-    await ox(...restore).catch(error => { console.error(`Chat restoration failed: ${error}`); process.exitCode = 1; });
+    const restore = previousConversation ? ["--chat", previousConversation, "conversation", "open"] : ["conversation", "new", "--temporary"];
+    await ox(...restore).catch(error => { console.error(`Conversation restoration failed: ${error}`); process.exitCode = 1; });
   }
   try { await writeFile(join(evidence, "results.json"), JSON.stringify(results, null, 2), { mode: 0o600 }); }
   finally { release(); }

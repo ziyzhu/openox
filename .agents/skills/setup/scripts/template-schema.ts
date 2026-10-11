@@ -126,17 +126,17 @@ export function parseTemplate(value: unknown): DeviceTemplate {
     if ([profile.memory, profile.soul].some(text => text !== undefined && new TextEncoder().encode(text).length > 200 * 1024)) throw new Error("Profile document exceeds Ox's text size limit");
     unique((profile.files ?? []).map(file => relativeStoragePath(file.path)), "Profile file path");
     for (const file of profile.files ?? []) {
-      if (/^(conversations|history|chats|MEMORY\.md|SOUL\.md)(\/|$)/.test(file.path)) throw new Error("Use chat files or memory/soul fields for reserved Profile paths");
+      if (/^(conversations|history|chats|MEMORY\.md|SOUL\.md)(\/|$)/.test(file.path)) throw new Error("Use conversation files or memory/soul fields for reserved Profile paths");
     }
-    unique((profile.chats ?? []).map(chat => chat.id), "chat ID");
+    unique((profile.chats ?? []).map(chat => chat.id), "conversation ID");
     for (const chat of profile.chats ?? []) {
-      if ((chat.messages !== undefined) === (chat.packageFrom !== undefined) || chat.packageFrom && chat.files?.length) throw new Error("Chat must declare messages or packageFrom, not both");
+      if ((chat.messages !== undefined) === (chat.packageFrom !== undefined) || chat.packageFrom && chat.files?.length) throw new Error("Conversation must declare messages or packageFrom, not both");
       const files = chat.files ?? [];
-      unique(files.map(file => file.id), "chat file ID");
-      unique(files.map(file => relativeStoragePath(file.name).toLowerCase()), "chat filename");
-      if (files.some(file => file.name.includes("/"))) throw new Error("Chat filenames must be basenames");
+      unique(files.map(file => file.id), "conversation file ID");
+      unique(files.map(file => relativeStoragePath(file.name).toLowerCase()), "conversation filename");
+      if (files.some(file => file.name.includes("/"))) throw new Error("Conversation filenames must be basenames");
       for (const message of chat.messages ?? []) {
-        if (message.role === "user" && message.attachments?.some(id => !files.some(file => file.id === id))) throw new Error("Unknown chat attachment ID");
+        if (message.role === "user" && message.attachments?.some(id => !files.some(file => file.id === id))) throw new Error("Unknown conversation attachment ID");
       }
     }
   }

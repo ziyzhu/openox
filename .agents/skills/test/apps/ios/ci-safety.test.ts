@@ -32,7 +32,7 @@ if (args[0] !== "apps/cli/src/ox.ts") {
   process.exit(await child.exited);
 }
 appendFileSync(Bun.env.IOS_TRACE, JSON.stringify(["ox", ...args.slice(1)]) + "\\n");
-const command = args[args.indexOf("chat") + 1];
+const command = args[args.indexOf("conversation") + 1];
 const text = "Sorry that took a moment.";
 const snapshot = { id: "fixture-chat", model: { id: "mock" }, isBusy: false, messages: [{ content: text }] };
 const result = command === "list" ? [] : command === "new" ? { chatId: "fixture-chat", temporary: Bun.env.IOS_TEMPORARY === "true", model: "mock:mock" }
@@ -102,9 +102,9 @@ test("iOS CI orchestrates a Mock smoke against stubbed native/Ox commands", asyn
   }
 });
 
-test("iOS CI refuses a non-temporary chat before submitting a model prompt", async () => {
+test("iOS CI refuses a non-temporary conversation before submitting a model prompt", async () => {
   const result = await ios(["--device", "ox-5", "--loopback"], "Booted", false, false);
   expect(result.code).toBe(1);
-  expect(result.stderr).toContain("requested temporary Mock chat");
+  expect(result.stderr).toContain("requested temporary Mock conversation");
   expect(result.calls.some(call => call.includes("send"))).toBe(false);
 });

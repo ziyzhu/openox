@@ -1,7 +1,7 @@
 import SwiftUI
 
 extension View {
-    func chatCardOutline(cornerRadius: CGFloat = Theme.Radius.lg) -> some View {
+    func conversationCardOutline(cornerRadius: CGFloat = Theme.Radius.lg) -> some View {
         overlay {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .strokeBorder(Theme.Colors.onSurfaceMuted.opacity(0.18), lineWidth: 1)

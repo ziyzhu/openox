@@ -136,7 +136,12 @@ nonisolated struct ScheduledSkill: Codable, Equatable, Identifiable, Sendable {
     let createdAt: Date
     var lastRunAt: Date?
     var lastOutcome: ScheduledSkillRunOutcome?
-    var lastChatID: UUID?
+    var lastConversationID: UUID?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, profileID, skill, argument, recurrence, nextFireAt, isEnabled, createdAt, lastRunAt, lastOutcome
+        case lastConversationID = "lastChatID"
+    }
 
     var expandedIntent: String {
         UserSkillInvocation(skill: skill, argument: argument).expandedIntent
@@ -336,7 +341,7 @@ final class ScheduledSkills {
     func record(
         id: UUID,
         outcome: ScheduledSkillRunOutcome,
-        chatID: UUID?,
+        conversationID: UUID?,
         at date: Date = Date()
     ) throws {
         try requireLoaded()
@@ -344,7 +349,7 @@ final class ScheduledSkills {
         var updated = all
         updated[index].lastRunAt = date
         updated[index].lastOutcome = bounded(outcome)
-        updated[index].lastChatID = chatID
+        updated[index].lastConversationID = conversationID
         updated[index].nextFireAt = updated[index].recurrence.next(after: date)
         if updated[index].nextFireAt == nil { updated[index].isEnabled = false }
         try save(updated, reason: "run", scheduleID: id)

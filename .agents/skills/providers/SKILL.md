@@ -12,15 +12,15 @@ Ox owns provider and model management through `skills/manage-providers/SKILL.md`
 Read the `ios-simulator` and `ox-cli` skills. Follow simulator ownership and data-preservation rules; use the selected device and matching Host endpoint.
 
 1. Establish whether the request is for an on-device change, bundled defaults, or native runtime support. On-device management does not authorize publication.
-2. Drive a real Ox chat through `skills/manage-providers/SKILL.md`. Let Ox inspect, research, propose, validate, save, and verify supported catalog changes. Do not substitute direct catalog edits for this workflow.
-3. Observe chat history, provider state, and structured logs. Report missing capabilities or unclear boundaries; improve the shared guidance or runtime and exercise the workflow again.
+2. Drive a real Ox conversation through `skills/manage-providers/SKILL.md`. Let Ox inspect, research, propose, validate, save, and verify supported catalog changes. Do not substitute direct catalog edits for this workflow.
+3. Observe conversation history, provider state, and structured logs. Report missing capabilities or unclear boundaries; improve the shared guidance or runtime and exercise the workflow again.
 4. Preserve sanitized verification evidence outside the repository. State separately which definitions were validated, which models were exercised, and which checks remain unperformed.
 
 ## Promote bundled defaults
 
 Only promote when the user requests a bundled update. Read the matching provider reference below and verify unstable metadata against first-party sources.
 
-- Export the verified definitions with `ox.provider.get` through the chat VM. Exclude credentials, personal configuration, unrelated overrides, and account-specific availability.
+- Export the verified definitions with `ox.provider.get` through the conversation VM. Exclude credentials, personal configuration, unrelated overrides, and account-specific availability.
 - Review the focused diff against `ox.provider.default` and the owning source files. Preserve provider identities, regional/subscription boundaries, intentional token caps, and request policy.
 - Translate the reviewed changes into the existing bundled sources; do not introduce a second runtime catalog. `provider-models.json` owns models.dev selections and metadata; `CuratedProviderModels.swift` owns reviewed models absent from that catalog. Provider Swift composition owns exact endpoints, credentials, transport selection, and request options.
 - For models.dev-backed changes, update source selections and affected ID/display-name overrides before `bun run update:llms`. The command refreshes selected sources; it does not discover successors. Keep capability/status checks intact and review model-specific thinking/reasoning lists against wire IDs, including provider prefixes.

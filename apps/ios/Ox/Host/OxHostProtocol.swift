@@ -26,44 +26,44 @@ enum OxHostProtocol {
             }
             return try JSONDecoder().decode(type, from: data)
         }
-        let chats = host.conversations
+        let conversations = host.conversations
         let services = host.services
         switch method {
-        case .durableStorage, .durableChat:
-            try handleDurableExperiment(method, params: params, chats: chats, reply: reply)
+        case .durableStorage, .durableConversation:
+            try handleDurableExperiment(method, params: params, conversations: conversations, reply: reply)
         case .describe:
             _ = try decode(EmptyRequest.self)
             reply.success(OxHostRPC.description)
-        case .invokeAction: handleInvokeAction(try decode(ActionRequest.self), conversationManager: chats, serviceManager: services, reply: reply)
+        case .invokeAction: handleInvokeAction(try decode(ActionRequest.self), conversationManager: conversations, serviceManager: services, reply: reply)
         case .evaluate: handleEvaluate(try decode(EvaluateRequest.self), serviceManager: services, reply: reply)
         case .reloadService: handleReloadService(try decode(ServiceRequest.self), serviceManager: services, reply: reply)
         case .refreshServiceAuth: handleRefreshServiceAuth(try decode(ServiceRequest.self), serviceManager: services, reply: reply)
         case .listServices: handleListServices(try decode(EmptyRequest.self), serviceManager: services, reply: reply)
         case .syncServices: handleSyncServices(try decode(EmptyRequest.self), serviceManager: services, reply: reply)
-        case .listChats: handleListChats(try decode(EmptyRequest.self), host: host, reply: reply)
-        case .getChat: handleGetChat(try decode(SessionRequest.self), conversationManager: chats, reply: reply)
-        case .openChat: handleOpenChat(try decode(SessionRequest.self), conversationManager: chats, reply: reply)
-        case .respondChat: handleRespondChat(try decode(RespondChatRequest.self), conversationManager: chats, reply: reply)
-        case .newChat: handleNewChat(try decode(NewChatRequest.self), conversationManager: chats, reply: reply)
-        case .sendChat: handleSendChat(try decode(SendChatRequest.self), conversationManager: chats, reply: reply)
-        case .stopChat: handleStopChat(try decode(SessionRequest.self), conversationManager: chats, reply: reply)
+        case .listConversations: handleListConversations(try decode(EmptyRequest.self), host: host, reply: reply)
+        case .getConversation: handleGetConversation(try decode(SessionRequest.self), conversationManager: conversations, reply: reply)
+        case .openConversation: handleOpenConversation(try decode(SessionRequest.self), conversationManager: conversations, reply: reply)
+        case .respondConversation: handleRespondConversation(try decode(RespondConversationRequest.self), conversationManager: conversations, reply: reply)
+        case .newConversation: handleNewConversation(try decode(NewConversationRequest.self), conversationManager: conversations, reply: reply)
+        case .sendConversation: handleSendConversation(try decode(SendConversationRequest.self), conversationManager: conversations, reply: reply)
+        case .stopConversation: handleStopConversation(try decode(SessionRequest.self), conversationManager: conversations, reply: reply)
         case .listProviders: handleListProviders(try decode(EmptyRequest.self), reply: reply)
         case .getLogs: handleGetLogs(try decode(GetLogsRequest.self), reply: reply)
         case .getComposerFormatting: ClientAutomation.handleGetComposerFormatting(try decode(EmptyRequest.self), reply: reply)
-        case .repositoryGate: handleRepositorySaveGate(try decode(RepositoryGateRequest.self), conversationManager: chats, reply: reply)
+        case .repositoryGate: handleRepositorySaveGate(try decode(RepositoryGateRequest.self), conversationManager: conversations, reply: reply)
         case .vmInspect:
             let request = try decode(VMRequest.self)
-            Task { await handleVMInspect(request, conversationManager: chats, reply: reply) }
+            Task { await handleVMInspect(request, conversationManager: conversations, reply: reply) }
         case .vmFunctions: handleVMFunctions(try decode(VMFunctionsRequest.self), reply: reply)
-        case .vmCall: handleVMCall(try decode(VMCallRequest.self), conversationManager: chats, reply: reply)
-        case .vmEval: handleVMEval(try decode(VMEvalRequest.self), conversationManager: chats, reply: reply)
+        case .vmCall: handleVMCall(try decode(VMCallRequest.self), conversationManager: conversations, reply: reply)
+        case .vmEval: handleVMEval(try decode(VMEvalRequest.self), conversationManager: conversations, reply: reply)
         case .bootstrapFiles: handleBootstrapFiles(try decode(BootstrapFilesRequest.self), reply: reply)
         case .writeFile: handleWriteFile(try decode(WriteFileRequest.self), reply: reply)
         case .exportWebsiteData: handleExportWebsiteData(try decode(EmptyRequest.self), serviceManager: services, reply: reply)
         case .restoreWebsiteData: handleRestoreWebsiteData(try decode(RestoreWebsiteDataRequest.self), serviceManager: services, reply: reply)
         case .setKey: handleSetKey(try decode(SetKeyRequest.self), reply: reply)
         case .setRegion: handleSetRegion(try decode(SetRegionRequest.self), reply: reply)
-        case .setAttachedService: handleSetAttachedService(try decode(SetAttachedServiceRequest.self), conversationManager: chats, serviceManager: services, reply: reply)
+        case .setAttachedService: handleSetAttachedService(try decode(SetAttachedServiceRequest.self), conversationManager: conversations, serviceManager: services, reply: reply)
         case .setComposerDraft: ClientAutomation.handleSetComposerDraft(try decode(PromptRequest.self), reply: reply)
         case .setComposerMarkedText: ClientAutomation.handleSetComposerMarkedText(try decode(PromptRequest.self), reply: reply)
         case .setPasteboardImage: ClientAutomation.handleSetPasteboardImage(try decode(EmptyRequest.self), reply: reply)

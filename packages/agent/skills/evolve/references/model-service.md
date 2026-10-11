@@ -6,7 +6,7 @@ Use the normal web-service discovery, copy-to-Local, conflict resolution, valida
 
 Read `references/model-schemas.md` for the exact `conversation` schema. It supports `submit`, `read`, and `cancel` on one Host-owned page. Keep the normal label, authentication, and approval fields; do not change the manifest format or standard schemas. Legacy model-generation Actions remain reserved for installed-service validation, not agent execution or ordinary tool discovery. Do not author new ones.
 
-- Pages belong separately to the calling chat, Canvas, or direct Client. They share website accounts, not DOM, session storage, conversation references, or submissions. Keep website state in the page installer closure.
+- Pages belong separately to the calling conversation, Canvas, or direct Client. They share website accounts, not DOM, session storage, conversation references, or submissions. Keep website state in the page installer closure.
 - `submit` receives explicit messages, options, and attachment references. Reject unsupported input before submission. Submit once, return promptly, and retain asynchronous work on the page. Never queue or retry implicitly.
 - Report acceptance as uncertain unless verified against the website's remote conversation and message identities. An exception after possible acceptance must not trigger resubmission. Keep the original failure in diagnostics.
 - Return page-local submission and conversation IDs. The Host wraps these in process-local opaque handles; archived handles cannot restore work after page or process loss.

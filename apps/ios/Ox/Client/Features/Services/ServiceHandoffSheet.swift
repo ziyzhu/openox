@@ -42,7 +42,7 @@ struct BotControlSheetView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    SheetDismissToolbarButton(accessibilityIdentifier: A11yID.Chat.Attach.botControlCancel(session.serviceDomain)) {
+                    SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ConversationControls.Attach.botControlCancel(session.serviceDomain)) {
                         session.cancel()
                         dismiss()
                     }

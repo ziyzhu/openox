@@ -18,7 +18,7 @@ When returning work to Ox for authoring or repair, follow the `ox-cli` skill's s
 
 ## Export the Local source
 
-Read `service.json`, `actions.js`, Local Git status, and the exact saved Local revision through Ox's debug or service-management APIs. Export from the virtual filesystem into a private temporary directory outside the repository. Do not reconstruct source from chat text or logs.
+Read `service.json`, `actions.js`, Local Git status, and the exact saved Local revision through Ox's debug or service-management APIs. Export from the virtual filesystem into a private temporary directory outside the repository. Do not reconstruct source from conversation text or logs.
 
 Compare the exported source with any existing built-in service and report behavioral differences before replacing it. Preserve unrelated built-in changes.
 

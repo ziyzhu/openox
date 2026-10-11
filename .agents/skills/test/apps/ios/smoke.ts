@@ -69,7 +69,7 @@ const release = claimSimulator(config.device);
 let bootedByCi = false;
 let launched = false;
 let chatId: string | undefined;
-let previousChat: string | undefined;
+let previousConversation: string | undefined;
 let evidence: string | undefined;
 let completed = false;
 try {
@@ -88,21 +88,21 @@ try {
   });
   await writeFile(join(evidence, "launch.json"), JSON.stringify(launch), { mode: 0o600 });
   await waitForHost();
-  const rows = await ox("chat", "list", "--active") as Array<{ id: string }>;
-  previousChat = rows[0]?.id;
-  const created = await ox("chat", "new", "--temporary", "--provider", "mock", "--model", "mock");
+  const rows = await ox("conversation", "list", "--active") as Array<{ id: string }>;
+  previousConversation = rows[0]?.id;
+  const created = await ox("conversation", "new", "--temporary", "--provider", "mock", "--model", "mock");
   if (typeof created.chatId !== "string" || !created.chatId || created.temporary !== true || created.model !== "mock:mock") {
-    throw new Error("Host did not return the requested temporary Mock chat");
+    throw new Error("Host did not return the requested temporary Mock conversation");
   }
   chatId = created.chatId;
-  const outcome = await ox("--chat", chatId!, "chat", "send", "2", "--timeout", "60000");
+  const outcome = await ox("--chat", chatId!, "conversation", "send", "2", "--timeout", "60000");
   if (outcome.outcome !== "completed" || outcome.text !== "Sorry that took a moment.") {
     throw new Error(`Mock chat did not complete as expected: ${JSON.stringify(outcome)}`);
   }
-  const snapshot = await ox("--chat", chatId!, "chat", "inspect", "--full");
+  const snapshot = await ox("--chat", chatId!, "conversation", "inspect", "--full");
   if (snapshot.id !== chatId || snapshot.model?.id !== "mock" || snapshot.isBusy
       || !JSON.stringify(snapshot.messages).includes(outcome.text)) {
-    throw new Error("Completed Mock chat snapshot is missing its reply");
+    throw new Error("Completed Mock conversation snapshot is missing its reply");
   }
   await writeFile(join(evidence, "chat.json"), JSON.stringify({ outcome, snapshot }, null, 2), { mode: 0o600 });
   await ios.wait({ id: "chat.message.agent" }, { timeout: 10_000 });
@@ -114,12 +114,12 @@ try {
 } finally {
   try {
     if (chatId) {
-      await run(["bun", "apps/cli/src/ox.ts", "--host", endpoint, "--chat", chatId, "chat", "stop", "--timeout", "5000"], { allowFailure: true });
-      const restore = previousChat
-        ? ["--chat", previousChat, "chat", "open"] : ["chat", "new", "--temporary"];
+      await run(["bun", "apps/cli/src/ox.ts", "--host", endpoint, "--chat", chatId, "conversation", "stop", "--timeout", "5000"], { allowFailure: true });
+      const restore = previousConversation
+        ? ["--chat", previousConversation, "conversation", "open"] : ["conversation", "new", "--temporary"];
       const result = await run(["bun", "apps/cli/src/ox.ts", "--host", endpoint, ...restore, "--timeout", "5000"], { allowFailure: true });
       if (result.code !== 0) {
-        console.error("Could not restore the previous chat; restore it in Ox before releasing the simulator");
+        console.error("Could not restore the previous conversation; restore it in Ox before releasing the simulator");
         process.exitCode ||= 1;
       }
     }

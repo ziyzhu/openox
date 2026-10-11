@@ -240,7 +240,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 ## 7. Verify in iOS
 
 1. Read every changed file back.
-2. Call `ox.service.validate` with the Local service's bare domain, then `ox.service.attach`. Validation checks the whole draft without invoking its actions; attach loads it when missing or reloads this chat's existing attachment from the current source. Repeat after another coherent set of edits is ready to test.
+2. Call `ox.service.validate` with the Local service's bare domain, then `ox.service.attach`. Validation checks the whole draft without invoking its actions; attach loads it when missing or reloads this conversation's existing attachment from the current source. Repeat after another coherent set of edits is ready to test.
 3. Inspect the action index and full contract for every exposed action.
 4. Compare manifest and installer parity: every declared ID has one handler, every handler is declared, every input is consumed, defaults validate, and cursor inputs advance results.
 5. Invoke each changed action with a small success case. For already completed bootstrap mutations, inspect resulting state read-only and mark unexecuted handlers partially verified.
@@ -250,11 +250,11 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 9. Request separate approval before invoking a live mutation; follow the bootstrap single-execution rule.
 10. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
 11. Inspect repository skills that depend on this service when action IDs or contracts changed and identify skills that need revision through `skills/manage-skills/SKILL.md`.
-12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this chat.
+12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this conversation.
 13. For customer-facing services, verify the stable HTTPS favicon URL loads anonymously through the native image loader within its format, size, and redirect limits. Reload the service and visually confirm its avatar represents the product in light and dark mode. Preserve a working icon; otherwise try official candidates, including usable smaller images, before Google's cache. If none works, report the limitation without blocking service delivery or Save.
 14. Stop capture with `discard: true` and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion, saving, or ending an abandoned or blocked run.
 
-Evaluate semantic usefulness as well as contract validity. The persisted catalog and search index provide routing in current and future chats.
+Evaluate semantic usefulness as well as contract validity. The persisted catalog and search index provide routing in current and future conversations.
 
 ## 8. Review and save
 

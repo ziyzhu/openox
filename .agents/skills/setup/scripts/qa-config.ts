@@ -21,8 +21,14 @@ type QaCommand<T extends ParseArgsOptionsConfig> = {
 };
 
 export function qaCommand<T extends ParseArgsOptionsConfig>(command: QaCommand<T>) {
+  const aliases: Record<string, string> = { "--conversation": "--chat", "--temporary-conversation": "--temporary-chat" };
+  const args = Bun.argv.slice(2).map(argument => {
+    const flag = argument.split("=", 1)[0]!;
+    const alias = aliases[flag];
+    return alias && command.options?.[alias.slice(2)] ? alias + argument.slice(flag.length) : argument;
+  });
   const { values, positionals } = parseArgs({
-    args: Bun.argv.slice(2),
+    args,
     options: { ...command.options, device: { type: "string" }, help: { type: "boolean", short: "h" } } as T & {
       device: { type: "string" };
       help: { type: "boolean"; short: "h" };

@@ -82,7 +82,7 @@ previews live under `Development`; these do not define a separate Host privilege
 - **Ox Agent** — The reasoning and tool-using process that pursues the user’s goals using the selected model, the state in an Ox Profile, and the capabilities exposed through the Ox VM.
 - **Ox Model Provider** — The language model selected by the user. OpenOx does not prescribe a model or provider; the Host adapts provider-specific APIs to the provider-neutral agent loop. API-backed subscription and OAuth accounts are supported. AI websites remain callable services, not browser-backed model providers.
 - **Ox Profile** — A portable folder containing the Agent’s persistent state: its identity, memory, skills, files, and conversation history. This keeps the Ox’s state independent of a particular Client or model.
-- **Ox VM** — The execution environment supplied by an Ox Host. The Agent writes and runs code inside the VM without direct access to the network, Host filesystem, or device. Instead, it uses explicit `ox.*` capabilities to interact with the Profile, services, websites, users, and device capabilities. The `ox.fs` virtual filesystem presents Profile content, skills, services, chats, and user-granted files while preserving each source’s permissions.
+- **Ox VM** — The execution environment supplied by an Ox Host. The Agent writes and runs code inside the VM without direct access to the network, Host filesystem, or device. Instead, it uses explicit `ox.*` capabilities to interact with the Profile, services, websites, users, and device capabilities. The `ox.fs` virtual filesystem presents Profile content, skills, services, conversations, and user-granted files while preserving each source’s permissions.
 - **Ox Repository** — A versioned collection of services and reusable skills described by a `repository.json` manifest. Each Ox Host manages an editable Local repository and can install compatible remote repositories. Services expose typed Actions; repository-root skill packages teach workflows that can combine several services. System, repository, and Profile skills share one catalog with explicit source selection for conflicting names.
 
   - **Device services** are supplied by the Host’s platform adapters and expose capabilities such as Browser.
@@ -99,7 +99,7 @@ With an attached Browser capability, an Ox can navigate and inspect a website, p
 
 1. The Agent invokes Browser or another attached service from the VM to gather evidence for the required capability.
 2. The Agent uses `ox.fs` to write or revise the service manifest, actions, and repository-root skills in its Local Repository.
-3. The Host validates each source mutation, and the Agent uses `ox.service.attach` to load or reload the service for the chat.
+3. The Host validates each source mutation, and the Agent uses `ox.service.attach` to load or reload the service for the conversation.
 4. The Agent can invoke new actions later in the same turn or in subsequent turns. New skills guide subsequent agent work.
 5. Local Git can record the changes for inspection, reversal, and publication.
 

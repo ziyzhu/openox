@@ -143,7 +143,7 @@ struct ServiceExplorerView: View {
                     LazyVStack(spacing: 0) {
                         if isRefreshingServices {
                             MonoRepositoryLoadingStatus(
-                                accessibilityIdentifier: A11yID.Chat.Attach.servicesLoading
+                                accessibilityIdentifier: A11yID.ConversationControls.Attach.servicesLoading
                             )
                         }
                         if filter == .mcp {
@@ -156,7 +156,7 @@ struct ServiceExplorerView: View {
                                 row(match)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityIdentifier(A11yID.Chat.Attach.service(match.service.domain))
+                            .accessibilityIdentifier(A11yID.ConversationControls.Attach.service(match.service.domain))
                             .onAppear { extendIfNeeded(match) }
                         }
                     }
@@ -172,7 +172,7 @@ struct ServiceExplorerView: View {
         .toolbar {
             if let onClose {
                 ToolbarItem(placement: .topBarLeading) {
-                    SheetDismissToolbarButton(accessibilityIdentifier: A11yID.Chat.Attach.close) {
+                    SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ConversationControls.Attach.close) {
                         endSearch()
                         onClose()
                     }
@@ -182,12 +182,12 @@ struct ServiceExplorerView: View {
                 filterMenu
             }
         }
-        .oxSearchable(text: $query, isPresented: $searchPresented, prompt: Text("Search services"), accessibilityIdentifier: A11yID.Chat.Attach.search)
+        .oxSearchable(text: $query, isPresented: $searchPresented, prompt: Text("Search services"), accessibilityIdentifier: A11yID.ConversationControls.Attach.search)
         .alert("Connect remote MCP", isPresented: $connectingMCP) {
             TextField("https://example.com/mcp", text: $mcpEndpoint)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .accessibilityIdentifier(A11yID.Chat.Attach.mcpEndpoint)
+                .accessibilityIdentifier(A11yID.ConversationControls.Attach.mcpEndpoint)
                 .onAppear { styleMCPPlaceholder() }
             Button("Cancel", role: .cancel) {}
             Button("Connect") {
@@ -254,7 +254,7 @@ struct ServiceExplorerView: View {
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
         }
-        .accessibilityIdentifier(A11yID.Chat.Attach.filter)
+        .accessibilityIdentifier(A11yID.ConversationControls.Attach.filter)
     }
 
     private var searchKey: String {
@@ -327,7 +327,7 @@ struct ServiceExplorerView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier(A11yID.Chat.Attach.connectMCP)
+        .accessibilityIdentifier(A11yID.ConversationControls.Attach.connectMCP)
     }
 
     private func row(_ match: ServiceManager.ServiceMatch) -> some View {
@@ -434,7 +434,7 @@ private struct RemoteMCPDetailView: View {
                         attempt += 1
                     }
                     .buttonStyle(OxChipButton(filled: true))
-                    .accessibilityIdentifier(A11yID.Chat.Attach.retryMCP(request.id))
+                    .accessibilityIdentifier(A11yID.ConversationControls.Attach.retryMCP(request.id))
                 }
             }
             .padding(.horizontal, Theme.Spacing.lg)
@@ -443,7 +443,7 @@ private struct RemoteMCPDetailView: View {
         .background(Theme.Colors.background)
         .navigationTitle(request.name)
         .navigationBarTitleDisplayMode(.inline)
-        .accessibilityIdentifier(A11yID.Chat.Attach.mcpConnecting(request.id))
+        .accessibilityIdentifier(A11yID.ConversationControls.Attach.mcpConnecting(request.id))
     }
 
     private func connect() async {

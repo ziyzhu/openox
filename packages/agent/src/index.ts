@@ -1,4 +1,3 @@
-/** Host-neutral entry: no runtime shims, native globals, or application chat binding required. */
 export { openProfileRuntime, ProfileRuntime, type ProfileRuntimeOptions, type CommittedEvent } from "./profile/runtime";
 export { ProfileFiles, ProfileFile, ProfileIndex, LegacyProfileFile, canonical } from "./profile/files";
 export { profileEnv, profileMounts } from "./profile/filesystem";

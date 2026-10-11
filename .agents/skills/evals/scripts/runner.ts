@@ -82,16 +82,16 @@ async function main(): Promise<void> {
   --qa-profile <name>      Required named local QA Profile for workflows
   --case <id>        Run one case instead of a suite
   --repeat <1..20>   Repetitions per case (default 1)
-  --timeout <ms>    Per-case chat deadline, at most 300000 (default 120000)
+  --timeout <ms>    Per-case conversation deadline, at most 300000 (default 120000)
   --output <path>   New JSON report outside the repo (default temporary directory)
   --list            List selected cases without contacting a provider
   --validate        Check case definitions without contacting a provider
   compare <baseline.json> <candidate.json>
 
-Drives ordinary chats through this checkout's Ox CLI and scores history plus independent state.
-Workflows use saved task chats and fresh probes; observers never repair results.
+Drives ordinary conversations through this checkout's Ox CLI and scores history plus independent state.
+Workflows use saved task conversations and fresh probes; observers never repair results.
 Captures Host logs for diagnosis. Tools execute normally; use a sanitized QA Profile.
-Never approves prompts. Stops its chat on timeout and does not retry submitted input.`);
+Never approves prompts. Stops its conversation on timeout and does not retry submitted input.`);
     return;
   }
   validateCases(cases);
@@ -119,15 +119,15 @@ Never approves prompts. Stops its chat on timeout and does not retry submitted i
   try {
     const description = await ox<{ implementation: unknown; methods: string[] }>(host, ["host", "describe"]);
     const methods = ["chats.new", "chats.send", "chats.get", "chats.stop", "logs.list", ...(selected.some(test => test.workflow) ? ["vm.call"] : []), ...(writes ? ["chats.open"] : [])];
-    if (!methods.every(method => description.methods.includes(method))) throw new Error("Host lacks required chat/log commands; update Ox");
+    if (!methods.every(method => description.methods.includes(method))) throw new Error("Host lacks required conversation/log commands; update Ox");
     report.host = description.implementation;
     const providers = await ox<Array<{ id: string; models: Array<{ id: string }> }>>(host, ["host", "providers"]);
     const provider = providers.find(entry => entry.id === values.provider);
     const model = provider?.models.find(entry => entry.id === values.model);
     if (!model) throw new Error("Requested provider/model is not exposed by this Host");
     report.catalog = { provider, model };
-    const active = await ox<EvalSnapshot | null>(host, ["chat", "inspect"]);
-    if (active?.isBusy || active?.pendingPrompt) throw new Error("QA Host has a running chat or pending prompt; leave it untouched");
+    const active = await ox<EvalSnapshot | null>(host, ["conversation", "inspect"]);
+    if (active?.isBusy || active?.pendingPrompt) throw new Error("QA Host has a running conversation or pending prompt; leave it untouched");
     for (const test of selected) {
       for (let repetition = 1; repetition <= repetitions; repetition++) {
         const base = { id: test.id, caseHash: hash(test), repetition, rubric: test.rubric };

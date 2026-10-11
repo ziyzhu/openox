@@ -17,7 +17,7 @@ Also use the agent-independent `ios-simulator` and `ox-cli` skills. Consult inst
 
 ## Relationship to deterministic tests
 
-Ox Gym does not replace portable checks, the iOS build/chat smoke, manual upgrade verification, or LLM evaluation and benchmarks. It explores realistic combinations and surfaces evidence that fixed checks may miss. Turn a stable finding into a focused regression check owned by a retained suite when appropriate.
+Ox Gym does not replace portable checks, the iOS build/conversation smoke, manual upgrade verification, or LLM evaluation and benchmarks. It explores realistic combinations and surfaces evidence that fixed checks may miss. Turn a stable finding into a focused regression check owned by a retained suite when appropriate.
 
 ## Roles
 
@@ -49,7 +49,7 @@ Default to `explore`. Use a recorded seed for every campaign and derived seed fo
 
 - Each user interaction session has a hard 120-second wall-clock limit after its starting UI is ready. Retries do not reset it. The coordinator must interrupt an overrun.
 - Drive the visible UI with `idb` on the explicit reserved UDID. Use accessibility identifiers and the current accessibility tree before coordinates. Do not replace an interaction under test with Host debug commands.
-- Use `ox` for Host discovery, chat inspection, structured logs, VM or service inspection, and supporting model-isolation evidence.
+- Use `ox` for Host discovery, conversation inspection, structured logs, VM or service inspection, and supporting model-isolation evidence.
 - Default to read-only user goals. External mutations require explicit authorization and narrow cleanup. Never supply blanket approval flags.
 - Never read, print, log, or pass provider credentials through command-line arguments. Existing configured credentials remain inside Ox's supported boundaries.
 - Capture observable actions, state, concise decision summaries, and outcomes. Do not request or preserve hidden model reasoning.

@@ -45,12 +45,12 @@ struct ProviderAuthenticationView: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             if let signInError {
                 SettingsErrorMessage(message: signInError, systemImage: "exclamationmark.circle.fill")
-                    .accessibilityIdentifier(A11yID.Chat.modelKeySignInError)
+                    .accessibilityIdentifier(A11yID.ConversationControls.modelKeySignInError)
             }
 
             if let notice = client.authNotice {
                 SettingsNoticeMessage(message: notice, systemImage: "info.circle.fill")
-                    .accessibilityIdentifier(A11yID.Chat.modelKeyNotice)
+                    .accessibilityIdentifier(A11yID.ConversationControls.modelKeyNotice)
             }
 
             if client.acceptsAPIKey, client.subscriptionAccount != nil {
@@ -62,7 +62,7 @@ struct ProviderAuthenticationView: View {
                     apiKeyContent
                 }
                 .accessibilityElement(children: .contain)
-                .accessibilityIdentifier(A11yID.Chat.modelAuthAPIKey)
+                .accessibilityIdentifier(A11yID.ConversationControls.modelAuthAPIKey)
             }
 
             if let account = client.subscriptionAccount, authenticationMethod == .subscription {
@@ -70,7 +70,7 @@ struct ProviderAuthenticationView: View {
                     subscriptionContent(account)
                 }
                 .accessibilityElement(children: .contain)
-                .accessibilityIdentifier(A11yID.Chat.modelAuthOAuth)
+                .accessibilityIdentifier(A11yID.ConversationControls.modelAuthOAuth)
             }
 
             if !client.acceptsAPIKey, client.subscriptionAccount == nil {
@@ -80,7 +80,7 @@ struct ProviderAuthenticationView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .settingsRowPadding()
                     .settingsSurface(singleRow: true)
-                    .accessibilityIdentifier(A11yID.Chat.modelAuthNone)
+                    .accessibilityIdentifier(A11yID.ConversationControls.modelAuthNone)
             }
         }
         .alert("Sign out of \(client.displayName)?", isPresented: $showSignOutConfirm) {
@@ -125,7 +125,7 @@ struct ProviderAuthenticationView: View {
                     }
                 )
             )
-            .accessibilityIdentifier(A11yID.Chat.modelKeyField)
+            .accessibilityIdentifier(A11yID.ConversationControls.modelKeyField)
 
             Button {
                 do {
@@ -170,7 +170,7 @@ struct ProviderAuthenticationView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Get API Key")
-            .accessibilityIdentifier(A11yID.Chat.modelKeyWebsite)
+            .accessibilityIdentifier(A11yID.ConversationControls.modelKeyWebsite)
         }
 
         Text(credentialDescription)
@@ -203,7 +203,7 @@ struct ProviderAuthenticationView: View {
             }
             .buttonStyle(.plain)
             .disabled(busy)
-            .accessibilityIdentifier(A11yID.Chat.modelKeySignIn(client.id))
+            .accessibilityIdentifier(A11yID.ConversationControls.modelKeySignIn(client.id))
 
         }
     }
@@ -229,7 +229,7 @@ struct ProviderAuthenticationView: View {
             }
             .labelStyle(.iconOnly)
             .font(.system(.body, weight: .medium))
-            .accessibilityIdentifier(A11yID.Chat.modelKeyRemove)
+            .accessibilityIdentifier(A11yID.ConversationControls.modelKeyRemove)
         }
         .settingsRowPadding()
         .settingsSurface(singleRow: true)

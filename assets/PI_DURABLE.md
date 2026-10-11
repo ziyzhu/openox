@@ -2,16 +2,16 @@
 
 ## Status and goal
 
-The local production cutover is implemented and undergoing final acceptance. Production and temporary chats use Pi; the Swift legacy loop and compactor are removed. Local Profiles activate through staged conversion/publication journals into `profile.json`, `state.sqlite`, and immutable physical artifacts. Qualified history, document-backed skills, verified provider/preview bytes, global recovery admission, native committed-tool hydration, and independent qualified fork routes are integrated. Custom mock proofs, effect receipts, fault injection,
+The local production cutover is implemented and undergoing final acceptance. Production and temporary conversations use Pi; the Swift legacy loop and compactor are removed. Local Profiles activate through staged conversion/publication journals into `profile.json`, `state.sqlite`, and immutable physical artifacts. Qualified history, document-backed skills, verified provider/preview bytes, global recovery admission, native committed-tool hydration, and independent qualified fork routes are integrated. Custom mock proofs, effect receipts, fault injection,
 codec/file fixtures, conversion/package experiments and the agent-overhead benchmark
 have been removed. Only published Pi Durable storage conformance and benchmarks
-remain in a separate diagnostics bundle; application acceptance uses actual-chat E2E.
-Current simulator evidence verifies real local conversion/activation, persisted normal/native-tool chats, canonical reopen, interrupted-model recovery, temporary-chat Stop/reopen, and regeneration via qualified Pi forks. Closed-snapshot export/import, exhaustive lifecycle/media/native cold-tool interruption acceptance, predecessor publication failures, and physical-device durability remain unfinished. Earlier native evidence below is historical, not a pass of the current tree. Native RPC verification requires approved Tailscale ingress; do not
+remain in a separate diagnostics bundle; application acceptance uses actual-conversation E2E.
+Current simulator evidence verifies real local conversion/activation, persisted normal/native-tool conversations, canonical reopen, interrupted-model recovery, temporary-conversation Stop/reopen, and regeneration via qualified Pi forks. Closed-snapshot export/import, exhaustive lifecycle/media/native cold-tool interruption acceptance, predecessor publication failures, and physical-device durability remain unfinished. Earlier native evidence below is historical, not a pass of the current tree. Native RPC verification requires approved Tailscale ingress; do not
 weaken transport checks or treat loopback discovery as verification. See
 [the test workflow](../.agents/skills/test/SKILL.md) for current commands and gates.
 
 Actual UI acceptance is available through `bun run test:agent-ui-ios --device ox-1
---app /absolute/Ox.app`. Ordinary temporary chats attach automatically; an explicit launch UUID selects a private QA cache identity. Preparation failure never falls back to another execution loop. The replay uses native Mock, reasoning/Markdown, native snippet
+--app /absolute/Ox.app`. Ordinary temporary conversations attach automatically; an explicit launch UUID selects a private QA cache identity. Preparation failure never falls back to another execution loop. The replay uses native Mock, reasoning/Markdown, native snippet
 tools, Stop and process reopen with full retained Pi history. It does not use Host
 RPC, change credentials, convert Profiles, or establish power-loss durability.
 
@@ -52,9 +52,9 @@ Pi Durable Harness — one storage Session per open Profile
         +-- Execution environment -> virtual filesystem
 ```
 
-A Pi storage Session contains many conversations. It is not one chat. In the production target, an Ox chat is a presentation of one Pi conversation, not a separate persisted entity, registry, or transcript. Conversations without Ox presentation state, such as internal roots/subagents, need not appear in the chat list.
+A Pi storage Session contains many conversations. It is not one conversation. In the production target, an Ox conversation is a presentation of one Pi conversation, not a separate persisted entity, registry, or transcript. Conversations without Ox presentation state, such as internal roots/subagents, need not appear in the conversation list.
 
-Pi conversation IDs are database-local. Application references use the owning Profile identity plus Pi conversation ID; an unqualified numeric ID is not globally unique. `StorageMigrator` converts old chat UUID references. The current `ox.chat` v1 `{ chatID }` binding remains necessary for the temporary-chat adapter until the application identity transition is verified; it is not the production identity model.
+Pi conversation IDs are database-local. Application references use the owning Profile identity plus Pi conversation ID; an unqualified numeric ID is not globally unique. `StorageMigrator` converts old conversation UUID references. The current `ox.chat` v1 `{ conversationID }` binding remains necessary for the temporary-conversation adapter until the application identity transition is verified; it is not the production identity model.
 
 Pi owns execution and transcript state. Swift renders projections of committed state and executes native capabilities; it does not maintain a second independently mutable agent loop or transcript.
 
@@ -95,7 +95,7 @@ packages/agent/src/
   index.ts         @openox/agent: native-free library entry
   profile/         Open Profile runtime, files/environment/tools, conversations, presentation, installation
   core/            Shared prompts and capability guidance
-  chat-bindings.ts Optional application UUID mapping over Pi conversation records
+  conversation-bindings.ts Optional application UUID mapping over Pi conversation records
   adapters/ios/    @openox/agent/ios: bridge, model adaptation, JSC compatibility
   adapters/ios/storage-diagnostics.ts  Published Pi storage checks only
 ```
@@ -108,15 +108,15 @@ Use Pi's existing `Storage`/`SqliteDatabase`, `Models`, tool registrations, and 
 
 `openProfileRuntime(options)` returns a `ProfileRuntime` owning one Profile's Harness, files, registry, observers, projections and pending-run state. It injects Pi's SQLite facade and `Models`, registry/settings, blob-ID allocation, file authorization, reporting and committed-event delivery. Native request correlation stays in the runtime-bound iOS transport. Multiple Profile runtimes coexist in one JavaScript runtime without cross-talk; the host must still enforce one owner per database.
 
-Use Pi's own conversation creation/configuration APIs through `runtime.harness`. Core `run`, `observe` and `abort` use Pi conversation IDs, including unbound conversations. The iOS adapter uses `ChatBindings` to resolve external chat UUIDs and route native models, tools and events. Persisted `ox.chat`/`chatID` and provider/extension names remain unchanged in this implemented extraction. Production adoption replaces the UUID bridge only through the identity/migration work below; no runtime legacy fallback is implied. Run completion is correlated with the terminal committed submission ID; completed request-ID deduplication does not wait for events that will not recur.
+Use Pi's own conversation creation/configuration APIs through `runtime.harness`. Core `run`, `observe` and `abort` use Pi conversation IDs, including unbound conversations. The iOS adapter uses `ConversationBindings` to resolve external conversation UUIDs and route native models, tools and events. Persisted `ox.chat`/`conversationID` and provider/extension names remain unchanged in this implemented extraction. Production adoption replaces the UUID bridge only through the identity/migration work below; no runtime legacy fallback is implied. Run completion is correlated with the terminal committed submission ID; completed request-ID deduplication does not wait for events that will not recur.
 
 Importing the shared core must not install shims, access `__oxDurableRequest`, or initialize native resources. The iOS entry point explicitly loads the compatibility layer and creates its bridge. The reusable library, iOS adapter and upstream storage diagnostics remain separate. Continue auditing the shipped iOS bundle for forbidden Node dependencies, shell tools, and unsupported provider SDKs; host-neutrality does not relax Ox's no-shell policy.
 
 ### Refactor scope and verification
 
-Make this a structural refactor before extending production integration. Preserve pinned upstream versions, document/storage formats, replay policy, permission behavior, temporary-chat restrictions, and activation gates. Do not migrate real Profiles or enable persisted-chat adoption as part of the extraction.
+Make this a structural refactor before extending production integration. Preserve pinned upstream versions, document/storage formats, replay policy, permission behavior, temporary-conversation restrictions, and activation gates. Do not migrate real Profiles or enable persisted-conversation adoption as part of the extraction.
 
-Native-free imports, injected in-process execution, isolated Sessions, unbound conversations, concurrent observation, deduplication, authorization, abort and cooperative close/reopen are covered by the portable suite. Earlier native mock/recovery and deterministic fixture results are historical; those custom campaigns have been removed. Retain upstream storage checks and verify application behavior through actual-chat E2E. Real-provider verification must be rerun with a working native login before claiming that gate. See the evidence below and the updated package README; additional production adapters remain planned.
+Native-free imports, injected in-process execution, isolated Sessions, unbound conversations, concurrent observation, deduplication, authorization, abort and cooperative close/reopen are covered by the portable suite. Earlier native mock/recovery and deterministic fixture results are historical; those custom campaigns have been removed. Retain upstream storage checks and verify application behavior through actual-conversation E2E. Real-provider verification must be rerun with a working native login before claiming that gate. See the evidence below and the updated package README; additional production adapters remain planned.
 
 ## JavaScriptCore host
 
@@ -183,11 +183,11 @@ Prefer Pi's typed documents for JSON/text state, avoiding a parallel persistence
 - Profile-owned skill packages and selections.
 - Other structured application state explicitly assigned to the Profile.
 
-Profile-wide content uses Session-scoped documents. Conversation presentation uses conversation-scoped documents for title, favorite, read/unread state and application-only settings. Model/thinking/tool choices stay in `pi.agent`; do not duplicate them in a separate chat record. Derive sidebar previews from committed entries where possible. Leave Pi's `ConversationRecord` and SQL tables unchanged; Ox-specific state belongs in documents/entry payloads, not ad hoc upstream columns. A document may keep an existing Ox kind when its semantics remain compatible; removing the identity binding or changing kinds requires explicit conversion, not a source-only rename.
+Profile-wide content uses Session-scoped documents. Conversation presentation uses conversation-scoped documents for title, favorite, read/unread state and application-only settings. Model/thinking/tool choices stay in `pi.agent`; do not duplicate them in a separate conversation record. Derive sidebar previews from committed entries where possible. Leave Pi's `ConversationRecord` and SQL tables unchanged; Ox-specific state belongs in documents/entry payloads, not ad hoc upstream columns. A document may keep an existing Ox kind when its semantics remain compatible; removing the identity binding or changing kinds requires explicit conversion, not a source-only rename.
 
 Long-lived artifact metadata must not be task-scoped: task documents retire on terminal settlement. Decide history/fork policies explicitly and keep payloads separately addressable rather than loading every artifact into one document. Define checkpoint policies for long-lived documents. Pi does not automatically bound delta tails; the current Ox file/presentation documents now checkpoint every 32 ordinary changes after the source-review smoke below reproduced accumulation.
 
-Pi documents contain strict JSON, not raw bytes. Production artifact contents, including Markdown/text artifacts, live as files under `artifacts/`; metadata stores references such as `artifacts/report.pdf`. Do not persist absolute container URLs or reference unmanaged external files as Profile-owned content. Import external/Share Extension bytes through the owning host. No production `ox_blobs`/`ox_blob_chunks`, parallel chat table, or mock receipt table is required by this design.
+Pi documents contain strict JSON, not raw bytes. Production artifact contents, including Markdown/text artifacts, live as files under `artifacts/`; metadata stores references such as `artifacts/report.pdf`. Do not persist absolute container URLs or reference unmanaged external files as Profile-owned content. Import external/Share Extension bytes through the owning host. No production `ox_blobs`/`ox_blob_chunks`, parallel conversation table, or mock receipt table is required by this design.
 
 ### Artifact publication and lifetime
 
@@ -208,10 +208,10 @@ SOUL.md                   -> Profile document
 artifacts/report.md       -> physical artifacts/report.md + Pi metadata
 artifacts/chart.png       -> physical artifacts/chart.png + Pi metadata
 skills/example/SKILL.md   -> Profile skill document
-chats/<conversation-id>/... -> read-only Pi transcript/metadata projection
+conversations/<conversation-id>/... -> read-only Pi transcript/metadata projection
 ```
 
-The `chats/` namespace is virtual and scoped to this Profile; it is not a physical chat directory or another identity registry. Reuse Pi's binary/directory reader contracts when the adopted release includes them, including opened-file lifetime and bounded reads. They require an Ox native implementation; Pi's Node filesystem is not an iOS backend. Keep only the capability subset permitted by Ox and exercise upstream filesystem cases without enabling shell execution.
+The `conversations/` namespace is virtual and scoped to this Profile; it is not a physical conversation directory or another identity registry. Reuse Pi's binary/directory reader contracts when the adopted release includes them, including opened-file lifetime and bounded reads. They require an Ox native implementation; Pi's Node filesystem is not an iOS backend. Keep only the capability subset permitted by Ox and exercise upstream filesystem cases without enabling shell execution.
 
 Other mounts may resolve to bundled resources, native Git working trees, or user-granted external folders. Database-private state and physical host paths remain inaccessible.
 
@@ -237,9 +237,9 @@ Pi serializes its own edit/write calls by filesystem identity and canonical path
 
 ## Projections and presentation
 
-Render chats from Pi's committed conversation snapshots and updates. Do not publish raw provider output through a separate volatile UI path. Observe application documents separately where needed; third-party documents are not automatically included in Pi's built-in conversation view.
+Render conversations from Pi's committed conversation snapshots and updates. Do not publish raw provider output through a separate volatile UI path. Observe application documents separately where needed; third-party documents are not automatically included in Pi's built-in conversation view.
 
-Expose chat-history paths as read-only projections from Pi entries. Do not maintain a second authoritative `turns.jsonl` beside the database.
+Expose conversation-history paths as read-only projections from Pi entries. Do not maintain a second authoritative `turns.jsonl` beside the database.
 
 Use managed artifact files directly for native previews/file-URL APIs where safe. Materialize disposable copies for document-backed content, transformations or sharing when needed; those copies are not authoritative. Artifact contents are authoritative files, while Pi owns their metadata/references and conversation state. Opening a native preview must pin its file against reclamation.
 
@@ -284,11 +284,11 @@ After an ordinary restart, recreate the runtime, reinstall extensions, reopen st
 
 Keep all application persisted-format compatibility behind `StorageMigrator` in `apps/ios/Ox/Host/Profile/StorageMigration.swift`. Do not add another application migrator or migration file. Establish how upstream SQLite/document/task version handling fits that gate before adoption. Reject unsupported future representations without overwriting them.
 
-Preserve a recoverable original during conversion from the current Profile directory layout to `profile.json` plus `state.sqlite` and `artifacts/`. Retain the manifest's stable identity and creation date. Stage and validate the complete destination before activation; atomically publish the manifest's appended immutable milestone only after the database/files are ready. Interrupted conversion must not advertise a completed Profile through a prematurely updated manifest. Keep restart-safe old-UUID-to-Pi-ID conversion bookkeeping within `StorageMigrator`, not a normal runtime chat registry. Translate native/RPC/UI references, deep links, scheduled-run associations and imported packages deliberately; decide whether legacy external references require a limited compatibility mapping. Do not rewrite durable external-effect keys simply because application IDs change.
+Preserve a recoverable original during conversion from the current Profile directory layout to `profile.json` plus `state.sqlite` and `artifacts/`. Retain the manifest's stable identity and creation date. Stage and validate the complete destination before activation; atomically publish the manifest's appended immutable milestone only after the database/files are ready. Interrupted conversion must not advertise a completed Profile through a prematurely updated manifest. Keep restart-safe old-UUID-to-Pi-ID conversion bookkeeping within `StorageMigrator`, not a normal runtime conversation registry. Translate native/RPC/UI references, deep links, scheduled-run associations and imported packages deliberately; decide whether legacy external references require a limited compatibility mapping. Do not rewrite durable external-effect keys simply because application IDs change.
 
 Verify rich transcript/context continuation, provider signatures/IDs, artifact references and saved state, skill ownership, interrupted conversion and no-op second activation before removing the source. Resolve compacted legacy context as well as full scrollback; do not seed only the active messages and lose history. Discovery/bootstrap/version probes must pass through the compatibility gate before any Pi initialization or storage consumer. Existing iCloud/external Profiles need an explicit transition/import path, including hydration/unavailability/collision handling; do not open a new live database in those locations implicitly.
 
-The host-neutral extraction is complete within the bounded rollout. Preserve its unchanged persisted formats and activation boundaries. Before extending adoption, complete the outstanding real-provider rerun and production gates; structural isolation alone does not authorize persisted-chat attachment or Profile conversion.
+The host-neutral extraction is complete within the bounded rollout. Preserve its unchanged persisted formats and activation boundaries. Before extending adoption, complete the outstanding real-provider rerun and production gates; structural isolation alone does not authorize persisted-conversation attachment or Profile conversion.
 
 ### Remaining implementation sequence
 
@@ -303,13 +303,13 @@ and verified through the actual application path.
 The following phases still need their production exit gates. Each must leave a
 bounded integration path testable before proceeding.
 
-1. **Finalize the Profile contract and identity transition.** Retain `profile.json` for Profile identity/creation/migration version; define manifest validation, database binding and native discovery/activation without duplicate manifest fields in Pi documents. Define conversation presentation documents, rich entry/attachment references and document checkpoint/history/fork policies. Choose artifact overwrite/rename/retention, filename collision and import identity policies. Inventory UUID-typed routes in `ChatModel`, Host protocol/CLI, providers/tools, notifications, schedules and package formats. Specify Profile-qualified Pi IDs without changing provider/extension names or reusing provider cache UUIDs as application IDs. Exit: reviewed formats and reference-conversion map, with no new parallel execution/chat authority.
+1. **Finalize the Profile contract and identity transition.** Retain `profile.json` for Profile identity/creation/migration version; define manifest validation, database binding and native discovery/activation without duplicate manifest fields in Pi documents. Define conversation presentation documents, rich entry/attachment references and document checkpoint/history/fork policies. Choose artifact overwrite/rename/retention, filename collision and import identity policies. Inventory UUID-typed routes in `ConversationModel`, Host protocol/CLI, providers/tools, notifications, schedules and package formats. Specify Profile-qualified Pi IDs without changing provider/extension names or reusing provider cache UUIDs as application IDs. Exit: reviewed formats and reference-conversion map, with no new parallel execution/conversation authority.
 2. **Replace fixture binary storage with injected native artifact files.** Adapt `profile/files.ts`, `profile/filesystem.ts`, `profile/runtime.ts` and iOS bridge ownership to physical artifact I/O while memory/soul/skills remain document-backed. Replace blob-ID allocation/SQL chunk operations with scoped relative-path I/O; bound reads/writes and define file publication/recovery/reader lifetime. Remove binary SQL tables only after all callers and integration fixtures use the new backend. Use fresh debug fixtures; reject stale formats or route any required conversion through `StorageMigrator`, never a runtime legacy reader. Audit/pin a published Pi release before using the currently unreleased reader contracts. Exit: native file/metadata round trips, interruption, containment and Profile-switch isolation pass without production activation.
-3. **Move application routing/presentation onto Pi conversations.** Update the iOS adapter, native chat models and Host/RPC/CLI boundaries to Profile-qualified Pi IDs. Render full fork-aware scrollback and built-in/Ox documents, preserving rich blocks, provider continuation, model choices, timestamps, outcomes and attachments. Keep UI models as projections, not writable transcripts. Introduce this routing behind the bounded rollout first; keep current UUID adapter compatibility until migration and every affected caller are ready, then retire `ChatBindings`/identity-only `ox.chat` use in phase 7. Exit: multiple visible/internal conversations, colliding IDs in independent Profiles, committed hydration/reopen/overflow and native capability routing pass.
+3. **Move application routing/presentation onto Pi conversations.** Update the iOS adapter, native conversation models and Host/RPC/CLI boundaries to Profile-qualified Pi IDs. Render full fork-aware scrollback and built-in/Ox documents, preserving rich blocks, provider continuation, model choices, timestamps, outcomes and attachments. Keep UI models as projections, not writable transcripts. Introduce this routing behind the bounded rollout first; keep current UUID adapter compatibility until migration and every affected caller are ready, then retire `ConversationBindings`/identity-only `ox.chat` use in phase 7. Exit: multiple visible/internal conversations, colliding IDs in independent Profiles, committed hydration/reopen/overflow and native capability routing pass.
 4. **Implement consistent Profile export/import and lifecycle.** Snapshot database state and referenced files under one owner; pin files, validate a versioned manifest, stage imports and decide duplicate identity/reference remapping. Enforce dormant imported work before any progress-enabling Pi API. Integrate create/rename/duplicate/delete, preview/share and Share Extension staging without opening SQLite from another process. Exit: exports during writes/cleanup, complete round trips, malformed packages and interrupted import preserve source/destination integrity.
-5. **Implement real-Profile conversion in StorageMigrator.** Append the version milestone and predecessor-produced before/after fixtures. Retain `profile.json` identity/creation fields, convert `chat.json`, `turns.jsonl`, compacted context, `.saved.json`, memory/soul/skills and their references into the reviewed target, then publish the new manifest milestone only after validation; preserve artifact basenames/content where valid. Hydrate iCloud sources or defer, stage destination, resume safely after interruption and fail closed on collisions/future versions. Exit: startup/activation gate runs before readers, second activation is a no-op and recoverable originals remain available.
+5. **Implement real-Profile conversion in StorageMigrator.** Append the version milestone and predecessor-produced before/after fixtures. Retain `profile.json` identity/creation fields, convert `conversation.json`, `turns.jsonl`, compacted context, `.saved.json`, memory/soul/skills and their references into the reviewed target, then publish the new manifest milestone only after validation; preserve artifact basenames/content where valid. Hydrate iCloud sources or defer, stage destination, resume safely after interruption and fail closed on collisions/future versions. Exit: startup/activation gate runs before readers, second activation is a no-op and recoverable originals remain available.
 6. **Complete native capability, UI, provider and lifecycle parity.** Verify permissions/approval persistence, steering/follow-ups, subagents, compaction, retries/deferred/media, recovery and foreground/background leases. Restore provider login only with authorization; the current ChatGPT HTTP 401 remains an outstanding gate. Measure actual document/file workloads, long delta tails, large files and native memory on supported simulator/device targets; published Pi storage timings do not cover the new artifact backend. Exit: retained integration/native E2E campaigns and human UI review pass with documented device/OS coverage.
-7. **Activate and remove superseded paths.** Enable converted Profiles only after the previous gates; remove legacy Swift loop/compactor, per-chat transcript persistence and duplicate public file tools when all replacement consumers are verified. Preserve native credentials, permissions, Git, WebKit, diagnostics and device-owned state. Update canonical storage/API documentation in the same implementation changes. Exit: one Pi execution/transcript authority, one Profile folder store, no implicit persisted-chat adoption or silent legacy fallback.
+7. **Activate and remove superseded paths.** Enable converted Profiles only after the previous gates; remove legacy Swift loop/compactor, per-conversation transcript persistence and duplicate public file tools when all replacement consumers are verified. Preserve native credentials, permissions, Git, WebKit, diagnostics and device-owned state. Update canonical storage/API documentation in the same implementation changes. Exit: one Pi execution/transcript authority, one Profile folder store, no implicit persisted-conversation adoption or silent legacy fallback.
 
 Use the agent-independent `ios-simulator` skill (`xcodebuild`, `simctl`, and `idb`) and `ox` for app testing, obey simulator ownership rules, keep diagnostics outside the repository, and provide screenshots for UI review.
 
@@ -343,7 +343,7 @@ The former implementation bundled pinned Pi Durable, pi-ai, and Chord 1.0.0
 into a dedicated JavaScriptCore context with asynchronous native SQLite and a
 Swift-selected mock model/native tool. Its custom harness and replay campaign have
 been removed; only the upstream storage checks remain. Results below describe the
-previous implementation and do not substitute for current actual-chat E2E.
+previous implementation and do not substitute for current actual-conversation E2E.
 
 On `ox-3` running iOS 26.0, all 23 upstream storage conformance cases passed through
 the native adapter. The E2E campaign also passed host API checks, transaction
@@ -362,16 +362,16 @@ remains blocked by absent `ox-4`/`ox-5` devices and runtime. Upstream schema,
 document, and task compatibility must still be integrated through `StorageMigrator`
 before any real Profile uses this backend.
 
-### Native temporary-chat rollout
+### Native temporary-conversation rollout
 
-`debug.durable.chat` attaches only idle temporary chats to a shared, UUID-bound
-cache Session under `PiDurableProof/Native/`; persisted chats remain refused. The
+`debug.durable.chat` attaches only idle temporary conversations to a shared, UUID-bound
+cache Session under `PiDurableProof/Native/`; persisted conversations remain refused. The
 runtime now adapts real Swift provider streams and native tools, with Swift-owned
-credentials/permissions and committed partial reconciliation in normal chat
+credentials/permissions and committed partial reconciliation in normal conversation
 presentation. The legacy runner, compactor and run configuration are grouped under `Host/Agent/Legacy/`
-and retained for every nonattached chat behind `Agent.runLegacy()`; their
+and retained for every nonattached conversation behind `Agent.runLegacy()`; their
 snapshot/queue/compaction setup is no longer constructed on the Pi path. It can
-be deleted only after saved-chat conversion supplies the replacement path.
+be deleted only after saved-conversation conversion supplies the replacement path.
 
 The integration lives in `packages/agent` (`@openox/agent`); its host-neutral
 Session core is now separate from the iOS adapter. Pi's conversation records
@@ -393,12 +393,12 @@ write preservation, 200 KiB text/32 MiB binary limits, a 524,291-byte round trip
 128 KiB chunks, replacement/reclamation and integrity. Blob commits precede Pi
 reference commits; failed reference writes can leave reclaimable orphans. This
 ordering is explicit, not a claim of one combined binary/document transaction.
-The tool namespace is deliberately distinguished from real `ox.fs`; temporary-chat
+The tool namespace is deliberately distinguished from real `ox.fs`; temporary-conversation
 restrictions on real Profile writes remain unchanged.
 
 Testing reproduced two rollout issues before fixing them: positional system
 records incorrectly reached the native presentation decoder and closed its watch,
-leaving a completed model turn waiting; and legacy temporary-chat instructions
+leaving a completed model turn waiting; and legacy temporary-conversation instructions
 made the model confuse synthetic file tools with prohibited real Profile writes.
 Projection closures now reject waiters and stop further execution instead of
 silently hanging; immutable replacement frames are detached before later deltas.
@@ -425,7 +425,7 @@ On `ox-1`, iOS 26.0, after extraction:
 - The existing deterministic native-provider fixture passed text, paced streams,
   tool rounds, seeded history, binary I/O and Session reopening. One retained
   iteration is functional regression evidence, not a performance conclusion.
-- Native Mock temporary chats passed committed reasoning/text presentation, runtime
+- Native Mock temporary conversations passed committed reasoning/text presentation, runtime
   reopen without duplicate transcript seeding, and two conversations in one Session.
   Screenshot and diagnostics remain outside the repository.
 - The real ChatGPT rerun passed codec/file/storage checks but its first user turn
@@ -434,8 +434,8 @@ On `ox-1`, iOS 26.0, after extraction:
   evidence does not establish successful real-provider parity for this refactor.
 
 Tests reproduced and fixed concurrent observer attachment opening duplicate watches,
-and Swift's Session-level `chatID: null` being mistaken for a conversation lookup.
-No real Profile migration, persisted-chat adoption or storage-format change was made.
+and Swift's Session-level `conversationID: null` being mistaken for a conversation lookup.
+No real Profile migration, persisted-conversation adoption or storage-format change was made.
 The remaining production gates above still apply.
 
 ### Upstream storage benchmarks
@@ -478,7 +478,7 @@ A standalone macOS JavaScriptCore probe using the published Pi Durable, pi-ai, a
 
 That probe used a deterministic faux model and investigation-only compatibility shims. It was not an iOS simulator/device test, a production native-model integration, a complete SQLite conformance run, or a binary-artifact implementation. Temporary probe artifacts are intentionally outside the repository.
 
-Remaining decisions include artifact overwrite/rename and historical-reference policy, native file publication/reclamation, document definitions/checkpoints/indexing, Profile discovery/bootstrap/backup policy, scoped application identity and legacy-link compatibility, rich-message/admission correlation, export manifest/imported-work policy, existing Profile transition behavior, and the precise wrappers needed around Pi file tools. The Profile-folder layout and removal of a separate production chat identity store are agreed targets; their implementations and activation gates remain outstanding.
+Remaining decisions include artifact overwrite/rename and historical-reference policy, native file publication/reclamation, document definitions/checkpoints/indexing, Profile discovery/bootstrap/backup policy, scoped application identity and legacy-link compatibility, rich-message/admission correlation, export manifest/imported-work policy, existing Profile transition behavior, and the precise wrappers needed around Pi file tools. The Profile-folder layout and removal of a separate production conversation identity store are agreed targets; their implementations and activation gates remain outstanding.
 
 ## References
 

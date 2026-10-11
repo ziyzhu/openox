@@ -3,7 +3,7 @@ import Foundation
 actor ProfileRepository {
     static let shared = ProfileRepository()
     nonisolated let debugSaveGate = ProfileRepositorySaveGate()
-    private var deleted: [ProfileScope: Set<ChatID>] = [:]
+    private var deleted: [ProfileScope: Set<ConversationID>] = [:]
 
     nonisolated static func localDocuments() -> URL {
         (try? FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)) ?? FileManager.default.temporaryDirectory
@@ -96,9 +96,9 @@ actor ProfileRepository {
         }
     }
 
-    func chatSummaries(in scope: ProfileScope) async -> [ChatMeta] {
+    func conversationSummaries(in scope: ProfileScope) async -> [ConversationMeta] {
         do {
-            var result: [ChatMeta] = []
+            var result: [ConversationMeta] = []
             var cursor: JSONValue = .null
             repeat {
                 let page = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationList"), "limit": .int(20), "listCursor": cursor]))
@@ -114,25 +114,25 @@ actor ProfileRepository {
         } catch { Log.session.error("ProfileRepository.list failed=\(error.localizedDescription)"); return [] }
     }
 
-    func loadChat(_ id: ChatID, in scope: ProfileScope) async -> ChatLoadResult? {
+    func loadConversation(_ id: ConversationID, in scope: ProfileScope) async -> ConversationLoadResult? {
         guard deleted[scope]?.contains(id) != true else { return nil }
         do { return try await load(DurableProfileStore.shared.reference(for: id, in: scope), scope: scope) }
         catch { Log.session.error("ProfileRepository.load chat=\(id) failed=\(error.localizedDescription)"); return nil }
     }
 
-    private func load(_ reference: DurableConversationReference, scope: ProfileScope) async throws -> ChatLoadResult {
+    private func load(_ reference: DurableConversationReference, scope: ProfileScope) async throws -> ConversationLoadResult {
         let value = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationLoad"), "reference": reference.value]))
         let fields = value.objectValue ?? [:]
         let meta = try decodeMeta(fields, reference: reference, scope: scope)
         let files = try await artifactListing(in: scope)
-        let turns = try DurableChatProjection.turns(from: fields["entries"]?.arrayValue ?? [], scope: scope, files: files)
-        return ChatLoadResult(state: ChatState(meta: meta, turns: turns, context: nil), needsPersistence: false)
+        let turns = try DurableConversationProjection.turns(from: fields["entries"]?.arrayValue ?? [], scope: scope, files: files)
+        return ConversationLoadResult(state: ConversationState(meta: meta, turns: turns, context: nil), needsPersistence: false)
     }
 
-    private func decodeMeta(_ fields: [String: JSONValue], reference: DurableConversationReference, scope: ProfileScope) throws -> ChatMeta {
+    private func decodeMeta(_ fields: [String: JSONValue], reference: DurableConversationReference, scope: ProfileScope) throws -> ConversationMeta {
         var metadata = fields["metadata"]?.objectValue ?? [:]
         metadata["id"] = .string(reference.compatibilityID.rawValue.uuidString)
-        metadata["schemaVersion"] = .int(ChatFormat.currentSchemaVersion)
+        metadata["schemaVersion"] = .int(ConversationFormat.currentSchemaVersion)
         metadata["createdAt"] = metadata["createdAt"] ?? .double(Date().timeIntervalSinceReferenceDate)
         metadata["attachedServiceDomains"] = metadata["attachedServiceDomains"] ?? .array([])
         metadata["title"] = fields["presentation"]?.objectValue?["title"] ?? .null
@@ -146,18 +146,18 @@ actor ProfileRepository {
                 "reasoningEffort": nativeEffort ?? agent["thinkingLevel"] ?? .null])
         }
         let decoder = JSONDecoder(); decoder.userInfo[.profileScope] = scope
-        return try decoder.decode(ChatMeta.self, from: Data(JSONValue.object(metadata).jsonString().utf8))
+        return try decoder.decode(ConversationMeta.self, from: Data(JSONValue.object(metadata).jsonString().utf8))
     }
 
-    func saveChat(_ request: ChatSaveRequest, in scope: ProfileScope) async -> ChatSaveReceipt {
+    func saveConversation(_ request: ConversationSaveRequest, in scope: ProfileScope) async -> ConversationSaveReceipt {
         debugSaveGate.pass()
         do {
-            let reference = try await DurableProfileStore.shared.reference(for: request.chatID, in: scope)
-            let meta: ChatMeta
+            let reference = try await DurableProfileStore.shared.reference(for: request.conversationID, in: scope)
+            let meta: ConversationMeta
             let turns: [Turn]?
             switch request.payload {
             case .metadata(let value): meta = value; turns = nil
-            case .chat(let state): meta = state.meta; turns = state.turns
+            case .conversation(let state): meta = state.meta; turns = state.turns
             }
             let effort = meta.model?.reasoningEffort
             let thinkingLevel = effort.flatMap { ["off", "minimal", "low", "medium", "high", "xhigh", "max"].contains($0) ? $0 : nil }
@@ -177,18 +177,18 @@ actor ProfileRepository {
                 ])
             }
             _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(command))
-            return ChatSaveReceipt(saveID: request.saveID, succeeded: true)
-        } catch { Log.session.error("ProfileRepository.save chat=\(request.chatID) failed=\(error.localizedDescription)"); return ChatSaveReceipt(saveID: request.saveID, succeeded: false) }
+            return ConversationSaveReceipt(saveID: request.saveID, succeeded: true)
+        } catch { Log.session.error("ProfileRepository.save chat=\(request.conversationID) failed=\(error.localizedDescription)"); return ConversationSaveReceipt(saveID: request.saveID, succeeded: false) }
     }
 
-    func deleteConversation(_ id: ChatID, in scope: ProfileScope) async throws {
+    func deleteConversation(_ id: ConversationID, in scope: ProfileScope) async throws {
         let reference = try await DurableProfileStore.shared.reference(for: id, in: scope)
         _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationDelete"), "reference": reference.value]))
         deleted[scope, default: []].insert(id)
     }
 
-    func virtualChatMetadata(_ id: ChatID, in scope: ProfileScope, snapshot: ChatState? = nil) async throws -> Data {
-        let loaded = snapshot == nil ? await loadChat(id, in: scope)?.state : nil
+    func virtualConversationMetadata(_ id: ConversationID, in scope: ProfileScope, snapshot: ConversationState? = nil) async throws -> Data {
+        let loaded = snapshot == nil ? await loadConversation(id, in: scope)?.state : nil
         guard let state = snapshot ?? loaded else { throw RuntimeError.bridge("Conversation unavailable") }
         let reference = try await DurableProfileStore.shared.reference(for: id, in: scope)
         var metadata = try encoded(state.meta).objectValue ?? [:]
@@ -196,24 +196,24 @@ actor ProfileRepository {
         return Data(try JSONValue.object(metadata).jsonString().utf8)
     }
 
-    func virtualChatTranscript(_ id: ChatID, in scope: ProfileScope, snapshot: ChatState? = nil) async throws -> Data {
-        let loaded = snapshot == nil ? await loadChat(id, in: scope)?.state : nil
+    func virtualConversationTranscript(_ id: ConversationID, in scope: ProfileScope, snapshot: ConversationState? = nil) async throws -> Data {
+        let loaded = snapshot == nil ? await loadConversation(id, in: scope)?.state : nil
         guard let state = snapshot ?? loaded else { throw RuntimeError.bridge("Conversation unavailable") }
         var data = Data()
         for turn in state.turns { data.append(try JSONEncoder().encode(turn)); data.append(0x0A) }
         return data
     }
 
-    func virtualChatFileSizes(_ id: ChatID, in scope: ProfileScope, snapshot: ChatState? = nil) async throws -> (metadata: Int, transcript: Int) {
-        (try await virtualChatMetadata(id, in: scope, snapshot: snapshot).count, try await virtualChatTranscript(id, in: scope, snapshot: snapshot).count)
+    func virtualConversationFileSizes(_ id: ConversationID, in scope: ProfileScope, snapshot: ConversationState? = nil) async throws -> (metadata: Int, transcript: Int) {
+        (try await virtualConversationMetadata(id, in: scope, snapshot: snapshot).count, try await virtualConversationTranscript(id, in: scope, snapshot: snapshot).count)
     }
 
-    func export(_ state: ChatState) throws -> Data {
+    func export(_ state: ConversationState) throws -> Data {
         try Data(JSONValue.object(["metadata": try encoded(state.meta), "turns": .array(try state.turns.map(encoded))]).jsonString().utf8)
     }
 
-    func importChatPackage(_ payload: ChatPackagePayload, in scope: ProfileScope) async throws -> ChatState {
-        let prepared = try ChatPackageCodec.prepare(payload)
+    func importConversationPackage(_ payload: ConversationPackagePayload, in scope: ProfileScope) async throws -> ConversationState {
+        let prepared = try ConversationPackageCodec.prepare(payload)
         let result = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("conversationCreate"),
             "metadata": .object(["createdAt": .double(payload.header.createdAt.timeIntervalSinceReferenceDate), "attachedServiceDomains": .array([])]),
             "title": .string(String(payload.header.title.prefix(60)))]))
@@ -232,7 +232,7 @@ actor ProfileRepository {
             let alias = "ox-native:" + UUID().uuidString
             let entries = try materialized.turns.map { turn -> JSONValue in
                 .object(["kind": .string("ox.native.turn"), "data": .object(["turn": try encoded(turn)]),
-                    "model": .array(ChatProjection.makeWireMessages(from: [turn]).map { DurableMessageCodec.message($0, provider: alias, profileID: scope.profileID) })])
+                    "model": .array(ConversationProjection.makeWireMessages(from: [turn]).map { DurableMessageCodec.message($0, provider: alias, profileID: scope.profileID) })])
             }
             _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
                 "action": .string("conversationPopulate"), "reference": reference.value, "entries": .array(entries),

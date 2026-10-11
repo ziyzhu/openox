@@ -50,7 +50,7 @@ extension ClientAutomation {
             .flatMap(\.windows)
             .compactMap { $0.rootViewController?.view }
             .flatMap(textViews)
-            .filter { $0.accessibilityIdentifier == A11yID.Chat.input }
+            .filter { $0.accessibilityIdentifier == A11yID.ConversationControls.input }
     }
 
     @MainActor

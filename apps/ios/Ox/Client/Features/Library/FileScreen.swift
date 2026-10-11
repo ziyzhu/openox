@@ -81,7 +81,7 @@ struct FileScreen<Content: View>: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .topTrailing) {
-                Rectangle().fill(Theme.Colors.chatSurface)
+                Rectangle().fill(Theme.Colors.conversationSurface)
                 content(geometry.safeAreaInsets)
                     .padding(geometry.safeAreaInsets)
                 Button(action: onDismiss) {
@@ -162,7 +162,7 @@ struct FileZoomPreviewScreen: View {
             case .navigation:
                 preview
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Theme.Colors.chatSurface)
+                    .background(Theme.Colors.conversationSurface)
                     .navigationTitle(artifact.userFacingName)
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar(.visible, for: .navigationBar)
@@ -372,7 +372,7 @@ private struct ZoomablePDFView: UIViewRepresentable {
         view.displayMode = .singlePageContinuous
         view.displaysPageBreaks = true
         view.pageShadowsEnabled = true
-        view.backgroundColor = Theme.Colors.chatSurface.uiColor
+        view.backgroundColor = Theme.Colors.conversationSurface.uiColor
         return view
     }
 

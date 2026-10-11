@@ -13,7 +13,7 @@ Each user-driver subagent owns one session at a time. Its assignment must includ
 
 ## Preflight outside the interaction timer
 
-Confirm the simulator exists and is available, the intended app build is installed and launched, the Host is discoverable, and the required Mock or real provider is exposed. Use bundled services normally; verify repository `/health` only when the session explicitly tests repository installation or sync. Establish theme, app language, keyboard, permissions, chat state, and safe fixtures before declaring the starting UI ready.
+Confirm the simulator exists and is available, the intended app build is installed and launched, the Host is discoverable, and the required Mock or real provider is exposed. Use bundled services normally; verify repository `/health` only when the session explicitly tests repository installation or sync. Establish theme, app language, keyboard, permissions, conversation state, and safe fixtures before declaring the starting UI ready.
 
 If preflight cannot establish the assigned state or authorization, return `blocked` with the exact boundary. Do not silently substitute a different provider, model, locale, or simulator.
 
@@ -28,7 +28,7 @@ Repeat until the goal, abandonment condition, failure, or guardrail is reached:
 5. Record the action, target, timestamps, immediate outcome, relevant UI state, and errors.
 6. Feed an execution failure back into session memory once so the user can recover intelligently. Do not blindly repeat an unchanged action.
 
-Use `ox chat inspect` and structured logs to verify state or diagnose boundaries, not to bypass UI actions under test. `ox chat send` or the LLM benchmark may provide supporting evidence after the user-visible session.
+Use `ox conversation inspect` and structured logs to verify state or diagnose boundaries, not to bypass UI actions under test. `ox conversation send` or the LLM benchmark may provide supporting evidence after the user-visible session.
 
 ## Time and action budgets
 
@@ -50,7 +50,7 @@ Capture continuously enough that a timeout remains diagnosable:
 - Exact prompts and visible responses.
 - User actions and outcomes with monotonic elapsed time.
 - The smallest relevant structured Ox log interval, including `AgentLatency.summary`, correlation identifiers, warnings, and errors when present.
-- Chat state and selected model verification.
+- Conversation state and selected model verification.
 - Resource samples when assigned.
 
 Record every artifact in `result.json` with its kind, relative path, capture time or monotonic offset, and what it proves. Correlate videos and screenshots with action timestamps and log intervals. Treat visual evidence and logs as complementary: the visual artifact establishes user impact, while the log explains timing or cause.

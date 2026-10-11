@@ -79,7 +79,7 @@ export async function check(): Promise<string> {
   if (!hostProtocol.includes("host: any OxHost")) {
     failures.push("apps/ios/Ox/Host/OxHostProtocol.swift: Host protocol must target the OxHost contract");
   }
-  for (const forbidden of ["viewportController", "ChatComposerModel", "var setEditDraft"]) {
+  for (const forbidden of ["viewportController", "ConversationComposerModel", "var setEditDraft"]) {
     if (hostProtocol.includes(forbidden)) {
       failures.push(`apps/ios/Ox/Host/OxHostProtocol.swift: UI automation state must remain in ClientAutomation (${forbidden})`);
     }
@@ -101,7 +101,7 @@ export async function check(): Promise<string> {
     "apps/ios/Ox/Host/Profile/StorageRoot.swift",
     "apps/ios/Ox/Host/Services/ServiceDebug.swift",
     "apps/ios/Ox/Host/Profile/ProfileRepositorySaveGate.swift",
-    ...["ChatCommands", "ServiceCommands", "BootstrapCommands"].map(name => `apps/ios/Ox/Host/RPC/${name}.swift`),
+    ...["ConversationCommands", "ServiceCommands", "BootstrapCommands"].map(name => `apps/ios/Ox/Host/RPC/${name}.swift`),
     ...["ComposerCommands", "ClientAutomation"].map(name => `apps/ios/Ox/Client/Automation/${name}.swift`),
   ]) {
     const source = await readFile(join(ROOT, path), "utf8");
@@ -150,7 +150,7 @@ export async function check(): Promise<string> {
   const migrationFiles = ["StorageMigration", ...migrationOwners.slice(1)].map(name => `apps/ios/Ox/Host/Profile/${name}.swift`);
   const migrationCallers: Record<string, Set<string>> = {
     StorageMigrator: new Set([migrationFiles[0], "apps/ios/Ox/Host/IOSHost.swift"]),
-    ProfileMigrator: new Set([...migrationFiles, "apps/ios/Ox/Host/Profile/StorageRoot.swift", "apps/ios/Ox/Host/Durable/DurableProfileStore.swift", "apps/ios/Ox/Host/RPC/DebugDurableChat.swift"]),
+    ProfileMigrator: new Set([...migrationFiles, "apps/ios/Ox/Host/Profile/StorageRoot.swift", "apps/ios/Ox/Host/Durable/DurableProfileStore.swift", "apps/ios/Ox/Host/RPC/DebugDurableConversation.swift"]),
     ApplicationStorageMigrator: new Set([...migrationFiles, "apps/ios/Ox/Host/Profile/ScheduledSkills.swift"]),
     CredentialMigrator: new Set(migrationFiles),
     RepositoryMigrator: new Set([...migrationFiles, "apps/ios/Ox/Host/Services/Repository/Repository.swift"]),

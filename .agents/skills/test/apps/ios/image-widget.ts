@@ -8,10 +8,10 @@ import { iosTarget } from "../../../setup/scripts/ios.ts";
 import { waitForHost } from "./host.ts";
 
 const qa = qaCommand({
-  usage: "bun .agents/skills/test/apps/ios/image-widget.ts --device ox-N --chat <saved-Mock-QA-chat-seeded-with-0> --app /absolute/Ox.app [--bundle id] [--output /tmp/directory]\nUses the assigned loopback Host. Retains run-owned QA files and chat for visual review; never changes approval policies or credentials.",
+  usage: "bun .agents/skills/test/apps/ios/image-widget.ts --device ox-N --conversation <saved-Mock-QA-conversation-seeded-with-0> --app /absolute/Ox.app [--bundle id] [--output /tmp/directory]\nUses the assigned loopback Host. Retains run-owned QA files and conversation for visual review; never changes approval policies or credentials.",
   options: { chat: { type: "string" }, app: { type: "string" }, bundle: { type: "string" }, output: { type: "string" } },
 });
-if (!qa.values.chat || !qa.values.app) throw new Error("Pass a seeded saved QA chat and the freshly built app");
+if (!qa.values.chat || !qa.values.app) throw new Error("Pass a seeded saved QA conversation and the freshly built app");
 const localConfig = await readFile(join(ROOT, "apps/ios/Local.xcconfig"), "utf8").catch(() => "");
 const bundle = qa.values.bundle ?? Bun.env.OX_BUNDLE_ID
   ?? /^OX_BUNDLE_IDENTIFIER\s*=\s*([^\s/]+)/m.exec(localConfig)?.[1] ?? "ai.openox.local";
@@ -28,10 +28,10 @@ async function call(name: string, args: Record<string, unknown>) {
   return (await json([...target, "vm", "call", name, "--args", JSON.stringify({ purpose: "Verify image widget", ...args }), "--json"])).value;
 }
 async function inspect() {
-  return json([...target, "chat", "inspect", "--json"]);
+  return json([...target, "conversation", "inspect", "--json"]);
 }
 async function present(image: string) {
-  await json([...target, "chat", "send", `execute\nawait ox.widget.image({ purpose: "Verify image widget", image: ${JSON.stringify(image)} });`, "--json"]);
+  await json([...target, "conversation", "send", `execute\nawait ox.widget.image({ purpose: "Verify image widget", image: ${JSON.stringify(image)} });`, "--json"]);
 }
 function images(state: Awaited<ReturnType<typeof inspect>>) {
   return state.blocks.flatMap((block: { kind: { items?: { image?: { source: { type: string; artifact?: string; url?: string } } }[] } }) =>
@@ -53,7 +53,7 @@ await requireSimulator(qa.device);
 const release = claimSimulator(qa.device);
 try {
   await mkdir(directory, { recursive: true });
-  await json([...target, "chat", "open", "--json"]);
+  await json([...target, "conversation", "open", "--json"]);
   const initial = await inspect();
   assert.equal(initial.isBusy, false);
   assert.equal(initial.model.id, "mock");
@@ -102,7 +102,7 @@ try {
   await ios.launch(bundle, resolve(qa.values.app), { OX_HOST_LOOPBACK: "1", OX_DEBUG_ENDPOINT: qa.debugEndpoint });
   await waitForHost(qa.debugEndpoint,
     () => json(["ox", "--host", qa.debugEndpoint, "host", "describe", "--timeout", "1000", "--json"]), 10_000);
-  await json([...target, "chat", "open", "--json"]);
+  await json([...target, "conversation", "open", "--json"]);
   assert.deepEqual(images(await inspect()), images(before));
   await bottom();
   await screenshot("reopened");

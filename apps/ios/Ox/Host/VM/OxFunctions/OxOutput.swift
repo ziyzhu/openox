@@ -6,7 +6,7 @@ nonisolated enum OxOutput {
         namespace: "output",
         schema: {
             [("ox.output.read", .object([
-                "description": .string("Read the complete text of a captured JavaScript output into JavaScript: `await ox.output.read({ purpose, id })`. Use an id from an output-truncation notice. Filter or slice the returned string before printing. Output ids expire when this chat is unloaded."),
+                "description": .string("Read the complete text of a captured JavaScript output into JavaScript: `await ox.output.read({ purpose, id })`. Use an id from an output-truncation notice. Filter or slice the returned string before printing. Output ids expire when this conversation is unloaded."),
                 "inputSchema": .object([
                     "type": .string("object"),
                     "properties": .object(["id": .object(["type": .string("string")])]),

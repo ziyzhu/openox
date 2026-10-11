@@ -183,7 +183,7 @@ struct ServiceChip: View {
         chipContent
             .task(id: "\(service?.id ?? "none"):\(scenePhase)") {
                 guard showsAuthStatus, authSource == .live, scenePhase == .active, let service else { return }
-                await service.checkAccess(reason: .chatOpen)
+                await service.checkAccess(reason: .conversationOpen)
             }
     }
 
@@ -197,7 +197,7 @@ struct ServiceChip: View {
             .buttonStyle(OxPressedSurfaceButtonStyle())
             .accessibilityLabel(title)
             .accessibilityValue(accessibilityValue)
-            .accessibilityIdentifier(service.map { A11yID.Chat.servicePill($0.domain) } ?? "")
+            .accessibilityIdentifier(service.map { A11yID.ConversationControls.servicePill($0.domain) } ?? "")
         } else {
             chip
         }
@@ -222,7 +222,7 @@ struct ServiceChip: View {
                 .buttonStyle(OxPressedSurfaceButtonStyle())
                 .accessibilityLabel(title)
                 .accessibilityValue(accessibilityValue)
-                .accessibilityIdentifier(service.map { A11yID.Chat.servicePill($0.domain) } ?? "")
+                .accessibilityIdentifier(service.map { A11yID.ConversationControls.servicePill($0.domain) } ?? "")
             } else {
                 label
                     .accessibilityElement(children: .combine)

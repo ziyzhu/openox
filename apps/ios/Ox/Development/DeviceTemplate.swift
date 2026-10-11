@@ -53,9 +53,14 @@ enum DeviceTemplate {
             let memory: String?
             let soul: String?
             let files: [File]?
-            let chats: [Chat]?
+            let conversations: [Conversation]?
+
+            private enum CodingKeys: String, CodingKey {
+                case id, name, memory, soul, files
+                case conversations = "chats"
+            }
         }
-        struct Chat: Decodable {
+        struct Conversation: Decodable {
             struct File: Decodable { let id: String; let name: String; let data: Data }
             struct Message: Decodable {
                 let role: String
@@ -73,7 +78,15 @@ enum DeviceTemplate {
             let files: [File]?
         }
         struct WebsiteState: Decodable { let data: Data }
-        struct Selection: Decodable { let profile: String; let chat: String? }
+        struct Selection: Decodable {
+            let profile: String
+            let conversation: String?
+
+            private enum CodingKeys: String, CodingKey {
+                case profile
+                case conversation = "chat"
+            }
+        }
         let version: Int
         let runID: UUID
         let settings: Settings?
@@ -94,7 +107,7 @@ enum DeviceTemplate {
 
     private static var state: State = .inactive
     private static var profiles: [String: Profile] = [:]
-    private static var chats: [String: [String: UUID]] = [:]
+    private static var conversationIDs: [String: [String: UUID]] = [:]
     private static var controlDirectory: URL?
 
     static func preparePreferences() {
@@ -193,7 +206,7 @@ enum DeviceTemplate {
                         "action": .string("fileWriteBinary"), "path": .string("/" + file.path), "base64": .string(file.data.base64EncodedString()),
                     ]))
                 }
-                for chat in input.chats ?? [] { chats[input.id, default: [:]][chat.id] = try await importChat(chat, in: scope) }
+                for conversation in input.conversations ?? [] { conversationIDs[input.id, default: [:]][conversation.id] = try await importConversation(conversation, in: scope) }
                 try await DurableProfileStore.shared.close(in: scope)
             }
             if let selection = request.selection, let profile = profiles[selection.profile] {
@@ -202,7 +215,7 @@ enum DeviceTemplate {
             }
             if let website = request.websiteState { try await services.restoreWebsiteData(website.data) }
             state = .imported(request)
-            Log.app.info("DeviceTemplate.storage applied run=\(request.runID) profiles=\(profiles.count) chats=\(chats.values.reduce(0) { $0 + $1.count }) websiteRestored=\(request.websiteState != nil)")
+            Log.app.info("DeviceTemplate.storage applied run=\(request.runID) profiles=\(profiles.count) conversations=\(conversationIDs.values.reduce(0) { $0 + $1.count }) websiteRestored=\(request.websiteState != nil)")
         } catch {
             state = .failed(error)
             writeResult(status: "failed", error: "Template storage application failed; inspect scoped device logs")
@@ -219,8 +232,8 @@ enum DeviceTemplate {
         case .prepared: throw RuntimeError.bridge("Template storage must be imported before selection")
         }
         do {
-            if let selection = request.selection, let chat = selection.chat,
-               let id = chats[selection.profile]?[chat] {
+            if let selection = request.selection, let conversation = selection.conversation,
+               let id = conversationIDs[selection.profile]?[conversation] {
                 _ = try await conversations.openForClient(id)
             }
             writeResult(status: "applied", error: nil)
@@ -232,10 +245,10 @@ enum DeviceTemplate {
         }
     }
 
-    private static func importChat(_ input: Request.Chat, in scope: ProfileScope) async throws -> UUID {
+    private static func importConversation(_ input: Request.Conversation, in scope: ProfileScope) async throws -> UUID {
         if let data = input.packageData {
-            let proposal = try ChatPackageCodec.decode(data, sourceName: "template.chat")
-            let state = try await ProfileRepository.shared.importChatPackage(proposal.payload, in: scope)
+            let proposal = try ConversationPackageCodec.decode(data, sourceName: "template.chat")
+            let state = try await ProfileRepository.shared.importConversationPackage(proposal.payload, in: scope)
             return try await saveMetadata(input, state: state, in: scope)
         }
         let result = try await DurableProfileStore.shared.command(scope: scope, value: .object([
@@ -267,23 +280,23 @@ enum DeviceTemplate {
         let alias = "ox-native:" + UUID().uuidString
         let entries = try turns.map { turn -> JSONValue in
             .object(["kind": .string("ox.native.turn"), "data": .object(["turn": try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(turn))]),
-                     "model": .array(ChatProjection.makeWireMessages(from: [turn]).map { DurableMessageCodec.message($0, provider: alias, profileID: scope.profileID) })])
+                     "model": .array(ConversationProjection.makeWireMessages(from: [turn]).map { DurableMessageCodec.message($0, provider: alias, profileID: scope.profileID) })])
         }
         _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
             "action": .string("conversationPopulate"), "reference": reference.value, "entries": .array(entries),
         ]))
-        guard let loaded = await ProfileRepository.shared.loadChat(reference.compatibilityID, in: scope)?.state else { throw RuntimeError.bridge("Seeded chat unavailable") }
+        guard let loaded = await ProfileRepository.shared.loadConversation(reference.compatibilityID, in: scope)?.state else { throw RuntimeError.bridge("Seeded conversation unavailable") }
         return try await saveMetadata(input, state: loaded, in: scope)
     }
 
-    private static func saveMetadata(_ input: Request.Chat, state: ChatState, in scope: ProfileScope) async throws -> UUID {
+    private static func saveMetadata(_ input: Request.Conversation, state: ConversationState, in scope: ProfileScope) async throws -> UUID {
         var meta = state.meta
         meta.title = input.title
         meta.model = try input.model.map(model)
         meta.isFavorite = input.favorite ?? false
         meta.hasUnreadResponse = input.unread ?? false
-        let saved = await ProfileRepository.shared.saveChat(ChatSaveRequest(payload: .metadata(meta)), in: scope)
-        guard saved.succeeded else { throw RuntimeError.bridge("Seeded chat metadata could not be saved") }
+        let saved = await ProfileRepository.shared.saveConversation(ConversationSaveRequest(payload: .metadata(meta)), in: scope)
+        guard saved.succeeded else { throw RuntimeError.bridge("Seeded conversation metadata could not be saved") }
         return meta.id
     }
 
@@ -330,7 +343,7 @@ enum DeviceTemplate {
         let value: JSONValue = .object([
             "status": .string(status), "error": error.map(JSONValue.string) ?? .null,
             "profiles": .object(profiles.mapValues { .string($0.id.uuidString) }),
-            "chats": .object(chats.mapValues { .object($0.mapValues { .string($0.uuidString) }) }),
+            "chats": .object(conversationIDs.mapValues { .object($0.mapValues { .string($0.uuidString) }) }),
         ])
         do { try JSONEncoder().encode(value).write(to: directory.appendingPathComponent("result.json"), options: .atomic) }
         catch { Log.app.error("DeviceTemplate.result write failed") }

@@ -62,7 +62,7 @@ private enum CompactPage: String {
     case workspace
 }
 
-private enum CompactChatTransition: Equatable {
+private enum CompactConversationTransition: Equatable {
     case idle
     case closing(UUID)
     case opening(UUID)
@@ -71,7 +71,7 @@ private enum CompactChatTransition: Equatable {
         if case .closing = self { true } else { false }
     }
 
-    var openingChatId: UUID? {
+    var openingConversationId: UUID? {
         guard case .opening(let id) = self else { return nil }
         return id
     }
@@ -254,7 +254,7 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
     }
 }
 
-private struct CurrentChatActivityObserver: View {
+private struct CurrentConversationActivityObserver: View {
     let conversation: Conversation?
     let onAwaitingUser: () -> Void
 
@@ -382,11 +382,11 @@ private struct SkillImportModifier: ViewModifier {
 }
 
 private struct ConversationImportModifier: ViewModifier {
-    let coordinator: ChatImportCoordinator
+    let coordinator: ConversationImportCoordinator
     let conversations: ConversationManager
     let ready: Bool
     let onProposalPresented: () -> Void
-    let onImportedChat: (UUID) -> Void
+    let onImportedConversation: (UUID) -> Void
 
     func body(content: Content) -> some View {
         content
@@ -401,7 +401,7 @@ private struct ConversationImportModifier: ViewModifier {
                         .presentationBackground(Theme.Colors.background)
                 }
             }
-            .alert("Couldn't import chat", isPresented: Binding(
+            .alert("Couldn't import conversation", isPresented: Binding(
                 get: { coordinator.errorMessage != nil },
                 set: { if !$0 { coordinator.dismissError() } }
             )) {
@@ -412,10 +412,10 @@ private struct ConversationImportModifier: ViewModifier {
             .onChange(of: coordinator.proposal?.id) { _, proposal in
                 if proposal != nil { onProposalPresented() }
             }
-            .onChange(of: coordinator.importedChatID) { _, id in
+            .onChange(of: coordinator.importedConversationID) { _, id in
                 guard let id else { return }
-                onImportedChat(id)
-                coordinator.consumeImportedChat()
+                onImportedConversation(id)
+                coordinator.consumeImportedConversation()
             }
     }
 }
@@ -435,19 +435,19 @@ private extension View {
         ))
     }
 
-    func chatImport(
-        coordinator: ChatImportCoordinator,
+    func conversationImport(
+        coordinator: ConversationImportCoordinator,
         conversations: ConversationManager,
         ready: Bool,
         onProposalPresented: @escaping () -> Void,
-        onImportedChat: @escaping (UUID) -> Void
+        onImportedConversation: @escaping (UUID) -> Void
     ) -> some View {
         modifier(ConversationImportModifier(
             coordinator: coordinator,
             conversations: conversations,
             ready: ready,
             onProposalPresented: onProposalPresented,
-            onImportedChat: onImportedChat
+            onImportedConversation: onImportedConversation
         ))
     }
 }
@@ -497,17 +497,17 @@ struct RootView: View {
 
     private let client: OxClient
     private let skillImports: SkillImportCoordinator
-    private let chatImports: ChatImportCoordinator
+    private let conversationImports: ConversationImportCoordinator
     private var manager: ServiceManager { client.services }
     private var storage: StorageRoot { .shared }
     @State private var conversations: ConversationManager
     @State private var compactPage: CompactPage = .workspace
     @State private var showSplitSidebar = true
     @State private var splitSidebarWidth: CGFloat?
-    @State private var compactSidebarSummaries: [ChatMeta] = []
+    @State private var compactSidebarSummaries: [ConversationMeta] = []
     @State private var compactSidebarCurrentId: UUID?
-    @State private var compactChatTransition = CompactChatTransition.idle
-    @State private var pendingChatPresentationId: UUID?
+    @State private var compactConversationTransition = CompactConversationTransition.idle
+    @State private var pendingConversationPresentationId: UUID?
     @State private var composerFocusRequest: ComposerFocusRequest?
     @State private var presentation: Presentation?
     @State private var startup = Startup.idle
@@ -525,11 +525,11 @@ struct RootView: View {
     init(
         client: OxClient,
         skillImports: SkillImportCoordinator,
-        chatImports: ChatImportCoordinator
+        conversationImports: ConversationImportCoordinator
     ) {
         self.client = client
         self.skillImports = skillImports
-        self.chatImports = chatImports
+        self.conversationImports = conversationImports
         _conversations = State(initialValue: client.conversations)
     }
 
@@ -587,7 +587,7 @@ struct RootView: View {
         }
         .background(Theme.Colors.surface, ignoresSafeAreaEdges: .all)
         .overlay {
-            CurrentChatActivityObserver(conversation: conversations.current, onAwaitingUser: handleAwaitingUser)
+            CurrentConversationActivityObserver(conversation: conversations.current, onAwaitingUser: handleAwaitingUser)
         }
         .onChange(of: horizontalSizeClass, initial: true) { _, _ in
             guard UIDevice.current.userInterfaceIdiom == .pad else { return }
@@ -635,12 +635,12 @@ struct RootView: View {
                 onProposalPresented: { presentation = nil },
                 onImportedSkill: handleImportedSkill
             )
-        .chatImport(
-            coordinator: chatImports,
+        .conversationImport(
+            coordinator: conversationImports,
             conversations: conversations,
             ready: startup == .ready,
             onProposalPresented: { presentation = nil },
-            onImportedChat: handleImportedChat
+            onImportedConversation: handleImportedConversation
         )
     }
 
@@ -664,7 +664,7 @@ struct RootView: View {
                         try await Soul.shared.waitUntilCurrent()
                         try await UserMemory.shared.waitUntilCurrent()
                         await Skills.shared.waitUntilCurrent()
-                        conversations.startNewChat()
+                        conversations.startNewConversation()
                         await conversations.loadSummariesNow()
                         refreshCompactSidebar()
                     } catch { Log.app.error("RootView Profile documents unavailable: \(error.localizedDescription)") }
@@ -685,8 +685,8 @@ struct RootView: View {
         )
     }
 
-    private func handleImportedChat(_ id: UUID) {
-        Log.ui.info("RootView.importedChat id=\(id)")
+    private func handleImportedConversation(_ id: UUID) {
+        Log.ui.info("RootView.importedConversation id=\(id)")
         setSidebar(false)
         refreshCompactSidebar()
     }
@@ -709,7 +709,7 @@ struct RootView: View {
                 dismissKeyboard(via: "sidebarDrag")
             },
             sidebar: compactSidebarPanel,
-            workspace: chatLayer
+            workspace: conversationLayer
         )
     }
 
@@ -733,7 +733,7 @@ struct RootView: View {
                     .transition(.move(edge: .leading))
                     .zIndex(1)
             }
-            chatLayer
+            conversationLayer
         }
         .animation(sidebarAnimation, value: showSplitSidebar)
     }
@@ -759,7 +759,7 @@ struct RootView: View {
         .equatable()
     }
 
-    private func makeSidebarPanel(summaries: [ChatMeta], currentId: UUID?) -> ConversationSidebar {
+    private func makeSidebarPanel(summaries: [ConversationMeta], currentId: UUID?) -> ConversationSidebar {
         ConversationSidebar(
             contentState: startup.sidebarContentState,
             summaries: summaries,
@@ -767,16 +767,16 @@ struct RootView: View {
             currentId: currentId,
             showsCloseButton: !isSplitLayout,
             onClose: { setSidebar(false) },
-            onNewChat: {
+            onNewConversation: {
                 sidebarAction("newChat") {
-                    let conversation = conversations.startNewChat()
+                    let conversation = conversations.startNewConversation()
                     requestComposerFocus(for: conversation, reason: "newChat")
                     autoCloseSidebar()
                 }
             },
             onOpen: { meta in
                 sidebarAction("openChat") {
-                    openChatFromSidebar(meta.id)
+                    openConversationFromSidebar(meta.id)
                 }
             },
             onDelete: { meta in
@@ -812,29 +812,29 @@ struct RootView: View {
     }
 
     @ViewBuilder
-    private var chatLayer: some View {
+    private var conversationLayer: some View {
         if case .failed(let message, let recovery) = startup {
             startupFailure(message: message, recovery: recovery)
         } else {
-            readyChatLayer
+            readyConversationLayer
         }
     }
 
     @ViewBuilder
-    private var readyChatLayer: some View {
+    private var readyConversationLayer: some View {
         ZStack {
             if let conversation = conversations.current,
                conversations.openingId == nil,
-               !compactChatTransition.isClosing,
-               pendingChatPresentationId == nil || pendingChatPresentationId == conversation.id {
+               !compactConversationTransition.isClosing,
+               pendingConversationPresentationId == nil || pendingConversationPresentationId == conversation.id {
                 ConversationPage(conversation: conversation,
                          composerFocusRequestID: composerFocusRequest?.conversationIdentity == ObjectIdentifier(conversation)
                              ? composerFocusRequest?.id
                              : nil,
                          onComposerFocusRequestHandled: handleComposerFocusRequest,
                          onShowSidebar: { setSidebar(isSplitLayout ? !showSidebar : true) },
-                         onToggleTemporary: { conversations.toggleTemporaryChat() },
-                         onDeleteChat: { conversations.delete(conversation.id) },
+                         onToggleTemporary: { conversations.toggleTemporaryConversation() },
+                         onDeleteConversation: { conversations.delete(conversation.id) },
                          onBranch: { blockId in conversations.branch(from: conversation, atBlock: blockId) },
                          onRenameFile: { artifact, newFilename in
                              try await conversations.renameFile(artifact, to: newFilename)
@@ -844,7 +844,7 @@ struct RootView: View {
                          },
                          onExploreServices: { showServices(for: conversation.id) },
                          onFileNavigationChange: setChildNavigationActive,
-                         onInitialTranscriptPresented: { finishChatOpening(conversation.id) })
+                         onInitialTranscriptPresented: { finishConversationOpening(conversation.id) })
                     .onAppear {
                         conversation.setTranscriptVisible(scenePhase == .active)
                     }
@@ -854,8 +854,8 @@ struct RootView: View {
 
             if conversations.current == nil
                 || conversations.openingId != nil
-                || compactChatTransition.isClosing
-                || pendingChatPresentationId != nil {
+                || compactConversationTransition.isClosing
+                || pendingConversationPresentationId != nil {
                 CellularAutomatonLoader()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Theme.Colors.surface)
@@ -884,7 +884,7 @@ struct RootView: View {
         }
         .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Colors.chatSurface)
+        .background(Theme.Colors.conversationSurface)
     }
 
     private func autoCloseSidebar() {
@@ -892,45 +892,45 @@ struct RootView: View {
         setSidebar(false)
     }
 
-    private func openChatFromSidebar(_ id: UUID) {
-        Haptics.impact(.chatOpened)
+    private func openConversationFromSidebar(_ id: UUID) {
+        Haptics.impact(.conversationOpened)
         guard !isSplitLayout, showSidebar else {
-            compactChatTransition = .idle
-            openChat(id)
+            compactConversationTransition = .idle
+            openConversation(id)
             return
         }
         compactSidebarCurrentId = id
         guard conversations.currentId != id else {
-            compactChatTransition = .idle
+            compactConversationTransition = .idle
             setSidebar(false)
             return
         }
-        pendingChatPresentationId = id
-        compactChatTransition = .closing(id)
-        Log.ui.info("ChatUX.lifecycle conversation=\(id) phase=shellClosing")
+        pendingConversationPresentationId = id
+        compactConversationTransition = .closing(id)
+        Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellClosing")
         setSidebar(false, completionCriteria: .removed) {
-            guard compactChatTransition == .closing(id) else { return }
-            compactChatTransition = .opening(id)
-            Log.ui.info("ChatUX.lifecycle conversation=\(id) phase=shellOpening")
+            guard compactConversationTransition == .closing(id) else { return }
+            compactConversationTransition = .opening(id)
+            Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellOpening")
             conversations.open(id)
         }
     }
 
-    private func finishChatOpening(_ visibleId: UUID) {
-        guard pendingChatPresentationId == visibleId, conversations.openingId == nil else { return }
+    private func finishConversationOpening(_ visibleId: UUID) {
+        guard pendingConversationPresentationId == visibleId, conversations.openingId == nil else { return }
         DispatchQueue.main.async {
-            guard pendingChatPresentationId == visibleId, conversations.openingId == nil else { return }
+            guard pendingConversationPresentationId == visibleId, conversations.openingId == nil else { return }
             withAnimation(reduceMotion ? nil : Theme.Animation.quick) {
-                pendingChatPresentationId = nil
-                compactChatTransition = .idle
+                pendingConversationPresentationId = nil
+                compactConversationTransition = .idle
             }
-            Log.ui.info("ChatUX.lifecycle conversation=\(visibleId) phase=shellReady")
+            Log.ui.info("ConversationUX.lifecycle conversation=\(visibleId) phase=shellReady")
         }
     }
 
-    private func openChat(_ id: UUID) {
+    private func openConversation(_ id: UUID) {
         guard conversations.currentId != id else { return }
-        pendingChatPresentationId = id
+        pendingConversationPresentationId = id
         conversations.open(id)
     }
 
@@ -941,8 +941,8 @@ struct RootView: View {
 
     private func selectService(_ service: Service, for conversationID: UUID) {
         guard conversations.contains(conversationID), let conversation = conversations.current, conversation.id == conversationID else {
-            Log.ui.error("RootView.servicesAttach missingChat id=\(conversationID) service=\(service.domain)")
-            returnToChat(conversationID)
+            Log.ui.error("RootView.servicesAttach missingConversation id=\(conversationID) service=\(service.domain)")
+            returnToConversation(conversationID)
             return
         }
         if conversation.attachedServices.contains(where: { $0.domain == service.domain }) {
@@ -953,7 +953,7 @@ struct RootView: View {
             Haptics.impact(.serviceAttached)
             Log.ui.info("RootView.servicesAttach conversation=\(conversationID) service=\(service.domain)")
         }
-        returnToChat(conversationID)
+        returnToConversation(conversationID)
     }
 
     private func isServiceAttached(_ service: Service, to conversationID: UUID) -> Bool {
@@ -961,20 +961,20 @@ struct RootView: View {
         return conversation.attachedServices.contains { $0.domain == service.domain }
     }
 
-    private func returnToChat(_ id: UUID) {
+    private func returnToConversation(_ id: UUID) {
         if conversations.contains(id) {
-            openChat(id)
+            openConversation(id)
         } else {
-            Log.ui.warning("RootView.servicesReturn missingChat id=\(id)")
-            if conversations.current == nil { conversations.startNewChat() }
+            Log.ui.warning("RootView.servicesReturn missingConversation id=\(id)")
+            if conversations.current == nil { conversations.startNewConversation() }
         }
         presentation = nil
         Log.ui.info("RootView.servicesReturn conversation=\(id)")
     }
 
     private func startConversation(with service: Service) {
-        Log.ui.info("RootView.servicesStartChat service=\(service.domain)")
-        let conversation = conversations.startNewChat()
+        Log.ui.info("RootView.servicesStartConversation service=\(service.domain)")
+        let conversation = conversations.startNewConversation()
         conversation.setAttachedServices([service])
         requestComposerFocus(for: conversation, reason: "serviceStartChat")
         presentation = nil
@@ -983,7 +983,7 @@ struct RootView: View {
     private func requestComposerFocus(for conversation: Conversation, reason: String) {
         let request = ComposerFocusRequest(conversationIdentity: ObjectIdentifier(conversation), reason: reason)
         composerFocusRequest = request
-        Log.ui.info("ChatUX.intent conversation=\(conversation.id) kind=focusRequest phase=requested request=\(request.id) reason=\(reason)")
+        Log.ui.info("ConversationUX.intent conversation=\(conversation.id) kind=focusRequest phase=requested request=\(request.id) reason=\(reason)")
     }
 
     private func handleComposerFocusRequest(_ id: UUID) {
@@ -1055,7 +1055,7 @@ struct RootView: View {
         if open { dismissKeyboard(via: "sidebarOpen") }
         if open {
             refreshCompactSidebar()
-            refreshChatSummaries(reason: "sidebar")
+            refreshConversationSummaries(reason: "sidebar")
         }
         withAnimation(sidebarAnimation, completionCriteria: completionCriteria) {
             if isSplitLayout {
@@ -1069,7 +1069,7 @@ struct RootView: View {
     }
 
     private func dismissKeyboard(via: String) {
-        Log.ui.info("ChatUX.intent conversation=\(conversations.currentId?.uuidString ?? "none") kind=dismissKeyboard via=\(via)")
+        Log.ui.info("ConversationUX.intent conversation=\(conversations.currentId?.uuidString ?? "none") kind=dismissKeyboard via=\(via)")
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
@@ -1093,7 +1093,7 @@ struct RootView: View {
             do {
                 try await client.prepareStorage()
                 withAnimation(reduceMotion ? Theme.Animation.press : Theme.Animation.standard, completionCriteria: .logicallyComplete) {
-                    if conversations.current == nil { conversations.startNewChat() }
+                    if conversations.current == nil { conversations.startNewConversation() }
                     transitionStartup(to: .loadingProfile)
                 } completion: {
                     if let conversation = conversations.current, isSplitLayout || !showSidebar {
@@ -1150,14 +1150,14 @@ struct RootView: View {
         compactSidebarCurrentId = conversations.currentId
     }
 
-    private func refreshChatSummaries(reason: String) {
+    private func refreshConversationSummaries(reason: String) {
         guard startup == .ready else { return }
         Task {
             let startedAt = Date()
             await conversations.loadSummariesNow()
             refreshCompactSidebar()
             let durationMs = Int(Date().timeIntervalSince(startedAt) * 1_000)
-            Log.ui.info("RootView.chatSummaries reason=\(reason) durationMs=\(durationMs) count=\(conversations.summaries.count)")
+            Log.ui.info("RootView.conversationSummaries reason=\(reason) durationMs=\(durationMs) count=\(conversations.summaries.count)")
         }
     }
 
@@ -1189,7 +1189,7 @@ struct RootView: View {
         if areas.contains(.artifacts) {
             conversations.artifactFilesChanged()
         }
-        if areas.contains(.chats), reason != "filesystem" || showSidebar {
+        if areas.contains(.conversations), reason != "filesystem" || showSidebar {
             await conversations.loadSummariesNow()
             refreshCompactSidebar()
         }
@@ -1221,7 +1221,7 @@ extension ConversationSidebar: Equatable {
     RootView(
         client: OxClient.preview(serviceManager: serviceManager),
         skillImports: SkillImportCoordinator(),
-        chatImports: ChatImportCoordinator()
+        conversationImports: ConversationImportCoordinator()
     )
         .environment(serviceManager)
 }

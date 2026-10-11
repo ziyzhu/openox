@@ -48,17 +48,17 @@ try {
   const version = (await run([executable, "--version"], resolve(import.meta.dir, "../.."))).trim();
   if (version !== packageMetadata.version) throw new Error(`installed ox reported version ${JSON.stringify(version)}`);
   const help = await run([executable, "--help"], resolve(import.meta.dir, "../.."));
-  if (!help.includes("Use Ox Profiles, repositories, Hosts, chats, and VMs")) throw new Error("installed ox help was incomplete");
-  if (!help.includes("chat watch")) throw new Error("installed ox help omitted chat commands");
+  if (!help.includes("Use Ox Profiles, repositories, Hosts, conversations, and VMs")) throw new Error("installed ox help was incomplete");
+  if (!help.includes("conversation watch")) throw new Error("installed ox help omitted conversation commands");
   if (!help.includes("profile skills")) throw new Error("installed ox help omitted Profile commands");
   if (!help.includes("host logs")) throw new Error("installed ox help omitted Host commands");
-  if (!help.includes("chat send")) throw new Error("installed ox help omitted chat driving commands");
+  if (!help.includes("conversation send")) throw new Error("installed ox help omitted conversation driving commands");
   if (!help.includes("host providers")) throw new Error("installed ox help omitted provider commands");
   if (help.includes("diagnostics")) throw new Error("installed ox help exposed removed diagnostic commands");
   if (/^\s+serve\s/m.test(help)) throw new Error("installed ox help exposed the extracted Pi MCP server command");
   if (!help.includes("repository verify")) throw new Error("installed ox help omitted repository verification");
   if (!help.includes("vm inspect")) throw new Error("installed ox help omitted VM commands");
-  if (!help.includes("--chat <chat-id>")) throw new Error("installed ox help omitted chat targeting");
+  if (!help.includes("--conversation <conversation-id>")) throw new Error("installed ox help omitted conversation targeting");
   if (!help.includes("--profile <path>")) throw new Error("installed ox help omitted Profile targeting");
   if (help.includes("--runtime") || help.includes("--session <id>") || help.includes("--vm-session") || help.includes("--root")) {
     throw new Error("installed ox help exposed removed targeting flags");

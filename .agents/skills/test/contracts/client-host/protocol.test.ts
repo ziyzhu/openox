@@ -58,19 +58,22 @@ async function exercise(options: FixtureOptions = {}) {
   return { cli, start, requests, close: () => server.stop(true) };
 }
 
-test("CLI and fixture Host conform across description and chat create/send/inspect", async () => {
+test("CLI and fixture Host conform across description and conversation create/send/inspect", async () => {
   const fixture = await exercise();
   try {
     expect((await fixture.cli("host", "describe")).code).toBe(0);
-    const created = await fixture.cli("chat", "new", "--temporary", "--provider", "mock", "--model", "mock");
+    const created = await fixture.cli("conversation", "new", "--temporary", "--provider", "mock", "--model", "mock");
     expect(created.code).toBe(0);
     const id = JSON.parse(created.stdout).chatId;
-    const sent = await fixture.cli("--chat", id, "chat", "send", "hello");
+    const sent = await fixture.cli("--conversation", id, "conversation", "send", "hello");
     expect(sent.code).toBe(0);
     expect(JSON.parse(sent.stdout)).toMatchObject({ chatId: id, outcome: "completed", text: "Hello from the fixture." });
     const inspected = await fixture.cli("--chat", id, "chat", "inspect");
     expect(inspected.code).toBe(0);
     expect(JSON.parse(inspected.stdout)).toMatchObject({ id, isBusy: false });
+    const duplicated = await fixture.cli("--conversation", id, "--chat", id, "conversation", "inspect");
+    expect(duplicated.code).toBe(1);
+    expect(duplicated.stderr).toContain("may only be specified once");
     expect(fixture.requests).toEqual(["host.describe", "host.describe", "chats.new", "host.describe", "chats.send", "host.describe", "chats.get"]);
   } finally { fixture.close(); }
 });
@@ -78,9 +81,9 @@ test("CLI and fixture Host conform across description and chat create/send/inspe
 test("CLI rejects malformed Host results without retrying a submitted request", async () => {
   const fixture = await exercise({ invalid: true });
   try {
-    const result = await fixture.cli("chat", "list");
+    const result = await fixture.cli("conversation", "list");
     expect(result.code).toBe(1);
-    expect(result.stderr).toContain("Host returned an invalid chat list");
+    expect(result.stderr).toContain("Host returned an invalid conversation list");
     expect(fixture.requests).toEqual(["host.describe", "chats.list"]);
   } finally { fixture.close(); }
 });
@@ -92,7 +95,7 @@ test("CLI rejects unsupported and unversioned RPC interfaces before mutation whi
       const description = await fixture.cli("host", "describe");
       expect(description.code).toBe(0);
       expect(JSON.parse(description.stdout).protocols.rpc).toEqual(rpcVersions);
-      const result = await fixture.cli("chat", "new", "--temporary");
+      const result = await fixture.cli("conversation", "new", "--temporary");
       expect(result.code).toBe(1);
       expect(result.stderr).toContain(`do not support CLI revision ${RPC_VERSION}`);
       expect(result.stderr).toContain("Operation request not sent");
@@ -104,7 +107,7 @@ test("CLI rejects unsupported and unversioned RPC interfaces before mutation whi
 test("CLI accepts the current RPC revision when the Host also supports newer revisions", async () => {
   const fixture = await exercise({ rpcVersions: [RPC_VERSION, RPC_VERSION + 1] });
   try {
-    expect((await fixture.cli("chat", "new", "--temporary")).code).toBe(0);
+    expect((await fixture.cli("conversation", "new", "--temporary")).code).toBe(0);
     expect(fixture.requests).toEqual(["host.describe", "chats.new"]);
   } finally { fixture.close(); }
 });
@@ -112,7 +115,7 @@ test("CLI accepts the current RPC revision when the Host also supports newer rev
 test("CLI spends the operation timeout on the version check without sending the mutation", async () => {
   const fixture = await exercise({ descriptionDelayMs: 100 });
   try {
-    const result = await fixture.cli("chat", "new", "--temporary", "--timeout", "20");
+    const result = await fixture.cli("conversation", "new", "--temporary", "--timeout", "20");
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("timeout");
     expect(fixture.requests).toEqual(["host.describe"]);
@@ -121,7 +124,7 @@ test("CLI spends the operation timeout on the version check without sending the 
 
 async function watchRequests(options: FixtureOptions, ready: (requests: string[]) => boolean) {
   const fixture = await exercise(options);
-  const child = fixture.start("chat", "watch", "--interval", "10");
+  const child = fixture.start("conversation", "watch", "--interval", "10");
   const stdout = new Response(child.stdout).text();
   const stderr = new Response(child.stderr).text();
   try {
@@ -158,7 +161,7 @@ test("CLI refuses ordinary requests after reconnecting to an incompatible Host",
 test("CLI reports Host errors without replaying mutations", async () => {
   const fixture = await exercise();
   try {
-    const result = await fixture.cli("chat", "new", "--provider", "missing", "--model", "missing");
+    const result = await fixture.cli("conversation", "new", "--provider", "missing", "--model", "missing");
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("fixture rejected provider");
     expect(fixture.requests).toEqual(["host.describe", "chats.new"]);

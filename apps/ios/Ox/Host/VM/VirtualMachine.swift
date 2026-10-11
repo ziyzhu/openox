@@ -395,7 +395,7 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
         Object.defineProperties(ox.app, {
           model: { value: ox.conversation.model },
           setModel: { value: ox.conversation.setModel },
-          renameChat: { value: ox.conversation.rename },
+          renameConversation: { value: ox.conversation.rename },
           repositories: { value: ox.repository.list },
         });
         Object.defineProperty(globalThis, 'ox', { value: ox, writable: false, configurable: false });

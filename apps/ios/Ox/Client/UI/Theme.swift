@@ -9,7 +9,7 @@ enum Theme {
         static let surface         = DynamicColor(light: 0xFFFDF7, dark: 0x1C1C1E)
         static let surfaceSunken   = DynamicColor(light: 0xFBE9C7, dark: 0x2C2C2E)
         static let chipOnBackground = DynamicColor(light: 0xFBE9C7, dark: 0x2C2C2E)
-        static let chatSurface     = DynamicColor(light: 0xFFFFFF, dark: 0x0A0A0A)
+        static let conversationSurface     = DynamicColor(light: 0xFFFFFF, dark: 0x0A0A0A)
         static let bubble          = DynamicColor(light: 0xF3F3F3, dark: 0x1C1C1E)
         static let background      = DynamicColor(light: 0xFFF6E6, dark: 0x0A0A0A)
         static let onSurface       = DynamicColor(light: 0x000000, dark: 0xECECEC)

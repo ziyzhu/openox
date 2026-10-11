@@ -173,9 +173,9 @@ test("one execute filesystem surface composes scoped text and physical mounts wi
       { path: "notes/shared", access: "readOnly", source: { kind: "text", files: { "readme.md": "second shared notes" } } },
     ] });
     expect((await profileEnv(first.files, first.conversations).readTextFile("skills/manage-skills/SKILL.md", context)).ok).toBe(false);
-    const firstChat = await conversation(first); const secondChat = await conversation(second);
-    expect(firstChat.id).toBe(secondChat.id);
-    const result = await first.run(firstChat.id, { type: "input", content: "Use the mounted files" });
+    const firstConversation = await conversation(first); const secondConversation = await conversation(second);
+    expect(firstConversation.id).toBe(secondConversation.id);
+    const result = await first.run(firstConversation.id, { type: "input", content: "Use the mounted files" });
     const results = result.messages.filter(message => message.role === "toolResult");
     expect(results).toHaveLength(8);
     expect(activations).toEqual(["manage-skills"]);
@@ -310,7 +310,7 @@ test("Profile ExecutionEnv exposes only visible, read-only Pi metadata and full-
   expect(JSON.stringify(tool)).toContain("readable old history");
 });
 
-test("presentation and history reopen from SQLite without creating another chat authority", async () => {
+test("presentation and history reopen from SQLite without creating another conversation authority", async () => {
   const path = `/tmp/ox-agent-presentation-${crypto.randomUUID()}.sqlite`;
   try {
     const first = await fixture("reopen", undefined, { database: backend(path).db });

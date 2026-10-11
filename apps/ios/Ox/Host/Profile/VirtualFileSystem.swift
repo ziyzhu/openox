@@ -21,10 +21,10 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case serviceKind(ServicesMount.Kind)
         case service(ServicesMount.Kind, String)
         case serviceItem(ServicesMount.Kind, String, [String])
-        case chats
-        case chat(ChatID)
-        case chatMetadata(ChatID)
-        case chatTurns(ChatID)
+        case conversations
+        case conversation(ConversationID)
+        case conversationMetadata(ConversationID)
+        case conversationTurns(ConversationID)
         case files
         case deviceFolder(String)
         case deviceItem(String, [String])
@@ -47,10 +47,10 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .service(let kind, let domain): "services/\(kind.rawValue)/\(domain)"
             case .serviceItem(let kind, let domain, let components):
                 "services/\(kind.rawValue)/\(domain)/\(components.joined(separator: "/"))"
-            case .chats: "history"
-            case .chat(let id): "history/\(id)"
-            case .chatMetadata(let id): "history/\(id)/conversation.json"
-            case .chatTurns(let id): "history/\(id)/turns.jsonl"
+            case .conversations: "history"
+            case .conversation(let id): "history/\(id)"
+            case .conversationMetadata(let id): "history/\(id)/conversation.json"
+            case .conversationTurns(let id): "history/\(id)/turns.jsonl"
             case .files: "files"
             case .deviceFolder(let id): "files/\(id)"
             case .deviceItem(let id, let components): "files/\(id)/\(components.joined(separator: "/"))"
@@ -59,8 +59,8 @@ nonisolated public struct VirtualFileSystem: Sendable {
 
         var isDirectory: Bool {
             switch self {
-            case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .chats, .chat, .files, .deviceFolder: true
-            case .resource, .memory, .soul, .artifact, .skillFile, .skillResource, .serviceItem, .chatMetadata, .chatTurns, .deviceItem: false
+            case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .conversations, .conversation, .files, .deviceFolder: true
+            case .resource, .memory, .soul, .artifact, .skillFile, .skillResource, .serviceItem, .conversationMetadata, .conversationTurns, .deviceItem: false
             }
         }
 
@@ -72,7 +72,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .resource: .resources
             case .skills, .skill, .skillFile, .skillDirectory, .skillResource: .skills
             case .services, .serviceKind, .service, .serviceItem: .services
-            case .chats, .chat, .chatMetadata, .chatTurns: .chats
+            case .conversations, .conversation, .conversationMetadata, .conversationTurns: .conversations
             case .files: .files
             case .deviceFolder(let id), .deviceItem(let id, _): .deviceFolder(id)
             case .root: .root
@@ -89,7 +89,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case resources
         case skills
         case services
-        case chats
+        case conversations
         case files
         case deviceFolder(String)
     }
@@ -166,16 +166,16 @@ nonisolated public struct VirtualFileSystem: Sendable {
                 throw Error.invalidPath(rawPath)
             }
             return .serviceItem(kind, parts[2], Array(parts.dropFirst(3)))
-        case ["conversations"]: return .chats
+        case ["conversations"]: return .conversations
         case let parts where parts.count == 2 && parts[0] == "conversations":
             guard let id = UUID(uuidString: parts[1]) else { throw Error.invalidPath(rawPath) }
-            return .chat(ChatID(id))
+            return .conversation(ConversationID(id))
         case let parts where parts.count == 3 && parts[0] == "conversations" && parts[2] == "conversation.json":
             guard let id = UUID(uuidString: parts[1]) else { throw Error.invalidPath(rawPath) }
-            return .chatMetadata(ChatID(id))
+            return .conversationMetadata(ConversationID(id))
         case let parts where parts.count == 3 && parts[0] == "conversations" && parts[2] == "turns.jsonl":
             guard let id = UUID(uuidString: parts[1]) else { throw Error.invalidPath(rawPath) }
-            return .chatTurns(ChatID(id))
+            return .conversationTurns(ConversationID(id))
         case ["files"]: return .files
         case let parts where parts.count == 2 && parts[0] == "files":
             return .deviceFolder(parts[1])

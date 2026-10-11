@@ -32,7 +32,7 @@ nonisolated enum A11yID {
         static let search = "sidebar.search"
         static let resizer = "sidebar.resizer"
         static let close = "sidebar.close"
-        static let newChat = "sidebar.newChat"
+        static let newConversation = "sidebar.newChat"
         static let settings = "sidebar.settings"
         static let services = "sidebar.services"
         static let artifacts = "sidebar.artifacts"
@@ -145,7 +145,7 @@ nonisolated enum A11yID {
         }
     }
 
-    enum Chat {
+    enum ConversationControls {
         static let toast = "chat.toast"
         static let more = "chat.more"
         static let attach = "chat.attach"
@@ -328,21 +328,21 @@ enum A11yLabel {
     static var send: String { L10n.string("Send", comment: "") }
     static var stop: String { L10n.string("Stop", comment: "") }
     static var addAttachment: String { L10n.string("Add attachment", comment: "") }
-    static var newChat: String { L10n.string("New chat", comment: "") }
+    static var newConversation: String { L10n.string("New conversation", comment: "") }
     static var settings: String { L10n.string("Settings", comment: "") }
-    static var deleteConversation: String { L10n.string("Delete chat", comment: "") }
-    static var renameChat: String { L10n.string("Rename chat", comment: "") }
+    static var deleteConversation: String { L10n.string("Delete conversation", comment: "") }
+    static var renameConversation: String { L10n.string("Rename conversation", comment: "") }
     static var pin: String { L10n.string("Pin", comment: "") }
     static var unpin: String { L10n.string("Unpin", comment: "") }
     static var services: String { L10n.string("Services", comment: "") }
     static var artifacts: String { L10n.string("Files", comment: "") }
     static var skills: String { L10n.string("Skills", comment: "") }
-    static var openSidebar: String { L10n.string("Open chat history", comment: "") }
-    static var resizeSidebar: String { L10n.string("Resize chat history", comment: "") }
-    static var widenSidebar: String { L10n.string("Widen chat history", comment: "") }
-    static var narrowSidebar: String { L10n.string("Narrow chat history", comment: "") }
-    static var searchChats: String { L10n.string("Search chats", comment: "") }
-    static var closeChatHistory: String { L10n.string("Close chat history", comment: "") }
+    static var openSidebar: String { L10n.string("Open conversation history", comment: "") }
+    static var resizeSidebar: String { L10n.string("Resize conversation history", comment: "") }
+    static var widenSidebar: String { L10n.string("Widen conversation history", comment: "") }
+    static var narrowSidebar: String { L10n.string("Narrow conversation history", comment: "") }
+    static var searchConversations: String { L10n.string("Search conversations", comment: "") }
+    static var closeConversationHistory: String { L10n.string("Close conversation history", comment: "") }
     static var scrollToBottom: String { L10n.string("Scroll to bottom", comment: "") }
     static var copyMessage: String { L10n.string("Copy message", comment: "") }
     static var shareMessage: String { L10n.string("Share message", comment: "") }

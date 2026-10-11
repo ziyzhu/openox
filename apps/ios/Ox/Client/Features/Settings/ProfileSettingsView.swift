@@ -118,9 +118,9 @@ struct ProfileSettingsView: View {
             if profile?.location == .external {
                 Text("This closes the Profile in Ox. Its folder and contents stay in Files.")
             } else if profile?.location == .iCloud {
-                Text("This removes it from iCloud and all your devices — chats, files, character and memory. This can't be undone.")
+                Text("This removes it from iCloud and all your devices — conversations, files, character and memory. This can't be undone.")
             } else {
-                Text("This removes it from this device — chats, files, character and memory. This can't be undone.")
+                Text("This removes it from this device — conversations, files, character and memory. This can't be undone.")
             }
         }
     }

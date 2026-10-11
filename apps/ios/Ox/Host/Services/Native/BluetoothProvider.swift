@@ -149,7 +149,7 @@ final class BluetoothProvider: NSObject, CBCentralManagerDelegate, CBPeripheralD
     private func perform(_ action: String, fields: [String: JSONValue]) async throws -> JSONValue {
         if action == "events" {
             let cursor = fields["after"]?.intValue ?? 0
-            guard (0...events.sequence).contains(cursor) else { throw BluetoothData.Failure("invalidCursor", "Use zero or the previous nextCursor from this chat session.") }
+            guard (0...events.sequence).contains(cursor) else { throw BluetoothData.Failure("invalidCursor", "Use zero or the previous nextCursor from this conversation session.") }
             return .object([
                 "events": try ServiceOperations.encodeToJSON(events.entries.filter { $0.sequence > cursor }),
                 "nextCursor": .int(events.sequence), "dropped": .int(events.dropped(after: cursor)),
@@ -282,7 +282,7 @@ final class BluetoothProvider: NSObject, CBCentralManagerDelegate, CBPeripheralD
     }
 
     private func stale() -> BluetoothData.Failure {
-        BluetoothData.Failure("staleHandle", "Device or attribute is unavailable in this chat. Scan, connect, and inspect again.")
+        BluetoothData.Failure("staleHandle", "Device or attribute is unavailable in this conversation. Scan, connect, and inspect again.")
     }
 
     private func invalidate(_ peripheral: CBPeripheral) {

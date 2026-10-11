@@ -122,7 +122,7 @@ final class ServiceManager {
         }
     }
 
-    @ObservationIgnored private var attachedServiceDomainsByChat: [UUID: Set<String>] = [:]
+    @ObservationIgnored private var attachedServiceDomainsByConversation: [UUID: Set<String>] = [:]
     @ObservationIgnored var webConversations: [UUID: WebConversation] = [:]
     @ObservationIgnored var openingWebConversations: [UUID: WebConversation.Opening] = [:]
 
@@ -417,7 +417,7 @@ final class ServiceManager {
     // An attached service whose origin owns this URL, so a tapped link can open
     // inside that service's credentialed page instead of a logged-out Safari.
     func attachedService(for url: URL) -> Service? {
-        let attachedDomains = attachedServiceDomainsByChat.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+        let attachedDomains = attachedServiceDomainsByConversation.values.reduce(into: Set<String>()) { $0.formUnion($1) }
         return relatedWebServices(for: url).first { attachedDomains.contains($0.domain) }
     }
 
@@ -443,34 +443,34 @@ final class ServiceManager {
             }
     }
 
-    func isChatAttached(_ chatID: UUID) -> Bool {
-        attachedServiceDomainsByChat[chatID] != nil
+    func isConversationAttached(_ conversationID: UUID) -> Bool {
+        attachedServiceDomainsByConversation[conversationID] != nil
     }
 
-    func isAttached(domain: String, to chatID: UUID) -> Bool {
-        attachedServiceDomainsByChat[chatID]?.contains(domain) == true
+    func isAttached(domain: String, to conversationID: UUID) -> Bool {
+        attachedServiceDomainsByConversation[conversationID]?.contains(domain) == true
     }
 
-    func setAttachedServices(_ attached: [Service], for chatID: UUID) {
-        let previous = attachedServiceDomainsByChat.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+    func setAttachedServices(_ attached: [Service], for conversationID: UUID) {
+        let previous = attachedServiceDomainsByConversation.values.reduce(into: Set<String>()) { $0.formUnion($1) }
         let retained = Set(attached.map(\.domain))
-        attachedServiceDomainsByChat[chatID] = retained
-        let detached = webConversations.values.filter { $0.owner == .chat(chatID) && !retained.contains($0.service.domain) }
+        attachedServiceDomainsByConversation[conversationID] = retained
+        let detached = webConversations.values.filter { $0.owner == .conversation(conversationID) && !retained.contains($0.service.domain) }
         detached.forEach { $0.close() }
-        let pendingDetached = openingWebConversations.values.filter { $0.owner == .chat(chatID) && !retained.contains($0.service.domain) }
-        pendingDetached.forEach { closeWebConversations(owner: .chat(chatID), service: $0.service) }
+        let pendingDetached = openingWebConversations.values.filter { $0.owner == .conversation(conversationID) && !retained.contains($0.service.domain) }
+        pendingDetached.forEach { closeWebConversations(owner: .conversation(conversationID), service: $0.service) }
         updateMCPActivation(from: previous)
     }
 
-    func removeAttachedServices(for chatID: UUID) {
-        let previous = attachedServiceDomainsByChat.values.reduce(into: Set<String>()) { $0.formUnion($1) }
-        attachedServiceDomainsByChat.removeValue(forKey: chatID)
-        closeWebConversations(owner: .chat(chatID))
+    func removeAttachedServices(for conversationID: UUID) {
+        let previous = attachedServiceDomainsByConversation.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+        attachedServiceDomainsByConversation.removeValue(forKey: conversationID)
+        closeWebConversations(owner: .conversation(conversationID))
         updateMCPActivation(from: previous)
     }
 
     private func updateMCPActivation(from previous: Set<String>) {
-        let current = attachedServiceDomainsByChat.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+        let current = attachedServiceDomainsByConversation.values.reduce(into: Set<String>()) { $0.formUnion($1) }
         for domain in current.subtracting(previous) {
             guard let service = service(domain: domain), let mcp = service.remoteMCPService else { continue }
             Task {
@@ -799,9 +799,9 @@ final class ServiceManager {
         _ = await loadRepositories(locale: locale)
         if service(domain: domain) == nil {
             savedDomains.remove(domain)
-            let previous = attachedServiceDomainsByChat.values.reduce(into: Set<String>()) { $0.formUnion($1) }
-            for chatID in Array(attachedServiceDomainsByChat.keys) {
-                attachedServiceDomainsByChat[chatID]?.remove(domain)
+            let previous = attachedServiceDomainsByConversation.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+            for conversationID in Array(attachedServiceDomainsByConversation.keys) {
+                attachedServiceDomainsByConversation[conversationID]?.remove(domain)
             }
             updateMCPActivation(from: previous)
         }

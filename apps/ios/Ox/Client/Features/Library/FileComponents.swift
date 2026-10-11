@@ -195,7 +195,7 @@ private struct FileMutationAlerts: ViewModifier {
                 }
                 .accessibilityIdentifier(A11yID.Files.deleteConfirm)
             } message: {
-                Text("This deletes the file. Existing chat references will show it as deleted.")
+                Text("This deletes the file. Existing conversation references will show it as deleted.")
             }
             .alert("Couldn't delete file", isPresented: presented { if case .deleteFailed = $0 { true } else { false } }) {
                 Button("OK", role: .cancel) { mutation = nil }

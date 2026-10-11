@@ -138,7 +138,7 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "showPage",
             label: "Show Page",
-            description: "Add a chat row the user can tap to view Browser's live page.",
+            description: "Add a conversation row the user can tap to view Browser's live page.",
             inputSchema: object(),
             outputSchema: object(["shown": boolean], required: ["shown"])
         ),

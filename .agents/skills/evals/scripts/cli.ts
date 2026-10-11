@@ -2,7 +2,7 @@ import { ROOT } from "../../../lib.ts";
 
 export async function ox<T>(host: string, args: string[], chatId?: string, timeoutMs = 10_000, allowOutcome = false): Promise<T> {
   const child = Bun.spawn([process.execPath, "--no-env-file", `${ROOT}/apps/cli/src/ox.ts`,
-    "--host", host, ...(chatId ? ["--chat", chatId] : []), ...args, "--json", "--timeout", String(timeoutMs)], {
+    "--host", host, ...(chatId ? ["--conversation", chatId] : []), ...args, "--json", "--timeout", String(timeoutMs)], {
     cwd: ROOT, stdin: "ignore", stdout: "pipe", stderr: "pipe",
   });
   const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs + 2_000);
@@ -20,9 +20,9 @@ export async function vmCall<T>(host: string, chatId: string, name: string, args
   return result.value;
 }
 
-export async function newChat(host: string, provider: string, model: string, temporary: boolean, timeoutMs: number): Promise<string> {
+export async function newConversation(host: string, provider: string, model: string, temporary: boolean, timeoutMs: number): Promise<string> {
   const result = await ox<{ chatId: string; temporary: boolean; model: string }>(host,
-    ["chat", "new", ...(temporary ? ["--temporary"] : []), "--provider", provider, "--model", model], undefined, timeoutMs);
-  if (!result.chatId || result.temporary !== temporary || result.model !== `${provider}:${model}`) throw new Error("Unexpected new chat identity, mode, or model");
+    ["conversation", "new", ...(temporary ? ["--temporary"] : []), "--provider", provider, "--model", model], undefined, timeoutMs);
+  if (!result.chatId || result.temporary !== temporary || result.model !== `${provider}:${model}`) throw new Error("Unexpected new conversation identity, mode, or model");
   return result.chatId;
 }

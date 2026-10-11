@@ -5,13 +5,13 @@ import CryptoKit
 @MainActor
 final class WebConversation {
     enum Owner: Equatable {
-        case chat(UUID)
+        case conversation(UUID)
         case canvas(UUID)
         case client
 
         var logLabel: String {
             switch self {
-            case .chat(let id): "chat:\(id.uuidString.prefix(8))"
+            case .conversation(let id): "conversation:\(id.uuidString.prefix(8))"
             case .canvas(let id): "canvas:\(id.uuidString.prefix(8))"
             case .client: "client"
             }

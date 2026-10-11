@@ -1,5 +1,5 @@
 enum ServiceListOrder {
-    private static let chatDomains = [
+    private static let conversationDomains = [
         "chatgpt.com",
         "claude.ai",
         "gemini.google.com",
@@ -15,6 +15,6 @@ enum ServiceListOrder {
     ]
 
     static func rank(_ domain: String) -> Int {
-        chatDomains.firstIndex(of: domain) ?? Int.max
+        conversationDomains.firstIndex(of: domain) ?? Int.max
     }
 }

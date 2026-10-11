@@ -5,7 +5,7 @@ nonisolated enum ProfileContentArea: String, CaseIterable, Sendable {
     case soul
     case memory
     case skills
-    case chats
+    case conversations = "chats"
     case artifacts
 
     static let all = Set(allCases)
@@ -21,7 +21,7 @@ nonisolated enum ProfileContentArea: String, CaseIterable, Sendable {
         case "MEMORY.md": return [.memory]
         case "SOUL.md": return [.soul]
         case "skills": return [.skills]
-        case "chats": return [.chats]
+        case "chats": return [.conversations]
         case "profile.json": return [.configuration]
         default: return [.artifacts]
         }

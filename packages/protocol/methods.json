@@ -78,7 +78,7 @@
         "$ref": "./schema.json#/definitions/EmptyRequest"
       },
       "result": {
-        "$ref": "./schema.json#/definitions/ListChatsResult"
+        "$ref": "./schema.json#/definitions/ListConversationsResult"
       }
     },
     "chats.get": {
@@ -86,7 +86,7 @@
         "$ref": "./schema.json#/definitions/SessionRequest"
       },
       "result": {
-        "$ref": "./schema.json#/definitions/GetChatResult"
+        "$ref": "./schema.json#/definitions/GetConversationResult"
       }
     },
     "chats.open": {
@@ -94,31 +94,31 @@
         "$ref": "./schema.json#/definitions/SessionRequest"
       },
       "result": {
-        "$ref": "./schema.json#/definitions/GetChatResult"
+        "$ref": "./schema.json#/definitions/GetConversationResult"
       }
     },
     "chats.respond": {
       "params": {
-        "$ref": "./schema.json#/definitions/RespondChatRequest"
+        "$ref": "./schema.json#/definitions/RespondConversationRequest"
       },
       "result": {
-        "$ref": "./schema.json#/definitions/RespondChatResult"
+        "$ref": "./schema.json#/definitions/RespondConversationResult"
       }
     },
     "chats.new": {
       "params": {
-        "$ref": "./schema.json#/definitions/NewChatRequest"
+        "$ref": "./schema.json#/definitions/NewConversationRequest"
       },
       "result": {
-        "$ref": "./schema.json#/definitions/NewChatResult"
+        "$ref": "./schema.json#/definitions/NewConversationResult"
       }
     },
     "chats.send": {
       "params": {
-        "$ref": "./schema.json#/definitions/SendChatRequest"
+        "$ref": "./schema.json#/definitions/SendConversationRequest"
       },
       "result": {
-        "$ref": "./schema.json#/definitions/SendChatResult"
+        "$ref": "./schema.json#/definitions/SendConversationResult"
       }
     },
     "chats.stop": {
@@ -126,7 +126,7 @@
         "$ref": "./schema.json#/definitions/SessionRequest"
       },
       "result": {
-        "$ref": "./schema.json#/definitions/StopChatResult"
+        "$ref": "./schema.json#/definitions/StopConversationResult"
       }
     },
     "providers.list": {

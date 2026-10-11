@@ -66,7 +66,7 @@ struct ToastPill: View {
         .accessibilityElement(children: toast.action == nil ? .combine : .contain)
         .accessibilityAddTraits(toast.action == nil ? .isButton : [])
         .accessibilityHint(toast.action == nil ? "Tap to dismiss" : "")
-        .accessibilityIdentifier(A11yID.Chat.toast)
+        .accessibilityIdentifier(A11yID.ConversationControls.toast)
     }
 }
 

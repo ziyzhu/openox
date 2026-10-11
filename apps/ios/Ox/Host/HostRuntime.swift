@@ -36,9 +36,9 @@ final class HostRuntime: OxHost {
         optionalRecovery?.cancel()
     }
 
-    func listChats() -> [HostChatSummary] {
+    func listConversations() -> [HostConversationSummary] {
         conversations.orderedSummaries.map { summary in
-            HostChatSummary(
+            HostConversationSummary(
                 id: summary.id,
                 title: summary.displayTitle,
                 model: summary.modelID,
