@@ -2,7 +2,7 @@ import Foundation
 import WebKit
 
 @MainActor
-final class ServiceAuthSession: ServiceSheetSession {
+final class ServiceAuthSession {
     enum Outcome: String, Equatable {
         case signedIn
         case signedOut

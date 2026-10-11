@@ -71,7 +71,7 @@ nonisolated enum StorageMigrator {
     }
 
     @MainActor
-    static func recoverOptionalStorage(services: ServiceManager) async -> Bool {
+    static func recoverOptionalStorage(services: ServiceManager, activateSchedules: @MainActor () throws -> Void) async -> Bool {
         guard !Task.isCancelled else { return false }
         if services.localRecoveryMessage != nil {
             do {
@@ -85,7 +85,7 @@ nonisolated enum StorageMigrator {
         if ScheduledSkills.shared.preparation?.failureMessage != nil {
             do {
                 try ScheduledSkills.shared.load(retry: true)
-                try ScheduledSkillScheduler.shared.activate()
+                try activateSchedules()
                 Log.app.info("StorageMigrator.recovery done resource=schedules")
             } catch {
                 Log.app.warning("StorageMigrator.recovery deferred resource=schedules error=\(error.localizedDescription)")

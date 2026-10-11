@@ -73,7 +73,7 @@ final class WebSocketOxHostTransport {
         addressPoll = poll
         poll.resume()
         monitor.start(queue: queue)
-        Log.app.info("WebSocketOxHostTransport starting mode=\(HostTransportIngress.loopbackEnabled ? "debug-simulator-loopback" : "tailscale") port=\(port)")
+        Log.app.info("WebSocketOxHostTransport starting mode=\(HostTransportIngress.loopbackEnabled ? "debug-loopback" : "tailscale") port=\(port)")
     }
 
     private func refreshIngress() {

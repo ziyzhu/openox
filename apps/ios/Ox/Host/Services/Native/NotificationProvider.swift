@@ -53,7 +53,12 @@ final class NotificationProvider {
 
     func deliverIfAuthorized(identifier: String, title: String, body: String) async throws -> Bool {
         let status = await center.notificationSettings().authorizationStatus
-        guard status == .authorized || status == .provisional || status == .ephemeral else {
+        #if os(iOS)
+        let authorized = status == .authorized || status == .provisional || status == .ephemeral
+        #else
+        let authorized = status == .authorized || status == .provisional
+        #endif
+        guard authorized else {
             return false
         }
         let content = UNMutableNotificationContent()
@@ -72,8 +77,12 @@ final class NotificationProvider {
     private func ensureAuthorized() async throws {
         let status = await center.notificationSettings().authorizationStatus
         switch status {
-        case .authorized, .provisional, .ephemeral:
+        case .authorized, .provisional:
             return
+        #if os(iOS)
+        case .ephemeral:
+            return
+        #endif
         case .denied:
             Log.agent.info("notify.auth denied")
             throw NotifyError.denied

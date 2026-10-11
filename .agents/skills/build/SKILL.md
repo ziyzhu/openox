@@ -18,6 +18,7 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | `bun run build:repository-schema` | Regenerate repository JSON/Swift artifacts. |
 | `bun run build:provider-schema` | Regenerate provider definitions schema. |
 | `bun run build:services` | Rebuild bundled services, Local Git seed, and model-action resources. |
+| `bun run build:macos` | Generate the native host-only project with XcodeGen and build for macOS 26+. |
 | `bun run build:agent` | Rebuild native bundles, the portable prompt renderer, default SOUL, package-owned bundled skills, and TS-owned `ModelGuidance.generated.swift`. |
 | `bun run update:llms` | Refresh already-selected models from models.dev; requires network access. |
 

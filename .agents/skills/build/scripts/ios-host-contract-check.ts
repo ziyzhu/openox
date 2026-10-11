@@ -66,6 +66,10 @@ export async function check(): Promise<string> {
     failures.push("Host preparation must pass through HostRuntime and StorageMigrator");
   }
 
+  for (const forbidden of ["import UIKit", "UIApplication", "ScheduledSkillScheduler.shared"]) {
+    if (runtime.includes(forbidden)) failures.push(`HostRuntime must not own iOS policy (${forbidden})`);
+  }
+
   const client = await readFile(join(ROOT, "apps/ios/Ox/Client/OxClient.swift"), "utf8");
   if (!client.includes("private let host: any OxHost")) {
     failures.push("apps/ios/Ox/Client/OxClient.swift: OxClient must target the OxHost contract");
@@ -117,10 +121,10 @@ export async function check(): Promise<string> {
     failures.push("WebSocket transport must not select loopback directly or expose an unrestricted listener");
   }
   const transportIngress = await readFile(join(ROOT, "apps/ios/Ox/Host/HostTransportIngress.swift"), "utf8");
-  for (const required of ["#if DEBUG && targetEnvironment(simulator)", 'environment["OX_HOST_LOOPBACK"] == "1"', "parameters.requiredInterface = ingress.interface", "parameters.requiredInterfaceType = .loopback", "TailscaleHostIngress.current(on:", 'address == "127.0.0.1"', "remoteHost == NWEndpoint.Host(address)"]) {
-    if (!transportIngress.includes(required)) failures.push(`Host ingress must constrain its opt-in Debug Simulator loopback (${required})`);
+  for (const required of ["#if DEBUG && (targetEnvironment(simulator) || os(macOS))", 'environment["OX_HOST_LOOPBACK"] == "1"', "parameters.requiredInterface = ingress.interface", "parameters.requiredInterfaceType = .loopback", "TailscaleHostIngress.current(on:", 'address == "127.0.0.1"', "remoteHost == NWEndpoint.Host(address)"]) {
+    if (!transportIngress.includes(required)) failures.push(`Host ingress must constrain its opt-in Debug loopback (${required})`);
   }
-  const productionIngress = transportIngress.replace(/#if DEBUG && targetEnvironment\(simulator\)[\s\S]*?#endif/g, "");
+  const productionIngress = transportIngress.replace(/#if DEBUG && \(targetEnvironment\(simulator\) \|\| os\(macOS\)\)[\s\S]*?#endif/g, "");
   if ([".loopback", '"127.0.0.1"', '"OX_HOST_LOOPBACK"'].some(value => productionIngress.includes(value))) {
     failures.push("Host loopback must be compiled out of Release and physical-device builds");
   }

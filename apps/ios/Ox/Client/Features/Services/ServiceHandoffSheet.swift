@@ -16,6 +16,7 @@ protocol ServiceSheetSession: AnyObject {
 }
 
 extension ServiceHandoffSession: ServiceSheetSession {}
+extension ServiceAuthSession: ServiceSheetSession {}
 
 struct BotControlSheetView: View {
     let session: ServiceHandoffSession

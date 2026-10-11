@@ -91,7 +91,11 @@ final class OutputDelivery {
 
 @MainActor
 final class StreamFrameDriver {
+    #if os(iOS)
     private var link: CADisplayLink?
+    #else
+    private var task: Task<Void, Never>?
+    #endif
     private let handler: @MainActor (CFTimeInterval) -> Void
 
     init(handler: @escaping @MainActor (CFTimeInterval) -> Void) {
@@ -99,23 +103,45 @@ final class StreamFrameDriver {
     }
 
     func start() -> Bool {
+        #if os(iOS)
         guard link == nil else { return false }
         let proxy = StreamFrameProxy(handler)
         let link = CADisplayLink(target: proxy, selector: #selector(StreamFrameProxy.fire))
         link.preferredFrameRateRange = CAFrameRateRange(minimum: 15, maximum: 30, preferred: 30)
         link.add(to: .main, forMode: .common)
         self.link = link
+        #else
+        guard task == nil else { return false }
+        task = Task { [handler] in
+            do {
+                while !Task.isCancelled {
+                    try await Task.sleep(for: .milliseconds(33))
+                    handler(CACurrentMediaTime())
+                }
+            } catch is CancellationError {
+            } catch {
+                Log.session.error("StreamFrameDriver failed error=\(error.localizedDescription)")
+            }
+        }
+        #endif
         return true
     }
 
     func stop() -> Bool {
+        #if os(iOS)
         guard link != nil else { return false }
         link?.invalidate()
         link = nil
+        #else
+        guard task != nil else { return false }
+        task?.cancel()
+        task = nil
+        #endif
         return true
     }
 }
 
+#if os(iOS)
 @MainActor
 private final class StreamFrameProxy: NSObject {
     private let handler: @MainActor (CFTimeInterval) -> Void
@@ -128,3 +154,4 @@ private final class StreamFrameProxy: NSObject {
         handler(link.timestamp)
     }
 }
+#endif

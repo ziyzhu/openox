@@ -47,6 +47,8 @@ public struct MockLLMClient: ProviderClient {
     public static var isEnabled: Bool {
         #if targetEnvironment(simulator)
         return !SimEnv.mockLLMDisabled
+        #elseif DEBUG && os(macOS)
+        return !ProcessInfo.processInfo.arguments.contains("--disable-mock-llm")
         #else
         return false
         #endif

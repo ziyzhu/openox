@@ -1,0 +1,74 @@
+name: OxHost
+options:
+  deploymentTarget:
+    macOS: "26.0"
+packages:
+  SwiftGitX:
+    url: https://github.com/ibrahimcetin/SwiftGitX
+    exactVersion: 0.4.0
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
+targets:
+  host:
+    type: application
+    platform: macOS
+    preBuildScripts:
+      - name: Validate agent bundle
+        script: SRCROOT="$SRCROOT/../ios" sh "$SRCROOT/../ios/validate-agent-bundle.sh"
+        basedOnDependencyAnalysis: false
+    sources:
+      - path: Host
+      - path: Resources
+      - path: ../ios/Ox/Host
+        excludes:
+          - IOSHost.swift
+          - Conversations/IOSConversationBackgroundExecution.swift
+          - Conversations/ScheduledSkillScheduler.swift
+          - Services/Native/MessageComposer.swift
+          - Services/Native/NativeServiceFunctions.swift
+          - Services/Native/LocationProvider.swift
+          - Services/Native/MapProvider.swift
+          - Services/Native/ContactsProvider.swift
+          - Services/Native/CalendarProvider.swift
+      - path: ../ios/Ox/Platform/Models
+      - path: ../ios/Ox/Diagnostics
+      - path: ../ios/Ox/Resources/OxServices.bundle
+        type: file
+        buildPhase: resources
+      - path: ../ios/Ox/Resources/PiDurable.bundle
+        type: file
+        buildPhase: resources
+      - path: ../ios/Ox/Resources/PublicSuffixList.bundle
+        type: file
+        buildPhase: resources
+      - path: ../ios/Ox/Resources/Localizations
+      - path: ../ios/Ox/Resources/ModelServiceActions.json
+    info:
+      path: Info.plist
+      properties:
+        LSUIElement: true
+        CFBundleDisplayName: Ox Host
+        OXAppGroupIdentifier: group.ai.openox.host.local
+        OXICloudContainerIdentifier: iCloud.ai.openox.host.local
+        OXKeychainService: ai.openox.host.local.llm
+        OXWebsiteDataNamespace: ai.openox.host.local.web-profile
+        OXAgentSkillTypeIdentifier: ai.openox.agent-skill
+        OXChatTypeIdentifier: ai.openox.chat
+        OXServiceTypeIdentifier: ai.openox.service
+    dependencies:
+      - package: SwiftGitX
+    settings:
+      base:
+        PRODUCT_NAME: OxHost
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: 1
+        PRODUCT_BUNDLE_IDENTIFIER: ai.openox.host.local
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSUIElement: YES
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: host.entitlements
+        ENABLE_HARDENED_RUNTIME: YES

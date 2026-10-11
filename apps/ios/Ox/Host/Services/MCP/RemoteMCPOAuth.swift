@@ -188,6 +188,7 @@ enum RemoteMCPOAuth {
         endpoint: URL,
         credential initialCredential: RemoteMCPOAuthCredential
     ) async throws -> String {
+        #if os(iOS)
         var credential = initialCredential
         let server = credential.server
         let pkce = OAuthSupport.makePKCE()
@@ -209,6 +210,9 @@ enum RemoteMCPOAuth {
         save(credential, endpoint: endpoint)
         Log.service.info("RemoteMCPOAuth.authorize completed issuer=\(LogPrivacy.url(server.issuer.absoluteString))")
         return credential.tokens!.accessToken
+        #else
+        throw RemoteMCPError.oauth("Interactive OAuth sign-in is unavailable on this macOS Host.")
+        #endif
     }
 
     static func clear(endpoint: URL) {

@@ -1,6 +1,8 @@
 import Foundation
 import Observation
+#if os(iOS)
 import UIKit
+#endif
 import WebKit
 
 @MainActor
@@ -113,6 +115,7 @@ final class ServiceBrowserSession {
     }
 
     private func openExternal(_ url: URL) {
+        #if os(iOS)
         UIApplication.shared.open(url) { [weak self] opened in
             Task { @MainActor in
                 if !opened {
@@ -121,6 +124,9 @@ final class ServiceBrowserSession {
                 Log.ui.info("ServiceBrowser.external scheme=\(url.scheme ?? "none") opened=\(opened)")
             }
         }
+        #else
+        Log.ui.warning("ServiceBrowser.external unavailable platform=macos scheme=\(url.scheme ?? "none")")
+        #endif
     }
 
     func start() {

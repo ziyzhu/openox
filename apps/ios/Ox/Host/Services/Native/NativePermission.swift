@@ -1,8 +1,10 @@
+import Foundation
+#if os(iOS)
 import Contacts
 import CoreLocation
 import EventKit
-import Foundation
 import UserNotifications
+#endif
 
 enum NativePermissionState: Equatable {
     case granted
@@ -20,6 +22,7 @@ enum NativePermission: String, Decodable, Equatable, Sendable {
     case health
 
     func state() async -> NativePermissionState {
+        #if os(iOS)
         switch self {
         case .contacts:
             return Self.map(CNContactStore.authorizationStatus(for: .contacts))
@@ -38,9 +41,13 @@ enum NativePermission: String, Decodable, Equatable, Sendable {
             }
         case .bluetooth, .health: return .denied
         }
+        #else
+        return .denied
+        #endif
     }
 
     func request() async -> NativePermissionState {
+        #if os(iOS)
         switch self {
         case .location:
             await LocationProvider.shared.requestAccess()
@@ -54,9 +61,11 @@ enum NativePermission: String, Decodable, Equatable, Sendable {
             _ = await ContactsProvider.shared.authorized()
         case .bluetooth, .health: break
         }
+        #endif
         return await state()
     }
 
+    #if os(iOS)
     private static func map(_ status: CLAuthorizationStatus) -> NativePermissionState {
         switch status {
         case .authorizedWhenInUse, .authorizedAlways: return .granted
@@ -83,4 +92,5 @@ enum NativePermission: String, Decodable, Equatable, Sendable {
         @unknown default: return .denied
         }
     }
+    #endif
 }

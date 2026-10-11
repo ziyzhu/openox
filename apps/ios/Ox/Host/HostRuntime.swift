@@ -14,12 +14,19 @@ final class HostRuntime: OxHost {
     var executionAvailable: Bool { executionPolicy() }
 
     private let executionPolicy: @MainActor () -> Bool
+    private let activateSchedules: @MainActor () throws -> Void
     private var preparation: Preparation?
     private var optionalRecovery: Task<Void, Never>?
 
-    init(serviceManager: ServiceManager, presentations: AppPresentations, executionPolicy: @escaping @MainActor () -> Bool) {
+    init(
+        serviceManager: ServiceManager,
+        presentations: AppPresentations,
+        executionPolicy: @escaping @MainActor () -> Bool,
+        activateSchedules: @escaping @MainActor () throws -> Void
+    ) {
         services = serviceManager
         self.executionPolicy = executionPolicy
+        self.activateSchedules = activateSchedules
         conversations = ConversationManager(
             repository: .shared,
             storage: .shared,
@@ -85,7 +92,7 @@ final class HostRuntime: OxHost {
                 var delay: Double = 2
                 while !Task.isCancelled {
                     try await Task.sleep(for: .seconds(delay))
-                    if await StorageMigrator.recoverOptionalStorage(services: services) { return }
+                    if await StorageMigrator.recoverOptionalStorage(services: services, activateSchedules: activateSchedules) { return }
                     delay = min(delay * 3, 300)
                 }
             } catch is CancellationError {
@@ -143,7 +150,7 @@ final class HostRuntime: OxHost {
                 _ = UserMemory.shared
                 try await UserMemory.shared.waitUntilCurrent()
                 await services.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
-                do { try ScheduledSkillScheduler.shared.activate() }
+                do { try activateSchedules() }
                 catch { Log.app.warning("HostRuntime schedules unavailable recoveryRequired=true error=\(error.localizedDescription)") }
                 #if DEBUG && targetEnvironment(simulator)
                 try await DeviceTemplate.finish(conversations: conversations)

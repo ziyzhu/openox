@@ -52,6 +52,14 @@ final class NativeServiceOperations {
     ) async throws -> JSONValue? {
         let browser = service
         let serviceID = service.domain
+        #if os(macOS)
+        guard serviceID == "ios:browser" else {
+            throw RuntimeError.bridge("Native iOS service '\(serviceID)' is unavailable on this macOS Host.")
+        }
+        guard actionID != "showPage", actionID != "waitForUserInteraction" else {
+            throw RuntimeError.bridge("Browser presentation is unavailable on this headless macOS Host.")
+        }
+        #endif
         let fields = args.objectValue ?? [:]
         switch (serviceID, actionID) {
         case ("ios:browser", "navigate"):
@@ -209,6 +217,7 @@ final class NativeServiceOperations {
                 .session(for: browser, ownerID: id)
                 .stopCapture(discard: fields["discard"]?.boolValue ?? false)
             return .object(["stopped": .bool(stopped)])
+        #if os(iOS)
         case ("ios:location", "current"):
             return try await currentLocation(purpose: purpose)
         case ("ios:location", "searchNearby"):
@@ -254,6 +263,7 @@ final class NativeServiceOperations {
             return try await composeMessage(options: fields["options"], purpose: purpose)
         case ("ios:contacts", "search"):
             return try await searchContacts(query: fields["query"]?.stringValue, purpose: purpose)
+        #endif
         default:
             throw Service.InvokeError.unknown("\(serviceID):\(actionID)")
         }

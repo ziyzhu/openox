@@ -12,6 +12,9 @@ extension Conversation {
         timeZone: String?,
         purpose: String
     ) async throws -> JSONValue? {
+        #if os(macOS)
+        throw RuntimeError.bridge("Scheduled execution is not available on this macOS Host.")
+        #else
         let args = scheduleArgs(skillName: skillName, frequency: frequency)
         return try await tracked(Actions.scheduleCreate, args, purpose: purpose) {
             try requireProfileMutation(Actions.scheduleCreate)
@@ -39,6 +42,7 @@ extension Conversation {
             Log.session.info("bridge.schedule.create id=\(schedule.id) skill=\(skill.name)")
             return scheduleResult(schedule)
         }
+        #endif
     }
 
     func listScheduledSkills(purpose: String) async throws -> JSONValue? {
@@ -62,6 +66,9 @@ extension Conversation {
     }
 
     func enableScheduledSkill(id: String, enabled: Bool, purpose: String) async throws -> JSONValue? {
+        #if os(macOS)
+        if enabled { throw RuntimeError.bridge("Scheduled execution is not available on this macOS Host.") }
+        #endif
         let schedule = try ownedSchedule(id)
         let verb = enabled ? L10n.string("Resume") : L10n.string("Pause")
         return try await tracked(
@@ -84,6 +91,9 @@ extension Conversation {
     }
 
     func runScheduledSkill(id: String, purpose: String) async throws -> JSONValue? {
+        #if os(macOS)
+        throw RuntimeError.bridge("Scheduled execution is not available on this macOS Host.")
+        #else
         let schedule = try ownedSchedule(id)
         return try await tracked(Actions.scheduleRun, .object(["id": .string(id)]), purpose: purpose) {
             try requireProfileMutation(Actions.scheduleRun)
@@ -95,6 +105,7 @@ extension Conversation {
             ScheduledSkillScheduler.shared.runNow(id: schedule.id)
             return .object(["id": .string(id), "started": .bool(true)])
         }
+        #endif
     }
 
     private func ownedSchedule(_ rawID: String) throws -> ScheduledSkill {

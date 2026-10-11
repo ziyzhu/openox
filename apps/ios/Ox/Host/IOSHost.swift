@@ -28,13 +28,8 @@ final class IOSHost: OxHost {
         runtime = HostRuntime(
             serviceManager: preparedServices,
             presentations: presentations,
-            executionPolicy: {
-                #if targetEnvironment(macCatalyst)
-                true
-                #else
-                UIApplication.shared.applicationState == .active
-                #endif
-            }
+            executionPolicy: { UIApplication.shared.applicationState == .active },
+            activateSchedules: { try ScheduledSkillScheduler.shared.activate() }
         )
         recoveryObservers = [
             NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in

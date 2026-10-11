@@ -1,7 +1,11 @@
 import Foundation
 import CryptoKit
 import os
+#if os(iOS)
 import UIKit
+#else
+import AppKit
+#endif
 
 nonisolated final class LogFile: @unchecked Sendable {
     static let shared = LogFile()
@@ -29,7 +33,12 @@ nonisolated final class LogFile: @unchecked Sendable {
     private var handle: FileHandle?
 
     private init() {
-        for name in [UIApplication.didEnterBackgroundNotification, UIApplication.willTerminateNotification] {
+        #if os(iOS)
+        let notifications = [UIApplication.didEnterBackgroundNotification, UIApplication.willTerminateNotification]
+        #else
+        let notifications = [NSApplication.willTerminateNotification]
+        #endif
+        for name in notifications {
             NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
                 guard let self else { return }
                 self.queue.async { self.flush() }
@@ -61,6 +70,10 @@ nonisolated final class LogFile: @unchecked Sendable {
                 }
             }
         }
+    }
+
+    func synchronize() {
+        queue.sync { flush() }
     }
 
     struct Page: Sendable {

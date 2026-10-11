@@ -1,6 +1,8 @@
 import Foundation
 import Observation
+#if os(iOS)
 import UIKit
+#endif
 
 @MainActor
 @Observable
@@ -638,13 +640,24 @@ final class ConversationManager {
     }
 
     func flushAll() {
+        #if os(iOS)
         let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "ConversationManager.flushAll", expirationHandler: nil)
+        #endif
         Task { [weak self] in
             guard let self else { return }
             _ = await self.flushAllNow()
+            #if os(iOS)
             if backgroundTask != .invalid { UIApplication.shared.endBackgroundTask(backgroundTask) }
+            #endif
             Log.session.info("ConversationManager.flushAll remaining=\(self.records.values.filter { $0.persistence.isDirty }.count)")
         }
+    }
+
+    func stopAllAndFlush() async -> Bool {
+        let conversations = records.values.compactMap { $0.hydration.conversation }
+        for conversation in conversations { conversation.cancelAll() }
+        for conversation in conversations { await conversation.waitForRun() }
+        return await flushAllNow()
     }
 
     func flushAllNow() async -> Bool {

@@ -13,8 +13,21 @@ enum OxHostRPC {
                 "rpc": versions([OxHostProtocol.contractVersion]),
                 "repository": versions(HostProtocols.repository),
             ]),
-            "methods": .array(OxHostProtocol.Method.allCases.map { .string($0.rawValue) }),
+            "methods": .array(methods.map { .string($0.rawValue) }),
         ])
+    }
+
+    private static var methods: [OxHostProtocol.Method] {
+        #if os(macOS)
+        OxHostProtocol.Method.allCases.filter {
+            switch $0 {
+            case .getComposerFormatting, .setComposerDraft, .setComposerMarkedText, .setPasteboardImage, .setPasteboardRichText, .stageSharedNote, .setEditDraft: false
+            default: true
+            }
+        }
+        #else
+        OxHostProtocol.Method.allCases
+        #endif
     }
 
     private static func versions(_ values: [Int]) -> JSONValue { .array(values.map { .int($0) }) }

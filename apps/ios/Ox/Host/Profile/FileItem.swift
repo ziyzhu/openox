@@ -2,7 +2,9 @@ import CoreGraphics
 import Foundation
 import ImageIO
 import Synchronization
+#if os(iOS)
 import UIKit
+#endif
 import UniformTypeIdentifiers
 
 extension Notification.Name {
@@ -963,7 +965,18 @@ nonisolated enum ImagePreparer {
         let lossless = inspection.type.conforms(to: .png)
             || inspection.type.conforms(to: .gif)
             || hasAlpha(image)
+        #if os(iOS)
         return try encode(UIImage(cgImage: image), lossless: lossless)
+        #else
+        let data = NSMutableData()
+        let type = lossless ? UTType.png : UTType.jpeg
+        guard let destination = CGImageDestinationCreateWithData(data, type.identifier as CFString, 1, nil) else {
+            throw ImagePreparationError.encode
+        }
+        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: FileLimits.imageJPEGQuality] as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else { throw ImagePreparationError.encode }
+        return PreparedImage(data: data as Data, mimeType: lossless ? "image/png" : "image/jpeg", fileExtension: lossless ? "png" : "jpg")
+        #endif
     }
 
     static func preparePreservingResolution(_ data: Data) throws -> PreparedImage {
@@ -977,6 +990,7 @@ nonisolated enum ImagePreparer {
         throw ImagePreparationError.invalid
     }
 
+    #if os(iOS)
     static func prepare(_ image: UIImage, suggestedName: String?) throws -> PreparedImage {
         let width = Int(image.size.width * image.scale)
         let height = Int(image.size.height * image.scale)
@@ -1006,6 +1020,8 @@ nonisolated enum ImagePreparer {
         return PreparedImage(data: data, mimeType: "image/jpeg", fileExtension: "jpg")
     }
 
+    #endif
+
     private static func hasAlpha(_ image: CGImage) -> Bool {
         switch image.alphaInfo {
         case .alphaOnly, .first, .last, .premultipliedFirst, .premultipliedLast: true
@@ -1021,6 +1037,7 @@ nonisolated public enum FileImporter {
         let fileName: String
     }
 
+    #if os(iOS)
     public static func importImageAsync(_ image: UIImage, suggestedName: String?) async throws -> FileItem {
         guard let scope = StorageRoot.currentScope else { throw CocoaError(.fileNoSuchFile) }
         return try await importImageAsync(image, suggestedName: suggestedName, in: scope)
@@ -1036,6 +1053,8 @@ nonisolated public enum FileImporter {
         }.value
         return try await write(draft, in: scope)
     }
+
+    #endif
 
     public static func importImageDataAsync(_ data: Data, suggestedName: String?) async throws -> FileItem {
         guard let scope = StorageRoot.currentScope else { throw CocoaError(.fileNoSuchFile) }
@@ -1083,6 +1102,7 @@ nonisolated public enum FileImporter {
         return try await write(draft, in: scope)
     }
 
+    #if os(iOS)
     private static func imageDraft(_ image: UIImage, suggestedName: String?) throws -> Draft {
         do {
             let prepared = try ImagePreparer.prepare(image, suggestedName: suggestedName)
@@ -1093,6 +1113,8 @@ nonisolated public enum FileImporter {
             throw FileError.imageDecodeFailed
         }
     }
+
+    #endif
 
     private static func imageDataDraft(_ data: Data, suggestedName: String?) throws -> Draft {
         do {

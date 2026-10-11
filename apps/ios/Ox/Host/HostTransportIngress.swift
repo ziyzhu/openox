@@ -3,12 +3,12 @@ import Network
 
 nonisolated enum HostTransportIngress: Equatable, Sendable {
     case tailscale(TailscaleHostIngress)
-    #if DEBUG && targetEnvironment(simulator)
+    #if DEBUG && (targetEnvironment(simulator) || os(macOS))
     case loopback
     #endif
 
     static var loopbackEnabled: Bool {
-        #if DEBUG && targetEnvironment(simulator)
+        #if DEBUG && (targetEnvironment(simulator) || os(macOS))
         ProcessInfo.processInfo.environment["OX_HOST_LOOPBACK"] == "1"
         #else
         false
@@ -20,7 +20,7 @@ nonisolated enum HostTransportIngress: Equatable, Sendable {
     }
 
     static func current(on path: NWPath) -> Self? {
-        #if DEBUG && targetEnvironment(simulator)
+        #if DEBUG && (targetEnvironment(simulator) || os(macOS))
         if loopbackEnabled { return .loopback }
         #endif
         return TailscaleHostIngress.current(on: path).map(Self.tailscale)
@@ -29,8 +29,8 @@ nonisolated enum HostTransportIngress: Equatable, Sendable {
     var description: String {
         switch self {
         case .tailscale(let ingress): "tailscale interface=\(ingress.interface.name)"
-        #if DEBUG && targetEnvironment(simulator)
-        case .loopback: "debug-simulator-loopback"
+        #if DEBUG && (targetEnvironment(simulator) || os(macOS))
+        case .loopback: "debug-loopback"
         #endif
         }
     }
@@ -38,7 +38,7 @@ nonisolated enum HostTransportIngress: Equatable, Sendable {
     var addresses: [String] {
         switch self {
         case .tailscale(let ingress): ingress.addresses
-        #if DEBUG && targetEnvironment(simulator)
+        #if DEBUG && (targetEnvironment(simulator) || os(macOS))
         case .loopback: ["127.0.0.1"]
         #endif
         }
@@ -47,7 +47,7 @@ nonisolated enum HostTransportIngress: Equatable, Sendable {
     func constrain(_ parameters: NWParameters) {
         switch self {
         case .tailscale(let ingress): parameters.requiredInterface = ingress.interface
-        #if DEBUG && targetEnvironment(simulator)
+        #if DEBUG && (targetEnvironment(simulator) || os(macOS))
         case .loopback: parameters.requiredInterfaceType = .loopback
         #endif
         }
@@ -57,7 +57,7 @@ nonisolated enum HostTransportIngress: Equatable, Sendable {
         switch self {
         case .tailscale(let ingress):
             ingress.accepts(path, address: address, port: port)
-        #if DEBUG && targetEnvironment(simulator)
+        #if DEBUG && (targetEnvironment(simulator) || os(macOS))
         case .loopback:
             if let path, path.status == .satisfied, path.usesInterfaceType(.loopback), address == "127.0.0.1",
                case let .hostPort(localHost, localPort) = path.localEndpoint,

@@ -1,6 +1,8 @@
 import Foundation
 import Observation
+#if os(iOS)
 import UIKit
+#endif
 
 struct ServiceDetailCapabilities {
     enum Authentication {
@@ -117,9 +119,13 @@ final class IOSService {
     func updatePermission(from state: NativePermissionState?) async -> NativePermissionState? {
         guard let permission else { return nil }
         if state == .notDetermined { return await permission.request() }
+        #if os(iOS)
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return state }
         let opened = await UIApplication.shared.open(url)
         Log.ui.info("IOSService.permission settings permission=\(permission.rawValue) opened=\(opened)")
+        #else
+        Log.ui.warning("IOSService.permission unavailable permission=\(permission.rawValue) platform=macos")
+        #endif
         return state
     }
 

@@ -2,7 +2,6 @@ import Foundation
 import CryptoKit
 import WebKit
 import Observation
-import SwiftUI
 
 @MainActor
 @Observable
@@ -20,7 +19,6 @@ final class Service: NSObject, Identifiable {
     private(set) var title: String
     private(set) var summary: String
 
-    nonisolated var tint: Color { Color(hex: tintHex) }
     var isWebService: Bool { webService != nil }
     var isIOSService: Bool { iOSService != nil }
     var isAPIService: Bool { apiService != nil }
@@ -981,14 +979,5 @@ extension Service {
         let g = 0x40 &+ ((h >> 8) & 0x7f)
         let b = 0x40 &+ ((h >> 16) & 0x7f)
         return (r << 16) | (g << 8) | b
-    }
-}
-
-nonisolated extension Color {
-    init(hex: UInt32) {
-        let r = Double((hex >> 16) & 0xFF) / 255.0
-        let g = Double((hex >> 8) & 0xFF) / 255.0
-        let b = Double(hex & 0xFF) / 255.0
-        self.init(red: r, green: g, blue: b)
     }
 }

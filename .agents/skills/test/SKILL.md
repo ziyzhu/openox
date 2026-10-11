@@ -20,6 +20,7 @@ bun run ci
 bun run ci --standalone-only --out /tmp/ox-cli-artifacts
 bun run test:e2e
 bun run test:logs
+bun run test:host-macos --app /absolute/OxHost.app --output /tmp/ox-macos-evidence
 bun run ci:ios --device ox-1 --loopback
 bun run ci:ios --device ox-1 --loopback --app /absolute/Ox.app
 bun run test:demo --device ox-1
@@ -57,6 +58,26 @@ and tar. It builds, downloads, and installs the current platform's CLI archive,
 then verifies version/help, repository validation, discovery, and conversation operations
 against fixtures with no Bun or Node on PATH. GitHub checks macOS ARM64/Intel and
 Linux ARM64/x64 using the same command and pins Bun 1.3.13.
+
+## Local macOS verification
+
+`test:host-macos` launches the actual signed Debug `ai.openox.host.local` app as a
+menu-bar process on reserved localhost port 19876. It verifies Mock conversations, native
+JavaScript, cancellation, explicit UI-capability rejection, graceful SIGTERM,
+restart persistence, browser-Origin rejection, disabled Host access, and quitting
+during an active run. It refuses existing Mac Host processes and uses the app's own sandbox,
+retains one QA conversation for review, disables connections afterward, and stops its
+processes. It does not run real providers, OAuth, native iOS services, scheduling,
+or Tailscale verification. Debug loopback is explicit; Release stays Tailscale-only.
+For Mac UI verification, use System Events accessibility to open the status menu,
+toggle connections, present an existing service page, and close/reopen its window.
+Verify the same page identity/DOM survives and CLI access continues without a
+window. Capture only the Host UI outside Git; screenshots require macOS Screen
+Recording permission, which must not be bypassed.
+For a Release smoke, launch the Release app with `OX_HOST_LOOPBACK=1`, verify
+localhost still refuses connections, and use the actual Tailscale endpoint for
+`ox host describe` and `ox host providers`; Mock must be absent. Quit cleanly
+and disable persisted access afterward.
 
 ## Local iOS verification
 

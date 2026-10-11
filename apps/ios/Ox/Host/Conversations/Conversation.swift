@@ -1,6 +1,8 @@
 import Foundation
 import WebKit
+#if os(iOS)
 import UIKit
+#endif
 import Observation
 
 enum ConversationRetention: Equatable {
@@ -1600,7 +1602,9 @@ final class Conversation: Identifiable {
     private func registerAgentDelta() {
         guard agentHapticPhase == .waitingForDelta else { return }
         agentHapticPhase = .deltaReceived
+        #if os(iOS)
         if isSelected { Haptics.impact(.agentDeltaReceived) }
+        #endif
     }
 
     private func applyAssistantFinal(_ assistant: AssistantMessage) {
@@ -2404,11 +2408,15 @@ final class Conversation: Identifiable {
         }
         Log.session.info("Conversation.worker finish id=\(id) run=\(runID.rawValue.uuidString.prefix(8)) conversationFailed=\(conversationFailed) conversationSucceeded=\(conversationSucceeded) leaseSucceeded=\(leaseSucceeded)")
         guard let completionNotification else { return }
+        #if os(iOS)
         guard UIApplication.shared.applicationState != .active else {
             Log.session.info("Conversation.notify skipped id=\(id) reason=active")
             return
         }
         deliverCompletionNotification(completionNotification)
+        #else
+        Log.session.info("Conversation.notify skipped id=\(id) reason=headless")
+        #endif
     }
 
     private func setRunPhase(_ phase: RunPhase) {
@@ -2540,7 +2548,7 @@ final class Conversation: Identifiable {
             filePaths: referencedFiles.map { "artifacts/\($0.fileName)" },
             isTemporary: retention == .temporary,
             responseLanguage: AppLocale.shared.responseLanguage,
-            hostID: "ios:\(Device.id)",
+            hostID: Device.hostID,
             profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"
         )
         submission.latency.mark(.promptReady)
@@ -2799,7 +2807,7 @@ final class Conversation: Identifiable {
         return AgentConfiguration(
             client: client,
             model: model,
-            promptState: ConversationPromptState.system(soul: Soul.shared.directive, memory: systemPromptMemory, hostID: "ios:\(Device.id)", profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"),
+            promptState: ConversationPromptState.system(soul: Soul.shared.directive, memory: systemPromptMemory, hostID: Device.hostID, profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"),
             tools: [ConversationTool(conversation: self)],
             streamOptions: StreamOptions(sessionID: conversationID.uuidString),
             transformContext: { request in

@@ -25,6 +25,28 @@ ox host list --help
 - Rebuild after source changes or switching worktrees. A global source link follows one checkout; concurrent agents should use `bun apps/cli/src/ox.ts` from their own checkout when they cannot share the linked build.
 - On Linux, limit setup to the CLI, repository tooling, and coding-agent configuration.
 
+## Native macOS Host
+
+The host-only target lives in `apps/macos/project.yml`; it requires macOS 26+,
+Xcode, and XcodeGen. Run `bun run build:services`, `bun run build:agent`, and
+`bun run build:macos`.
+For an isolated build, append `-derivedDataPath /tmp/ox-macos-derived` to the build command.
+Stop an existing Mac Host before launching it directly again.
+Launch `OxHost.app/Contents/MacOS/OxHost --allow-connections`; use
+`--disable-connections` to disable persisted remote access. `OX_HOST_ENDPOINT`
+selects the port, not the listening interface. Normal launches use validated
+Tailscale ingress. Debug builds can explicitly use `OX_HOST_LOOPBACK=1` and
+`OX_HOST_ENDPOINT=ws://127.0.0.1:19876` for local verification. Release cannot.
+The signed app uses a separate sandbox and credential namespace; do not replay
+an iOS container into it. The menu bar shows Host status, controls connections,
+and opens existing service pages in native windows. Closing a window detaches
+presentation without closing its runtime page or stopping the Host. There is no
+conversation UI. Programmatic interactive sign-in/handoffs,
+iOS native services, and scheduled execution are unavailable initially.
+SIGINT/SIGTERM request an orderly quit; cancellation and persistence finish
+before exit. AppKit termination must be entered outside a main-dispatch callback
+so its deferred termination loop can run MainActor cleanup.
+
 ## iOS tools and simulator pool
 
 Use macOS with Xcode supporting the assigned iOS 26 and iOS 27 runtimes. Install components in **Xcode > Settings > Components**, following [Apple's component installation guide](https://developer.apple.com/documentation/xcode/downloading-and-installing-additional-xcode-components). An older Xcode may need upgrading before it can use a newer runtime. Keep existing Xcode installations and devices until replacements work; never erase simulator data to resolve a missing runtime.

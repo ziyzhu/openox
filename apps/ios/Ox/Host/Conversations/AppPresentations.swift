@@ -212,6 +212,7 @@ private struct UnavailableMessageComposer: MessageComposing {
     }
 }
 
+#if os(iOS)
 extension AppPresentations {
     static let live = AppPresentations(
         serviceSignIn: AppPresentationCoordinator.shared,
@@ -229,3 +230,4 @@ private struct MessageSheetComposer: MessageComposing {
         try await MessageComposer.present(recipients: recipients, body: body)
     }
 }
+#endif

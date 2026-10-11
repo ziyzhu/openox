@@ -2,7 +2,9 @@ import Foundation
 import JavaScriptCore
 import WebKit
 import Observation
+#if os(iOS)
 import UIKit
+#endif
 
 @MainActor
 @Observable
@@ -187,6 +189,7 @@ final class ServiceManager {
         savedDomains = Set(UserDefaults.standard.stringArray(forKey: Self.savedKey) ?? [])
         actionPolicies = Self.loadActionPolicies()
         persistedRemoteMCPServers = Self.loadPersistedRemoteMCPServers()
+        #if os(iOS)
         memoryWarningObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
@@ -198,6 +201,7 @@ final class ServiceManager {
                 self.closeWebConversations()
             }
         }
+        #endif
     }
 
     private static func loadActionPolicies(defaults: UserDefaults = .standard) -> ActionPolicyConfiguration {
@@ -1300,6 +1304,9 @@ final class ServiceManager {
     }
 
     private func listIOSServiceDefinitions(locale: String?) async -> [ServiceDefinition] {
+        #if os(macOS)
+        return []
+        #else
         guard let files = monoRepository?.iOSManifests else { return [] }
         let version = ProcessInfo.processInfo.operatingSystemVersion
         let definitions = files.compactMap { file -> ServiceDefinition? in
@@ -1328,6 +1335,7 @@ final class ServiceManager {
         }
         Log.service.info("ServiceManager.listIOSServices count=\(definitions.count) os=\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)")
         return definitions
+        #endif
     }
 
     private func listMCPServiceDefinitions(locale: String?) async -> [ServiceDefinition] {

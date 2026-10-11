@@ -8,6 +8,8 @@
     "ci:ios": "bun .agents/skills/test/apps/ios/smoke.ts",
     "test:e2e": "bun test ./.agents/skills/test",
     "test:logs": "bun .agents/skills/test/apps/cli/logs.ts",
+    "test:host-macos": "bun .agents/skills/test/apps/macos/host.ts",
+    "build:macos": "xcodegen generate --spec apps/macos/project.yml && xcodebuild -project apps/macos/OxHost.xcodeproj -scheme host -configuration Debug -destination 'platform=macOS' build",
     "evals": "bun .agents/skills/evals/scripts/runner.ts",
     "build:services": "bun .agents/skills/build/scripts/ios-services-build.ts",
     "test:demo": "bun .agents/skills/test/apps/ios/demo-preview.ts",

@@ -186,7 +186,7 @@ extension Service {
             let previous = auth.observation
             setAuth(.signingIn(previous: previous))
             do {
-                try await APIServiceSignIn.present(self)
+                try await presentAPIAuthentication()
                 setAuth(try await apiService.authorization.checkAccess(previous: nil))
             } catch is CancellationError {
                 setAuth(try await apiService.authorization.checkAccess(previous: nil))
@@ -212,6 +212,14 @@ extension Service {
         if case .cancelled = outcome, auth == .signingIn(previous: previous) {
             setAuth(previousAuth)
         }
+    }
+
+    private func presentAPIAuthentication() async throws {
+        #if os(iOS)
+        try await APIServiceSignIn.present(self)
+        #else
+        throw RuntimeError.bridge("Interactive API service authentication is unavailable on this macOS Host.")
+        #endif
     }
 
     private func performInteractiveSignIn(

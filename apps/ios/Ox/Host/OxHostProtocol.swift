@@ -49,7 +49,11 @@ enum OxHostProtocol {
         case .stopConversation: handleStopConversation(try decode(SessionRequest.self), conversationManager: conversations, reply: reply)
         case .listProviders: handleListProviders(try decode(EmptyRequest.self), reply: reply)
         case .getLogs: handleGetLogs(try decode(GetLogsRequest.self), reply: reply)
+        #if os(iOS)
         case .getComposerFormatting: ClientAutomation.handleGetComposerFormatting(try decode(EmptyRequest.self), reply: reply)
+        #else
+        case .getComposerFormatting: reply.failure("This Host has no composer UI", code: -32601)
+        #endif
         case .repositoryGate: handleRepositorySaveGate(try decode(RepositoryGateRequest.self), conversationManager: conversations, reply: reply)
         case .vmInspect:
             let request = try decode(VMRequest.self)
@@ -64,12 +68,17 @@ enum OxHostProtocol {
         case .setKey: handleSetKey(try decode(SetKeyRequest.self), reply: reply)
         case .setRegion: handleSetRegion(try decode(SetRegionRequest.self), reply: reply)
         case .setAttachedService: handleSetAttachedService(try decode(SetAttachedServiceRequest.self), conversationManager: conversations, serviceManager: services, reply: reply)
+        #if os(iOS)
         case .setComposerDraft: ClientAutomation.handleSetComposerDraft(try decode(PromptRequest.self), reply: reply)
         case .setComposerMarkedText: ClientAutomation.handleSetComposerMarkedText(try decode(PromptRequest.self), reply: reply)
         case .setPasteboardImage: ClientAutomation.handleSetPasteboardImage(try decode(EmptyRequest.self), reply: reply)
         case .setPasteboardRichText: ClientAutomation.handleSetPasteboardRichText(try decode(PromptRequest.self), reply: reply)
         case .stageSharedNote: ClientAutomation.handleStageSharedNote(try decode(PromptRequest.self), reply: reply)
         case .setEditDraft: ClientAutomation.handleSetEditDraft(try decode(PromptRequest.self), reply: reply)
+        #else
+        case .setComposerDraft, .setComposerMarkedText, .setPasteboardImage, .setPasteboardRichText, .stageSharedNote, .setEditDraft:
+            reply.failure("This Host has no client UI", code: -32601)
+        #endif
         }
     }
 

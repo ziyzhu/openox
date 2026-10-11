@@ -294,7 +294,11 @@ final class OxCanvas {
         let presentationID = UUID()
         messagePresentationID = presentationID
         defer { if messagePresentationID == presentationID { messagePresentationID = nil } }
+        #if os(iOS)
         return try await AppPresentations.live.messages.present(recipients: recipients, body: body)
+        #else
+        throw RuntimeError.bridge("Message composition is unavailable on this macOS Host.")
+        #endif
     }
 
     private func receiveFiles(_ artifacts: [RemoteMCPFile]) throws {
@@ -334,7 +338,13 @@ private struct CanvasHandoffPresenter: ServiceHandoffPresenting {
 @MainActor
 private struct CanvasMessagePresenter: MessageComposing {
     let canvas: OxCanvas
-    var canSend: Bool { AppPresentations.live.messages.canSend }
+    var canSend: Bool {
+        #if os(iOS)
+        AppPresentations.live.messages.canSend
+        #else
+        false
+        #endif
+    }
     func present(recipients: [String], body: String?) async throws -> MessageDisposition {
         try await canvas.presentMessages(recipients: recipients, body: body)
     }

@@ -27,9 +27,14 @@ nonisolated enum ProcessStats {
 
     static func sample() -> Sample {
         let (cpu, threads) = cpuPercentAndThreadCount()
+        #if os(iOS)
+        let availableMB = Double(os_proc_available_memory()) / 1_048_576
+        #else
+        let availableMB: Double = 0
+        #endif
         return Sample(cpuPercent: cpu,
                       footprintMB: footprintMB(),
-                      availableMB: Double(os_proc_available_memory()) / 1_048_576,
+                      availableMB: availableMB,
                       threadCount: threads)
     }
 
