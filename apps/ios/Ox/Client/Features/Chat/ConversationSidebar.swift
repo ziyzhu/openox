@@ -29,6 +29,9 @@ struct ConversationSidebar: View {
     @State private var titleDraft = ""
     @State private var searchQuery = ""
     @State private var searchPresented = false
+    @State private var visibleCount = 20
+
+    private let pageSize = 20
 
     var body: some View {
         NavigationStack {
@@ -52,6 +55,7 @@ struct ConversationSidebar: View {
             prompt: Text(A11yLabel.searchChats)
         )
         .background(Theme.Colors.surface, ignoresSafeAreaEdges: .all)
+        .onChange(of: searchQuery) { _, _ in visibleCount = pageSize }
         .alert(A11yLabel.renameChat, isPresented: Binding(
             get: { renaming != nil },
             set: { if !$0 { renaming = nil } }
@@ -163,7 +167,19 @@ struct ConversationSidebar: View {
                         .padding(.horizontal, edgeInset)
                         .padding(.vertical, 11)
                 } else if contentState == .ready {
-                    ForEach(ordered) { row($0) }
+                    ForEach(ordered.prefix(visibleCount)) { row($0) }
+                    if ordered.count > visibleCount {
+                        CellularAutomatonLoader.small
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Theme.Spacing.md)
+                            .accessibilityLabel("Loading your chats…")
+                            .task {
+                                await Task.yield()
+                                guard !Task.isCancelled else { return }
+                                visibleCount = min(visibleCount + pageSize, ordered.count)
+                            }
+                            .id("\(query):\(visibleCount)")
+                    }
                 }
                 Color.clear.frame(height: Theme.Spacing.md)
             }

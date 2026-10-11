@@ -101,7 +101,7 @@ actor ProfileRepository {
             var result: [ChatMeta] = []
             var cursor: JSONValue = .null
             repeat {
-                let page = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationList"), "limit": .int(100), "listCursor": cursor]))
+                let page = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationList"), "limit": .int(20), "listCursor": cursor]))
                 for item in page.objectValue?["items"]?.arrayValue ?? [] {
                     guard let fields = item.objectValue, fields["hasTranscript"]?.boolValue == true,
                           let value = fields["reference"] else { continue }

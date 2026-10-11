@@ -1617,8 +1617,14 @@ struct ConversationPage: View {
     }
 
     private func earlierWindowBoundary(blocks: [ConversationBlock]) -> some View {
-        Color.clear
-            .frame(height: transcriptWindow.hasEarlier ? 1 : 0)
+        ZStack {
+            if transcriptWindow.isLoadingEarlier {
+                CellularAutomatonLoader.small
+                    .accessibilityLabel("Loading earlier messages…")
+            }
+        }
+            .frame(maxWidth: .infinity)
+            .frame(height: transcriptWindow.hasEarlier ? 44 : 0)
             .onScrollVisibilityChange(threshold: 0.01) { visible in
                 transcriptWindow.setEarlierBoundaryVisible(visible)
                 if visible { requestEarlierReveal(blocks: blocks) }

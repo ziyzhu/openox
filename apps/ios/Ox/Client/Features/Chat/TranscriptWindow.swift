@@ -14,6 +14,11 @@ struct TranscriptWindow: Equatable {
 
     var hasEarlier: Bool { range.lowerBound > 0 }
 
+    var isLoadingEarlier: Bool {
+        if case .pending = earlierRequest { return hasEarlier }
+        return false
+    }
+
     func resolvedRange(total: Int) -> Range<Int> {
         guard !range.isEmpty, range.lowerBound < total else { return Self.tailRange(total: total) }
         return range.lowerBound..<total
