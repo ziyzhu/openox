@@ -20,23 +20,15 @@ struct ProfileSettingsView: View {
         storage.activeId == profileID
     }
 
-    private var iCloudBinding: Binding<Bool> {
-        Binding(
-            get: { profile?.location == .iCloud },
-            set: { enabled in
-                guard let profile else { return }
-                move(profile, to: enabled ? .iCloud : .local)
-            }
-        )
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 if let profile {
                     if profile.version == ProfileSchema.current {
                         manageSection(for: profile)
-                        storageSection
+                        if profile.location == .external {
+                            storageSection
+                        }
                         ProfileContentsView(profile: profile, initialSkillDraft: initialSkillDraft)
                             .id(profile.url.path)
                         deleteSection(for: profile)
@@ -136,17 +128,6 @@ struct ProfileSettingsView: View {
         }
     }
 
-    private func move(_ profile: Profile, to location: Profile.Location) {
-        Task {
-            do {
-                try await storage.move(profile, to: location)
-            } catch {
-                Log.ui.error("ProfileSettings.move id=\(profile.id) location=\(location.rawValue) error=\(error.localizedDescription)")
-                operationErrorMessage = error.localizedDescription
-            }
-        }
-    }
-
     private func nameRow(for profile: Profile) -> some View {
         Group {
             if profile.location == .external {
@@ -215,24 +196,6 @@ struct ProfileSettingsView: View {
                     .font(Theme.Fonts.caption)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .settingsContentInset()
-                    .accessibilityIdentifier(A11yID.Settings.storeStatus)
-            } else if storage.iCloudAvailable {
-                Toggle("iCloud", isOn: iCloudBinding)
-                    .font(Theme.Fonts.bodyMd)
-                    .tint(Theme.Colors.primary)
-                    .foregroundStyle(storage.isBusy ? Theme.Colors.onSurfaceMuted : Theme.Colors.onSurface)
-                    .settingsRowPadding()
-                    .settingsSurface(singleRow: true)
-                    .disabled(storage.isBusy)
-                    .accessibilityIdentifier(A11yID.Settings.storeICloud)
-
-                Text("iCloud syncs this Profile across your devices. On-device keeps it here only. You can move it either way later.")
-                .font(Theme.Fonts.caption)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .settingsContentInset()
-                .accessibilityIdentifier(A11yID.Settings.storeStatus)
-            } else {
-                ICloudUnavailableNotice()
                     .accessibilityIdentifier(A11yID.Settings.storeStatus)
             }
         }
