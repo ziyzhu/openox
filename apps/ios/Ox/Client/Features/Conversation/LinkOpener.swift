@@ -67,6 +67,15 @@ struct ServiceBrowserView: View {
         }
         .onAppear(perform: session.start)
         .onDisappear(perform: session.stop)
+        .alert("Couldn’t Open Link", isPresented: Binding(
+            get: { session.navigationNotice != nil },
+            set: { if !$0 { session.dismissNavigationNotice() } }
+        )) {
+            Button("OK") { session.dismissNavigationNotice() }
+                .accessibilityIdentifier("serviceBrowser.dismissNavigationNotice")
+        } message: {
+            Text(session.navigationNotice ?? "")
+        }
     }
 
     private var browser: some View {

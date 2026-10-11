@@ -157,7 +157,7 @@ private struct OxApplicationView: View {
     }
 
     private var incomingURLToOpen: URL? {
-        guard onboarded, scenePhase == .active, presentations.canOpenBrowser,
+        guard onboarded, scenePhase == .active, !StorageRoot.shared.isBusy, presentations.canOpenBrowser,
               serviceImports.proposal == nil, serviceImports.errorMessage == nil,
               serviceImports.importedDomain == nil,
               skillImports.proposal == nil, skillImports.errorMessage == nil,

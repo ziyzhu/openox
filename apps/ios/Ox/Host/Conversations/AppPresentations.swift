@@ -75,9 +75,18 @@ final class AppPresentationCoordinator {
 
     private(set) var presented: Presented?
     private var hostActive = false
+    private var browserBlockers: Set<UUID> = []
+
+    func blockBrowser(owner: UUID) {
+        browserBlockers.insert(owner)
+    }
+
+    func unblockBrowser(owner: UUID) {
+        browserBlockers.remove(owner)
+    }
 
     var canOpenBrowser: Bool {
-        guard hostActive else { return false }
+        guard hostActive, browserBlockers.isEmpty else { return false }
         guard let presented else { return true }
         if case .browser = presented.content { return true }
         return false

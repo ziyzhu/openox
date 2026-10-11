@@ -1,8 +1,8 @@
 # Ox browser plan
 
-Goal: qualify Ox as an Apple-approved browser so users can authenticate to third-party websites with passkeys inside Ox. Keep the existing WebKit browser and Profile-owned website sessions; do not build a separate engine or custom JavaScript passkey bridge.
+Goal: qualify Ox as an Apple-approved browser so users can authenticate to third-party websites with passkeys inside Ox. Keep the existing WebKit browser; establish Profile-owned website sessions through an agreed storage transition. Current website sessions are app-wide. Do not build a separate engine or custom JavaScript passkey bridge.
 
-Status: external-link handling is implemented and simulator-verified; the remaining compliance work is proposed. Apple approval and passkey behavior in an entitled Ox build remain unverified. Users should not need to select Ox as their default browser to use embedded passkeys; verify this on-device before promising support.
+Status: external-link handling and selected navigation paths are implemented and simulator-verified. The audit reproduced cross-Profile cookie/local-storage sharing and a nonfunctional JavaScript popup; Profile isolation and broader compatibility remain unfinished. Apple approval and passkey behavior in an entitled Ox build remain unverified. Users should not need to select Ox as their default browser to use embedded passkeys; verify this on-device before promising support.
 
 ## Benefits and trade-offs
 
@@ -68,7 +68,11 @@ Build on `apps/ios/Ox/Client/UI/WebBrowserView.swift`.
 - [x] Use the selected Profile; retain the latest incoming link until onboarding, foreground activity, Profile preparation, and conflicting presentations allow opening. Offer retry or cancellation if preparation fails.
 - [x] Verify targeted simulator delivery for cold launch with delayed preparation, warm launch, and an existing Browser.
 - [x] Verify HTTP paths, query strings, fragments, redirects, and a `.chat` website path without importing it.
-- [ ] Verify onboarding, conflicting presentations, preparation failures, Profile switching/isolation, multiple windows, and physical-device default-browser delivery.
+- [x] Verify onboarding deferral and latest-link retention on a simulator.
+- [x] Defer links until Settings/Services sheets finish dismissal and Profile operations finish; verify Settings deferral, latest-link retention, and delivery after a Profile switch.
+- [x] Verify preparation failure, retry under continued failure, cancellation, and successful delivery after normal relaunch using a Debug Simulator template-input failure.
+- [ ] Verify all conflicting presentation types, multiwindow ownership, and physical-device default-browser delivery. The app declares multiple-scene support, but presentation ownership is still shared.
+- [ ] Establish Profile website isolation; switching currently retains the app-wide website session.
 
 Gate: demonstrate that external links open correctly, not merely that Browser can open URLs internally.
 
@@ -78,19 +82,27 @@ Review `apps/ios/Ox/Host/Services/Web/ServiceWebKit.swift` and its navigation co
 
 - [x] Confirm ordinary `ServiceBrowserSession` browsing supports HTTP independently of the restricted agent-controlled browser policy; keep that policy intact.
 - [x] Enable HTTP only for WebKit content using `NSAllowsArbitraryLoadsInWebContent`; keep URLSession ATS unchanged. Verify a local HTTP page and redirect.
-- [ ] Verify redirects, forms, JavaScript navigation, and same-document routes.
-- [ ] Handle popup and `target="_blank"` requests coherently.
-- [ ] Handle downloads, unsupported content types, and external app schemes.
-- [ ] Preserve expected website destinations and content rather than redirecting links into agent workflows.
-- [ ] Keep network protections explicit; do not remove safeguards solely to broaden browsing.
+- [x] Simulator-verify a redirect, POST form submission, JavaScript location navigation, and a same-document history route on a controlled HTTP fixture.
+- [x] Verify `target="_blank"` links open their destination in the same Browser page.
+- [ ] Handle JavaScript popups coherently. A user-triggered `window.open(url, "_blank")` did not navigate in the current WebPage browser; flows requiring a separate window/opener are unverified.
+- [x] Explicitly reject download requests, attachment responses, and unsupported content with a notice while retaining the current page; verify attachment and unsupported-content responses on a simulator.
+- [ ] Implement actual download saving; rejection is not download support.
+- [x] Report unavailable external apps instead of silently discarding the link; simulator-verify an unregistered app scheme.
+- [ ] Verify successful external-app handoff on a physical device.
+- [x] Preserve controlled fixture destinations, form method, and page content without creating agent workflows.
+- [x] Keep the restricted agent-browser policy and URLSession ATS unchanged; ordinary manual browsing remains independently HTTP/HTTPS-capable.
 
-## 5. Preserve Profile isolation
+## 5. Establish Profile isolation
 
 - [ ] Use the intended Profile's WebKit website-data store for browsing, manual login, and subsequent service actions.
 - [ ] Verify cookies, local storage, and cached website data do not leak across Profiles.
 - [ ] Provide clear website-data deletion behavior.
 - [ ] Distinguish Profile-local website sessions from system-managed passkeys; passkeys are not Ox Profile secrets.
 - [ ] Avoid persisted-storage changes unless needed. If needed, use scoped migration owners and obtain actual predecessor/changed-build compatibility evidence before release.
+
+Audit: `ServiceWebsiteDataCoordinator.dataStoreID` hashes only the app's website-data namespace. Manual browsing, sign-in/handoff, and service actions use that same app-wide store. A cookie and local-storage marker written in Default were visible after switching to a newly created QA Profile; that Profile and the markers were removed afterward. Cache isolation is not established either. Existing service website-data deletion clears the shared site's data, not one Profile's data; arbitrary Browser-site deletion and active-page quiescence remain unfinished. System passkeys must not be described as Profile-owned secrets.
+
+Gate: agree which Profile, if any, inherits existing shared website sessions before implementing the storage transition. Do not copy authenticated sessions into every Profile. Preserve older data until scoped migration and actual predecessor/changed-build evidence establish the intended behavior; report downgrade incompatibilities before release.
 
 ## 6. Configure approved signing
 
@@ -128,6 +140,8 @@ Gate: reproduce the current failure and demonstrate the same flow succeeding in 
 Execution order: eligibility and permission clarification → minimum browser UX → external-link handling → navigation and Profile verification → approved signing → physical-device passkey verification.
 
 ## Evidence and references
+
+Sections 3–5 audit: iOS 26 simulator ox-2, baseline and changed Debug builds succeeded. Controlled HTTP fixture requests, native input, AX alerts, and screenshots verified the paths marked above. Evidence is outside Git at `/tmp/ox-browser-audit/`; no real website authentication, entitled physical-device delivery, or passkeys were tested. Profile isolation and JavaScript popup checks failed as described above; rejection notices do not establish download support.
 
 Apple requirements and APIs:
 - [Preparing your app to be the default browser](https://developer.apple.com/documentation/xcode/preparing-your-app-to-be-the-default-browser)

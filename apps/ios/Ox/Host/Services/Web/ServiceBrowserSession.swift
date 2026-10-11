@@ -9,6 +9,7 @@ final class ServiceBrowserSession {
     private final class Router {
         var openPopup: @MainActor (URLRequest) -> Void = { _ in }
         var openExternal: @MainActor (URL) -> Void = { _ in }
+        var rejectContent: @MainActor (String) -> Void = { _ in }
     }
 
     private struct NavigationDecider: WebPage.NavigationDeciding {
@@ -19,6 +20,10 @@ final class ServiceBrowserSession {
             preferences: inout WebPage.NavigationPreferences
         ) async -> WKNavigationActionPolicy {
             guard action.target?.isMainFrame != false else { return .allow }
+            guard !action.shouldPerformDownload else {
+                router.rejectContent(Self.downloadNotice)
+                return .cancel
+            }
             guard let url = action.request.url, let scheme = url.scheme?.lowercased() else { return .cancel }
             guard scheme == "about" || scheme == "http" || scheme == "https" else {
                 router.openExternal(url)
@@ -30,6 +35,24 @@ final class ServiceBrowserSession {
             }
             return .allow
         }
+
+        mutating func decidePolicy(for response: WebPage.NavigationResponse) async -> WKNavigationResponsePolicy {
+            let attachment = (response.response as? HTTPURLResponse)?
+                .value(forHTTPHeaderField: "Content-Disposition")?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased().hasPrefix("attachment") == true
+            guard response.canShowMimeType, !attachment else {
+                router.rejectContent(attachment
+                    ? Self.downloadNotice
+                    : String(localized: "Ox’s browser can’t display this content. The current page has been kept."))
+                return .cancel
+            }
+            return .allow
+        }
+
+        private static var downloadNotice: String {
+            String(localized: "Downloads aren’t supported in Ox’s browser yet. The current page has been kept.")
+        }
     }
 
     let serviceDomain: String
@@ -37,6 +60,7 @@ final class ServiceBrowserSession {
     let initialURL: URL
     let page: WebPage
     private(set) var errorMessage: String?
+    private(set) var navigationNotice: String?
 
     private var navigationTask: Task<Void, Never>?
     private var started = false
@@ -51,7 +75,8 @@ final class ServiceBrowserSession {
             navigationDecider: NavigationDecider(router: router)
         )
         router.openPopup = { [weak self] request in self?.loadPopup(request) }
-        router.openExternal = { url in UIApplication.shared.open(url) }
+        router.openExternal = { [weak self] url in self?.openExternal(url) }
+        router.rejectContent = { [weak self] message in self?.rejectContent(message) }
         #if targetEnvironment(simulator)
         page.isInspectable = true
         #endif
@@ -71,10 +96,31 @@ final class ServiceBrowserSession {
             page = WebPage(navigationDecider: NavigationDecider(router: router))
         }
         router.openPopup = { [weak self] request in self?.loadPopup(request) }
-        router.openExternal = { url in UIApplication.shared.open(url) }
+        router.openExternal = { [weak self] url in self?.openExternal(url) }
+        router.rejectContent = { [weak self] message in self?.rejectContent(message) }
         #if targetEnvironment(simulator)
         page.isInspectable = true
         #endif
+    }
+
+    func dismissNavigationNotice() {
+        navigationNotice = nil
+    }
+
+    private func rejectContent(_ message: String) {
+        navigationNotice = message
+        Log.ui.warning("ServiceBrowser.content rejected domain=\(serviceDomain) reason=\(LogPrivacy.text(message))")
+    }
+
+    private func openExternal(_ url: URL) {
+        UIApplication.shared.open(url) { [weak self] opened in
+            Task { @MainActor in
+                if !opened {
+                    self?.navigationNotice = String(localized: "No available app could open this link. The current page has been kept.")
+                }
+                Log.ui.info("ServiceBrowser.external scheme=\(url.scheme ?? "none") opened=\(opened)")
+            }
+        }
     }
 
     func start() {

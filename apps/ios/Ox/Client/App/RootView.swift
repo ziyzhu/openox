@@ -510,6 +510,7 @@ struct RootView: View {
     @State private var pendingConversationPresentationId: UUID?
     @State private var composerFocusRequest: ComposerFocusRequest?
     @State private var presentation: Presentation?
+    @State private var browserBlockerOwner = UUID()
     @State private var startup = Startup.idle
     @State private var activeProfileMonitor = ActiveProfileMonitor()
     @State private var childNavigationActive = false
@@ -604,7 +605,9 @@ struct RootView: View {
 
     private var presentedRoot: some View {
         rootLayout
-            .sheet(item: $presentation) { presented in
+            .sheet(item: $presentation, onDismiss: {
+                AppPresentationCoordinator.shared.unblockBrowser(owner: browserBlockerOwner)
+            }) { presented in
                 Group {
                     switch presented {
                     case let .settings(profileID, skillDraft):
@@ -649,8 +652,14 @@ struct RootView: View {
             .onAppear {
                 bootstrap()
             }
+            .onChange(of: presentation?.id, initial: true) { _, presented in
+                if presented != nil {
+                    AppPresentationCoordinator.shared.blockBrowser(owner: browserBlockerOwner)
+                }
+            }
             .onDisappear {
                 activeProfileMonitor.deactivate()
+                AppPresentationCoordinator.shared.unblockBrowser(owner: browserBlockerOwner)
             }
             .onChange(of: storage.switchEpoch) { _, _ in
                 Log.ui.info("RootView.profileSwitch epoch=\(storage.switchEpoch) root=\(storage.root.path)")
