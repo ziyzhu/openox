@@ -1988,6 +1988,7 @@ struct ConversationPage: View {
     private func openSkill(_ skill: Skill) {
         Skills.shared.refresh()
         let current = Skills.shared.skill(named: skill.name) ?? skill
+        guard current.owner != .system else { return }
         navigationSkill = SkillDraft(current)
         Log.ui.info("ConversationPage.skillNavigation select conversation=\(conversation.id) name=\(current.name)")
     }

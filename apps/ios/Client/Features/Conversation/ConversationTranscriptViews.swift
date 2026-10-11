@@ -1071,15 +1071,24 @@ private struct UserSkillBubble: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 6) {
-            Button { onOpenSkill(invocation.skill) } label: {
-                SkillLibraryRow(skill: invocation.skill)
+            if invocation.skill.owner == .system {
+                UserBubble(
+                    text: invocation.displayTitle,
+                    attachments: attachments,
+                    sourcePrefix: sourcePrefix,
+                    onOpenAttachment: onOpenAttachment
+                )
+            } else {
+                Button { onOpenSkill(invocation.skill) } label: {
+                    SkillLibraryRow(skill: invocation.skill)
+                }
+                .buttonStyle(.plain)
+                .modifier(ConversationInteractiveRowSurface())
+                .accessibilityLabel("/\(invocation.skill.displayName), \(invocation.skill.description)")
+                .accessibilityIdentifier(A11yID.ConversationControls.Message.skill(invocation.skill.name))
             }
-            .buttonStyle(.plain)
-            .modifier(ConversationInteractiveRowSurface())
-            .accessibilityLabel("/\(invocation.skill.displayName), \(invocation.skill.description)")
-            .accessibilityIdentifier(A11yID.ConversationControls.Message.skill(invocation.skill.name))
 
-            if !invocation.argument.isEmpty || !attachments.isEmpty {
+            if invocation.skill.owner != .system && (!invocation.argument.isEmpty || !attachments.isEmpty) {
                 UserBubble(
                     text: invocation.argument,
                     attachments: attachments,
@@ -1258,14 +1267,14 @@ struct BlockView: View, Equatable {
             .contextMenu {
                 Section(Self.timestampFormatter.string(from: createdAt)) {
                     Button {
-                        controls.onCopy(invocation.argument.isEmpty ? "/\(invocation.skill.name)" : invocation.argument)
+                        controls.onCopy(invocation.displayTitle)
                     } label: {
                         Label(L10n.string("Copy", comment: "Context menu action on a sent message that copies its text to the clipboard."), systemImage: "doc.on.doc")
                     }
                 }
             } preview: {
                 MessageContextMenuPreview(
-                    title: "/\(invocation.skill.displayName)",
+                    title: invocation.skill.owner == .system ? invocation.displayTitle : "/\(invocation.skill.displayName)",
                     text: invocation.argument,
                     attachments: attachments
                 )
@@ -1351,14 +1360,16 @@ struct BlockView: View, Equatable {
                                 .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(artifact.id))
                         }
                     case let .skill(skill):
-                        Button { onOpenSkill(skill) } label: {
-                            SkillLibraryRow(skill: skill)
+                        if skill.owner != .system {
+                            Button { onOpenSkill(skill) } label: {
+                                SkillLibraryRow(skill: skill)
+                            }
+                            .buttonStyle(.plain)
+                            .modifier(ConversationInteractiveRowSurface())
+                            .padding(.horizontal, 4)
+                            .accessibilityLabel("/\(skill.displayName), \(skill.description)")
+                            .accessibilityIdentifier(A11yID.ConversationControls.Message.skill(skill.name))
                         }
-                        .buttonStyle(.plain)
-                        .modifier(ConversationInteractiveRowSurface())
-                        .padding(.horizontal, 4)
-                        .accessibilityLabel("/\(skill.displayName), \(skill.description)")
-                        .accessibilityIdentifier(A11yID.ConversationControls.Message.skill(skill.name))
                     }
                 }
             }

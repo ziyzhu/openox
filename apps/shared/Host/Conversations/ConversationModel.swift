@@ -39,7 +39,11 @@ nonisolated struct UserSkillInvocation: Codable, Equatable, Sendable {
     }
 
     var displayTitle: String {
-        argument.isEmpty ? "/\(skill.displayName)" : argument
+        if !argument.isEmpty { return argument }
+        if skill.owner == .system {
+            return skill.name == "import-memory" ? String(localized: "Import memory to Ox") : "Ox"
+        }
+        return "/\(skill.displayName)"
     }
 }
 

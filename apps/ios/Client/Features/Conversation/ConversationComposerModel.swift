@@ -84,14 +84,10 @@ final class ConversationComposerModel {
         stopControlTransition != nil
     }
 
-    private var slashSkills: [Skill] {
-        Skills.shared.all.filter { $0.owner != .system }
-    }
-
     var slashSuggestions: [Skill] {
         guard case .slash(let query) = surface else { return [] }
         let needle = query.lowercased()
-        return slashSkills.filter {
+        return Skills.shared.userFacing.filter {
             needle.isEmpty || $0.name.lowercased().contains(needle)
         }
     }
@@ -151,7 +147,7 @@ final class ConversationComposerModel {
         let commandEnd = draft.firstIndex(where: \.isWhitespace) ?? draft.endIndex
         let nameStart = draft.index(after: draft.startIndex)
         let name = String(draft[nameStart..<commandEnd])
-        guard let skill = slashSkills.first(where: {
+        guard let skill = Skills.shared.userFacing.first(where: {
             $0.name.caseInsensitiveCompare(name) == .orderedSame
         }) else { return nil }
         return SlashInvocation(

@@ -333,6 +333,7 @@ extension ProfileRepository {
 final class Skills {
     static let shared = Skills()
     private(set) var all: [Skill] = []
+    var userFacing: [Skill] { all.filter { $0.owner != .system } }
     private(set) var conflicts: [SkillCatalog.Conflict] = []
     private(set) var errorMessage: String?
     private(set) var repositorySkills: [Skill] = []

@@ -123,7 +123,7 @@ struct SkillsListView: View {
                     .padding(.vertical, Theme.Spacing.md)
                 }
                 let displayed = displayedSkills
-                if skills.all.isEmpty {
+                if skills.userFacing.isEmpty {
                     emptyNote
                 } else if displayed.isEmpty {
                     ContentUnavailableView.search(text: query)
@@ -147,8 +147,8 @@ struct SkillsListView: View {
     }
 
     private var displayedSkills: [Skill] {
-        guard !query.isEmpty else { return skills.all }
-        return skills.all.filter {
+        guard !query.isEmpty else { return skills.userFacing }
+        return skills.userFacing.filter {
             $0.name.localizedCaseInsensitiveContains(query)
                 || $0.description.localizedCaseInsensitiveContains(query)
         }
