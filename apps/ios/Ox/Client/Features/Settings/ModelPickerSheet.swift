@@ -80,7 +80,7 @@ struct SettingsSheet: View {
         guard let selection = registry.defaultModel else { return Text("Not configured") }
         let client = registry.client(for: selection)
         let model = registry.model(for: selection, client: client)
-        return Text(verbatim: "\(client.displayName) · \(model.displayName)")
+        return Text(verbatim: model.displayName)
     }
 
     var body: some View {
