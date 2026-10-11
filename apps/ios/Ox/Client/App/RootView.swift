@@ -544,7 +544,7 @@ struct RootView: View {
 
     var body: some View {
         observedRoot
-            .toast($sharedNoteToast)
+            .toast($sharedNoteToast, accessibilityIdentifier: A11yID.ConversationControls.toast)
             .alert("Couldn't import shared note", isPresented: Binding(
                 get: { sharedNoteImportError != nil },
                 set: { if !$0 { sharedNoteImportError = nil } }

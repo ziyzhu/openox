@@ -50,6 +50,7 @@ enum LinkOpener {
 
 struct ServiceBrowserView: View {
     let session: ServiceBrowserSession
+    @State private var toast: Toast?
     @Environment(\.dismiss) private var dismiss
 
     private var title: String {
@@ -59,6 +60,7 @@ struct ServiceBrowserView: View {
     var body: some View {
         NavigationStack {
             browser
+                .toast($toast, accessibilityIdentifier: "serviceBrowser.navigationNotice")
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -67,14 +69,11 @@ struct ServiceBrowserView: View {
         }
         .onAppear(perform: session.start)
         .onDisappear(perform: session.stop)
-        .alert("Couldn’t Open Link", isPresented: Binding(
-            get: { session.navigationNotice != nil },
-            set: { if !$0 { session.dismissNavigationNotice() } }
-        )) {
-            Button("OK") { session.dismissNavigationNotice() }
-                .accessibilityIdentifier("serviceBrowser.dismissNavigationNotice")
-        } message: {
-            Text(session.navigationNotice ?? "")
+        .onChange(of: session.navigationNotice, initial: true) { _, message in
+            toast = message.map { Toast(message: $0, role: .error) }
+        }
+        .onChange(of: toast?.id) { _, _ in
+            if toast == nil { session.dismissNavigationNotice() }
         }
     }
 

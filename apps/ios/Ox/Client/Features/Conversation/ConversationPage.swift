@@ -536,7 +536,7 @@ struct ConversationPage: View {
             .onChange(of: browserPage.map(ObjectIdentifier.init), initial: true) { _, _ in
                 browserPageMount.reconcile(page: browserPage, ownerIDs: servicePageOwnerIDs)
             }
-            .toast($toast)
+            .toast($toast, accessibilityIdentifier: A11yID.ConversationControls.toast)
             .safeAreaBar(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     pageTopBar(blockCount: totalBlockCount)

@@ -85,7 +85,7 @@ Review `apps/ios/Ox/Host/Services/Web/ServiceWebKit.swift` and its navigation co
 - [x] Simulator-verify a redirect, POST form submission, JavaScript location navigation, and a same-document history route on a controlled HTTP fixture.
 - [x] Verify `target="_blank"` links open their destination in the same Browser page.
 - [ ] Handle JavaScript popups coherently. A user-triggered `window.open(url, "_blank")` did not navigate in the current WebPage browser; flows requiring a separate window/opener are unverified.
-- [x] Explicitly reject download requests, attachment responses, and unsupported content with a notice while retaining the current page; verify attachment and unsupported-content responses on a simulator.
+- [x] Explicitly reject download requests, attachment responses, and unsupported content with the shared chat-style Liquid Glass error toast below the Browser toolbar while retaining the current page; verify attachment and unsupported-content responses on a simulator.
 - [ ] Implement actual download saving; rejection is not download support.
 - [x] Report unavailable external apps instead of silently discarding the link; simulator-verify an unregistered app scheme.
 - [ ] Verify successful external-app handoff on a physical device.

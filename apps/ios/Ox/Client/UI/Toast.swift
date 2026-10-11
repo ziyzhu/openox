@@ -35,6 +35,7 @@ struct Toast: Identifiable, Equatable {
 
 struct ToastPill: View {
     let toast: Toast
+    let accessibilityIdentifier: String
     let onDismiss: () -> Void
 
     var body: some View {
@@ -66,7 +67,7 @@ struct ToastPill: View {
         .accessibilityElement(children: toast.action == nil ? .combine : .contain)
         .accessibilityAddTraits(toast.action == nil ? .isButton : [])
         .accessibilityHint(toast.action == nil ? "Tap to dismiss" : "")
-        .accessibilityIdentifier(A11yID.ConversationControls.toast)
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
 
@@ -104,13 +105,14 @@ private extension Toast.Role {
 
 private struct ToastModifier: ViewModifier {
     @Binding var toast: Toast?
+    let accessibilityIdentifier: String
 
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .top) {
                 ZStack {
                     if let t = toast {
-                        ToastPill(toast: t) { toast = nil }
+                        ToastPill(toast: t, accessibilityIdentifier: accessibilityIdentifier) { toast = nil }
                             .padding(.horizontal, Theme.Spacing.md)
                             .padding(.top, 4)
                             .transition(.opacity.combined(with: .move(edge: .top)))
@@ -129,16 +131,16 @@ private struct ToastModifier: ViewModifier {
 }
 
 extension View {
-    func toast(_ toast: Binding<Toast?>) -> some View {
-        modifier(ToastModifier(toast: toast))
+    func toast(_ toast: Binding<Toast?>, accessibilityIdentifier: String) -> some View {
+        modifier(ToastModifier(toast: toast, accessibilityIdentifier: accessibilityIdentifier))
     }
 }
 
 #Preview("Toast pill variants") {
     VStack(spacing: Theme.Spacing.md) {
-        ToastPill(toast: Toast(message: "Message copied")) {}
-        ToastPill(toast: Toast(message: "Network error — check your connection and try again.", role: .error)) {}
-        ToastPill(toast: Toast(message: "HTTP 429: insufficient balance or no resource package. Please recharge.", role: .error)) {}
+        ToastPill(toast: Toast(message: "Message copied"), accessibilityIdentifier: "preview.toast.info") {}
+        ToastPill(toast: Toast(message: "Network error — check your connection and try again.", role: .error), accessibilityIdentifier: "preview.toast.network") {}
+        ToastPill(toast: Toast(message: "HTTP 429: insufficient balance or no resource package. Please recharge.", role: .error), accessibilityIdentifier: "preview.toast.balance") {}
     }
     .padding(Theme.Spacing.md)
     .background(Theme.Colors.surface)
