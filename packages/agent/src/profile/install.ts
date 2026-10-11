@@ -57,7 +57,7 @@ function validate(draft: NormalizedProfileDraft) {
   const artifacts = new Set<string>();
   for (const file of draft.artifacts) {
     validateFileRecord(file, legacyFilePath(file.path), file.size);
-    if (artifacts.has(file.path) || typeof file.binary !== "boolean" || typeof file.saved !== "boolean") throw new Error("Invalid or duplicate Profile artifact");
+    if (artifacts.has(file.path) || typeof file.binary !== "boolean" || typeof file.saved !== "boolean") throw new Error("Invalid or duplicate Profile file");
     artifacts.add(file.path);
   }
   const payloads = new Map<string, FileRecord>();
@@ -130,7 +130,7 @@ async function verifyFiles(session: ProfileRuntime, draft: NormalizedProfileDraf
   for (const file of draft.artifacts) {
     await session.files.readReference(file.path);
     const record = await session.harness.snapshot(LegacyProfileFile, file.path, context);
-    if (!same(record, file)) throw new Error("Profile artifact verification failed");
+    if (!same(record, file)) throw new Error("Profile file verification failed");
   }
   for (const file of draft.payloads ?? []) {
     if (!session.files.immutableFiles) throw new Error("Payload archives require physical files");
@@ -170,7 +170,7 @@ export async function installOxProfile(draft: NormalizedProfileDraft, host: Prof
     session = await openProfileRuntime({ ...host, profileID: draft.profileID, models: createModels() });
     for (const file of draft.documents) await session.files.write(file.path, file.text);
     for (const file of draft.artifacts) {
-      if (file.size > (file.binary ? 32 * 1024 * 1024 : 200 * 1024)) throw new Error("Profile artifact exceeds supported size");
+      if (file.size > (file.binary ? 32 * 1024 * 1024 : 200 * 1024)) throw new Error("Profile file exceeds supported size");
       await host.artifacts.read(file);
       await host.artifacts.flush(file.path);
       await session.harness.commit(async tx => {

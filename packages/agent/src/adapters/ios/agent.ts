@@ -51,7 +51,7 @@ type Command = CommandScope & (
   | { action: "fileSeed" | "fileWrite"; path: string; text: string }
   | { action: "fileWriteBinary"; path: string; base64: string }
   | { action: "fileRead" | "fileReference" | "fileReadBinary" | "fileRemove"; path: string }
-  | { action: "fileStat" | "fileArtifact"; path: string; byPath?: boolean }
+  | { action: "fileStat"; path: string; byPath?: boolean }
   | { action: "fileAdopt"; artifact: FileRecord & { binary: boolean; saved: boolean } }
   | { action: "fileSaved"; path: string; saved: boolean }
   | { action: "fileMove"; path: string; prefix: string }
@@ -85,7 +85,7 @@ export interface NativeRecoveryPlan {
 }
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 function decodeBase64(value: string) {
-  if (typeof value !== "string" || value.length % 4 !== 0 || value.length > Math.ceil(32 * 1024 * 1024 / 3) * 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) throw new Error("Invalid bounded artifact Base64");
+  if (typeof value !== "string" || value.length % 4 !== 0 || value.length > Math.ceil(32 * 1024 * 1024 / 3) * 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) throw new Error("Invalid bounded file Base64");
   const size = value.length / 4 * 3 - (value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0);
   const bytes = new Uint8Array(size);
   for (let start = 0, offset = 0; start < value.length; start += 4) {
@@ -278,11 +278,10 @@ export class IOSAgentAdapter {
         const bytes = typeof content === "string" ? new TextEncoder().encode(content) : content;
         return { base64: encodeBase64(bytes), ...await this.fileReceipt(args.path) };
       }
-      case "fileStat":
-      case "fileArtifact": {
+      case "fileStat": {
         const file = session.files.physical ? await session.files.record(args.path, !args.byPath) : await session.harness.snapshot(LegacyProfileFile, legacyFilePath(canonical(args.path)), context);
         const record = !file || ("hidden" in file && file.hidden) ? null : { ...file, reference: "id" in file ? file.id : file.path };
-        return args.action === "fileStat" ? { file: record } : { artifact: record };
+        return { file: record };
       }
       case "fileAdopt": await this.adopt(args.artifact); return this.fileReceipt(args.artifact.path);
       case "fileSaved": await this.fileSaved(args.path, args.saved); return {};
@@ -541,7 +540,7 @@ export class IOSAgentAdapter {
   }
   private documentPath(path: string) {
     const name = canonical(path);
-    if (!["MEMORY.md", "SOUL.md", "skill-selections.json"].includes(name) && !name.startsWith("skills/")) throw new Error("Operation requires Profile text documents, never artifacts");
+    if (!["MEMORY.md", "SOUL.md", "skill-selections.json"].includes(name) && !name.startsWith("skills/")) throw new Error("Operation requires MEMORY.md, SOUL.md, skill-selections.json, or a skill file");
     return name;
   }
   private async fileSeed(path: string, text: string) {
@@ -599,18 +598,18 @@ export class IOSAgentAdapter {
     path = canonical(path);
     if (typeof saved !== "boolean") throw new Error("Saved flag must be Boolean");
     if (this.current.session.files.physical) { await this.current.session.files.saved(path, saved); return; }
-    if (!path.startsWith("artifacts/") || typeof saved !== "boolean") throw new Error("Saved flags require an artifact and Boolean");
+    if (!path.startsWith("artifacts/") || typeof saved !== "boolean") throw new Error("Saved flags require a legacy file and Boolean");
     legacyFilePath(path);
     await this.current.session.harness.commit(async tx => {
       const index = await tx.doc(ProfileIndex);
-      if (!index.files[path]) throw new Error("Artifact is not visible");
+      if (!index.files[path]) throw new Error("File is not visible");
       if (this.current.artifacts) (await tx.doc(LegacyProfileFile, path, null)).saved = saved;
       else (await tx.doc(ProfileFile, path, null)).saved = saved;
     }, context);
   }
   private async adopt(file: FileRecord & { binary: boolean; saved: boolean }) {
     const { artifacts, session } = this.current;
-    if (!artifacts || !file || typeof file.binary !== "boolean" || typeof file.saved !== "boolean" || !Number.isSafeInteger(file.size) || file.size < 0 || file.size > (file.binary ? 32 * 1024 * 1024 : 200 * 1024)) throw new Error("Invalid file-backed artifact adoption");
+    if (!artifacts || !file || typeof file.binary !== "boolean" || typeof file.saved !== "boolean" || !Number.isSafeInteger(file.size) || file.size < 0 || file.size > (file.binary ? 32 * 1024 * 1024 : 200 * 1024)) throw new Error("Invalid file-backed adoption");
     validateFileRecord(file, file.path, file.size);
     const bytes = await artifacts.read(file);
     if (!file.binary) new TextDecoder("utf-8", { fatal: true }).decode(bytes);
@@ -618,7 +617,7 @@ export class IOSAgentAdapter {
     await session.harness.commit(async tx => {
       const record = await tx.doc(LegacyProfileFile, file.path, null);
       const index = await tx.doc(ProfileIndex);
-      if (record.path) throw new Error("Artifact references are immutable; choose a distinct filename");
+      if (record.path) throw new Error("Legacy file references are immutable; choose a distinct filename");
       if (Object.keys(index.files).length >= 10_000) throw new Error("Profile file count limit reached");
       Object.assign(record, file);
       index.files[file.path] = { size: file.size, mtime: Date.now(), binary: file.binary };

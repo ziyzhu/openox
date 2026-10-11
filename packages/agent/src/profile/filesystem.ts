@@ -118,7 +118,7 @@ export function profileEnv(files: ProfileFiles, conversations?: OxConversations)
       return value;
     }
     const value = await files.read(path);
-    if (typeof value !== "string") throw new FileError("invalid", "Binary artifacts require a dedicated image/document operation", path);
+    if (typeof value !== "string") throw new FileError("invalid", "Binary files require a dedicated image/document operation", path);
     return value;
   }
   return {
