@@ -10,8 +10,7 @@
   },
   "files": [
     "dist",
-    "LICENSE",
-    "README.md"
+    "LICENSE"
   ],
   "scripts": {
     "build": "bun build.ts",

@@ -42,7 +42,7 @@ try {
     throw new Error(`packed ${report.name}@${report.version}, expected ${packageMetadata.name}@${packageMetadata.version}`);
   }
   const files = report.files.map(({ path }) => path);
-  const unexpected = files.filter((path) => !["LICENSE", "README.md", "package.json", "repository.js", "src/skills.ts"].includes(path)
+  const unexpected = files.filter((path) => !["LICENSE", "package.json", "repository.js", "src/skills.ts"].includes(path)
     && !path.startsWith("dist/repository/"));
   if (unexpected.length) throw new Error(`unexpected package files: ${unexpected.join(", ")}`);
   for (const path of ["dist/repository/repository.json", "src/skills.ts"]) {

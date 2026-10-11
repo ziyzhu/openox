@@ -5,7 +5,7 @@ description: Set up an OpenOx checkout for local development or Pi, including CL
 
 # Setup
 
-Help the contributor reach a verified working environment. First determine whether they need the CLI, the iOS app, coding-agent setup, or commit readiness. Inspect existing tools and configuration before changing anything; preserve their chosen simulator, bundle identifier, Apple team, and local data. Read the repository [AGENTS.md](../../../AGENTS.md) and relevant package documentation. Keep machine-specific values in ignored local files.
+Help the contributor reach a verified working environment. First determine whether they need the CLI, the iOS app, coding-agent setup, or commit readiness. Inspect existing tools and configuration before changing anything; preserve their chosen simulator, bundle identifier, Apple team, and local data. Read the repository [AGENTS.md](../../../AGENTS.md) and the top-level [README.md](../../../README.md). Keep machine-specific values in ignored local files.
 
 ## Source checkout and Ox CLI
 
@@ -19,7 +19,7 @@ ox --help
 ox host list --help
 ```
 
-- Use `bun run typecheck` as the first source check. Follow [apps/cli/README.md](../../../apps/cli/README.md) for standalone installation or package checks.
+- Use `bun run typecheck` as the first source check. Use `apps/cli/install.sh` for standalone installation and `bun run --cwd apps/cli package:check` for package checks.
 - Run `bun link` inside `apps/cli`, not `bun link @openox/cli` at the workspace root; the latter creates a dependency loop with the existing workspace.
 - If help still lists old top-level `discover`, `logs`, or `service` commands, check `command -v ox`. The current CLI groups those operations under `host`. Resolve stale installations with their original package manager or adjust PATH; do not overwrite an unrelated executable.
 - Rebuild after source changes or switching worktrees. A global source link follows one checkout; concurrent agents should use `bun apps/cli/src/ox.ts` from their own checkout when they cannot share the linked build.

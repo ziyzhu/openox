@@ -4,7 +4,7 @@
   "description": "Shared OpenOx Client-Host and Host-Repository contracts, schemas, and validation",
   "license": "Apache-2.0",
   "type": "module",
-  "files": ["src", "schema.json", "methods.json", "fixtures.json", "repository.schema.json", "LICENSE", "README.md"],
+  "files": ["src", "schema.json", "methods.json", "fixtures.json", "repository.schema.json", "LICENSE"],
   "exports": {
     ".": "./src/index.ts",
     "./schema.json": "./schema.json",

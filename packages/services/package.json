@@ -9,8 +9,7 @@
     "dist",
     "repository.js",
     "src/skills.ts",
-    "LICENSE",
-    "README.md"
+    "LICENSE"
   ],
   "exports": {
     ".": "./repository.js",

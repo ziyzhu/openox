@@ -30,7 +30,7 @@ A self-evolving mobile app.
 | Implementation | Client | Host |
 | --- | --- | --- |
 | [iOS app](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) ([source](apps/ios)) | On-device app | Embedded on the device |
-| [CLI](apps/cli/README.md) | Terminal app for macOS and Linux | Connects to a running Ox Host |
+| [CLI](apps/cli) | Terminal app for macOS and Linux | Connects to a running Ox Host |
 
 Install the standalone terminal Client on macOS or Linux:
 
@@ -45,9 +45,8 @@ requiring Bun or Node.js. Run the same command to update.
 
 Live commands connect to a foreground iOS Host through Tailscale. Enable
 Settings → Host → Allow connections, then pass its tailnet endpoint to the CLI.
-Debug and Release builds use the same API and network restrictions. See the
-[CLI guide](apps/cli/README.md) for connections, offline commands, and
-package-manager alternatives.
+Debug and Release builds use the same API and network restrictions. Use `ox --help` and `ox <group> --help` for connections and offline commands.
+With Bun 1.3 or newer, `bun install --global @openox/cli` installs the package-manager version.
 
 ## Development setup
 
@@ -69,10 +68,10 @@ An Ox separates the interface, runtime, model, persistent state, and capabilitie
 *The Client and model remain replaceable around a Host that owns the Agent, Profile, VM, and service lifecycle.*
 
 The network Client–Host protocol is JSON-RPC 2.0 over WebSocket inside Tailscale.
-The [shared protocol package](packages/protocol/README.md) owns Client–Host RPC
+The [shared protocol package](packages/protocol) owns Client–Host RPC
 schemas and Host–Repository content contracts. It supplies portable JSON Schema,
 generated iOS RPC request models, and the supported repository version.
-The [services package](packages/services/README.md) supplies the official repository
+The [services package](packages/services) supplies the official repository
 and filesystem skill readers.
 iOS RPC handlers live under `Host/RPC`, UI automation under `Client/Automation`,
 and production logging under `Diagnostics`. Simulator launch helpers and demo

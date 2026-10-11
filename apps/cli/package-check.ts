@@ -12,7 +12,7 @@ type PackReport = {
   files: Array<{ path: string }>;
 };
 
-const expectedFiles = ["LICENSE", "README.md", "dist/ox.js", "package.json"];
+const expectedFiles = ["LICENSE", "dist/ox.js", "package.json"];
 const outputArgument = process.argv.indexOf("--output");
 if (outputArgument >= 0 && !process.argv[outputArgument + 1]) throw new Error("--output requires a directory");
 const temporaryRoot = await mkdtemp(join(tmpdir(), "ox-cli-package-check-"));

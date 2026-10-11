@@ -16,7 +16,7 @@ export async function packProtocol(directory: string): Promise<string> {
   if (reports.length !== 1 || report?.name !== packageMetadata.name || report.version !== packageMetadata.version) {
     throw new Error("npm pack returned an unexpected protocol package");
   }
-  const expected = ["LICENSE", "README.md", "package.json", "src/contract.ts",
+  const expected = ["LICENSE", "package.json", "src/contract.ts",
     ...Object.values(packageMetadata.exports).map(path => path.replace(/^\.\//, ""))].sort();
   if (JSON.stringify(report.files.map(file => file.path).sort()) !== JSON.stringify(expected)) throw new Error("unexpected protocol package files");
   console.log(`PASS packed ${report.name}@${report.version} ${report.size} bytes packed, ${report.unpackedSize} bytes unpacked`);

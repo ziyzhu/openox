@@ -8,7 +8,7 @@ have been removed. Only published Pi Durable storage conformance and benchmarks
 remain in a separate diagnostics bundle; application acceptance uses actual-chat E2E.
 Current simulator evidence verifies real local conversion/activation, persisted normal/native-tool chats, canonical reopen, interrupted-model recovery, temporary-chat Stop/reopen, and regeneration via qualified Pi forks. Closed-snapshot export/import, exhaustive lifecycle/media/native cold-tool interruption acceptance, predecessor publication failures, and physical-device durability remain unfinished. Earlier native evidence below is historical, not a pass of the current tree. Native RPC verification requires approved Tailscale ingress; do not
 weaken transport checks or treat loopback discovery as verification. See
-[`packages/agent/README.md`](../packages/agent/README.md) for current commands and gates.
+[the test workflow](../.agents/skills/test/SKILL.md) for current commands and gates.
 
 Actual UI acceptance is available through `bun run test:agent-ui-ios --device ox-1
 --app /absolute/Ox.app`. Ordinary temporary chats attach automatically; an explicit launch UUID selects a private QA cache identity. Preparation failure never falls back to another execution loop. The replay uses native Mock, reasoning/Markdown, native snippet
@@ -461,7 +461,6 @@ was empty afterward. The new native clock and trusted bridge globals were undefi
 in snippet execution. The existing complete native storage/recovery campaign
 passed after wiring. No isolated unit tests were added.
 
-See the [native diagnostics methodology](../packages/agent/README.md#upstream-storage-benchmarks).
 Raw measurements remain outside the repository. WAL/FULL differs from upstream
 Node's NORMAL default; whole-app process gauges are not isolated backend memory
 measurements. These are small DEBUG Simulator diagnostics, not device/production
