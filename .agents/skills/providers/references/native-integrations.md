@@ -16,6 +16,6 @@ Verify fresh-page fetch and XHR, explicit prompt delivery, remote conversation/r
 
 ## Artwork
 
-Built-in website services use reviewed 128×128 `assets/services/<domain>/favicon.png` sources and explicit OpenOx CloudFront `faviconUrl` values. Audit the opaque central 96×96 area and light/dark rendering at 20 px, deploy through the existing service-assets workflow, and verify the anonymous hosted bytes. Local user-authored services retain verified public icon URLs.
+Built-in website services use reviewed 128×128 icons hosted at `https://openox.ai/assets/services/<domain>/favicon.png` as explicit `faviconUrl` values. Audit the opaque central 96×96 area and light/dark rendering at 20 px, upload to the hosted path, and verify the anonymous hosted bytes. Local user-authored services retain verified public icon URLs.
 
 Native API/subscription artwork is hosted on OpenOx CloudFront; do not track source files here. Keep artwork and official provenance outside Git. Published URLs belong in provider composition and `ProviderPresentation.iconURL`. Cover regional/protocol-suffixed IDs, including Bedrock and BytePlus/Volcengine. Never upscale raster sources; document opaque white backing used for transparency.

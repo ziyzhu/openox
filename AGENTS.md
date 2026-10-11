@@ -21,6 +21,7 @@
 1. Use perceptual animation completion (`.logicallyComplete`) for user-facing handoffs unless full animation removal is required; do not infer spring completion from a fixed delay.
 1. Keep temporary screenshots, recordings, traces, and diagnostics outside the repository.
 1. App Store Connect owns listing metadata and media; do not keep local copies in either repository. Keep release credentials, signing material, review contacts, demo access, and evidence outside Git. Website and infrastructure deployment belong in `openox-dev`.
+1. Hosted service and model-provider icons live only in the `openox-service-assets-prod` S3 bucket, served at `https://openox.ai/assets/services/`; do not keep local copies. Upload reviewed icons directly and verify the anonymous hosted bytes.
 1. Reproduce the issue first before attempting to fix it so that you can verify the fix.
 1. Do not add unit tests; prefer E2E tests.
 1. For each commit, review lines of code and cyclomatic complexity, prefer low.

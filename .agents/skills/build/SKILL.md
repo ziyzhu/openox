@@ -39,7 +39,7 @@ follow the `providers` skill rather than a second catalog-management workflow.
 Both native targets compile `apps/shared` and their own platform sources; neither compiles the other app. `typecheck` enforces this boundary and rejects OS conditionals in native Swift sources. Keep shared/platform Swift filenames distinct: localization extraction writes their `.stringsdata` outputs into the same target directory.
 `build:services` validates it, refreshes its content hash without rewriting service
 files, and creates a deterministic Local Git seed and model-action resources.
-Package builds copy this source; hosted icon artwork lives in `assets/services/`.
+Package builds copy this source.
 It is a build operation, not live service verification. Bundled installers register handlers through `window.ox.install`; the Host runtime owns dispatch and error logging. Do not replace `window.ox` or retain a second dispatcher.
 Do not overwrite unrelated repository or generated changes.
 `PiDurable.bundle` is an ignored build output: edit bundled packages in `packages/agent/skills/`, then run `build:agent` before native builds. The package exports normal System skill packages. Hosts receive a scoped `skillPackages` snapshot from the trusted runtime and resolve them through the normal skills catalog and filesystem. Skill activation loads workflow context; runtime permissions are independent of activation. Xcode Cloud installs the pinned Bun version and generates it in `ci_post_clone.sh`; the target rejects missing or empty runtime resources. Verify the built `.app` when changing this packaging path.

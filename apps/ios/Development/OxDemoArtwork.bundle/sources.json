@@ -52,7 +52,7 @@
     "finalURL": "https://openox.ai/assets/services/gemini.google.com/favicon.png"
   },
   "mail.google.com": {
-    "source": "assets/services/mail.google.com/favicon.png",
+    "source": "https://openox.ai/assets/services/mail.google.com/favicon.png",
     "finalURL": "https://openox.ai/assets/services/mail.google.com/favicon.png"
   },
   "ios:calendar": {
