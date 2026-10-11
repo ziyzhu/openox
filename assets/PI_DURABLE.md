@@ -133,7 +133,7 @@ Provide production-quality implementations of the host APIs the selected bundle 
 
 Audit the final bundle for accidental Node dependencies. Do not assume browser compatibility means it runs in a bare `JSContext` without adapters.
 
-`apps/ios/Ox/Host/VM/VirtualMachine.swift` currently creates a fresh context per snippet and binds bridge tasks to snippet lifetime. Reuse its asynchronous bridging pattern, not that lifecycle. The trusted harness context must remain separate from model-authored snippet execution. Snippets must not receive raw database access, credentials, or the privileged harness bridge.
+`apps/shared/Host/VM/VirtualMachine.swift` currently creates a fresh context per snippet and binds bridge tasks to snippet lifetime. Reuse its asynchronous bridging pattern, not that lifecycle. The trusted harness context must remain separate from model-authored snippet execution. Snippets must not receive raw database access, credentials, or the privileged harness bridge.
 
 ## Native model and tool adapters
 
@@ -282,7 +282,7 @@ After an ordinary restart, recreate the runtime, reinstall extensions, reopen st
 
 ## Migration and rollout
 
-Keep all application persisted-format compatibility behind `StorageMigrator` in `apps/ios/Ox/Host/Profile/StorageMigration.swift`. Do not add another application migrator or migration file. Establish how upstream SQLite/document/task version handling fits that gate before adoption. Reject unsupported future representations without overwriting them.
+Keep all application persisted-format compatibility behind `StorageMigrator` in `apps/shared/Host/Profile/StorageMigration.swift`. Do not add another application migrator or migration file. Establish how upstream SQLite/document/task version handling fits that gate before adoption. Reject unsupported future representations without overwriting them.
 
 Preserve a recoverable original during conversion from the current Profile directory layout to `profile.json` plus `state.sqlite` and `artifacts/`. Retain the manifest's stable identity and creation date. Stage and validate the complete destination before activation; atomically publish the manifest's appended immutable milestone only after the database/files are ready. Interrupted conversion must not advertise a completed Profile through a prematurely updated manifest. Keep restart-safe old-UUID-to-Pi-ID conversion bookkeeping within `StorageMigrator`, not a normal runtime conversation registry. Translate native/RPC/UI references, deep links, scheduled-run associations and imported packages deliberately; decide whether legacy external references require a limited compatibility mapping. Do not rewrite durable external-effect keys simply because application IDs change.
 

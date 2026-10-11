@@ -1,6 +1,6 @@
 <div align="center">
 
-<img alt="Ox app icon" src="/apps/ios/Ox/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="160" height="160">
+<img alt="Ox app icon" src="/apps/ios/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="160" height="160">
 
 <h1>OpenOx</h1>
 

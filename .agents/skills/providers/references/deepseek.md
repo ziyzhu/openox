@@ -12,6 +12,6 @@ Ox presents DeepSeek in Global and China under one provider identity. The curren
 
 ## Runtime sources
 
-- Provider composition: [DeepSeekProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/DeepSeekProvider.swift)
-- Shared wire behavior: [OpenAICompatibleProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/OpenAICompatibleProvider.swift)
-- Models: [provider-models.json](../../../../apps/ios/Ox/Host/ModelProviders/provider-models.json)
+- Provider composition: [DeepSeekProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/DeepSeekProvider.swift)
+- Shared wire behavior: [OpenAICompatibleProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/OpenAICompatibleProvider.swift)
+- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)

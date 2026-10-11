@@ -54,7 +54,7 @@ Apple's public guidance does not specify whether entitlement assessment uses the
 
 ## 2. Complete the minimum browser experience
 
-Build on `apps/ios/Ox/Client/UI/WebBrowserView.swift`.
+Build on `apps/ios/Client/UI/WebBrowserView.swift`.
 
 - [ ] Provide readily accessible URL entry, web search, or curated bookmarks from launch; Apple's criteria permit these alternatives.
 - [ ] Allow browsing without asking the agent first.
@@ -80,7 +80,7 @@ Gate: demonstrate that external links open correctly, not merely that Browser ca
 
 ## 4. Audit navigation and website compatibility
 
-Review `apps/ios/Ox/Host/Services/Web/ServiceWebKit.swift` and its navigation collaborators.
+Review `apps/shared/Host/Services/Web/ServiceWebKit.swift` and its navigation collaborators.
 
 - [x] Confirm ordinary `ServiceBrowserSession` browsing supports HTTP independently of the restricted agent-controlled browser policy; keep that policy intact.
 - [x] Enable HTTP only for WebKit content using `NSAllowsArbitraryLoadsInWebContent`; keep URLSession ATS unchanged. Verify a local HTTP page and redirect.

@@ -57,7 +57,7 @@ export function artifacts(): Record<string, string> {
   return {
     "packages/protocol/schema.json": JSON.stringify(schema, null, 2) + "\n",
     "packages/protocol/methods.json": JSON.stringify(methods, null, 2) + "\n",
-    "apps/ios/Ox/Host/RPC/HostRPCRequests.swift": swift,
+    "apps/shared/Host/RPC/HostRPCRequests.swift": swift,
   };
 }
 

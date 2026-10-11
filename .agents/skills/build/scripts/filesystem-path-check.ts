@@ -10,7 +10,7 @@ export async function check(): Promise<string> {
     /\.path\s*\.\s*replacingOccurrences\(\s*of:\s*[\w.]+\.path\b/g,
     /\.standardizedFileURL\s*\.\s*path\s*\.\s*dropFirst\(/g,
   ];
-  for await (const file of new Bun.Glob("apps/ios/**/*.swift").scan(ROOT)) {
+  for await (const file of new Bun.Glob("apps/{ios,macos,shared}/**/*.swift").scan(ROOT)) {
     const source = await readFile(join(ROOT, file), "utf8");
     count += 1;
     for (const pattern of patterns) {

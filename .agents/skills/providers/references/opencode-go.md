@@ -12,5 +12,5 @@ Ox presents OpenCode Go in Global. It is a subscription-key provider, not an API
 
 ## Runtime sources
 
-- Provider composition: [OpenCodeGoProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/OpenCodeGoProvider.swift)
-- Models: [provider-models.json](../../../../apps/ios/Ox/Host/ModelProviders/provider-models.json)
+- Provider composition: [OpenCodeGoProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/OpenCodeGoProvider.swift)
+- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)

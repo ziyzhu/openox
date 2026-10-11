@@ -6,7 +6,7 @@ import {
 } from "@openox/protocol/manifest";
 import { inspectInstaller } from "@openox/protocol/installer";
 
-export const BUILTIN_REPOSITORY_ROOT = resolve(import.meta.dir, "../../../apps/ios/Ox/Resources/OxServices.bundle");
+export const BUILTIN_REPOSITORY_ROOT = resolve(import.meta.dir, "../../../apps/shared/Resources/OxServices.bundle");
 
 export function sourceDirFor(domain: string, root = BUILTIN_REPOSITORY_ROOT): string {
   return domain.startsWith("api:")

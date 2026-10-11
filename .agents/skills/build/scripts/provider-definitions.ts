@@ -78,7 +78,7 @@ const ProviderSchema = Type.Union([
   object({ ...common, api: Type.Literal("web") }),
 ]);
 
-const providerSchemaPath = join(ROOT, "apps/ios/Ox/Host/ModelProviders/provider-definition.schema.json");
+const providerSchemaPath = join(ROOT, "apps/shared/Host/ModelProviders/provider-definition.schema.json");
 
 export const generated = (): Generated => ({
   [providerSchemaPath]: `${JSON.stringify(ProviderSchema, (key, value) => {

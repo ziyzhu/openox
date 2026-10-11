@@ -16,11 +16,11 @@ Grok Website remains an ordinary service using the signed-in browser session for
 
 ## Runtime sources
 
-- Provider composition: [XAIProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/XAI/XAIProvider.swift)
-- OAuth: [XAIOAuth.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/XAI/XAIOAuth.swift)
-- Account state: [XAISubscriptionAccount.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/XAI/XAISubscriptionAccount.swift)
-- Models: [provider-models.json](../../../../apps/ios/Ox/Host/ModelProviders/provider-models.json)
-- Website service: [grok.com/actions.js](../../../../apps/ios/Ox/Resources/OxServices.bundle/web/grok.com/actions.js)
+- Provider composition: [XAIProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/XAI/XAIProvider.swift)
+- OAuth: [XAIOAuth.swift](../../../../apps/shared/Host/Agent/LLM/Providers/XAI/XAIOAuth.swift)
+- Account state: [XAISubscriptionAccount.swift](../../../../apps/shared/Host/Agent/LLM/Providers/XAI/XAISubscriptionAccount.swift)
+- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
+- Website service: [grok.com/actions.js](../../../../apps/shared/Resources/OxServices.bundle/web/grok.com/actions.js)
 
 ## Implementation comparison
 

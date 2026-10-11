@@ -18,35 +18,26 @@ targets:
     platform: macOS
     preBuildScripts:
       - name: Validate agent bundle
-        script: SRCROOT="$SRCROOT/../ios" sh "$SRCROOT/../ios/validate-agent-bundle.sh"
+        script: sh "$SRCROOT/../shared/validate-agent-bundle.sh"
         basedOnDependencyAnalysis: false
     sources:
       - path: Host
       - path: Resources
-      - path: ../ios/Ox/Host
-        excludes:
-          - IOSHost.swift
-          - Conversations/IOSConversationBackgroundExecution.swift
-          - Conversations/ScheduledSkillScheduler.swift
-          - Services/Native/MessageComposer.swift
-          - Services/Native/NativeServiceFunctions.swift
-          - Services/Native/LocationProvider.swift
-          - Services/Native/MapProvider.swift
-          - Services/Native/ContactsProvider.swift
-          - Services/Native/CalendarProvider.swift
-      - path: ../ios/Ox/Platform/Models
-      - path: ../ios/Ox/Diagnostics
-      - path: ../ios/Ox/Resources/OxServices.bundle
+      - path: Diagnostics
+      - path: ../shared/Host
+      - path: ../shared/Platform/Models
+      - path: ../shared/Diagnostics
+      - path: ../shared/Resources/OxServices.bundle
         type: file
         buildPhase: resources
-      - path: ../ios/Ox/Resources/PiDurable.bundle
+      - path: ../shared/Resources/PiDurable.bundle
         type: file
         buildPhase: resources
-      - path: ../ios/Ox/Resources/PublicSuffixList.bundle
+      - path: ../shared/Resources/PublicSuffixList.bundle
         type: file
         buildPhase: resources
-      - path: ../ios/Ox/Resources/Localizations
-      - path: ../ios/Ox/Resources/ModelServiceActions.json
+      - path: ../shared/Resources/Localizations
+      - path: ../shared/Resources/ModelServiceActions.json
     info:
       path: Info.plist
       properties:

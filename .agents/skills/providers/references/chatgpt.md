@@ -15,10 +15,10 @@ The current Ox flow uses the Codex CLI OAuth client identity. Resolve this again
 
 ## Runtime sources
 
-- Provider composition: [ChatGPTProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/ChatGPT/ChatGPTProvider.swift)
-- OAuth: [ChatGPTOAuth.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/ChatGPT/ChatGPTOAuth.swift)
-- Account state: [ChatGPTSubscriptionAccount.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/ChatGPT/ChatGPTSubscriptionAccount.swift)
-- Models: [provider-models.json](../../../../apps/ios/Ox/Host/ModelProviders/provider-models.json)
+- Provider composition: [ChatGPTProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/ChatGPT/ChatGPTProvider.swift)
+- OAuth: [ChatGPTOAuth.swift](../../../../apps/shared/Host/Agent/LLM/Providers/ChatGPT/ChatGPTOAuth.swift)
+- Account state: [ChatGPTSubscriptionAccount.swift](../../../../apps/shared/Host/Agent/LLM/Providers/ChatGPT/ChatGPTSubscriptionAccount.swift)
+- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
 
 ## Implementation comparison
 

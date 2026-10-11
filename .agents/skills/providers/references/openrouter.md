@@ -14,10 +14,10 @@ Ox presents OpenRouter in Global. Users can connect their OpenRouter account wit
 
 ## Runtime sources
 
-- Provider composition and routing policy: [OpenRouterProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/OpenRouter/OpenRouterProvider.swift)
-- OAuth endpoints and exchange: [OpenRouterOAuth.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/OpenRouter/OpenRouterOAuth.swift)
-- OAuth account storage: [OpenRouterSubscriptionAccount.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/OpenRouter/OpenRouterSubscriptionAccount.swift)
-- Models: [provider-models.json](../../../../apps/ios/Ox/Host/ModelProviders/provider-models.json)
+- Provider composition and routing policy: [OpenRouterProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/OpenRouter/OpenRouterProvider.swift)
+- OAuth endpoints and exchange: [OpenRouterOAuth.swift](../../../../apps/shared/Host/Agent/LLM/Providers/OpenRouter/OpenRouterOAuth.swift)
+- OAuth account storage: [OpenRouterSubscriptionAccount.swift](../../../../apps/shared/Host/Agent/LLM/Providers/OpenRouter/OpenRouterSubscriptionAccount.swift)
+- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
 
 ## Implementation comparison
 

@@ -20,7 +20,7 @@ export function artifacts(): Record<string, string> {
   const swift = `nonisolated extension HostProtocols {\n    static let repository = [${REPOSITORY_VERSIONS.join(", ")}]\n}\n`;
   return {
     "packages/protocol/repository.schema.json": JSON.stringify(schema, null, 2) + "\n",
-    "apps/ios/Ox/Host/HostRepositoryContract.swift": swift,
+    "apps/shared/Host/HostRepositoryContract.swift": swift,
   };
 }
 

@@ -12,5 +12,5 @@ Ox presents ModelScope API Inference only in China. The service is free for deve
 
 ## Runtime sources
 
-- Provider composition: [ModelScopeProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/ModelScopeProvider.swift)
-- Models: [provider-models.json](../../../../apps/ios/Ox/Host/ModelProviders/provider-models.json)
+- Provider composition: [ModelScopeProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/ModelScopeProvider.swift)
+- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)

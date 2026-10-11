@@ -3,8 +3,8 @@ import { ROOT, runCheck } from "../../../lib.ts";
 
 const REQUIRED_LOCALES = ["zh-Hans"];
 const CATALOG_PATHS = [
-  "apps/ios/Ox/Resources/Localizations/Localizable.xcstrings",
-  "apps/ios/Ox/Resources/Localizations/InfoPlist.xcstrings",
+  "apps/shared/Resources/Localizations/Localizable.xcstrings",
+  "apps/shared/Resources/Localizations/InfoPlist.xcstrings",
   "apps/ios/ShareExtension/Localizable.xcstrings",
 ];
 const PLACEHOLDER = /%(?:\d+\$)?(?:lld|ld|d|@|f|s)/g;

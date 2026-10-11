@@ -20,7 +20,7 @@ function usesNodeRuntime(text: string) {
 }
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const destination = `${root}apps/ios/Ox/Resources/PiDurable.bundle`;
+const destination = `${root}apps/shared/Resources/PiDurable.bundle`;
 for (const name of ["pi-durable", "pi-ai", "chord"]) {
   const metadata = await Bun.file(new URL("../package.json", import.meta.resolve(`@earendil-works/${name}`))).json();
   if (metadata.version !== "1.0.0") throw new Error(`Unverified ${name} version ${metadata.version}; audit the host adapters before upgrading`);
@@ -67,7 +67,7 @@ for (const generated of [result, promptResult]) for (const file of generated.out
   bundles[name] = { bytes: file.contents.length, sha256: new Bun.CryptoHasher("sha256").update(file.text).digest("hex") };
   console.log(`PASS ${name} audit: ${inputs.length} inputs, ${file.contents.length} bytes, no external imports or Node runtime`);
 }
-const guidancePath = `${root}apps/ios/Ox/Host/Agent/ModelGuidance.generated.swift`;
+const guidancePath = `${root}apps/shared/Host/Agent/ModelGuidance.generated.swift`;
 const guidanceSource = nativeGuidanceSource();
 if (!await Bun.file(guidancePath).exists() || await Bun.file(guidancePath).text() !== guidanceSource) {
   const temporary = `${guidancePath}.${process.pid}.tmp`;

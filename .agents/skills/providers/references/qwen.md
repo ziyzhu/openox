@@ -20,6 +20,6 @@ The China general API is a first-run trial option because new Model Studio accou
 
 ## Runtime sources
 
-- Provider composition and regional account mapping: [QwenProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/QwenProvider.swift)
-- Models: [provider-models.json](../../../../apps/ios/Ox/Host/ModelProviders/provider-models.json)
-- Website adapter: [qwen.ai/actions.js](../../../../apps/ios/Ox/Resources/OxServices.bundle/web/qwen.ai/actions.js)
+- Provider composition and regional account mapping: [QwenProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/QwenProvider.swift)
+- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
+- Website adapter: [qwen.ai/actions.js](../../../../apps/shared/Resources/OxServices.bundle/web/qwen.ai/actions.js)

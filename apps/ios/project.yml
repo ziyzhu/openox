@@ -1,0 +1,219 @@
+name: Ox
+options:
+  minimumXcodeGenVersion: 2.46.0
+  xcodeVersion: "26.2"
+  settingPresets: none
+  defaultConfig: Release
+  disabledValidations:
+    - missingConfigFiles
+packages:
+  SwiftGitX:
+    url: https://github.com/ibrahimcetin/SwiftGitX
+    from: 0.4.0
+configFiles:
+  Debug: Local.xcconfig
+  Release: Local.xcconfig
+settings:
+  base:
+    ALWAYS_SEARCH_USER_PATHS: "NO"
+    ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: "YES"
+    CLANG_ANALYZER_NONNULL: "YES"
+    CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION: YES_AGGRESSIVE
+    CLANG_CXX_LANGUAGE_STANDARD: gnu++20
+    CLANG_ENABLE_MODULES: "YES"
+    CLANG_ENABLE_OBJC_ARC: "YES"
+    CLANG_ENABLE_OBJC_WEAK: "YES"
+    CLANG_WARN__DUPLICATE_METHOD_MATCH: "YES"
+    CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING: "YES"
+    CLANG_WARN_BOOL_CONVERSION: "YES"
+    CLANG_WARN_COMMA: "YES"
+    CLANG_WARN_CONSTANT_CONVERSION: "YES"
+    CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS: "YES"
+    CLANG_WARN_DIRECT_OBJC_ISA_USAGE: YES_ERROR
+    CLANG_WARN_DOCUMENTATION_COMMENTS: "YES"
+    CLANG_WARN_EMPTY_BODY: "YES"
+    CLANG_WARN_ENUM_CONVERSION: "YES"
+    CLANG_WARN_INFINITE_RECURSION: "YES"
+    CLANG_WARN_INT_CONVERSION: "YES"
+    CLANG_WARN_NON_LITERAL_NULL_CONVERSION: "YES"
+    CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF: "YES"
+    CLANG_WARN_OBJC_LITERAL_CONVERSION: "YES"
+    CLANG_WARN_OBJC_ROOT_CLASS: YES_ERROR
+    CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER: "YES"
+    CLANG_WARN_RANGE_LOOP_ANALYSIS: "YES"
+    CLANG_WARN_STRICT_PROTOTYPES: "YES"
+    CLANG_WARN_SUSPICIOUS_MOVE: "YES"
+    CLANG_WARN_UNGUARDED_AVAILABILITY: YES_AGGRESSIVE
+    CLANG_WARN_UNREACHABLE_CODE: "YES"
+    COPY_PHASE_STRIP: "NO"
+    DEVELOPMENT_TEAM: $(OX_DEVELOPMENT_TEAM)
+    ENABLE_STRICT_OBJC_MSGSEND: "YES"
+    ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+    GCC_C_LANGUAGE_STANDARD: gnu17
+    GCC_NO_COMMON_BLOCKS: "YES"
+    GCC_WARN_64_TO_32_BIT_CONVERSION: "YES"
+    GCC_WARN_ABOUT_RETURN_TYPE: YES_ERROR
+    GCC_WARN_UNDECLARED_SELECTOR: "YES"
+    GCC_WARN_UNINITIALIZED_AUTOS: YES_AGGRESSIVE
+    GCC_WARN_UNUSED_FUNCTION: "YES"
+    GCC_WARN_UNUSED_VARIABLE: "YES"
+    IPHONEOS_DEPLOYMENT_TARGET: "26.2"
+    LOCALIZATION_PREFERS_STRING_CATALOGS: "YES"
+    MTL_FAST_MATH: "YES"
+    SDKROOT: iphoneos
+  configs:
+    Debug:
+      DEBUG_INFORMATION_FORMAT: dwarf
+      ENABLE_TESTABILITY: "YES"
+      GCC_DYNAMIC_NO_PIC: "NO"
+      GCC_OPTIMIZATION_LEVEL: "0"
+      GCC_PREPROCESSOR_DEFINITIONS:
+        - DEBUG=1
+        - $(inherited)
+      MTL_ENABLE_DEBUG_INFO: INCLUDE_SOURCE
+      ONLY_ACTIVE_ARCH: "YES"
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG $(inherited)
+      SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+    Release:
+      DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+      ENABLE_NS_ASSERTIONS: "NO"
+      MTL_ENABLE_DEBUG_INFO: "NO"
+      SWIFT_COMPILATION_MODE: wholemodule
+      VALIDATE_PRODUCT: "YES"
+targets:
+  ios:
+    type: application
+    platform: iOS
+    configFiles:
+      Debug: Local.xcconfig
+      Release: Local.xcconfig
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_ENTITLEMENTS: ios.entitlements
+        CODE_SIGN_STYLE: Automatic
+        CURRENT_PROJECT_VERSION: "1"
+        DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: "NO"
+        DEVELOPMENT_TEAM: $(OX_DEVELOPMENT_TEAM)
+        ENABLE_PREVIEWS: "YES"
+        GENERATE_INFOPLIST_FILE: "NO"
+        INFOPLIST_FILE: Info.plist
+        INFOPLIST_OTHER_PREPROCESSOR_FLAGS: "-traditional-cpp"
+        INFOPLIST_PREPROCESS: "YES"
+        IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+        LD_RUNPATH_SEARCH_PATHS:
+          - $(inherited)
+          - "@executable_path/Frameworks"
+        LM_SKIP_METADATA_EXTRACTION: "NO"
+        MARKETING_VERSION: 1.0.11
+        PRODUCT_BUNDLE_IDENTIFIER: $(OX_BUNDLE_IDENTIFIER)
+        PRODUCT_NAME: Ox
+        STRING_CATALOG_GENERATE_SYMBOLS: "YES"
+        SUPPORTS_MACCATALYST: "YES"
+        SWIFT_APPROACHABLE_CONCURRENCY: "YES"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_EMIT_LOC_STRINGS: "YES"
+        SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: "YES"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: 1,2
+      configs:
+        Debug:
+          INFOPLIST_PREPROCESSOR_DEFINITIONS: DEBUG=1
+        Release:
+          EXCLUDED_SOURCE_FILE_NAMES:
+            - $(inherited)
+            - OxDemoArtwork.bundle
+    sources:
+      - path: Client
+        type: syncedFolder
+      - path: Development
+        type: syncedFolder
+      - path: Diagnostics
+        type: syncedFolder
+      - path: Host
+        type: syncedFolder
+      - path: Platform
+        type: syncedFolder
+      - path: Resources
+        type: syncedFolder
+      - path: ../shared/Host
+        type: syncedFolder
+      - path: ../shared/Platform
+        type: syncedFolder
+      - path: ../shared/Diagnostics
+        type: syncedFolder
+      - path: ../shared/Resources/OxServices.bundle
+        type: file
+        buildPhase: resources
+      - path: ../shared/Resources/PiDurable.bundle
+        type: file
+        buildPhase: resources
+      - path: ../shared/Resources/PublicSuffixList.bundle
+        type: file
+        buildPhase: resources
+      - path: ../shared/Resources/Localizations
+      - path: ../shared/Resources/ModelServiceActions.json
+    preBuildScripts:
+      - name: Validate agent bundle
+        script: "sh \"$SRCROOT/../shared/validate-agent-bundle.sh\""
+        inputFiles:
+          - $(SRCROOT)/../shared/validate-agent-bundle.sh
+          - $(SRCROOT)/../shared/Resources/PiDurable.bundle
+        basedOnDependencyAnalysis: false
+    dependencies:
+      - package: SwiftGitX
+      - target: ShareExtension
+        embed: true
+  ShareExtension:
+    type: app-extension
+    platform: iOS
+    configFiles:
+      Debug: Local.xcconfig
+      Release: Local.xcconfig
+    settings:
+      base:
+        APPLICATION_EXTENSION_API_ONLY: "YES"
+        CODE_SIGN_ENTITLEMENTS: ShareExtension.entitlements
+        CODE_SIGN_STYLE: Automatic
+        CURRENT_PROJECT_VERSION: "1"
+        DEVELOPMENT_TEAM: $(OX_DEVELOPMENT_TEAM)
+        GENERATE_INFOPLIST_FILE: "NO"
+        INFOPLIST_FILE: ShareExtension-Info.plist
+        IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+        LD_RUNPATH_SEARCH_PATHS:
+          - $(inherited)
+          - "@executable_path/../../Frameworks"
+        LM_SKIP_METADATA_EXTRACTION: "YES"
+        MARKETING_VERSION: 1.0.11
+        PRODUCT_BUNDLE_IDENTIFIER: $(OX_BUNDLE_IDENTIFIER).ShareExtension
+        PRODUCT_NAME: ShareExtension
+        SKIP_INSTALL: "YES"
+        STRING_CATALOG_GENERATE_SYMBOLS: "YES"
+        SUPPORTS_MACCATALYST: "NO"
+        SWIFT_APPROACHABLE_CONCURRENCY: "YES"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_EMIT_LOC_STRINGS: "YES"
+        SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: "YES"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: 1,2
+    sources:
+      - path: ShareExtension
+        type: syncedFolder
+schemes:
+  ios:
+    build:
+      targets:
+        ios: all
+    run:
+      config: Debug
+      environmentVariables:
+        OX_DEBUG_ENDPOINT: ws://127.0.0.1:9876
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

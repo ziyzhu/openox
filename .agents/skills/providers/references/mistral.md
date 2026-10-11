@@ -14,5 +14,5 @@ Ox presents the Mistral API in Global. Mistral enables API access in Free mode w
 
 ## Runtime sources
 
-- Provider composition: [MistralProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/MistralProvider.swift)
-- Models: [provider-models.json](../../../../apps/ios/Ox/Host/ModelProviders/provider-models.json)
+- Provider composition: [MistralProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/MistralProvider.swift)
+- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)

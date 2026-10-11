@@ -18,6 +18,7 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | `bun run build:repository-schema` | Regenerate repository JSON/Swift artifacts. |
 | `bun run build:provider-schema` | Regenerate provider definitions schema. |
 | `bun run build:services` | Rebuild bundled services, Local Git seed, and model-action resources. |
+| `bun run generate:ios` / `bun run generate:macos` | Generate Xcode projects from each app's `project.yml`; include generated iOS changes for Xcode Cloud. |
 | `bun run build:macos` | Generate the native host-only project with XcodeGen and build for macOS 26+. |
 | `bun run build:agent` | Rebuild native bundles, the portable prompt renderer, default SOUL, package-owned bundled skills, and TS-owned `ModelGuidance.generated.swift`. |
 | `bun run update:llms` | Refresh already-selected models from models.dev; requires network access. |
@@ -34,7 +35,8 @@ focused output diff. Do not change contract schemas merely to make checks pass;
 service manifest changes require maintainer approval. Provider selection changes
 follow the `providers` skill rather than a second catalog-management workflow.
 
-`apps/ios/Ox/Resources/OxServices.bundle/` is the single built-in repository source.
+`apps/shared/Resources/OxServices.bundle/` is the single built-in repository source.
+Both native targets compile `apps/shared` and their own platform sources; neither compiles the other app. `typecheck` enforces this boundary and rejects OS conditionals in native Swift sources.
 `build:services` validates it, refreshes its content hash without rewriting service
 files, and creates a deterministic Local Git seed and model-action resources.
 Package builds copy this source; hosted icon artwork lives in `assets/services/`.

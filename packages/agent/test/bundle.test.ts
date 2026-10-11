@@ -13,7 +13,7 @@ beforeAll(async () => {
 });
 
 it("ships a standalone prompt renderer and byte-identical default SOUL without a Profile or native bridge", async () => {
-  const directory = new URL("../../../apps/ios/Ox/Resources/PiDurable.bundle/", import.meta.url);
+  const directory = new URL("../../../apps/shared/Resources/PiDurable.bundle/", import.meta.url);
   const realm = createContext({ console: undefined });
   runInContext(await Bun.file(new URL("prompts.js", directory)).text(), realm);
   expect(runInContext("typeof OxDurable + ':' + typeof __oxDurableRequest + ':' + typeof process + ':' + typeof fetch", realm))
@@ -42,7 +42,7 @@ it("ships a standalone prompt renderer and byte-identical default SOUL without a
     const source = await Bun.file(new URL(`../skills/${skill.name}/${path}`, import.meta.url)).text();
     expect(text).toBe(source);
   }
-  const nativeSource = await Bun.file(new URL("../../../apps/ios/Ox/Host/Agent/ModelGuidance.generated.swift", import.meta.url)).text();
+  const nativeSource = await Bun.file(new URL("../../../apps/shared/Host/Agent/ModelGuidance.generated.swift", import.meta.url)).text();
   expect(nativeSource).toBe(nativeGuidanceSource());
   const seed = await Bun.file(new URL("default-soul.md", directory)).text();
   expect(seed).toBe(defaultSoul);
@@ -56,7 +56,7 @@ it("ships a standalone prompt renderer and byte-identical default SOUL without a
 
 it("uses explicit prompt variants without inferring prose from capabilities and rejects ambiguous ownership in the shipped renderer", async () => {
   const realm = createContext({ console: undefined });
-  runInContext(await Bun.file(new URL("../../../apps/ios/Ox/Resources/PiDurable.bundle/prompts.js", import.meta.url)).text(), realm);
+  runInContext(await Bun.file(new URL("../../../apps/shared/Resources/PiDurable.bundle/prompts.js", import.meta.url)).text(), realm);
   const scope = { hostID: "desktop-host", profileID: "profile-a" };
   realm.input = { soul: "## Voice\nBe direct.", memory: "frozen", hostContext: { active: scope,
     hosts: [{ ...scope, functions: ["ox.fs.read", "ox.fs.edit", "ox.fs.write", "ox.output.read"], serviceKinds: [], presentation: "text", externalFiles: false }] } };
@@ -89,7 +89,7 @@ it("uses explicit prompt variants without inferring prose from capabilities and 
 
 for (const name of ["harness", "harness-storage"]) {
   it(`loads audited ${name} in a bare realm without Node or browser globals`, async () => {
-    const source = await Bun.file(new URL(`../../../apps/ios/Ox/Resources/PiDurable.bundle/${name}.js`, import.meta.url)).text();
+    const source = await Bun.file(new URL(`../../../apps/shared/Resources/PiDurable.bundle/${name}.js`, import.meta.url)).text();
     let next = 0;
     const timers = new Map<number, ReturnType<typeof setTimeout>>();
     const realm = createContext({

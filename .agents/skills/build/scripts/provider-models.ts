@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { ROOT, runCheck } from "../../../lib.ts";
 
 const source = "https://models.dev/catalog.json";
-const manifestPath = join(ROOT, "apps/ios/Ox/Host/ModelProviders/provider-models.json");
+const manifestPath = join(ROOT, "apps/shared/Host/ModelProviders/provider-models.json");
 const expectedClients = {
   global: [
     "chatgpt", "openai", "anthropic", "gemini", "github-copilot", "xai", "opencode-go",

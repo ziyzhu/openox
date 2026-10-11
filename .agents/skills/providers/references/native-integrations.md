@@ -4,7 +4,7 @@ Read the matching provider reference before changing an integration. Verify unst
 
 ## API and subscription providers
 
-Give each integration a provider-owned composition file under `apps/ios/Ox/Host/Agent/LLM/Providers`. Reuse an existing transport from `LLM/Transports`. Keep Global/China and subscription/API account boundaries explicit. When OpenOx functionality uses OAuth, use apps registered as OpenOx.
+Give each integration a provider-owned composition file under `apps/shared/Host/Agent/LLM/Providers`. Reuse an existing transport from `LLM/Transports`. Keep Global/China and subscription/API account boundaries explicit. When OpenOx functionality uses OAuth, use apps registered as OpenOx.
 
 Verify request requirements, reasoning controls, intentional token caps, and adaptive-thinking/reasoning-replay wire IDs against provider documentation. Do not infer reseller availability from an upstream catalog. Check provider validation, user messages, Action results, and history together; upload success alone does not prove a model can read an attachment.
 

@@ -11,4 +11,4 @@ Claude Website remains an ordinary service using its consumer website session in
 
 ## Runtime sources
 
-- Website service: [claude.ai/actions.js](../../../../apps/ios/Ox/Resources/OxServices.bundle/web/claude.ai/actions.js)
+- Website service: [claude.ai/actions.js](../../../../apps/shared/Resources/OxServices.bundle/web/claude.ai/actions.js)
