@@ -4,7 +4,7 @@
 
 <h1>OpenOx</h1>
 
-A self-evolving mobile app.
+A self-evolving agent that runs on your phone.
 
 <h3>
 
@@ -25,39 +25,62 @@ A self-evolving mobile app.
 2. **Local first** — Ox runs on your device, keeping your conversations, credentials, and memory stored locally.
 3. **Yours** — Open source and malleable, Ox evolves with you and uses the models you choose.
 
-## Ox Clients and Hosts
+## Usage
 
-| Implementation | Client | Host |
-| --- | --- | --- |
-| [iOS app](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) ([source](apps/ios)) | On-device app | Embedded on the device |
-| [CLI](apps/cli) | Terminal app for macOS and Linux | Connects to a running Ox Host |
+- **Clients:** [iOS app](apps/ios) and [CLI](apps/cli) for macOS and Linux.
+- **Hosts:** built-in iOS Host and standalone [macOS Host](apps/macos) (WIP).
 
-Install the standalone terminal Client on macOS or Linux:
+The iOS app uses its built-in Host. The CLI can connect to either Host.
+
+```mermaid
+flowchart LR
+    iOS["iOS app"] --> iOSHost["iOS Host · on your phone"]
+    CLI["CLI · macOS / Linux"] --> iOSHost
+    CLI --> MacHost["macOS Host · WIP"]
+```
+
+**Use Ox on iPhone**
+
+1. Install [Ox from the App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502).
+2. Follow onboarding to choose your model.
+
+**Install the CLI — macOS or Linux**
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ziyzhu/openox/main/apps/cli/install.sh | sh
 ox --help
 ```
 
-Standalone downloads require a published `ox-cli-v<version>` GitHub Release.
-The installer verifies the download and installs into `~/.local/bin` without
-requiring Bun or Node.js. Run the same command to update.
+**Run a Host on Mac — WIP**
 
-Live commands connect to a foreground iOS Host through Tailscale. Enable
-Settings → Host → Allow connections, then pass its tailnet endpoint to the CLI.
-Debug and Release builds use the same API and network restrictions. Use `ox --help` and `ox <group> --help` for connections and offline commands.
-With Bun 1.3 or newer, `bun install --global @openox/cli` installs the package-manager version.
+The macOS Host runs in the menu bar. It has no conversation UI; use the CLI to
+interact with it.
 
-## Development setup
+Requires macOS 26+, Xcode, [Bun](https://bun.sh/) 1.3+, and XcodeGen
+(`brew install xcodegen`). Run from a source checkout:
 
-For a new checkout, follow the [setup skill](.agents/skills/setup/SKILL.md).
-It covers CLI and skill dependencies, Pi setup, simulator provisioning, iOS
-signing, App Store authentication, bundled services, and a verified first launch.
-Local repository loading can be tested separately.
+```sh
+bun install
+bun run build:services
+bun run build:agent
+bun run build:macos -derivedDataPath /tmp/ox-macos-build
+open /tmp/ox-macos-build/Build/Products/Debug/OxHost.app --args --allow-connections
+```
 
-Follow the [release skill](.agents/skills/release/SKILL.md) for npm/CLI publication
-and App Store promotional copy, What's New, and approved staging. App Store Connect is the source
-of truth for listing metadata and media; App Review submission remains manual.
+**Connect the CLI to a Host**
+
+1. Connect your terminal device and Host to the same [Tailscale](https://tailscale.com/) tailnet.
+2. Allow connections on the Host:
+   - **iPhone:** Enable Settings → Host → Allow connections and keep Ox open.
+   - **Mac:** Keep the Host running; the launch command above enables connections.
+3. Discover available Hosts and check your connection:
+
+```sh
+ox host list
+ox --host ws://<host-tailnet-address>:9876 host describe
+```
+
+Use `ox --help` for commands and connection options.
 
 ## Architecture
 
