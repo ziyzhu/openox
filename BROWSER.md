@@ -14,7 +14,7 @@ Benefits:
 
 Costs and limitations:
 - Apple-managed entitlement approval has uncertain eligibility and timing.
-- Current photo-library read access conflicts with Apple's published browser requirements.
+- Native photo-library search and album organization are removed; user-selected photo attachments remain available.
 - Current Bluetooth permission key conflicts with the published requirements; retaining foreground CoreBluetooth functionality needs Apple clarification.
 - General browsing, external-link handling, and broader compatibility testing become ongoing responsibilities.
 - Passkeys still require user participation and do not resolve embedded OAuth rejection, CAPTCHAs, or anti-bot checks.
@@ -23,16 +23,16 @@ Costs and limitations:
 
 - [ ] Ask Apple about eligibility for an AI app with user-controlled general browsing, or submit an entitlement request describing Ox honestly.
 - [ ] Clarify whether foreground CoreBluetooth functionality can coexist with the browser entitlement.
-- [ ] Decide how to remove or redesign photo-library read and organization features in `PhotoLibraryProvider.swift`.
-- [ ] Preserve picker-based photo attachments; consider add-only authorization for saving images.
+- [x] Remove the read/write Photos provider, native actions, bundled service, permission key, and permission translations with maintainer approval.
+- [x] Preserve and simulator-verify picker-based photo attachments without Photos library authorization. Add-only image saving is not implemented.
 - [x] Audit declared capabilities and permission keys against Apple's published browser requirements; findings below do not establish Apple approval.
-- [ ] Update permission-owning implementations together with `apps/ios/Info.plist`; do not delete usage strings while leaving authorization requests intact.
+- [x] Remove Photos authorization requests together with `apps/ios/Info.plist` declarations; keep Bluetooth unchanged pending clarification.
 
 Gate: obtain maintainer agreement on feature trade-offs and clarify eligibility before undertaking a large redesign.
 
 Audit findings:
-- `apps/ios/Info.plist` declares both explicitly prohibited keys: `NSPhotoLibraryUsageDescription` and `NSBluetoothAlwaysUsageDescription`.
-- `PhotoLibraryProvider.swift` requests `.readWrite` authorization and supports album listing, asset search, previews, album creation, and album membership changes. Limited-library authorization still uses the prohibited usage key; it is not a browser-compliance workaround.
+- `NSPhotoLibraryUsageDescription` is removed from the built app; the explicitly prohibited `NSBluetoothAlwaysUsageDescription` remains unresolved.
+- The removed `PhotoLibraryProvider.swift` requested `.readWrite` authorization for library search and album operations. Limited-library authorization was not a compliance workaround and cannot create or fetch user albums.
 - Chat attachments already use SwiftUI's system Photos picker. Preserve this path. Add-only access is not a replacement for searching existing assets or organizing existing albums.
 - `BluetoothProvider.swift` rejects operations unless the app is active and closes its session when backgrounded. `UIBackgroundModes` declares processing, not Bluetooth modes. Nevertheless, the prohibited key remains present.
 - Apple's current Bluetooth-key documentation says `NSBluetoothAlwaysUsageDescription` is required when using the device's Bluetooth interface. Its browser guide instead recommends `NSBluetoothWhileInUseUsageDescription`. Treat this documentation conflict as unresolved; do not substitute keys without a supported solution from Apple.
@@ -43,11 +43,11 @@ Audit findings:
 Questions to submit to Apple after maintainer review:
 1. Can Ox qualify for `com.apple.developer.web-browser` as an AI assistant with a user-controlled general WebKit browser, if it meets launch-time browsing and external HTTP/HTTPS navigation requirements?
 2. Can Ox retain foreground-only CoreBluetooth operations? The app closes Bluetooth sessions on backgrounding and does not declare Bluetooth background modes. How should it satisfy both the browser prohibition and the modern Bluetooth usage-key requirement?
-3. Must Ox remove all PhotoKit `.readWrite` features, including limited-library access and album organization, while retaining picker-based attachments and optional add-only saving?
+3. Ox has removed PhotoKit `.readWrite` features and retained system-picker attachments. Are there additional Photos restrictions beyond avoiding library access and using add-only authorization for any future saving?
 4. Are there additional restrictions on Ox's user-authorized Contacts, calendar, reminders, camera, microphone, local-network, background-processing, or iCloud features?
 5. What build and review evidence should accompany the request, and how can external-link behavior be demonstrated before production entitlement approval?
 
-No inquiry has been submitted. Do not represent planned compliance changes as already implemented. The Photos redesign and any Bluetooth feature removal require maintainer approval before code changes.
+No inquiry has been submitted. Photos removal is approved and implemented; Bluetooth feature removal still requires maintainer approval. Do not represent the remaining compliance plan as implemented or Apple-approved.
 
 ## 2. Complete the minimum browser experience
 

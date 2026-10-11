@@ -1,7 +1,7 @@
 {
   "version": 3,
   "name": "Built-in",
-  "contentHash": "3ca9a719d7d18e2793665e88537f4a96d801ac98aad22780043cb9981aef78ee",
+  "contentHash": "8075fb615366314ebd1cde9951338e5c3852b0d48a08cceae073c14b046a1289",
   "services": [
     "ios:bluetooth",
     "ios:calendar",
@@ -10,7 +10,6 @@
     "ios:location",
     "ios:messages",
     "ios:notifications",
-    "ios:photos",
     "ios:reminders",
     "web:amazon.com",
     "web:americanexpress.com",
