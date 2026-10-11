@@ -18,7 +18,6 @@
     "build:agent": "bun packages/agent/build.ts",
     "test:agent": "bun test packages/agent/test",
     "test:agent-ui-ios": "bun .agents/skills/test/apps/ios/durable-conversation.ts",
-    "build:diagram": "dot -Tsvg assets/openox-components.dot -o assets/openox-components.svg",
     "sim:bootstrap": "bun .agents/skills/setup/scripts/bootstrap.ts",
     "sim:launch": "bun .agents/skills/setup/scripts/template.ts",
     "sim:website-export": "bun .agents/skills/setup/scripts/website-export.ts",
