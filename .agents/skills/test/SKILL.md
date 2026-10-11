@@ -87,6 +87,8 @@ and visible assistant message, then attempts to restore the prior saved conversa
 It only shuts down a simulator it booted. Relaunching can discard an unsaved
 temporary conversation: use a dedicated QA target, not personal working state.
 
+Inline service sign-in verification must include sending while the page is open, then expanding and returning it inline. Attach the service before running Mock `50`; verify the queued message and continued app process, since transcript layout changes can recreate row-owned WebViews.
+
 Screenshots, build results, conversation snapshots, and failure logs go in a new directory
 outside the repository; `--output` selects its parent. PID claims coordinate these
 runners only, not manual native-tool use or other agents. `test:agent-ui-ios --device ox-1 --app /absolute/Ox.app` exercises the actual

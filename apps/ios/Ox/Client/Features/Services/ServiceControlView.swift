@@ -26,12 +26,12 @@ struct InlineBotControlView: View {
             fallbackSystemImage: "checkmark.shield.fill",
             title: name,
             subtitle: String(localized: "Complete the site's human verification to continue"),
-            mount: session.flatMap { session in
-                pageMount.isInline(page: session.page, ownerID: session.id)
-                    ? WebPageMount(page: session.page, ownerID: session.id, coordinator: pageMount)
+            mount: nil,
+            inlinePageAnchorID: session.flatMap { session in
+                pageMount.isInline(page: session.page, ownerID: session.id) && !isPresentedInSheet
+                    ? session.id
                     : nil
             },
-            inlinePageAnchorID: nil,
             isPresented: isPresentedInSheet,
             placeholder: .progress(String(localized: "Complete the site's human verification to continue")),
             activate: nil,
@@ -69,12 +69,12 @@ struct InlineServiceAuthView: View {
             fallbackSystemImage: "person.badge.key.fill",
             title: name,
             subtitle: String(localized: "Sign in to continue"),
-            mount: session.flatMap { session in
-                pageMount.isInline(page: session.page, ownerID: session.id)
-                    ? WebPageMount(page: session.page, ownerID: session.id, coordinator: pageMount)
+            mount: nil,
+            inlinePageAnchorID: session.flatMap { session in
+                pageMount.isInline(page: session.page, ownerID: session.id) && !isPresentedInSheet
+                    ? session.id
                     : nil
             },
-            inlinePageAnchorID: nil,
             isPresented: isPresentedInSheet,
             placeholder: .progress(String(localized: "Sign in to continue")),
             activate: nil,
