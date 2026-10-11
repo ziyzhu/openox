@@ -5,8 +5,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./ios": "./src/adapters/ios/index.ts",
-    "./storage-diagnostics": "./src/adapters/ios/storage-diagnostics.ts",
-    "./chat-bindings": "./src/chat-bindings.ts"
+    "./storage-diagnostics": "./src/adapters/ios/storage-diagnostics.ts"
   },
   "scripts": {
     "build": "bun build.ts",

@@ -14,7 +14,7 @@ extension Conversation {
             guard let route = durableRoute else { throw RuntimeError.bridge("Agent filesystem is unavailable") }
             let normalized = try await route.session.runtime.command(.object(["action": .string("filesystemValidate"),
                 "operation": .string("read"), "arguments": .object(["path": .string(path), "purpose": .string(args["purpose"]?.stringValue ?? "Attach file")]),
-                "chatID": .string(route.nativeID.uuidString), "reference": route.reference?.value ?? .null]))
+                "conversationID": .int(route.conversationID)]))
             guard let source = normalized.objectValue?["path"]?.stringValue else { throw RuntimeError.bridge("Invalid attachment path") }
             return try await attachFileSystem(path: source, purpose: args["purpose"]?.stringValue ?? "Attach file")
         }
@@ -23,7 +23,7 @@ extension Conversation {
         guard let route = durableRoute else { throw RuntimeError.bridge("Agent filesystem is unavailable") }
         let validated = try await route.session.runtime.command(.object(["action": .string("filesystemValidate"),
             "operation": .string(name), "arguments": .object(args), "profileID": .string(route.profileID.uuidString),
-            "chatID": .string(route.nativeID.uuidString), "reference": route.reference?.value ?? .null]))
+            "conversationID": .int(route.conversationID)]))
         guard var fields = validated.objectValue else { throw RuntimeError.bridge("Invalid agent filesystem request") }
         if let historyPath = fields["path"]?.stringValue {
             var parts = historyPath.split(separator: "/").map(String.init)

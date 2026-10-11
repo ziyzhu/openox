@@ -9,10 +9,14 @@ nonisolated private enum SubmissionCancellation {
 
 nonisolated struct DurableConversationRoute: Sendable {
     let session: DurableProfileStore.Session
-    let nativeID: UUID
+    let conversationID: Int
     let profileID: UUID
     let artifactScope: ProfileScope?
     let reference: DurableConversationReference?
+
+    var runtimeReference: JSONValue {
+        DurableConversationReference(profileID: profileID, conversationID: conversationID).value
+    }
 }
 
 extension Conversation {
@@ -41,22 +45,21 @@ extension Conversation {
         try Task.checkCancellation()
         guard let route = durableRoute else { throw RuntimeError.bridge("Pi conversation preparation has not completed") }
         let session = route.session
-        let chatID = route.nativeID.uuidString
+        let conversationID = route.conversationID
         if let reference = route.reference {
             guard reference.profileID == scope.profileID else {
                 throw RuntimeError.bridge("Conversation does not belong to its Profile")
             }
         }
-        try await session.host.bind(chatID: chatID, scope: scope, configuration: configuration, runtime: session.runtime,
+        try await session.host.bind(conversationID: conversationID, scope: scope, configuration: configuration, runtime: session.runtime,
                                     runtimeProfileID: route.profileID.uuidString, artifactScope: route.artifactScope,
                                     isolatedFiles: route.reference == nil) { [weak self] event in
             await self?.receiveAgentEvent(event)
         }
-        if let reference = route.reference { try await session.host.expectReference(chatID: chatID, reference: reference.value) }
         let effort = configuration.model.selectedReasoningEffort
         let thinkingLevel = effort.flatMap { ["off", "minimal", "low", "medium", "high", "xhigh", "max"].contains($0) ? $0 : nil }
         let config: JSONValue = .object([
-            "chatID": .string(chatID), "model": .string(configuration.model.id), "promptState": configuration.promptState,
+            "model": .string(configuration.model.id), "promptState": configuration.promptState,
             "isolatedFiles": .bool(route.reference == nil),
             "providerID": .string(configuration.client.id),
             "thinkingLevel": thinkingLevel.map(JSONValue.string) ?? .null,
@@ -70,9 +73,9 @@ extension Conversation {
             ]) }),
             "messages": .array([]),
         ])
-        let attachment = try await session.runtime.command(.object(["action": .string("attach"), "config": config, "reference": route.reference?.value ?? .null]))
-        guard let reference = attachment.objectValue?["reference"] else { throw RuntimeError.bridge("Missing qualified conversation reference") }
-        try await session.host.expectReference(chatID: chatID, reference: reference)
+        let attachment = try await session.runtime.command(.object(["action": .string("attach"), "config": config, "conversationID": .int(conversationID)]))
+        guard attachment.objectValue?["reference"] == route.runtimeReference else { throw RuntimeError.bridge("Native attachment returned another conversation identity") }
+        let reference = route.runtimeReference
         preparedConfiguration = configuration
         return reference
     }
@@ -102,10 +105,9 @@ extension Conversation {
         let cancellation = Mutex(SubmissionCancellation.ready)
         let result: ConversationRunResult
         do {
-            let reference = try await prepareDurableConversation(configuration: configuration)
+            _ = try await prepareDurableConversation(configuration: configuration)
             try Task.checkCancellation()
-            let request = fields.merging(["action": .string(action), "chatID": .string(route.nativeID.uuidString),
-                                          "reference": reference]) { _, value in value }
+            let request = fields.merging(["action": .string(action), "conversationID": .int(route.conversationID)]) { _, value in value }
             let response = try await withTaskCancellationHandler {
                 try await route.session.runtime.command(.object(request))
             } onCancel: {
@@ -114,13 +116,13 @@ extension Conversation {
                     state = .aborting(Task {
                         do {
                             _ = try await route.session.runtime.command(.object(["action": .string("abort"),
-                                "chatID": .string(route.nativeID.uuidString), "reference": reference]))
-                        } catch { Log.agent.error("PiDurable abort failed conversation=\(route.nativeID) error=\(error.localizedDescription)") }
+                                "conversationID": .int(route.conversationID)]))
+                        } catch { Log.agent.error("PiDurable abort failed conversation=\(route.conversationID) error=\(error.localizedDescription)") }
                     })
                 }
             }
             let status = response.objectValue?["receipt"]?.objectValue?["status"]?.stringValue
-            let failure = await route.session.host.failure(chatID: route.nativeID.uuidString)
+            let failure = await route.session.host.failure(conversationID: route.conversationID)
             let outcome: ConversationRunOutcome = Task.isCancelled || failure?.0 == "aborted" ? .aborted : status == "done" ? .completed :
                 .failed(message: failure?.0 ?? "Durable submission was not answered: \(response.objectValue?["receipt"]?.jsonString() ?? "unknown")", kind: failure?.1 ?? .provider)
             result = ConversationRunResult(outcome: outcome)
@@ -142,7 +144,7 @@ extension Conversation {
         try await durablePreparation?.value
         guard let route = durableRoute else { throw RuntimeError.bridge("Pi conversation is not attached") }
         let result = try await route.session.runtime.command(.object(["action": .string("conversationContext"),
-            "chatID": .string(route.nativeID.uuidString), "reference": route.reference?.value ?? .null]))
+            "conversationID": .int(route.conversationID)]))
         guard let messages = result.objectValue?["messages"]?.arrayValue else { throw RuntimeError.bridge("Invalid Pi conversation context") }
         return try messages.map {
             try DurableMessageCodec.decode($0, scope: scope, artifactScope: route.artifactScope)

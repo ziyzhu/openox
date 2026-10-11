@@ -764,7 +764,7 @@ final class ConversationManager {
         chat.durablePreparation = Task { @MainActor [weak self, weak chat] in
             guard let self, let chat else { throw CancellationError() }
             if chat.isTemporary {
-                try await OxHostProtocol.prepareDurableTemporaryChat(chat, caseID: OxHostProtocol.durableTemporarySessionID ?? UUID())
+                try await OxHostProtocol.prepareDurableTemporaryConversation(chat, caseID: OxHostProtocol.durableTemporarySessionID ?? UUID())
             } else {
                 let oldID = ChatID(chat.id)
                 let reference: DurableConversationReference
@@ -777,7 +777,7 @@ final class ConversationManager {
                 try Task.checkCancellation()
                 let session = try await DurableProfileStore.shared.session(in: chat.scope)
                 try chat.installDurableRoute(DurableConversationRoute(session: session,
-                    nativeID: reference.compatibilityID.rawValue, profileID: reference.profileID,
+                    conversationID: reference.conversationID, profileID: reference.profileID,
                     artifactScope: chat.scope, reference: reference))
                 if oldID != reference.compatibilityID, var record = records.removeValue(forKey: oldID) {
                     if case .debouncing(_, let task) = record.persistence { task.cancel() }

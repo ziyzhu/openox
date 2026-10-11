@@ -9,7 +9,6 @@ import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promise
 import { join } from "node:path";
 import { FileError, getOrThrow } from "@earendil-works/pi-durable/env";
 import { profileEnv } from "../src/profile/filesystem";
-import { ChatBindings, ConversationIdentity } from "../src/chat-bindings";
 import { openProfileRuntime, type ProfileRuntime, type CommittedEvent, type ProfileRuntimeOptions,
   canonical, type FileOperation, type FileRequest,
   type ConversationReference, type ConversationHistoryCursor, type ConversationListCursor } from "../src/index";
@@ -117,14 +116,14 @@ test("multiple conversations in one Profile runtime route events by Pi identity"
   expect(ids).toEqual(new Set([a.id, b.id]));
 });
 
-test("identical external chat UUIDs bind independently without changing persisted fields", async () => {
+test("database-local conversation IDs remain independently scoped across Profiles", async () => {
   const first = await fixture("first"); const second = await fixture("second");
-  const a = new ChatBindings(first.harness); const b = new ChatBindings(second.harness);
-  const firstHandle = await a.attach("same-external-uuid", []); const secondHandle = await b.attach("same-external-uuid", []);
-  expect(await first.harness.snapshot(ConversationIdentity, firstHandle.id, context)).toEqual({ chatID: "same-external-uuid" });
-  expect(await second.harness.snapshot(ConversationIdentity, secondHandle.id, context)).toEqual({ chatID: "same-external-uuid" });
+  const firstHandle = await conversation(first); const secondHandle = await conversation(second);
+  expect(firstHandle.id).toBe(secondHandle.id);
+  expect(first.conversations.reference(firstHandle.id)).toEqual({ profileID: "first", conversationID: firstHandle.id });
+  expect(second.conversations.reference(secondHandle.id)).toEqual({ profileID: "second", conversationID: secondHandle.id });
   await first.close();
-  expect((await b.forChat("same-external-uuid")).id).toBe(secondHandle.id);
+  expect((await second.harness.conversation(secondHandle.id, context))?.id).toBe(secondHandle.id);
 });
 
 test("dedicated file tools are absent and cannot mutate Profile documents", async () => {
@@ -336,7 +335,7 @@ test("presentation and history reopen from SQLite without creating another chat 
 test("bounded iOS commands route qualified references and execute structured prompts through the native boundary", async () => {
   const path = `/tmp/ox-ios-prompts-${crypto.randomUUID()}.sqlite`;
   let storage = backend(path);
-  const modelRequests: { systemPrompt: string; messages: { role: string; content: unknown }[] }[] = [];
+  const modelRequests: { conversationID: ConversationId; reference: ConversationReference; systemPrompt: string; messages: { role: string; content: unknown }[] }[] = [];
   const host = globalThis as typeof globalThis & { __oxDurableRequest?: (id: number, json: string) => void };
   const previous = host.__oxDurableRequest;
   let adapter = new IOSAgentAdapter();
@@ -369,28 +368,31 @@ test("bounded iOS commands route qualified references and execute structured pro
     await expect(adapter.command({ action: "fileMounts", profileID: "wrong" })).rejects.toThrow("Profile mismatch");
     const scope = { hostID: "ios-host", profileID: "ios-profile" };
     const hostContext = { active: scope, hosts: [{ ...scope, functions: ["ox"], serviceKinds: ["web", "ios", "mcp"] as ("web" | "ios" | "mcp")[], presentation: "chat-bubbles" as const, externalFiles: true }] };
-    const config = { chatID: "external-uuid", title: "Native", promptState: { soul: "## Voice\nBe helpful.", memory: "frozen memory", hostContext }, model: "mock", contextWindow: 100000,
-      maxTokens: 1000, reasoning: false, tools: [], messages: [{ role: "user" as const, content: "seed", timestamp: 1 }] };
-    const attached = await adapter.command({ action: "attach", config }) as { conversationID: ConversationId; reference: ConversationReference };
+    const config = { title: "Native", promptState: { soul: "## Voice\nBe helpful.", memory: "frozen memory", hostContext }, model: "mock", contextWindow: 100000,
+      maxTokens: 1000, reasoning: false, tools: [] };
+    const created = await adapter.command({ action: "conversationCreate", title: config.title,
+      entries: [{ kind: "pi.user", model: [{ role: "user", content: "seed", timestamp: 1 }] }] }) as { reference: ConversationReference };
+    const attached = await adapter.command({ action: "attach", config, conversationID: created.reference.conversationID }) as { conversationID: ConversationId; reference: ConversationReference };
     expect(attached.reference).toEqual({ profileID: "ios-profile", conversationID: attached.conversationID });
     const metadata = await adapter.command({ action: "conversationMetadata", reference: attached.reference }) as { agent: AgentState; presentation: { title: string } };
-    expect(metadata.agent.model?.provider).toBe("ox-native:external-uuid");
-    expect(metadata.agent.extensions).toContain("ox-chat:external-uuid");
+    expect(metadata.agent.model?.provider).toBe(`ox-native:ios-profile:${attached.conversationID}`);
+    expect(metadata.agent.extensions).toContain(`ox-conversation:ios-profile:${attached.conversationID}`);
     expect(metadata.presentation.title).toBe("Native");
     const history = await adapter.command({ action: "conversationHistory", reference: attached.reference, limit: 1 }) as { items: unknown[]; next?: ConversationHistoryCursor };
     expect(JSON.stringify(history.items)).toContain("seed");
-    await adapter.command({ action: "conversationPresent", chatID: config.chatID, presentation: { favorite: true, title: "Updated" } });
+    await adapter.command({ action: "conversationPresent", conversationID: attached.conversationID, presentation: { favorite: true, title: "Updated" } });
     const again = await adapter.command({ action: "attach", config, reference: attached.reference }) as typeof attached;
     expect(again.reference).toEqual(attached.reference);
     const list = await adapter.command({ action: "conversationList" }) as { items: { favorite: boolean; presentation: { title: string } }[] };
     expect(list.items).toHaveLength(1); expect(list.items[0]!.favorite).toBe(true); expect(list.items[0]!.presentation.title).toBe("Updated");
-    await expect(adapter.command({ action: "conversationHistory", chatID: "missing", reference: { ...attached.reference, profileID: "wrong" } })).rejects.toThrow("Profile mismatch");
-    await expect(adapter.command({ action: "inspect", profileID: "wrong", chatID: "missing" })).rejects.toThrow("Profile mismatch");
-    const inspected = await adapter.command({ action: "inspect", chatID: config.chatID }) as { conversations: { chatID: string; id: ConversationId }[] };
-    expect(inspected.conversations).toEqual([{ chatID: config.chatID, id: attached.conversationID }]);
-    const second = await adapter.command({ action: "attach", config: { ...config, chatID: "second-uuid" } }) as typeof attached;
-    await expect(adapter.command({ action: "attach", config, reference: second.reference })).rejects.toThrow("UUID/reference mismatch");
-    await expect(adapter.command({ action: "conversationMetadata", chatID: config.chatID, reference: second.reference })).rejects.toThrow("UUID/reference mismatch");
+    await expect(adapter.command({ action: "conversationHistory", reference: { ...attached.reference, profileID: "wrong" } })).rejects.toThrow("Profile mismatch");
+    await expect(adapter.command({ action: "inspect", profileID: "wrong", conversationID: attached.conversationID })).rejects.toThrow("Profile mismatch");
+    const inspected = await adapter.command({ action: "inspect", conversationID: attached.conversationID }) as { conversations: { id: ConversationId }[] };
+    expect(inspected.conversations).toEqual([{ id: attached.conversationID }]);
+    const secondCreated = await adapter.command({ action: "conversationCreate" }) as typeof created;
+    const second = await adapter.command({ action: "attach", config, conversationID: secondCreated.reference.conversationID }) as typeof attached;
+    await expect(adapter.command({ action: "attach", config, conversationID: attached.conversationID, reference: second.reference })).rejects.toThrow("identity mismatch");
+    await expect(adapter.command({ action: "conversationMetadata", conversationID: attached.conversationID, reference: second.reference })).rejects.toThrow("identity mismatch");
     const prompt = composeIOSPrompt(config.promptState);
     expect(await adapter.command({ action: "composePrompt", promptState: config.promptState })).toEqual(prompt);
     const turnState = { skills: [{ name: "example", description: "Example skill" }], skillConflicts: [],
@@ -402,6 +404,8 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(modelRequests).toHaveLength(0);
     const run = await adapter.command({ action: "run", reference: attached.reference, content: "first", turnState }) as { receipt: { status: string } };
     expect(run.receipt.status).toBe("done");
+    expect(modelRequests[0]!.conversationID).toBe(attached.conversationID);
+    expect(modelRequests[0]!.reference).toEqual(attached.reference);
     expect(modelRequests[0]!.systemPrompt.startsWith(prompt.rendered)).toBe(true);
     expect(modelRequests[0]!.systemPrompt).toContain("<profile_files>");
     expect(modelRequests[0]!.systemPrompt).not.toContain("<ox>");
@@ -421,7 +425,8 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(modelRequests[1]!.systemPrompt).toContain("frozen memory");
     expect(modelRequests[1]!.systemPrompt).not.toContain("new live memory");
     expect(JSON.stringify(modelRequests[1]!.messages.at(-1))).not.toContain("files/a");
-    const isolated = await adapter.command({ action: "attach", config: { ...config, chatID: "isolated", isolatedFiles: true } }) as typeof attached;
+    const isolatedCreated = await adapter.command({ action: "conversationCreate" }) as typeof created;
+    const isolated = await adapter.command({ action: "attach", config: { ...config, isolatedFiles: true }, conversationID: isolatedCreated.reference.conversationID }) as typeof attached;
     await adapter.command({ action: "run", reference: isolated.reference, content: "files" });
     expect(modelRequests[2]!.systemPrompt).toContain("<durable_test_files>");
     const retained = await adapter.command({ action: "conversationHistory", reference: attached.reference, limit: 100 });
@@ -431,8 +436,8 @@ test("bounded iOS commands route qualified references and execute structured pro
     await adapter.command({ action: "open", profileID: "ios-profile", mounts: [{ path: "notes/shared", access: "readOnly", files: { "readme.md": "native notes" } }] });
     expect(await adapter.command({ action: "fileMounts" })).toEqual(mounts);
     expect(await adapter.command({ action: "conversationHistory", reference: attached.reference, limit: 100 })).toEqual(retained);
-    for (const [config_, reference_] of [[updated, attached.reference], [{ ...config, chatID: "second-uuid" }, second.reference],
-      [{ ...config, chatID: "isolated", isolatedFiles: true }, isolated.reference]] as const) {
+    for (const [config_, reference_] of [[updated, attached.reference], [config, second.reference],
+      [{ ...config, isolatedFiles: true }, isolated.reference]] as const) {
       await adapter.command({ action: "attach", config: config_, reference: reference_ });
     }
     await adapter.command({ action: "run", reference: attached.reference, content: "after reopen" });

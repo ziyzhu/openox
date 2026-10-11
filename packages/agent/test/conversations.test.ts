@@ -1,65 +1,22 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels } from "@earendil-works/pi-ai/models";
-import { Harness, createRegistry, defineDoc, type EntryRecord, type ConversationId } from "@earendil-works/pi-durable";
+import { Harness, createRegistry, type EntryRecord, type ConversationId } from "@earendil-works/pi-durable";
 import { fauxAssistantMessage } from "@earendil-works/pi-ai/providers/faux";
 import { OxConversations, ConversationPresentation, ConversationFavorite, ConversationReadState, type ConversationHistoryCursor } from "../src/index";
 import { SqliteStorage } from "@earendil-works/pi-durable/storage/sqlite";
-import { ChatBindings as Conversations, ConversationIdentity } from "../src/chat-bindings";
 import { backend } from "./sqlite-backend";
 
 const context = BACKGROUND_CONTEXT;
 let harness: Harness;
-let conversations: Conversations;
 let storage: ReturnType<typeof backend>;
 let presentation: OxConversations;
 beforeEach(async () => {
   storage = backend();
   harness = await Harness.open(await SqliteStorage.open(storage.db), { registry: createRegistry(), models: createModels() }, context);
-  conversations = new Conversations(harness); await conversations.restore();
   presentation = new OxConversations("profile-a", harness, () => {});
 });
 afterEach(async () => { await harness.close(context); });
-
-test("concurrent attachment creates one Pi conversation, seeds once, and writes no shadow registry", async () => {
-  const seed = [{ role: "user" as const, content: "seed", timestamp: 1 }];
-  const [first, second] = await Promise.all([conversations.attach("chat-a", seed), conversations.attach("chat-a", seed)]);
-  expect(first.id).toBe(second.id);
-  expect((await first.entries({}, 100, undefined, context)).items.filter(entry => entry.kind === "pi.user")).toHaveLength(1);
-  expect(await harness.snapshot(ConversationIdentity, first.id, context)).toEqual({ chatID: "chat-a" });
-  const obsolete = defineDoc<{ byID: Record<string, number> }>({ kind: "ox.chats", version: 1, scope: "session", initial: () => ({ byID: {} }) });
-  expect(await harness.snapshot(obsolete, context)).toBeUndefined();
-  expect(conversations.list()).toEqual([{ chatID: "chat-a", id: first.id }]);
-});
-
-test("a discarded lookup is rebuilt from Pi records and per-conversation identity", async () => {
-  const first = await conversations.attach("chat-a", []);
-  const second = await conversations.attach("chat-b", []);
-  await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
-  const restored = new Conversations(harness); await restored.restore();
-  expect((await restored.forChat("chat-a")).id).toBe(first.id);
-  expect((await restored.forChat("chat-b")).id).toBe(second.id);
-  expect(restored.list()).toHaveLength(2); // An unbound Pi conversation does not become a fabricated Ox UUID.
-  expect((await restored.attach("chat-a", [])).id).toBe(first.id);
-  await expect(restored.forChat("missing")).rejects.toThrow("not attached");
-});
-
-test("duplicate external identities fail closed without replacing an existing lookup", async () => {
-  const first = await conversations.attach("chat-a", []);
-  await harness.createConversation({ ownership: { kind: "ownerless" }, init: async (tx, id) => {
-    (await tx.doc(ConversationIdentity, id)).chatID = "chat-a";
-  } }, context);
-  await expect(conversations.restore()).rejects.toThrow("same Ox chat identity");
-  expect((await conversations.forChat("chat-a")).id).toBe(first.id);
-});
-
-test("restoration follows Pi pagination rather than assuming a fixed conversation count", async () => {
-  for (let index = 0; index < 101; index++) await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
-  const last = await conversations.attach("last-chat", []);
-  const restored = new Conversations(harness); await restored.restore();
-  expect((await restored.forChat("last-chat")).id).toBe(last.id);
-  expect(restored.list()).toEqual([{ chatID: "last-chat", id: last.id }]);
-}, 20_000);
 
 test("visible listing is presentation-only, paginated, and never creates documents for internal roots", async () => {
   const internal = await harness.createConversation({ ownership: { kind: "ownerless" } }, context);

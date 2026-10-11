@@ -436,7 +436,7 @@ final class Conversation: Identifiable {
         deselect()
         serviceManager.browserActionSessions.closeSession(for: id)
         if cancelling { durablePreparation?.cancel(); cancelAll() }
-        if isTemporary { Task { await OxHostProtocol.releaseDurableTemporaryChat(self) } }
+        if isTemporary { Task { await OxHostProtocol.releaseDurableTemporaryConversation(self) } }
     }
 
     var customTitle: String?

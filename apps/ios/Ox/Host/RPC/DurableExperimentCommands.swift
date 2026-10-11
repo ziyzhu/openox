@@ -9,7 +9,7 @@ extension OxHostProtocol {
         let data = try JSONEncoder().encode(params)
         switch method {
         case .durableStorage: handleDurableStorage(try JSONDecoder().decode(DurableStorageRequest.self, from: data), reply: reply)
-        case .durableChat: handleDurableChat(try JSONDecoder().decode(DurableChatRequest.self, from: data), chats: chats, reply: reply)
+        case .durableChat: handleDurableConversation(try JSONDecoder().decode(DurableConversationRequest.self, from: data), conversations: chats, reply: reply)
         default: reply.failure("Unknown Pi Durable experiment")
         }
         #else

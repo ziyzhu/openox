@@ -8,7 +8,7 @@ export const emptyUsage = () => ({ input: 0, output: 0, cacheRead: 0, cacheWrite
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } });
 
 /** Swift's contract has a leading prompt/tools, not positional system messages. Use Pi's specified collapse semantics. */
-export function nativeStream(chatID: string, model: Model<Api>, transcript: TranscriptContext, options?: SimpleStreamOptions, reference?: ConversationReference) {
+export function nativeStream(reference: ConversationReference, model: Model<Api>, transcript: TranscriptContext, options?: SimpleStreamOptions) {
   const output = createAssistantMessageEventStream();
   let terminal = false;
   let partial: AssistantMessage = { role: "assistant", api: model.api, provider: model.provider, model: model.id,
@@ -18,7 +18,7 @@ export function nativeStream(chatID: string, model: Model<Api>, transcript: Tran
       if (options?.deferred) throw new Error("Native deferred generation is unsupported");
       const tools = getCurrentTools(transcript.messages);
       const purpose = options?.cacheRetention === "none" && tools.length === 0 ? "compaction" : "generation";
-      await native("nativeModel", { chatID, reference, purpose, streamOptions: { maxTokens: options?.maxTokens, cacheRetention: options?.cacheRetention },
+      await native("nativeModel", { conversationID: reference.conversationID, reference, purpose, streamOptions: { maxTokens: options?.maxTokens, cacheRetention: options?.cacheRetention },
         systemPrompt: getCurrentSystemPrompt(transcript.messages), tools, messages: transcript.messages.filter(message => message.role !== "system") },
       options?.signal, value => {
         const event = value as AssistantMessageEvent;

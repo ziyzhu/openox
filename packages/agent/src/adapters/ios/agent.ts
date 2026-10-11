@@ -2,14 +2,13 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Context } from "@earendil-works/chord";
 import { createModels, createProvider } from "@earendil-works/pi-ai/models";
 import { getCurrentSystemPrompt, getCurrentTools } from "@earendil-works/pi-ai/utils/transcript";
-import type { Message, Model, Tool, Api, ModelThinkingLevel } from "@earendil-works/pi-ai";
+import type { Model, Tool, Api, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { AgentDoc, defineExtension, defineTool, section, type EntryDraft, type UserInput, type ToolExecutionResult, type ToolExecutionMode } from "@earendil-works/pi-durable";
 import { openProfileRuntime, type ProfileRuntime, type ConversationReference, type ConversationHistoryCursor,
   type ConversationListCursor, type PresentationChange, installOxProfile, type NormalizedProfileDraft,
   ApplicationPresentation, type ApplicationPresentationChange, ProfileArtifact, ProfileFile, ProfileIndex, canonical, type TextFileMount,
   ConversationApplicationMetadata, ConversationPresentation, type ArtifactFiles, type ArtifactRecord } from "../../index";
 import type { CompactionCheckpoint, ConversationId, EntryId, GenerationCheckpoint, HarnessInspection, SubmissionId, TaskId, ToolExecutionApi, ToolTaskInput } from "@earendil-works/pi-durable";
-import { ChatBindings } from "../../chat-bindings";
 import { artifactPath, artifactRecord } from "../../profile/artifacts";
 import { publicDocument, type ProfileFileRecord } from "../../profile/file-store";
 import { nativeDatabase } from "../../sqlite";
@@ -24,18 +23,60 @@ import { composeTurnContext, type SystemPromptInput, type TurnState } from "../.
 import { activeHost, sameScope, type HostScope } from "../../core/host-context";
 
 const context = BACKGROUND_CONTEXT;
-interface Config { chatID: string; title?: string; promptState: SystemPromptInput; isolatedFiles?: boolean; model: string; contextWindow: number; maxTokens: number;
-  reasoning: boolean; tools: (Tool & { executionMode?: ToolExecutionMode })[]; messages: Message[]; toolExecutionMode?: ToolExecutionMode;
+interface Config { title?: string; promptState: SystemPromptInput; isolatedFiles?: boolean; model: string; contextWindow: number; maxTokens: number;
+  reasoning: boolean; tools: (Tool & { executionMode?: ToolExecutionMode })[]; toolExecutionMode?: ToolExecutionMode;
   providerID?: string; thinkingLevel?: ModelThinkingLevel | null; nativeReasoningEffort?: string | null }
-interface Command extends ApplicationPresentationChange { action: string; draft?: NormalizedProfileDraft; config?: Config; chatID?: string | null; content?: UserInput;
-  conversationCount?: number; mounts?: TextFileMount[];
-  capability?: string; fileMounts?: NativeFileMount[]; operation?: FileOperation; arguments?: FileRequest;
-  promptState?: SystemPromptInput; turnState?: TurnState;
-  requestID?: string; submissionID?: SubmissionId; profileID?: string; path?: string; prefix?: string; text?: string; base64?: string; saved?: boolean; artifactFiles?: boolean; physicalFiles?: boolean; prepareFiles?: boolean; publicFiles?: boolean; splitStorage?: boolean;
-  artifact?: ArtifactRecord & { binary: boolean; saved: boolean }; writes?: { path: string; text: string }[]; removes?: string[]; entries?: EntryDraft[];
-  offset?: number; length?: number; byPath?: boolean;
-  reference?: ConversationReference | null; limit?: number; historyCursor?: ConversationHistoryCursor | null; listCursor?: ConversationListCursor | null;
-  presentation?: PresentationChange | null; lastReadEntryID?: EntryId | null; entryID?: EntryId }
+type CommandScope = { profileID?: string; conversationID?: ConversationId; reference?: ConversationReference | null };
+type Command = CommandScope & (
+  | { action: "composePrompt"; promptState: SystemPromptInput }
+  | { action: "installProfile"; draft: NormalizedProfileDraft; conversationCount?: number }
+  | { action: "open"; profileID: string; mounts?: TextFileMount[]; artifactFiles?: boolean; physicalFiles?: boolean; prepareFiles?: boolean; publicFiles?: boolean }
+  | { action: "attach"; config: Config }
+  | { action: "filesystemValidate"; operation: FileOperation; arguments: FileRequest }
+  | { action: "filesystemAbort"; capability: string }
+  | { action: "filesystem"; capability: string; fileMounts: NativeFileMount[]; operation: FileOperation; arguments: FileRequest }
+  | { action: "publicFilesPrepare"; splitStorage?: boolean }
+  | ({ action: "conversationCreate"; entries?: EntryDraft[] } & ApplicationPresentationChange)
+  | ({ action: "applicationSave" } & ApplicationPresentationChange)
+  | { action: "conversationPopulate"; entries: EntryDraft[] }
+  | { action: "conversationFork"; entryID: EntryId; title?: string }
+  | { action: "applicationList" | "conversationList"; limit?: number; listCursor?: ConversationListCursor | null }
+  | { action: "conversationHistory"; limit?: number; historyCursor?: ConversationHistoryCursor | null }
+  | { action: "conversationPresent"; presentation?: PresentationChange | null }
+  | { action: "conversationRead"; lastReadEntryID?: EntryId | null }
+  | { action: "run"; content?: UserInput; turnState?: TurnState; requestID?: string }
+  | { action: "resumeExisting"; submissionID?: SubmissionId; requestID?: string }
+  | { action: "fileList"; prefix?: string }
+  | { action: "fileBatch"; writes?: { path: string; text: string }[]; removes?: string[] }
+  | { action: "fileSeed" | "fileWrite"; path: string; text: string }
+  | { action: "fileWriteBinary"; path: string; base64: string }
+  | { action: "fileRead" | "fileReference" | "fileReadBinary" | "fileRemove"; path: string }
+  | { action: "fileStat" | "fileArtifact"; path: string; byPath?: boolean }
+  | { action: "fileAdopt"; artifact: ArtifactRecord & { binary: boolean; saved: boolean } }
+  | { action: "fileSaved"; path: string; saved: boolean }
+  | { action: "fileMove"; path: string; prefix: string }
+  | { action: "filesPrepare" | "publicFilesInventory" | "applicationLoad" | "applicationDelete" | "conversationMetadata" | "conversationContext"
+      | "observe" | "recoveryPlan" | "resume" | "abort" | "inspect" | "fileMounts" | "skillPackages" | "close" }
+);
+interface OpenedSession {
+  session: ProfileRuntime;
+  application: ApplicationPresentation;
+  artifacts?: ArtifactFiles;
+  preparingFiles: boolean;
+  publicFiles: boolean;
+}
+interface NativeConfiguration {
+  provider: string;
+  modelId: string;
+  thinkingLevel: ModelThinkingLevel;
+  nativeProviderID?: string;
+  nativeReasoningEffort?: string;
+  scope?: HostScope;
+}
+type NativeAttachment = (
+  | { status: "attaching" }
+  | { status: "attached"; configuration: NativeConfiguration }
+);
 export interface NativeRecoveryPlan {
   scheduling: HarnessInspection["scheduling"];
   tasks: { reference: ConversationReference; taskID: TaskId }[];
@@ -68,23 +109,20 @@ function encodeBase64(bytes: Uint8Array) {
 }
 
 export class IOSAgentAdapter {
-  private session?: ProfileRuntime;
-  private bindings?: ChatBindings;
-  private application?: ApplicationPresentation;
-  private artifacts?: ArtifactFiles;
-  private preparingFiles = false;
-  private publicFiles = false;
-  private routes = new Map<ConversationId, string>();
-  private configured = new Map<ConversationId, { provider: string; modelId: string; thinkingLevel: ModelThinkingLevel;
-    nativeProviderID?: string; nativeReasoningEffort?: string; scope?: HostScope }>();
+  private opened?: OpenedSession;
+  private get current(): OpenedSession {
+    if (!this.opened) throw new Error("Profile runtime not open");
+    return this.opened;
+  }
+  private attachments = new Map<ConversationId, NativeAttachment>();
   private providerRoutes = new Map<string, ConversationId>();
   private models = createModels();
   private filesystemCalls = new Map<string, AbortController>();
 
   async command(args: Command): Promise<unknown> {
-    if (args.action === "composePrompt") return composeIOSPrompt(args.promptState!);
+    if (args.action === "composePrompt") return composeIOSPrompt(args.promptState);
     if (args.action === "installProfile") {
-      if (this.session || !args.draft) throw new Error("Profile installation requires an unopened staged runtime and normalized draft");
+      if (this.opened || !args.draft) throw new Error("Profile installation requires an unopened staged runtime and normalized draft");
       const count = args.conversationCount;
       if (count !== undefined && (!Number.isSafeInteger(count) || count < 0)) throw new Error("Invalid Profile conversation count");
       async function* conversations() {
@@ -96,16 +134,15 @@ export class IOSAgentAdapter {
         artifacts: nativeArtifacts(), conversations: count === undefined ? undefined : conversations() });
     }
     if (args.action === "open") {
-      if (this.session) throw new Error("Profile runtime already open");
+      if (this.opened) throw new Error("Profile runtime already open");
       this.models = createModels();
-      this.routes.clear(); this.configured.clear(); this.providerRoutes.clear();
-      this.preparingFiles = args.prepareFiles === true;
-      this.publicFiles = args.publicFiles === true;
-      this.artifacts = args.artifactFiles && (!args.physicalFiles || this.preparingFiles) ? nativeArtifacts() : undefined;
+      this.attachments.clear(); this.providerRoutes.clear();
+      const preparingFiles = args.prepareFiles === true;
+      const artifacts = args.artifactFiles && (!args.physicalFiles || preparingFiles) ? nativeArtifacts() : undefined;
       const database = nativeDatabase((op, sql, params) => native("sql", { op, sql, params }));
-      const session: ProfileRuntime = await openProfileRuntime({ database, models: this.models, profileID: args.profileID!,
-        artifacts: this.artifacts,
-        fileStorage: args.physicalFiles || args.prepareFiles ? { kind: this.preparingFiles ? "prepare" : "physical", backend: nativeFiles(), publicFiles: args.publicFiles } : undefined,
+      const session: ProfileRuntime = await openProfileRuntime({ database, models: this.models, profileID: args.profileID,
+        artifacts,
+        fileStorage: args.physicalFiles || args.prepareFiles ? { kind: preparingFiles ? "prepare" : "physical", backend: nativeFiles(), publicFiles: args.publicFiles } : undefined,
         mounts: args.mounts?.map(({ path, files, access }) => {
           if (access !== "readOnly") throw new Error("Native text mounts must be read-only");
           return { path, access, source: { kind: "text", files } };
@@ -114,45 +151,41 @@ export class IOSAgentAdapter {
         settings: { retry: { enabled: true, maxRetries: 2 }, toolExecution: "parallel" },
         beforeProgress: reference => this.guardProgress(reference),
         onEvents: async (id, events) => {
-          const chatID = this.routes.get(id);
-          if (chatID) await native("agentEvents", { chatID, reference: session.conversations.reference(id), events });
+          if (this.attachments.has(id)) await native("agentEvents", { conversationID: id, reference: session.conversations.reference(id), events });
         },
         onReport: error => { void native("report", { message: String(error) }); },
       });
       try {
-        const bindings = new ChatBindings(session.harness);
-        await bindings.restore();
-        this.session = session; this.bindings = bindings; this.application = new ApplicationPresentation(session);
+        this.opened = { session, application: new ApplicationPresentation(session), artifacts, preparingFiles, publicFiles: args.publicFiles === true };
         return { opened: true };
       } catch (error) { await session.close(); throw error; }
     }
-    const session = this.session;
-    if (!session || !this.bindings) throw new Error("Profile runtime not open");
+    const { session, application } = this.current;
     if (args.profileID !== undefined && args.profileID !== session.conversations.profileID) throw new Error("Conversation Profile mismatch");
-    if (args.action === "filesystemValidate") {
-      validateFileRequest(args.operation!, args.arguments!);
-      const id = args.reference?.conversationID ?? [...this.routes].find(([, chatID]) => chatID === args.chatID)?.[0];
-      const request = session.files.physical && id !== undefined ? resolveFileRequest(args.arguments!, `conversations/${id}`) : args.arguments!;
-      return validateFileRequest(args.operation!, request);
+    const reference = args.reference ?? (args.conversationID === undefined ? undefined : session.conversations.reference(args.conversationID));
+    if (reference) {
+      const id = session.conversations.id(reference);
+      if (args.conversationID !== undefined && id !== args.conversationID) throw new Error("Conversation identity mismatch");
     }
-    if (args.action === "filesystemAbort") { this.filesystemCalls.get(args.capability!)?.abort(); return {}; }
+    if (args.action === "filesystemValidate") {
+      validateFileRequest(args.operation, args.arguments);
+      const id = reference?.conversationID;
+      const request = session.files.physical && id !== undefined ? resolveFileRequest(args.arguments, `conversations/${id}`) : args.arguments;
+      return validateFileRequest(args.operation, request);
+    }
+    if (args.action === "filesystemAbort") { this.filesystemCalls.get(args.capability)?.abort(); return {}; }
     if (args.action === "filesystem") {
       if (args.reference && session.files.physical && (await session.files.state()).deletedConversations.includes(args.reference.conversationID)) throw new Error("Conversation not found");
-      if (this.filesystemCalls.has(args.capability!)) throw new Error("Filesystem capability already in use");
+      if (this.filesystemCalls.has(args.capability)) throw new Error("Filesystem capability already in use");
       const controller = new AbortController();
-      this.filesystemCalls.set(args.capability!, controller);
-      try { return await invokeFilesystem(session, args.capability!, args.fileMounts!, args.operation!, args.arguments!, controller.signal); }
-      finally { this.filesystemCalls.delete(args.capability!); }
+      this.filesystemCalls.set(args.capability, controller);
+      try { return await invokeFilesystem(session, args.capability, args.fileMounts, args.operation, args.arguments, controller.signal); }
+      finally { this.filesystemCalls.delete(args.capability); }
     }
-    const qualifiedID = args.reference == null ? undefined : session.conversations.id(args.reference);
-    if (args.action === "attach") return this.attach(args.config!, args.reference ?? undefined);
-    const routeID = args.chatID ? [...this.routes].find(([, chatID]) => chatID === args.chatID)?.[0] : undefined;
-    const compatibility = args.chatID && routeID === undefined
-      ? args.action === "conversationContext" ? this.bindings.list().find(binding => binding.chatID === args.chatID) : await this.bindings.forChat(args.chatID)
-      : undefined;
-    const chatID = routeID ?? compatibility?.id;
-    if (chatID !== undefined && qualifiedID !== undefined && chatID !== qualifiedID) throw new Error("Conversation UUID/reference mismatch");
-    const reference = args.reference ?? (chatID === undefined ? undefined : session.conversations.reference(chatID));
+    if (args.action === "attach") {
+      if (!reference) throw new Error("Pi conversation identity required before attachment");
+      return this.attach(args.config, reference);
+    }
     const required = () => {
       if (!reference) throw new Error("Conversation reference required");
       return reference;
@@ -162,15 +195,15 @@ export class IOSAgentAdapter {
       case "filesPrepare": return this.prepareFiles();
       case "publicFilesPrepare": return this.preparePublicFiles(args.splitStorage === true);
       case "publicFilesInventory":
-        if (!this.preparingFiles || !session.files.physical) throw new Error("Private inventory requires StorageMigrator admission");
+        if (!this.current.preparingFiles || !session.files.physical) throw new Error("Private inventory requires StorageMigrator admission");
         return { files: Object.values((await session.files.state()).files).filter(file => file.hidden) };
-      case "conversationCreate": return this.application!.create(args);
-      case "conversationPopulate": await this.application!.populate(required(), args.entries!); return {};
-      case "conversationFork": return this.fork(required(), args.entryID!, args.title);
-      case "applicationLoad": return this.application!.load(required());
-      case "applicationList": return this.application!.list(args.limit, args.listCursor ?? undefined);
-      case "applicationSave": await this.application!.save(required(), args); return {};
-      case "applicationDelete": await this.application!.delete(required()); return {};
+      case "conversationCreate": return application.create(args);
+      case "conversationPopulate": await application.populate(required(), args.entries); return {};
+      case "conversationFork": return this.fork(required(), args.entryID, args.title);
+      case "applicationLoad": return application.load(required());
+      case "applicationList": return application.list(args.limit, args.listCursor ?? undefined);
+      case "applicationSave": await application.save(required(), args); return {};
+      case "applicationDelete": await application.delete(required()); return {};
       case "conversationList": return session.conversations.list(args.limit, args.listCursor ?? undefined);
       case "conversationMetadata": return session.conversations.metadata(required());
       case "conversationContext": {
@@ -187,7 +220,8 @@ export class IOSAgentAdapter {
       case "run": {
         const target = attached();
         if (args.turnState?.hostContext) {
-          const expected = this.configured.get(target.conversationID)?.scope;
+          const attachment = this.attachments.get(target.conversationID);
+          const expected = attachment?.status === "attached" ? attachment.configuration.scope : undefined;
           if (!expected || !sameScope(expected, activeHost(args.turnState.hostContext))) throw new Error("Turn state does not belong to the attached host/Profile scope");
         }
         await this.guardProgress(target);
@@ -211,57 +245,57 @@ export class IOSAgentAdapter {
       }
       case "inspect": {
         const result = await session.inspect(reference);
-        const conversations = [...new Map([...this.bindings.list().map(({ id, chatID }) => [id, chatID] as const), ...this.routes]).entries()].map(([id, chatID]) => ({ id, chatID }));
+        const conversations = [...this.attachments.keys()].map(id => ({ id }));
         return { ...result, recovery: await this.recoveryPlan(result.inspection), conversations, streamEnds: Object.fromEntries(conversations
-          .filter(({ id }) => result.streamEnds[id]).map(({ id, chatID }) => [chatID, result.streamEnds[id]])) };
+          .filter(({ id }) => result.streamEnds[id]).map(({ id }) => [id, result.streamEnds[id]])) };
       }
       case "fileMounts": return session.textMounts;
       case "skillPackages": return session.skillPackages;
       case "fileList": return this.fileList(args.prefix);
       case "fileBatch": await this.fileBatch(args.writes ?? [], args.removes ?? []); return {};
-      case "fileSeed": return this.fileSeed(args.path!, args.text!);
+      case "fileSeed": return this.fileSeed(args.path, args.text);
       case "fileWrite":
-        await session.files.write(args.path!, args.text!);
-        return this.fileReceipt(args.path!);
+        await session.files.write(args.path, args.text);
+        return this.fileReceipt(args.path);
       case "fileWriteBinary":
         if (session.files.physical) {
-          const path = reference && args.path!.startsWith("artifacts/") ? `conversations/${reference.conversationID}/${args.path!.slice(10)}` : args.path!;
-          await session.files.write(path, decodeBase64(args.base64!));
+          const path = reference && args.path.startsWith("artifacts/") ? `conversations/${reference.conversationID}/${args.path.slice(10)}` : args.path;
+          await session.files.write(path, decodeBase64(args.base64));
           return this.fileReceipt(path);
         }
-        else await session.files.write(artifactPath(canonical(args.path!)), decodeBase64(args.base64!));
-        return this.fileReceipt(args.path!);
+        else await session.files.write(artifactPath(canonical(args.path)), decodeBase64(args.base64));
+        return this.fileReceipt(args.path);
       case "fileRead": {
-        const content = await session.files.read(args.path!);
-        return typeof content === "string" ? { content } : { base64: encodeBase64(content), ...await this.fileReceipt(args.path!) };
+        const content = await session.files.read(args.path);
+        return typeof content === "string" ? { content } : { base64: encodeBase64(content), ...await this.fileReceipt(args.path) };
       }
       case "fileReference": {
-        const content = await session.files.readReference(args.path!);
-        return typeof content === "string" ? { content } : { base64: encodeBase64(content), ...await this.fileReceipt(args.path!) };
+        const content = await session.files.readReference(args.path);
+        return typeof content === "string" ? { content } : { base64: encodeBase64(content), ...await this.fileReceipt(args.path) };
       }
       case "fileReadBinary": {
-        const content = await session.files.readReference(args.path!);
+        const content = await session.files.readReference(args.path);
         const bytes = typeof content === "string" ? new TextEncoder().encode(content) : content;
-        return { base64: encodeBase64(bytes), ...await this.fileReceipt(args.path!) };
+        return { base64: encodeBase64(bytes), ...await this.fileReceipt(args.path) };
       }
       case "fileStat":
       case "fileArtifact": {
-        const file = session.files.physical ? await session.files.record(args.path!, !args.byPath) : await session.harness.snapshot(ProfileArtifact, artifactPath(canonical(args.path!)), context);
+        const file = session.files.physical ? await session.files.record(args.path, !args.byPath) : await session.harness.snapshot(ProfileArtifact, artifactPath(canonical(args.path)), context);
         const record = !file || ("hidden" in file && file.hidden) ? null : { ...file, reference: "id" in file ? file.id : file.path };
         return args.action === "fileStat" ? { file: record } : { artifact: record };
       }
-      case "fileAdopt": await this.adopt(args.artifact!); return this.fileReceipt(args.artifact!.path);
-      case "fileSaved": await this.fileSaved(args.path!, args.saved!); return {};
+      case "fileAdopt": await this.adopt(args.artifact); return this.fileReceipt(args.artifact.path);
+      case "fileSaved": await this.fileSaved(args.path, args.saved); return {};
       case "fileMove":
-        await session.files.move(args.path!, args.prefix!); return this.fileReceipt(args.prefix!);
+        await session.files.move(args.path, args.prefix); return this.fileReceipt(args.prefix);
       case "fileRemove":
-        if (session.files.physical && !this.isDocument(args.path!)) {
-          const file = await session.files.record(args.path!);
+        if (session.files.physical && !this.isDocument(args.path)) {
+          const file = await session.files.record(args.path);
           if (!file) throw new Error("File unavailable");
           await session.files.remove(file.path);
-        } else await session.files.remove(args.path!);
+        } else await session.files.remove(args.path);
         return {};
-      case "close": await session.close(); this.session = undefined; this.bindings = undefined; this.application = undefined; this.artifacts = undefined; this.routes.clear(); this.configured.clear(); this.providerRoutes.clear(); return {};
+      case "close": await session.close(); this.opened = undefined; this.attachments.clear(); this.providerRoutes.clear(); return {};
       default: throw new Error("Unknown agent command");
     }
   }
@@ -270,8 +304,8 @@ export class IOSAgentAdapter {
     return ["MEMORY.md", "SOUL.md", "skill-selections.json"].includes(path) || path.startsWith("skills/");
   }
   private async preparePublicFiles(split: boolean) {
-    const session = this.session!;
-    if (!this.preparingFiles || !session.files.physical) throw new Error("Public files preparation requires StorageMigrator admission");
+    const session = this.current.session;
+    if (!this.current.preparingFiles || !session.files.physical) throw new Error("Public files preparation requires StorageMigrator admission");
     await session.files.flush();
     if (split) await session.files.installFileIndex(Object.values((await session.files.state()).files).map(file => file.hidden
       ? { ...file, path: "payloads/" + file.path.split("/").at(-1)!, aliases: [...new Set([...(file.aliases ?? []), file.path])] }
@@ -286,12 +320,12 @@ export class IOSAgentAdapter {
     }
     await session.files.bindPhysicalFiles(true);
     session.files.usePublicFiles();
-    this.publicFiles = true;
+    this.current.publicFiles = true;
     return { prepared: true, files: (await session.files.listFiles()).filter(file => !file.hidden).length };
   }
   private async prepareFiles() {
-    const session = this.session!;
-    if (!this.preparingFiles || !session.files.physical) throw new Error("File preparation requires StorageMigrator admission");
+    const session = this.current.session;
+    if (!this.current.preparingFiles || !session.files.physical) throw new Error("File preparation requires StorageMigrator admission");
     const state = await session.files.state();
     if (state.pending.some(operation => operation.op === "replace" && !("previous" in operation))) {
       await fileRequest("filesPreparePending", { operations: state.pending });
@@ -331,11 +365,11 @@ export class IOSAgentAdapter {
     if (!archives.size) return new Map<string, number>();
     let cursor;
     do {
-      const page = await this.session!.conversations.list(100, cursor);
+      const page = await this.current.session.conversations.list(100, cursor);
       for (const item of page.items) {
         let history;
         do {
-          const entries = await this.session!.conversations.history(item.reference, 100, history);
+          const entries = await this.current.session.conversations.history(item.reference, 100, history);
           for (const entry of entries.items) {
             if (!["ox.native.metadata", "ox.native.context", "ox.native.turn", "pi.reset"].includes(entry.kind)) continue;
             if (!entry.data || typeof entry.data !== "object" || Array.isArray(entry.data)) continue;
@@ -353,7 +387,7 @@ export class IOSAgentAdapter {
       }
       cursor = page.next;
     } while (cursor);
-    const active = new Set((await this.session!.files.state()).directories.filter(path => /^conversations\/[0-9]+$/.test(path)).map(path => Number(path.split("/")[1])));
+    const active = new Set((await this.current.session.files.state()).directories.filter(path => /^conversations\/[0-9]+$/.test(path)).map(path => Number(path.split("/")[1])));
     return new Map([...owners].filter(([, ids]) => ids.size === 1 && active.has([...ids][0]!)).map(([path, ids]) => [path, [...ids][0]!]));
   }
   private normalizedFile(file: ProfileFileRecord & { reference?: string }): ProfileFileRecord {
@@ -365,12 +399,10 @@ export class IOSAgentAdapter {
     return { ...record, id, aliases };
   }
   private route(id: ConversationId) {
-    const chatID = this.routes.get(id);
-    if (!chatID) throw new Error("Native conversation is not attached");
-    return chatID;
+    if (!this.attachments.has(id)) throw new Error("Native conversation is not attached");
   }
   private async fork(reference: ConversationReference, entryID: EntryId, title?: string) {
-    const session = this.session!;
+    const session = this.current.session;
     const id = session.conversations.id(reference);
     if (!Number.isSafeInteger(entryID) || entryID < 0) throw new Error("Invalid fork entry ID");
     if (title !== undefined && (typeof title !== "string" || title.length > 1024)) throw new Error("Invalid conversation title");
@@ -385,7 +417,8 @@ export class IOSAgentAdapter {
         if (!agent.model.provider.startsWith("ox-native:") && typeof metadata.fields.nativeProviderID !== "string") metadata.fields.nativeProviderID = agent.model.provider;
         agent.model.provider = `ox-native:${alias}`;
       }
-      if (Array.isArray(agent.extensions)) agent.extensions = agent.extensions.map(name => name.startsWith("ox-chat:") ? `ox-chat:${alias}` : name);
+      if (Array.isArray(agent.extensions)) agent.extensions = agent.extensions.map(name => name !== "ox-profile-files" && name.includes(":")
+        ? `${name.slice(0, name.indexOf(":") + 1)}${alias}` : name);
       if (title !== undefined) (await tx.doc(ConversationPresentation, forkID)).title = title;
     } }, context);
     await session.files.createConversation(conversation.id);
@@ -393,7 +426,7 @@ export class IOSAgentAdapter {
     return { conversationID: conversation.id, reference: forkReference };
   }
   private async recoveryPlan(inspection?: HarnessInspection, target?: ConversationReference): Promise<NativeRecoveryPlan> {
-    const session = this.session!;
+    const session = this.current.session;
     const current = inspection ?? await session.harness.inspect(context);
     const tasks = current.tasks.map(({ record }) => ({ reference: session.conversations.reference(record.conversationId), taskID: record.id }));
     const submissions = current.submissions.map(record => ({ reference: session.conversations.reference(record.conversationId),
@@ -403,10 +436,11 @@ export class IOSAgentAdapter {
     const unconfigured: NativeRecoveryPlan["unconfigured"] = [];
     for (const id of ids) {
       let reason: string | undefined;
-      const config = this.configured.get(id);
+      const attachment = this.attachments.get(id);
+      const config = attachment?.status === "attached" ? attachment.configuration : undefined;
       const agent = await session.harness.snapshot(AgentDoc, id, context);
       const metadata = (await session.harness.snapshot(ConversationApplicationMetadata, id, context))?.fields;
-      if (!this.routes.has(id)) reason = "nativeRouteMissing";
+      if (!attachment) reason = "nativeRouteMissing";
       else if (!config) reason = "nativeConfigurationMissing";
       else if (config.provider !== agent?.model?.provider || config.modelId !== agent.model.modelId) reason = "nativeModelConfigurationMismatch";
       else if (config.thinkingLevel !== (agent?.thinkingLevel ?? "off")) reason = "nativeReasoningConfigurationMismatch";
@@ -434,7 +468,7 @@ export class IOSAgentAdapter {
     return { scheduling: current.scheduling, tasks, submissions, unconfigured };
   }
   private async guardProgress(target?: ConversationReference) {
-    if (target && this.session!.files.physical && (await this.session!.files.state()).deletedConversations.includes(target.conversationID)) throw new Error("Conversation not found");
+    if (target && this.current.session.files.physical && (await this.current.session.files.state()).deletedConversations.includes(target.conversationID)) throw new Error("Conversation not found");
     const recovery = await this.recoveryPlan(undefined, target);
     if (recovery.unconfigured.length) {
       const missing = recovery.unconfigured.map(({ reference, reason }) => `${reference.profileID}/${reference.conversationID}: ${reason}`).join(", ");
@@ -442,7 +476,7 @@ export class IOSAgentAdapter {
     }
   }
   private async resumeExisting(reference: ConversationReference, submissionID?: SubmissionId, requestID?: string) {
-    const session = this.session!;
+    const session = this.current.session;
     const id = session.conversations.id(reference);
     if (submissionID !== undefined && (!Number.isSafeInteger(submissionID) || submissionID < 0)) throw new Error("Invalid submission ID");
     const record = submissionID === undefined && requestID !== undefined ? await session.harness.commit(tx => tx.submissionByRequest(id, requestID), context) : undefined;
@@ -456,7 +490,7 @@ export class IOSAgentAdapter {
     return session.resumeExisting(reference, existingID);
   }
   private async executeNativeTool(name: string, arguments_: unknown, api: ToolExecutionApi, ctx: Context) {
-    const session = this.session!;
+    const session = this.current.session;
     const task = await api.getTask(api.taskId, ctx);
     if (!task || task.kind !== "pi.tool" || task.conversationId !== api.conversationId) throw new Error("Native tool requires its authoritative Pi task");
     const input = task.input as ToolTaskInput;
@@ -474,12 +508,12 @@ export class IOSAgentAdapter {
     const boundary = active.messages.indexOf(assistant);
     if (boundary < 0) throw new Error("Native tool assistant is not present in canonical Pi model context");
     const prefix = active.messages.slice(0, boundary);
-    return native<ToolExecutionResult>("nativeTool", { chatID: this.route(api.conversationId), reference: session.conversations.reference(api.conversationId),
+    return native<ToolExecutionResult>("nativeTool", { conversationID: api.conversationId, reference: session.conversations.reference(api.conversationId),
       callID: api.callId, taskID: api.taskId, name, arguments: arguments_, assistantEntryID: input.assistant, assistant, toolCall: call,
       systemPrompt: getCurrentSystemPrompt(prefix), tools: getCurrentTools(prefix), contextMessages: prefix.filter(message => message.role !== "system") }, ctx.abortSignal);
   }
   private async fileReceipt(path: string) {
-    const session = this.session!;
+    const session = this.current.session;
     path = canonical(path);
     if (session.files.physical) {
       const file = await session.files.record(path, false);
@@ -490,11 +524,11 @@ export class IOSAgentAdapter {
     return artifact?.path ? { ...artifact, artifact, reference: { oxAttachment: path.slice(10), oxProfileID: session.conversations.profileID } } : {};
   }
   private async fileList(prefix?: string) {
-    const session = this.session!;
+    const session = this.current.session;
     const root = canonical(prefix?.endsWith("/") ? prefix.slice(0, -1) : prefix ?? "");
     const entries = Object.entries(await session.files.index()).filter(([path]) => !root || path === root || path.startsWith(`${root}/`));
     const files = await Promise.all(entries.map(async ([path, metadata]) => {
-      const artifact = this.artifacts && path.startsWith("artifacts/") ? await session.harness.snapshot(ProfileArtifact, path, context) : undefined;
+      const artifact = this.current.artifacts && path.startsWith("artifacts/") ? await session.harness.snapshot(ProfileArtifact, path, context) : undefined;
       const file = artifact ? undefined : await session.harness.snapshot(ProfileFile, path, context);
       return { path, ...metadata, saved: artifact?.saved ?? file?.saved ?? false, ...(artifact ? { sha256: artifact.sha256 } : {}) };
     }));
@@ -515,8 +549,8 @@ export class IOSAgentAdapter {
     if (typeof text !== "string") throw new Error("Profile documents require UTF-8 text");
     const size = new TextEncoder().encode(text).length;
     if (size > 200 * 1024) throw new Error("Profile document exceeds size limit");
-    if (this.publicFiles && publicDocument(path)) return this.session!.files.seedDocument(path, text);
-    return this.session!.harness.commit(async tx => {
+    if (this.current.publicFiles && publicDocument(path)) return this.current.session.files.seedDocument(path, text);
+    return this.current.session.harness.commit(async tx => {
       const index = await tx.doc(ProfileIndex);
       const existing = index.files[path];
       if (existing && existing.binary !== false) throw new Error("Existing Profile file is not text");
@@ -540,12 +574,12 @@ export class IOSAgentAdapter {
     const names = new Set(changes.map(({ path }) => path));
     if (names.size !== changes.length) throw new Error("Duplicate batch write path");
     let deleted = [...new Set(removes.map(path => this.documentPath(path)))].filter(path => !names.has(path));
-    if (this.publicFiles) {
-      await this.session!.files.documentBatch(changes.filter(file => publicDocument(file.path)), deleted.filter(publicDocument));
+    if (this.current.publicFiles) {
+      await this.current.session.files.documentBatch(changes.filter(file => publicDocument(file.path)), deleted.filter(publicDocument));
       changes = changes.filter(file => !publicDocument(file.path)); deleted = deleted.filter(path => !publicDocument(path));
       if (!changes.length && !deleted.length) return;
     }
-    await this.session!.harness.commit(async tx => {
+    await this.current.session.harness.commit(async tx => {
       const index = await tx.doc(ProfileIndex);
       const remaining = new Set([...Object.keys(index.files).filter(path => !deleted.includes(path)), ...names]);
       if (remaining.size > 10_000) throw new Error("Profile file count limit reached");
@@ -564,23 +598,24 @@ export class IOSAgentAdapter {
   private async fileSaved(path: string, saved: boolean) {
     path = canonical(path);
     if (typeof saved !== "boolean") throw new Error("Saved flag must be Boolean");
-    if (this.session!.files.physical) { await this.session!.files.saved(path, saved); return; }
+    if (this.current.session.files.physical) { await this.current.session.files.saved(path, saved); return; }
     if (!path.startsWith("artifacts/") || typeof saved !== "boolean") throw new Error("Saved flags require an artifact and Boolean");
     artifactPath(path);
-    await this.session!.harness.commit(async tx => {
+    await this.current.session.harness.commit(async tx => {
       const index = await tx.doc(ProfileIndex);
       if (!index.files[path]) throw new Error("Artifact is not visible");
-      if (this.artifacts) (await tx.doc(ProfileArtifact, path, null)).saved = saved;
+      if (this.current.artifacts) (await tx.doc(ProfileArtifact, path, null)).saved = saved;
       else (await tx.doc(ProfileFile, path, null)).saved = saved;
     }, context);
   }
   private async adopt(file: ArtifactRecord & { binary: boolean; saved: boolean }) {
-    if (!this.artifacts || !file || typeof file.binary !== "boolean" || typeof file.saved !== "boolean" || !Number.isSafeInteger(file.size) || file.size < 0 || file.size > (file.binary ? 32 * 1024 * 1024 : 200 * 1024)) throw new Error("Invalid file-backed artifact adoption");
+    const { artifacts, session } = this.current;
+    if (!artifacts || !file || typeof file.binary !== "boolean" || typeof file.saved !== "boolean" || !Number.isSafeInteger(file.size) || file.size < 0 || file.size > (file.binary ? 32 * 1024 * 1024 : 200 * 1024)) throw new Error("Invalid file-backed artifact adoption");
     artifactRecord(file, file.path, file.size);
-    const bytes = await this.artifacts.read(file);
+    const bytes = await artifacts.read(file);
     if (!file.binary) new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    await this.artifacts.flush(file.path);
-    await this.session!.harness.commit(async tx => {
+    await artifacts.flush(file.path);
+    await session.harness.commit(async tx => {
       const record = await tx.doc(ProfileArtifact, file.path, null);
       const index = await tx.doc(ProfileIndex);
       if (record.path) throw new Error("Artifact references are immutable; choose a distinct filename");
@@ -590,33 +625,29 @@ export class IOSAgentAdapter {
     }, context);
   }
 
-  private async attach(config: Config, requestedReference?: ConversationReference) {
-    if (!config?.chatID) throw new Error("A native route identity is required");
+  private async attach(config: Config, reference: ConversationReference) {
+    if (!config) throw new Error("Native configuration required");
     const prompt = composeIOSPrompt(config.promptState, config.isolatedFiles);
     if (config.toolExecutionMode !== undefined && !["parallel", "sequential"].includes(config.toolExecutionMode)) throw new Error("Invalid tool execution mode");
     if (config.providerID !== undefined && (typeof config.providerID !== "string" || !config.providerID)) throw new Error("Invalid native credential provider ID");
     if (config.thinkingLevel != null && !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(config.thinkingLevel)) throw new Error("Invalid Pi thinking level");
     if (config.nativeReasoningEffort != null && typeof config.nativeReasoningEffort !== "string") throw new Error("Invalid native reasoning effort");
-    const session = this.session!;
-    const existing = [...this.routes].find(([, chatID]) => chatID === config.chatID)?.[0]
-      ?? this.bindings!.list().find(({ chatID }) => chatID === config.chatID)?.id;
-    if (requestedReference && existing !== undefined && session.conversations.id(requestedReference) !== existing) throw new Error("Conversation UUID/reference mismatch");
-    const conversation = requestedReference ? await session.harness.conversation(session.conversations.id(requestedReference), context)
-      : await this.bindings!.attach(config.chatID, config.messages);
+    const { session, application } = this.current;
+    const conversation = await session.harness.conversation(session.conversations.id(reference), context);
     if (!conversation) throw new Error("Conversation not found");
-    const reference = session.conversations.reference(conversation.id);
     const metadata = await session.conversations.metadata(reference);
     let alias = metadata.agent?.model?.provider;
     if (!alias?.startsWith("ox-native:") && !metadata.record?.parent) {
-      const loaded = requestedReference ? await this.application!.load(reference) : undefined;
+      const loaded = await application.load(reference);
       const assistant = loaded?.entries.flatMap(entry => entry.model ?? []).find(message => message.role === "assistant" && message.provider.startsWith("ox-native:"));
       alias = assistant?.role === "assistant" ? assistant.provider : undefined;
     }
-    alias = alias?.startsWith("ox-native:") ? alias : `ox-native:${requestedReference ? `${reference.profileID}:${conversation.id}` : config.chatID}`;
+    alias = alias?.startsWith("ox-native:") ? alias : `ox-native:${reference.profileID}:${conversation.id}`;
     const extensions = metadata.agent?.extensions;
-    const extensionName = Array.isArray(extensions) ? extensions.find(name => name.startsWith("ox-chat:")) : undefined;
-    const stream = (model: Model<Api>, transcript: Parameters<typeof nativeStream>[2], options?: Parameters<typeof nativeStream>[3]) => nativeStream(this.route(conversation.id), model, transcript, options, reference);
-    this.configured.delete(conversation.id);
+    const extensionName = Array.isArray(extensions) ? extensions.find(name => name !== "ox-profile-files") : undefined;
+    const stream = (model: Model<Api>, transcript: Parameters<typeof nativeStream>[2], options?: Parameters<typeof nativeStream>[3]) => nativeStream(reference, model, transcript, options);
+    const previous = this.attachments.get(conversation.id);
+    if (previous) this.attachments.set(conversation.id, { status: "attaching" });
     this.providerRoutes.set(alias, conversation.id);
     this.models.setProvider(createProvider({ id: alias, auth: { apiKey: { name: "Native credentials", resolve: async () => ({ auth: {} }) } },
       models: [{ id: config.model, provider: alias, api: "ox-native", name: config.model, baseUrl: "", reasoning: config.reasoning,
@@ -624,12 +655,11 @@ export class IOSAgentAdapter {
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }], api: { stream, streamSimple: stream } }));
     const sections = Object.entries(prompt.sections).map(([key, text]) => section(key, () => text, { tag: false }));
     if (session.files.physical) sections.push(section("working_directory", () => `Your working directory is conversations/${conversation.id}/. Relative file paths resolve there. Use / for the Profile root and absolute paths such as /reports/report.md for shared files. Mounted resource paths such as skills/ and services/ remain Profile-relative.`, { tag: false }));
-    const extension = defineExtension({ name: extensionName ?? `ox-chat:${alias.slice(10)}`, sections,
+    const extension = defineExtension({ name: extensionName ?? `ox-conversation:${alias.slice(10)}`, sections,
       tools: config.tools.map(tool => defineTool({ ...tool, replay: "unsafe", executionMode: config.toolExecutionMode === "sequential" ? "sequential" : tool.executionMode ?? config.toolExecutionMode ?? "sequential",
         execute: async (arguments_, api, ctx) => this.executeNativeTool(tool.name, arguments_, api, ctx) })) });
     session.registry.install(extension);
-    const previous = this.routes.get(conversation.id);
-    this.routes.set(conversation.id, config.chatID);
+    this.attachments.set(conversation.id, { status: "attaching" });
     try {
       await conversation.commit(async tx => {
         const agent = await tx.doc(AgentDoc, conversation.id);
@@ -651,14 +681,14 @@ export class IOSAgentAdapter {
       await session.files.createConversation(conversation.id);
       await session.observe(reference);
       const saved = (await session.harness.snapshot(ConversationApplicationMetadata, conversation.id, context))?.fields;
-      this.configured.set(conversation.id, { provider: alias, modelId: config.model,
+      this.attachments.set(conversation.id, { status: "attached", configuration: { provider: alias, modelId: config.model,
         scope: config.promptState.hostContext ? { ...config.promptState.hostContext.active } : undefined,
         thinkingLevel: config.thinkingLevel === undefined ? metadata.agent?.thinkingLevel ?? "off" : config.thinkingLevel ?? "off",
         nativeProviderID: config.providerID ?? (typeof saved?.nativeProviderID === "string" ? saved.nativeProviderID : undefined),
-        nativeReasoningEffort: config.nativeReasoningEffort === undefined ? typeof saved?.nativeReasoningEffort === "string" ? saved.nativeReasoningEffort : undefined : config.nativeReasoningEffort ?? undefined });
+        nativeReasoningEffort: config.nativeReasoningEffort === undefined ? typeof saved?.nativeReasoningEffort === "string" ? saved.nativeReasoningEffort : undefined : config.nativeReasoningEffort ?? undefined } });
       return { conversationID: conversation.id, reference };
     } catch (error) {
-      if (previous) this.routes.set(conversation.id, previous); else this.routes.delete(conversation.id);
+      if (previous) this.attachments.set(conversation.id, { status: "attaching" }); else this.attachments.delete(conversation.id);
       throw error;
     }
   }

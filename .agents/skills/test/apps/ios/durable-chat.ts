@@ -44,7 +44,7 @@ async function waitForLog<T>(find: (messages: string[]) => T | undefined): Promi
   throw new Error("Actual chat did not settle; inspect retained native logs before retrying");
 }
 async function attach() {
-  const attached = (messages: string[]) => messages.map(message => /PiDurable rollout attached chat=([A-F0-9-]+) case=([A-F0-9-]+)/.exec(message))
+  const attached = (messages: string[]) => messages.map(message => /PiDurable rollout attached temporary=([A-F0-9-]+) case=([A-F0-9-]+)/.exec(message))
     .filter(match => match?.[2] === caseID);
   const count = attached(await logs()).length;
   await ios.tap({ id: "chat.temporaryToggle" }, { timeout: 5000, stable: 200 });
@@ -122,12 +122,17 @@ async function send(chatID: string, text: string, stop = false) {
   await ios.wait({ id: "chat.stop" }, { missing: true, timeout: 10_000, stable: 1000 });
   verifyTelemetry(await logs(), chatID, text, stop);
 }
+function nativeModelStarts(messages: string[], temporaryID: string) {
+  const attachment = messages.map(message => /PiDurable rollout attached temporary=([A-F0-9-]+) case=([A-F0-9-]+) conversation=(\d+)/.exec(message))
+    .find(match => match?.[1] === temporaryID && match?.[2] === caseID);
+  return attachment ? messages.filter(message => message.includes(`PiDurable native model start conversation=${attachment[3]} profile=${caseID} `)) : [];
+}
 async function stopWithQueuedInput(chatID: string) {
   const count = (messages: string[], outcome: string) => messages.filter(message => message.includes(`Chat.runOne end id=${chatID} outcome=${outcome}`)).length;
   const before = await logs();
-  const started = before.filter(message => message.includes(`PiDurable native model start chat=${chatID}`)).length;
+  const started = nativeModelStarts(before, chatID).length;
   await post("13");
-  await waitForLog(messages => messages.filter(message => message.includes(`PiDurable native model start chat=${chatID}`)).length > started ? true : undefined);
+  await waitForLog(messages => nativeModelStarts(messages, chatID).length > started ? true : undefined);
   await post("2");
   await ios.tap({ id: "chat.stop" }, { timeout: 5000 });
   await waitForLog(messages => count(messages, "aborted") > count(before, "aborted") && count(messages, "completed") > count(before, "completed") ? true : undefined);
@@ -166,8 +171,9 @@ async function verifyModelChanges(chatID: string) {
   const after = await logs();
   const applied = after.findIndex(message => message.includes(`Chat.modelChange applied id=${chatID}`));
   check(applied >= 0, "Successful submission applies the pending model");
-  check(after.slice(applied + 1).some(message => message.includes(`PiDurable native model start chat=${chatID}`) && message.includes("model=mock-text-only")), "Next queued turn uses the requested native model");
-  check(after.slice(0, applied).filter(message => message.includes(`PiDurable native model start chat=${chatID}`)).every(message => message.includes("model=mock ")), "The switching submission and cancelled requests retain the original model");
+  const starts = new Set(nativeModelStarts(after, chatID));
+  check(after.slice(applied + 1).some(message => starts.has(message) && message.includes("model=mock-text-only")), "Next queued turn uses the requested native model");
+  check(after.slice(0, applied).filter(message => starts.has(message)).every(message => message.includes("model=mock ")), "The switching submission and cancelled requests retain the original model");
   await ios.screenshot(`${directory}/model-applied.png`);
   await send(chatID, "23 defaults");
   check(JSON.stringify(await ios.describe()).includes("Default model preferences were verified and restored."), "Default mutations, reset, validation, and restoration succeed through native Actions");
