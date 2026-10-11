@@ -61,8 +61,9 @@ export async function check(): Promise<string> {
   if (!host.includes("final class IOSHost: OxHost")) {
     failures.push("apps/ios/Ox/Host/IOSHost.swift: IOSHost must implement OxHost");
   }
-  if (!host.includes("StorageMigrator.prepare")) {
-    failures.push("apps/ios/Ox/Host/IOSHost.swift: Host preparation must pass through StorageMigrator");
+  const runtime = await readFile(join(ROOT, "apps/ios/Ox/Host/HostRuntime.swift"), "utf8");
+  if (!host.includes("HostRuntime(") || !host.includes("try await runtime.prepare()") || !runtime.includes("StorageMigrator.prepare")) {
+    failures.push("Host preparation must pass through HostRuntime and StorageMigrator");
   }
 
   const client = await readFile(join(ROOT, "apps/ios/Ox/Client/OxClient.swift"), "utf8");
@@ -126,7 +127,7 @@ export async function check(): Promise<string> {
   if (app.includes("WebSocketOxHostTransport.configuredPort != nil")) {
     failures.push("Foreground Host access must not require launch configuration");
   }
-  if (!webSocketTransport.includes("guard access.enabled, prepared") || !webSocketTransport.includes("access.onEnabledChange")) {
+  if (!webSocketTransport.includes("access.enabled && host.state == .running && host.executionAvailable") || !webSocketTransport.includes("if available { start() } else if monitor != nil { stop() }") || !webSocketTransport.includes("access.onEnabledChange")) {
     failures.push("Host access must be opt-in and stop immediately when disabled");
   }
   const ingress = await readFile(join(ROOT, "apps/ios/Ox/Host/TailscaleHostIngress.swift"), "utf8");
@@ -149,7 +150,7 @@ export async function check(): Promise<string> {
   const migrationOwners = ["StorageMigrator", "ProfileMigrator", "ApplicationStorageMigrator", "CredentialMigrator", "RepositoryMigrator", "StorageMigrationSupport"];
   const migrationFiles = ["StorageMigration", ...migrationOwners.slice(1)].map(name => `apps/ios/Ox/Host/Profile/${name}.swift`);
   const migrationCallers: Record<string, Set<string>> = {
-    StorageMigrator: new Set([migrationFiles[0], "apps/ios/Ox/Host/IOSHost.swift"]),
+    StorageMigrator: new Set([migrationFiles[0], "apps/ios/Ox/Host/IOSHost.swift", "apps/ios/Ox/Host/HostRuntime.swift"]),
     ProfileMigrator: new Set([...migrationFiles, "apps/ios/Ox/Host/Profile/StorageRoot.swift", "apps/ios/Ox/Host/Durable/DurableProfileStore.swift", "apps/ios/Ox/Host/RPC/DebugDurableConversation.swift"]),
     ApplicationStorageMigrator: new Set([...migrationFiles, "apps/ios/Ox/Host/Profile/ScheduledSkills.swift"]),
     CredentialMigrator: new Set(migrationFiles),
