@@ -1,7 +1,7 @@
 {
   "version": 3,
   "name": "Built-in",
-  "contentHash": "410027541958d7ab133c3bbd498fa8df5c6de629a886066b260463a167aca670",
+  "contentHash": "1926a4358908fc0353028bdf9ac5985b14440e09a0f5bf76b9e3e1b193c07575",
   "services": [
     "ios:calendar",
     "ios:contacts",
