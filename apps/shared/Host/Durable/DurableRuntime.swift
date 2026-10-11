@@ -1,5 +1,7 @@
 import Foundation
 import CryptoKit
+import Darwin
+import Synchronization
 @preconcurrency import JavaScriptCore
 
 /// Separate trusted context, never reachable through model-authored snippet execution.
@@ -68,12 +70,48 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
     func publishFile(data: Data, filename: String, reference: JSONValue? = nil) async throws -> JSONValue {
         _ = try FileStore.validatedFilename(filename)
         let directory = reference?.objectValue?["conversationID"]?.intValue.map { "conversations/\($0)/" } ?? "imports/"
-        let request = JSONValue.object(["action": .string("fileWriteBinary"), "path": .string(directory + filename),
-                                        "base64": .string(data.base64EncodedString()), "reference": reference ?? .null])
-        return try JSONDecoder().decode(JSONValue.self, from: Data(try await command(request.jsonString()).utf8))
+        return try await writeFile(data: data, path: directory + filename)
+    }
+
+    @discardableResult
+    func writeFile(data: Data, path: String) async throws -> JSONValue {
+        guard data.count <= FileLimits.fileBytes else { throw failure("File exceeds size limit") }
+        try Task.checkCancellation()
+        let cancelled = Mutex(false)
+        let staged: JSONValue = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                nativeQueue.async { [self] in
+                    do {
+                        guard let files, let token = try files.perform(["op": "filesStage", "size": data.count]) as? String else { throw failure("Cannot stage file") }
+                        defer { _ = try? files.perform(["op": "release", "token": token]) }
+                        for offset in stride(from: 0, to: data.count, by: 128 * 1024) {
+                            if cancelled.withLock({ $0 }) { throw CancellationError() }
+                            let end = min(offset + 128 * 1024, data.count)
+                            _ = try files.perform(["op": "write", "token": token, "offset": offset, "bytes": Array(data[offset..<end])])
+                        }
+                        if cancelled.withLock({ $0 }) { throw CancellationError() }
+                        continuation.resume(returning: JSONValue.from(try files.perform(["op": "publish", "token": token])))
+                    } catch { continuation.resume(throwing: error) }
+                }
+            }
+        } onCancel: {
+            cancelled.withLock { $0 = true }
+        }
+        let result = try await command(.object(["action": .string("fileWriteStaged"), "path": .string(path), "file": staged]))
+        Log.agent.info("Filesystem.publish bytes=\(data.count) chunked=true")
+        return result
     }
 
     func readFile(_ file: JSONValue) async throws -> Data {
+        try await transferFile(file, to: nil)
+    }
+
+    func copyFile(_ file: JSONValue, to destination: URL) async throws {
+        _ = try await transferFile(file, to: destination)
+    }
+
+    private func transferFile(_ file: JSONValue, to destination: URL?) async throws -> Data {
+        try Task.checkCancellation()
         guard let reference = file.objectValue?["id"]?.stringValue ?? file.objectValue?["reference"]?.stringValue ?? file.objectValue?["path"]?.stringValue else { throw failure("Invalid file reference") }
         let current = try await command(.object(["action": .string("fileStat"), "path": .string(reference)]))
         guard let fields = current.objectValue?["file"]?.objectValue, let path = fields["path"]?.stringValue,
@@ -83,25 +121,45 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
             if let expected = file.objectValue?[key], expected != fields[key] { throw failure("File changed while preparing read; reacquire its metadata") }
         }
         let operation = fields["id"] == nil ? "open" : "filesOpen"
-        return try await withCheckedThrowingContinuation { continuation in
-            nativeQueue.async { [self] in
-                do {
-                    guard let files else { throw failure("No physical filesystem owner") }
-                    guard let token = try files.perform(["op": operation, "path": path, "size": size]) as? String else { throw failure("Cannot pin file") }
-                    defer { _ = try? files.perform(["op": "release", "token": token]) }
-                    var data = Data()
-                    data.reserveCapacity(size)
-                    while data.count < size {
-                        let length = min(128 * 1024, size - data.count)
-                        guard let bytes = try files.perform(["op": "read", "token": token, "offset": data.count, "length": length]) as? [UInt8], bytes.count == length else {
-                            throw failure("File read incomplete")
+        let cancelled = Mutex(false)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                nativeQueue.async { [self] in
+                    do {
+                        guard let files else { throw failure("No physical filesystem owner") }
+                        guard let token = try files.perform(["op": operation, "path": path, "size": size]) as? String else { throw failure("Cannot pin file") }
+                        defer { _ = try? files.perform(["op": "release", "token": token]) }
+                        let output: FileHandle?
+                        if let destination {
+                            let descriptor = Darwin.open(destination.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+                            guard descriptor >= 0 else { throw failure("Cannot create file snapshot") }
+                            output = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+                        } else { output = nil }
+                        var completed = false
+                        defer {
+                            try? output?.close()
+                            if !completed, output != nil, let destination { try? FileManager.default.removeItem(at: destination) }
                         }
-                        data.append(contentsOf: bytes)
-                    }
-                    _ = try files.perform(["op": "verify", "token": token, "sha256": digest])
-                    continuation.resume(returning: data)
-                } catch { continuation.resume(throwing: error) }
+                        var data = Data()
+                        if output == nil { data.reserveCapacity(size) }
+                        var offset = 0
+                        while offset < size {
+                            if cancelled.withLock({ $0 }) { throw CancellationError() }
+                            let length = min(128 * 1024, size - offset)
+                            guard let bytes = try files.perform(["op": "read", "token": token, "offset": offset, "length": length]) as? [UInt8], bytes.count == length else { throw failure("File read incomplete") }
+                            if let output { try output.write(contentsOf: Data(bytes)) }
+                            else { data.append(contentsOf: bytes) }
+                            offset += length
+                        }
+                        _ = try files.perform(["op": "verify", "token": token, "sha256": digest])
+                        if cancelled.withLock({ $0 }) { throw CancellationError() }
+                        completed = true
+                        continuation.resume(returning: data)
+                    } catch { continuation.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            cancelled.withLock { $0 = true }
         }
     }
 

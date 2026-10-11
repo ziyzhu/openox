@@ -6,6 +6,7 @@ import { legacyFilePath, validateFileRecord, type FilePayloadStore } from "./fil
 import { SYSTEM_SKILL_NAMES } from "@openox/protocol/skills";
 import { canonical } from "../core/file-paths";
 import { publicDocument, ProfileFileStore, type ProfileFileBackend, type ProfileFileRecord } from "./file-store";
+import type { FileRecord } from "./file-record";
 export { canonical } from "../core/file-paths";
 
 const context = BACKGROUND_CONTEXT;
@@ -61,6 +62,8 @@ export class ProfileFiles {
   }
   state() { return this.physicalStore().state(); }
   record(path: string, reference = true) { return this.physicalStore().record(path, reference); }
+  records(paths: string[]) { return this.physicalStore().records(paths); }
+  writeStaged(path: string, file: FileRecord) { return this.physicalStore().writeStaged(path, file); }
   listFiles() { return this.physicalStore().listFiles(); }
   info(path: string) { return this.physicalStore().info(path); }
   list(path: string) { return this.physicalStore().list(path); }

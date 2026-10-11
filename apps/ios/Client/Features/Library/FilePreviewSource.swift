@@ -23,11 +23,16 @@ nonisolated struct FilePreviewSource: Sendable {
     }
 
     func snapshot() async throws -> FilePreviewSnapshot {
-        let data = try await read()
-        let snapshot = try await Task.detached(priority: .userInitiated) {
-            try FilePreviewSnapshot(artifact: artifact, data: data)
-        }.value
+        guard let scope, scope.profileID != nil else { throw CocoaError(.fileReadNoPermission) }
         try Task.checkCancellation()
+        let snapshot = try await Task.detached(priority: .userInitiated) {
+            try FilePreviewSnapshot(artifact: artifact)
+        }.value
+        try await ProfileRepository.shared.copyFile(named: artifact.fileName, to: snapshot.url, in: scope)
+        try Task.checkCancellation()
+        try await Task.detached(priority: .userInitiated) {
+            try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: snapshot.url.path)
+        }.value
         return snapshot
     }
 }
@@ -36,14 +41,12 @@ nonisolated final class FilePreviewSnapshot: Sendable {
     let url: URL
     private let directory: URL
 
-    init(artifact: FileItem, data: Data) throws {
+    init(artifact: FileItem) throws {
         let name = try FileStore.validatedFilename(artifact.displayName)
         directory = try FileStaging.createDirectory(in: FileManager.default.temporaryDirectory, prefix: "artifact-preview")
         url = directory.appendingPathComponent(name, isDirectory: false)
         do {
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
-            try data.write(to: url, options: .withoutOverwriting)
-            try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: url.path)
         } catch {
             FileStaging.cleanup(directory, operation: "artifact-preview")
             throw error

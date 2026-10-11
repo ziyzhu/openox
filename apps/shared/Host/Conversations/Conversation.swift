@@ -758,7 +758,7 @@ final class Conversation: Identifiable {
         artifactRefreshTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let listing = try await repository.artifactListing(in: scope)
+                let listing = try await repository.artifactListing(for: state.turns, in: scope)
                 guard !Task.isCancelled, let files = listing.files else { return }
                 document.refreshFiles(files)
             } catch {

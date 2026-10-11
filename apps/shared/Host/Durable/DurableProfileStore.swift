@@ -87,6 +87,14 @@ actor DurableProfileStore {
         try await session(in: scope).runtime.readFile(file)
     }
 
+    func copyFile(scope: ProfileScope, file: JSONValue, to destination: URL) async throws {
+        try await session(in: scope).runtime.copyFile(file, to: destination)
+    }
+
+    func writeFile(data: Data, path: String, in scope: ProfileScope) async throws {
+        try await session(in: scope).runtime.writeFile(data: data, path: path)
+    }
+
     func readFileData(path: String, in scope: ProfileScope) async throws -> Data {
         let result = try await command(scope: scope, value: .object(["action": .string("fileStat"), "path": .string(path)]))
         guard let file = result.objectValue?["file"], file != .null else { throw RuntimeError.bridge("File is not committed in this Profile") }

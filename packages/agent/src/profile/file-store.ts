@@ -196,6 +196,16 @@ export class ProfileFileStore {
     return reference ? files.find(file => file.id === path || file.aliases?.includes(path)) : files.find(file => file.path === path);
   }
   record(input: string, reference = true) { return this.serialize(async () => this.resolve(await this.state(), input, reference)); }
+  records(inputs: string[]) {
+    return this.serialize(async () => {
+      const index = new Map<string, ProfileFileRecord>();
+      for (const file of Object.values((await this.state()).files)) {
+        index.set(file.id, file);
+        for (const alias of file.aliases ?? []) if (!index.has(alias)) index.set(alias, file);
+      }
+      return inputs.map(input => index.get(canonical(input)));
+    });
+  }
   listFiles() { return this.serialize(async () => Object.values((await this.state()).files)); }
   private assertActive(state: Awaited<ReturnType<ProfileFileStore["state"]>>, path: string) {
     const id = owner(path);
@@ -264,7 +274,10 @@ export class ProfileFileStore {
     if (Object.keys(state.files).length + state.directories.length + directories.length + (existing ? 0 : 1) > 10_000) throw new FileError("invalid", "Profile file entry limit reached");
     const id = existing?.id ?? await this.identifier(path);
     const staged = await this.backend.stage(bytes);
-    const file: ProfileFileRecord = { ...staged, id, path, aliases: existing?.aliases ?? [], binary: typeof content !== "string", saved: existing?.saved ?? false, mtime: Date.now(), owner: owner(path) };
+    return this.publishLocked(path, staged, typeof content !== "string", state, existing, directories, id);
+  }
+  private async publishLocked(path: string, staged: FileRecord, binary: boolean, state: Awaited<ReturnType<ProfileFileStore["state"]>>, existing: ProfileFileRecord | undefined, directories: string[], id: string) {
+    const file: ProfileFileRecord = { ...staged, id, path, aliases: existing?.aliases ?? [], binary, saved: existing?.saved ?? false, mtime: Date.now(), owner: owner(path) };
     await this.commit({ ...state.files, [id]: file }, [...state.directories, ...directories], [
       ...directories.map(path => ({ op: "mkdir" as const, path })),
       { op: "replace", path, source: staged.path, size: staged.size, sha256: staged.sha256,
@@ -277,6 +290,21 @@ export class ProfileFileStore {
     if (managed(path)) throw new FileError("permission_denied", "Conversation directories are managed", path);
     const frozen = typeof content === "string" ? content : content.slice();
     return this.serialize(() => this.writeLocked(path, frozen, expected));
+  }
+  writeStaged(input: string, staged: FileRecord) {
+    const path = workingFilePath(input), frozen = { ...staged };
+    if (managed(path)) throw new FileError("permission_denied", "Conversation directories are managed", path);
+    if (!/^(staging|\.files)\/\.stage-[0-9a-f-]{36}$/i.test(frozen.path) || !Number.isSafeInteger(frozen.size) || frozen.size < 0 || frozen.size > 32 * 1024 * 1024 || !/^[a-f0-9]{64}$/.test(frozen.sha256)) throw new FileError("invalid", "Invalid staged file", path);
+    return this.serialize(async () => {
+      const state = await this.state();
+      this.assertActive(state, path);
+      const existingPath = this.findPath(state, path);
+      if (existingPath && (existingPath !== path || state.directories.includes(path))) throw new FileError("invalid", "Destination collides with an existing entry", path);
+      const existing = Object.values(state.files).find(file => file.path === path);
+      if (existing?.hidden) throw new FileError("permission_denied", "Private blobs are not editable", path);
+      const directories = this.parents(state, path, true);
+      return this.publishLocked(path, frozen, true, state, existing, directories, existing?.id ?? await this.identifier(path));
+    });
   }
   writeDocument(input: string, content: string, expected?: string) {
     const path = documentPath(input);

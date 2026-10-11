@@ -124,9 +124,12 @@ actor ProfileRepository {
         let value = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationLoad"), "reference": reference.value]))
         let fields = value.objectValue ?? [:]
         let meta = try decodeMeta(fields, reference: reference, scope: scope)
-        let files = try await artifactListing(in: scope)
-        let turns = try DurableConversationProjection.turns(from: fields["entries"]?.arrayValue ?? [], scope: scope, files: files)
-        return ConversationLoadResult(state: ConversationState(meta: meta, turns: turns, context: nil), needsPersistence: false)
+        let turns = try DurableConversationProjection.turns(from: fields["entries"]?.arrayValue ?? [], scope: scope, files: FileDirectoryListing(files: [:]))
+        let files = try await artifactListing(for: turns, in: scope).files ?? [:]
+        let resolved = turns.map { turn in
+            turn.mappingFiles { files[$0.fileName] ?? files[$0.fileName.lowercased()] ?? $0 }
+        }
+        return ConversationLoadResult(state: ConversationState(meta: meta, turns: resolved, context: nil), needsPersistence: false)
     }
 
     private func decodeMeta(_ fields: [String: JSONValue], reference: DurableConversationReference, scope: ProfileScope) throws -> ConversationMeta {

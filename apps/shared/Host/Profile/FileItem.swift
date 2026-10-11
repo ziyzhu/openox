@@ -572,18 +572,33 @@ extension ProfileRepository {
     }
 
     func profileFiles(prefix: String, in scope: ProfileScope) async throws -> [DurableProfileFile] {
+        var files: [DurableProfileFile] = []
+        var cursor: String?
+        repeat {
+            try Task.checkCancellation()
+            let page = try await profileFilesPage(prefix: prefix, cursor: cursor, in: scope)
+            files.append(contentsOf: page.files)
+            cursor = page.next
+        } while cursor != nil
+        guard Set(files.map(\.path)).count == files.count else { throw CocoaError(.fileReadCorruptFile) }
+        return files
+    }
+
+    func profileFilesPage(prefix: String, cursor: String? = nil, in scope: ProfileScope) async throws -> (files: [DurableProfileFile], next: String?) {
         let result = try await DurableProfileStore.shared.command(scope: scope, value: .object([
-            "action": .string("fileList"), "prefix": .string(prefix),
+            "action": .string("fileList"), "prefix": .string(prefix), "limit": .int(100),
+            "fileCursor": cursor.map(JSONValue.string) ?? .null,
         ]))
-        guard let values = result.objectValue?["files"]?.arrayValue, values.count <= 10_000 else {
+        guard let values = result.objectValue?["files"]?.arrayValue, values.count <= 100,
+              let nextValue = result.objectValue?["next"], nextValue == .null || nextValue.stringValue != nil else {
             throw CocoaError(.fileReadCorruptFile)
         }
         let files = try JSONDecoder().decode([DurableProfileFile].self, from: JSONEncoder().encode(JSONValue.array(values)))
-        guard Set(files.map(\.path)).count == files.count,
-              files.allSatisfy({ $0.path.hasPrefix(prefix) && $0.size >= 0 && $0.size <= FileLimits.fileBytes && $0.mtime.isFinite && $0.mtime >= 0 }) else {
+        guard files.allSatisfy({ $0.path.hasPrefix(prefix) && $0.size >= 0 && $0.size <= FileLimits.fileBytes && $0.mtime.isFinite && $0.mtime >= 0 }),
+              nextValue.stringValue == nil || (nextValue.stringValue == files.last?.path && nextValue.stringValue != cursor) else {
             throw CocoaError(.fileReadCorruptFile)
         }
-        return files
+        return (files, nextValue.stringValue)
     }
 
     func removeProfileFile(path: String, in scope: ProfileScope) async throws {
@@ -592,14 +607,32 @@ extension ProfileRepository {
         ]))
     }
 
-    func artifactListing(in scope: ProfileScope) async throws -> FileDirectoryListing {
+    func artifactListing(for turns: [Turn], in scope: ProfileScope) async throws -> FileDirectoryListing {
+        var names = Set<String>()
+        for turn in turns {
+            _ = turn.mappingFiles { file in
+                names.insert(file.fileName)
+                return file
+            }
+        }
+        let ordered = names.sorted()
         var references: [String: FileItem] = [:]
-        for file in try await profileFiles(prefix: "", in: scope) {
-            guard let name = file.reference else { continue }
-            let artifact = FileItem(fileName: name, directory: scope.root, relativePath: file.path, size: file.size,
-                modifiedAt: Date(timeIntervalSince1970: file.mtime / 1000))
-            references[name] = artifact
-            for alias in file.aliases ?? [] { references[alias] = artifact }
+        for offset in stride(from: 0, to: ordered.count, by: 100) {
+            try Task.checkCancellation()
+            let batch = Array(ordered[offset..<min(offset + 100, ordered.count)])
+            let result = try await DurableProfileStore.shared.command(scope: scope, value: .object([
+                "action": .string("fileResolve"), "paths": .array(batch.map(JSONValue.string)),
+            ]))
+            guard let values = result.objectValue?["files"]?.arrayValue, values.count == batch.count else { throw CocoaError(.fileReadCorruptFile) }
+            for (name, value) in zip(batch, values) where value != .null {
+                let record = try JSONDecoder().decode(DurableFileRecord.self, from: JSONEncoder().encode(value))
+                guard record.reference == name || record.aliases?.contains(name) == true,
+                      record.hidden != true, record.size >= 0, record.size <= (record.binary ? FileLimits.fileBytes : FileLimits.textBytes),
+                      record.sha256.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { throw CocoaError(.fileReadCorruptFile) }
+                let file = record.artifact(in: scope)
+                references[name] = file
+                references[name.lowercased()] = file
+            }
         }
         return FileDirectoryListing(files: references)
     }
@@ -623,9 +656,7 @@ extension ProfileRepository {
     }
 
     func artifact(named name: String, in scope: ProfileScope) async throws -> FileItem {
-        let record = try await requiredFileRecord(named: name, in: scope)
-        _ = try await readFileBytes(record, in: scope)
-        return record.artifact(in: scope)
+        try await requiredFileRecord(named: name, in: scope).artifact(in: scope)
     }
 
     func savedFileNames(in scope: ProfileScope) async throws -> Set<String> {
@@ -676,15 +707,13 @@ extension ProfileRepository {
         } else {
             path = try await artifactRecord(named: name, in: scope)?.path ?? "imports/" + name
         }
-        var request: [String: JSONValue] = ["path": .string(path)]
         if let text {
-            request["action"] = .string("fileWrite")
-            request["text"] = .string(text)
+            _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
+                "action": .string("fileWrite"), "path": .string(path), "text": .string(text),
+            ]))
         } else {
-            request["action"] = .string("fileWriteBinary")
-            request["base64"] = .string(data.base64EncodedString())
+            try await DurableProfileStore.shared.writeFile(data: data, path: path, in: scope)
         }
-        _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(request))
         let published = try await self.artifact(named: path, in: scope)
         Log.app.info("ProfileRepository.artifact publish profile=\(scope.profileID?.uuidString ?? "temporary") file=\(name) bytes=\(data.count) binary=\(text == nil)")
         return published
@@ -761,6 +790,12 @@ extension ProfileRepository {
     func readFileData(named name: String, in scope: ProfileScope) async throws -> Data {
         let record = try await requiredFileRecord(named: name, in: scope)
         return try await readFileBytes(record, in: scope)
+    }
+
+    func copyFile(named name: String, to destination: URL, in scope: ProfileScope) async throws {
+        let record = try await requiredFileRecord(named: name, in: scope)
+        let value = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(record))
+        try await DurableProfileStore.shared.copyFile(scope: scope, file: value, to: destination)
     }
 
     private func readFileBytes(_ record: DurableFileRecord, in scope: ProfileScope) async throws -> Data {

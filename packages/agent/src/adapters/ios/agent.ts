@@ -46,7 +46,9 @@ type Command = CommandScope & (
   | { action: "conversationRead"; lastReadEntryID?: EntryId | null }
   | { action: "run"; content?: UserInput; turnState?: TurnState; requestID?: string }
   | { action: "resumeExisting"; submissionID?: SubmissionId; requestID?: string }
-  | { action: "fileList"; prefix?: string }
+  | { action: "fileList"; prefix?: string; limit?: number; fileCursor?: string | null }
+  | { action: "fileResolve"; paths: string[] }
+  | { action: "fileWriteStaged"; path: string; file: FileRecord }
   | { action: "fileBatch"; writes?: { path: string; text: string }[]; removes?: string[] }
   | { action: "fileSeed" | "fileWrite"; path: string; text: string }
   | { action: "fileWriteBinary"; path: string; base64: string }
@@ -118,6 +120,7 @@ export class IOSAgentAdapter {
   private providerRoutes = new Map<string, ConversationId>();
   private models = createModels();
   private filesystemCalls = new Map<string, AbortController>();
+  private fileListing?: { root: string; files: Awaited<ReturnType<IOSAgentAdapter["listedFiles"]>> };
 
   async command(args: Command): Promise<unknown> {
     if (args.action === "composePrompt") return composeIOSPrompt(args.promptState);
@@ -251,7 +254,13 @@ export class IOSAgentAdapter {
       }
       case "fileMounts": return session.textMounts;
       case "skillPackages": return session.skillPackages;
-      case "fileList": return this.fileList(args.prefix);
+      case "fileList": return this.fileList(args.prefix, args.limit, args.fileCursor ?? undefined);
+      case "fileResolve": {
+        if (!Array.isArray(args.paths) || args.paths.length > 100 || args.paths.some(path => typeof path !== "string")) throw new Error("Invalid file reference batch");
+        const files = await session.files.records(args.paths);
+        return { files: files.map(file => !file || file.hidden ? null : { ...file, reference: file.id }) };
+      }
+      case "fileWriteStaged": await session.files.writeStaged(args.path, args.file); return this.fileReceipt(args.path);
       case "fileBatch": await this.fileBatch(args.writes ?? [], args.removes ?? []); return {};
       case "fileSeed": return this.fileSeed(args.path, args.text);
       case "fileWrite":
@@ -294,7 +303,7 @@ export class IOSAgentAdapter {
           await session.files.remove(file.path);
         } else await session.files.remove(args.path);
         return {};
-      case "close": await session.close(); this.opened = undefined; this.attachments.clear(); this.providerRoutes.clear(); return {};
+      case "close": await session.close(); this.opened = undefined; this.attachments.clear(); this.providerRoutes.clear(); this.fileListing = undefined; return {};
       default: throw new Error("Unknown agent command");
     }
   }
@@ -522,21 +531,38 @@ export class IOSAgentAdapter {
     const artifact = await session.harness.snapshot(LegacyProfileFile, legacyFilePath(path), context);
     return artifact?.path ? { ...artifact, artifact, reference: { oxAttachment: path.slice(10), oxProfileID: session.conversations.profileID } } : {};
   }
-  private async fileList(prefix?: string) {
-    const session = this.current.session;
+  private async fileList(prefix?: string, limit?: number, cursor?: string) {
+    if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1 || limit > 200)) throw new Error("Invalid file page size");
+    if (cursor !== undefined && (limit === undefined || typeof cursor !== "string")) throw new Error("Invalid file cursor");
     const root = canonical(prefix?.endsWith("/") ? prefix.slice(0, -1) : prefix ?? "");
-    const entries = Object.entries(await session.files.index()).filter(([path]) => !root || path === root || path.startsWith(`${root}/`));
+    const matching = (path: string) => !root || path === root || path.startsWith(`${root}/`);
+    if (cursor !== undefined && (!matching(canonical(cursor)) || canonical(cursor) !== cursor)) throw new Error("File cursor belongs to another prefix");
+    const listed = cursor !== undefined && this.fileListing?.root === root ? this.fileListing.files : await this.listedFiles(root);
+    if (limit === undefined) return { files: listed };
+    const remaining = cursor === undefined ? listed : listed.filter(file => file.path.localeCompare(cursor) > 0);
+    const page = remaining.slice(0, limit);
+    const next = remaining.length > limit ? page.at(-1)!.path : null;
+    this.fileListing = next === null ? undefined : { root, files: listed };
+    return { files: page, next };
+  }
+  private async listedFiles(root: string) {
+    const session = this.current.session;
+    const matching = (path: string) => !root || path === root || path.startsWith(`${root}/`);
+    const index = session.files.physical ? (await session.harness.snapshot(ProfileIndex, context))?.files ?? {} : await session.files.index();
+    const entries = Object.entries(index).filter(([path]) => matching(path));
     const files = await Promise.all(entries.map(async ([path, metadata]) => {
       const artifact = this.current.artifacts && path.startsWith("artifacts/") ? await session.harness.snapshot(LegacyProfileFile, path, context) : undefined;
       const file = artifact ? undefined : await session.harness.snapshot(ProfileFile, path, context);
       return { path, ...metadata, saved: artifact?.saved ?? file?.saved ?? false, ...(artifact ? { sha256: artifact.sha256 } : {}) };
     }));
+    let listed = files;
     if (session.files.physical) {
-      const working = (await session.files.listFiles()).filter(file => !file.hidden && (!root || file.path === root || file.path.startsWith(root + "/"))).map(file => ({ ...file, reference: file.id }));
+      const working = (await session.files.listFiles()).filter(file => !file.hidden && matching(file.path)).map(file => ({ ...file, reference: file.id }));
       const physical = new Set(working.map(file => file.path));
-      return { files: [...files.filter(file => this.isDocument(file.path) && !physical.has(file.path)), ...working].sort((a, b) => a.path.localeCompare(b.path)) };
+      listed = [...files.filter(file => this.isDocument(file.path) && !physical.has(file.path)), ...working];
     }
-    return { files: files.sort((a, b) => a.path.localeCompare(b.path)) };
+    listed.sort((a, b) => a.path.localeCompare(b.path));
+    return listed;
   }
   private documentPath(path: string) {
     const name = canonical(path);
