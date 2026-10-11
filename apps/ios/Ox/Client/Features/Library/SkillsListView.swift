@@ -77,7 +77,7 @@ struct SkillsListView: View {
                 .accessibilityIdentifier(A11yID.Settings.skillCreate)
             }
         }
-        .searchable(text: $query, prompt: "Search skills")
+        .oxSearchable(text: $query, prompt: Text("Search skills"), accessibilityIdentifier: A11yID.Settings.skillSearch)
         .onChange(of: Skills.shared.repositorySkills) { _, _ in skills.refresh() }
         .onChange(of: Skills.shared.all) { _, _ in skills.refresh() }
         .alert("Could not update skill", isPresented: Binding(get: { skills.errorMessage != nil }, set: { if !$0 { skills.dismissError() } })) {
@@ -514,7 +514,7 @@ private struct SkillServicePicker: View {
             }
             .scrollIndicators(.hidden)
             .background(Theme.Colors.surface)
-            .searchable(text: $query)
+            .oxSearchable(text: $query, accessibilityIdentifier: A11yID.Settings.skillServiceSearch)
             .navigationTitle("Services")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

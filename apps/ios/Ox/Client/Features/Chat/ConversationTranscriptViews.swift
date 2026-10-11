@@ -1405,7 +1405,7 @@ struct ResponseFooterBlockView: View, Equatable {
             iconButton(
                 systemName: controls.isCopied ? "checkmark" : "doc.on.doc",
                 label: A11yLabel.copyMessage,
-                id: A11yID.Chat.Message.copy,
+                id: actionIdentifier(A11yID.Chat.Message.copy),
                 disabled: controls.isCopied
             ) {
                 controls.onCopy(text)
@@ -1415,19 +1415,19 @@ struct ResponseFooterBlockView: View, Equatable {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(A11yLabel.shareMessage)
-            .accessibilityIdentifier(A11yID.Chat.Message.share)
+            .accessibilityIdentifier(actionIdentifier(A11yID.Chat.Message.share))
             if controls.canMutate {
                 iconButton(
                     systemName: "arrow.branch",
                     label: A11yLabel.branchMessage,
-                    id: A11yID.Chat.Message.branch
+                    id: actionIdentifier(A11yID.Chat.Message.branch)
                 ) {
                     controls.onBranch()
                 }
                 iconButton(
                     systemName: "arrow.clockwise",
                     label: A11yLabel.retryMessage,
-                    id: A11yID.Chat.Message.retry
+                    id: actionIdentifier(A11yID.Chat.Message.retry)
                 ) {
                     controls.onRetry()
                 }
@@ -1438,6 +1438,10 @@ struct ResponseFooterBlockView: View, Equatable {
         .opacity(isVisible ? 1 : 0)
         .allowsHitTesting(isVisible)
         .accessibilityHidden(!isVisible)
+    }
+
+    private func actionIdentifier(_ action: String) -> String {
+        "\(action).\(id.uuidString)"
     }
 
     private func iconButton(

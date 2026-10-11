@@ -40,6 +40,9 @@ export async function check(): Promise<string> {
 
   for (const file of files) {
     const source = await readFile(file, "utf8");
+    if (file !== join(ROOT, "apps/ios/Ox/Client/UI/Searchable.swift") && /\.searchable\s*\(/.test(source)) {
+      failures.push(`${relative(ROOT, file)}: use oxSearchable so the native search field has an automation identifier`);
+    }
     for (const forbidden of ["IOSHost", "OxHost", "OxRuntime"]) {
       if (source.includes(forbidden)) {
         failures.push(`${relative(ROOT, file)}: client layer references ${forbidden}`);

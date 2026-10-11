@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SheetDismissToolbarButton: View {
+    let accessibilityIdentifier: String
     let action: () -> Void
 
     var body: some View {
@@ -12,5 +13,6 @@ struct SheetDismissToolbarButton: View {
         }
             .buttonStyle(.plain)
             .accessibilityLabel("Close")
+            .accessibilityIdentifier(accessibilityIdentifier)
     }
 }

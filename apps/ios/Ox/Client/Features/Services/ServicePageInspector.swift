@@ -45,8 +45,7 @@ struct ServicePageInspector: View {
         .navigationBarBackButtonHidden()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                SheetDismissToolbarButton { dismiss() }
-                    .accessibilityIdentifier(A11yID.ServiceInspector.close)
+                SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceInspector.close) { dismiss() }
             }
         }
         .task {

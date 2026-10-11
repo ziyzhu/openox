@@ -44,7 +44,7 @@ struct ArtifactPickerSheet: View {
             .navigationTitle("Files")
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier(A11yID.Chat.ArtifactPicker.list)
-            .searchable(text: $query, prompt: "Search files")
+            .oxSearchable(text: $query, prompt: Text("Search files"), accessibilityIdentifier: A11yID.Chat.ArtifactPicker.search)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

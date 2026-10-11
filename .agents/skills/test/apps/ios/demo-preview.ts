@@ -72,7 +72,7 @@ try {
   check(tree.some(element => element.AXUniqueId === "demo.thinking"), "native completed task trace");
   check(tree.some(element => element.AXUniqueId === "demo.reply" && element.AXLabel?.includes("private memory stores")), "source-specific memory reply includes access limits");
   for (const id of ["chat.message.copy", "chat.message.share"]) {
-    check(tree.some(element => element.AXUniqueId === id), `native completed response control: ${id}`);
+    check(tree.some(element => element.AXUniqueId?.startsWith(`${id}.`)), `native completed response control: ${id}`);
   }
   for (const domain of ["chatgpt.com", "claude.ai", "muse.ai"]) {
     check(tree.some(element => element.AXUniqueId === `conversation.servicePill.${domain}` && element.AXValue === "Signed in"), `native memory service chip with fixture auth status: ${domain}`);
@@ -113,7 +113,7 @@ try {
   await scene("memory", false, true);
   await wait("demo.thinking");
   tree = await elements();
-  check(!tree.some(element => element.AXUniqueId === "chat.message.copy"), "response controls stay hidden during work");
+  check(!tree.some(element => element.AXUniqueId?.startsWith("chat.message.copy.")), "response controls stay hidden during work");
   await ios.wait({ id: "demo.reply" }, { timeout: 20_000, stable: 300 });
   await ios.wait({ id: "chat.stop" }, { missing: true, timeout: 30_000, stable: 300 });
   tree = await elements();
@@ -147,7 +147,7 @@ try {
       };
       check(tree.some(element => element.AXLabel === prompts[name as keyof typeof prompts]), `App Store ${name}: screenshot-specific task prompt`);
     }
-    check(tree.some(element => element.AXUniqueId === "chat.message.copy"), `App Store ${name}: native completed response controls`);
+    check(tree.some(element => element.AXUniqueId?.startsWith("chat.message.copy.")), `App Store ${name}: native completed response controls`);
     check(!tree.some(element => ["demo.chapter", "demo.playPause", "demo.record", "demo.disclosure", "demo.airplane", "chat.stop", "chat.send"].includes(element.AXUniqueId ?? "")), `App Store ${name}: static app-only scene without overlays or playback`);
     check(await value("chat.input") === "Type a message", `App Store ${name}: empty native composer placeholder`);
     const path = join(screenshotDirectory, `${String(index + 1).padStart(2, "0")}-${name}.png`);

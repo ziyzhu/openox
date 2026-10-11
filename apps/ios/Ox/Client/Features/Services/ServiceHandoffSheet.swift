@@ -42,11 +42,10 @@ struct BotControlSheetView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    SheetDismissToolbarButton {
+                    SheetDismissToolbarButton(accessibilityIdentifier: A11yID.Chat.Attach.botControlCancel(session.serviceDomain)) {
                         session.cancel()
                         dismiss()
                     }
-                    .accessibilityIdentifier(A11yID.Chat.Attach.botControlCancel(session.serviceDomain))
                 }
             }
         }
@@ -92,11 +91,10 @@ struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
                             Button("Done") { dismiss() }
                                 .accessibilityIdentifier(A11yID.ServiceHandoff.done)
                         } else {
-                            SheetDismissToolbarButton {
+                            SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceHandoff.done) {
                                 session.cancel()
                                 dismiss()
                             }
-                            .accessibilityIdentifier(A11yID.ServiceHandoff.done)
                         }
                     }
                 }

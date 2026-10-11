@@ -29,6 +29,7 @@ nonisolated enum A11yID {
 
     enum Sidebar {
         static let panel = "sidebar.panel"
+        static let search = "sidebar.search"
         static let resizer = "sidebar.resizer"
         static let close = "sidebar.close"
         static let newChat = "sidebar.newChat"
@@ -90,6 +91,8 @@ nonisolated enum A11yID {
         static let memoryCopy = "settings.memoryCopy"
         static let artifacts = "settings.artifacts"
         static let skills = "settings.skills"
+        static let skillSearch = "settings.skills.search"
+        static let skillServiceSearch = "settings.skillServices.search"
         static let skillCreate = "settings.skillCreate"
         static let skillName = "settings.skillName"
         static let skillDescription = "settings.skillDescription"
@@ -210,6 +213,7 @@ nonisolated enum A11yID {
 
         enum ArtifactPicker {
             static let list = "chat.artifactPicker.list"
+            static let search = "chat.artifactPicker.search"
             static let attach = "chat.artifactPicker.attach"
             static let cancel = "chat.artifactPicker.cancel"
             static let empty = "chat.artifactPicker.empty"
@@ -243,6 +247,8 @@ nonisolated enum A11yID {
             static let explore = "chat.attach.explore"
             static let exploreBack = "chat.attach.exploreBack"
             static let servicesLoading = "chat.attach.servicesLoading"
+            static let search = "chat.attach.search"
+            static let close = "chat.attach.close"
             static let filter = "chat.attach.filter"
             static let connectMCP = "chat.attach.connectMCP"
             static func catalogMCP(_ id: String) -> String { "conversation.attach.catalogMCP.\(id)" }

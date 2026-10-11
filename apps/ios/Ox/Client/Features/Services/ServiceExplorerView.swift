@@ -172,7 +172,7 @@ struct ServiceExplorerView: View {
         .toolbar {
             if let onClose {
                 ToolbarItem(placement: .topBarLeading) {
-                    SheetDismissToolbarButton {
+                    SheetDismissToolbarButton(accessibilityIdentifier: A11yID.Chat.Attach.close) {
                         endSearch()
                         onClose()
                     }
@@ -182,7 +182,7 @@ struct ServiceExplorerView: View {
                 filterMenu
             }
         }
-        .searchable(text: $query, isPresented: $searchPresented, prompt: "Search services")
+        .oxSearchable(text: $query, isPresented: $searchPresented, prompt: Text("Search services"), accessibilityIdentifier: A11yID.Chat.Attach.search)
         .alert("Connect remote MCP", isPresented: $connectingMCP) {
             TextField("https://example.com/mcp", text: $mcpEndpoint)
                 .textInputAutocapitalization(.never)

@@ -48,11 +48,12 @@ struct ConversationSidebar: View {
                 }
                 .toolbarVisibility(horizontalSizeClass == .compact ? .hidden : .automatic, for: .navigationBar)
         }
-        .searchable(
+        .oxSearchable(
             text: $searchQuery,
             isPresented: $searchPresented,
             placement: .toolbar,
-            prompt: Text(A11yLabel.searchChats)
+            prompt: Text(A11yLabel.searchChats),
+            accessibilityIdentifier: A11yID.Sidebar.search
         )
         .background(Theme.Colors.surface, ignoresSafeAreaEdges: .all)
         .onChange(of: searchQuery) { _, _ in visibleCount = pageSize }

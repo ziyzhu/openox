@@ -469,8 +469,7 @@ struct SheetCloseButton: ToolbarContent {
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
-            SheetDismissToolbarButton(action: action)
-                .accessibilityIdentifier(A11yID.Settings.close)
+            SheetDismissToolbarButton(accessibilityIdentifier: A11yID.Settings.close, action: action)
         }
     }
 }
@@ -625,8 +624,7 @@ struct ModelPickerContent: View {
                     }
                 } else if let onClose {
                     ToolbarItem(placement: .topBarLeading) {
-                        SheetDismissToolbarButton(action: onClose)
-                            .accessibilityIdentifier(A11yID.Chat.modelClose)
+                        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.Chat.modelClose, action: onClose)
                     }
                 }
             }

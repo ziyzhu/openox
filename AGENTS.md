@@ -12,6 +12,7 @@
 1. Persisted-storage changes require actual predecessor/changed-build evidence for newer readers with older data and older readers with newer data. Report incompatibilities and obtain maintainer approval before release; safe rejection is not full compatibility.
 1. Do not modify the service manifest schema without maintainer approval.
 1. UX must hold up across supported devices and use equal outer-edge padding.
+1. Shared interactive UI components must require stable automation identifiers and apply them to the actual controls. Use `oxSearchable` for native search fields; repeated controls must derive unique identifiers from their stable item IDs.
 1. Reference Apple development documentation for iOS changes.
 1. Prefer springs configured with duration and bounce for movement and gesture settling; start with zero bounce and tune duration in context. See [Animate with springs](https://developer.apple.com/videos/play/wwdc2023/10158/).
 1. Use perceptual animation completion (`.logicallyComplete`) for user-facing handoffs unless full animation removal is required; do not infer spring completion from a fixed delay.
