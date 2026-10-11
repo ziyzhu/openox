@@ -11,7 +11,7 @@ nonisolated struct ImageWidget: Codable, Equatable, Sendable {
 
 nonisolated enum WidgetMediaSource: Codable, Equatable, Sendable {
     case remote(String)
-    case artifact(Artifact)
+    case artifact(FileItem)
 
     private enum CodingKeys: String, CodingKey {
         case type
@@ -25,7 +25,7 @@ nonisolated enum WidgetMediaSource: Codable, Equatable, Sendable {
         case "remote":
             self = .remote(try container.decode(String.self, forKey: .url))
         case "artifact":
-            self = .artifact(try container.decode(Artifact.self, forKey: .artifact))
+            self = .artifact(try container.decode(FileItem.self, forKey: .artifact))
         case let type:
             throw DecodingError.dataCorruptedError(
                 forKey: .type,
@@ -47,7 +47,7 @@ nonisolated enum WidgetMediaSource: Codable, Equatable, Sendable {
         }
     }
 
-    var artifact: Artifact? {
+    var artifact: FileItem? {
         guard case let .artifact(artifact) = self else { return nil }
         return artifact
     }

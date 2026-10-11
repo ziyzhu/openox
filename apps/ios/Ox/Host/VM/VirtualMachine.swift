@@ -243,8 +243,8 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
             tool.installNatives(ctx, env)
         }
 
-        let helpCatalog = OxFunctionCatalog.build(compatibility: true)
-        let helpTextCatalog = OxFunctionCatalog.buildHelpText(compatibility: true)
+        let helpCatalog = OxFunctionCatalog.build()
+        let helpTextCatalog = OxFunctionCatalog.buildHelpText()
         ctx.setObject(helpCatalog.toAny(), forKeyedSubscript: "__oxHelpCatalog" as NSString)
         ctx.setObject(helpTextCatalog.toAny(), forKeyedSubscript: "__oxHelpTextCatalog" as NSString)
         let helpTextCharacters = helpTextCatalog.objectValue?.values.reduce(0) { $0 + ($1.stringValue?.count ?? 0) } ?? 0
@@ -517,7 +517,7 @@ nonisolated private final class RunHandle: @unchecked Sendable {
         let exceeded = state.withLock { state in
             guard !state.settled else { return false }
             let bytes = message.utf8.count + level.utf8.count + 4
-            guard state.logBytes + bytes <= ArtifactLimits.fileBytes else { return true }
+            guard state.logBytes + bytes <= FileLimits.fileBytes else { return true }
             state.logBytes += bytes
             state.logs.append(VirtualMachineLog(level: level, message: message))
             return false
@@ -530,7 +530,7 @@ nonisolated private final class RunHandle: @unchecked Sendable {
     func acceptsReturn(_ value: JSONValue?) -> Bool {
         guard let value else { return true }
         let bytes = (value.stringValue ?? value.jsonString()).utf8.count
-        return state.withLock { $0.logBytes + bytes <= ArtifactLimits.fileBytes }
+        return state.withLock { $0.logBytes + bytes <= FileLimits.fileBytes }
     }
 
     func snapshotLogs() -> [VirtualMachineLog] {

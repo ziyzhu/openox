@@ -1,7 +1,7 @@
 import Foundation
 
-nonisolated struct ArtifactReferenceAdapter: ModelAdapter {
-    let id = "lazy-artifact-reference"
+nonisolated struct FileReferenceAdapter: ModelAdapter {
+    let id = "lazy-file-reference"
 
     func transform(messages: [Message], model: ProviderModel) async -> ModelAdapterOutcome {
         var transformedMessages: [Message] = []
@@ -35,7 +35,7 @@ nonisolated struct ArtifactReferenceAdapter: ModelAdapter {
         let transformed = content.map { block in
             guard case .attachment(let artifact) = block else { return block }
             changed = true
-            return .text(TextContent(ArtifactPromptReference.text(for: artifact)))
+            return .text(TextContent(FilePromptReference.text(for: artifact)))
         }
         return (transformed, changed)
     }

@@ -2,7 +2,7 @@ import Foundation
 
 nonisolated enum SharedNoteInbox {
     struct Outcome: Sendable {
-        let imported: [Artifact]
+        let imported: [FileItem]
         let failures: [String]
     }
 
@@ -13,14 +13,14 @@ nonisolated enum SharedNoteInbox {
         } catch {
             return Outcome(imported: [], failures: [error.localizedDescription])
         }
-        var imported: [Artifact] = []
+        var imported: [FileItem] = []
         var failures: [String] = []
         for payload in payloads {
             do {
                 let data = try await Task.detached(priority: .userInitiated) {
                     try Data(contentsOf: payload.file)
                 }.value
-                let artifact = try await ArtifactImporter.importDataAsync(
+                let artifact = try await FileImporter.importDataAsync(
                     data,
                     suggestedName: payload.file.lastPathComponent,
                     in: scope
@@ -40,7 +40,7 @@ nonisolated enum SharedNoteInbox {
         let directory = try pendingDirectory()
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let name = ArtifactStore.sanitizedFilename(title) + ".md"
+        let name = FileStore.sanitizedFilename(title) + ".md"
         try Data(text.utf8).write(to: directory.appendingPathComponent(name), options: .atomic)
     }
 

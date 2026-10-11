@@ -3,12 +3,12 @@ import Observation
 import WebKit
 
 private struct AttachmentThumb: View {
-    let attachment: Artifact
+    let attachment: FileItem
     let sourceID: String
-    let onOpen: (Artifact, String) -> Void
+    let onOpen: (FileItem, String) -> Void
 
     var body: some View {
-        ArtifactThumbnail(
+        FileThumbnail(
             attachment: attachment,
             style: .transcript,
             previewSourceID: sourceID
@@ -19,14 +19,14 @@ private struct AttachmentThumb: View {
     }
 }
 
-private struct ConversationArtifactRow: View {
-    let artifact: Artifact
+private struct ConversationFileRow: View {
+    let artifact: FileItem
     var previewSourceID: String? = nil
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
             if artifact.exists {
-                ArtifactThumbnail(
+                FileThumbnail(
                     attachment: artifact,
                     style: .row,
                     previewSourceID: previewSourceID
@@ -1011,18 +1011,18 @@ struct MessageControls {
     let onEdit: () -> Void
 }
 
-struct ArtifactControls {
+struct FileControls {
     let revision: Int
     let canMutate: Bool
-    let onRename: (Artifact) -> Void
-    let onDelete: (Artifact) -> Void
+    let onRename: (FileItem) -> Void
+    let onDelete: (FileItem) -> Void
 }
 
 struct UserBubble: View {
     let text: String
-    let attachments: [Artifact]
+    let attachments: [FileItem]
     let sourcePrefix: String
-    let onOpenAttachment: (Artifact, String) -> Void
+    let onOpenAttachment: (FileItem, String) -> Void
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 6) {
@@ -1064,9 +1064,9 @@ struct UserBubble: View {
 
 private struct UserSkillBubble: View {
     let invocation: UserSkillInvocation
-    let attachments: [Artifact]
+    let attachments: [FileItem]
     let sourcePrefix: String
-    let onOpenAttachment: (Artifact, String) -> Void
+    let onOpenAttachment: (FileItem, String) -> Void
     let onOpenSkill: (Skill) -> Void
 
     var body: some View {
@@ -1095,7 +1095,7 @@ private struct UserSkillBubble: View {
 
 struct QueuedBubble: View {
     let message: Conversation.QueuedMessage
-    let onOpenAttachment: (Artifact, String) -> Void
+    let onOpenAttachment: (FileItem, String) -> Void
     let onOpenSkill: (Skill) -> Void
     let onCancel: () -> Void
 
@@ -1151,8 +1151,8 @@ struct BlockView: View, Equatable {
     let browserPageMount: WebPageMountCoordinator
     let isThinkingTail: Bool
     let controls: MessageControls
-    let artifactControls: ArtifactControls
-    let onOpenAttachment: (Artifact, String) -> Void
+    let artifactControls: FileControls
+    let onOpenAttachment: (FileItem, String) -> Void
     let onOpenSkill: (Skill) -> Void
     let onOpenLink: (URL) -> Void
 
@@ -1203,7 +1203,7 @@ struct BlockView: View, Equatable {
         )
     }
 
-    private func userTextBubble(_ text: String, attachments: [Artifact], createdAt: Date) -> some View {
+    private func userTextBubble(_ text: String, attachments: [FileItem], createdAt: Date) -> some View {
         HStack {
             Spacer(minLength: 40)
             UserBubble(
@@ -1242,7 +1242,7 @@ struct BlockView: View, Equatable {
 
     private func userSkillBubble(
         _ invocation: UserSkillInvocation,
-        attachments: [Artifact],
+        attachments: [FileItem],
         createdAt: Date
     ) -> some View {
         HStack {
@@ -1311,7 +1311,7 @@ struct BlockView: View, Equatable {
                         ShovelerView(
                             shoveler: shoveler,
                             accessibilityPrefix: A11yID.Chat.Message.shoveler(block.id.uuidString),
-                            onOpenArtifact: onOpenAttachment
+                            onOpenFile: onOpenAttachment
                         )
                     case let .video(video):
                         VideoWidgetView(video: video)
@@ -1332,16 +1332,16 @@ struct BlockView: View, Equatable {
                             .padding(.horizontal, 4)
                             .contextMenuPreviewShape()
                             .contextMenu {
-                                ArtifactContextMenu(artifact: artifact, canMutate: artifactControls.canMutate) {
+                                FileContextMenu(artifact: artifact, canMutate: artifactControls.canMutate) {
                                     artifactControls.onRename(artifact)
                                 } onDelete: {
                                     artifactControls.onDelete(artifact)
                                 }
                             } preview: {
-                                ArtifactContextMenuPreview(artifact: artifact)
+                                FileContextMenuPreview(artifact: artifact)
                             }
                         } else {
-                            ConversationArtifactRow(artifact: artifact)
+                            ConversationFileRow(artifact: artifact)
                                 .padding(.horizontal, 4)
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel(String(
@@ -1366,9 +1366,9 @@ struct BlockView: View, Equatable {
         }
     }
 
-    private func artifactRow(_ artifact: Artifact, sourceID: String) -> some View {
+    private func artifactRow(_ artifact: FileItem, sourceID: String) -> some View {
         Button { onOpenAttachment(artifact, sourceID) } label: {
-            ConversationArtifactRow(artifact: artifact, previewSourceID: sourceID)
+            ConversationFileRow(artifact: artifact, previewSourceID: sourceID)
         }
         .buttonStyle(.plain)
         .modifier(ConversationInteractiveRowSurface())

@@ -28,12 +28,12 @@ nonisolated struct VisionImageAdapter: ModelAdapter {
                     content.append(block)
                     continue
                 }
-                guard let data = try? ProviderArtifactInputs.read(artifact),
+                guard let data = try? ProviderFileInputs.read(artifact),
                       let analysis = await analysis(data: data, filename: artifact.fileName, mimeType: artifact.mimeType) else {
                     Log.agent.error("VisionImageAdapter couldn't analyze artifact=\(artifact.fileName)")
                     return nil
                 }
-                content.append(.text(TextContent("\(ArtifactPromptReference.text(for: artifact))\n\n\(analysis)")))
+                content.append(.text(TextContent("\(FilePromptReference.text(for: artifact))\n\n\(analysis)")))
                 transformed = true
             }
             guard transformed else { return message }
@@ -48,12 +48,12 @@ nonisolated struct VisionImageAdapter: ModelAdapter {
                     content.append(block)
                     continue
                 }
-                guard let data = try? ProviderArtifactInputs.read(artifact),
+                guard let data = try? ProviderFileInputs.read(artifact),
                       let analysis = await analysis(data: data, filename: artifact.fileName, mimeType: artifact.mimeType) else {
                     Log.agent.error("VisionImageAdapter couldn't analyze tool artifact=\(artifact.fileName)")
                     return nil
                 }
-                content.append(.text(TextContent("\n\n\(ArtifactPromptReference.text(for: artifact))\n\n\(analysis)")))
+                content.append(.text(TextContent("\n\n\(FilePromptReference.text(for: artifact))\n\n\(analysis)")))
                 transformed = true
             }
 

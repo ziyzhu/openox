@@ -234,7 +234,7 @@ private extension UIColor {
 }
 
 private struct SharedImportPayload {
-    let artifacts: [SharedArtifactPayload]
+    let artifacts: [SharedFilePayload]
 
     var preview: String {
         if artifacts.count == 1 { return artifacts[0].preview }
@@ -243,24 +243,24 @@ private struct SharedImportPayload {
 
     var status: String {
         if artifacts.count == 1 {
-            return String(localized: "It’ll appear in Artifacts the next time you open Ox.")
+            return String(localized: "It’ll appear in Files the next time you open Ox.")
         }
         return String.localizedStringWithFormat(
-            String(localized: "%lld items will appear in Artifacts the next time you open Ox."),
+            String(localized: "%lld items will appear in Files the next time you open Ox."),
             artifacts.count
         )
     }
 }
 
-private struct SharedArtifactPayload {
+private struct SharedFilePayload {
     let fileName: String
     let data: Data
     let preview: String
 }
 
 private enum LoadedAttachment {
-    case artifact(SharedArtifactPayload)
-    case link(SharedArtifactPayload)
+    case artifact(SharedFilePayload)
+    case link(SharedFilePayload)
     case text(String)
 }
 
@@ -272,7 +272,7 @@ private enum SharedItemReader {
     static func read(_ inputItems: [Any]) async throws -> SharedImportPayload {
         var titles: [String] = []
         var textParts: [String] = []
-        var artifacts: [SharedArtifactPayload] = []
+        var artifacts: [SharedFilePayload] = []
         let extensionItems = inputItems.compactMap { $0 as? NSExtensionItem }
         let providers = extensionItems.flatMap { $0.attachments ?? [] }
         ShareLog.logger.info("SharedItemReader.read items=\(extensionItems.count) providers=\(providers.count)")
@@ -302,7 +302,7 @@ private enum SharedItemReader {
             guard data.count <= maximumTextBytes else { throw SharedItemError.tooLarge }
             let title = titles.first ?? firstLineTitle(text) ?? String(localized: "Shared Note")
             artifacts.insert(
-                SharedArtifactPayload(
+                SharedFilePayload(
                     fileName: fileName(sanitizedTitle(title), defaultExtension: "md"),
                     data: data,
                     preview: textPreview(text)
@@ -347,7 +347,7 @@ private enum SharedItemReader {
         if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier),
            let url = await sharedURL(from: provider) {
             if url.isFileURL {
-                if let artifact = try fileArtifact(at: url, from: provider) {
+                if let artifact = try fileFile(at: url, from: provider) {
                     return .artifact(artifact)
                 }
             } else {
@@ -358,7 +358,7 @@ private enum SharedItemReader {
                 } else {
                     url.host() ?? String(localized: "Shared Link")
                 }
-                return .link(SharedArtifactPayload(
+                return .link(SharedFilePayload(
                     fileName: fileName(name, defaultExtension: "md"),
                     data: Data(urlString.utf8),
                     preview: urlString
@@ -402,7 +402,7 @@ private enum SharedItemReader {
         return nil
     }
 
-    private static func fileArtifact(at url: URL, from provider: NSItemProvider) throws -> SharedArtifactPayload? {
+    private static func fileFile(at url: URL, from provider: NSItemProvider) throws -> SharedFilePayload? {
         let type = UTType(filenameExtension: url.pathExtension)
             ?? provider.registeredTypeIdentifiers.compactMap(UTType.init).first(where: supportedFileType)
         guard let type, supportedFileType(type) else { return nil }
@@ -522,10 +522,10 @@ private enum SharedItemReader {
         fallbackName: String,
         defaultExtension: String,
         preview: String? = nil
-    ) throws -> SharedArtifactPayload {
+    ) throws -> SharedFilePayload {
         guard data.count <= maximumMediaBytes else { throw SharedItemError.tooLarge }
         let name = fileName(suggestedName ?? fallbackName, defaultExtension: defaultExtension)
-        return SharedArtifactPayload(fileName: name, data: data, preview: preview ?? name)
+        return SharedFilePayload(fileName: name, data: data, preview: preview ?? name)
     }
 
     private static func data(from provider: NSItemProvider, identifier: String) async -> Data? {

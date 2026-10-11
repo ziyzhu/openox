@@ -37,10 +37,10 @@ nonisolated enum ProfileSchema {
     static let steps: [@Sendable (URL) throws -> Void] = [
         { _ in },
         { _ in },
-        { try ProfileMigrator.moveAttachmentsToArtifacts(at: $0) },
+        { try ProfileMigrator.moveAttachmentsToFiles(at: $0) },
         { try ProfileMigrator.migrateLegacySkills(at: $0) },
         { _ in },
-        { try ProfileMigrator.renameLibraryToArtifacts(at: $0) },
+        { try ProfileMigrator.renameLibraryToFiles(at: $0) },
         { try ProfileMigrator.moveChatsIntoDirectories(at: $0) },
         { try ProfileMigrator.repairStorage(at: $0) },
         { try ProfileMigrator.migrateAgentContexts(at: $0) },
@@ -466,7 +466,7 @@ nonisolated enum ProfileMigrator {
         let scope = ProfileScope(profileID: profile.id, root: profile.url, location: .local)
         let decoder = JSONDecoder()
         decoder.userInfo[.profileScope] = scope
-        decoder.userInfo[.artifactDirectoryListing] = ArtifactDirectoryListing()
+        decoder.userInfo[.artifactDirectoryListing] = FileDirectoryListing()
         var documents: [[String: Any]] = []
         var artifacts: [[String: Any]] = []
         let conversationDirectory = destination.appendingPathComponent(".migration-conversations", isDirectory: true)
@@ -493,7 +493,7 @@ nonisolated enum ProfileMigrator {
                 documents.append(["path": path, "text": text])
             } else if path.hasPrefix("artifacts/"), path != savedPath {
                 let name = String(path.dropFirst("artifacts/".count))
-                guard !name.contains("/"), try ArtifactStore.validatedFilename(name) == name else { throw StorageMigrationError.invalidArtifact(path) }
+                guard !name.contains("/"), try FileStore.validatedFilename(name) == name else { throw StorageMigrationError.invalidFile(path) }
                 let data = try durableSourceFile(path, at: profile.url, limit: 32 * 1024 * 1024)
                 let binary = data.count > 200 * 1024 || String(data: data, encoding: .utf8) == nil
                 try data.write(to: artifactDirectory.appendingPathComponent(name), options: .withoutOverwriting)
@@ -502,7 +502,7 @@ nonisolated enum ProfileMigrator {
             }
         }
         let names = Set(artifacts.compactMap { $0["path"] as? String }.map { String($0.dropFirst("artifacts/".count)).lowercased() })
-        guard saved.allSatisfy({ names.contains($0.lowercased()) }) else { throw StorageMigrationError.invalidArtifact(savedPath) }
+        guard saved.allSatisfy({ names.contains($0.lowercased()) }) else { throw StorageMigrationError.invalidFile(savedPath) }
         let chatFiles = inventory.keys.filter { $0.hasPrefix("chats/") }
         guard chatFiles.allSatisfy({ path in
             let parts = path.split(separator: "/")
@@ -1259,7 +1259,7 @@ nonisolated enum ProfileMigrator {
         try ProfileIO.writeConfig(config, to: url)
     }
 
-    static func moveAttachmentsToArtifacts(at root: URL) throws {
+    static func moveAttachmentsToFiles(at root: URL) throws {
         let fm = FileManager.default
         let attachments = root.appendingPathComponent("attachments", isDirectory: true)
         guard fm.fileExists(atPath: attachments.path) else { return }
@@ -1294,11 +1294,11 @@ nonisolated enum ProfileMigrator {
                           let displayName = legacy["displayName"] as? String,
                           let mimeType = legacy["mimeType"] as? String,
                           let kindString = legacy["kind"] as? String,
-                          let kind = Artifact.Kind(rawValue: kindString) else {
+                          let kind = FileItem.Kind(rawValue: kindString) else {
                         throw StorageMigrationError.invalidAttachment(transcript.path)
                     }
                     let ext = URL(fileURLWithPath: oldFileName).pathExtension
-                    let metadata = ArtifactMetadata(
+                    let metadata = FileMetadata(
                         id: id,
                         fileName: ext.isEmpty ? "content" : "content.\(ext)",
                         displayName: displayName,
@@ -1306,7 +1306,7 @@ nonisolated enum ProfileMigrator {
                         kind: kind
                     )
                     let source = attachments.appendingPathComponent(oldFileName, isDirectory: false)
-                    try importLegacyArtifact(metadata, source: source, into: artifacts)
+                    try importLegacyFile(metadata, source: source, into: artifacts)
                     try finishLegacyImport(metadata, source: source, artifacts: artifacts)
                     converted.append(id.uuidString)
                     lineChanged = true
@@ -1329,16 +1329,16 @@ nonisolated enum ProfileMigrator {
             }
             let ext = source.pathExtension
             let type = UTType(filenameExtension: ext) ?? .data
-            let kind: Artifact.Kind = type.conforms(to: .image) ? .image : type.conforms(to: .pdf) ? .pdf : .text
+            let kind: FileItem.Kind = type.conforms(to: .image) ? .image : type.conforms(to: .pdf) ? .pdf : .text
             let id = UUID(uuidString: source.deletingPathExtension().lastPathComponent) ?? UUID()
-            let metadata = ArtifactMetadata(
+            let metadata = FileMetadata(
                 id: id,
                 fileName: ext.isEmpty ? "content" : "content.\(ext)",
                 displayName: source.lastPathComponent,
                 mimeType: type.preferredMIMEType ?? "application/octet-stream",
                 kind: kind
             )
-            try importLegacyArtifact(metadata, source: source, into: artifacts)
+            try importLegacyFile(metadata, source: source, into: artifacts)
             try finishLegacyImport(metadata, source: source, artifacts: artifacts)
             recovered += 1
         }
@@ -1346,17 +1346,17 @@ nonisolated enum ProfileMigrator {
             throw StorageMigrationError.invalidAttachment(attachments.path)
         }
         try fm.removeItem(at: attachments)
-        Log.app.info("StorageMigrator.moveAttachmentsToArtifacts root=\(root.lastPathComponent) references=\(references) recovered=\(recovered)")
+        Log.app.info("StorageMigrator.moveAttachmentsToFiles root=\(root.lastPathComponent) references=\(references) recovered=\(recovered)")
     }
 
-    static func renameLibraryToArtifacts(at root: URL) throws {
+    static func renameLibraryToFiles(at root: URL) throws {
         let fm = FileManager.default
         let library = root.appendingPathComponent("library", isDirectory: true)
         let artifacts = root.appendingPathComponent("artifacts", isDirectory: true)
         guard fm.fileExists(atPath: library.path) else { return }
         if !fm.fileExists(atPath: artifacts.path) {
             try fm.moveItem(at: library, to: artifacts)
-            Log.app.info("StorageMigrator.renameLibraryToArtifacts root=\(root.lastPathComponent) moved=directory")
+            Log.app.info("StorageMigrator.renameLibraryToFiles root=\(root.lastPathComponent) moved=directory")
             return
         }
         let items = try fm.contentsOfDirectory(at: library, includingPropertiesForKeys: nil)
@@ -1372,7 +1372,7 @@ nonisolated enum ProfileMigrator {
             }
         }
         try fm.removeItem(at: library)
-        Log.app.info("StorageMigrator.renameLibraryToArtifacts root=\(root.lastPathComponent) moved=\(items.count)")
+        Log.app.info("StorageMigrator.renameLibraryToFiles root=\(root.lastPathComponent) moved=\(items.count)")
     }
 
     static func moveChatsIntoDirectories(at root: URL) throws {
@@ -1410,9 +1410,9 @@ nonisolated enum ProfileMigrator {
     }
 
     static func repairStorage(at root: URL) throws {
-        try moveAttachmentsToArtifacts(at: root)
-        try renameLibraryToArtifacts(at: root)
-        try flattenLegacyArtifacts(at: root)
+        try moveAttachmentsToFiles(at: root)
+        try renameLibraryToFiles(at: root)
+        try flattenLegacyFiles(at: root)
         try migrateLegacySkills(at: root)
         try moveChatsIntoDirectories(at: root)
     }
@@ -1937,12 +1937,12 @@ nonisolated enum ProfileMigrator {
         Log.app.info("StorageMigrator.removeUserSkillNamespace root=\(root.lastPathComponent) count=\(migrated)")
     }
 
-    private static func finishLegacyImport(_ metadata: ArtifactMetadata, source: URL, artifacts: URL) throws {
+    private static func finishLegacyImport(_ metadata: FileMetadata, source: URL, artifacts: URL) throws {
         let destination = artifacts
             .appendingPathComponent(metadata.id.uuidString, isDirectory: true)
             .appendingPathComponent(metadata.fileName, isDirectory: false)
         guard FileManager.default.fileExists(atPath: destination.path) else {
-            throw StorageMigrationError.missingArtifact(destination.path)
+            throw StorageMigrationError.missingFile(destination.path)
         }
         guard FileManager.default.fileExists(atPath: source.path) else { return }
         guard try Data(contentsOf: source) == Data(contentsOf: destination) else {
@@ -1951,13 +1951,13 @@ nonisolated enum ProfileMigrator {
         try FileManager.default.removeItem(at: source)
     }
 
-    private static func importLegacyArtifact(
-        _ metadata: ArtifactMetadata,
+    private static func importLegacyFile(
+        _ metadata: FileMetadata,
         source: URL,
         into directory: URL
     ) throws {
         let folder = directory.appendingPathComponent(metadata.id.uuidString, isDirectory: true)
-        let metadataURL = folder.appendingPathComponent(ArtifactStore.metadataName, isDirectory: false)
+        let metadataURL = folder.appendingPathComponent(FileStore.metadataName, isDirectory: false)
         if FileManager.default.fileExists(atPath: metadataURL.path) { return }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let destination = folder.appendingPathComponent(metadata.fileName, isDirectory: false)
@@ -1968,7 +1968,7 @@ nonisolated enum ProfileMigrator {
         try JSONEncoder().encode(metadata).write(to: metadataURL, options: .atomic)
     }
 
-    private static func flattenLegacyArtifacts(at root: URL) throws {
+    private static func flattenLegacyFiles(at root: URL) throws {
         let fm = FileManager.default
         let artifacts = root.appendingPathComponent("artifacts", isDirectory: true)
         guard fm.fileExists(atPath: artifacts.path) else { return }
@@ -1979,20 +1979,20 @@ nonisolated enum ProfileMigrator {
         }
         var replacements: [String: String] = [:]
         for folder in folders {
-            let metadataURL = folder.appendingPathComponent(ArtifactStore.metadataName, isDirectory: false)
-            let metadata: ArtifactMetadata
+            let metadataURL = folder.appendingPathComponent(FileStore.metadataName, isDirectory: false)
+            let metadata: FileMetadata
             do {
-                metadata = try JSONDecoder().decode(ArtifactMetadata.self, from: Data(contentsOf: metadataURL))
+                metadata = try JSONDecoder().decode(FileMetadata.self, from: Data(contentsOf: metadataURL))
             } catch {
-                throw StorageMigrationError.invalidArtifact(folder.path)
+                throw StorageMigrationError.invalidFile(folder.path)
             }
             guard metadata.id.uuidString.caseInsensitiveCompare(folder.lastPathComponent) == .orderedSame,
                   URL(fileURLWithPath: metadata.fileName).lastPathComponent == metadata.fileName else {
-                throw StorageMigrationError.invalidArtifact(folder.path)
+                throw StorageMigrationError.invalidFile(folder.path)
             }
             let source = folder.appendingPathComponent(metadata.fileName, isDirectory: false)
             guard fm.fileExists(atPath: source.path) else {
-                throw StorageMigrationError.missingArtifact(source.path)
+                throw StorageMigrationError.missingFile(source.path)
             }
             let data = try Data(contentsOf: source)
             let fileName = reusableFilename(
@@ -2008,16 +2008,16 @@ nonisolated enum ProfileMigrator {
             replacements[metadata.id.uuidString.lowercased()] = fileName
         }
         for transcript in try transcriptURLs(at: root) {
-            try rewriteArtifactReferences(in: transcript, replacements: replacements)
+            try rewriteFileReferences(in: transcript, replacements: replacements)
         }
         for folder in folders { try fm.removeItem(at: folder) }
         if !folders.isEmpty {
-            Log.app.info("StorageMigrator.flattenLegacyArtifacts root=\(root.lastPathComponent) artifacts=\(folders.count)")
+            Log.app.info("StorageMigrator.flattenLegacyFiles root=\(root.lastPathComponent) artifacts=\(folders.count)")
         }
     }
 
     private static func reusableFilename(suggested: String, id: UUID, data: Data, directory: URL) -> String {
-        let cleaned = ArtifactStore.sanitizedFilename(suggested)
+        let cleaned = FileStore.sanitizedFilename(suggested)
         let url = URL(fileURLWithPath: cleaned)
         let ext = url.pathExtension
         let stem = url.deletingPathExtension().lastPathComponent
@@ -2035,13 +2035,13 @@ nonisolated enum ProfileMigrator {
     }
 
     private static func displayName(_ displayName: String, contentName: String) -> String {
-        let cleaned = ArtifactStore.sanitizedFilename(displayName)
+        let cleaned = FileStore.sanitizedFilename(displayName)
         guard URL(fileURLWithPath: cleaned).pathExtension.isEmpty else { return cleaned }
         let ext = URL(fileURLWithPath: contentName).pathExtension
         return ext.isEmpty ? cleaned : "\(cleaned).\(ext)"
     }
 
-    private static func rewriteArtifactReferences(in transcript: URL, replacements: [String: String]) throws {
+    private static func rewriteFileReferences(in transcript: URL, replacements: [String: String]) throws {
         guard !replacements.isEmpty else { return }
         let data = try Data(contentsOf: transcript)
         var output = Data()
@@ -2053,7 +2053,7 @@ nonisolated enum ProfileMigrator {
                 output.append(0x0A)
                 continue
             }
-            let replacement = replaceArtifactReferences(object, replacements: replacements, enabled: false)
+            let replacement = replaceFileReferences(object, replacements: replacements, enabled: false)
             if replacement.changed {
                 output.append(try JSONSerialization.data(withJSONObject: replacement.value))
                 changed = true
@@ -2065,14 +2065,14 @@ nonisolated enum ProfileMigrator {
         if changed { try output.write(to: transcript, options: .atomic) }
     }
 
-    private static func replaceArtifactReferences(_ value: Any, replacements: [String: String], enabled: Bool) -> (value: Any, changed: Bool) {
+    private static func replaceFileReferences(_ value: Any, replacements: [String: String], enabled: Bool) -> (value: Any, changed: Bool) {
         if let string = value as? String, enabled, let replacement = replacements[string.lowercased()] {
             return (replacement, true)
         }
         if let values = value as? [Any] {
             var changed = false
             let output = values.map {
-                let replacement = replaceArtifactReferences($0, replacements: replacements, enabled: enabled)
+                let replacement = replaceFileReferences($0, replacements: replacements, enabled: enabled)
                 changed = changed || replacement.changed
                 return replacement.value
             }
@@ -2083,7 +2083,7 @@ nonisolated enum ProfileMigrator {
             var output: [String: Any] = [:]
             for (key, child) in fields {
                 let replaceStrings = enabled || ["attachments", "artifact", "media"].contains(key)
-                let replacement = replaceArtifactReferences(child, replacements: replacements, enabled: replaceStrings)
+                let replacement = replaceFileReferences(child, replacements: replacements, enabled: replaceStrings)
                 output[key] = replacement.value
                 changed = changed || replacement.changed
             }

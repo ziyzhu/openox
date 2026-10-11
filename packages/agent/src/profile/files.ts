@@ -2,7 +2,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { defineDoc, defineDocFamily, type Harness, type ConversationId } from "@earendil-works/pi-durable";
 import { FileError } from "@earendil-works/pi-durable/env";
 import type { SqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite";
-import { artifactPath, artifactRecord, type ArtifactFiles } from "./artifacts";
+import { legacyFilePath, validateFileRecord, type FilePayloadStore } from "./file-payloads";
 import { SYSTEM_SKILL_NAMES } from "@openox/protocol/skills";
 import { canonical } from "../core/file-paths";
 import { publicDocument, ProfileFileStore, type ProfileFileBackend, type ProfileFileRecord } from "./file-store";
@@ -21,7 +21,7 @@ export const ProfileFile = defineDocFamily<{ text: string; blob: string; saved: 
   checkpointWhen: (_, __, info) => info.deltasSinceBase >= 31,
 });
 /** Immutable publication metadata remains addressable after logical removal. */
-export const ProfileArtifact = defineDocFamily<{ path: string; size: number; sha256: string; binary: boolean; saved: boolean }, null>({
+export const LegacyProfileFile = defineDocFamily<{ path: string; size: number; sha256: string; binary: boolean; saved: boolean }, null>({
   kind: "ox.artifact", version: 1, scope: "session", family: true,
   initial: () => ({ path: "", size: 0, sha256: "", binary: false, saved: false }),
   checkpointWhen: (_, __, info) => info.deltasSinceBase >= 31,
@@ -44,12 +44,12 @@ function owned(path: string) {
  */
 export class ProfileFiles {
   private tail: Promise<unknown> = Promise.resolve();
-  get immutableArtifacts() { return this.artifacts !== undefined; }
+  get immutableFiles() { return this.artifacts !== undefined; }
   private harness: Harness;
   private db: SqliteDatabase;
   readonly identity: string;
   private createBlobID?: () => Promise<string>;
-  private artifacts?: ArtifactFiles;
+  private artifacts?: FilePayloadStore;
   private bindingMode: "legacy" | "physical" | "prepare";
   private store?: ProfileFileStore;
   private publicFiles = false;
@@ -80,7 +80,7 @@ export class ProfileFiles {
   async deleteConversation(id: ConversationId) { await this.store?.deleteConversation(id); }
 
   constructor(harness: Harness, db: SqliteDatabase, identity: string,
-    createBlobID?: () => Promise<string>, artifacts?: ArtifactFiles, bindingMode: "legacy" | "physical" | "prepare" = "legacy",
+    createBlobID?: () => Promise<string>, artifacts?: FilePayloadStore, bindingMode: "legacy" | "physical" | "prepare" = "legacy",
     backend?: ProfileFileBackend, publicFiles = false) {
     this.harness = harness;
     this.db = db;
@@ -156,18 +156,18 @@ export class ProfileFiles {
     return this.serialize(async () => {
       if (this.store && (!this.isStoredDocument(path) || this.publicFiles && publicDocument(path))) { await this.store.flush(); return; }
       if (!(await this.index())[path]) throw new FileError("not_found", "File not found", path);
-      if (this.artifacts && path.startsWith("artifacts/")) await this.artifacts.flush(artifactPath(path));
+      if (this.artifacts && path.startsWith("artifacts/")) await this.artifacts.flush(legacyFilePath(path));
     });
   }
   /** Historical attachment access does not depend on membership in the visible file index. */
   readReference(path: string): Promise<string | Uint8Array> {
-    return this.store ? this.store.read(path, true) : this.serialize(() => this.readArtifact(artifactPath(path)));
+    return this.store ? this.store.read(path, true) : this.serialize(() => this.readStoredFile(legacyFilePath(path)));
   }
-  private async readArtifact(path: string): Promise<string | Uint8Array> {
+  private async readStoredFile(path: string): Promise<string | Uint8Array> {
     if (!this.artifacts) throw new Error("File-backed artifacts are not installed");
-    const record = await this.harness.snapshot(ProfileArtifact, path, context);
+    const record = await this.harness.snapshot(LegacyProfileFile, path, context);
     if (!record || record.path !== path) throw new FileError("not_found", "Artifact reference not found", path);
-    artifactRecord(record, path, record.size);
+    validateFileRecord(record, path, record.size);
     if (record.size > (record.binary ? binaryLimit : textLimit)) throw new Error("Artifact exceeds size limit");
     const bytes = await this.artifacts.read(record);
     if (bytes.length !== record.size) throw new Error("Artifact size does not match committed reference");
@@ -191,7 +191,7 @@ export class ProfileFiles {
     if (this.publicFiles && publicDocument(path)) return this.physicalStore().read(path);
     const metadata = (await this.index())[path];
     if (!metadata) throw new FileError("not_found", "File not found", path);
-    if (this.artifacts && path.startsWith("artifacts/")) return this.readArtifact(artifactPath(path));
+    if (this.artifacts && path.startsWith("artifacts/")) return this.readStoredFile(legacyFilePath(path));
     const file = await this.harness.snapshot(ProfileFile, path, context);
     if (!file) throw new Error("Missing Profile document");
     if (!metadata.binary) return file.text;
@@ -222,13 +222,13 @@ export class ProfileFiles {
     await this.serialize(async () => {
       if (!(await this.index())[path] && Object.keys(await this.index()).length >= 10_000) throw new Error("Profile file count limit reached");
       if (this.artifacts && path.startsWith("artifacts/")) {
-        if (await this.harness.snapshot(ProfileArtifact, path, context)) {
+        if (await this.harness.snapshot(LegacyProfileFile, path, context)) {
           throw new FileError("invalid", "Artifact references are immutable; choose a distinct filename", path);
         }
         const bytes = typeof content === "string" ? new TextEncoder().encode(content) : content;
-        const receipt = artifactRecord(await this.artifacts.publish(artifactPath(path), bytes), path, size);
+        const receipt = validateFileRecord(await this.artifacts.publish(legacyFilePath(path), bytes), path, size);
         await this.harness.commit(async tx => {
-          Object.assign(await tx.doc(ProfileArtifact, path, null), receipt, { binary: typeof content !== "string" });
+          Object.assign(await tx.doc(LegacyProfileFile, path, null), receipt, { binary: typeof content !== "string" });
           (await tx.doc(ProfileIndex)).files[path] = { size, mtime: Date.now(), binary: typeof content !== "string" };
         }, context);
         return;

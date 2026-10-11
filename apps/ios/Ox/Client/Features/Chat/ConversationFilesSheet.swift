@@ -1,8 +1,8 @@
 import SwiftUI
 
-struct ConversationArtifactsSheet: View {
-    let artifacts: [Artifact]
-    let onOpenArtifact: (Artifact) -> Void
+struct ConversationFilesSheet: View {
+    let artifacts: [FileItem]
+    let onOpenFile: (FileItem) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
@@ -12,13 +12,13 @@ struct ConversationArtifactsSheet: View {
                 LazyVStack(spacing: Theme.Spacing.sm) {
                     ForEach(artifacts) { artifact in
                         Button {
-                            Log.ui.info("ConversationArtifactsSheet.navigation select filename=\(artifact.fileName)")
-                            onOpenArtifact(artifact)
+                            Log.ui.info("ConversationFilesSheet.navigation select filename=\(artifact.fileName)")
+                            onOpenFile(artifact)
                         } label: {
-                            ArtifactLibraryRow(artifact: artifact)
+                            FileLibraryRow(artifact: artifact)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityIdentifier(A11yID.Chat.Artifact.item(artifact.id))
+                        .accessibilityIdentifier(A11yID.Chat.FileItem.item(artifact.id))
                     }
                 }
                 .padding(.horizontal, Theme.Spacing.lg)
@@ -28,11 +28,11 @@ struct ConversationArtifactsSheet: View {
             .background(Theme.Colors.background)
             .navigationTitle("Files")
             .navigationBarTitleDisplayMode(.inline)
-            .accessibilityIdentifier(A11yID.Chat.Artifact.list)
+            .accessibilityIdentifier(A11yID.Chat.FileItem.list)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .accessibilityIdentifier(A11yID.Chat.Artifact.done)
+                        .accessibilityIdentifier(A11yID.Chat.FileItem.done)
                 }
             }
         }

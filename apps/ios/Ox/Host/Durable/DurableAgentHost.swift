@@ -9,7 +9,7 @@ actor DurableAgentHost {
         let assistant: AssistantMessage
         let committedAssistant: AssistantMessage
         let calls: [String: ToolCall]
-        let inputs: ProviderArtifactInputs
+        let inputs: ProviderFileInputs
     }
     nonisolated private struct ToolHydration: Sendable {
         let id: UUID
@@ -27,7 +27,7 @@ actor DurableAgentHost {
         let latency: TurnLatencyTrace?
         let turnID: UUID?
         var context: AgentContext?
-        var providerInputs: ProviderArtifactInputs?
+        var providerInputs: ProviderFileInputs?
         var toolHydration: ToolHydration?
         var modelAssistant: AssistantMessage?
         var assistant: AssistantMessage?
@@ -170,7 +170,7 @@ actor DurableAgentHost {
             var options = config.streamOptions
             if fields["streamOptions"]?.objectValue?["cacheRetention"]?.stringValue == "none" { options.promptCachePolicy = .disabled }
             if let maxTokens = fields["streamOptions"]?.objectValue?["maxTokens"]?.intValue, maxTokens > 0 { options.maxTokens = maxTokens }
-            let inputs = ProviderArtifactInputs()
+            let inputs = ProviderFileInputs()
             defer { withExtendedLifetime(inputs) {} }
             var messages: [Message] = []
             for value in fields["messages"]?.arrayValue ?? [] {
@@ -180,7 +180,7 @@ actor DurableAgentHost {
             if !compaction, let transform = config.transformContext {
                 messages = await transform(TransformContextRequest(messages: messages, model: config.model))
             }
-            try ProviderArtifactInputs.validate(messages)
+            try ProviderFileInputs.validate(messages)
             if let error = modelInputCompatibilityError(messages: messages, model: config.model) { throw RuntimeError.bridge(error.message) }
             let systemPrompt = fields["systemPrompt"]?.stringValue
             if !compaction {
@@ -358,7 +358,7 @@ actor DurableAgentHost {
         guard Set(calls.map(\.id)).count == calls.count, calls.contains(call), call.id == callID, call.name == name, call.arguments == arguments else {
             throw RuntimeError.bridge("Recovered native tool does not match its actual Pi assistant")
         }
-        let inputs = ProviderArtifactInputs()
+        let inputs = ProviderFileInputs()
         var messages: [Message] = []
         for message in values {
             try Task.checkCancellation()
@@ -369,7 +369,7 @@ actor DurableAgentHost {
             runtime: runtime, runtimeProfileID: binding.runtimeProfileID, inputs: inputs) else {
             throw RuntimeError.bridge("Recovered Pi message is not an assistant")
         }
-        try ProviderArtifactInputs.validate(messages + [.assistant(assistant)])
+        try ProviderFileInputs.validate(messages + [.assistant(assistant)])
         return ToolGeneration(context: AgentContext(systemPrompt: systemPrompt, messages: messages, tools: binding.configuration.tools),
                               assistant: assistant, committedAssistant: actual, calls: Dictionary(uniqueKeysWithValues: calls.map { ($0.id, $0) }), inputs: inputs)
     }

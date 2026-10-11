@@ -301,15 +301,15 @@ extension Scenario {
             Entry("28", "pending stop — reject missing terminal reason", .pendingStopReason),
             Entry("29", "compaction — estimate, isolate, and summarize", .compaction),
         ]),
-        ("Artifacts & handoffs", [
+        ("Files & handoffs", [
             Entry("30", "chart — inline JavaScript", .htmlChart),
             Entry("50", "signin — auth card → resume after sign-in", .signin),
             Entry("53", "recover — tool error, then fall back", .recover),
-            Entry("58", "artifact — write, edit, rename, and present", .artifactWorkflow),
+            Entry("58", "files — write, edit, rename, and display", .fileWorkflow),
             Entry("69", "solve — human-verification handoff", .botControl),
             Entry("74", "progress — report, continue thinking, then answer", .progressReport),
             Entry("75", "shoveler — display non-interactive cards", .shoveler),
-            Entry("76", "video — display inline artifact video", .video),
+            Entry("76", "video — display inline file video", .video),
             Entry("77", "payment — user-controlled checkout", .payment),
         ]),
         ("Context & diagnostics", [
@@ -317,7 +317,7 @@ extension Scenario {
             Entry("67", "overflow recovery — compact and retry once", .overflowRecovery),
             Entry("68", "overflow failure — stop after one retry", .overflowFailure),
             Entry("71", "rate limit — normalize provider quota errors", .rateLimited),
-            Entry("72", "prompt context — unified skills and current service and artifact state", .skillCatalog),
+            Entry("72", "prompt context — unified skills and current service and file state", .skillCatalog),
             Entry("73", "memory — freeze prompt context and read updates on demand", .memoryOnDemand),
             Entry("78", "URL context — annotate user and tool URLs with related services", .urlServiceContext),
             Entry("80", "app information — read app identity and current model", .appInformation),
@@ -636,7 +636,7 @@ extension Scenario {
                 .think("Planning the first pass."),
                 execute("""
                 await ox.user.reportProgress({ message: "I found the first result. I’m checking the remaining details now.", purpose: "Share progress" });
-                console.log(await ox.fs.list({ path: "artifacts", purpose: "List artifacts" }));
+                console.log(await ox.fs.list({ path: "artifacts", purpose: "List files" }));
                 """),
             ]
         }
@@ -800,20 +800,20 @@ extension Scenario {
         ]
     }
 
-    static let artifactWorkflow = Scenario(name: "artifact") { ctx in
+    static let fileWorkflow = Scenario(name: "files") { ctx in
         if ctx.turn == 0 {
             return [execute("""
             await ox.fs.write({ path: "artifacts/agent-note.md", content: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40"><text x="8" y="26">Hello</text></svg>', purpose: "Create agent note" });
             await ox.fs.edit({ path: "artifacts/agent-note.md", edits: [{ oldText: "Hello", newText: "Hello, Ox!" }], purpose: "Edit agent note" });
-            await ox.artifact.rename({ filename: "agent-note.md", newFilename: "agent-image.svg", purpose: "Rename agent note" });
+            await ox.fs.move({ from: "artifacts/agent-note.md", to: "artifacts/agent-image.svg", purpose: "Rename agent note" });
             console.log((await ox.fs.read({ path: "artifacts/agent-image.svg", purpose: "Read agent image" })).text);
             """)]
         }
         guard ctx.toolResults.last?.isError == false,
               let text = ctx.resultText("execute"), text.contains("Hello, Ox!") else {
-            return [.say("The artifact workflow failed."), .stop(.stop)]
+            return [.say("The file workflow failed."), .stop(.stop)]
         }
-        return [.say("The finished artifact contains **Hello, Ox!** in agent-image.svg."), .stop(.stop)]
+        return [.say("The finished file contains **Hello, Ox!** in agent-image.svg."), .stop(.stop)]
     }
 
     static let skillCatalog = Scenario(name: "skill-catalog") { ctx in
@@ -833,7 +833,7 @@ extension Scenario {
         let hasServiceSkill = ctx.transientContext.contains("## Attached Services")
         let retainedServiceState = ctx.priorUserContext(containing: "attached")
             .map { $0.contains("## Attached Services") } == true
-        let artifactPaths = ctx.messages.flatMap { message -> [String] in
+        let filePaths = ctx.messages.flatMap { message -> [String] in
             let content = switch message {
             case .user(let value): value.content
             case .assistant(let value): value.content
@@ -844,9 +844,9 @@ extension Scenario {
                 return "artifacts/\(artifact.fileName)"
             }
         }
-        let hasArtifactState = artifactPaths.isEmpty
-            || ctx.transientContext.contains("## Chat Artifacts")
-                && artifactPaths.allSatisfy { ctx.transientContext.contains("`\($0)`") }
+        let hasFileState = filePaths.isEmpty
+            || ctx.transientContext.contains("## Conversation Files")
+                && filePaths.allSatisfy { ctx.transientContext.contains("`\($0)`") }
         guard let languageDirective = try? ModelPromptRenderer.shared.render(.responseDirective, input: AppLocale.resolvedResponseLanguage) else {
             return [.say("Response language could not be rendered."), .stop(.stop)]
         }
@@ -862,7 +862,7 @@ extension Scenario {
               hasTimestamp,
               hasTurnStateAfterTimestamp,
               !verifiesStablePrefix || retainedServiceState,
-              hasArtifactState,
+              hasFileState,
               hasServiceSkill == expectsService else {
             return [.say("Skill catalog context was incorrect."), .stop(.stop)]
         }
@@ -1083,7 +1083,7 @@ extension Scenario {
             return [
                 .say("Here's the chart you asked for:\n\n"),
                 .wait(.seconds(3)),
-                execute(htmlArtifact("revenue", revenueDocument)),
+                execute(htmlFile("revenue", revenueDocument)),
                 .stop(.toolUse)
             ]
         }
@@ -1094,10 +1094,10 @@ extension Scenario {
         .tool(name: "execute", args: .object(["purpose": .string("Run Mock scenario"), "source": .string(source)]))
     }
 
-    private static func htmlArtifact(_ id: String, _ document: String) -> String {
+    private static func htmlFile(_ id: String, _ document: String) -> String {
         let literal = String(decoding: try! JSONEncoder().encode(document), as: UTF8.self)
         return """
-        await ox.fs.write({ path: "artifacts/mock-\(id).html", content: \(literal), purpose: "Create interactive artifact" });
+        await ox.fs.write({ path: "artifacts/mock-\(id).html", content: \(literal), purpose: "Create interactive HTML file" });
         """
     }
 }

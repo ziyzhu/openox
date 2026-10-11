@@ -31,7 +31,7 @@ final class OxCanvas {
     let serviceManager: ServiceManager
     let presentations: AppPresentationCoordinator
     private var state: State = .running
-    private var outputs: [Artifact] = []
+    private var outputs: [FileItem] = []
     private(set) var interaction: Interaction?
     var browser: Browser?
 
@@ -186,7 +186,7 @@ final class OxCanvas {
             presentControl: { [unowned self] control, service in
                 await waitForInteraction(.control(UUID(), control, service))
             },
-            receiveArtifacts: { [unowned self] in try receiveArtifacts($0) },
+            receiveFiles: { [unowned self] in try receiveFiles($0) },
             serviceChanged: { [unowned self] domain in
                 if let service = services.removeValue(forKey: domain), service.isWebService { service.discardPages() }
             },
@@ -220,7 +220,7 @@ final class OxCanvas {
                 attachTransient: { _ in
                     throw RuntimeError.bridge("Browser exports are available only to chat agents.")
                 },
-                importArtifact: { _, _ in
+                importFile: { _, _ in
                     throw RuntimeError.bridge("Browser export files are available only to chat agents.")
                 },
                 choose: { [unowned self] prompt in
@@ -301,7 +301,7 @@ final class OxCanvas {
         return try await AppPresentations.live.messages.present(recipients: recipients, body: body)
     }
 
-    private func receiveArtifacts(_ artifacts: [RemoteMCPArtifact]) throws {
+    private func receiveFiles(_ artifacts: [RemoteMCPFile]) throws {
         try requireRunning()
         let added = artifacts.reduce(0) { $0 + $1.data.count }
         guard outputBytes + added <= 20 * 1_048_576, outputs.count + artifacts.count <= 32 else {
@@ -309,12 +309,12 @@ final class OxCanvas {
         }
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
         for artifact in artifacts {
-            let name = (try? ArtifactStore.validatedFilename(artifact.suggestedFilename)) ?? "output.dat"
+            let name = (try? FileStore.validatedFilename(artifact.suggestedFilename)) ?? "output.dat"
             let filename = "\(UUID().uuidString.prefix(8))-\(name)"
             let file = outputDirectory.appendingPathComponent(filename)
             try artifact.data.write(to: file, options: .atomic)
             outputBytes += artifact.data.count
-            outputs.append(Artifact(fileName: filename, directory: outputDirectory))
+            outputs.append(FileItem(fileName: filename, directory: outputDirectory))
         }
     }
 }

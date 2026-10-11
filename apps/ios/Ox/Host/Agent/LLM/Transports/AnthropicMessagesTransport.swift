@@ -392,7 +392,7 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         case .image:
             return ["type": "image", "source": source]
         case .pdf:
-            let pdf = try PDFPreparer.prepareArtifact(data)
+            let pdf = try PDFPreparer.prepareFile(data)
             return [
                 "type": "document",
                 "source": ["type": "base64", "media_type": pdf.mimeType, "data": pdf.data.base64EncodedString()],

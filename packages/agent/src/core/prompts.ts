@@ -9,7 +9,7 @@ export interface TurnState {
   skillConflicts: string[];
   attachedServices: { domain: string; description?: string; signIn: SignInState; fileMounts?: string[]; scope?: HostScope }[];
   hostContext?: HostContext;
-  artifactPaths: string[];
+  filePaths: string[];
   storageMode: "persisted" | "temporary";
   responseLanguage: ResponseLanguage | null;
 }
@@ -22,8 +22,8 @@ const signInHints: Record<SignInState, string> = {
   notAuthorized: "not authorized — authorize this service before using it",
   unknown: "sign-in status still being checked — attempt the action; the error will say if sign-in is needed",
 };
-const temporaryStorage = "## Storage\nThis is a temporary conversation. You may read Profile-owned files, but cannot save changes to `MEMORY.md`, `SOUL.md`, `artifacts/`, or user skills. Selected external files under `files/<folder-id>/` are separate: they may still be changed when Files is attached and runtime approval is granted. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
-const temporaryProfileStorage = "## Storage\nThis is a temporary conversation. You may read Profile-owned files, but cannot save changes to `MEMORY.md`, `SOUL.md`, `artifacts/`, or user skills. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
+const temporaryStorage = "## Storage\nThis is a temporary conversation. You may read Profile-owned files, but cannot save changes to Profile files, including `MEMORY.md`, `SOUL.md`, or user skills. Selected external files under `files/<folder-id>/` are separate: they may still be changed when Files is attached and runtime approval is granted. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
+const temporaryProfileStorage = "## Storage\nThis is a temporary conversation. You may read Profile-owned files, but cannot save changes to Profile files, including `MEMORY.md`, `SOUL.md`, or user skills. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
 const join = (sections: string[]) => sections.filter(Boolean).join("\n\n");
 const normalized = (text: string) => text.split(/\s+/u).filter(Boolean).join(" ");
 const ordered = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
@@ -59,8 +59,8 @@ export function composeTurnContext(state: TurnState) {
       return [line, service.fileMounts.length === 0 ? "    - no folders are currently selected"
         : `    - selected folder mounts: ${[...service.fileMounts].sort().map(path => `\`${path}\``).join(", ")}`];
     })].join("\n");
-  const artifacts = state.artifactPaths.length === 0 ? "" : ["## Conversation Artifacts", ...state.artifactPaths.map(path => `- \`${path}\``)].join("\n");
+  const files = state.filePaths.length === 0 ? "" : ["## Conversation Files", ...state.filePaths.map(path => `- \`${path}\``)].join("\n");
   const storage = host?.externalFiles === false ? temporaryProfileStorage : temporaryStorage;
-  const content = join([skills, state.hostContext ? hostContextText(state.hostContext) : "", services, artifacts, state.storageMode === "temporary" ? storage : "", responseDirective(state.responseLanguage)]);
+  const content = join([skills, state.hostContext ? hostContextText(state.hostContext) : "", services, files, state.storageMode === "temporary" ? storage : "", responseDirective(state.responseLanguage)]);
   return `<turn-state>\n${content}\n</turn-state>`;
 }

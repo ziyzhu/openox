@@ -31,11 +31,10 @@ async function json(args: string[], allowFailure = false) {
 async function call(name: string, args: Record<string, unknown>) {
   return (await json([...target, "vm", "call", name, "--args", JSON.stringify({ purpose: "Verify Profile filesystem", ...args }), "--json"])).value;
 }
-async function evaluate(script: string) {
-  return (await json([...target, "vm", "eval", "--script", script, "--json"])).value;
-}
-async function present(path: string) {
-  return evaluate(`return await ox.artifact.present({filename:${JSON.stringify(path)},purpose:"Verify live file reference"})`);
+async function inspectFile(path: string) {
+  const filename = path.startsWith("/") ? path : `/${path}`;
+  await call("ox.fs.read", { path: filename });
+  return { filename };
 }
 async function rejected(name: string, args: Record<string, unknown>) {
   await assert.rejects(() => call(name, args));
@@ -92,27 +91,26 @@ try {
   assert((await call("ox.fs.grep", { ...search, path: "/conversations" })).matches.some((match: { path: string }) => match.path === transcript));
   assert.equal((await call("ox.fs.grep", { ...search, path: "/" })).matches.length, 0);
   checks.push("unified conversation records and files, old history aliases, read-only reserved names and explicit transcript search");
-  const original = await present(created.path);
+  const original = await inspectFile(created.path);
   await call("ox.fs.edit", { path: `/${created.path}`, edits: [{ oldText: "Version one", newText: "Version two" }] });
   await rejected("ox.fs.edit", { path: `/${created.path}`, edits: [{ oldText: "Missing", newText: "Unexpected" }] });
   assert.equal((await call("ox.fs.read", { path: `/${created.path}` })).text, "# Current file\nVersion two\n");
   await call("ox.fs.move", { from: `/${conversationRoot}/${prefix}`, to: shared });
   const path = `${shared}/nested/note.md`;
-  await assert.rejects(() => present(original.filename));
-  const moved = await present(path);
+  await assert.rejects(() => inspectFile(original.filename));
+  const moved = await inspectFile(path);
   assert.notEqual(moved.filename, original.filename);
   const copy = await call("ox.fs.copy", { from: path, to: `${shared}/copy.md` });
-  assert.notEqual((await present(copy.path)).filename, original.filename);
+  assert.notEqual((await inspectFile(copy.path)).filename, original.filename);
   await rejected("ox.fs.copy", { from: path, to: `${shared}/copy.md` });
   await call("ox.fs.move", { from: path, to: `${shared}/nested/current.html` });
-  await assert.rejects(() => present(moved.filename));
-  const current = await present(`${shared}/nested/current.html`);
-  assert.equal(current.mimeType, "text/html");
+  await assert.rejects(() => inspectFile(moved.filename));
+  const current = await inspectFile(`${shared}/nested/current.html`);
   await call("ox.fs.write", { path: `${shared}/nested/current.html`, content: "<h1>Current HTML</h1>\n" });
   const attachment = await call("ox.fs.attach", { path: `${shared}/nested/current.html` });
   assert.equal(attachment.filename, "current.html");
   assert.equal(attachment.contentType, "text/html");
-  assert.equal((await present(current.filename)).filename, current.filename);
+  assert.equal((await inspectFile(current.filename)).filename, current.filename);
   await call("ox.fs.mkdir", { path: `${shared}/empty` });
   await rejected("ox.fs.move", { from: `/${conversationRoot}`, to: `${shared}/illegal` });
   checks.push("conversation cwd, checked edits, moves retiring old references, independent copies, current MIME type and managed roots");
@@ -128,20 +126,19 @@ try {
     await writeFile(fixture, "External creation\n");
     await copyFile(fixture, await physical(external));
     assert.equal((await call("ox.fs.read", { path: `/${prefix}-external.md` })).text, "External creation\n");
-    const externalReference = await present(`/${prefix}-external.md`);
+    const externalReference = await inspectFile(`/${prefix}-external.md`);
     await writeFile(fixture, "External edit\n");
     await copyFile(fixture, await physical(external));
     assert.equal((await call("ox.fs.read", { path: `/${prefix}-external.md` })).text, "External edit\n");
-    assert.equal((await present(externalReference.filename)).filename, externalReference.filename);
+    assert.equal((await inspectFile(externalReference.filename)).filename, externalReference.filename);
     await rename(await physical(external), await physical(`${publicRoot}/${prefix}-renamed.md`));
-    await assert.rejects(() => present(externalReference.filename));
+    await assert.rejects(() => inspectFile(externalReference.filename));
     assert.equal((await call("ox.fs.read", { path: `/${prefix}-renamed.md` })).text, "External edit\n");
-    const renamedReference = await present(`/${prefix}-renamed.md`);
+    const renamedReference = await inspectFile(`/${prefix}-renamed.md`);
     await rm(await physical(`${publicRoot}/${prefix}-renamed.md`));
-    await assert.rejects(() => present(renamedReference.filename));
+    await assert.rejects(() => inspectFile(renamedReference.filename));
     await copyFile(fixture, await physical(`${publicRoot}/${prefix}-renamed.md`));
-    await assert.rejects(() => present(renamedReference.filename));
-    assert.notEqual((await present(`/${prefix}-renamed.md`)).filename, renamedReference.filename);
+    assert.equal((await call("ox.fs.read", { path: renamedReference.filename })).text, "External edit\n");
     await rm(await physical(`${publicRoot}/${prefix}-renamed.md`));
     const originalDocuments = join(directory, "original-documents"), memory = join(originalDocuments, "MEMORY.md");
     await ios.pull(bundle, `${publicRoot}/MEMORY.md`, originalDocuments);
@@ -168,14 +165,14 @@ try {
   await ready();
   await json([...target, "chat", "open", "--json"]);
   assert.equal((await call("ox.fs.read", { path: `${shared}/nested/current.html` })).text, "<h1>Current HTML</h1>\n");
-  assert.equal((await present(current.filename)).filename, current.filename);
-  await assert.rejects(() => present(original.filename));
+  assert.equal((await inspectFile(current.filename)).filename, current.filename);
+  await assert.rejects(() => inspectFile(original.filename));
   assert.equal((await call("ox.fs.list", { path: `${shared}/empty` })).items.length, 0);
-  checks.push("current file contents, identity, and empty directories persist through process reopen");
+  checks.push("current file contents, paths, and empty directories persist through process reopen");
   const removalPurpose = `Remove ${prefix}`;
   await approve(`return await ox.fs.rmdir({path:${JSON.stringify(shared)},recursive:true,purpose:${JSON.stringify(removalPurpose)}})`, removalPurpose);
   assert(!(await call("ox.fs.list", { path: "/" })).items.some((item: { path: string }) => item.path === prefix));
-  await assert.rejects(() => present(original.filename));
+  await assert.rejects(() => inspectFile(original.filename));
   await rejected("ox.fs.read", { path: `${shared}/nested/current.html` });
   checks.push("ordinary approval deletes the run-owned directory recursively and makes live references unavailable");
   const host = ["ox", "--host", qa.debugEndpoint];
@@ -186,7 +183,7 @@ try {
   const childFile = (await json([...host, "--chat", child.id, "vm", "call", "ox.fs.write", "--args",
     JSON.stringify({ path: `${prefix}/owned.md`, content: "Conversation-owned content\n", purpose: "Verify conversation ownership" }), "--json"])).value;
   const childRoot = childFile.path.split("/").slice(0, 2).join("/");
-  const ownedReference = await present(childFile.path);
+  const ownedReference = await inspectFile(childFile.path);
   const ownershipRoot = `${shared}-ownership`;
   await call("ox.fs.move", { from: `/${childFile.path}`, to: `${ownershipRoot}/shared.md` });
   await call("ox.fs.copy", { from: `${ownershipRoot}/shared.md`, to: `${ownershipRoot}/survivor.md` });
@@ -195,7 +192,7 @@ try {
   const deletionPurpose = `Delete ${prefix} chat`;
   await approve(`return await ox.conversation.delete({id:${JSON.stringify(child.id)},purpose:${JSON.stringify(deletionPurpose)}})`, deletionPurpose);
   assert(!(await call("ox.fs.list", { path: "/conversations" })).items.some((item: { path: string }) => item.path === childRoot));
-  await assert.rejects(() => present(ownedReference.filename));
+  await assert.rejects(() => inspectFile(ownedReference.filename));
   assert.equal((await call("ox.fs.read", { path: `${ownershipRoot}/survivor.md` })).text, "Conversation-owned content\n");
   checks.push("conversation deletion reclaims transferred-back owned files without retaining referenced bytes or deleting shared copies");
   await approve(`return await ox.fs.rmdir({path:${JSON.stringify(ownershipRoot)},recursive:true,purpose:${JSON.stringify(removalPurpose)}})`, removalPurpose);
@@ -203,6 +200,6 @@ try {
 } finally {
   try {
     await writeFile(join(directory, "report.json"), JSON.stringify({ device: qa.device, chat: qa.values.chat, prefix, checks,
-      limitations: ["No physical-device power-loss test", "No predecessor fixture, provider submission, or package round-trip test"] }, null, 2) + "\n", { mode: 0o600 });
+      limitations: ["No physical-device power-loss test", "No predecessor fixture, provider submission, or package round-trip test", "Historical reference retirement is not checked through the removed presentation API"] }, null, 2) + "\n", { mode: 0o600 });
   } finally { release(); }
 }

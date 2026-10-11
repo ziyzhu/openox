@@ -3,7 +3,7 @@ import PDFKit
 import SwiftUI
 import UIKit
 
-struct ArtifactThumbnail: View {
+struct FileThumbnail: View {
     enum Style: Equatable {
         case composer
         case transcript
@@ -51,7 +51,7 @@ struct ArtifactThumbnail: View {
         }
     }
 
-    let attachment: Artifact
+    let attachment: FileItem
     let style: Style
     var background: DynamicColor? = nil
     var previewSourceID: String? = nil
@@ -96,7 +96,7 @@ struct ArtifactThumbnail: View {
             let size = CGSize(width: style.size * 3, height: style.size * 3)
             let targetPixelSize = max(1, Int((style.size * displayScale).rounded(.up)))
             do {
-                let data = try await ArtifactPreviewSource(artifact: attachment, scope: scope).read()
+                let data = try await FilePreviewSource(artifact: attachment, scope: scope).read()
                 let loaded = await Task.detached(priority: .utility) {
                     if kind == .image { return Self.thumbnail(data: data, targetPixelSize: targetPixelSize) }
                     return PDFDocument(data: data)?.page(at: 0)?.thumbnail(of: size, for: .cropBox)
@@ -105,7 +105,7 @@ struct ArtifactThumbnail: View {
                 image = loaded
             } catch is CancellationError {
             } catch {
-                Log.ui.error("ArtifactThumbnail.read file=\(attachment.fileName) error=\(error.localizedDescription)")
+                Log.ui.error("FileThumbnail.read file=\(attachment.fileName) error=\(error.localizedDescription)")
             }
         }
     }

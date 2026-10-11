@@ -90,7 +90,7 @@ final class ActiveProfileMonitor {
         }
         self.presenter = presenter
         NSFileCoordinator.addFilePresenter(presenter)
-        if scope.location == .iCloud { startArtifactMetadataQuery(in: scope) }
+        if scope.location == .iCloud { startFileMetadataQuery(in: scope) }
         Log.app.info("ActiveProfileMonitor.activate root=\(root.lastPathComponent) generation=\(scope.generation)")
     }
 
@@ -124,7 +124,7 @@ final class ActiveProfileMonitor {
         }
     }
 
-    private func startArtifactMetadataQuery(in scope: ProfileScope) {
+    private func startFileMetadataQuery(in scope: ProfileScope) {
         let directory = scope.root.appendingPathComponent("artifacts", isDirectory: true)
         let query = NSMetadataQuery()
         query.searchScopes = [NSMetadataQueryUbiquitousDocumentsScope]

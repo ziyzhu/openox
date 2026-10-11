@@ -1,7 +1,7 @@
-import type { ArtifactFiles } from "../../profile/artifacts";
+import type { FilePayloadStore } from "../../profile/file-payloads";
 import { fileRequest, readFile, stageFile } from "./files";
 
-export function nativeArtifacts(): ArtifactFiles {
+export function nativeFilePayloads(): FilePayloadStore {
   return {
     publish: (path, bytes) => stageFile(bytes, path),
     read: record => readFile(record, "open"),

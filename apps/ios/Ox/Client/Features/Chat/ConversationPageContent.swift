@@ -9,8 +9,8 @@ struct ConversationBlock: Identifiable, Equatable {
     }
 
     enum Kind: Equatable {
-        case userText(String, attachments: [Artifact])
-        case userSkill(UserSkillInvocation, attachments: [Artifact])
+        case userText(String, attachments: [FileItem])
+        case userSkill(UserSkillInvocation, attachments: [FileItem])
         case agentContent(ContentItem)
         case thinking(ThinkingTrace)
         case contextCompaction(ContextCompaction)

@@ -106,7 +106,7 @@ Choice, approval, and secret-entry prompts are transient `Conversation` interact
 - Credential conversion — owner: Host/Profile/CredentialMigrator.swift
 - Repository compatibility — owner: Host/Profile/RepositoryMigrator.swift
 - Shared stateless conversion and verified-copy helpers — owner: Host/Profile/StorageMigrationSupport.swift
-- Artifact metadata — owner: Host/Profile/Artifact.swift
+- File metadata — owner: Host/Profile/FileItem.swift
 - Folder bookmarks — owner: Services/Native/DeviceFolderStore.swift
 - Service repositories — owner: Services/Repository/Repository.swift
 - Service-search vector cache — owner: Services/Repository/ServiceSearchIndex.swift
@@ -118,7 +118,7 @@ Choice, approval, and secret-entry prompts are transient `Conversation` interact
 
 ## Profile filesystem
 
-`ProfileFiles` is the Profile file API. Its owned `ProfileFileStore` coordinates file identities, paths, ownership, directories, and a resumable mutation journal. The persisted Pi document retains its historical `ox.workspace` key. File bytes live in the Profile directory, never in SQLite blobs. `DurableFileStore` owns the native lock, staged transfers, pinned reads, verification, and atomic replacement; it composes descriptor-relative `DurableFileDirectory` operations. Normal runtimes inject `ProfileFileBackend` through `fileStorage`, without `ArtifactFiles`, an artifact index, or immutable publication. Memory, soul, and user skills are authoritative physical public files; their predecessor Pi text documents are retired only by trusted preparation. Skill selections remain private Pi documents, and bundled System resources stay app-managed/read-only. Services and granted device folders retain their scoped mounts and permissions.
+`ProfileFiles` is the Profile file API. Its owned `ProfileFileStore` coordinates file identities, paths, ownership, directories, and a resumable mutation journal. The persisted Pi document retains its historical `ox.workspace` key. File bytes live in the Profile directory, never in SQLite blobs. `DurableFileStore` owns the native lock, staged transfers, pinned reads, verification, and atomic replacement; it composes descriptor-relative `DurableFileDirectory` operations. Normal runtimes inject `ProfileFileBackend` through `fileStorage`, without `FileFiles`, an artifact index, or immutable publication. Memory, soul, and user skills are authoritative physical public files; their predecessor Pi text documents are retired only by trusted preparation. Skill selections remain private Pi documents, and bundled System resources stay app-managed/read-only. Services and granted device folders retain their scoped mounts and permissions.
 
 New files have opaque registrations with an initial extension hint, not artifact paths. Same-path edits retain references. Rename and move retire the old registration and create a new one; old messages show the file as deleted rather than following it. Current paths determine content type. Messages read current contents; copy creates an independent file, and deletion makes references unavailable. Request-owned verified bytes and temporary exports/previews are not persisted attachment versions. Empty directories persist. Relative file paths use `conversations/<Pi-ID>/`; `/` addresses the Profile root. Read-only virtual `conversation.json` and `turns.jsonl` live alongside working files under `conversations/<Pi-ID>/`; these filenames are reserved by the agent filesystem. `history/`, `chats/`, and UUID conversation paths remain unlisted compatibility aliases. No disk transcript is introduced. Existing working-file collisions remain on disk and in the file index; virtual record access reports the conflict without overwriting user bytes. Generic operations cannot mutate conversation roots, mounted roots, database/sidecars, the manifest, hidden staging, or private archives.
 
@@ -177,7 +177,7 @@ no production Profile format or compatibility milestone is changed.
 ### Predecessor physical files and conversation projections
 
 `NativeFiles` uses `state.sqlite` and flat ordinary files in
-`artifacts/`, including UTF-8 text artifacts. The native `DurableArtifactStore`
+`artifacts/`, including UTF-8 text artifacts. The native `DurableFileStore`
 acquires the descriptor-relative `.owner` lock **before** SQLite opens and retains
 it until database close. Files/directories reject links; published files are
 single-link regular files. Private transfer staging, `.owner`, WAL and SHM are
@@ -223,13 +223,13 @@ staged manifest receives `2026-10-05-pi-durable`. This appended milestone is now
 
 The predecessor Pi Profile was `profile.json`, `state.sqlite`, and immutable files at `artifacts/<filename>`. `profile.json` alone owns identity, creation date, and migration milestone; database bindings are integrity checks. Production identity is `(Profile ID, Pi conversation ID)`. Native UUIDs are deterministic presentation projections, not a registry. Source UUID conversion mappings remain in `StorageMigrator` journals.
 
-`ox.native.presentation` entries retain immutable current rich UI decorations without contributing model context. `ox.conversation.metadata` stores `nativeProviderID` for credential routing and native-only reasoning options; Pi AgentDoc owns model/thinking choices. Canonical Pi models override decoration text/calls/results. New migration entries retain exact source JSON through `{path,size,sha256}` file references; older inline `sourceJSON` entries remain readable without rewriting. Runtime presentation never decodes the source archive. Legacy invocation arguments and results larger than 16 KiB use `oxPayload: {format:1,source,offset,length}` plus a bounded omission notice instead of embedding their full bytes. Existing archive descriptors remain available to migration readers. These content-addressed immutable `artifacts/payload-<sha256>.json` archives are committed as `ox.artifact` metadata without entering the visible `ox.profile` file index. They share the native artifact owner, are retained with history, and have no automatic reclamation. `ox.output.read` reads only chat-local captured JavaScript output; model-facing archive retrieval is retired. Existing archives and migration readers are retained without a storage-format change. Publication and streaming digest verification precede migration references; no raw payload SQL blobs are introduced. New Actions do not create diagnostic archives. Whole skill package and selection changes use one Pi document/index commit. Artifact edits/renames choose new immutable filenames and retain prior metadata/bytes.
+`ox.native.presentation` entries retain immutable current rich UI decorations without contributing model context. `ox.conversation.metadata` stores `nativeProviderID` for credential routing and native-only reasoning options; Pi AgentDoc owns model/thinking choices. Canonical Pi models override decoration text/calls/results. New migration entries retain exact source JSON through `{path,size,sha256}` file references; older inline `sourceJSON` entries remain readable without rewriting. Runtime presentation never decodes the source archive. Legacy invocation arguments and results larger than 16 KiB use `oxPayload: {format:1,source,offset,length}` plus a bounded omission notice instead of embedding their full bytes. Existing archive descriptors remain available to migration readers. These content-addressed immutable `artifacts/payload-<sha256>.json` archives are committed as `ox.artifact` metadata without entering the visible `ox.profile` file index. They share the native artifact owner, are retained with history, and have no automatic reclamation. `ox.output.read` reads only chat-local captured JavaScript output; model-facing archive retrieval is retired. Existing archives and migration readers are retained without a storage-format change. Publication and streaming digest verification precede migration references; no raw payload SQL blobs are introduced. New Actions do not create diagnostic archives. Whole skill package and selection changes use one Pi document/index commit. File edits/renames choose new immutable filenames and retain prior metadata/bytes.
 
 New native Action traces retain bounded JSON previews rather than complete inner results. `Invocation.preview` records argument, result, and purpose clipping; optional `sources` retains bounded query/domain/link metadata for source chips. `Execution.invocationTrace` counts retained and omitted calls and preview bytes. Each execution retains at most 256 Actions and a 64 KiB combined preview/source budget, with 8 KiB arguments and 4 KiB results per call. Preview traversal also limits depth, nodes, keys, and array items. Purpose/error text is limited to 500 Unicode scalars. `ThinkingTrace.omittedInvocations` projects omissions into the inspector. These optional fields are additive; older records, canonical Pi context, source archives, and artifact effects are unchanged. Recording is synchronous and nonthrowing; approvals, Actions, and JavaScript receive complete original values. Temporary chats use the same preview policy. Actual artifact effects keep their existing byte-retention policy; diagnostic previews do not publish artifacts.
 
 Pi scheduling is global to a Session. Before any progress, every recovered task/submission conversation must have its qualified native route and saved model/transport configuration installed. Recovery uses existing durable submissions and waits for both settlement and committed native-event delivery; it never resubmits user input. Cold native tools hydrate from actual Pi task/assistant/context proof without model re-stream or native hook replay. Unsafe interrupted tool intents are not rerun. Storage admission failure can poison a Pi Session even after SQLite rolls back: report failure and explicitly close/reacquire; never blindly retry effects through the failed Session.
 
-Provider media uses request-owned verified bytes, and preview/share/HTML sibling readers use pinned bytes or owned immutable snapshots. An ordinary Artifact URL is routing metadata, not snapshot proof. No live SQLite sync, external in-place edits, unsafe artifact garbage collection, or adoption of old debug caches is authorized. Native migration/normal-chat/process-recovery evidence is simulator-specific; released-predecessor and physical-power-loss acceptance remain separate gates.
+Provider media uses request-owned verified bytes, and preview/share/HTML sibling readers use pinned bytes or owned immutable snapshots. An ordinary file URL is routing metadata, not snapshot proof. No live SQLite sync, external in-place edits, unsafe artifact garbage collection, or adoption of old debug caches is authorized. Native migration/normal-chat/process-recovery evidence is simulator-specific; released-predecessor and physical-power-loss acceptance remain separate gates.
 
 ## Compatibility gate
 
@@ -415,7 +415,7 @@ index containing the basenames the user saved. The case-insensitive basename is
 the stable identity; type, MIME type, size, and dates are derived from the file.
 Imports sanitize names and resolve collisions with numbered suffixes. Text is
 limited to 200 KB, other files to 32 MB, and imported images are bounded before
-storage. Artifact rename and deletion keep the saved index aligned with the
+storage. File rename and deletion keep the saved index aligned with the
 user-visible file operation.
 
 Chats persist live filename references. Editing changes what an old chat opens.
@@ -511,7 +511,7 @@ provider, and original external paths are never durable
 attachment references. Saved chats retain published bytes in their Profile;
 temporary chats use their purgeable Session. No new storage format is introduced.
 Writes, edits, and deletes require the attached Files service and existing folder grant. Built-in
-writes and edits default to Allow, while delete defaults to Ask. Artifact import
+writes and edits default to Allow, while delete defaults to Ask. File import
 and rename default to Allow; artifact and filesystem deletion default to Ask.
 
 HTML artifacts remain ordinary UTF-8 files. Presentation creates a fresh
@@ -528,7 +528,7 @@ native artifact preview as other chat artifact references. Chat package export
 includes artifacts referenced only by Shoveler cards.
 
 Video and image widgets persist a public HTTPS source or an artifact filename in
-the chat transcript. Artifact-backed widgets participate in rename, package export,
+the chat transcript. File-backed widgets participate in rename, package export,
 and collision rewriting like other artifact references. Image widgets add an
 `image` execution effect and content item using the same tagged source encoding as
 video; existing records are unchanged and require no transform. Older builds cannot

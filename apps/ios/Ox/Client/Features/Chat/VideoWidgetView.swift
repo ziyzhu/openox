@@ -120,14 +120,14 @@ struct VideoWidgetView: View {
 
 private struct VideoWidgetAsset {
     let asset: AVURLAsset
-    let snapshot: ArtifactPreviewSnapshot?
+    let snapshot: FilePreviewSnapshot?
 
     static func asset(for source: VideoWidget.Source, scope: ProfileScope?, serviceManager: ServiceManager) async -> Self? {
         switch source {
         case let .artifact(artifact):
             guard artifact.isVideo else { return nil }
             do {
-                let snapshot = try await ArtifactPreviewSource(artifact: artifact, scope: scope).snapshot()
+                let snapshot = try await FilePreviewSource(artifact: artifact, scope: scope).snapshot()
                 return Self(asset: AVURLAsset(url: snapshot.url), snapshot: snapshot)
             } catch is CancellationError {
                 return nil

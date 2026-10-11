@@ -3,12 +3,12 @@ import QuickLook
 import SwiftUI
 import UIKit
 
-struct ArtifactZoomPreview: Identifiable, Hashable {
-    let artifact: Artifact
+struct FileZoomPreview: Identifiable, Hashable {
+    let artifact: FileItem
     let sourceID: String
     let scope: ProfileScope?
 
-    init(artifact: Artifact, sourceID: String, scope: ProfileScope? = StorageRoot.currentScope) {
+    init(artifact: FileItem, sourceID: String, scope: ProfileScope? = StorageRoot.currentScope) {
         self.artifact = artifact
         self.sourceID = sourceID
         self.scope = scope
@@ -25,19 +25,19 @@ struct ArtifactZoomPreview: Identifiable, Hashable {
     }
 }
 
-private struct ArtifactPreviewNamespaceKey: EnvironmentKey {
+private struct FilePreviewNamespaceKey: EnvironmentKey {
     static let defaultValue: Namespace.ID? = nil
 }
 
 extension EnvironmentValues {
     var artifactPreviewNamespace: Namespace.ID? {
-        get { self[ArtifactPreviewNamespaceKey.self] }
-        set { self[ArtifactPreviewNamespaceKey.self] = newValue }
+        get { self[FilePreviewNamespaceKey.self] }
+        set { self[FilePreviewNamespaceKey.self] = newValue }
     }
 }
 
-private struct ArtifactPreviewTransitionSource: ViewModifier {
-    let artifact: Artifact
+private struct FilePreviewTransitionSource: ViewModifier {
+    let artifact: FileItem
     let sourceID: String?
 
     @Environment(\.artifactPreviewNamespace) private var namespace
@@ -56,12 +56,12 @@ private struct ArtifactPreviewTransitionSource: ViewModifier {
 }
 
 extension View {
-    func artifactPreviewTransitionSource(_ artifact: Artifact, sourceID: String?) -> some View {
-        modifier(ArtifactPreviewTransitionSource(artifact: artifact, sourceID: sourceID))
+    func artifactPreviewTransitionSource(_ artifact: FileItem, sourceID: String?) -> some View {
+        modifier(FilePreviewTransitionSource(artifact: artifact, sourceID: sourceID))
     }
 }
 
-struct ArtifactScreen<Content: View>: View {
+struct FileScreen<Content: View>: View {
     let onDismiss: () -> Void
     let dismissIdentifier: String
     let content: (EdgeInsets) -> Content
@@ -104,11 +104,11 @@ struct ArtifactScreen<Content: View>: View {
     }
 }
 
-struct ArtifactNavigationPage: View {
-    let artifact: Artifact
+struct FileNavigationPage: View {
+    let artifact: FileItem
     let scope: ProfileScope?
 
-    init(artifact: Artifact, scope: ProfileScope? = StorageRoot.currentScope) {
+    init(artifact: FileItem, scope: ProfileScope? = StorageRoot.currentScope) {
         self.artifact = artifact
         self.scope = scope
     }
@@ -116,15 +116,15 @@ struct ArtifactNavigationPage: View {
     var body: some View {
         Group {
             if artifact.kind == .html {
-                HTMLArtifactScreen(artifact: artifact, scope: scope)
+                HTMLFileScreen(artifact: artifact, scope: scope)
             } else if artifact.isMarkdown {
-                MarkdownArtifactScreen(artifact: artifact, scope: scope)
+                MarkdownFileScreen(artifact: artifact, scope: scope)
             }
         }
     }
 }
 
-struct ArtifactZoomPreviewScreen: View {
+struct FileZoomPreviewScreen: View {
     enum Chrome {
         case immersive(onDismiss: () -> Void)
         case navigation
@@ -136,19 +136,19 @@ struct ArtifactZoomPreviewScreen: View {
         case unavailable
     }
 
-    let artifact: Artifact
+    let artifact: FileItem
     let chrome: Chrome
-    private let source: ArtifactPreviewSource
+    private let source: FilePreviewSource
     @State private var image: UIImage?
     @State private var pdfDocument: PDFDocument?
-    @State private var snapshot: ArtifactPreviewSnapshot?
+    @State private var snapshot: FilePreviewSnapshot?
     @State private var previewURL: URL?
     @State private var loadState = LoadState.loading
 
-    init(artifact: Artifact, chrome: Chrome, scope: ProfileScope? = StorageRoot.currentScope) {
+    init(artifact: FileItem, chrome: Chrome, scope: ProfileScope? = StorageRoot.currentScope) {
         self.artifact = artifact
         self.chrome = chrome
-        source = ArtifactPreviewSource(artifact: artifact, scope: scope)
+        source = FilePreviewSource(artifact: artifact, scope: scope)
     }
 
     @ViewBuilder
@@ -156,7 +156,7 @@ struct ArtifactZoomPreviewScreen: View {
         Group {
             switch chrome {
             case .immersive(let onDismiss):
-                ArtifactScreen(onDismiss: onDismiss, dismissIdentifier: A11yID.Artifacts.previewDismiss) { _ in
+                FileScreen(onDismiss: onDismiss, dismissIdentifier: A11yID.Files.previewDismiss) { _ in
                     preview
                 }
             case .navigation:
@@ -169,10 +169,10 @@ struct ArtifactZoomPreviewScreen: View {
             }
         }
         .onAppear {
-            Log.ui.info("ArtifactZoomPreviewScreen.load filename=\(artifact.fileName) kind=\(artifact.kind.rawValue)")
+            Log.ui.info("FileZoomPreviewScreen.load filename=\(artifact.fileName) kind=\(artifact.kind.rawValue)")
         }
         .task(id: artifact.fileURL) {
-            await loadArtifact()
+            await loadFile()
         }
         .quickLookPreview($previewURL)
     }
@@ -230,7 +230,7 @@ struct ArtifactZoomPreviewScreen: View {
         )
     }
 
-    private func loadArtifact() async {
+    private func loadFile() async {
         image = nil
         pdfDocument = nil
         snapshot = nil
@@ -262,9 +262,9 @@ struct ArtifactZoomPreviewScreen: View {
             return
         } catch {
             loadState = .unavailable
-            Log.ui.error("ArtifactZoomPreviewScreen.read file=\(artifact.fileName) error=\(error.localizedDescription)")
+            Log.ui.error("FileZoomPreviewScreen.read file=\(artifact.fileName) error=\(error.localizedDescription)")
         }
-        Log.ui.info("ArtifactZoomPreviewScreen.ready filename=\(artifact.fileName) kind=\(artifact.kind.rawValue) success=\(loadState == .ready) elapsed=\(ContinuousClock.now - started)")
+        Log.ui.info("FileZoomPreviewScreen.ready filename=\(artifact.fileName) kind=\(artifact.kind.rawValue) success=\(loadState == .ready) elapsed=\(ContinuousClock.now - started)")
     }
 }
 

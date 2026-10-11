@@ -3,7 +3,7 @@ import SwiftUI
 struct ShovelerView: View {
     let shoveler: Shoveler
     let accessibilityPrefix: String
-    let onOpenArtifact: (Artifact, String) -> Void
+    let onOpenFile: (FileItem, String) -> Void
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -12,7 +12,7 @@ struct ShovelerView: View {
                     ShovelerCardContainer(
                         card: card,
                         sourceID: "\(accessibilityPrefix).card.\(index):\(card.artifact?.id ?? "none")",
-                        onOpenArtifact: onOpenArtifact
+                        onOpenFile: onOpenFile
                     )
                         .accessibilityIdentifier("\(accessibilityPrefix).card.\(index)")
                 }
@@ -72,12 +72,12 @@ private struct ShovelerLayout: Layout {
 private struct ShovelerCardContainer: View {
     let card: ShovelerCard
     let sourceID: String
-    let onOpenArtifact: (Artifact, String) -> Void
+    let onOpenFile: (FileItem, String) -> Void
 
     @ViewBuilder
     var body: some View {
         if let artifact = card.artifact, artifact.exists {
-            Button { onOpenArtifact(artifact, sourceID) } label: {
+            Button { onOpenFile(artifact, sourceID) } label: {
                 ShovelerCardView(card: card)
                     .artifactPreviewTransitionSource(artifact, sourceID: sourceID)
             }

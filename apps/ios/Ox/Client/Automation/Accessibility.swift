@@ -43,7 +43,7 @@ nonisolated enum A11yID {
         static func favoriteRow(_ sessionId: String) -> String { "sidebar.favoriteRow.\(sessionId)" }
     }
 
-    enum Artifacts {
+    enum Files {
         static let ready = "artifacts.ready"
         static let transitioning = "artifacts.transitioning"
         static let search = "artifacts.search"
@@ -193,25 +193,25 @@ nonisolated enum A11yID {
         static let modelKeyWebsite = "chat.modelKeyWebsite"
         static let mentionLoading = "chat.mention.loading"
 
-        enum HTMLArtifact {
-            static let dismiss = "chat.htmlArtifact.dismiss"
+        enum HTMLFile {
+            static let dismiss = "chat.htmlFile.dismiss"
         }
 
-        enum MarkdownArtifact {
-            static let dismiss = "chat.markdownArtifact.dismiss"
-            static let edit = "chat.markdownArtifact.edit"
-            static let editor = "chat.markdownArtifact.editor"
-            static let save = "chat.markdownArtifact.save"
+        enum MarkdownFile {
+            static let dismiss = "chat.markdownFile.dismiss"
+            static let edit = "chat.markdownFile.edit"
+            static let editor = "chat.markdownFile.editor"
+            static let save = "chat.markdownFile.save"
         }
 
-        enum Artifact {
+        enum FileItem {
             static let open = "chat.artifact.open"
             static let list = "chat.artifact.list"
             static let done = "chat.artifact.done"
             static func item(_ filename: String) -> String { "conversation.artifact.item.\(filename)" }
         }
 
-        enum ArtifactPicker {
+        enum FilePicker {
             static let list = "chat.artifactPicker.list"
             static let search = "chat.artifactPicker.search"
             static let attach = "chat.artifactPicker.attach"
@@ -346,7 +346,7 @@ enum A11yLabel {
     static var scrollToBottom: String { L10n.string("Scroll to bottom", comment: "") }
     static var copyMessage: String { L10n.string("Copy message", comment: "") }
     static var shareMessage: String { L10n.string("Share message", comment: "") }
-    static var shareArtifact: String { L10n.string("Share file", comment: "") }
+    static var shareFile: String { L10n.string("Share file", comment: "") }
     static var copyCode: String { L10n.string("Copy code", comment: "") }
     static var branchMessage: String { L10n.string("Branch from this reply", comment: "") }
     static var retryMessage: String { L10n.string("Regenerate reply", comment: "") }

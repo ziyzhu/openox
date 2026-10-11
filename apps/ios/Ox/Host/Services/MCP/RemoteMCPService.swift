@@ -40,7 +40,7 @@ nonisolated struct RemoteMCPTool: Sendable {
     let outputSchema: JSONValue?
 }
 
-nonisolated struct RemoteMCPArtifact: Sendable {
+nonisolated struct RemoteMCPFile: Sendable {
     let data: Data
     let suggestedFilename: String
     let mimeType: String
@@ -48,7 +48,7 @@ nonisolated struct RemoteMCPArtifact: Sendable {
 
 nonisolated struct RemoteMCPToolResult: Sendable {
     let value: JSONValue
-    let artifacts: [RemoteMCPArtifact]
+    let artifacts: [RemoteMCPFile]
 }
 
 nonisolated enum RemoteMCPError: LocalizedError, Sendable {
@@ -641,22 +641,22 @@ actor RemoteMCPClient {
         value?.arrayValue?.compactMap { $0.objectValue?["text"]?.stringValue }.joined(separator: "\n")
     }
 
-    private struct ArtifactContent {
+    private struct FileContent {
         let data: Data
         let filename: String?
         let mimeType: String
     }
 
-    private static func artifacts(_ content: JSONValue?, value: JSONValue) throws -> [RemoteMCPArtifact] {
+    private static func artifacts(_ content: JSONValue?, value: JSONValue) throws -> [RemoteMCPFile] {
         let decoded = try content?.arrayValue?.compactMap(artifactContent) ?? []
         let structuredFilename = decoded.count == 1 ? resultFilename(value) : nil
         return decoded.enumerated().map { index, artifact in
             let filename = artifact.filename ?? structuredFilename ?? fallbackFilename(mimeType: artifact.mimeType, index: index, count: decoded.count)
-            return RemoteMCPArtifact(data: artifact.data, suggestedFilename: filename, mimeType: artifact.mimeType)
+            return RemoteMCPFile(data: artifact.data, suggestedFilename: filename, mimeType: artifact.mimeType)
         }
     }
 
-    private static func artifactContent(_ value: JSONValue) throws -> ArtifactContent? {
+    private static func artifactContent(_ value: JSONValue) throws -> FileContent? {
         guard let fields = value.objectValue, let type = fields["type"]?.stringValue else { return nil }
         if type == "image" {
             guard let encoded = fields["data"]?.stringValue,
@@ -665,7 +665,7 @@ actor RemoteMCPClient {
                   mimeType.lowercased().hasPrefix("image/") else {
                 throw RemoteMCPError.protocolError("tool returned invalid image content")
             }
-            return ArtifactContent(data: data, filename: nil, mimeType: mimeType)
+            return FileContent(data: data, filename: nil, mimeType: mimeType)
         }
         guard type == "resource", let resource = fields["resource"]?.objectValue else { return nil }
         let text = resource["text"]?.stringValue
@@ -685,7 +685,7 @@ actor RemoteMCPClient {
         let filename = resource["uri"]?.stringValue.flatMap {
             URL(string: $0)?.lastPathComponent.removingPercentEncoding
         }
-        return ArtifactContent(data: data, filename: filename?.isEmpty == false ? filename : nil, mimeType: mimeType)
+        return FileContent(data: data, filename: filename?.isEmpty == false ? filename : nil, mimeType: mimeType)
     }
 
     private static func resultFilename(_ value: JSONValue) -> String? {
@@ -694,7 +694,7 @@ actor RemoteMCPClient {
     }
 
     private static func fallbackFilename(mimeType: String, index: Int, count: Int) -> String {
-        let stem = count == 1 ? "Artifact" : "Artifact \(index + 1)"
+        let stem = count == 1 ? "FileItem" : "FileItem \(index + 1)"
         guard let suffix = UTType(mimeType: mimeType)?.preferredFilenameExtension else { return "\(stem).bin" }
         return "\(stem).\(suffix)"
     }
@@ -1159,7 +1159,7 @@ final class RemoteMCPService {
         actionID: String,
         args: JSONValue,
         approve: @MainActor (_ action: String, _ args: Any?) async -> Bool,
-        receiveArtifacts: @MainActor ([RemoteMCPArtifact]) async throws -> Void = { _ in }
+        receiveFiles: @MainActor ([RemoteMCPFile]) async throws -> Void = { _ in }
     ) async -> Result<JSONValue, Error> {
         let name = "\(service.domain):\(actionID)"
         guard let action = service.definition.action(actionID),
@@ -1181,7 +1181,7 @@ final class RemoteMCPService {
             let result = try await client.callTool(name: actionID, arguments: args)
             let outputViolations = JSONSchemaValidator.validate(result.value, against: outputSchema, definitions: [:])
             guard outputViolations.isEmpty else { return .failure(Service.InvokeError.invalidOutput(name, outputViolations)) }
-            try await receiveArtifacts(result.artifacts)
+            try await receiveFiles(result.artifacts)
             service.setAuth(.authorized)
             Log.service.info("RemoteMCP.invoke completed name=\(name) artifacts=\(result.artifacts.count)")
             return .success(result.value)
@@ -1196,7 +1196,7 @@ final class RemoteMCPService {
                 let result = try await client.callTool(name: actionID, arguments: args)
                 let outputViolations = JSONSchemaValidator.validate(result.value, against: outputSchema, definitions: [:])
                 guard outputViolations.isEmpty else { return .failure(Service.InvokeError.invalidOutput(name, outputViolations)) }
-                try await receiveArtifacts(result.artifacts)
+                try await receiveFiles(result.artifacts)
                 service.setAuth(.authorized)
                 Log.service.info("RemoteMCP.invoke completed-after-refresh name=\(name) artifacts=\(result.artifacts.count)")
                 return .success(result.value)

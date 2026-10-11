@@ -418,30 +418,30 @@ nonisolated struct StreamAssembler {
 // attachments inlined as fenced code blocks) plus loaded binary attachments.
 nonisolated struct UserMessageParts {
     let text: String
-    let media: [(attachment: Artifact, data: Data)]
+    let media: [(attachment: FileItem, data: Data)]
 
     init(_ u: UserMessage, label: String) {
         var textParts: [String] = []
         if let transientContext = u.transientContext, !transientContext.isEmpty {
             textParts.append(transientContext)
         }
-        var media: [(Artifact, Data)] = []
+        var media: [(FileItem, Data)] = []
         for block in u.content {
             switch block {
             case .text(let t):
                 if !t.text.isEmpty { textParts.append(t.text) }
             case .attachment(let a):
-                textParts.append(ArtifactPromptReference.text(for: a))
+                textParts.append(FilePromptReference.text(for: a))
                 switch a.kind {
                 case .text, .html:
-                    if let data = try? ProviderArtifactInputs.read(a), let raw = String(data: data, encoding: .utf8) {
+                    if let data = try? ProviderFileInputs.read(a), let raw = String(data: data, encoding: .utf8) {
                         let lang = Self.languageHint(for: a.fileURL.pathExtension)
                         textParts.append("```\(lang) filename=\(a.displayName)\n\(raw)\n```")
                     } else {
                         Log.network.error("\(label): failed to read text attachment \(a.fileURL.lastPathComponent)")
                     }
                 case .image, .pdf:
-                    if let data = try? ProviderArtifactInputs.read(a) {
+                    if let data = try? ProviderFileInputs.read(a) {
                         media.append((a, data))
                     } else {
                         Log.network.error("\(label): failed to read \(a.kind.rawValue) attachment \(a.fileURL.lastPathComponent)")
@@ -513,7 +513,7 @@ nonisolated struct ToolResultParts {
     init(_ result: ToolResultMessage, label: String) {
         let artifactReferences = result.content.compactMap { block -> String? in
             guard case .attachment(let artifact) = block else { return nil }
-            return ArtifactPromptReference.text(for: artifact)
+            return FilePromptReference.text(for: artifact)
         }
         let sourceText = [result.content.concatenatedText, artifactReferences.joined(separator: "\n\n")]
             .filter { !$0.isEmpty }
@@ -526,7 +526,7 @@ nonisolated struct ToolResultParts {
                   !media.contains(where: {
                       $0.displayName.caseInsensitiveCompare(attachment.fileName) == .orderedSame
                   }) else { return }
-            guard let data = try? ProviderArtifactInputs.read(attachment) else {
+            guard let data = try? ProviderFileInputs.read(attachment) else {
                 Log.network.error("\(label): failed to read \(attachment.kind.rawValue) tool result \(attachment.fileURL.lastPathComponent)")
                 return
             }
@@ -572,7 +572,7 @@ nonisolated extension Array where Element == ContentBlock {
 nonisolated func requiredInputModalities(in messages: [Message]) -> Set<ProviderModelModality> {
     var modalities: Set<ProviderModelModality> = [.text]
 
-    func include(_ artifact: Artifact) {
+    func include(_ artifact: FileItem) {
         switch artifact.kind {
         case .image: modalities.insert(.image)
         case .pdf: modalities.insert(.pdf)

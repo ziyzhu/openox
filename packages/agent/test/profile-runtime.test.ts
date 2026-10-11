@@ -397,7 +397,7 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(await adapter.command({ action: "composePrompt", promptState: config.promptState })).toEqual(prompt);
     const turnState = { skills: [{ name: "example", description: "Example skill" }], skillConflicts: [],
       attachedServices: [{ domain: "ios:files", signIn: "authorized" as const, fileMounts: ["files/a"] }],
-      artifactPaths: ["artifacts/note.md"], storageMode: "temporary" as const, responseLanguage: { identifier: "zh-Hans", name: "Chinese (Simplified)" }, hostContext };
+      filePaths: ["artifacts/note.md"], storageMode: "temporary" as const, responseLanguage: { identifier: "zh-Hans", name: "Chinese (Simplified)" }, hostContext };
     const foreignScope = { ...scope, hostID: "another-host" };
     await expect(adapter.command({ action: "run", reference: attached.reference, content: "wrong owner", turnState: { ...turnState,
       hostContext: { active: foreignScope, hosts: [{ ...hostContext.hosts[0]!, ...foreignScope }] } } })).rejects.toThrow("attached host/Profile scope");
@@ -419,7 +419,7 @@ test("bounded iOS commands route qualified references and execute structured pro
     await adapter.command({ action: "fileWrite", path: "MEMORY.md", text: "new live memory" });
     await adapter.command({ action: "attach", config: updated, reference: attached.reference });
     await adapter.command({ action: "run", reference: attached.reference, content: "second",
-      turnState: { ...turnState, skills: [], attachedServices: [], artifactPaths: [], storageMode: "persisted", responseLanguage: null } });
+      turnState: { ...turnState, skills: [], attachedServices: [], filePaths: [], storageMode: "persisted", responseLanguage: null } });
     expect(modelRequests[1]!.systemPrompt).toContain("Be direct.");
     expect(modelRequests[1]!.systemPrompt).not.toContain("Be helpful.");
     expect(modelRequests[1]!.systemPrompt).toContain("frozen memory");

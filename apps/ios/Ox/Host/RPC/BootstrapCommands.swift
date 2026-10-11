@@ -42,8 +42,8 @@ extension OxHostProtocol {
     }
 
     @MainActor
-    static func handleBootstrapArtifacts(
-        _ command: BootstrapArtifactsRequest,
+    static func handleBootstrapFiles(
+        _ command: BootstrapFilesRequest,
         reply: OxHostRPC.Reply
     ) {
         guard !command.artifacts.isEmpty else {
@@ -55,18 +55,18 @@ extension OxHostProtocol {
             return
         }
         Task { @MainActor in
-            var installed: [Artifact] = []
-            var created: [Artifact] = []
+            var installed: [FileItem] = []
+            var created: [FileItem] = []
             do {
                 for artifact in command.artifacts {
                     let existing = try await ProfileRepository.shared.artifacts(in: scope)
-                    let imported = try await ArtifactImporter.importDataAsync(
+                    let imported = try await FileImporter.importDataAsync(
                         artifact.data,
                         suggestedName: artifact.name,
                         in: scope
                     )
-                    if let duplicate = existing.first(where: { sameBootstrapArtifact($0, imported) }) {
-                        _ = try await ProfileRepository.shared.deleteArtifact(named: imported.fileName, in: scope)
+                    if let duplicate = existing.first(where: { sameBootstrapFile($0, imported) }) {
+                        _ = try await ProfileRepository.shared.deleteFile(named: imported.fileName, in: scope)
                         installed.append(duplicate)
                     } else {
                         installed.append(imported)
@@ -75,10 +75,10 @@ extension OxHostProtocol {
                 }
                 let names = installed.map(\.fileName)
                 Log.app.info("OxHostRPC.debug.artifacts.bootstrap count=\(names.count) files=\(names.joined(separator: ","))")
-                reply.success(BootstrapArtifactsResult(artifacts: names))
+                reply.success(BootstrapFilesResult(artifacts: names))
             } catch {
                 for artifact in created.reversed() {
-                    _ = try? await ProfileRepository.shared.deleteArtifact(named: artifact.fileName, in: scope)
+                    _ = try? await ProfileRepository.shared.deleteFile(named: artifact.fileName, in: scope)
                 }
                 Log.app.error("OxHostRPC.debug.artifacts.bootstrap imported=\(created.count) failed=\(error.localizedDescription)")
                 reply.failure(error.localizedDescription)
@@ -87,8 +87,8 @@ extension OxHostProtocol {
     }
 
     @MainActor
-    static func handleWriteArtifact(
-        _ command: WriteArtifactRequest,
+    static func handleWriteFile(
+        _ command: WriteFileRequest,
         reply: OxHostRPC.Reply
     ) {
         guard let scope = StorageRoot.currentScope else {
@@ -97,7 +97,7 @@ extension OxHostProtocol {
         }
         Task { @MainActor in
             do {
-                let artifact = try await ProfileRepository.shared.writeArtifact(
+                let artifact = try await ProfileRepository.shared.writeFile(
                     data: command.data,
                     named: command.name,
                     in: scope
@@ -156,15 +156,15 @@ extension OxHostProtocol {
         }
     }
 
-    static func sameBootstrapArtifact(_ existing: Artifact, _ imported: Artifact) -> Bool {
-        guard bootstrapArtifactFamily(existing.fileName) == bootstrapArtifactFamily(imported.fileName),
+    static func sameBootstrapFile(_ existing: FileItem, _ imported: FileItem) -> Bool {
+        guard bootstrapFileFamily(existing.fileName) == bootstrapFileFamily(imported.fileName),
               existing.size == imported.size,
               let existingData = try? Data(contentsOf: existing.fileURL),
               let importedData = try? Data(contentsOf: imported.fileURL) else { return false }
         return existingData == importedData
     }
 
-    static func bootstrapArtifactFamily(_ fileName: String) -> String {
+    static func bootstrapFileFamily(_ fileName: String) -> String {
         let url = URL(fileURLWithPath: fileName)
         var stem = url.deletingPathExtension().lastPathComponent
         if let space = stem.lastIndex(of: " "), Int(stem[stem.index(after: space)...]) != nil {

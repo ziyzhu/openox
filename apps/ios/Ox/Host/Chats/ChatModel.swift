@@ -24,7 +24,7 @@ nonisolated enum Turn: Equatable, Identifiable, Sendable {
 
 nonisolated struct UserTurn: Codable, Equatable, Sendable {
     var intent: String
-    var attachments: [Artifact]
+    var attachments: [FileItem]
     var at: Date
     var submissionID: SubmissionID? = nil
     var skillInvocation: UserSkillInvocation? = nil
@@ -164,9 +164,9 @@ nonisolated enum ExecutionEffect: Equatable, Sendable {
     case shoveler(Shoveler)
     case video(VideoWidget)
     case image(ImageWidget)
-    case artifact(Artifact)
+    case artifact(FileItem)
     case skill(Skill)
-    case media(Artifact)
+    case media(FileItem)
 }
 
 nonisolated struct AgentPrompt: Codable, Equatable, Sendable {
@@ -429,15 +429,15 @@ nonisolated extension ChatFormat {
 }
 
 nonisolated extension Turn {
-    func replacingArtifact(named oldName: String, with newName: String, directory: URL) -> Turn {
-        mappingArtifacts { artifact in
+    func replacingFile(named oldName: String, with newName: String, directory: URL) -> Turn {
+        mappingFiles { artifact in
             artifact.fileName.caseInsensitiveCompare(oldName) == .orderedSame
-                ? Artifact(fileName: newName, directory: directory)
+                ? FileItem(fileName: newName, directory: directory)
                 : artifact
         }
     }
 
-    func mappingArtifacts(_ replace: (Artifact) -> Artifact) -> Turn {
+    func mappingFiles(_ replace: (FileItem) -> FileItem) -> Turn {
         func replaceContent(_ content: [ContentBlock]) -> [ContentBlock] {
             content.map { block in
                 guard case .attachment(let artifact) = block else { return block }
@@ -579,9 +579,9 @@ nonisolated extension ExecutionEffect: Codable {
         case "shoveler": self = .shoveler(try c.decode(Shoveler.self, forKey: .shoveler))
         case "video": self = .video(try c.decode(VideoWidget.self, forKey: .video))
         case "image": self = .image(try c.decode(ImageWidget.self, forKey: .image))
-        case "artifact": self = .artifact(try c.decode(Artifact.self, forKey: .artifact))
+        case "artifact": self = .artifact(try c.decode(FileItem.self, forKey: .artifact))
         case "skill": self = .skill(try c.decode(Skill.self, forKey: .skill))
-        case "media": self = .media(try c.decode(Artifact.self, forKey: .media))
+        case "media": self = .media(try c.decode(FileItem.self, forKey: .media))
         case let other:
             throw DecodingError.dataCorruptedError(forKey: .type, in: c, debugDescription: "Unknown execution effect type '\(other)'")
         }

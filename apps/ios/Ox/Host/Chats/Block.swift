@@ -6,9 +6,9 @@ nonisolated struct Block: Identifiable, Equatable, Codable {
     var kind: Kind
 
     enum Kind: Equatable, Codable {
-        case userText(String, attachments: [Artifact] = [])
+        case userText(String, attachments: [FileItem] = [])
 
-        case userSkill(UserSkillInvocation, attachments: [Artifact] = [])
+        case userSkill(UserSkillInvocation, attachments: [FileItem] = [])
 
         case agentContent([ContentItem])
 
@@ -59,7 +59,7 @@ nonisolated enum ContentItem: Equatable, Codable {
     case shoveler(Shoveler)
     case video(VideoWidget)
     case image(ImageWidget)
-    case artifact(Artifact)
+    case artifact(FileItem)
     case skill(Skill)
 
     private enum CodingKeys: String, CodingKey { case text, progress, serviceControl, serviceInspector, shoveler, video, image, artifact, skill }
@@ -73,7 +73,7 @@ nonisolated enum ContentItem: Equatable, Codable {
         } else if c.contains(.skill) {
             self = .skill(try c.decode(Skill.self, forKey: .skill))
         } else if c.contains(.artifact) {
-            self = .artifact(try c.decode(Artifact.self, forKey: .artifact))
+            self = .artifact(try c.decode(FileItem.self, forKey: .artifact))
         } else if c.contains(.shoveler) {
             self = .shoveler(try c.decode(Shoveler.self, forKey: .shoveler))
         } else if c.contains(.video) {
@@ -239,12 +239,12 @@ nonisolated extension Block.Kind {
         case "userText":
             self = .userText(
                 try c.decode(String.self, forKey: .text),
-                attachments: try c.decode([Artifact].self, forKey: .attachments)
+                attachments: try c.decode([FileItem].self, forKey: .attachments)
             )
         case "userSkill":
             self = .userSkill(
                 try c.decode(UserSkillInvocation.self, forKey: .skillInvocation),
-                attachments: try c.decode([Artifact].self, forKey: .attachments)
+                attachments: try c.decode([FileItem].self, forKey: .attachments)
             )
         case "agentContent":
             self = .agentContent(try c.decode([ContentItem].self, forKey: .items))

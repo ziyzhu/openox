@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated enum ChatDocumentEvent {
-    case appendUser(intent: String, attachments: [Artifact], skillInvocation: UserSkillInvocation? = nil, at: Date, submissionID: SubmissionID? = nil, id: TurnID = TurnID())
+    case appendUser(intent: String, attachments: [FileItem], skillInvocation: UserSkillInvocation? = nil, at: Date, submissionID: SubmissionID? = nil, id: TurnID = TurnID())
     case beginAgentTurn(at: Date, id: TurnID = TurnID())
     case resumeAgentTurn(id: TurnID)
     case beginGeneration(model: String, at: Date, id: AgentGenerationID = AgentGenerationID())
@@ -18,9 +18,9 @@ nonisolated enum ChatDocumentEvent {
     case embedShoveler(Shoveler)
     case embedVideo(VideoWidget)
     case embedImage(ImageWidget)
-    case embedArtifact(Artifact)
+    case embedFile(FileItem)
     case embedSkill(Skill)
-    case attachMedia(Artifact)
+    case attachMedia(FileItem)
     case appendInvocation(Invocation)
     case recordInvocation(Invocation)
     case setInvocationTrace(InvocationTrace)
@@ -86,7 +86,7 @@ nonisolated struct ChatDocument {
                                 case let .shoveler(shoveler): state.apply(.embedShoveler(shoveler))
                                 case let .video(video): state.apply(.embedVideo(video))
                                 case let .image(image): state.apply(.embedImage(image))
-                                case let .artifact(artifact): state.apply(.embedArtifact(artifact))
+                                case let .artifact(artifact): state.apply(.embedFile(artifact))
                                 case let .skill(skill): state.apply(.embedSkill(skill))
                                 case let .media(artifact): state.apply(.attachMedia(artifact))
                                 }
@@ -215,9 +215,9 @@ nonisolated struct ChatDocument {
         return (range, blocks)
     }
 
-    var referencedArtifacts: [Artifact] {
+    var referencedFiles: [FileItem] {
         var seen = Set<String>()
-        var result: [Artifact] = []
+        var result: [FileItem] = []
         for block in projection.reversed() {
             for artifact in Self.artifacts(in: block) where artifact.exists {
                 if seen.insert(artifact.fileName.lowercased()).inserted {
@@ -228,23 +228,23 @@ nonisolated struct ChatDocument {
         return result
     }
 
-    mutating func renameArtifactReferences(from oldName: String, to newName: String, directory: URL) {
-        let updated = turns.map { $0.replacingArtifact(named: oldName, with: newName, directory: directory) }
+    mutating func renameFileReferences(from oldName: String, to newName: String, directory: URL) {
+        let updated = turns.map { $0.replacingFile(named: oldName, with: newName, directory: directory) }
         guard updated != turns else { return }
         turns = updated
         reproject()
     }
 
-    mutating func refreshArtifacts(_ files: [String: Artifact]) {
+    mutating func refreshFiles(_ files: [String: FileItem]) {
         let updated = turns.map { turn in
-            turn.mappingArtifacts { files[$0.fileName] ?? files[$0.fileName.lowercased()] ?? $0.updatingAvailability(.unavailable) }
+            turn.mappingFiles { files[$0.fileName] ?? files[$0.fileName.lowercased()] ?? $0.updatingAvailability(.unavailable) }
         }
         guard updated != turns else { return }
         turns = updated
         reproject()
     }
 
-    private static func artifacts(in block: Block) -> [Artifact] {
+    private static func artifacts(in block: Block) -> [FileItem] {
         switch block.kind {
         case .userText(_, let attachments), .userSkill(_, let attachments):
             attachments
@@ -321,8 +321,8 @@ nonisolated struct ChatDocument {
         case let .embedImage(image):
             mutateExecution { $0.effects.append(.image(image)) }
             reconcileTail()
-        case let .embedArtifact(artifact):
-            embedArtifact(artifact)
+        case let .embedFile(artifact):
+            embedFile(artifact)
             reconcileTail()
         case let .embedSkill(skill):
             embedSkill(skill)
@@ -398,7 +398,7 @@ nonisolated struct ChatDocument {
 
     private mutating func appendUser(
         intent: String,
-        attachments: [Artifact],
+        attachments: [FileItem],
         skillInvocation: UserSkillInvocation?,
         at: Date,
         submissionID: SubmissionID?,
@@ -645,7 +645,7 @@ nonisolated struct ChatDocument {
         mutateExecution { $0.effects.append(.video(video)) }
     }
 
-    private mutating func embedArtifact(_ artifact: Artifact) {
+    private mutating func embedFile(_ artifact: FileItem) {
         upsertExecutionEffect(.artifact(artifact)) { effect in
             guard case let .artifact(existing) = effect else { return false }
             return existing.fileName.caseInsensitiveCompare(artifact.fileName) == .orderedSame
@@ -672,7 +672,7 @@ nonisolated struct ChatDocument {
         }
     }
 
-    private mutating func attachMedia(_ artifact: Artifact) {
+    private mutating func attachMedia(_ artifact: FileItem) {
         mutateExecution { $0.effects.append(.media(artifact)) }
     }
 
@@ -899,7 +899,7 @@ nonisolated struct ChatDocument {
             for effect in execution.effects.dropFirst(start) {
                 switch effect {
                 case let .artifact(artifact):
-                    guard invocation.name == Actions.artifactPresent,
+                    guard invocation.name == "ox.artifact.present",
                           let filename,
                           artifact.fileName.caseInsensitiveCompare(filename) == .orderedSame else { continue }
                     let completed: Bool

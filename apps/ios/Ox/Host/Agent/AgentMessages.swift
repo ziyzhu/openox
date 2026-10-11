@@ -47,7 +47,7 @@ nonisolated public struct TransientAttachment: Sendable, Equatable {
 
 nonisolated public enum ContentBlock: Equatable, Sendable, Codable {
     case text(TextContent)
-    case attachment(Artifact)
+    case attachment(FileItem)
     case thinking(ThinkingContent)
     case toolCall(ToolCall)
 
@@ -57,7 +57,7 @@ nonisolated public enum ContentBlock: Equatable, Sendable, Codable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         switch try c.decode(String.self, forKey: .type) {
         case "text": self = .text(try c.decode(TextContent.self, forKey: .text))
-        case "attachment": self = .attachment(try c.decode(Artifact.self, forKey: .attachment))
+        case "attachment": self = .attachment(try c.decode(FileItem.self, forKey: .attachment))
         case "thinking":
             if let value = try? c.decode(ThinkingContent.self, forKey: .thinking) {
                 self = .thinking(value)
@@ -122,7 +122,7 @@ nonisolated public struct UserMessage: Sendable, Codable {
     public var transientContext: String?
     public init(
         text: String,
-        attachments: [Artifact] = [],
+        attachments: [FileItem] = [],
         transientContext: String? = nil,
         timestamp: Date = Date()
     ) {

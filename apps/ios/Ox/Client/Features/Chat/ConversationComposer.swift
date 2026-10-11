@@ -214,7 +214,7 @@ struct ConversationComposer: View, Equatable {
     @Binding var editDraft: AttributedString
     let speech: ConversationSpeechInput
     let attachedServices: [Service]
-    let chatArtifacts: [Artifact]
+    let chatFiles: [FileItem]
     let fieldFocused: FocusState<Bool>.Binding
     let isFieldFocused: Bool
     let sessionID: UUID
@@ -226,8 +226,8 @@ struct ConversationComposer: View, Equatable {
     let isEmbedded: Bool
     let iconButtonSize: CGFloat
     let composerButtonSize: CGFloat
-    let onOpenAttachment: (Artifact, String) -> Void
-    let onOpenChatArtifact: (Artifact) -> Void
+    let onOpenAttachment: (FileItem, String) -> Void
+    let onOpenChatFile: (FileItem) -> Void
     let onPasteImages: ([PastedComposerImage]) -> Void
     let onOpenService: (Service) -> Void
     let onRemoveService: (Service) -> Void
@@ -265,7 +265,7 @@ struct ConversationComposer: View, Equatable {
             && lhs.isEditingMessage == rhs.isEditingMessage
             && lhs.editDraft == rhs.editDraft
             && lhs.attachedServices.map(\.domain) == rhs.attachedServices.map(\.domain)
-            && lhs.chatArtifacts == rhs.chatArtifacts
+            && lhs.chatFiles == rhs.chatFiles
             && lhs.isFieldFocused == rhs.isFieldFocused
             && lhs.sessionID == rhs.sessionID
             && lhs.isChatEmpty == rhs.isChatEmpty
@@ -519,7 +519,7 @@ struct ConversationComposer: View, Equatable {
     }
 
     private var showsTopStrip: Bool {
-        isEditingMessage || !chatArtifacts.isEmpty || !attachedServices.isEmpty
+        isEditingMessage || !chatFiles.isEmpty || !attachedServices.isEmpty
     }
 
     private var showsFollowIntents: Bool {
@@ -537,7 +537,7 @@ struct ConversationComposer: View, Equatable {
             && isChatEmpty
             && !isBusy
             && attachedServices.isEmpty
-            && chatArtifacts.isEmpty
+            && chatFiles.isEmpty
     }
 
     private var importMemoryOpportunity: ImportMemoryOpportunity {
@@ -622,29 +622,29 @@ struct ConversationComposer: View, Equatable {
     }
 
     private var artifactAccessibilityLabel: String {
-        String(localized: "\(chatArtifacts.count) files")
+        String(localized: "\(chatFiles.count) files")
     }
 
     private var artifactButton: some View {
         Menu {
-            ForEach(chatArtifacts) { artifact in
+            ForEach(chatFiles) { artifact in
                 Button {
                     Haptics.impact(.artifactTabSelected)
                     Log.ui.info("ConversationComposer.artifactSelect conversation=\(sessionID) filename=\(artifact.fileName)")
-                    onOpenChatArtifact(artifact)
+                    onOpenChatFile(artifact)
                 } label: {
                     Label(
                         artifact.userFacingName,
                         systemImage: artifactSystemImage(artifact)
                     )
                 }
-                .accessibilityIdentifier(A11yID.Chat.Artifact.item(artifact.id))
+                .accessibilityIdentifier(A11yID.Chat.FileItem.item(artifact.id))
             }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: OxActionIconKind.artifacts.systemImage)
                 Text("Files")
-                Text(verbatim: "· \(chatArtifacts.count)")
+                Text(verbatim: "· \(chatFiles.count)")
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
             .font(Theme.Fonts.labelMd)
@@ -657,10 +657,10 @@ struct ConversationComposer: View, Equatable {
         .glassEffect(.regular.interactive(), in: Capsule())
         .minimumTouchTarget()
         .accessibilityLabel(Text(verbatim: artifactAccessibilityLabel))
-        .accessibilityIdentifier(A11yID.Chat.Artifact.open)
+        .accessibilityIdentifier(A11yID.Chat.FileItem.open)
     }
 
-    private func artifactSystemImage(_ artifact: Artifact) -> String {
+    private func artifactSystemImage(_ artifact: FileItem) -> String {
         switch artifact.kind {
         case .image: "photo"
         case .pdf: "doc.richtext"
@@ -674,7 +674,7 @@ struct ConversationComposer: View, Equatable {
         ScrollView(.horizontal, showsIndicators: false) {
             GlassEffectContainer(spacing: Theme.Spacing.sm) {
                 HStack(spacing: Theme.Spacing.sm) {
-                    if !chatArtifacts.isEmpty {
+                    if !chatFiles.isEmpty {
                         artifactButton
                     }
                     ForEach(attachedServices) { attachedServicePill($0) }
@@ -1052,7 +1052,7 @@ struct ConversationComposer: View, Equatable {
 }
 
 private struct DraftAttachmentChip: View {
-    let attachment: Artifact
+    let attachment: FileItem
     let sourceID: String
     let onOpen: () -> Void
     let onRemove: () -> Void
@@ -1065,7 +1065,7 @@ private struct DraftAttachmentChip: View {
             onOpen: onOpen,
             onRemove: onRemove
         ) {
-            ArtifactThumbnail(
+            FileThumbnail(
                 attachment: attachment,
                 style: .composer,
                 previewSourceID: sourceID
@@ -1078,7 +1078,7 @@ private struct PendingAttachmentChip: View {
     let pending: ConversationComposerModel.PendingAttachment
     let onRemove: () -> Void
 
-    private var userFacingName: String { Artifact.userFacingName(forFileName: pending.displayName) }
+    private var userFacingName: String { FileItem.userFacingName(forFileName: pending.displayName) }
 
     var body: some View {
         ComposerAttachmentChip(

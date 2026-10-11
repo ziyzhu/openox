@@ -97,15 +97,15 @@ nonisolated enum ChatProjection {
     }
 
     nonisolated private static func wireAction(_ step: Step, callId: String, at: Date) -> (ToolCall, ToolResultMessage) {
-        func result(_ name: String, _ text: String, artifacts: [Artifact] = [], isError: Bool) -> ToolResultMessage {
+        func result(_ name: String, _ text: String, artifacts: [FileItem] = [], isError: Bool) -> ToolResultMessage {
             ToolResultMessage(toolCallId: callId, toolName: name,
                               content: [.text(TextContent(text))] + artifacts.map(ContentBlock.attachment), isError: isError, timestamp: at)
         }
         switch step.kind {
         case let .execute(exec):
             let call = ToolCall(id: callId, name: "execute", arguments: .object(["source": .string(exec.source)]))
-            let artifacts = exec.effects.reduce(into: [Artifact]()) { artifacts, effect in
-                let artifact: Artifact?
+            let artifacts = exec.effects.reduce(into: [FileItem]()) { artifacts, effect in
+                let artifact: FileItem?
                 switch effect {
                 case let .artifact(value), let .media(value): artifact = value
                 case .invocation, .progress, .serviceControl, .serviceInspector, .shoveler, .video, .image, .skill: artifact = nil

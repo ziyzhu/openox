@@ -65,8 +65,8 @@ extension Conversation {
         let request = try WebFetchRequest(url: url)
         return try await tracked(Actions.webFetch, .object(["url": .string(request.url.absoluteString)]), purpose: purpose) {
             let (_, response) = try await fetchWebResource(request)
-            let readOptions = ArtifactLibrary.readOptions(from: options)
-            let read: ArtifactLibrary.Read?
+            let readOptions = FileLibrary.readOptions(from: options)
+            let read: FileLibrary.Read?
             switch response.kind {
             case .text, .html, .pdf:
                 if response.kind == .html {
@@ -77,14 +77,14 @@ extension Conversation {
                     let markdown = try await Defuddle.markdown(html: html, baseURL: response.url)
                     let elapsed = Int(Date().timeIntervalSince(started) * 1_000)
                     Log.webFetch.info("native extraction result url=\(LogPrivacy.url(response.url.absoluteString)) htmlChars=\(html.count) markdownChars=\(markdown.count) ms=\(elapsed)")
-                    read = try ArtifactLibrary.read(
+                    read = try FileLibrary.read(
                         data: Data(markdown.utf8),
                         kind: .text,
                         options: readOptions
                     )
                 } else {
                     read = try await Task.detached(priority: .userInitiated) {
-                        try ArtifactLibrary.read(data: response.data, kind: response.kind, options: readOptions)
+                        try FileLibrary.read(data: response.data, kind: response.kind, options: readOptions)
                     }.value
                 }
             case .image, .file:
@@ -119,7 +119,7 @@ extension Conversation {
 
     private func webFetchJSON(
         _ response: WebFetchResponse,
-        read: ArtifactLibrary.Read?
+        read: FileLibrary.Read?
     ) -> JSONValue {
         var fields = response.json().objectValue ?? [:]
         fields["kind"] = .string(response.kind.rawValue)

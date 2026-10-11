@@ -351,7 +351,7 @@
       },
       "additionalProperties": true
     },
-    "BootstrapArtifactInput": {
+    "BootstrapFileInput": {
       "type": "object",
       "required": [
         "name",
@@ -368,7 +368,7 @@
       },
       "additionalProperties": true
     },
-    "BootstrapArtifactsRequest": {
+    "BootstrapFilesRequest": {
       "type": "object",
       "required": [
         "artifacts"
@@ -377,13 +377,13 @@
         "artifacts": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/BootstrapArtifactInput"
+            "$ref": "#/definitions/BootstrapFileInput"
           }
         }
       },
       "additionalProperties": true
     },
-    "WriteArtifactRequest": {
+    "WriteFileRequest": {
       "type": "object",
       "required": [
         "name",
@@ -1250,7 +1250,7 @@
       },
       "additionalProperties": true
     },
-    "BootstrapArtifactsResult": {
+    "BootstrapFilesResult": {
       "type": "object",
       "properties": {
         "artifacts": {

@@ -13,7 +13,7 @@ nonisolated public struct ConversationInput: Sendable {
 
     public init(
         text: String,
-        attachments: [Artifact] = [],
+        attachments: [FileItem] = [],
         turnState: JSONValue? = nil,
         turnID: UUID? = nil
     ) {

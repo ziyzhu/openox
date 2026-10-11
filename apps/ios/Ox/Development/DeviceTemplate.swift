@@ -244,9 +244,9 @@ enum DeviceTemplate {
         ]))
         guard let value = result.objectValue?["reference"] else { throw RuntimeError.bridge("Conversation identity missing") }
         let reference = try JSONDecoder().decode(DurableConversationReference.self, from: JSONEncoder().encode(value))
-        var files: [String: Artifact] = [:]
+        var files: [String: FileItem] = [:]
         for file in input.files ?? [] {
-            files[file.id] = try await ProfileRepository.shared.importArtifact(data: file.data, suggestedName: file.name, in: scope, conversation: reference)
+            files[file.id] = try await ProfileRepository.shared.importFile(data: file.data, suggestedName: file.name, in: scope, conversation: reference)
         }
         let turns = try (input.messages ?? []).map { message -> Turn in
             let at = Date()

@@ -1,30 +1,30 @@
 import SwiftUI
 import UIKit
 
-struct MarkdownArtifactScreen: View {
-    @State private var artifact: Artifact
+struct MarkdownFileScreen: View {
+    @State private var artifact: FileItem
     let scope: ProfileScope?
 
-    init(artifact: Artifact, scope: ProfileScope?) {
+    init(artifact: FileItem, scope: ProfileScope?) {
         _artifact = State(initialValue: artifact)
         self.scope = scope
     }
 
     var body: some View {
-        MarkdownArtifactView(artifact: $artifact, scope: scope)
+        MarkdownFileView(artifact: $artifact, scope: scope)
             .navigationTitle(artifact.userFacingName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
     }
 }
 
-struct MarkdownArtifactView: View {
-    @Binding var artifact: Artifact
+struct MarkdownFileView: View {
+    @Binding var artifact: FileItem
     let scope: ProfileScope?
 
     private enum Phase {
         case loading
-        case ready(MarkdownArtifactDocument)
+        case ready(MarkdownFileDocument)
         case failed(String)
     }
 
@@ -66,7 +66,7 @@ struct MarkdownArtifactView: View {
                     .scrollIndicators(.hidden)
                     .contentShape(Rectangle())
                     .dismissesSelectableTextSelection {
-                        Log.ui.info("MarkdownArtifactView.dismissTextSelection filename=\(artifact.fileName)")
+                        Log.ui.info("MarkdownFileView.dismissTextSelection filename=\(artifact.fileName)")
                     }
                 case .editing:
                     TextEditor(text: $draft)
@@ -77,7 +77,7 @@ struct MarkdownArtifactView: View {
                         .padding(.horizontal, Theme.Spacing.lg)
                         .padding(.vertical, Theme.Spacing.md)
                         .accessibilityLabel(artifact.userFacingName)
-                        .accessibilityIdentifier(A11yID.Chat.MarkdownArtifact.editor)
+                        .accessibilityIdentifier(A11yID.Chat.MarkdownFile.editor)
                 }
             case .failed(let message):
                 ContentUnavailableView(
@@ -96,11 +96,11 @@ struct MarkdownArtifactView: View {
                     switch mode {
                     case .viewing:
                         Button("Edit") { edit(document) }
-                            .accessibilityIdentifier(A11yID.Chat.MarkdownArtifact.edit)
+                            .accessibilityIdentifier(A11yID.Chat.MarkdownFile.edit)
                     case .editing:
                         Button("Save") { save() }
                             .disabled(isSaving)
-                            .accessibilityIdentifier(A11yID.Chat.MarkdownArtifact.save)
+                            .accessibilityIdentifier(A11yID.Chat.MarkdownFile.save)
                     }
                 }
             }
@@ -119,8 +119,8 @@ struct MarkdownArtifactView: View {
     private func load() async {
         phase = .loading
         do {
-            guard let scope = ArtifactPreviewSource(artifact: artifact, scope: scope).scope else { throw CocoaError(.fileReadNoPermission) }
-            let document = try await ProfileRepository.shared.readMarkdownArtifact(
+            guard let scope = FilePreviewSource(artifact: artifact, scope: scope).scope else { throw CocoaError(.fileReadNoPermission) }
+            let document = try await ProfileRepository.shared.readMarkdownFile(
                 named: artifact.fileName,
                 in: scope
             )
@@ -128,18 +128,18 @@ struct MarkdownArtifactView: View {
             draft = document.source
             mode = .viewing
             phase = .ready(document)
-            Log.ui.info("MarkdownArtifactView.load filename=\(artifact.fileName) bytes=\(document.byteCount)")
+            Log.ui.info("MarkdownFileView.load filename=\(artifact.fileName) bytes=\(document.byteCount)")
         } catch {
             guard !Task.isCancelled else { return }
             phase = .failed(artifact.userFacingErrorDescription(error))
-            Log.ui.error("MarkdownArtifactView.load filename=\(artifact.fileName) error=\(error.localizedDescription)")
+            Log.ui.error("MarkdownFileView.load filename=\(artifact.fileName) error=\(error.localizedDescription)")
         }
     }
 
-    private func edit(_ document: MarkdownArtifactDocument) {
+    private func edit(_ document: MarkdownFileDocument) {
         draft = document.source
         mode = .editing
-        Log.ui.info("MarkdownArtifactView.edit filename=\(artifact.fileName)")
+        Log.ui.info("MarkdownFileView.edit filename=\(artifact.fileName)")
         Haptics.impact(.editStarted)
     }
 
@@ -153,8 +153,8 @@ struct MarkdownArtifactView: View {
         isSaving = true
         Task {
             do {
-                guard let scope = ArtifactPreviewSource(artifact: artifact, scope: scope).scope else { throw CocoaError(.fileReadNoPermission) }
-                let published = try await ProfileRepository.shared.writeMarkdownArtifact(
+                guard let scope = FilePreviewSource(artifact: artifact, scope: scope).scope else { throw CocoaError(.fileReadNoPermission) }
+                let published = try await ProfileRepository.shared.writeMarkdownFile(
                     source,
                     named: artifact.fileName,
                     in: scope
@@ -164,15 +164,15 @@ struct MarkdownArtifactView: View {
                 isSaving = false
                 draft = source
                 mode = .viewing
-                let document = MarkdownArtifactDocument(source: source, byteCount: source.utf8.count)
+                let document = MarkdownFileDocument(source: source, byteCount: source.utf8.count)
                 phase = .ready(document)
-                Log.ui.info("MarkdownArtifactView.save filename=\(published.fileName) bytes=\(document.byteCount)")
+                Log.ui.info("MarkdownFileView.save filename=\(published.fileName) bytes=\(document.byteCount)")
                 Haptics.success(.settingsSaved)
             } catch {
                 guard !Task.isCancelled else { return }
                 isSaving = false
                 saveError = artifact.userFacingErrorDescription(error)
-                Log.ui.error("MarkdownArtifactView.save filename=\(artifact.fileName) error=\(error.localizedDescription)")
+                Log.ui.error("MarkdownFileView.save filename=\(artifact.fileName) error=\(error.localizedDescription)")
             }
         }
     }

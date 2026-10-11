@@ -29,7 +29,7 @@ nonisolated struct WebFetchResponse: Sendable {
             ?? "application/octet-stream"
     }
     var suggestedFilename: String { WebFetchFilename.make(url: url, mimeType: mimeType) }
-    var kind: Artifact.Kind {
+    var kind: FileItem.Kind {
         if mimeType == "text/html" || mimeType == "application/xhtml+xml" { return .html }
         guard let type = UTType(mimeType: mimeType) else { return .file }
         if type.conforms(to: .image) { return .image }
@@ -330,7 +330,7 @@ nonisolated enum WebAttachmentFactory {
             mimeType = declared
             data = response.data
         }
-        let suggestedName = requestedName.map(ArtifactStore.sanitizedFilename)
+        let suggestedName = requestedName.map(FileStore.sanitizedFilename)
             ?? WebFetchFilename.make(url: response.url, mimeType: mimeType)
         let filename = kind == .image
             ? PreparedImage(data: data, mimeType: mimeType, fileExtension: mimeType == "image/png" ? "png" : "jpg")

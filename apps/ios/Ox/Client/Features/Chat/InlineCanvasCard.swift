@@ -14,17 +14,17 @@ private final class InlineCanvasSession {
     let page: WebPage
     let canvas: OxCanvas
     let presentations: AppPresentationCoordinator
-    let source: ArtifactPreviewSource
+    let source: FilePreviewSource
     private(set) var phase: Phase = .loading
 
-    init(source: ArtifactPreviewSource, serviceManager: ServiceManager) {
+    init(source: FilePreviewSource, serviceManager: ServiceManager) {
         let artifact = source.artifact
         self.source = source
         let presentations = AppPresentationCoordinator()
         let canvas = OxCanvas(title: artifact.userFacingName, serviceManager: serviceManager, presentations: presentations)
         self.presentations = presentations
         self.canvas = canvas
-        page = HTMLArtifactPage.make(scope: source.scope, canvas: canvas, documentURL: HTMLArtifactPage.documentURL(for: source))
+        page = HTMLFilePage.make(scope: source.scope, canvas: canvas, documentURL: HTMLFilePage.documentURL(for: source))
     }
 
     var isReady: Bool {
@@ -35,7 +35,7 @@ private final class InlineCanvasSession {
     func load() async {
         let artifact = source.artifact
         do {
-            let document = try await HTMLArtifactDocument.read(source)
+            let document = try await HTMLFileDocument.read(source)
             try Task.checkCancellation()
             Log.ui.info("InlineCanvas.loading filename=\(artifact.fileName) bytes=\(document.byteCount)")
             for try await event in page.load(html: document.html, baseURL: document.baseURL) {
@@ -59,14 +59,14 @@ private final class InlineCanvasSession {
 }
 
 struct InlineCanvasCard: View {
-    let artifact: Artifact
+    let artifact: FileItem
     let rowID: UUID
-    private let source: ArtifactPreviewSource
+    private let source: FilePreviewSource
 
-    init(artifact: Artifact, rowID: UUID, scope: ProfileScope? = StorageRoot.currentScope) {
+    init(artifact: FileItem, rowID: UUID, scope: ProfileScope? = StorageRoot.currentScope) {
         self.artifact = artifact
         self.rowID = rowID
-        source = ArtifactPreviewSource(artifact: artifact, scope: scope)
+        source = FilePreviewSource(artifact: artifact, scope: scope)
     }
 
     @Environment(ServiceManager.self) private var serviceManager
@@ -160,14 +160,14 @@ struct InlineCanvasCard: View {
 }
 
 private struct InlineCanvasPageCard: View {
-    let artifact: Artifact
+    let artifact: FileItem
     let session: InlineCanvasSession
     let rowID: UUID
     let pageMount: WebPageMountCoordinator
     let expand: () -> Void
     @Bindable private var canvas: OxCanvas
 
-    init(artifact: Artifact, session: InlineCanvasSession, rowID: UUID, pageMount: WebPageMountCoordinator, expand: @escaping () -> Void) {
+    init(artifact: FileItem, session: InlineCanvasSession, rowID: UUID, pageMount: WebPageMountCoordinator, expand: @escaping () -> Void) {
         self.artifact = artifact
         self.session = session
         self.rowID = rowID
@@ -217,12 +217,12 @@ private struct InlineCanvasPageCard: View {
 }
 
 private struct InlineCanvasExpandedView: View {
-    let artifact: Artifact
+    let artifact: FileItem
     let session: InlineCanvasSession
     let dismiss: () -> Void
     @Bindable private var canvas: OxCanvas
 
-    init(artifact: Artifact, session: InlineCanvasSession, dismiss: @escaping () -> Void) {
+    init(artifact: FileItem, session: InlineCanvasSession, dismiss: @escaping () -> Void) {
         self.artifact = artifact
         self.session = session
         self.dismiss = dismiss
@@ -242,11 +242,11 @@ private struct InlineCanvasExpandedView: View {
                             .accessibilityIdentifier(A11yID.ServiceInspector.close)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        ArtifactShareButton(artifact: artifact, scope: session.source.scope) {
+                        FileShareButton(artifact: artifact, scope: session.source.scope) {
                             Image(systemName: "square.and.arrow.up")
                         }
-                        .accessibilityLabel(A11yLabel.shareArtifact)
-                        .accessibilityIdentifier(A11yID.Artifacts.share(artifact.id))
+                        .accessibilityLabel(A11yLabel.shareFile)
+                        .accessibilityIdentifier(A11yID.Files.share(artifact.id))
                     }
                 }
         }

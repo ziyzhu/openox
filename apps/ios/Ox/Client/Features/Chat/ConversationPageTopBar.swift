@@ -3,13 +3,13 @@ import SwiftUI
 struct ConversationPageTopBar: View {
     let conversation: Conversation
     let blockCount: Int
-    let hasArtifacts: Bool
+    let hasFiles: Bool
     let showsModelPicker: Bool
     let iconButtonSize: CGFloat
     let onShowSidebar: () -> Void
     let onToggleTemporary: () -> Void
     let onPickModel: () -> Void
-    let onShowArtifacts: () -> Void
+    let onShowFiles: () -> Void
     let onCopyTranscript: () -> Void
     let onDeleteConversation: () -> Void
 
@@ -35,14 +35,14 @@ struct ConversationPageTopBar: View {
                 Label("Models", systemImage: "slider.horizontal.3")
             }
             .accessibilityIdentifier(A11yID.Chat.modelPicker)
-            if hasArtifacts || blockCount > 0 {
+            if hasFiles || blockCount > 0 {
                 Divider()
             }
-            if hasArtifacts {
-                Button(action: onShowArtifacts) {
+            if hasFiles {
+                Button(action: onShowFiles) {
                     Label("Files", systemImage: OxActionIconKind.artifacts.systemImage)
                 }
-                .accessibilityIdentifier(A11yID.Chat.Artifact.open)
+                .accessibilityIdentifier(A11yID.Chat.FileItem.open)
             }
             if blockCount > 0 {
                 Button(action: onCopyTranscript) {
@@ -52,7 +52,7 @@ struct ConversationPageTopBar: View {
                 ShareLink(
                     item: ChatPackageDocument(
                         state: conversation.state,
-                        fileName: ArtifactStore.sanitizedFilename(conversation.title)
+                        fileName: FileStore.sanitizedFilename(conversation.title)
                     ),
                     preview: SharePreview(Text(verbatim: conversation.title))
                 ) {

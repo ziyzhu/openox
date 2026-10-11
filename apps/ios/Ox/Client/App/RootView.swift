@@ -836,14 +836,14 @@ struct RootView: View {
                          onToggleTemporary: { conversations.toggleTemporaryChat() },
                          onDeleteChat: { conversations.delete(conversation.id) },
                          onBranch: { blockId in conversations.branch(from: conversation, atBlock: blockId) },
-                         onRenameArtifact: { artifact, newFilename in
-                             try await conversations.renameArtifact(artifact, to: newFilename)
+                         onRenameFile: { artifact, newFilename in
+                             try await conversations.renameFile(artifact, to: newFilename)
                          },
-                         onDeleteArtifact: { artifact in
-                             try await conversations.deleteArtifact(artifact)
+                         onDeleteFile: { artifact in
+                             try await conversations.deleteFile(artifact)
                          },
                          onExploreServices: { showServices(for: conversation.id) },
-                         onArtifactNavigationChange: setChildNavigationActive,
+                         onFileNavigationChange: setChildNavigationActive,
                          onInitialTranscriptPresented: { finishChatOpening(conversation.id) })
                     .onAppear {
                         conversation.setTranscriptVisible(scenePhase == .active)
@@ -1006,27 +1006,27 @@ struct RootView: View {
         }
     }
 
-    private func renameArtifact(
-        _ artifact: Artifact,
+    private func renameFile(
+        _ artifact: FileItem,
         to newFilename: String,
         in scope: ProfileScope
-    ) async throws -> Artifact {
+    ) async throws -> FileItem {
         if scope.profileID == storage.activeId {
-            return try await conversations.renameArtifact(artifact, to: newFilename)
+            return try await conversations.renameFile(artifact, to: newFilename)
         }
-        return try await ProfileRepository.shared.renameArtifact(
+        return try await ProfileRepository.shared.renameFile(
             named: artifact.fileName,
             to: newFilename,
             in: scope
         )
     }
 
-    private func deleteArtifact(_ artifact: Artifact, in scope: ProfileScope) async throws {
+    private func deleteFile(_ artifact: FileItem, in scope: ProfileScope) async throws {
         if scope.profileID == storage.activeId {
-            try await conversations.deleteArtifact(artifact)
+            try await conversations.deleteFile(artifact)
             return
         }
-        _ = try await ProfileRepository.shared.deleteArtifact(named: artifact.fileName, in: scope)
+        _ = try await ProfileRepository.shared.deleteFile(named: artifact.fileName, in: scope)
     }
 
     private func setChildNavigationActive(_ active: Bool) {

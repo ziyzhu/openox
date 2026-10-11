@@ -27,7 +27,7 @@ nonisolated enum ChatPromptState {
         skillConflicts: [String],
         attachedServices: [Service.Snapshot],
         fileMountPaths: [String],
-        artifactPaths: [String],
+        filePaths: [String],
         isTemporary: Bool,
         responseLanguage: JSONValue,
         hostID: String,
@@ -43,7 +43,7 @@ nonisolated enum ChatPromptState {
                 return .object(fields)
             }),
             "hostContext": hostContext(hostID: hostID, profileID: profileID),
-            "artifactPaths": .array(artifactPaths.map(JSONValue.string)),
+            "filePaths": .array(filePaths.map(JSONValue.string)),
             "storageMode": .string(isTemporary ? "temporary" : "persisted"),
             "responseLanguage": responseLanguage,
         ])

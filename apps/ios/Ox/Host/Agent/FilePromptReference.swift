@@ -1,7 +1,7 @@
 import Foundation
 
-nonisolated enum ArtifactPromptReference {
-    static func text(for artifact: Artifact) -> String {
+nonisolated enum FilePromptReference {
+    static func text(for artifact: FileItem) -> String {
         let fields = [
             "filename": artifact.fileName,
             "mimeType": artifact.mimeType,
@@ -9,8 +9,8 @@ nonisolated enum ArtifactPromptReference {
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys]),
               let json = String(data: data, encoding: .utf8) else {
-            return "Available artifact: artifacts/\(artifact.fileName)"
+            return "Available file: artifacts/\(artifact.fileName)"
         }
-        return "Available artifact: \(json)"
+        return "Available file: \(json)"
     }
 }

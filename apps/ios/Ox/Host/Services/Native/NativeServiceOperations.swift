@@ -16,7 +16,7 @@ final class NativeServiceOperations {
     let requireActive: () throws -> Void
     let showBrowser: (Service, UUID) -> Void
     let attachTransient: (TransientAttachment) throws -> Void
-    let importArtifact: (TransientAttachment, String) async throws -> Artifact
+    let importFile: (TransientAttachment, String) async throws -> FileItem
     let choose: (Prompt) async throws -> String?
 
     init(
@@ -27,7 +27,7 @@ final class NativeServiceOperations {
         requireActive: @escaping () throws -> Void,
         showBrowser: @escaping (Service, UUID) -> Void,
         attachTransient: @escaping (TransientAttachment) throws -> Void,
-        importArtifact: @escaping (TransientAttachment, String) async throws -> Artifact,
+        importFile: @escaping (TransientAttachment, String) async throws -> FileItem,
         choose: @escaping (Prompt) async throws -> String?
     ) {
         self.id = id
@@ -37,7 +37,7 @@ final class NativeServiceOperations {
         self.requireActive = requireActive
         self.showBrowser = showBrowser
         self.attachTransient = attachTransient
-        self.importArtifact = importArtifact
+        self.importFile = importFile
         self.choose = choose
     }
 
@@ -140,9 +140,9 @@ final class NativeServiceOperations {
             let pdf = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
                 .exportPDF()
-            let artifact: Artifact?
+            let artifact: FileItem?
             if let filename = fields["filename"]?.stringValue {
-                artifact = try await importArtifact(pdf.attachment, filename)
+                artifact = try await importFile(pdf.attachment, filename)
             } else {
                 try attachTransient(pdf.attachment)
                 artifact = nil

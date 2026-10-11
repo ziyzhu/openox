@@ -1,13 +1,13 @@
 import SwiftUI
 
-struct ArtifactLibraryRow: View {
+struct FileLibraryRow: View {
     enum Accessory {
         case none
         case disclosure
         case selection(Bool)
     }
 
-    let artifact: Artifact
+    let artifact: FileItem
     var accessory: Accessory = .disclosure
     var showsContainer = true
     var horizontalPadding = Theme.Spacing.md
@@ -17,7 +17,7 @@ struct ArtifactLibraryRow: View {
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
-            ArtifactThumbnail(
+            FileThumbnail(
                 attachment: artifact,
                 style: .library,
                 background: showsContainer ? Theme.Colors.surfaceSunken : Theme.Colors.surface,
@@ -73,8 +73,8 @@ struct ArtifactLibraryRow: View {
     }
 }
 
-struct ArtifactContextMenu: View {
-    let artifact: Artifact
+struct FileContextMenu: View {
+    let artifact: FileItem
     let canMutate: Bool
     let onRename: () -> Void
     let onDelete: () -> Void
@@ -82,33 +82,33 @@ struct ArtifactContextMenu: View {
 
     var body: some View {
         if artifact.availability == .local {
-            ArtifactShareButton(artifact: artifact, scope: scope) {
+            FileShareButton(artifact: artifact, scope: scope) {
                 Label("Share", systemImage: "square.and.arrow.up")
             }
-            .accessibilityLabel(A11yLabel.shareArtifact)
-            .accessibilityIdentifier(A11yID.Artifacts.share(artifact.id))
+            .accessibilityLabel(A11yLabel.shareFile)
+            .accessibilityIdentifier(A11yID.Files.share(artifact.id))
 
             if canMutate {
                 Button(action: onRename) {
                     Label("Rename", systemImage: "pencil")
                 }
-                .accessibilityIdentifier(A11yID.Artifacts.rename(artifact.id))
+                .accessibilityIdentifier(A11yID.Files.rename(artifact.id))
 
                 Button(role: .destructive, action: onDelete) {
                     Label("Delete", systemImage: "trash")
                 }
-                .accessibilityIdentifier(A11yID.Artifacts.delete(artifact.id))
+                .accessibilityIdentifier(A11yID.Files.delete(artifact.id))
             }
         }
     }
 }
 
-struct ArtifactPreviewPresentation: View {
-    let artifact: Artifact
+struct FilePreviewPresentation: View {
+    let artifact: FileItem
     var scope: ProfileScope? = StorageRoot.currentScope
 
     var body: some View {
-        ArtifactZoomPreviewScreen(
+        FileZoomPreviewScreen(
             artifact: artifact,
             chrome: .navigation,
             scope: scope
@@ -116,13 +116,13 @@ struct ArtifactPreviewPresentation: View {
     }
 }
 
-struct ArtifactZoomPreviewPresentation: View {
-    let preview: ArtifactZoomPreview
+struct FileZoomPreviewPresentation: View {
+    let preview: FileZoomPreview
     let namespace: Namespace.ID
     let onDismiss: () -> Void
 
     var body: some View {
-        ArtifactZoomPreviewScreen(
+        FileZoomPreviewScreen(
             artifact: preview.artifact,
             chrome: .immersive(onDismiss: onDismiss),
             scope: preview.scope
@@ -131,17 +131,17 @@ struct ArtifactZoomPreviewPresentation: View {
     }
 }
 
-private struct ArtifactZoomPreviewCover: ViewModifier {
-    let presentation: ZoomPresentation<ArtifactZoomPreview>
+private struct FileZoomPreviewCover: ViewModifier {
+    let presentation: ZoomPresentation<FileZoomPreview>
     let namespace: Namespace.ID
-    let onDismiss: (Artifact) -> Void
+    let onDismiss: (FileItem) -> Void
 
     func body(content: Content) -> some View {
         content
             .scrollDisabled(presentation.isDismissing)
             .environment(\.artifactPreviewNamespace, namespace)
             .fullScreenCover(item: presentation.binding, onDismiss: finishDismissal) { presented in
-                ArtifactZoomPreviewPresentation(preview: presented, namespace: namespace) {
+                FileZoomPreviewPresentation(preview: presented, namespace: namespace) {
                     presentation.dismiss()
                 }
             }
@@ -152,21 +152,21 @@ private struct ArtifactZoomPreviewCover: ViewModifier {
     }
 }
 
-enum ArtifactMutation: Equatable {
-    case renaming(Artifact, draft: String)
+enum FileMutation: Equatable {
+    case renaming(FileItem, draft: String)
     case renameFailed(String)
-    case deleting(Artifact)
+    case deleting(FileItem)
     case deleteFailed(String)
 
-    static func rename(_ artifact: Artifact) -> ArtifactMutation {
+    static func rename(_ artifact: FileItem) -> FileMutation {
         .renaming(artifact, draft: artifact.userFacingName)
     }
 }
 
-private struct ArtifactMutationAlerts: ViewModifier {
-    @Binding var mutation: ArtifactMutation?
-    let onRename: (Artifact, String) -> Void
-    let onDelete: (Artifact) -> Void
+private struct FileMutationAlerts: ViewModifier {
+    @Binding var mutation: FileMutation?
+    let onRename: (FileItem, String) -> Void
+    let onDelete: (FileItem) -> Void
 
     func body(content: Content) -> some View {
         content
@@ -179,7 +179,7 @@ private struct ArtifactMutationAlerts: ViewModifier {
                     onRename(artifact, artifact.fileName(forUserFacingName: draft))
                 }
                 .disabled(!canSubmitRename)
-                .accessibilityIdentifier(A11yID.Artifacts.renameSubmit)
+                .accessibilityIdentifier(A11yID.Files.renameSubmit)
             }
             .alert("Rename file", isPresented: presented { if case .renameFailed = $0 { true } else { false } }) {
                 Button("OK", role: .cancel) { mutation = nil }
@@ -193,7 +193,7 @@ private struct ArtifactMutationAlerts: ViewModifier {
                     mutation = nil
                     onDelete(artifact)
                 }
-                .accessibilityIdentifier(A11yID.Artifacts.deleteConfirm)
+                .accessibilityIdentifier(A11yID.Files.deleteConfirm)
             } message: {
                 Text("This deletes the file. Existing chat references will show it as deleted.")
             }
@@ -204,7 +204,7 @@ private struct ArtifactMutationAlerts: ViewModifier {
             }
     }
 
-    private func presented(_ matches: @escaping (ArtifactMutation) -> Bool) -> Binding<Bool> {
+    private func presented(_ matches: @escaping (FileMutation) -> Bool) -> Binding<Bool> {
         Binding(
             get: { mutation.map(matches) ?? false },
             set: { if !$0, mutation.map(matches) == true { mutation = nil } }
@@ -239,11 +239,11 @@ private struct ArtifactMutationAlerts: ViewModifier {
 
 extension View {
     func artifactZoomPreviewCover(
-        presentation: ZoomPresentation<ArtifactZoomPreview>,
+        presentation: ZoomPresentation<FileZoomPreview>,
         namespace: Namespace.ID,
-        onDismiss: @escaping (Artifact) -> Void
+        onDismiss: @escaping (FileItem) -> Void
     ) -> some View {
-        modifier(ArtifactZoomPreviewCover(
+        modifier(FileZoomPreviewCover(
             presentation: presentation,
             namespace: namespace,
             onDismiss: onDismiss
@@ -251,10 +251,10 @@ extension View {
     }
 
     func artifactMutationAlerts(
-        _ mutation: Binding<ArtifactMutation?>,
-        onRename: @escaping (Artifact, String) -> Void,
-        onDelete: @escaping (Artifact) -> Void
+        _ mutation: Binding<FileMutation?>,
+        onRename: @escaping (FileItem, String) -> Void,
+        onDelete: @escaping (FileItem) -> Void
     ) -> some View {
-        modifier(ArtifactMutationAlerts(mutation: mutation, onRename: onRename, onDelete: onDelete))
+        modifier(FileMutationAlerts(mutation: mutation, onRename: onRename, onDelete: onDelete))
     }
 }

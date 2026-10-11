@@ -60,7 +60,7 @@ nonisolated struct OxFunctionError: LocalizedError, Sendable {
             }
             return Self(code: guidance.0, message: error.localizedDescription, recovery: guidance.1)
         }
-        if let error = error as? ArtifactError {
+        if let error = error as? FileError {
             let guidance: (String, String) = switch error {
             case .missing: ("not_found", "Use ox.fs.list on the file's parent folder to discover an existing path.")
             case .filenameExists: ("already_exists", "Use ox.fs.list on the destination folder and choose a distinct filename.")

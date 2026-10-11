@@ -90,10 +90,10 @@ struct ActionApproval {
         } else if override == nil, action == "ox.web.browser.exportPdf" {
             let page = serviceManager.browserActionSessions.existingSession(for: ownerID)?.webPage
             let destination = page?.url?.host(percentEncoded: false) ?? L10n.string("Current page")
-            let savesArtifact = (args as? [String: Any])?["filename"] is String
+            let savesFile = (args as? [String: Any])?["filename"] is String
             title = "\(display) - \(destination)"
-            disclosure = savesArtifact
-                ? L10n.string("The exported PDF may include signed-in or sensitive information beyond the visible area, is saved to the current Profile as an artifact, and becomes available to the current model. Always allow applies to every page Browser visits.")
+            disclosure = savesFile
+                ? L10n.string("The exported PDF may include signed-in or sensitive information beyond the visible area, is saved to the current Profile as a file, and becomes available to the current model. Always allow applies to every page Browser visits.")
                 : L10n.string("The exported PDF may include signed-in or sensitive information beyond the visible area and becomes available to the current model. Always allow applies to every page Browser visits.")
         } else if override == nil, [
             "ox.web.browser.executeScript",

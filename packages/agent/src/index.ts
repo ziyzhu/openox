@@ -1,6 +1,6 @@
 /** Host-neutral entry: no runtime shims, native globals, or application chat binding required. */
 export { openProfileRuntime, ProfileRuntime, type ProfileRuntimeOptions, type CommittedEvent } from "./profile/runtime";
-export { ProfileFiles, ProfileFile, ProfileIndex, ProfileArtifact, canonical } from "./profile/files";
+export { ProfileFiles, ProfileFile, ProfileIndex, LegacyProfileFile, canonical } from "./profile/files";
 export { profileEnv, profileMounts } from "./profile/filesystem";
 export { mountedFileSystem, type FileBackend, type FileMount, type TextFileMount, type MountedExecutionEnv } from "./core/file-mounts";
 export { composeSystemPrompt, composeTurnContext, responseDirective, defaultSoul,
@@ -14,7 +14,7 @@ export { guidanceText } from "./core/guidance-texts";
 export { bundledSkills, type BundledSkill } from "./core/bundled-skills";
 export { OxConversations, ConversationPresentation, ConversationFavorite, ConversationReadState,
   type ConversationReference, type ConversationListCursor, type ConversationHistoryCursor, type PresentationChange } from "./profile/conversations";
-export type { ArtifactFiles, ArtifactRecord } from "./profile/artifacts";
+export type { FilePayloadStore } from "./profile/file-payloads";
 export type { FileRecord } from "./profile/file-record";
 export { ProfileFileState, type ProfileFileBackend, type ProfileFileRecord } from "./profile/file-store";
 export { AgentFileSystem, type FileOperation, type FileRequest } from "./core/filesystem";

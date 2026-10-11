@@ -36,7 +36,7 @@ digraph OpenOx {
     host_api [label="Ox Host API\nChats · Services · Lifecycle"];
     agent [label="Ox Agent\nReasoning · Tool use"];
     model_adapter [label="Model adapter\nProvider-neutral agent loop"];
-    profile [label="Ox Profile\nIdentity · Memory · Skills\nArtifacts · Conversations"];
+    profile [label="Ox Profile\nIdentity · Memory · Skills\nFiles · Conversations"];
     vm [label="Ox VM\nSandboxed JavaScript · ox.*\nSkills · Virtual filesystem"];
     local_repository [label="Local Repository\nServices · Skills\nEditable Git + repository.json"];
     services [label="Catalog\nServices · Skills\nResolved sources"];

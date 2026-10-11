@@ -195,15 +195,15 @@
     },
     "debug.artifacts.bootstrap": {
       "params": {
-        "$ref": "./schema.json#/definitions/BootstrapArtifactsRequest"
+        "$ref": "./schema.json#/definitions/BootstrapFilesRequest"
       },
       "result": {
-        "$ref": "./schema.json#/definitions/BootstrapArtifactsResult"
+        "$ref": "./schema.json#/definitions/BootstrapFilesResult"
       }
     },
     "debug.artifacts.write": {
       "params": {
-        "$ref": "./schema.json#/definitions/WriteArtifactRequest"
+        "$ref": "./schema.json#/definitions/WriteFileRequest"
       },
       "result": {
         "$ref": "./schema.json#/definitions/EmptyResult"

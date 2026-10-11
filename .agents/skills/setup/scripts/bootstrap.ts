@@ -61,7 +61,7 @@ function parseAPIKeys(value: unknown): APIKeys {
   }));
 }
 
-function parseArtifact(value: unknown, index: number): BootstrapProfile["artifacts"][number] {
+function parseFile(value: unknown, index: number): BootstrapProfile["artifacts"][number] {
   const label = `artifacts[${index}]`;
   if (typeof value === "string") return { path: requiredString(value, label) };
   const entry = record(value, label, ["path", "name"]);
@@ -82,7 +82,7 @@ function parseBootstrapProfile(value: unknown): BootstrapProfile {
   if (artifacts.length === 0 && parsedProviders.length === 0 && !websiteData) {
     throw new Error("profile must declare at least one artifact, provider, or websiteData snapshot");
   }
-  return { version: 1, artifacts: artifacts.map(parseArtifact), providers: parsedProviders, websiteData };
+  return { version: 1, artifacts: artifacts.map(parseFile), providers: parsedProviders, websiteData };
 }
 
 async function readJSON(path: string, label: string): Promise<unknown> {
@@ -95,7 +95,7 @@ async function readJSON(path: string, label: string): Promise<unknown> {
   }
 }
 
-async function readArtifacts(directory: string, artifacts: BootstrapProfile["artifacts"]) {
+async function readFiles(directory: string, artifacts: BootstrapProfile["artifacts"]) {
   let totalBytes = 0;
   const prepared = [];
   for (const entry of artifacts) {
@@ -151,7 +151,7 @@ async function bootstrap(): Promise<void> {
 
   await requireBooted([target.device, ...(source ? [source.device] : [])]);
   const region = needsCredentials ? await simulatorRegion(target.debugEndpoint) : undefined;
-  const artifacts = await readArtifacts(dirname(profilePath ?? apiKeysPath), profile.artifacts);
+  const artifacts = await readFiles(dirname(profilePath ?? apiKeysPath), profile.artifacts);
   const credentials = profile.providers.map((providerId) => ({ providerId, key: region && apiKeys[providerId]?.[region]?.trim() }));
   const missing = credentials.filter(({ key }) => !key).map(({ providerId }) => providerId);
   if (missing.length > 0) throw new Error(`missing API keys for ${missing.join(", ")}`);
@@ -170,7 +170,7 @@ async function bootstrap(): Promise<void> {
     }, 60_000, target.debugEndpoint);
     const installed = result.artifacts as string[] | undefined;
     if (!installed || installed.length !== artifacts.length) throw new Error("artifact bootstrap returned an invalid result");
-    artifacts.forEach((artifact, index) => console.log(`Artifact ${artifact.path} -> ${installed[index]} (${artifact.bytes} bytes)`));
+    artifacts.forEach((artifact, index) => console.log(`FileItem ${artifact.path} -> ${installed[index]} (${artifact.bytes} bytes)`));
   }
   for (const { providerId, key } of credentials) {
     await callHost("debug.providers.setKey", { providerId, key, region }, 10_000, target.debugEndpoint);

@@ -3,11 +3,11 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
-nonisolated struct ArtifactPreviewSource: Sendable {
-    let artifact: Artifact
+nonisolated struct FilePreviewSource: Sendable {
+    let artifact: FileItem
     let scope: ProfileScope?
 
-    init(artifact: Artifact, scope: ProfileScope? = StorageRoot.currentScope) {
+    init(artifact: FileItem, scope: ProfileScope? = StorageRoot.currentScope) {
         self.artifact = artifact
         let root = scope?.root.standardizedFileURL.pathComponents
         let path = artifact.fileURL.standardizedFileURL.pathComponents
@@ -17,27 +17,27 @@ nonisolated struct ArtifactPreviewSource: Sendable {
     func read() async throws -> Data {
         guard let scope, scope.profileID != nil else { throw CocoaError(.fileReadNoPermission) }
         try Task.checkCancellation()
-        let data = try await ProfileRepository.shared.readArtifactData(named: artifact.fileName, in: scope)
+        let data = try await ProfileRepository.shared.readFileData(named: artifact.fileName, in: scope)
         try Task.checkCancellation()
         return data
     }
 
-    func snapshot() async throws -> ArtifactPreviewSnapshot {
+    func snapshot() async throws -> FilePreviewSnapshot {
         let data = try await read()
         let snapshot = try await Task.detached(priority: .userInitiated) {
-            try ArtifactPreviewSnapshot(artifact: artifact, data: data)
+            try FilePreviewSnapshot(artifact: artifact, data: data)
         }.value
         try Task.checkCancellation()
         return snapshot
     }
 }
 
-nonisolated final class ArtifactPreviewSnapshot: Sendable {
+nonisolated final class FilePreviewSnapshot: Sendable {
     let url: URL
     private let directory: URL
 
-    init(artifact: Artifact, data: Data) throws {
-        let name = try ArtifactStore.validatedFilename(artifact.displayName)
+    init(artifact: FileItem, data: Data) throws {
+        let name = try FileStore.validatedFilename(artifact.displayName)
         directory = try FileStaging.createDirectory(in: FileManager.default.temporaryDirectory, prefix: "artifact-preview")
         url = directory.appendingPathComponent(name, isDirectory: false)
         do {
@@ -53,8 +53,8 @@ nonisolated final class ArtifactPreviewSnapshot: Sendable {
     deinit { FileStaging.cleanup(directory, operation: "artifact-preview") }
 }
 
-nonisolated private struct ArtifactShareContent: Transferable, Sendable {
-    let source: ArtifactPreviewSource
+nonisolated private struct FileShareContent: Transferable, Sendable {
+    let source: FilePreviewSource
 
     static var transferRepresentation: some TransferRepresentation {
         representation(for: .pdf)
@@ -69,11 +69,11 @@ nonisolated private struct ArtifactShareContent: Transferable, Sendable {
         representation(for: .data)
     }
 
-    private static func representation(for type: UTType) -> some TransferRepresentation<ArtifactShareContent> {
-        DataRepresentation(exportedContentType: type) { (content: ArtifactShareContent) in
+    private static func representation(for type: UTType) -> some TransferRepresentation<FileShareContent> {
+        DataRepresentation(exportedContentType: type) { (content: FileShareContent) in
             do { return try await content.source.read() }
             catch {
-                Log.ui.error("ArtifactShare.read file=\(content.source.artifact.fileName) error=\(error.localizedDescription)")
+                Log.ui.error("FileShare.read file=\(content.source.artifact.fileName) error=\(error.localizedDescription)")
                 throw error
             }
         }
@@ -82,17 +82,17 @@ nonisolated private struct ArtifactShareContent: Transferable, Sendable {
     }
 }
 
-struct ArtifactShareButton<Label: View>: View {
-    private let source: ArtifactPreviewSource
+struct FileShareButton<Label: View>: View {
+    private let source: FilePreviewSource
     private let label: Label
 
-    init(artifact: Artifact, scope: ProfileScope? = StorageRoot.currentScope, @ViewBuilder label: () -> Label) {
-        source = ArtifactPreviewSource(artifact: artifact, scope: scope)
+    init(artifact: FileItem, scope: ProfileScope? = StorageRoot.currentScope, @ViewBuilder label: () -> Label) {
+        source = FilePreviewSource(artifact: artifact, scope: scope)
         self.label = label()
     }
 
     var body: some View {
-        ShareLink(item: ArtifactShareContent(source: source), preview: SharePreview(Text(source.artifact.userFacingName))) {
+        ShareLink(item: FileShareContent(source: source), preview: SharePreview(Text(source.artifact.userFacingName))) {
             label
         }
         .disabled(source.scope == nil)

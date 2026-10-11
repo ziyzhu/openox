@@ -21,7 +21,7 @@ final class ConversationComposerModel {
     struct Message {
         let id: UUID
         let text: String
-        let attachments: [Artifact]
+        let attachments: [FileItem]
     }
 
     struct PendingAttachment: Identifiable, Equatable {
@@ -36,7 +36,7 @@ final class ConversationComposerModel {
         }
 
         case importing(PendingAttachment)
-        case ready(Artifact)
+        case ready(FileItem)
 
         var id: ID {
             switch self {
@@ -170,7 +170,7 @@ final class ConversationComposerModel {
     func takeMessage() -> Message? {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard canSubmit else { return nil }
-        let attachments = draftAttachments.compactMap { item -> Artifact? in
+        let attachments = draftAttachments.compactMap { item -> FileItem? in
             if case .ready(let artifact) = item { artifact } else { nil }
         }
         let message = Message(id: draftID, text: text, attachments: attachments)
@@ -197,7 +197,7 @@ final class ConversationComposerModel {
 
     func importAttachment(
         named displayName: String,
-        operation: @escaping @MainActor () async throws -> Artifact,
+        operation: @escaping @MainActor () async throws -> FileItem,
         onFailure: @escaping @MainActor (Error) -> Void
     ) {
         let pending = PendingAttachment(id: UUID(), displayName: displayName)
@@ -219,7 +219,7 @@ final class ConversationComposerModel {
         }
     }
 
-    func attachArtifact(_ artifact: Artifact) {
+    func attachFile(_ artifact: FileItem) {
         guard !draftAttachments.contains(where: { $0.id == .artifact(artifact.id) }) else {
             Log.ui.info("ConversationComposer.attachment duplicate draft=\(draftID) artifact=\(artifact.id)")
             return
@@ -228,7 +228,7 @@ final class ConversationComposerModel {
         Log.ui.info("ConversationComposer.attachment artifact draft=\(draftID) artifact=\(artifact.id)")
     }
 
-    var draftArtifactIDs: Set<String> {
+    var draftFileIDs: Set<String> {
         Set(draftAttachments.compactMap { item in
             if case .artifact(let id) = item.id { id } else { nil }
         })
@@ -240,7 +240,7 @@ final class ConversationComposerModel {
         Log.ui.info("ConversationComposer.attachment remove draft=\(draftID) item=\(item.id)")
     }
 
-    private func finishImport(_ id: UUID, draftID importingDraftID: UUID, artifact: Artifact) {
+    private func finishImport(_ id: UUID, draftID importingDraftID: UUID, artifact: FileItem) {
         importTasks.removeValue(forKey: id)
         guard draftID == importingDraftID else {
             draftAttachments.removeAll { $0.id == .operation(id) }

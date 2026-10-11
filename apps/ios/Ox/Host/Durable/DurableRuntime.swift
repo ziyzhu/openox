@@ -66,7 +66,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
     }
 
     func publishFile(data: Data, filename: String, reference: JSONValue? = nil) async throws -> JSONValue {
-        _ = try ArtifactStore.validatedFilename(filename)
+        _ = try FileStore.validatedFilename(filename)
         let directory = reference?.objectValue?["conversationID"]?.intValue.map { "conversations/\($0)/" } ?? "imports/"
         let request = JSONValue.object(["action": .string("fileWriteBinary"), "path": .string(directory + filename),
                                         "base64": .string(data.base64EncodedString()), "reference": reference ?? .null])

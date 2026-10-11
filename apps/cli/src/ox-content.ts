@@ -16,7 +16,7 @@ export type ProfileEntry = ProfileConfig & {
   root: string;
 };
 
-type ArtifactEntry = {
+type FileEntry = {
   name: string;
   bytes: number;
   modifiedAt: string;
@@ -156,7 +156,7 @@ function chatTitle(chat: ChatSummary): string {
   return chat.title?.trim() || chat.preview?.trim() || "New chat";
 }
 
-export function listArtifacts(root: string): ArtifactEntry[] {
+export function listFiles(root: string): FileEntry[] {
   const directory = join(root, "artifacts");
   if (!existsSync(directory)) return [];
   return readdirSync(directory, { withFileTypes: true })
@@ -168,20 +168,20 @@ export function listArtifacts(root: string): ArtifactEntry[] {
         name: entry.name,
         bytes: stats.size,
         modifiedAt: stats.mtime.toISOString(),
-        availability: artifactAvailability(path),
+        availability: fileAvailability(path),
       };
     })
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
-export function artifactAvailabilityFromFlags(flags: string): ArtifactEntry["availability"] {
+export function fileAvailabilityFromFlags(flags: string): FileEntry["availability"] {
   return /(?:^|,)(?:dataless|offline)(?:,|$)/i.test(flags.trim()) ? "cloudOnly" : "local";
 }
 
-function artifactAvailability(path: string): ArtifactEntry["availability"] {
+function fileAvailability(path: string): FileEntry["availability"] {
   if (process.platform !== "darwin") return "local";
   try {
-    return artifactAvailabilityFromFlags(execFileSync("/usr/bin/stat", ["-f", "%Sf", path], { encoding: "utf8" }));
+    return fileAvailabilityFromFlags(execFileSync("/usr/bin/stat", ["-f", "%Sf", path], { encoding: "utf8" }));
   } catch {
     return "local";
   }
@@ -281,13 +281,13 @@ async function artifacts(args: string[], context: CliContext): Promise<void> {
     if (parsed.json) fail("--json cannot be used when printing an artifact");
     const path = directChild(join(root, "artifacts"), parsed.value);
     if (!existsSync(path) || !statSync(path).isFile()) fail(`artifact not found: ${parsed.value}`);
-    if (artifactAvailability(path) === "cloudOnly") {
+    if (fileAvailability(path) === "cloudOnly") {
       fail(`artifact is in iCloud and has not been downloaded: ${parsed.value}`);
     }
     process.stdout.write(readFileSync(path));
     return;
   }
-  const entries = listArtifacts(root);
+  const entries = listFiles(root);
   if (parsed.json) {
     writeJson(entries);
     return;

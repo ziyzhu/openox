@@ -28,8 +28,8 @@ extension OxHostProtocol {
         case vmFunctions = "vm.functions"
         case vmCall = "vm.call"
         case vmEval = "vm.eval"
-        case bootstrapArtifacts = "debug.artifacts.bootstrap"
-        case writeArtifact = "debug.artifacts.write"
+        case bootstrapFiles = "debug.artifacts.bootstrap"
+        case writeFile = "debug.artifacts.write"
         case exportWebsiteData = "debug.websiteData.export"
         case restoreWebsiteData = "debug.websiteData.restore"
         case setKey = "debug.providers.setKey"
@@ -121,11 +121,11 @@ extension OxHostProtocol {
         let script: String
     }
 
-    struct BootstrapArtifactsRequest: Decodable {
-        let artifacts: [BootstrapArtifactInput]
+    struct BootstrapFilesRequest: Decodable {
+        let artifacts: [BootstrapFileInput]
     }
 
-    struct WriteArtifactRequest: Decodable {
+    struct WriteFileRequest: Decodable {
         let name: String
         let data: Data
     }
@@ -153,7 +153,7 @@ extension OxHostProtocol {
         let prompt: String
     }
 
-    struct BootstrapArtifactInput: Decodable {
+    struct BootstrapFileInput: Decodable {
         let name: String
         let data: Data
     }

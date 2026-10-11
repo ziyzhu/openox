@@ -10,7 +10,7 @@ extension OxHostProtocol {
         let visibleHasMarkedText: Bool
     }
 
-    struct BootstrapArtifactsResult: Encodable {
+    struct BootstrapFilesResult: Encodable {
         let artifacts: [String]?
     }
 

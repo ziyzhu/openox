@@ -363,7 +363,7 @@ public struct GeminiProvider: ProviderClient {
         for (a, data) in split.media {
             let preparedData: Data
             if a.kind == .pdf {
-                preparedData = try PDFPreparer.prepareArtifact(data).data
+                preparedData = try PDFPreparer.prepareFile(data).data
             } else {
                 preparedData = data
             }
@@ -427,7 +427,7 @@ public struct GeminiProvider: ProviderClient {
         let media = try result.media.map { attachment -> [String: Any] in
             let preparedData: Data
             if attachment.kind == .pdf {
-                preparedData = try PDFPreparer.prepareArtifact(attachment.data).data
+                preparedData = try PDFPreparer.prepareFile(attachment.data).data
             } else {
                 preparedData = attachment.data
             }

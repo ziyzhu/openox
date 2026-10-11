@@ -3,8 +3,9 @@ import { createModels } from "@earendil-works/pi-ai/models";
 import type { Message } from "@earendil-works/pi-ai";
 import { defineDoc, type AgentChange, type EntryDraft, type EntryRecord, type Cursor, type JsonObject } from "@earendil-works/pi-durable";
 import type { SqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite";
-import { artifactPath, artifactRecord, type ArtifactFiles, type ArtifactRecord } from "./artifacts";
-import { canonical, ProfileArtifact, ProfileIndex } from "./files";
+import { legacyFilePath, validateFileRecord, type FilePayloadStore } from "./file-payloads";
+import type { FileRecord } from "./file-record";
+import { canonical, LegacyProfileFile, ProfileIndex } from "./files";
 import { openProfileRuntime, type ProfileRuntime } from "./runtime";
 import type { ConversationReference } from "./conversations";
 
@@ -12,8 +13,8 @@ export interface NormalizedProfileDraft {
   format: 1;
   profileID: string;
   documents: { path: string; text: string }[];
-  artifacts: (ArtifactRecord & { binary: boolean; saved: boolean })[];
-  payloads?: ArtifactRecord[];
+  artifacts: (FileRecord & { binary: boolean; saved: boolean })[];
+  payloads?: FileRecord[];
   conversations: {
     key: string;
     title: string;
@@ -27,7 +28,7 @@ export interface NormalizedProfileDraft {
 }
 export interface ProfileInstallHost {
   database: SqliteDatabase;
-  artifacts: ArtifactFiles;
+  artifacts: FilePayloadStore;
   conversations?: AsyncIterable<NormalizedProfileDraft["conversations"][number]>;
 }
 export const ConversationApplicationMetadata = defineDoc<{ fields: JsonObject }>({
@@ -55,13 +56,13 @@ function validate(draft: NormalizedProfileDraft) {
   }
   const artifacts = new Set<string>();
   for (const file of draft.artifacts) {
-    artifactRecord(file, artifactPath(file.path), file.size);
+    validateFileRecord(file, legacyFilePath(file.path), file.size);
     if (artifacts.has(file.path) || typeof file.binary !== "boolean" || typeof file.saved !== "boolean") throw new Error("Invalid or duplicate Profile artifact");
     artifacts.add(file.path);
   }
-  const payloads = new Map<string, ArtifactRecord>();
+  const payloads = new Map<string, FileRecord>();
   for (const file of draft.payloads ?? []) {
-    artifactRecord(file, artifactPath(file.path), file.size);
+    validateFileRecord(file, legacyFilePath(file.path), file.size);
     if (file.path !== `artifacts/payload-${file.sha256}.json` || !Number.isSafeInteger(file.size) || file.size < 0 || payloads.has(file.path) || artifacts.has(file.path)) {
       throw new Error("Invalid or duplicate Profile payload");
     }
@@ -73,7 +74,7 @@ function validate(draft: NormalizedProfileDraft) {
     const fields = value as Record<string, unknown>;
     const candidate = fields.oxPayload;
     if (candidate && typeof candidate === "object" && !Array.isArray(candidate) && (candidate as { format?: unknown }).format === 1) {
-      const reference = candidate as { source?: ArtifactRecord; offset?: number; length?: number };
+      const reference = candidate as { source?: FileRecord; offset?: number; length?: number };
       const record = reference?.source && payloads.get(reference.source.path);
       if (!record || !same(record, reference!.source) || !Number.isSafeInteger(reference!.offset) || !Number.isSafeInteger(reference!.length)
           || reference!.offset! < 0 || reference!.length! < 0 || reference!.offset! > record.size || reference!.length! > record.size - reference!.offset!) {
@@ -87,7 +88,7 @@ function validate(draft: NormalizedProfileDraft) {
     if (!value || typeof value !== "object") return;
     const fields = value as Record<string, unknown>;
     if ("oxAttachment" in fields) {
-      if (typeof fields.oxAttachment !== "string" || fields.oxProfileID !== draft.profileID || !artifacts.has(artifactPath(`artifacts/${fields.oxAttachment}`))) {
+      if (typeof fields.oxAttachment !== "string" || fields.oxProfileID !== draft.profileID || !artifacts.has(legacyFilePath(`artifacts/${fields.oxAttachment}`))) {
         throw new Error("Attachment is not declared in the owning Profile");
       }
     }
@@ -105,7 +106,7 @@ function validate(draft: NormalizedProfileDraft) {
       attachment(entry.model);
       payload(entry.data);
       if (entry.data && typeof entry.data === "object" && !Array.isArray(entry.data) && entry.data.source !== undefined) {
-        const source = entry.data.source as unknown as ArtifactRecord;
+        const source = entry.data.source as unknown as FileRecord;
         if (!same(payloads.get(source.path), source)) throw new Error("Missing source archive payload");
       }
     }
@@ -128,12 +129,12 @@ async function verifyFiles(session: ProfileRuntime, draft: NormalizedProfileDraf
   }
   for (const file of draft.artifacts) {
     await session.files.readReference(file.path);
-    const record = await session.harness.snapshot(ProfileArtifact, file.path, context);
+    const record = await session.harness.snapshot(LegacyProfileFile, file.path, context);
     if (!same(record, file)) throw new Error("Profile artifact verification failed");
   }
   for (const file of draft.payloads ?? []) {
-    if (!session.files.immutableArtifacts) throw new Error("Payload archives require physical files");
-    const record = await session.harness.snapshot(ProfileArtifact, file.path, context);
+    if (!session.files.immutableFiles) throw new Error("Payload archives require physical files");
+    const record = await session.harness.snapshot(LegacyProfileFile, file.path, context);
     if (!same(record, { ...file, binary: true, saved: false })) throw new Error("Profile payload metadata verification failed");
   }
 }
@@ -173,7 +174,7 @@ export async function installOxProfile(draft: NormalizedProfileDraft, host: Prof
       await host.artifacts.read(file);
       await host.artifacts.flush(file.path);
       await session.harness.commit(async tx => {
-        Object.assign(await tx.doc(ProfileArtifact, file.path, null), file);
+        Object.assign(await tx.doc(LegacyProfileFile, file.path, null), file);
         (await tx.doc(ProfileIndex)).files[file.path] = { size: file.size, mtime: 0, binary: file.binary };
       }, context);
     }
@@ -182,7 +183,7 @@ export async function installOxProfile(draft: NormalizedProfileDraft, host: Prof
       await host.artifacts.verifyPayload(file);
       await host.artifacts.flush(file.path);
       await session.harness.commit(async tx => {
-        Object.assign(await tx.doc(ProfileArtifact, file.path, null), file, { binary: true, saved: false });
+        Object.assign(await tx.doc(LegacyProfileFile, file.path, null), file, { binary: true, saved: false });
       }, context);
     }
     await verifyFiles(session, draft);

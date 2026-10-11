@@ -59,7 +59,7 @@ struct SkillContextMenuPreview: View {
     }
 }
 
-struct ArtifactContextMenuPreview: View {
+struct FileContextMenuPreview: View {
     private enum PreviewContent {
         case loading
         case image(UIImage)
@@ -67,7 +67,7 @@ struct ArtifactContextMenuPreview: View {
         case unavailable
     }
 
-    let artifact: Artifact
+    let artifact: FileItem
     var scope: ProfileScope? = StorageRoot.currentScope
     @State private var previewContent = PreviewContent.loading
 
@@ -133,7 +133,7 @@ struct ArtifactContextMenuPreview: View {
         let artifact = artifact
         guard artifact.kind != .html, artifact.kind != .file else { return .unavailable }
         do {
-            let data = try await ArtifactPreviewSource(artifact: artifact, scope: scope).read()
+            let data = try await FilePreviewSource(artifact: artifact, scope: scope).read()
             return await Task.detached(priority: .utility) {
                 switch artifact.kind {
                 case .image:
@@ -152,7 +152,7 @@ struct ArtifactContextMenuPreview: View {
         } catch is CancellationError {
             return .unavailable
         } catch {
-            Log.ui.error("ArtifactContextMenuPreview.read file=\(artifact.fileName) error=\(error.localizedDescription)")
+            Log.ui.error("FileContextMenuPreview.read file=\(artifact.fileName) error=\(error.localizedDescription)")
             return .unavailable
         }
     }

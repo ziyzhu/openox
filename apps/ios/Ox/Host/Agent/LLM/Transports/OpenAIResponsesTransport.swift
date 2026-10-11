@@ -497,7 +497,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
                             "image_url": "data:\(a.mimeType);base64,\(data.base64EncodedString())",
                         ])
                     case .pdf:
-                        let pdf = try PDFPreparer.prepareArtifact(data)
+                        let pdf = try PDFPreparer.prepareFile(data)
                         content.append([
                             "type": "input_file",
                             "filename": a.displayName,
@@ -563,7 +563,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
                             "image_url": "data:\(attachment.mimeType);base64,\(attachment.data.base64EncodedString())",
                         ])
                     case .pdf:
-                        let pdf = try PDFPreparer.prepareArtifact(attachment.data)
+                        let pdf = try PDFPreparer.prepareFile(attachment.data)
                         output.append([
                             "type": "input_file",
                             "filename": attachment.displayName,

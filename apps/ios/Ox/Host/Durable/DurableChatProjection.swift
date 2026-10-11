@@ -16,7 +16,7 @@ nonisolated enum DurableChatProjection {
         }
     }
 
-    static func turns(from entries: [JSONValue], scope: ProfileScope, files: ArtifactDirectoryListing? = nil) throws -> [Turn] {
+    static func turns(from entries: [JSONValue], scope: ProfileScope, files: FileDirectoryListing? = nil) throws -> [Turn] {
         let annotations = annotations(from: entries, scope: scope, files: files)
         let decorations = annotations.flatMap { turn -> [Decoration] in
             guard case .agent(let agent, _) = turn else { return [] }
@@ -47,7 +47,7 @@ nonisolated enum DurableChatProjection {
         return builder.turns
     }
 
-    private static func annotations(from entries: [JSONValue], scope: ProfileScope, files: ArtifactDirectoryListing?) -> [Turn] {
+    private static func annotations(from entries: [JSONValue], scope: ProfileScope, files: FileDirectoryListing?) -> [Turn] {
         let decoder = JSONDecoder()
         decoder.userInfo[.profileScope] = scope
         decoder.userInfo[.artifactDirectoryListing] = files
@@ -82,7 +82,7 @@ nonisolated enum DurableChatProjection {
             case .user(let user):
                 finishAgent()
                 let intent = user.content.concatenatedText
-                let attachments = user.content.compactMap { block -> Artifact? in
+                let attachments = user.content.compactMap { block -> FileItem? in
                     if case .attachment(let artifact) = block { return artifact }
                     return nil
                 }

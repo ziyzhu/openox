@@ -6,17 +6,17 @@ import type { Model, Tool, Api, ModelThinkingLevel } from "@earendil-works/pi-ai
 import { AgentDoc, defineExtension, defineTool, section, type EntryDraft, type UserInput, type ToolExecutionResult, type ToolExecutionMode } from "@earendil-works/pi-durable";
 import { openProfileRuntime, type ProfileRuntime, type ConversationReference, type ConversationHistoryCursor,
   type ConversationListCursor, type PresentationChange, installOxProfile, type NormalizedProfileDraft,
-  ApplicationPresentation, type ApplicationPresentationChange, ProfileArtifact, ProfileFile, ProfileIndex, canonical, type TextFileMount,
-  ConversationApplicationMetadata, ConversationPresentation, type ArtifactFiles, type ArtifactRecord } from "../../index";
+  ApplicationPresentation, type ApplicationPresentationChange, LegacyProfileFile, ProfileFile, ProfileIndex, canonical, type TextFileMount,
+  ConversationApplicationMetadata, ConversationPresentation, type FilePayloadStore, type FileRecord } from "../../index";
 import type { CompactionCheckpoint, ConversationId, EntryId, GenerationCheckpoint, HarnessInspection, SubmissionId, TaskId, ToolExecutionApi, ToolTaskInput } from "@earendil-works/pi-durable";
-import { artifactPath, artifactRecord } from "../../profile/artifacts";
+import { legacyFilePath, validateFileRecord } from "../../profile/file-payloads";
 import { publicDocument, type ProfileFileRecord } from "../../profile/file-store";
 import { nativeDatabase } from "../../sqlite";
 import { native } from "./bridge";
 import { nativeStream } from "./native-model";
 import { invokeFilesystem, type NativeFileMount } from "./filesystem";
 import { resolveFileRequest, validateFileRequest, type FileOperation, type FileRequest } from "../../core/filesystem";
-import { nativeArtifacts } from "./artifacts";
+import { nativeFilePayloads } from "./file-payloads";
 import { fileRequest, nativeFiles } from "./files";
 import { composeIOSPrompt } from "./prompts";
 import { composeTurnContext, type SystemPromptInput, type TurnState } from "../../core/prompts";
@@ -52,7 +52,7 @@ type Command = CommandScope & (
   | { action: "fileWriteBinary"; path: string; base64: string }
   | { action: "fileRead" | "fileReference" | "fileReadBinary" | "fileRemove"; path: string }
   | { action: "fileStat" | "fileArtifact"; path: string; byPath?: boolean }
-  | { action: "fileAdopt"; artifact: ArtifactRecord & { binary: boolean; saved: boolean } }
+  | { action: "fileAdopt"; artifact: FileRecord & { binary: boolean; saved: boolean } }
   | { action: "fileSaved"; path: string; saved: boolean }
   | { action: "fileMove"; path: string; prefix: string }
   | { action: "filesPrepare" | "publicFilesInventory" | "applicationLoad" | "applicationDelete" | "conversationMetadata" | "conversationContext"
@@ -61,7 +61,7 @@ type Command = CommandScope & (
 interface OpenedSession {
   session: ProfileRuntime;
   application: ApplicationPresentation;
-  artifacts?: ArtifactFiles;
+  artifacts?: FilePayloadStore;
   preparingFiles: boolean;
   publicFiles: boolean;
 }
@@ -131,14 +131,14 @@ export class IOSAgentAdapter {
         }
       }
       return installOxProfile(args.draft, { database: nativeDatabase((op, sql, params) => native("sql", { op, sql, params })),
-        artifacts: nativeArtifacts(), conversations: count === undefined ? undefined : conversations() });
+        artifacts: nativeFilePayloads(), conversations: count === undefined ? undefined : conversations() });
     }
     if (args.action === "open") {
       if (this.opened) throw new Error("Profile runtime already open");
       this.models = createModels();
       this.attachments.clear(); this.providerRoutes.clear();
       const preparingFiles = args.prepareFiles === true;
-      const artifacts = args.artifactFiles && (!args.physicalFiles || preparingFiles) ? nativeArtifacts() : undefined;
+      const artifacts = args.artifactFiles && (!args.physicalFiles || preparingFiles) ? nativeFilePayloads() : undefined;
       const database = nativeDatabase((op, sql, params) => native("sql", { op, sql, params }));
       const session: ProfileRuntime = await openProfileRuntime({ database, models: this.models, profileID: args.profileID,
         artifacts,
@@ -263,7 +263,7 @@ export class IOSAgentAdapter {
           await session.files.write(path, decodeBase64(args.base64));
           return this.fileReceipt(path);
         }
-        else await session.files.write(artifactPath(canonical(args.path)), decodeBase64(args.base64));
+        else await session.files.write(legacyFilePath(canonical(args.path)), decodeBase64(args.base64));
         return this.fileReceipt(args.path);
       case "fileRead": {
         const content = await session.files.read(args.path);
@@ -280,7 +280,7 @@ export class IOSAgentAdapter {
       }
       case "fileStat":
       case "fileArtifact": {
-        const file = session.files.physical ? await session.files.record(args.path, !args.byPath) : await session.harness.snapshot(ProfileArtifact, artifactPath(canonical(args.path)), context);
+        const file = session.files.physical ? await session.files.record(args.path, !args.byPath) : await session.harness.snapshot(LegacyProfileFile, legacyFilePath(canonical(args.path)), context);
         const record = !file || ("hidden" in file && file.hidden) ? null : { ...file, reference: "id" in file ? file.id : file.path };
         return args.action === "fileStat" ? { file: record } : { artifact: record };
       }
@@ -341,7 +341,7 @@ export class IOSAgentAdapter {
     const backend = nativeFiles();
     const index = await session.files.index(), files: ProfileFileRecord[] = [];
     for (const path of await backend.inventory()) {
-      const record = await session.harness.snapshot(ProfileArtifact, path, context);
+      const record = await session.harness.snapshot(LegacyProfileFile, path, context);
       if (!record?.path) continue;
       files.push(this.normalizedFile({ ...record, id: await backend.identifier(), reference: path,
         mtime: index[path]?.mtime ?? 0, owner: null, hidden: !index[path] }));
@@ -520,7 +520,7 @@ export class IOSAgentAdapter {
       return file ? { ...file, file: { ...file, reference: file.id }, reference: { oxAttachment: file.id, oxProfileID: session.conversations.profileID } } : {};
     }
     if (!path.startsWith("artifacts/")) return {};
-    const artifact = await session.harness.snapshot(ProfileArtifact, artifactPath(path), context);
+    const artifact = await session.harness.snapshot(LegacyProfileFile, legacyFilePath(path), context);
     return artifact?.path ? { ...artifact, artifact, reference: { oxAttachment: path.slice(10), oxProfileID: session.conversations.profileID } } : {};
   }
   private async fileList(prefix?: string) {
@@ -528,7 +528,7 @@ export class IOSAgentAdapter {
     const root = canonical(prefix?.endsWith("/") ? prefix.slice(0, -1) : prefix ?? "");
     const entries = Object.entries(await session.files.index()).filter(([path]) => !root || path === root || path.startsWith(`${root}/`));
     const files = await Promise.all(entries.map(async ([path, metadata]) => {
-      const artifact = this.current.artifacts && path.startsWith("artifacts/") ? await session.harness.snapshot(ProfileArtifact, path, context) : undefined;
+      const artifact = this.current.artifacts && path.startsWith("artifacts/") ? await session.harness.snapshot(LegacyProfileFile, path, context) : undefined;
       const file = artifact ? undefined : await session.harness.snapshot(ProfileFile, path, context);
       return { path, ...metadata, saved: artifact?.saved ?? file?.saved ?? false, ...(artifact ? { sha256: artifact.sha256 } : {}) };
     }));
@@ -600,23 +600,23 @@ export class IOSAgentAdapter {
     if (typeof saved !== "boolean") throw new Error("Saved flag must be Boolean");
     if (this.current.session.files.physical) { await this.current.session.files.saved(path, saved); return; }
     if (!path.startsWith("artifacts/") || typeof saved !== "boolean") throw new Error("Saved flags require an artifact and Boolean");
-    artifactPath(path);
+    legacyFilePath(path);
     await this.current.session.harness.commit(async tx => {
       const index = await tx.doc(ProfileIndex);
       if (!index.files[path]) throw new Error("Artifact is not visible");
-      if (this.current.artifacts) (await tx.doc(ProfileArtifact, path, null)).saved = saved;
+      if (this.current.artifacts) (await tx.doc(LegacyProfileFile, path, null)).saved = saved;
       else (await tx.doc(ProfileFile, path, null)).saved = saved;
     }, context);
   }
-  private async adopt(file: ArtifactRecord & { binary: boolean; saved: boolean }) {
+  private async adopt(file: FileRecord & { binary: boolean; saved: boolean }) {
     const { artifacts, session } = this.current;
     if (!artifacts || !file || typeof file.binary !== "boolean" || typeof file.saved !== "boolean" || !Number.isSafeInteger(file.size) || file.size < 0 || file.size > (file.binary ? 32 * 1024 * 1024 : 200 * 1024)) throw new Error("Invalid file-backed artifact adoption");
-    artifactRecord(file, file.path, file.size);
+    validateFileRecord(file, file.path, file.size);
     const bytes = await artifacts.read(file);
     if (!file.binary) new TextDecoder("utf-8", { fatal: true }).decode(bytes);
     await artifacts.flush(file.path);
     await session.harness.commit(async tx => {
-      const record = await tx.doc(ProfileArtifact, file.path, null);
+      const record = await tx.doc(LegacyProfileFile, file.path, null);
       const index = await tx.doc(ProfileIndex);
       if (record.path) throw new Error("Artifact references are immutable; choose a distinct filename");
       if (Object.keys(index.files).length >= 10_000) throw new Error("Profile file count limit reached");

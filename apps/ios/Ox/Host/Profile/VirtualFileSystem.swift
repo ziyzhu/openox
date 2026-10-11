@@ -2,7 +2,7 @@ import Foundation
 
 nonisolated public struct VirtualFileSystem: Sendable {
     static let hostRoots = ["MEMORY.md", "SOUL.md", "artifacts", "skills", "services", "history"]
-    static let maximumReadBytes = ArtifactLimits.textBytes
+    static let maximumReadBytes = FileLimits.textBytes
     static let maximumSearchFiles = 1_000
 
     enum Location: Equatable, Sendable {
@@ -134,7 +134,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case ["artifacts"]: return .artifacts
         case let parts where parts.count == 2 && parts[0] == "artifacts":
             let name = parts[1]
-            _ = try ArtifactStore.validatedFilename(name)
+            _ = try FileStore.validatedFilename(name)
             return .artifact(name)
         case ["skills"]: return .skills
         case let parts where parts.count == 2 && parts[0] == "skills":

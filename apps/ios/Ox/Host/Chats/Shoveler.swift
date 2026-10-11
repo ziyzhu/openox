@@ -9,5 +9,5 @@ nonisolated struct ShovelerCard: Codable, Equatable, Sendable {
     let title: String?
     let description: String?
     let badge: String?
-    let artifact: Artifact?
+    let artifact: FileItem?
 }

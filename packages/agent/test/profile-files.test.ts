@@ -8,8 +8,8 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { ProfileFiles, ProfileFile, canonical } from "../src/profile/files";
 import { profileEnv } from "../src/profile/filesystem";
 import { backend } from "./sqlite-backend";
-import { openProfileRuntime, installOxProfile, type NormalizedProfileDraft, type ArtifactFiles } from "../src/index";
-import { artifactPath } from "../src/profile/artifacts";
+import { openProfileRuntime, installOxProfile, type NormalizedProfileDraft, type FilePayloadStore } from "../src/index";
+import { legacyFilePath } from "../src/profile/file-payloads";
 import { mkdtemp, mkdir, open, rm, readFile, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 
@@ -93,11 +93,11 @@ test("document checkpoint policy bounds replay and binary admission freezes call
 test("file-backed host integrates actual Pi SQLite commits, physical files, history, corruption and reopen", async () => {
   const directory = await mkdtemp("/tmp/ox-artifacts-integration-");
   const hash = (bytes: Uint8Array) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex");
-  const host = (root = directory): ArtifactFiles => {
+  const host = (root = directory): FilePayloadStore => {
     let closed = false;
     const path = (name: string) => {
       if (closed) throw new Error("Native file owner closed");
-      return `${root}/${artifactPath(name)}`;
+      return `${root}/${legacyFilePath(name)}`;
     };
     return {
       async publish(name, bytes) {

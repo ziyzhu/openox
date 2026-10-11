@@ -1,9 +1,9 @@
 import Foundation
 import Synchronization
 
-nonisolated final class ProviderArtifactInputs: Sendable {
+nonisolated final class ProviderFileInputs: Sendable {
     nonisolated private struct Group: Sendable {
-        var sources: [URL: Artifact] = [:]
+        var sources: [URL: FileItem] = [:]
         var bytes: [URL: Data] = [:]
         var size = 0
     }
@@ -19,18 +19,18 @@ nonisolated final class ProviderArtifactInputs: Sendable {
         Self.groups.withLock { _ = $0.removeValue(forKey: id) }
     }
 
-    func snapshot(_ artifact: Artifact, data: Data) throws -> Artifact {
+    func snapshot(_ artifact: FileItem, data: Data) throws -> FileItem {
         try Self.groups.withLock { groups in
-            guard var group = groups[id] else { throw RuntimeError.bridge("Provider artifact input scope is closed") }
+            guard var group = groups[id] else { throw RuntimeError.bridge("Provider file input scope is closed") }
             if let existing = group.sources[artifact.fileURL] {
-                guard group.bytes[existing.fileURL] == data else { throw RuntimeError.bridge("Immutable artifact changed during model input preparation") }
+                guard group.bytes[existing.fileURL] == data else { throw RuntimeError.bridge("Immutable file changed during model input preparation") }
                 return existing
             }
-            guard data.count <= ArtifactLimits.fileBytes, group.size + data.count <= 4 * ArtifactLimits.fileBytes else {
-                throw RuntimeError.bridge("Verified provider artifact inputs exceed their bounded memory budget")
+            guard data.count <= FileLimits.fileBytes, group.size + data.count <= 4 * FileLimits.fileBytes else {
+                throw RuntimeError.bridge("Verified provider file inputs exceed their bounded memory budget")
             }
             let directory = URL(string: "ox-model-input://\(id.uuidString)/\(UUID().uuidString)/")!
-            let snapshot = Artifact(fileName: artifact.fileName, directory: directory, size: data.count)
+            let snapshot = FileItem(fileName: artifact.fileName, directory: directory, size: data.count)
             group.sources[artifact.fileURL] = snapshot
             group.bytes[snapshot.fileURL] = data
             group.size += data.count
@@ -46,13 +46,13 @@ nonisolated final class ProviderArtifactInputs: Sendable {
         }
     }
 
-    func cached(_ artifact: Artifact) -> Artifact? {
+    func cached(_ artifact: FileItem) -> FileItem? {
         Self.groups.withLock { $0[id]?.sources[artifact.fileURL] }
     }
 
-    static func read(_ artifact: Artifact) throws -> Data {
+    static func read(_ artifact: FileItem) throws -> Data {
         guard artifact.fileURL.scheme == "ox-model-input", let host = artifact.fileURL.host, let id = UUID(uuidString: host) else {
-            throw RuntimeError.bridge("Provider attachment has not been verified by its native artifact owner")
+            throw RuntimeError.bridge("Provider attachment has not been verified by its native file owner")
         }
         return try groups.withLock { groups in
             guard let data = groups[id]?.bytes[artifact.fileURL] else {

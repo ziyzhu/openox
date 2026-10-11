@@ -421,7 +421,7 @@ public struct OpenAIChatTransport: ProviderClient {
                     "image_url": ["url": "data:\(a.mimeType);base64,\(b64)"]
                 ])
             case .pdf:
-                let pdf = try PDFPreparer.prepareArtifact(data)
+                let pdf = try PDFPreparer.prepareFile(data)
                 parts.append([
                     "type": "file",
                     "file": [
@@ -481,7 +481,7 @@ public struct OpenAIChatTransport: ProviderClient {
                     "image_url": ["url": "data:\(attachment.mimeType);base64,\(attachment.data.base64EncodedString())"]
                 ])
             case .pdf:
-                let pdf = try PDFPreparer.prepareArtifact(attachment.data)
+                let pdf = try PDFPreparer.prepareFile(attachment.data)
                 parts.append([
                     "type": "file",
                     "file": [

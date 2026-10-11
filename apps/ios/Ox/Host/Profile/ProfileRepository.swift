@@ -222,13 +222,13 @@ actor ProfileRepository {
         do {
             var names: [String: String] = [:], dependencies: [String: String] = [:]
             for (name, data) in prepared.artifacts {
-                let artifact = try await importArtifact(data: data, suggestedName: name, in: scope, conversation: reference)
+                let artifact = try await importFile(data: data, suggestedName: name, in: scope, conversation: reference)
                 names[name.lowercased()] = artifact.fileName
                 dependencies[name.lowercased()] = artifact.displayName
             }
             let directory = scope.root.appendingPathComponent("conversations/\(reference.conversationID)")
             let materialized = try prepared.materialized(artifactNames: names, directory: directory, dependencyNames: dependencies)
-            for (name, data) in materialized.artifacts { _ = try await writeArtifact(data: data, named: name, in: scope) }
+            for (name, data) in materialized.artifacts { _ = try await writeFile(data: data, named: name, in: scope) }
             let alias = "ox-native:" + UUID().uuidString
             let entries = try materialized.turns.map { turn -> JSONValue in
                 .object(["kind": .string("ox.native.turn"), "data": .object(["turn": try encoded(turn)]),

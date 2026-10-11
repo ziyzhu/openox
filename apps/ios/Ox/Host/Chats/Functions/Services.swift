@@ -10,14 +10,14 @@ extension Conversation: OxFunctionBridge {
                 throw WebsiteProviderError("Invalid website attachment reference", kind: .unsupportedInput)
             }
             let stored = try await repository.artifact(named: name, in: scope)
-            let artifact = try await repository.materializeArtifact(stored, in: scope)
+            let artifact = try await repository.materializeFile(stored, in: scope)
             guard artifact.exists, artifact.mimeType == mimeType,
-                  let size = artifact.size, size <= ArtifactLimits.fileBytes else {
+                  let size = artifact.size, size <= FileLimits.fileBytes else {
                 throw WebsiteProviderError("Website attachment is unavailable, too large, or has a different MIME type", kind: .unsupportedInput)
             }
             let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: artifact.fileURL) }.value
             total += data.count
-            guard !data.isEmpty, total <= ArtifactLimits.fileBytes else {
+            guard !data.isEmpty, total <= FileLimits.fileBytes else {
                 throw WebsiteProviderError("Website attachments exceed the upload limit", kind: .unsupportedInput)
             }
             attachments.append(WebsiteAttachment(name: name, mimeType: mimeType, data: data))

@@ -64,7 +64,7 @@ nonisolated enum DurableMessageCodec {
               let digest = fields["sha256"]?.stringValue else {
             throw RuntimeError.bridge("Attachment has no committed file reference")
         }
-        _ = try ArtifactStore.validatedFilename(name)
+        _ = try FileStore.validatedFilename(name)
         let kind: String
         switch attachment.kind {
         case .image: kind = "image"
@@ -83,7 +83,7 @@ nonisolated enum DurableMessageCodec {
     }
 
     static func decodeModel(_ value: JSONValue, scope: ProfileScope, artifactScope: ProfileScope? = nil, runtime: DurableRuntime,
-                            runtimeProfileID: String? = nil, inputs: ProviderArtifactInputs) async throws -> Message {
+                            runtimeProfileID: String? = nil, inputs: ProviderFileInputs) async throws -> Message {
         let message = try decode(value, scope: scope, artifactScope: artifactScope, includeTransientReferences: false)
         let references = (value.objectValue?["content"]?.arrayValue ?? []).filter { $0.objectValue?["oxTransientAttachment"] != nil }
         let ownerID = runtimeProfileID ?? (artifactScope ?? scope).profileID?.uuidString
@@ -113,7 +113,7 @@ nonisolated enum DurableMessageCodec {
                   let displayName = descriptor["displayName"]?.stringValue else {
                 throw RuntimeError.bridge("Transient reference does not belong to its immutable artifact owner")
             }
-            _ = try ArtifactStore.validatedFilename(name)
+            _ = try FileStore.validatedFilename(name)
             guard let kind = descriptor["kind"]?.stringValue, ["image", "pdf", "text", "file"].contains(kind) else {
                 throw RuntimeError.bridge("Invalid transient media kind")
             }
@@ -123,7 +123,7 @@ nonisolated enum DurableMessageCodec {
                 continue
             }
             let data = try await runtime.readFile(descriptor: current)
-            let artifact = Artifact(fileName: name, directory: (artifactScope ?? scope).root,
+            let artifact = FileItem(fileName: name, directory: (artifactScope ?? scope).root,
                 relativePath: current.objectValue?["path"]?.stringValue ?? "artifacts/\(name)", size: data.count)
             _ = try inputs.snapshot(artifact, data: data)
             result.transientAttachments.append(try WebAttachmentFactory.make(data: data, filename: artifact.displayName, mimeType: artifact.mimeType))
@@ -132,7 +132,7 @@ nonisolated enum DurableMessageCodec {
     }
 
     private static func modelContent(_ content: [ContentBlock], scope: ProfileScope, artifactScope: ProfileScope?, runtime: DurableRuntime,
-                                     runtimeProfileID: String?, inputs: ProviderArtifactInputs) async throws -> [ContentBlock] {
+                                     runtimeProfileID: String?, inputs: ProviderFileInputs) async throws -> [ContentBlock] {
         var verified: [ContentBlock] = []
         for block in content {
             guard case .attachment(let artifact) = block else { verified.append(block); continue }
@@ -161,14 +161,14 @@ nonisolated enum DurableMessageCodec {
                 continue
             }
             let data = try await reader.readFile(descriptor: descriptor)
-            let resolved = Artifact(fileName: artifact.fileName, directory: owner.root,
+            let resolved = FileItem(fileName: artifact.fileName, directory: owner.root,
                 relativePath: descriptor.objectValue?["path"]?.stringValue ?? path, size: data.count)
             verified.append(.attachment(try inputs.snapshot(resolved, data: data)))
         }
         return verified
     }
 
-    static func decode(_ value: JSONValue, scope: ProfileScope, artifactScope: ProfileScope? = nil, includeTransientReferences: Bool = true, files: ArtifactDirectoryListing? = nil) throws -> Message {
+    static func decode(_ value: JSONValue, scope: ProfileScope, artifactScope: ProfileScope? = nil, includeTransientReferences: Bool = true, files: FileDirectoryListing? = nil) throws -> Message {
         guard let fields = value.objectValue, let role = fields["role"]?.stringValue else { throw RuntimeError.bridge("Invalid Pi message") }
         let timestamp = Date(timeIntervalSince1970: (fields["timestamp"]?.doubleValue ?? 0) / 1000)
         let values = fields["content"]?.arrayValue ?? fields["content"]?.stringValue.map {
@@ -221,10 +221,10 @@ nonisolated enum DurableMessageCodec {
         return call
     }
 
-    private static func decodeBlock(_ value: JSONValue, scope: ProfileScope, artifactScope: ProfileScope?, files: ArtifactDirectoryListing? = nil) throws -> ContentBlock {
+    private static func decodeBlock(_ value: JSONValue, scope: ProfileScope, artifactScope: ProfileScope?, files: FileDirectoryListing? = nil) throws -> ContentBlock {
         let fields = value.objectValue ?? [:]
         if let name = fields["oxAttachment"]?.stringValue {
-            _ = try ArtifactStore.validatedFilename(name)
+            _ = try FileStore.validatedFilename(name)
             let owner: ProfileScope
             if let profileID = fields["oxProfileID"]?.stringValue {
                 guard let identity = UUID(uuidString: profileID) else { throw RuntimeError.bridge("Invalid attachment Profile identity") }
@@ -233,9 +233,9 @@ nonisolated enum DurableMessageCodec {
                 else { throw RuntimeError.bridge("Attachment reference belongs to another Profile") }
             } else { owner = scope } // Existing UUID-bound cache/legacy codec compatibility.
             if let references = files?.files {
-                return .attachment(references[name] ?? Artifact(fileName: name, directory: owner.root.appendingPathComponent("artifacts"), availability: .unavailable))
+                return .attachment(references[name] ?? FileItem(fileName: name, directory: owner.root.appendingPathComponent("artifacts"), availability: .unavailable))
             }
-            return .attachment(Artifact(fileName: name, directory: owner.root.appendingPathComponent("artifacts")))
+            return .attachment(FileItem(fileName: name, directory: owner.root.appendingPathComponent("artifacts")))
         }
         switch fields["type"]?.stringValue {
         case "text": return .text(TextContent(fields["text"]?.stringValue ?? "", textSignature: fields["textSignature"]?.stringValue,

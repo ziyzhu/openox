@@ -5,7 +5,7 @@ import { Harness, createRegistry, watchEvents, type AgentEvent, type AgentEventS
 import { SqliteStorage, type SqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite";
 import { applyChanges } from "./committed-partial";
 import { ProfileFiles } from "./files";
-import type { ArtifactFiles } from "./artifacts";
+import type { FilePayloadStore } from "./file-payloads";
 import { profileMounts } from "./filesystem";
 import { mountedFileSystem, type FileMount, type TextFileMount } from "../core/file-mounts";
 import { bundledSkills } from "../core/bundled-skills";
@@ -22,7 +22,7 @@ export interface ProfileRuntimeOptions {
   models: Models;
   registry?: Registry;
   settings?: HarnessSettings;
-  artifacts?: ArtifactFiles;
+  artifacts?: FilePayloadStore;
   fileStorage?: { kind: "physical" | "prepare"; backend: ProfileFileBackend; publicFiles?: boolean };
   mounts?: readonly FileMount[];
   /** Only for the explicitly retained, purgeable SQLite-blob fixtures. */

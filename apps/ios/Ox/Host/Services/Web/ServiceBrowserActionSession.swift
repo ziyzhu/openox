@@ -173,7 +173,7 @@ final class ServiceBrowserActionSession {
             let generation = page.navigationGeneration
             let data = try await page.page.exported(as: .pdf())
             guard generation == page.navigationGeneration else { throw Service.EvalError.contextInvalidated }
-            let prepared = try PDFPreparer.prepareArtifact(data)
+            let prepared = try PDFPreparer.prepareFile(data)
             let attachment = TransientAttachment(
                 kind: .pdf,
                 mimeType: prepared.mimeType,

@@ -33,7 +33,7 @@ struct ImageWidgetView: View {
             .chatCardOutline(cornerRadius: Theme.Radius.md)
             .task(id: LoadRequest(image: image, retry: retry)) { await load() }
             .fullScreenCover(item: $preview) { preview in
-                ArtifactScreen(onDismiss: { self.preview = nil }, dismissIdentifier: A11yID.Chat.Message.imageClose) { _ in
+                FileScreen(onDismiss: { self.preview = nil }, dismissIdentifier: A11yID.Chat.Message.imageClose) { _ in
                     ZoomableImageView(image: preview.image)
                 }
             }
@@ -83,7 +83,7 @@ struct ImageWidgetView: View {
             let data: Data
             switch image.source {
             case let .artifact(artifact):
-                data = try await ArtifactPreviewSource(artifact: artifact, scope: scope).read()
+                data = try await FilePreviewSource(artifact: artifact, scope: scope).read()
             case let .remote(value):
                 let request = try WebFetchRequest(url: value)
                 guard request.url.scheme == "https" else { throw ImagePreparationError.invalid }

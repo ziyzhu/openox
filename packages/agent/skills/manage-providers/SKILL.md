@@ -32,7 +32,7 @@ Use available `ox.web` research functions and normal service Actions to verify u
 
 Start from `get` for an existing provider, or a compatible bundled definition as a structural example for a requested new provider. Use only fields and protocols accepted by the current `ox.provider.validate` contract. Do not reuse another provider's custom adapter identity or OAuth registration to simulate unsupported native behavior. OAuth functionality must use apps registered as OpenOx.
 
-1. Build the complete candidate with only the requested changes; never put credential values in the document, headers, options, artifacts, or chat.
+1. Build the complete candidate with only the requested changes; never put credential values in the document, headers, options, files, or chat.
 2. Call `ox.provider.validate({ provider: candidate, purpose })`. This checks structure/runtime compatibility without network requests; it does not verify credentials, availability, or model capability.
 3. Re-read the active definition before saving. If it changed since inspection, reconcile against fresh state rather than overwriting another edit.
 4. Call `ox.provider.save({ provider: candidate, purpose })`, then `get` and `list` to verify the intended definition/source and availability. Save models explicitly; saving does not perform discovery.

@@ -32,7 +32,6 @@ nonisolated enum OxFunctionCatalog {
         OxOutput.function,
         OxSkills.function,
         OxSchedules.function,
-        OxArtifacts.function,
         OxVision.function,
         OxWidgets.function,
     ]
@@ -63,18 +62,18 @@ nonisolated enum OxFunctionCatalog {
         return .object(entry)
     }
 
-    static func build(compatibility: Bool = false) -> JSONValue {
-        .object(compatibility ? catalog : catalog.filter { !$0.key.hasPrefix("ox.artifact.") })
+    static func build() -> JSONValue {
+        .object(catalog)
     }
 
-    static func buildHelpText(compatibility: Bool = false) -> JSONValue {
-        .object(Dictionary(uniqueKeysWithValues: catalogEntries.filter { compatibility || !$0.0.hasPrefix("ox.artifact.") }.map { name, schema in
+    static func buildHelpText() -> JSONValue {
+        .object(Dictionary(uniqueKeysWithValues: catalogEntries.map { name, schema in
             (name, .string(helpText(name: name, schema: schema)))
         }))
     }
 
     static func helpTree(includesSummaries: Bool = false) -> String {
-        let catalog = catalogEntries.filter { !$0.0.hasPrefix("ox.artifact.") }
+        let catalog = catalogEntries
         var lines = ["ox"]
         let rootHelpers = catalog.compactMap { name, schema -> (String, String)? in
             guard name.dropFirst("ox.".count).contains(".") == false,

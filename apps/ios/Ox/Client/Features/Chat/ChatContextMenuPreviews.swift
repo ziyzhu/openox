@@ -42,7 +42,7 @@ struct ConversationContextMenuPreview: View {
 struct MessageContextMenuPreview: View {
     let title: String?
     let text: String
-    let attachments: [Artifact]
+    let attachments: [FileItem]
 
     var body: some View {
         ContextMenuPreviewSurface {
@@ -63,7 +63,7 @@ struct MessageContextMenuPreview: View {
 
                 ForEach(attachments.prefix(2)) { artifact in
                     HStack(spacing: Theme.Spacing.sm) {
-                        ArtifactThumbnail(attachment: artifact, style: .row)
+                        FileThumbnail(attachment: artifact, style: .row)
                         Text(artifact.userFacingName)
                             .font(Theme.Fonts.bodySm)
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)

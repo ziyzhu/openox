@@ -79,12 +79,12 @@ nonisolated extension PreparedChatPackage {
         var updatedTurns = turns
         for (source, destination) in artifactNames {
             updatedTurns = updatedTurns.map {
-                $0.replacingArtifact(named: source, with: destination, directory: directory)
+                $0.replacingFile(named: source, with: destination, directory: directory)
             }
         }
         let updatedContext: AgentContextCheckpoint?
         if let context, let boundary = contextBoundary {
-            let messages = context.messages.map { $0.replacingArtifacts(artifactNames, directory: directory) }
+            let messages = context.messages.map { $0.replacingFiles(artifactNames, directory: directory) }
             updatedContext = AgentContextCheckpoint(
                 messages: messages,
                 tokensBefore: context.tokensBefore,
@@ -94,7 +94,7 @@ nonisolated extension PreparedChatPackage {
         } else {
             updatedContext = nil
         }
-        var updatedArtifacts: [String: Data] = [:]
+        var updatedFiles: [String: Data] = [:]
         for (source, data) in artifacts {
             let destination = artifactNames[source.lowercased()] ?? source
             var rewritten = data
@@ -109,12 +109,12 @@ nonisolated extension PreparedChatPackage {
                 }
                 rewritten = Data(text.utf8)
             }
-            updatedArtifacts[destination] = rewritten
+            updatedFiles[destination] = rewritten
         }
         guard updatedContext == nil || updatedContext?.boundary(in: updatedTurns) != nil else {
             throw ChatPackageError.invalidContext
         }
-        return MaterializedChatPackage(turns: updatedTurns, context: updatedContext, artifacts: updatedArtifacts)
+        return MaterializedChatPackage(turns: updatedTurns, context: updatedContext, artifacts: updatedFiles)
     }
 }
 
@@ -137,7 +137,7 @@ nonisolated enum ChatPackageError: LocalizedError, Sendable {
     case invalidHeader
     case invalidTranscript
     case invalidContext
-    case missingArtifact(String)
+    case missingFile(String)
     case incompleteCompaction
 
     var errorDescription: String? {
@@ -152,7 +152,7 @@ nonisolated enum ChatPackageError: LocalizedError, Sendable {
         case .invalidHeader: "This chat package has an invalid chat.json."
         case .invalidTranscript: "This chat package has an invalid transcript."
         case .invalidContext: "This chat package has invalid compacted context."
-        case .missingArtifact(let name): "This chat package is missing \(name)."
+        case .missingFile(let name): "This chat package is missing \(name)."
         case .incompleteCompaction: "This compacted chat is missing its continuation context."
         }
     }
@@ -175,10 +175,10 @@ nonisolated enum ChatPackageCodec {
         if !fileNames.isEmpty {
             let directory = FileManager.default.temporaryDirectory
             var turns = prepared.turns
-            for (source, destination) in fileNames { turns = turns.map { $0.replacingArtifact(named: source, with: destination, directory: directory) } }
+            for (source, destination) in fileNames { turns = turns.map { $0.replacingFile(named: source, with: destination, directory: directory) } }
             let context: AgentContextCheckpoint?
             if let retained = prepared.context, let boundary = prepared.contextBoundary {
-                context = AgentContextCheckpoint(messages: retained.messages.map { $0.replacingArtifacts(fileNames, directory: directory) },
+                context = AgentContextCheckpoint(messages: retained.messages.map { $0.replacingFiles(fileNames, directory: directory) },
                     tokensBefore: retained.tokensBefore, turns: turns, through: boundary)
             } else { context = nil }
             prepared = try validate(turns: turns, context: context)
@@ -188,8 +188,8 @@ nonisolated enum ChatPackageCodec {
         let artifacts: [String: Data]
         if let files { artifacts = files }
         else {
-            let directArtifacts = try artifactData(turns: prepared.turns, context: prepared.context)
-            artifacts = try includingArtifactDependencies(directArtifacts.data, directory: directArtifacts.directory)
+            let directFiles = try artifactData(turns: prepared.turns, context: prepared.context)
+            artifacts = try includingFileDependencies(directFiles.data, directory: directFiles.directory)
         }
 
         var bodyFiles = [ZipArchiveCodec.File(path: turnsPath, data: turns)]
@@ -274,7 +274,7 @@ nonisolated enum ChatPackageCodec {
             let name = String(path.dropFirst(artifactsPrefix.count))
             guard !name.isEmpty,
                   !name.contains("/"),
-                  try ArtifactStore.validatedFilename(name) == name,
+                  try FileStore.validatedFilename(name) == name,
                   artifacts[name.lowercased()] == nil else {
                 throw ChatPackageError.invalidHeader
             }
@@ -327,9 +327,9 @@ nonisolated enum ChatPackageCodec {
             throw ChatPackageError.invalidHeader
         }
         let packaged = Set(payload.artifacts.keys.map { $0.lowercased() })
-        for artifact in referencedArtifacts(turns: prepared.turns, context: prepared.context) {
+        for artifact in referencedFiles(turns: prepared.turns, context: prepared.context) {
             guard packaged.contains(artifact.fileName.lowercased()) else {
-                throw ChatPackageError.missingArtifact(artifact.fileName)
+                throw ChatPackageError.missingFile(artifact.fileName)
             }
         }
         return PreparedChatPackage(
@@ -372,11 +372,11 @@ nonisolated enum ChatPackageCodec {
         context: AgentContextCheckpoint?
     ) throws -> (data: [String: Data], directory: URL?) {
         var result: [String: Data] = [:]
-        let referenced = referencedArtifacts(turns: turns, context: context)
+        let referenced = referencedFiles(turns: turns, context: context)
         for artifact in referenced {
             let key = artifact.fileName.lowercased()
             guard !result.keys.contains(where: { $0.lowercased() == key }) else { continue }
-            guard artifact.exists else { throw ChatPackageError.missingArtifact(artifact.fileName) }
+            guard artifact.exists else { throw ChatPackageError.missingFile(artifact.fileName) }
             let data = try Data(contentsOf: artifact.fileURL, options: .mappedIfSafe)
             guard data.count <= maximumEntryBytes else { throw ChatPackageError.tooLarge }
             result[artifact.fileName] = data
@@ -384,9 +384,9 @@ nonisolated enum ChatPackageCodec {
         return (result, referenced.first?.fileURL.deletingLastPathComponent())
     }
 
-    private static func includingArtifactDependencies(_ direct: [String: Data], directory: URL?) throws -> [String: Data] {
+    private static func includingFileDependencies(_ direct: [String: Data], directory: URL?) throws -> [String: Data] {
         guard let directory else { return direct }
-        let candidates = ArtifactStore.list(in: directory).filter { artifact in
+        let candidates = FileStore.list(in: directory).filter { artifact in
             let type = UTType(filenameExtension: artifact.fileURL.pathExtension) ?? .data
             return type.conforms(to: .image) || type.conforms(to: .audio) || type.conforms(to: .movie)
         }
@@ -407,8 +407,8 @@ nonisolated enum ChatPackageCodec {
         return result
     }
 
-    static func referencedArtifacts(turns: [Turn], context: AgentContextCheckpoint?) -> [Artifact] {
-        var result: [Artifact] = []
+    static func referencedFiles(turns: [Turn], context: AgentContextCheckpoint?) -> [FileItem] {
+        var result: [FileItem] = []
         for turn in turns {
             switch turn {
             case .user(let value, _):
@@ -462,9 +462,9 @@ extension ProfileRepository {
         let inventory = try await profileFiles(prefix: "", in: scope).filter { $0.reference != nil }
         var pending: [DurableProfileFile] = []
         var names: [String: String] = [:]
-        for artifact in ChatPackageCodec.referencedArtifacts(turns: state.turns, context: state.context) {
+        for artifact in ChatPackageCodec.referencedFiles(turns: state.turns, context: state.context) {
             guard let file = inventory.first(where: { $0.reference == artifact.fileName }) ?? inventory.first(where: { $0.aliases?.contains(artifact.fileName) == true }) else {
-                throw ChatPackageError.missingArtifact(artifact.fileName)
+                throw ChatPackageError.missingFile(artifact.fileName)
             }
             names[artifact.fileName.lowercased()] = Self.packageFileName(file)
             if !pending.contains(where: { $0.reference == file.reference }) { pending.append(file) }
@@ -480,7 +480,7 @@ extension ProfileRepository {
             let data = try await DurableProfileStore.shared.readFile(scope: scope, file: descriptor)
             total += data.count
             guard total <= ChatPackageCodec.maximumPackageBytes else { throw ChatPackageError.tooLarge }
-            if var text = String(data: data, encoding: .utf8), data.count <= ArtifactLimits.textBytes {
+            if var text = String(data: data, encoding: .utf8), data.count <= FileLimits.textBytes {
                 for candidate in inventory where candidate.path != file.path {
                     let relative = Self.relativeFilePath(from: file.path, to: candidate.path)
                     let encoded = relative.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? relative
@@ -513,20 +513,20 @@ extension ProfileRepository {
 }
 
 private nonisolated extension ContentBlock {
-    var artifact: Artifact? {
+    var artifact: FileItem? {
         if case .attachment(let artifact) = self { return artifact }
         return nil
     }
 
-    func replacingArtifacts(_ names: [String: String], directory: URL) -> ContentBlock {
+    func replacingFiles(_ names: [String: String], directory: URL) -> ContentBlock {
         guard case .attachment(let artifact) = self,
               let name = names[artifact.fileName.lowercased()] else { return self }
-        return .attachment(Artifact(fileName: name, directory: directory))
+        return .attachment(FileItem(fileName: name, directory: directory))
     }
 }
 
 private nonisolated extension Message {
-    var artifacts: [Artifact] {
+    var artifacts: [FileItem] {
         switch self {
         case .user(let value): value.content.compactMap(\.artifact)
         case .assistant(let value): value.content.compactMap(\.artifact)
@@ -534,16 +534,16 @@ private nonisolated extension Message {
         }
     }
 
-    func replacingArtifacts(_ names: [String: String], directory: URL) -> Message {
+    func replacingFiles(_ names: [String: String], directory: URL) -> Message {
         switch self {
         case .user(var value):
-            value.content = value.content.map { $0.replacingArtifacts(names, directory: directory) }
+            value.content = value.content.map { $0.replacingFiles(names, directory: directory) }
             return .user(value)
         case .assistant(var value):
-            value.content = value.content.map { $0.replacingArtifacts(names, directory: directory) }
+            value.content = value.content.map { $0.replacingFiles(names, directory: directory) }
             return .assistant(value)
         case .toolResult(var value):
-            value.content = value.content.map { $0.replacingArtifacts(names, directory: directory) }
+            value.content = value.content.map { $0.replacingFiles(names, directory: directory) }
             return .toolResult(value)
         }
     }

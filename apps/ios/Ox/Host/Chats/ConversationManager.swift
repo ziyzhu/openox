@@ -525,25 +525,25 @@ final class ConversationManager {
         persist(meta)
     }
 
-    func renameArtifact(_ artifact: Artifact, to newFilename: String) async throws -> Artifact {
+    func renameFile(_ artifact: FileItem, to newFilename: String) async throws -> FileItem {
         ensureRepositoryScope()
         let scope = repositoryScope
-        let renamed = try await repository.renameArtifact(named: artifact.fileName, to: newFilename, in: scope)
+        let renamed = try await repository.renameFile(named: artifact.fileName, to: newFilename, in: scope)
         guard repositoryScope == scope else { return renamed }
         let directory = renamed.fileURL.deletingLastPathComponent()
         for chat in records.values.compactMap({ $0.hydration.chat }) {
-            chat.renameArtifactReferences(from: artifact.fileName, to: renamed.fileName, directory: directory)
+            chat.renameFileReferences(from: artifact.fileName, to: renamed.fileName, directory: directory)
         }
-        Log.session.info("ChatManager.renameArtifact from=\(artifact.fileName) to=\(renamed.fileName)")
+        Log.session.info("ChatManager.renameFile from=\(artifact.fileName) to=\(renamed.fileName)")
         return renamed
     }
 
-    func deleteArtifact(_ artifact: Artifact) async throws {
+    func deleteFile(_ artifact: FileItem) async throws {
         ensureRepositoryScope()
         let scope = repositoryScope
-        _ = try await repository.deleteArtifact(named: artifact.fileName, in: scope)
+        _ = try await repository.deleteFile(named: artifact.fileName, in: scope)
         artifactFilesChanged()
-        Log.session.info("ChatManager.deleteArtifact file=\(artifact.fileName)")
+        Log.session.info("ChatManager.deleteFile file=\(artifact.fileName)")
     }
 
     func artifactFilesChanged() {

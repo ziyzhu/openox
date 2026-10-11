@@ -12,7 +12,7 @@ final class ServiceOperations {
     let attachedDomains: () -> Set<String>
     let requireApproval: (String, ActionPolicy, Any?, String?, String?) async throws -> Void
     let presentControl: (ServiceControl, Service) async -> JSONValue?
-    let receiveArtifacts: @MainActor ([RemoteMCPArtifact]) async throws -> Void
+    let receiveFiles: @MainActor ([RemoteMCPFile]) async throws -> Void
     let serviceChanged: (String) -> Void
     let botControlRequired: (Service, JSONValue, Service.ServiceWebPage) -> Void
     let begin: (String, JSONValue, String) -> UUID
@@ -31,7 +31,7 @@ final class ServiceOperations {
         attachedDomains: @escaping () -> Set<String> = { [] },
         approve: @escaping (String, ActionPolicy, Any?, String?, String?) async throws -> Void,
         presentControl: @escaping (ServiceControl, Service) async -> JSONValue?,
-        receiveArtifacts: @escaping @MainActor ([RemoteMCPArtifact]) async throws -> Void,
+        receiveFiles: @escaping @MainActor ([RemoteMCPFile]) async throws -> Void,
         serviceChanged: @escaping (String) -> Void,
         botControlRequired: @escaping (Service, JSONValue, Service.ServiceWebPage) -> Void = { _, _, _ in },
         begin: @escaping (String, JSONValue, String) -> UUID,
@@ -46,7 +46,7 @@ final class ServiceOperations {
         self.attachedDomains = attachedDomains
         self.requireApproval = approve
         self.presentControl = presentControl
-        self.receiveArtifacts = receiveArtifacts
+        self.receiveFiles = receiveFiles
         self.serviceChanged = serviceChanged
         self.botControlRequired = botControlRequired
         self.begin = begin
@@ -140,7 +140,7 @@ final class ServiceOperations {
             } else if let implementation = service.remoteMCPService {
                 result = await implementation.invoke(
                     service: service, actionID: actionID, args: input,
-                    approve: approve, receiveArtifacts: receiveArtifacts
+                    approve: approve, receiveFiles: receiveFiles
                 )
             } else {
                 result = await service.invokeAction(

@@ -5,10 +5,10 @@ nonisolated enum StorageMigrationError: LocalizedError {
     case collision(String)
     case invalidAttachment(String)
     case invalidApplicationStorage(String)
-    case invalidArtifact(String)
+    case invalidFile(String)
     case invalidLocalRepositorySeed
     case invalidRepairedLocalRepository
-    case missingArtifact(String)
+    case missingFile(String)
     case missingConfig
     case localRepositoryRollbackFailed(String)
     case profileMigrationFailed(String)
@@ -21,10 +21,10 @@ nonisolated enum StorageMigrationError: LocalizedError {
         case .collision(let path): "Migration destination conflicts with existing data: \(path)"
         case .invalidAttachment(let path): "Legacy attachment metadata is invalid: \(path)"
         case .invalidApplicationStorage(let component): "Stored \(component) data is not compatible with this version of Ox."
-        case .invalidArtifact(let path): "Legacy artifact metadata is invalid: \(path)"
+        case .invalidFile(let path): "Legacy artifact metadata is invalid: \(path)"
         case .invalidLocalRepositorySeed: "The Local repository repair seed is invalid."
         case .invalidRepairedLocalRepository: "The repaired Local repository is invalid."
-        case .missingArtifact(let path): "Legacy artifact content is missing: \(path)"
+        case .missingFile(let path): "Legacy artifact content is missing: \(path)"
         case .missingConfig: "The Profile configuration could not be read."
         case .localRepositoryRollbackFailed(let detail): "The Local repository repair and rollback failed: \(detail)"
         case .profileMigrationFailed(let name): "The Profile “\(name)” could not be updated safely."

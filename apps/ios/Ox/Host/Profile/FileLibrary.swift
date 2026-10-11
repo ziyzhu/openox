@@ -1,7 +1,7 @@
 import Foundation
 import PDFKit
 
-nonisolated enum ArtifactLibrary {
+nonisolated enum FileLibrary {
     struct ListOptions {
         var query = ""
         var limit = 50
@@ -22,7 +22,7 @@ nonisolated enum ArtifactLibrary {
         let modifiedAt: String?
         let exists: Bool
 
-        init(_ artifact: Artifact) {
+        init(_ artifact: FileItem) {
             filename = artifact.fileName
             type = artifact.typeIdentifier
             mimeType = artifact.mimeType
@@ -56,7 +56,7 @@ nonisolated enum ArtifactLibrary {
         }
     }
 
-    static func list(_ artifacts: [Artifact], options: ListOptions) -> Listing {
+    static func list(_ artifacts: [FileItem], options: ListOptions) -> Listing {
         let matching = artifacts
             .filter { options.query.isEmpty || $0.fileName.localizedCaseInsensitiveContains(options.query) }
             .sorted { $0.fileName.localizedStandardCompare($1.fileName) == .orderedAscending }
@@ -64,12 +64,12 @@ nonisolated enum ArtifactLibrary {
         return Listing(items: matching.prefix(limit).map(Item.init), truncated: matching.count > limit)
     }
 
-    static func read(_ artifact: Artifact, options: ReadOptions) throws -> Read {
+    static func read(_ artifact: FileItem, options: ReadOptions) throws -> Read {
         guard artifact.exists else {
             return Read(text: nil, truncated: false, unsupported: "Missing artifact.")
         }
-        if let size = artifact.size, size > ArtifactLimits.fileBytes {
-            throw ArtifactError.fileTooLarge(bytes: size, limit: ArtifactLimits.fileBytes)
+        if let size = artifact.size, size > FileLimits.fileBytes {
+            throw FileError.fileTooLarge(bytes: size, limit: FileLimits.fileBytes)
         }
         return try read(
             data: Data(contentsOf: artifact.fileURL),
@@ -78,21 +78,21 @@ nonisolated enum ArtifactLibrary {
         )
     }
 
-    static func read(data: Data, kind: Artifact.Kind, options: ReadOptions) throws -> Read {
-        guard data.count <= ArtifactLimits.fileBytes else {
-            throw ArtifactError.fileTooLarge(bytes: data.count, limit: ArtifactLimits.fileBytes)
+    static func read(data: Data, kind: FileItem.Kind, options: ReadOptions) throws -> Read {
+        guard data.count <= FileLimits.fileBytes else {
+            throw FileError.fileTooLarge(bytes: data.count, limit: FileLimits.fileBytes)
         }
-        let maxBytes = options.maxBytes.map { clamp($0, min: 1, max: ArtifactLimits.fileBytes) } ?? ArtifactLimits.fileBytes
+        let maxBytes = options.maxBytes.map { clamp($0, min: 1, max: FileLimits.fileBytes) } ?? FileLimits.fileBytes
         switch kind {
         case .text, .html:
-            guard let fullText = String(data: data, encoding: .utf8) else { throw ArtifactError.textNotUTF8 }
+            guard let fullText = String(data: data, encoding: .utf8) else { throw FileError.textNotUTF8 }
             let truncated = data.count > maxBytes
             guard truncated else { return Read(text: fullText, truncated: false, unsupported: nil) }
             var end = data.index(data.startIndex, offsetBy: min(maxBytes, data.count))
             while end != data.endIndex && data[end] & 0xC0 == 0x80 {
                 end = data.index(before: end)
             }
-            guard let text = String(data: data[..<end], encoding: .utf8) else { throw ArtifactError.textNotUTF8 }
+            guard let text = String(data: data[..<end], encoding: .utf8) else { throw FileError.textNotUTF8 }
             return Read(text: text, truncated: truncated, unsupported: nil)
         case .pdf:
             guard let document = PDFDocument(data: data) else {
@@ -107,7 +107,7 @@ nonisolated enum ArtifactLibrary {
                 let candidate = text.isEmpty ? section : text + "\n\n" + section
                 if candidate.utf8.count > maxBytes {
                     guard options.maxBytes != nil else {
-                        throw ArtifactError.textTooLarge(bytes: candidate.utf8.count, limit: ArtifactLimits.fileBytes)
+                        throw FileError.textTooLarge(bytes: candidate.utf8.count, limit: FileLimits.fileBytes)
                     }
                     return try read(data: Data(candidate.utf8), kind: .text, options: options)
                 }
@@ -115,9 +115,9 @@ nonisolated enum ArtifactLibrary {
             }
             return Read(text: text, truncated: truncated, unsupported: nil)
         case .image:
-            return Read(text: nil, truncated: false, unsupported: ModelGuidance.text("image.artifactRead"))
+            return Read(text: nil, truncated: false, unsupported: ModelGuidance.text("image.fileRead"))
         case .file:
-            return Read(text: nil, truncated: false, unsupported: ModelGuidance.text("file.artifactConversion"))
+            return Read(text: nil, truncated: false, unsupported: ModelGuidance.text("file.conversion"))
         }
     }
 
@@ -129,7 +129,7 @@ nonisolated enum ArtifactLibrary {
     static func readOptions(from value: JSONValue?) -> ReadOptions {
         let values = value?.objectValue ?? [:]
         return ReadOptions(
-            maxBytes: values["maxBytes"].map { int($0, default: ArtifactLimits.fileBytes) },
+            maxBytes: values["maxBytes"].map { int($0, default: FileLimits.fileBytes) },
             maxPages: values["maxPages"].map { int($0, default: Int.max) }
         )
     }

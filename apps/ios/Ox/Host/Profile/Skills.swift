@@ -209,8 +209,8 @@ extension ProfileRepository {
         let prefix = "skills/\(name)/"
         let resources = skill.resources ?? [:]
         let instructions = SkillFiles.serialize(skill)
-        guard instructions.utf8.count <= ArtifactLimits.textBytes,
-              resources.values.allSatisfy({ $0.utf8.count <= ArtifactLimits.textBytes }) else { throw SkillError.invalidPackage }
+        guard instructions.utf8.count <= FileLimits.textBytes,
+              resources.values.allSatisfy({ $0.utf8.count <= FileLimits.textBytes }) else { throw SkillError.invalidPackage }
         var writes = Dictionary(uniqueKeysWithValues: resources.map { (prefix + $0.key, $0.value) })
         writes[prefix + SkillFiles.fileName] = instructions
         var removes = existing.filter { writes[$0.path] == nil }.map(\.path)

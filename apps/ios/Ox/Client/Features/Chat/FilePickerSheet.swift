@@ -1,11 +1,11 @@
 import SwiftUI
 
-struct ArtifactPickerSheet: View {
+struct FilePickerSheet: View {
     let attachedIDs: Set<String>
-    let onAttach: ([Artifact]) -> Void
+    let onAttach: ([FileItem]) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var artifacts: [Artifact] = []
+    @State private var artifacts: [FileItem] = []
     @State private var selection: Set<String> = []
     @State private var query = ""
     @State private var loading = true
@@ -14,7 +14,7 @@ struct ArtifactPickerSheet: View {
     @State private var loadErrorMessage: String?
     @State private var loadedScope: ProfileScope?
 
-    private var matches: [Artifact] {
+    private var matches: [FileItem] {
         artifacts.filter { query.isEmpty || $0.userFacingName.localizedCaseInsensitiveContains(query) }
     }
 
@@ -33,7 +33,7 @@ struct ArtifactPickerSheet: View {
                     )
                     .padding(Theme.Spacing.lg)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .accessibilityIdentifier(A11yID.Chat.ArtifactPicker.empty)
+                    .accessibilityIdentifier(A11yID.Chat.FilePicker.empty)
                 } else if matches.isEmpty {
                     ContentUnavailableView.search(text: query)
                 } else {
@@ -43,12 +43,12 @@ struct ArtifactPickerSheet: View {
             .background(Theme.Colors.background)
             .navigationTitle("Files")
             .navigationBarTitleDisplayMode(.inline)
-            .accessibilityIdentifier(A11yID.Chat.ArtifactPicker.list)
-            .oxSearchable(text: $query, prompt: Text("Search files"), accessibilityIdentifier: A11yID.Chat.ArtifactPicker.search)
+            .accessibilityIdentifier(A11yID.Chat.FilePicker.list)
+            .oxSearchable(text: $query, prompt: Text("Search files"), accessibilityIdentifier: A11yID.Chat.FilePicker.search)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .accessibilityIdentifier(A11yID.Chat.ArtifactPicker.cancel)
+                        .accessibilityIdentifier(A11yID.Chat.FilePicker.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(action: attach) {
@@ -59,7 +59,7 @@ struct ArtifactPickerSheet: View {
                         }
                     }
                         .disabled(selection.isEmpty || attaching)
-                        .accessibilityIdentifier(A11yID.Chat.ArtifactPicker.attach)
+                        .accessibilityIdentifier(A11yID.Chat.FilePicker.attach)
                 }
             }
             .task(id: StorageRoot.currentScope?.root) { await load() }
@@ -82,11 +82,11 @@ struct ArtifactPickerSheet: View {
                         ? artifact.updatingAvailability(.downloading)
                         : artifact
                     Button { toggle(artifact) } label: {
-                        ArtifactLibraryRow(artifact: displayed, accessory: .selection(selection.contains(artifact.id)), scope: loadedScope)
+                        FileLibraryRow(artifact: displayed, accessory: .selection(selection.contains(artifact.id)), scope: loadedScope)
                     }
                     .buttonStyle(.plain)
                     .disabled(attaching)
-                    .accessibilityIdentifier(A11yID.Chat.ArtifactPicker.item(artifact.id))
+                    .accessibilityIdentifier(A11yID.Chat.FilePicker.item(artifact.id))
                 }
             }
             .padding(.horizontal, Theme.Spacing.lg)
@@ -95,10 +95,10 @@ struct ArtifactPickerSheet: View {
         .scrollIndicators(.hidden)
     }
 
-    private func toggle(_ artifact: Artifact) {
+    private func toggle(_ artifact: FileItem) {
         if selection.remove(artifact.id) == nil { selection.insert(artifact.id) }
         Haptics.impact(.attachmentChoice)
-        Log.ui.info("ArtifactPickerSheet.toggle artifact=\(artifact.id) selected=\(selection.contains(artifact.id))")
+        Log.ui.info("FilePickerSheet.toggle artifact=\(artifact.id) selected=\(selection.contains(artifact.id))")
     }
 
     private func attach() {
@@ -107,17 +107,17 @@ struct ArtifactPickerSheet: View {
             attaching = true
             defer { attaching = false }
             do {
-                var picked: [Artifact] = []
+                var picked: [FileItem] = []
                 for artifact in artifacts where selection.contains(artifact.id) {
-                    picked.append(try await ProfileRepository.shared.materializeArtifact(artifact, in: scope))
+                    picked.append(try await ProfileRepository.shared.materializeFile(artifact, in: scope))
                 }
                 guard StorageRoot.currentScope == scope else { return }
-                Log.ui.info("ArtifactPickerSheet.attach count=\(picked.count)")
+                Log.ui.info("FilePickerSheet.attach count=\(picked.count)")
                 onAttach(picked)
                 dismiss()
             } catch is CancellationError {
             } catch {
-                Log.ui.error("ArtifactPickerSheet.attach download error=\(error.localizedDescription)")
+                Log.ui.error("FilePickerSheet.attach download error=\(error.localizedDescription)")
                 attachErrorMessage = error.localizedDescription
             }
         }
@@ -142,7 +142,7 @@ struct ArtifactPickerSheet: View {
             artifacts = loaded
             loadErrorMessage = nil
             loading = false
-            Log.ui.info("ArtifactPickerSheet.load count=\(artifacts.count) attached=\(attachedIDs.count)")
+            Log.ui.info("FilePickerSheet.load count=\(artifacts.count) attached=\(attachedIDs.count)")
         } catch is CancellationError {
         } catch {
             artifacts = []
@@ -150,7 +150,7 @@ struct ArtifactPickerSheet: View {
             loadedScope = nil
             loading = false
             loadErrorMessage = error.localizedDescription
-            Log.ui.error("ArtifactPickerSheet.load profile=\(scope.profileID?.uuidString ?? "nil") error=\(error.localizedDescription)")
+            Log.ui.error("FilePickerSheet.load profile=\(scope.profileID?.uuidString ?? "nil") error=\(error.localizedDescription)")
         }
     }
 }

@@ -46,7 +46,7 @@ struct ChatContinuation {
     let meta: ChatMeta
     let turns: [Turn]
     let intent: String
-    let attachments: [Artifact]
+    let attachments: [FileItem]
     let skillInvocation: UserSkillInvocation?
 }
 
@@ -596,7 +596,7 @@ final class Conversation: Identifiable {
                 let pending = embedServiceControl(control)
                 return await waitForServiceControl(pending)
             },
-            receiveArtifacts: { [unowned self] in try await importRemoteMCPArtifacts($0) },
+            receiveFiles: { [unowned self] in try await importRemoteMCPFiles($0) },
             serviceChanged: { [unowned self] domain in
                 let replacement = serviceManager.service(domain: domain)
                 setAttachedServices(attachedServices.compactMap { $0.domain == domain ? replacement : $0 })
@@ -655,18 +655,18 @@ final class Conversation: Identifiable {
                 }
                 try appendTransientAttachment(attachment)
             },
-            importArtifact: { [unowned self] attachment, filename in
-                try requireProfileMutation(Actions.artifactImport)
+            importFile: { [unowned self] attachment, filename in
+                try requireProfileMutation(Actions.fsWrite)
                 let fileExtension = URL(fileURLWithPath: attachment.displayName).pathExtension
                 let suggestedName = URL(fileURLWithPath: filename).pathExtension.isEmpty
                     ? "\(filename).\(fileExtension)"
                     : filename
-                let artifact = try await ArtifactImporter.importDataAsync(
+                let artifact = try await FileImporter.importDataAsync(
                     attachment.data,
                     suggestedName: suggestedName,
                     in: scope
                 )
-                embedArtifact(artifact)
+                embedFile(artifact)
                 Log.session.info("Chat.importBrowserExport filename=\(artifact.fileName) bytes=\(attachment.data.count)")
                 return artifact
             },
@@ -713,32 +713,32 @@ final class Conversation: Identifiable {
     private(set) var transcriptRevision: UInt64 = 0
     private(set) var transcriptPreview: String?
     private(set) var hasTranscript = false
-    private var currentExecutionArtifacts: [Artifact] = []
+    private var currentExecutionFiles: [FileItem] = []
     var currentExecutionTransientAttachments: [(sequence: Int, attachment: TransientAttachment)] = []
     private var currentExecutionActivatedSkills: [String: ActivatedSkillContext] = [:]
     var currentExecutionFetchCount = 0
     var currentExecutionFetchBytes = 0
 
-    private struct ReferencedArtifactsCache {
+    private struct ReferencedFilesCache {
         struct Key: Equatable {
             let references: UUID
             let files: Int
         }
 
         let key: Key
-        let artifacts: [Artifact]
+        let artifacts: [FileItem]
     }
 
     private var artifactFilesRevision = 0
     @ObservationIgnored private var artifactRefreshTask: Task<Void, Never>?
-    @ObservationIgnored private var referencedArtifactsCache: ReferencedArtifactsCache?
+    @ObservationIgnored private var referencedFilesCache: ReferencedFilesCache?
     var transcript: [Block] { document.projection }
     var transcriptBlockCount: Int { document.blockCount }
-    var referencedArtifacts: [Artifact] {
-        let key = ReferencedArtifactsCache.Key(references: document.artifactReferencesRevision, files: artifactFilesRevision)
-        if let cache = referencedArtifactsCache, cache.key == key { return cache.artifacts }
-        let artifacts = document.referencedArtifacts
-        referencedArtifactsCache = ReferencedArtifactsCache(key: key, artifacts: artifacts)
+    var referencedFiles: [FileItem] {
+        let key = ReferencedFilesCache.Key(references: document.artifactReferencesRevision, files: artifactFilesRevision)
+        if let cache = referencedFilesCache, cache.key == key { return cache.artifacts }
+        let artifacts = document.referencedFiles
+        referencedFilesCache = ReferencedFilesCache(key: key, artifacts: artifacts)
         return artifacts
     }
     var blocksWithTurnID: [(block: Block, turnID: TurnID)] { document.blocksWithTurnID() }
@@ -752,7 +752,7 @@ final class Conversation: Identifiable {
             do {
                 let listing = try await repository.artifactListing(in: scope)
                 guard !Task.isCancelled, let files = listing.files else { return }
-                document.refreshArtifacts(files)
+                document.refreshFiles(files)
             } catch {
                 Log.session.warning("Chat.files refresh failed id=\(id) error=\(error.localizedDescription)")
             }
@@ -804,7 +804,7 @@ final class Conversation: Identifiable {
         let id: SubmissionID
         let kind: Kind
         let text: String
-        let attachments: [Artifact]
+        let attachments: [FileItem]
         let skillInvocation: UserSkillInvocation?
         let latency: TurnLatencyTrace
         var state: State
@@ -831,7 +831,7 @@ final class Conversation: Identifiable {
     struct QueuedMessage: Identifiable {
         let id: UUID
         let text: String
-        let attachments: [Artifact]
+        let attachments: [FileItem]
         let skillInvocation: UserSkillInvocation?
     }
 
@@ -1171,7 +1171,7 @@ final class Conversation: Identifiable {
 
     func beginExecution(source: String) {
         flushBufferedAgentText()
-        currentExecutionArtifacts = []
+        currentExecutionFiles = []
         currentExecutionTransientAttachments = []
         currentExecutionActivatedSkills = [:]
         currentExecutionFetchCount = 0
@@ -1187,9 +1187,9 @@ final class Conversation: Identifiable {
         growAgentText(text)
     }
 
-    func executionAttachments() -> (artifacts: [Artifact], transient: [TransientAttachment]) {
+    func executionAttachments() -> (artifacts: [FileItem], transient: [TransientAttachment]) {
         (
-            currentExecutionArtifacts,
+            currentExecutionFiles,
             currentExecutionTransientAttachments.sorted { $0.sequence < $1.sequence }.map(\.attachment)
         )
     }
@@ -1379,13 +1379,13 @@ final class Conversation: Identifiable {
         if removedActive { advanceInteraction() }
     }
 
-    func embedArtifact(_ artifact: Artifact) {
+    func embedFile(_ artifact: FileItem) {
         let standalone = ensureExecutionContext()
-        appendExecutionArtifact(artifact)
-        document.apply(.embedArtifact(artifact))
+        appendExecutionFile(artifact)
+        document.apply(.embedFile(artifact))
         NotificationCenter.default.post(name: .artifactChanged, object: artifact.fileURL)
         if standalone { finishStandaloneExecution() }
-        Log.session.info("Chat.embedArtifact filename=\(artifact.fileName)")
+        Log.session.info("Chat.embedFile filename=\(artifact.fileName)")
     }
 
     func embedShoveler(_ shoveler: Shoveler) {
@@ -1423,23 +1423,23 @@ final class Conversation: Identifiable {
         Log.session.info("Chat.embedSkill name=\(skill.name)")
     }
 
-    private func attachMedia(_ artifact: Artifact) {
+    private func attachMedia(_ artifact: FileItem) {
         let standalone = ensureExecutionContext()
-        appendExecutionArtifact(artifact)
+        appendExecutionFile(artifact)
         document.apply(.attachMedia(artifact))
         if standalone { finishStandaloneExecution() }
         Log.session.info("Chat.attachMedia filename=\(artifact.fileName)")
     }
 
-    func renameArtifactReferences(from oldName: String, to newName: String, directory: URL) {
-        document.renameArtifactReferences(from: oldName, to: newName, directory: directory)
+    func renameFileReferences(from oldName: String, to newName: String, directory: URL) {
+        document.renameFileReferences(from: oldName, to: newName, directory: directory)
     }
 
-    private func appendExecutionArtifact(_ artifact: Artifact) {
-        guard !currentExecutionArtifacts.contains(where: {
+    private func appendExecutionFile(_ artifact: FileItem) {
+        guard !currentExecutionFiles.contains(where: {
             $0.fileName.caseInsensitiveCompare(artifact.fileName) == .orderedSame
         }) else { return }
-        currentExecutionArtifacts.append(artifact)
+        currentExecutionFiles.append(artifact)
     }
 
     @discardableResult
@@ -1800,7 +1800,7 @@ final class Conversation: Identifiable {
 
     // MARK: - Branch / retry
 
-    private func rerunCut(at blockId: UUID) -> (cutEntry: Int, text: String, attachments: [Artifact], skillInvocation: UserSkillInvocation?)? {
+    private func rerunCut(at blockId: UUID) -> (cutEntry: Int, text: String, attachments: [FileItem], skillInvocation: UserSkillInvocation?)? {
         guard let target = document.blocksWithTurn().first(where: { $0.0.id == blockId })?.1 else { return nil }
         for ei in stride(from: target, through: 0, by: -1) {
             if case let .user(turn, _) = document.turns[ei] {
@@ -1892,7 +1892,7 @@ final class Conversation: Identifiable {
     private func continuation(
         before index: Int,
         intent: String,
-        attachments: [Artifact],
+        attachments: [FileItem],
         skillInvocation: UserSkillInvocation?
     ) -> ChatContinuation {
         let branchedMeta = ChatMeta(
@@ -1920,7 +1920,7 @@ final class Conversation: Identifiable {
     @discardableResult
     func enqueue(
         _ intent: String,
-        attachments: [Artifact] = [],
+        attachments: [FileItem] = [],
         skillInvocation: UserSkillInvocation? = nil
     ) -> SubmissionReceipt {
         enqueue(
@@ -1933,7 +1933,7 @@ final class Conversation: Identifiable {
 
     func submitAndWait(
         _ intent: String,
-        attachments: [Artifact] = [],
+        attachments: [FileItem] = [],
         skillInvocation: UserSkillInvocation? = nil
     ) async -> ChatSubmissionOutcome {
         let submissionID = SubmissionID()
@@ -1985,7 +1985,7 @@ final class Conversation: Identifiable {
     @discardableResult
     private func enqueue(
         _ intent: String,
-        attachments: [Artifact],
+        attachments: [FileItem],
         skillInvocation: UserSkillInvocation?,
         submissionID: SubmissionID
     ) -> SubmissionReceipt {
@@ -2543,7 +2543,7 @@ final class Conversation: Identifiable {
             skillConflicts: skillConflicts,
             attachedServices: attached,
             fileMountPaths: fileMountPaths,
-            artifactPaths: referencedArtifacts.map { "artifacts/\($0.fileName)" },
+            filePaths: referencedFiles.map { "artifacts/\($0.fileName)" },
             isTemporary: retention == .temporary,
             responseLanguage: AppLocale.shared.responseLanguage,
             hostID: "ios:\(Device.id)",
@@ -2818,7 +2818,7 @@ final class Conversation: Identifiable {
                 return await ModelAdapterPipeline.transform(
                     messages: messages,
                     model: request.model,
-                    loadsArtifactsLazily: client.supportsTools(for: request.model)
+                    loadsFilesLazily: client.supportsTools(for: request.model)
                 )
             }
         )

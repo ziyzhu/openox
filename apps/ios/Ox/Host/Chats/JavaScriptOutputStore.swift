@@ -40,7 +40,7 @@ final class JavaScriptOutputStore {
 
     func save(_ text: String) throws -> String {
         let data = Data(text.utf8)
-        guard storedBytes + data.count <= ArtifactLimits.fileBytes else {
+        guard storedBytes + data.count <= FileLimits.fileBytes else {
             throw RuntimeError.bridge(ModelGuidance.text("output.cacheExceeded"))
         }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

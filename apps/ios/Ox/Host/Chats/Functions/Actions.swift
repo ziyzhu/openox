@@ -87,13 +87,6 @@ nonisolated enum Actions {
     static let memoryRead = "ox.memory.read"
     static let memoryWrite = "ox.memory.write"
     static let memoryReplaceText = "ox.memory.replaceText"
-    static let artifactList = "ox.artifact.list"
-    static let artifactImport = "ox.artifact.import"
-    static let artifactWrite = "ox.artifact.write"
-    static let artifactReplaceText = "ox.artifact.replaceText"
-    static let artifactRename = "ox.artifact.rename"
-    static let artifactDelete = "ox.artifact.delete"
-    static let artifactPresent = "ox.artifact.present"
     static let widgetShoveler = "ox.widget.shoveler"
     static let widgetVideo = "ox.widget.video"
     static let widgetImage = "ox.widget.image"
@@ -120,8 +113,6 @@ nonisolated enum Actions {
         skillCreate, skillCopy, skillDelete, skillShare,
         scheduleCreate, scheduleList, scheduleDelete, scheduleEnable, scheduleRun,
         memoryRead, memoryWrite, memoryReplaceText,
-        artifactList, artifactImport, artifactWrite, artifactReplaceText, artifactRename,
-        artifactDelete, artifactPresent,
         widgetShoveler, widgetVideo, widgetImage, userChoose, userFollow, userReportProgress,
     ]
 
@@ -210,13 +201,6 @@ nonisolated enum Actions {
         case scheduleRun: L10n.string("Run a scheduled skill")
         case memoryRead: L10n.string("Read memory")
         case memoryWrite, memoryReplaceText: L10n.string("Update memory")
-        case artifactList: L10n.string("List artifacts")
-        case artifactImport: L10n.string("Import an artifact")
-        case artifactWrite: L10n.string("Write an artifact")
-        case artifactReplaceText: L10n.string("Edit an artifact")
-        case artifactRename: L10n.string("Rename an artifact")
-        case artifactDelete: L10n.string("Delete an artifact")
-        case artifactPresent: L10n.string("Present an artifact")
         case widgetShoveler: L10n.string("Display cards")
         case widgetVideo: L10n.string("Display video")
         case widgetImage: L10n.string("Display image")
@@ -232,7 +216,7 @@ nonisolated enum Actions {
         if action == appRenameChat || action.hasPrefix("ox.user.") { return .conversations }
         if action.hasPrefix("ox.provider.") || action.hasPrefix("ox.app.") || action.hasPrefix("ox.secret.") { return .device }
         if action.hasPrefix("ox.service.") { return .services }
-        if action.hasPrefix("ox.artifact.") || action.hasPrefix("ox.vision.") { return .artifacts }
+        if action.hasPrefix("ox.vision.") { return .files }
         if action.hasPrefix("ox.skill.") || action.hasPrefix("ox.schedule.") { return .skills }
         if action.hasPrefix("ox.memory.") { return .memory }
         if action.hasPrefix("ox.web.") { return .web }

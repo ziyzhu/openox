@@ -107,7 +107,7 @@
 <polygon fill="white" stroke="#222222" points="462.29,-369.23 306.62,-369.23 306.62,-306.32 462.29,-306.32 462.29,-369.23"/>
 <text xml:space="preserve" text-anchor="middle" x="384.46" y="-347.75" font-family="Arial" font-size="12.00" fill="#171717">Ox Profile</text>
 <text xml:space="preserve" text-anchor="middle" x="384.46" y="-333.5" font-family="Arial" font-size="12.00" fill="#171717">Identity · Memory · Skills</text>
-<text xml:space="preserve" text-anchor="middle" x="384.46" y="-319.25" font-family="Arial" font-size="12.00" fill="#171717">Artifacts · Conversations</text>
+<text xml:space="preserve" text-anchor="middle" x="384.46" y="-319.25" font-family="Arial" font-size="12.00" fill="#171717">Files · Conversations</text>
 </g>
 <!-- profile&#45;&gt;vm -->
 <g id="edge8" class="edge">
