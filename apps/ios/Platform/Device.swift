@@ -1,6 +1,14 @@
 import UIKit
 
 enum Device {
+    static let hostKind = "ios"
+    static var hostMode: String {
+        #if targetEnvironment(simulator)
+        "simulator"
+        #else
+        "device"
+        #endif
+    }
     static let id = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
     static var hostID: String { "ios:\(id)" }
 

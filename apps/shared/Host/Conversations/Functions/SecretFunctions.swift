@@ -29,6 +29,10 @@ extension Conversation {
                 guard let key = fields["key"]?.stringValue else { throw RuntimeError.bridge("Secret key is required") }
                 try Secret.validateKey(key)
                 guard !key.hasPrefix("ox.") else { throw RuntimeError.bridge("Secret key is reserved") }
+                if let presenter = presentations.secretEntry {
+                    let saved = try await presenter(key)
+                    return .object(["key": .string(key), "status": .string(saved ? "saved" : "cancelled")])
+                }
                 let status = await awaitPrompt(prompt: "Save a secret: \(key)",
                                                options: ["Saved", "Cancelled"], secretEntry: SecretEntryRequest(key: key))
                 return .object(["key": .string(key), "status": .string(status == "Saved" ? "saved" : "cancelled")])

@@ -43,6 +43,11 @@ targets:
       properties:
         LSUIElement: true
         CFBundleDisplayName: Ox Host
+        NSContactsUsageDescription: Ox Host accesses contacts when you request contact lookup.
+        NSCalendarsWriteOnlyAccessUsageDescription: Ox Host adds calendar events when you request them.
+        NSRemindersFullAccessUsageDescription: Ox Host adds reminders when you request them.
+        NSLocationUsageDescription: Ox Host uses your location for nearby places and routes.
+        NSLocationWhenInUseUsageDescription: Ox Host uses your location for nearby places and routes.
         OXAppGroupIdentifier: group.ai.openox.host.local
         OXICloudContainerIdentifier: iCloud.ai.openox.host.local
         OXKeychainService: ai.openox.host.local.llm

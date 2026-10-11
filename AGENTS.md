@@ -5,6 +5,7 @@
 1. Logs are user-owned on-device diagnostics.
 1. Keep enough structured logs to diagnose production issues.
 1. Prefer composition and explicit state.
+1. Hosts own `ox.*` execution, capability enforcement, service sessions, credentials, schedules, and persistence; implement platform-supported capabilities through owned collaborators. Clients own rendering, input, theme, and local feedback. Host-requested interaction must not depend on the iOS Client; retain client-local API behavior only as explicit compatibility.
 1. Keep iOS and macOS implementations independent under their app directories. Put platform-neutral runtime code and resources in `apps/shared`; neither app may compile the other's sources. Select platform adapters through target source membership, not OS conditionals. Duplication is acceptable for platform-specific behavior.
 1. Use files, not artifacts, in current UI, model-facing prose, and runtime type names. Do not expose `ox.artifact.*` helpers. Preserve artifact identifiers only at persisted-data and wire-format boundaries.
 1. Keep model-facing guides self-contained and free of external links; explain required concepts inline.

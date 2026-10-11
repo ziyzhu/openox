@@ -14,7 +14,7 @@ enum MessageComposeError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unavailable:
-            return "This device can't send text messages — the iOS Simulator has no Messages app. The compose sheet only works on a real iPhone. Tell the user."
+            return "This Host cannot present a text-message composer. Ask the user to compose the message in their messaging app."
         case .noPresenter:
             return "Couldn't open the message composer — no active window to present from."
         }
@@ -48,6 +48,8 @@ struct AppPresentations {
     let serviceHandoff: any ServiceHandoffPresenting
     let messages: any MessageComposing
     var providerAuthentication: (any ProviderAuthenticating)? = nil
+    var browser: (@MainActor (Service, Service.ServiceWebPage) -> Void)? = nil
+    var secretEntry: (@MainActor (String) async throws -> Bool)? = nil
 
     static let unavailable = AppPresentations(
         serviceSignIn: UnavailableServiceAuthPresenter(),

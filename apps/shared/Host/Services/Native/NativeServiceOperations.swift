@@ -38,6 +38,12 @@ final class NativeServiceOperations {
         self.choose = choose
     }
 
+    private func presentBrowser(_ service: Service) async throws {
+        let page = try await serviceManager.browserActionSessions.session(for: service, ownerID: id).inspectionPage()
+        if let presenter = presentations.browser { presenter(service, page) }
+        else { showBrowser(service, id) }
+    }
+
     private func chooseUser(body: String, options: [String], purpose: String) async throws -> JSONValue? {
         try Task.checkCancellation()
         guard let answer = try await choose(Prompt(body: body, options: options, purpose: purpose)) else { throw CancellationError() }
@@ -52,12 +58,6 @@ final class NativeServiceOperations {
     ) async throws -> JSONValue? {
         let browser = service
         let serviceID = service.domain
-        guard serviceID == "ios:browser" else {
-            throw RuntimeError.bridge("Native iOS service '\(serviceID)' is unavailable on this macOS Host.")
-        }
-        guard actionID != "showPage", actionID != "waitForUserInteraction" else {
-            throw RuntimeError.bridge("Browser presentation is unavailable on this headless macOS Host.")
-        }
         let fields = args.objectValue ?? [:]
         switch (serviceID, actionID) {
         case ("ios:browser", "navigate"):
@@ -123,10 +123,7 @@ final class NativeServiceOperations {
                 .waitForNavigation(timeoutMilliseconds: fields["timeoutMs"]?.intValue ?? 15_000)
             return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
         case ("ios:browser", "showPage"):
-            _ = try await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .inspectionPage()
-            showBrowser(browser, id)
+            try await presentBrowser(browser)
             return .object(["shown": .bool(true)])
         case ("ios:browser", "executeScript"):
             guard let script = fields["script"]?.stringValue else {
@@ -157,7 +154,7 @@ final class NativeServiceOperations {
         case ("ios:browser", "waitForUserInteraction"):
             let session = serviceManager.browserActionSessions.session(for: browser, ownerID: id)
             try await session.prepareForUserInteraction()
-            showBrowser(browser, id)
+            try await presentBrowser(browser)
             let done = L10n.string("Done")
             let answer = try await chooseUser(
                 body: fields["instructions"]?.stringValue
@@ -215,6 +212,51 @@ final class NativeServiceOperations {
                 .session(for: browser, ownerID: id)
                 .stopCapture(discard: fields["discard"]?.boolValue ?? false)
             return .object(["stopped": .bool(stopped)])
+        case ("ios:location", "current"):
+            return try await currentLocation(purpose: purpose)
+        case ("ios:location", "searchNearby"):
+            return try await searchNearby(
+                query: fields["query"]?.stringValue,
+                radiusMeters: fields["radiusMeters"]?.doubleValue,
+                limit: fields["limit"]?.intValue,
+                purpose: purpose
+            )
+        case ("ios:location", "resolve"):
+            return try await resolveLocation(
+                query: fields["query"]?.stringValue,
+                limit: fields["limit"]?.intValue,
+                purpose: purpose
+            )
+        case ("ios:location", "route"):
+            return try await routeLocation(
+                destination: fields["destination"]?.stringValue,
+                transport: fields["transport"]?.stringValue,
+                purpose: purpose
+            )
+        case ("ios:location", "openInMaps"):
+            return try await openLocationInMaps(
+                placeID: fields["placeID"]?.stringValue,
+                directionsMode: fields["directionsMode"]?.stringValue,
+                purpose: purpose
+            )
+        case ("ios:notifications", "schedule"):
+            let schedule = fields["schedule"]?.objectValue ?? [:]
+            return try await scheduleNotification(options: .object([
+                "title": fields["title"] ?? .null,
+                "body": fields["body"] ?? .null,
+                "inSeconds": schedule["type"]?.stringValue == "relative" ? schedule["seconds"] ?? .null : .null,
+                "fireAt": schedule["type"]?.stringValue == "absolute" ? schedule["dateTime"] ?? .null : .null,
+            ]), purpose: purpose)
+        case ("ios:notifications", "cancel"):
+            return try await cancelNotification(id: fields["id"]?.stringValue)
+        case ("ios:calendar", "addEvent"):
+            return try await addCalendarEvent(options: fields["options"], purpose: purpose)
+        case ("ios:reminders", "add"):
+            return try await addReminder(options: fields["options"], purpose: purpose)
+        case ("ios:messages", "compose"):
+            return try await composeMessage(options: fields["options"], purpose: purpose)
+        case ("ios:contacts", "search"):
+            return try await searchContacts(query: fields["query"]?.stringValue, purpose: purpose)
         default:
             throw Service.InvokeError.unknown("\(serviceID):\(actionID)")
         }

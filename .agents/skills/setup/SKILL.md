@@ -51,8 +51,12 @@ The signed app uses a separate sandbox and credential namespace; do not replay
 an iOS container into it. The menu bar shows Host status, controls connections,
 and opens existing service pages in native windows. Closing a window detaches
 presentation without closing its runtime page or stopping the Host. There is no
-conversation UI. Programmatic interactive sign-in/handoffs,
-iOS native services, and scheduled execution are unavailable initially.
+conversation UI. Authentication, secure credential entry, service sign-in/handoffs,
+and browser presentation use Host-owned macOS windows. Calendar, reminders,
+contacts, notifications, and location/Maps use native macOS providers and OS
+permissions. Message composition is unavailable. Scheduled skills execute while
+the Host process is running; overdue work is reconsidered after wake and startup,
+without promising execution while the Mac sleeps or the Host is stopped.
 SIGINT/SIGTERM request an orderly quit; cancellation and persistence finish
 before exit. AppKit termination must be entered outside a main-dispatch callback
 so its deferred termination loop can run MainActor cleanup.

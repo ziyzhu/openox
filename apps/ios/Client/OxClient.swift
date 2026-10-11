@@ -1,16 +1,44 @@
+import Foundation
+
 @MainActor
 final class OxClient {
     static let shared = OxClient(host: IOSHost.shared)
 
     private let host: any OxHost
+    let conversationReader: any HostConversationReading
+    let conversationController: any HostConversationControlling
 
     var conversations: ConversationManager { host.conversations }
     var services: ServiceManager { host.services }
 
-    func listConversations() -> [HostConversationSummary] { host.listConversations() }
+    func listConversations() async throws -> [HostConversationSummary] {
+        try await conversationReader.listConversations()
+    }
 
-    init(host: any OxHost) {
+    func readConversation(_ id: UUID) async throws -> HostConversationState {
+        try await conversationReader.readConversation(id)
+    }
+
+    func sendText(_ text: String, to id: UUID, mode: HostConversationSendMode) async throws -> HostConversationSendResult {
+        try await conversationController.sendText(text, to: id, mode: mode)
+    }
+
+    func stopConversation(_ id: UUID) async throws -> HostConversationStopResult {
+        try await conversationController.stopConversation(id)
+    }
+
+    func respondToPrompt(_ promptID: UUID, in id: UUID, answer: String) async throws -> UUID {
+        try await conversationController.respondToPrompt(promptID, in: id, answer: answer)
+    }
+
+    init(
+        host: any OxHost,
+        conversationReader: (any HostConversationReading)? = nil,
+        conversationController: (any HostConversationControlling)? = nil
+    ) {
         self.host = host
+        self.conversationReader = conversationReader ?? EmbeddedHostConversationReader(host: host)
+        self.conversationController = conversationController ?? EmbeddedHostConversationController(host: host)
     }
 
     func prepareStorage() async throws {

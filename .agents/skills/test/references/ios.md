@@ -24,3 +24,9 @@ WAL/SHM; they are diagnostics, not Profile exports or power-loss evidence.
 
 Verify behavior or independent effects, not just taps, queued sends, or idle status.
 For transcript comparisons, use immutable historical turns: VM calls append receipts.
+
+Measure Client–Host latency over a warmed persistent RPC connection using identical fresh
+fixtures for A/B runs. Report stop acknowledgement separately from observed idle state,
+and inspection snapshots separately from embedded presentation reads. Use physical
+footprint, not RSS, for memory comparisons; run profiling separately from latency samples.
+Pass the Simulator UDID to `xctrace --device` when attaching to its app process.

@@ -28,15 +28,13 @@ final class MacHostApplication: NSObject, NSApplicationDelegate {
         StorageMigrator.migrateApplicationStorage()
         let host = HostRuntime(
             serviceManager: ServiceManager(nativeServices: MacNativeServiceCatalog()),
-            presentations: .unavailable,
+            presentations: MacAppPresentations().presentations,
             conversationExecution: MacConversationExecution(),
             conversationFeedback: MacConversationFeedback(),
             executionPolicy: { true },
-            activateSchedules: {
-                try ScheduledSkills.shared.load()
-                Log.app.info("MacHost schedules loaded executionSupported=false")
-            }
+            activateSchedules: { try ScheduledSkillScheduler.shared.activate() }
         )
+        ScheduledSkillScheduler.shared.configure(host: host)
         let access = HostAccess()
         if ProcessInfo.processInfo.arguments.contains("--allow-connections") { access.enabled = true }
         if ProcessInfo.processInfo.arguments.contains("--disable-connections") { access.enabled = false }
@@ -74,12 +72,16 @@ final class MacHostApplication: NSObject, NSApplicationDelegate {
         startup?.cancel()
         transport?.stop()
         termination = Task {
+            let scheduleShutdown = Task { await ScheduledSkillScheduler.shared.stop() }
             let flushed = await host?.conversations.stopAllAndFlush() ?? true
+            await scheduleShutdown.value
             Log.app.info("MacHost terminating flushed=\(flushed)")
             LogFile.shared.synchronize()
             if !flushed {
                 termination = nil
                 transport?.reconcile()
+                do { try ScheduledSkillScheduler.shared.activate() }
+                catch { Log.app.error("MacHost schedules resume failed error=\(error.localizedDescription)") }
             }
             sender.reply(toApplicationShouldTerminate: flushed)
         }

@@ -57,20 +57,17 @@ final class ConversationManager {
 
         var hydration: HydrationState
         var persistence: PersistenceState
-        var accessOrdinal: UInt64
         var metadataRevision: UInt64
 
-        init(meta: ConversationMeta, accessOrdinal: UInt64 = 0) {
+        init(meta: ConversationMeta) {
             hydration = .unloaded(meta)
             persistence = .clean
-            self.accessOrdinal = accessOrdinal
             metadataRevision = 0
         }
 
-        init(conversation: Conversation, accessOrdinal: UInt64) {
+        init(conversation: Conversation) {
             hydration = .loaded(conversation)
             persistence = .clean
-            self.accessOrdinal = accessOrdinal
             metadataRevision = 0
         }
     }
@@ -84,6 +81,7 @@ final class ConversationManager {
 
     private var records: [ConversationID: Record] = [:]
     private var selection: Selection = .empty
+    @ObservationIgnored private var accessOrdinals: [ConversationID: UInt64] = [:]
     @ObservationIgnored private var hydrationOrdinal: UInt64 = 0
     @ObservationIgnored private var hydrationGeneration: UInt64 = 0
     @ObservationIgnored private var recoveryPreparation: (scope: ProfileScope, task: Task<Void, Error>)?
@@ -208,6 +206,7 @@ final class ConversationManager {
             }
         }
         records = loaded
+        accessOrdinals = accessOrdinals.filter { loaded[$0.key] != nil }
         do { try await recoverConversations(in: scope) }
         catch { Log.session.error("ConversationManager.recovery blocked error=\(error.localizedDescription)") }
         Log.session.info("ConversationManager.loadSummaries count=\(summaries.count) preserved=\(preserved) generation=\(scope.generation)")
@@ -233,8 +232,7 @@ final class ConversationManager {
                         throw RuntimeError.bridge("Recovered conversation is unavailable; Profile progress remains paused")
                     }
                     conversation = restoredConversation(from: loaded, in: scope)
-                    hydrationOrdinal &+= 1
-                    records[reference.compatibilityID] = Record(conversation: conversation, accessOrdinal: hydrationOrdinal)
+                    register(conversation)
                 }
                 try await conversation.prepareDurableRecovery()
                 conversations[reference.conversationID] = conversation
@@ -266,8 +264,7 @@ final class ConversationManager {
         ensureRepositoryScope()
         if let current, current.transcript.isEmpty, !current.isTemporary { return current }
         let conversation = makeConversation()
-        hydrationOrdinal &+= 1
-        records[ConversationID(conversation.id)] = Record(conversation: conversation, accessOrdinal: hydrationOrdinal)
+        register(conversation)
         setCurrent(conversation)
         return conversation
     }
@@ -280,8 +277,7 @@ final class ConversationManager {
         let conversation = makeConversation()
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         if !title.isEmpty { conversation.rename(to: title) }
-        hydrationOrdinal &+= 1
-        records[ConversationID(conversation.id)] = Record(conversation: conversation, accessOrdinal: hydrationOrdinal)
+        register(conversation)
         conversation.enqueue(prompt)
         Log.session.info("bridge.chat.start caller=\(caller.id) target=\(conversation.id)")
         return conversation.id
@@ -307,8 +303,7 @@ final class ConversationManager {
             from: ConversationLoadResult(state: state, needsPersistence: false),
             in: scope
         )
-        hydrationOrdinal &+= 1
-        records[state.conversationID] = Record(conversation: conversation, accessOrdinal: hydrationOrdinal)
+        register(conversation)
         setCurrent(conversation)
         Log.session.info("ConversationManager.import chat=\(conversation.id) turns=\(state.turns.count)")
         return conversation
@@ -344,8 +339,7 @@ final class ConversationManager {
         )
         conversation.rename(to: "Scheduled /\(schedule.skill.displayName)")
         conversation.setAttachedServices(services)
-        hydrationOrdinal &+= 1
-        records[ConversationID(conversation.id)] = Record(conversation: conversation, accessOrdinal: hydrationOrdinal)
+        register(conversation)
         let invocation = UserSkillInvocation(skill: schedule.skill, argument: schedule.argument)
         let outcome = await conversation.submitUntilAttention(
             invocation.expandedIntent,
@@ -359,8 +353,7 @@ final class ConversationManager {
     func toggleTemporaryConversation() {
         guard let previous = current, previous.transcript.isEmpty, previous.queuedMessages.isEmpty, !previous.isBusy else { return }
         let conversation = makeConversation(retention: previous.isTemporary ? .persisted : .temporary)
-        hydrationOrdinal &+= 1
-        records[ConversationID(conversation.id)] = Record(conversation: conversation, accessOrdinal: hydrationOrdinal)
+        register(conversation)
         setCurrent(conversation)
         Log.session.info("ConversationManager.retention chat=\(conversation.id) temporary=\(conversation.isTemporary)")
     }
@@ -385,8 +378,7 @@ final class ConversationManager {
             retention: .temporary
         )
         attachPersistence(conversation)
-        hydrationOrdinal &+= 1
-        records[ConversationID(conversation.id)] = Record(conversation: conversation, accessOrdinal: hydrationOrdinal)
+        register(conversation)
         setCurrent(conversation)
         conversation.enqueue(
             continuation.intent,
@@ -400,6 +392,7 @@ final class ConversationManager {
         guard let conversation = records[id]?.hydration.conversation, conversation.isTemporary else { return }
         conversation.release()
         records[id] = nil
+        accessOrdinals[id] = nil
         if currentId == id.rawValue { selection = .empty }
         Log.session.info("ConversationManager.temporary discarded chat=\(id)")
     }
@@ -430,6 +423,12 @@ final class ConversationManager {
     }
 
     func openForClient(_ rawID: UUID) async throws -> Conversation {
+        let conversation = try await loadForClient(rawID)
+        setCurrent(conversation)
+        return conversation
+    }
+
+    func loadForClient(_ rawID: UUID) async throws -> Conversation {
         ensureRepositoryScope()
         let scope = repositoryScope
         let storageScope = storage.scope
@@ -438,7 +437,8 @@ final class ConversationManager {
               scope == repositoryScope, storageScope == storage.scope, contains(rawID) else {
             throw RuntimeError.bridge("conversation unavailable: \(rawID)")
         }
-        setCurrent(conversation)
+        touch(id)
+        trimHydrated()
         return conversation
     }
 
@@ -466,10 +466,9 @@ final class ConversationManager {
             }
             let restored = record.persistence.isDirty ? loaded.replacingMeta(record.hydration.meta) : loaded
             let conversation = self.restoredConversation(from: restored, in: scope)
-            self.hydrationOrdinal &+= 1
             record.hydration = .loaded(conversation)
-            record.accessOrdinal = self.hydrationOrdinal
             self.records[id] = record
+            self.touch(id)
             if loaded.needsPersistence || conversation.state != loaded.state { self.persist(conversation) }
             return conversation
         }
@@ -509,8 +508,7 @@ final class ConversationManager {
         )
         branched.durableForkSource = (reference, result.turns.filter { if case .user = $0 { return true }; return false }.count)
         attachPersistence(branched)
-        hydrationOrdinal &+= 1
-        records[ConversationID(branched.id)] = Record(conversation: branched, accessOrdinal: hydrationOrdinal)
+        register(branched)
         if branched.state.turns != result.turns { persist(branched) }
         setCurrent(branched)
         return branched
@@ -628,6 +626,7 @@ final class ConversationManager {
                 self.records[id] = deleting
             }
             self.records[id] = nil
+            self.accessOrdinals[id] = nil
         }
         if wasCurrent {
             selection = .empty
@@ -691,6 +690,7 @@ final class ConversationManager {
         hydrationTasks.values.forEach { $0.task.cancel() }
         hydrationTasks.removeAll()
         records.removeAll()
+        accessOrdinals.removeAll()
         selection = .empty
         ensureRepositoryScope(force: true)
         Log.session.info("ConversationManager.reset generation=\(repositoryScope.generation)")
@@ -806,6 +806,7 @@ final class ConversationManager {
                     if case .debouncing(_, let task) = record.persistence { task.cancel() }
                     record.persistence = .clean
                     records[reference.compatibilityID] = record
+                    accessOrdinals[reference.compatibilityID] = accessOrdinals.removeValue(forKey: oldID)
                 }
                 persist(conversation)
             }
@@ -925,18 +926,23 @@ final class ConversationManager {
         trimHydrated()
     }
 
+    private func register(_ conversation: Conversation) {
+        let id = ConversationID(conversation.id)
+        records[id] = Record(conversation: conversation)
+        touch(id)
+    }
+
     private func touch(_ id: ConversationID) {
-        guard var record = records[id] else { return }
+        guard records[id] != nil else { return }
         hydrationOrdinal &+= 1
-        record.accessOrdinal = hydrationOrdinal
-        records[id] = record
+        accessOrdinals[id] = hydrationOrdinal
     }
 
     private func trimHydrated() {
         while records.values.compactMap({ $0.hydration.conversation }).count > Self.maxHydratedConversations {
             guard let candidate = records
                 .filter({ $0.key.rawValue != currentId && $0.value.hydration.conversation?.isBusy == false })
-                .min(by: { $0.value.accessOrdinal < $1.value.accessOrdinal }) else {
+                .min(by: { (accessOrdinals[$0.key] ?? 0) < (accessOrdinals[$1.key] ?? 0) }) else {
                 Log.session.warning("ConversationManager.evict deferred loaded=\(records.values.compactMap { $0.hydration.conversation }.count)")
                 return
             }
@@ -953,6 +959,7 @@ final class ConversationManager {
             conversation.release(cancelling: false)
             record.hydration = .unloaded(meta)
             records[id] = record
+            accessOrdinals[id] = nil
             Log.session.info("ConversationManager.evict id=\(id)")
         }
     }

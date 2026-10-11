@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -116,7 +117,17 @@ final class IOSService {
     func updatePermission(from state: NativePermissionState?) async -> NativePermissionState? {
         guard let permission else { return nil }
         if state == .notDetermined { return await permission.request() }
-        Log.ui.warning("IOSService.permission unavailable permission=\(permission.rawValue) platform=macos")
+        let url: URL?
+        switch permission {
+        case .notifications: url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")
+        case .contacts: url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Contacts")
+        case .calendar: url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")
+        case .reminders: url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders")
+        case .location: url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices")
+        case .bluetooth, .health: url = nil
+        }
+        let opened = url.map { NSWorkspace.shared.open($0) } ?? false
+        Log.ui.info("IOSService.permission settings permission=\(permission.rawValue) platform=macos opened=\(opened)")
         return state
     }
 

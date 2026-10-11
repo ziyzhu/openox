@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import WebKit
@@ -112,8 +113,9 @@ final class ServiceBrowserSession {
     }
 
     private func openExternal(_ url: URL) {
-        navigationNotice = String(localized: "Opening links in other apps is unavailable on this platform.")
-        Log.ui.warning("ServiceBrowser.external unavailable platform=macos scheme=\(url.scheme ?? "none")")
+        let opened = NSWorkspace.shared.open(url)
+        if !opened { navigationNotice = String(localized: "No available app could open this link. The current page has been kept.") }
+        Log.ui.info("ServiceBrowser.external platform=macos scheme=\(url.scheme ?? "none") opened=\(opened)")
     }
 
     func start() {
