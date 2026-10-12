@@ -211,7 +211,7 @@ final class Conversation: Identifiable {
     @ObservationIgnored private(set) var durableRoute: DurableConversationRoute?
     @ObservationIgnored var preparedConfiguration: AgentConfiguration?
     @ObservationIgnored var durablePreparation: Task<Void, Error>?
-    @ObservationIgnored var durableForkSource: (reference: DurableConversationReference, users: Int)?
+    @ObservationIgnored var durableForkSource: (reference: DurableConversationReference, users: Int, replacing: Bool)?
     var conversationReference: DurableConversationReference? { durableRoute?.reference }
 
     func installDurableRoute(_ route: DurableConversationRoute?) throws {
@@ -1862,7 +1862,7 @@ final class Conversation: Identifiable {
             attachments: cut.attachments,
             skillInvocation: cut.skillInvocation
         )
-        guard let branched = conversationManager?.branch(from: self, snapshot: snapshot) else { return nil }
+        guard let branched = conversationManager?.branch(from: self, snapshot: snapshot, replacing: true) else { return nil }
         return branched.enqueue(
             text,
             attachments: cut.attachments,

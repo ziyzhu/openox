@@ -491,7 +491,7 @@ final class ConversationManager {
         return branch(from: conversation, snapshot: result)
     }
 
-    func branch(from conversation: Conversation, snapshot result: ConversationContinuation) -> Conversation? {
+    func branch(from conversation: Conversation, snapshot result: ConversationContinuation, replacing: Bool = false) -> Conversation? {
         guard let reference = conversation.conversationReference else { Log.session.error("ConversationManager.branch requires a qualified persisted conversation"); return nil }
         let selection = result.meta.model ?? providerRegistry.sessionModel
         let client = providerRegistry.client(for: selection)
@@ -510,7 +510,7 @@ final class ConversationManager {
             feedback: feedback,
             serviceManager: serviceManager
         )
-        branched.durableForkSource = (reference, result.turns.filter { if case .user = $0 { return true }; return false }.count)
+        branched.durableForkSource = (reference, result.turns.filter { if case .user = $0 { return true }; return false }.count, replacing)
         attachPersistence(branched)
         register(branched)
         if branched.state.turns != result.turns { persist(branched) }
@@ -799,7 +799,14 @@ final class ConversationManager {
                 if let existing = try? DurableProfileStore.shared.reference(for: oldID, in: conversation.scope) { reference = existing }
                 else if let origin = conversation.durableForkSource {
                     reference = try await DurableProfileStore.shared.fork(in: conversation.scope, from: origin.reference,
-                        beforeUser: origin.users, title: conversation.metadata.title)
+                        beforeUser: origin.users, title: conversation.metadata.title, replacing: origin.replacing)
+                    if origin.replacing {
+                        let sourceID = origin.reference.compatibilityID
+                        if case .debouncing(_, let task) = records[sourceID]?.persistence { task.cancel() }
+                        records.removeValue(forKey: sourceID)
+                        accessOrdinals.removeValue(forKey: sourceID)
+                        Log.session.info("ConversationManager.rerun replaced source=\(sourceID.rawValue) target=\(reference.compatibilityID.rawValue)")
+                    }
                     conversation.durableForkSource = nil
                 } else { reference = try await DurableProfileStore.shared.create(in: conversation.scope) }
                 try Task.checkCancellation()
