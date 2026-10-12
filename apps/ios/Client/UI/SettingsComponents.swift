@@ -93,9 +93,13 @@ struct SettingsDisclosureRow: View {
     let value: Text
     var isLoading = false
     var indicator = "chevron.right"
+    var icon: String?
 
     var body: some View {
         HStack(spacing: Theme.Spacing.xs) {
+            if let icon {
+                Image(systemName: icon).foregroundStyle(Theme.Colors.primary)
+            }
             Text(title)
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
