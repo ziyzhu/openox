@@ -44,6 +44,154 @@
       "additionalProperties": true,
       "description": "Experimental cache-only Pi Durable command result."
     },
+    "ProfileRequest": {
+      "type": "object",
+      "required": [
+        "profileId"
+      ],
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36
+        }
+      },
+      "additionalProperties": true
+    },
+    "CreateProfileRequest": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "additionalProperties": true
+    },
+    "UpdateProfileRequest": {
+      "type": "object",
+      "required": [
+        "profileId"
+      ],
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memory": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 204800
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "soul": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 204800
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "FolderProfileRequest": {
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 36,
+              "maxLength": 36
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "FolderGrantRequest": {
+      "type": "object",
+      "required": [
+        "grantId"
+      ],
+      "properties": {
+        "grantId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "profileId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 36,
+              "maxLength": 36
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "MountedRepositoryRequest": {
+      "type": "object",
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      },
+      "additionalProperties": true
+    },
+    "RepositoryIDRequest": {
+      "type": "object",
+      "required": [
+        "repositoryId"
+      ],
+      "properties": {
+        "repositoryId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "additionalProperties": true
+    },
     "SessionRequest": {
       "type": "object",
       "properties": {
@@ -565,6 +713,174 @@
       "properties": {},
       "additionalProperties": true,
       "description": "Existing transcript Block Codable payload."
+    },
+    "ProfileRow": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "location",
+        "version",
+        "active"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "active": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ListProfilesResult": {
+      "type": "object",
+      "required": [
+        "profiles"
+      ],
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProfileRow"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "ProfileResult": {
+      "type": "object",
+      "required": [
+        "profile"
+      ],
+      "properties": {
+        "profile": {
+          "$ref": "#/definitions/ProfileRow"
+        },
+        "memory": {
+          "type": "string"
+        },
+        "soul": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "FolderGrantRow": {
+      "type": "object",
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ListFolderGrantsResult": {
+      "type": "object",
+      "required": [
+        "folders"
+      ],
+      "properties": {
+        "folders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FolderGrantRow"
+          }
+        },
+        "unassignedFolders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FolderGrantRow"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "FolderGrantResult": {
+      "type": "object",
+      "required": [
+        "folder"
+      ],
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/FolderGrantRow"
+        }
+      },
+      "additionalProperties": true
+    },
+    "RepositoryRow": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "provenance",
+        "enabled",
+        "state"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "provenance": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "state": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ListRepositoriesResult": {
+      "type": "object",
+      "required": [
+        "repositories"
+      ],
+      "properties": {
+        "repositories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RepositoryRow"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "RepositoryResult": {
+      "type": "object",
+      "required": [
+        "repository"
+      ],
+      "properties": {
+        "repository": {
+          "$ref": "#/definitions/RepositoryRow"
+        }
+      },
+      "additionalProperties": true
     },
     "EmptyResult": {
       "type": "object",

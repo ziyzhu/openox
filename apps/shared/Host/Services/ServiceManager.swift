@@ -84,6 +84,7 @@ final class ServiceManager {
     @ObservationIgnored private var repositoryLoadWaiters: [CheckedContinuation<Void, Never>] = []
     @ObservationIgnored private let nativeServices: any NativeServiceCatalog
     @ObservationIgnored private var memoryWarningObserver: NSObjectProtocol?
+    @ObservationIgnored private var folderGrantObserver: NSObjectProtocol?
     @ObservationIgnored let actionScheduler = ServiceActionScheduler(capacity: 5)
     @ObservationIgnored let sessionCoordinator = ServiceSessionCoordinator()
     @ObservationIgnored let browserActionSessions = ServiceBrowserActionSessionCoordinator()
@@ -188,6 +189,11 @@ final class ServiceManager {
         savedDomains = Set(UserDefaults.standard.stringArray(forKey: Self.savedKey) ?? [])
         actionPolicies = Self.loadActionPolicies()
         persistedRemoteMCPServers = Self.loadPersistedRemoteMCPServers()
+        folderGrantObserver = NotificationCenter.default.addObserver(forName: DeviceFolderStore.didChange, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
+            }
+        }
         if let memoryWarningNotification {
             memoryWarningObserver = NotificationCenter.default.addObserver(
                 forName: memoryWarningNotification,
@@ -244,6 +250,7 @@ final class ServiceManager {
     }
 
     deinit {
+        if let folderGrantObserver { NotificationCenter.default.removeObserver(folderGrantObserver) }
         if let memoryWarningObserver {
             NotificationCenter.default.removeObserver(memoryWarningObserver)
         }
@@ -694,6 +701,33 @@ final class ServiceManager {
         _ = await mutateRepositories(locale: locale) {
             try await self.repository.install(from: origin)
         }
+    }
+
+    func requireInvocationAccess(for service: Service) async throws {
+        guard byDomain[service.domain] === service || service === browserService else {
+            throw RuntimeError.bridge("Service \(service.domain) changed or disconnected before execution")
+        }
+        try await requireRepositoryAccess(for: service)
+    }
+
+    func requireRepositoryAccess(for service: Service) async throws {
+        if case .repository(let id, .mounted) = service.definition.source {
+            try await repository.requireMountedAccess(id)
+        }
+    }
+
+    func connectMountedRepository(path: String, locale: String?) async throws -> Repository.Descriptor {
+        let id = try await repository.connectMountedRepository(path: path)
+        await refreshServices(locale: locale)
+        guard let descriptor = repositories.first(where: { $0.id == id }), case .ready = descriptor.state else {
+            throw Repository.Failure(message: "Mounted repository is unavailable; inspect repositories and folder access")
+        }
+        return descriptor
+    }
+
+    func disconnectMountedRepository(_ id: String, locale: String?) async throws {
+        try await repository.disconnectMountedRepository(id)
+        await refreshServices(locale: locale)
     }
 
     func connectRepository(from origin: URL, locale: String?) async throws -> Repository.Descriptor {

@@ -43,7 +43,7 @@ export type CommandGroup = {
 function printUsage(program: string, description: string, groups: Record<string, CommandGroup>): void {
   console.log(terminalText(CLI_LOGO, [C.bold, C.harvest]));
   console.log(`${description}\n`);
-  console.log(`Usage: ${program} [--host <ws-url>] [--conversation <conversation-id>] [--profile <path>] [--repository <path-or-url>] <command> [...flags] [...args]\n`);
+  console.log(`Usage: ${program} [--host <ws-url>] [--conversation <conversation-id>] [--profile <id-or-path>] [--repository <path-or-url>] <command> [...flags] [...args]\n`);
   console.log("Commands:");
   const rows = Object.entries(groups).flatMap(([name, group]) => {
     const subs = Object.entries(group.subs ?? {});
@@ -60,7 +60,7 @@ function printUsage(program: string, description: string, groups: Record<string,
   const flags = [
     ["--host <ws-url>", "Ox Host WebSocket endpoint"],
     ["--conversation <conversation-id>", "Conversation-bound VM on the Host"],
-    ["--profile <path>", "Profile directory for direct administration"],
+    ["--profile <id-or-path>", "Host Profile ID with --host, or directory for disk inspection"],
     ["--repository <origin>", "Repository path or Git URL"],
     ["-v, --version", "Display the installed version and exit"],
     ["-h, --help", "Display this menu and exit"],
@@ -75,7 +75,7 @@ function printUsage(program: string, description: string, groups: Record<string,
 export function parseGlobalOptions(args: string[]): { context: CliContext; rest: string[] } {
   const options = new Map<string, { key: keyof CliContext; requirement: string }>([
     ["--host", { key: "host", requirement: "a WebSocket URL" }],
-    ["--profile", { key: "profile", requirement: "a path" }],
+    ["--profile", { key: "profile", requirement: "a Profile ID or path" }],
     ["--conversation", { key: "conversation", requirement: "a conversation id" }],
     ["--chat", { key: "conversation", requirement: "a conversation id" }],
     ["--repository", { key: "repository", requirement: "a path or URL" }],
@@ -179,10 +179,10 @@ function validateContext(command: string, subcommand: string | undefined, contex
   if (context.conversation && command === "conversation" && (subcommand === "list" || subcommand === "new")) {
     throw new Error(`--conversation does not apply to ox conversation ${subcommand}`);
   }
-  if (context.profile && command !== "profile") throw new Error("--profile applies only to ox profile");
+  if (context.profile && command !== "profile" && !(command === "host" && subcommand === "files")) throw new Error("--profile applies only to ox profile and ox host files");
   if (context.repository && command !== "repository") throw new Error("--repository applies only to ox repository");
-  const usesHost = command === "host" || command === "conversation" || command === "vm";
-  if (context.host && !usesHost) throw new Error("--host applies only to ox host, ox conversation, and ox vm");
+  const usesHost = command === "host" || command === "conversation" || command === "vm" || command === "profile";
+  if (context.host && !usesHost) throw new Error("--host applies only to ox host, ox profile, ox conversation, and ox vm");
 }
 
 export function group(name: string, desc: string, subs: Record<string, SubCommand>): CommandGroup {

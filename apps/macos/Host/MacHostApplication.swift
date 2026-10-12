@@ -32,7 +32,8 @@ final class MacHostApplication: NSObject, NSApplicationDelegate {
             conversationExecution: MacConversationExecution(),
             conversationFeedback: MacConversationFeedback(),
             executionPolicy: { true },
-            activateSchedules: { try ScheduledSkillScheduler.shared.activate() }
+            activateSchedules: { try ScheduledSkillScheduler.shared.activate() },
+            deactivateSchedules: { await ScheduledSkillScheduler.shared.stop() }
         )
         ScheduledSkillScheduler.shared.configure(host: host)
         let access = HostAccess()

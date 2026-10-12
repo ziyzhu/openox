@@ -154,7 +154,7 @@ export async function check(): Promise<string> {
   const migrationFiles = ["StorageMigration", ...migrationOwners.slice(1)].map(name => `apps/shared/Host/Profile/${name}.swift`);
   const migrationCallers: Record<string, Set<string>> = {
     StorageMigrator: new Set([migrationFiles[0], "apps/ios/Host/IOSHost.swift", "apps/shared/Host/HostRuntime.swift"]),
-    ProfileMigrator: new Set([...migrationFiles, "apps/shared/Host/Profile/StorageRoot.swift", "apps/shared/Host/Durable/DurableProfileStore.swift", "apps/shared/Host/RPC/DebugDurableConversation.swift"]),
+    ProfileMigrator: new Set([...migrationFiles, "apps/shared/Host/Profile/ProfileRepository.swift", "apps/shared/Host/Profile/StorageRoot.swift", "apps/shared/Host/Durable/DurableProfileStore.swift", "apps/shared/Host/RPC/DebugDurableConversation.swift"]),
     ApplicationStorageMigrator: new Set([...migrationFiles, "apps/shared/Host/Profile/ScheduledSkills.swift"]),
     CredentialMigrator: new Set(migrationFiles),
     RepositoryMigrator: new Set([...migrationFiles, "apps/shared/Host/Services/Repository/Repository.swift"]),

@@ -45,10 +45,11 @@ actor Repository {
             case local
             case development
             case remote
+            case mounted
 
             var exposesFullSource: Bool {
                 switch self {
-                case .bundled, .local: true
+                case .bundled, .local, .mounted: true
                 case .development, .remote: false
                 }
             }
@@ -59,6 +60,7 @@ actor Repository {
                 case .local: 1
                 case .development: 2
                 case .remote: 3
+                case .mounted: 4
                 }
             }
         }
@@ -315,6 +317,7 @@ actor Repository {
     private var configuration: Configuration
     private var activeSources: [String: ActiveSource] = [:]
     private var localPreparation: StoragePreparation?
+    private var mountedRepositories = MountedRepositoryStore()
 
     init(root: URL? = nil, developmentRemote: URL? = nil) {
         bundledRoot = root ?? Bundle.main.url(forResource: "OxServices", withExtension: "bundle")
@@ -345,7 +348,14 @@ actor Repository {
         let development = loadDevelopmentRepository()
         let local = localMaterializationFailure.map(failedLocal) ?? loadLocalRepository()
         let installed = configuration.repositories.map(loadInstalledRepository)
-        let available = [bundled, development, local].compactMap { $0 } + installed
+        let profileId = await StorageRoot.shared.activeId
+        let grantIDs = Set(await DeviceFolderStore.shared.grants(for: profileId).map(\.id))
+        var mounted: [LoadedRepository] = []
+        for record in (try? mountedRepositories.records()) ?? [] where grantIDs.contains(record.grantID) {
+            mounted.append(await loadMountedRepository(record, profileId: profileId))
+        }
+        guard await StorageRoot.shared.activeId == profileId else { throw CancellationError() }
+        let available = [bundled, development, local].compactMap { $0 } + installed + mounted
         let loaded = available.compactMap { loaded in
             if case .ready = loaded.descriptor.state { return loaded }
             return nil
@@ -463,7 +473,7 @@ actor Repository {
             let repository = $0.repository
             let version: String?
             switch repository.descriptor.provenance {
-            case .local:
+            case .local, .mounted:
                 version = try? Self.contentHash(at: repository.root, package: repository.package)
             case .bundled, .development, .remote:
                 version = repository.package.contentHash
@@ -486,12 +496,29 @@ actor Repository {
     }
 
     func source(domain: String) async -> Source? {
-        guard let root = activeSources[domain]?.root,
-              let actions = try? String(contentsOf: root.appendingPathComponent("actions.js"), encoding: .utf8) else { return nil }
+        guard let source = activeSources[domain] else { return nil }
+        if source.provenance == .mounted {
+            do {
+                guard let record = try mountedRepositories.records().first(where: { $0.id == source.repositoryID }) else { return nil }
+                return try await DeviceFolderStore.shared.coordinate(
+                    grantID: record.grantID,
+                    relativePath: record.relativePath + [source.kind.rawValue, domain, "actions.js"],
+                    profileId: await StorageRoot.shared.activeId, mode: .read
+                ) { url in Source(actions: try String(contentsOf: url, encoding: .utf8)) }
+            } catch {
+                Log.service.error("Repository.mounted source unavailable domain=\(domain) error=\(error.localizedDescription)")
+                return nil
+            }
+        }
+        guard let actions = try? String(contentsOf: source.root.appendingPathComponent("actions.js"), encoding: .utf8) else { return nil }
         return Source(actions: actions)
     }
 
     func setEnabled(repositoryID: String, enabled: Bool) throws {
+        if (try? mountedRepositories.records().contains(where: { $0.id == repositoryID })) == true {
+            try mountedRepositories.setEnabled(repositoryID, enabled: enabled)
+            return
+        }
         let previous = configuration
         if repositoryID == Self.bundledID {
             configuration.bundledEnabled = enabled
@@ -552,6 +579,7 @@ actor Repository {
     }
 
     func update(repositoryID: String) async throws {
+        if (try? mountedRepositories.records().contains(where: { $0.id == repositoryID })) == true { return }
         if repositoryID == "development", let developmentRemote {
             Log.service.info("Repository.update origin=\(Self.redacted(developmentRemote)) id=development")
             try await syncDevelopmentRepository()
@@ -572,6 +600,10 @@ actor Repository {
     }
 
     func remove(repositoryID: String) throws {
+        if (try? mountedRepositories.records().contains(where: { $0.id == repositoryID })) == true {
+            try mountedRepositories.disconnect(repositoryID)
+            return
+        }
         guard repositoryID != Self.bundledID,
               repositoryID != Self.localID,
               let index = configuration.repositories.firstIndex(where: { $0.id == repositoryID })
@@ -881,8 +913,9 @@ actor Repository {
         }
     }
 
-    func listSource(kind: ServiceKind, id: String, path: [String]) throws -> [Entry] {
+    func listSource(kind: ServiceKind, id: String, path: [String]) async throws -> [Entry] {
         let source = try activeSource(kind: kind, id: id)
+        if source.provenance == .mounted { try await requireMountedAccess(source.repositoryID) }
         if !source.provenance.exposesFullSource {
             guard path.isEmpty else { throw Failure(message: "Full service source is available only for Bundled and Local services.") }
             let manifest = Self.serviceManifestURL(at: source.root)
@@ -913,14 +946,16 @@ actor Repository {
         }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
-    func sourceIsDirectory(kind: ServiceKind, id: String, path: [String]) throws -> Bool {
+    func sourceIsDirectory(kind: ServiceKind, id: String, path: [String]) async throws -> Bool {
         let source = try activeSource(kind: kind, id: id)
+        if source.provenance == .mounted { try await requireMountedAccess(source.repositoryID) }
         guard source.provenance.exposesFullSource || path.isEmpty else { return false }
         return try sourceURL(source, path: path).resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true
     }
 
-    func readSource(kind: ServiceKind, id: String, path: [String]) throws -> Data {
+    func readSource(kind: ServiceKind, id: String, path: [String]) async throws -> Data {
         let source = try activeSource(kind: kind, id: id)
+        if source.provenance == .mounted { try await requireMountedAccess(source.repositoryID) }
         guard source.provenance.exposesFullSource || path == ["service.json"] else {
             throw Failure(message: "Full service source is available only for Bundled and Local services.")
         }
@@ -999,8 +1034,9 @@ actor Repository {
         return ActiveSource(kind: kind, root: localRoot.appendingPathComponent(service.id.path), repositoryID: Self.localID, provenance: .local)
     }
 
-    func sourcePaths(kind: ServiceKind, id: String) throws -> [String] {
+    func sourcePaths(kind: ServiceKind, id: String) async throws -> [String] {
         let source = try activeSource(kind: kind, id: id)
+        if source.provenance == .mounted { try await requireMountedAccess(source.repositoryID) }
         if !source.provenance.exposesFullSource { return ["services/\(kind.rawValue)/\(id)/service.json"] }
         guard let enumerator = FileManager.default.enumerator(
             at: source.root,
@@ -1549,6 +1585,55 @@ actor Repository {
         }
     }
 
+    func connectMountedRepository(path: String) async throws -> String {
+        let components = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard components.count >= 2, components[0] == "files", components.allSatisfy({ !$0.isEmpty }),
+              path.utf8.count <= 2048 else { throw Failure(message: "Use files/<grant-id>[/repository-subfolder]") }
+        let grantID = components[1]
+        let relativePath = Array(components.dropFirst(2))
+        let root = try await DeviceFolderStore.shared.repositoryRoot(grantID: grantID, relativePath: relativePath, profileId: StorageRoot.shared.activeId)
+        _ = try Self.loadPackage(at: root, provenance: .mounted)
+        let record = try mountedRepositories.connect(grantID: grantID, relativePath: relativePath)
+        Log.service.info("Repository.mounted connected id=\(record.id) grant=\(grantID)")
+        return record.id
+    }
+
+    func requireMountedAccess(_ id: String) async throws {
+        guard let record = try mountedRepositories.records().first(where: { $0.id == id }), record.isEnabled else {
+            throw Failure(message: "Mounted repository is disconnected or disabled")
+        }
+        _ = try await DeviceFolderStore.shared.repositoryRoot(grantID: record.grantID, relativePath: record.relativePath, profileId: StorageRoot.shared.activeId)
+    }
+
+    func disconnectMountedRepository(_ id: String) throws {
+        try mountedRepositories.disconnect(id)
+        activeSources = activeSources.filter { $0.value.repositoryID != id }
+        Log.service.info("Repository.mounted disconnected id=\(id)")
+    }
+
+    private func loadMountedRepository(_ record: MountedRepositoryStore.Record, profileId: UUID?) async -> LoadedRepository {
+        do {
+            let root = try await DeviceFolderStore.shared.repositoryRoot(grantID: record.grantID, relativePath: record.relativePath, profileId: profileId)
+            let package = try Self.loadPackage(at: root, provenance: .mounted)
+            return LoadedRepository(
+                descriptor: Descriptor(
+                    id: record.id, name: package.name, origin: nil, commitHash: nil, tipCommitHash: nil,
+                    view: .live, lastSyncedAt: nil, isEnabled: record.isEnabled, provenance: .mounted,
+                    serviceCount: package.services.count, services: Self.serviceReferences(in: package), state: .ready
+                ), root: root, package: package
+            )
+        } catch {
+            Log.service.error("Repository.mounted unavailable id=\(record.id) grant=\(record.grantID) error=\(error.localizedDescription)")
+            return LoadedRepository(
+                descriptor: Descriptor(
+                    id: record.id, name: "files/\(record.grantID)", origin: nil, commitHash: nil, tipCommitHash: nil,
+                    view: .live, lastSyncedAt: nil, isEnabled: record.isEnabled, provenance: .mounted,
+                    serviceCount: 0, services: [], state: .failed(error.localizedDescription)
+                ), root: repositoriesRoot, package: Package(version: HostProtocols.repository.last!, name: "Files", contentHash: nil, services: [])
+            )
+        }
+    }
+
     private func loadInstalledRepository(_ stored: InstalledRepository) -> LoadedRepository {
         let root = repositoryDirectory(stored.id)
         do {
@@ -1597,7 +1682,7 @@ actor Repository {
         guard FileManager.default.fileExists(atPath: repositoryManifestURL(at: root).path) else {
             throw Failure(message: "The repository is missing repository.json at its root.")
         }
-        let root = try RepositoryMigrator.prepareRepository(at: root, local: provenance == .local)
+        let root = provenance == .mounted ? root : try RepositoryMigrator.prepareRepository(at: root, local: provenance == .local)
         let packageURL = repositoryManifestURL(at: root)
         let values = try packageURL.resourceValues(forKeys: [.isSymbolicLinkKey, .fileSizeKey])
         guard values.isSymbolicLink != true, (values.fileSize ?? 0) <= 512_000 else {

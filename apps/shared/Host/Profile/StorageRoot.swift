@@ -30,13 +30,24 @@ final class StorageRoot {
     @ObservationIgnored private let repository = ProfileRepository.shared
     @ObservationIgnored private let profileStore = ProfileStore.shared
     private var cloudDocs: URL?
+    var beforeProfileChange: (@MainActor () async throws -> Void)?
+    var profileDidChange: (@MainActor () async throws -> Void)?
 
     private static let activeKey = "storage.activeProfile"
     private static let defaultName = "Default"
 
     private var storedActiveId: UUID? {
-        get { UserDefaults.standard.string(forKey: Self.activeKey).flatMap(UUID.init(uuidString:)) }
-        set { UserDefaults.standard.set(newValue?.uuidString, forKey: Self.activeKey) }
+        UserDefaults.standard.string(forKey: Self.activeKey).flatMap(UUID.init(uuidString:))
+    }
+
+    private func storeActiveProfile(_ id: UUID) throws {
+        let defaults = UserDefaults.standard
+        let previous = defaults.object(forKey: Self.activeKey)
+        defaults.set(id.uuidString, forKey: Self.activeKey)
+        guard defaults.synchronize() else {
+            defaults.set(previous, forKey: Self.activeKey)
+            throw RuntimeError.bridge("The active Profile preference could not be saved")
+        }
     }
 
     private init() {
@@ -89,7 +100,7 @@ final class StorageRoot {
         let migrated = try await ProfileMigrator.migrate(profile)
         update(migrated.id) { $0 = migrated }
         try await activate(migrated)
-        switchEpoch += 1
+        try await publishProfileChange()
     }
 
     func createProfile(name: String, location: Profile.Location) async throws {
@@ -120,7 +131,7 @@ final class StorageRoot {
             }
             sortProfiles()
             try await activate(migrated)
-            switchEpoch += 1
+            try await publishProfileChange()
             Log.app.info("StorageRoot.open id=\(migrated.id) name=\(migrated.name)")
             return migrated
         } catch {
@@ -138,7 +149,7 @@ final class StorageRoot {
             update(profile.id) { $0 = renamed }
             if profile.id == activeId {
                 try await activate(renamed)
-                switchEpoch += 1
+                try await publishProfileChange()
             }
             sortProfiles()
         } catch {
@@ -159,7 +170,7 @@ final class StorageRoot {
             update(profile.id) { $0 = moved }
             if profile.id == activeId {
                 try await activate(moved)
-                switchEpoch += 1
+                try await publishProfileChange()
             }
             Log.app.info("StorageRoot.move id=\(profile.id) name=\(moved.name) location=\(location.rawValue)")
         } catch {
@@ -200,7 +211,7 @@ final class StorageRoot {
                     let migrated = try await ProfileMigrator.migrate(current)
                     update(migrated.id) { $0 = migrated }
                     try await activate(migrated)
-                    switchEpoch += 1
+                    try await publishProfileChange()
                 } catch {
                     Log.app.error("StorageRoot.reconcile id=\(current.id) failed: \(error.localizedDescription)")
                 }
@@ -217,7 +228,7 @@ final class StorageRoot {
                 let migrated = try await ProfileMigrator.migrate(next)
                 update(migrated.id) { $0 = migrated }
                 try await activate(migrated)
-                switchEpoch += 1
+                try await publishProfileChange()
             } catch {
                 Log.app.error("StorageRoot.fallback id=\(next.id) failed: \(error.localizedDescription)")
             }
@@ -226,7 +237,7 @@ final class StorageRoot {
                 let migrated = try await ProfileMigrator.migrate(seeded)
                 profiles = [migrated]
                 try await activate(migrated)
-                switchEpoch += 1
+                try await publishProfileChange()
             } catch { Log.app.error("StorageRoot.seed activation failed=\(error.localizedDescription)") }
         }
     }
@@ -243,11 +254,23 @@ final class StorageRoot {
         }
     }
 
+    private func publishProfileChange() async throws {
+        try await profileDidChange?()
+        switchEpoch += 1
+    }
+
     private func activate(_ profile: Profile) async throws {
         let scope = isActive(profile) ? activeScope : ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
-        if activeScope.profileID != nil, activeScope.root != scope.root { try await DurableProfileStore.shared.close(in: activeScope) }
-        _ = try await DurableProfileStore.shared.session(in: scope)
-        storedActiveId = profile.id
+        let changingProfile = activeScope.profileID != nil && activeScope.root != scope.root
+        if changingProfile { try await beforeProfileChange?() }
+        do {
+            if changingProfile { try await DurableProfileStore.shared.close(in: activeScope) }
+            _ = try await DurableProfileStore.shared.session(in: scope)
+            try storeActiveProfile(profile.id)
+        } catch {
+            if changingProfile { try? await profileDidChange?() }
+            throw error
+        }
         activeScope = scope
         sortProfiles()
         Log.app.info("StorageRoot.activate id=\(profile.id) name=\(profile.name) location=\(profile.location.rawValue) root=\(self.root.path)")

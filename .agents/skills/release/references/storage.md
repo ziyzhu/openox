@@ -26,11 +26,12 @@ types remain authoritative in their `Codable` implementations.
 │   │   └── chatgpt.installationId           per-install Codex client ID
 │   ├── Application Support/
 │   │   ├── service-repositories.json        built-in, Local, Development, and installed repository enablement; conflict resolutions
+│   │   ├── mounted-repositories.json       version 1 repository bindings to Files grant IDs and relative folders
 │   │   ├── service-repositories/local/      editable local git working tree
 │   │   ├── service-repositories/development/ simulator development HEAD snapshot
 │   │   ├── service-repositories/<uuid>/     installed public HEAD snapshots
 │   │   ├── external-profiles.json           external profile folder bookmarks
-│   │   ├── device-folder-grants.json         security-scoped folder bookmarks
+│   │   ├── device-folder-grants.json         Profile-bound native folder bookmarks; nullable profileId means unassigned
 │   │   ├── scheduled-skills.json             device-owned scheduled skill snapshots
 │   │   ├── Profiles/<uuid>/profile.json    private identity, version, public-folder registration
 │   │   ├── Profiles/<uuid>/state.sqlite    conversations, settings, file references/derived metadata; WAL sidecars
@@ -107,7 +108,8 @@ Choice, approval, and secret-entry prompts are transient `Conversation` interact
 - Repository compatibility — owner: Host/Profile/RepositoryMigrator.swift
 - Shared stateless conversion and verified-copy helpers — owner: Host/Profile/StorageMigrationSupport.swift
 - File metadata — owner: Host/Profile/FileItem.swift
-- Folder bookmarks — owner: Services/Native/DeviceFolderStore.swift
+- Folder bookmarks — owner: Services/Native/DeviceFolderStore.swift; records include nullable profileId, with unassigned grants inaccessible until explicitly assigned. ApplicationStorageMigrator stamps predecessor records as unassigned while preserving bookmarks. ProfileMigrator filters retired ios:files attachments at the ProfileRepository metadata boundary; ordinary saves converge them. ApplicationStorageMigrator retires saved Files service references and expands Files source policies into filesystem Action overrides without widening approval. Older readers ignore Profile ownership, and older writes can lose ownership fields; downgrade is not ownership-compatible and requires approval. iOS uses minimal bookmarks, macOS uses security-scoped bookmarks through target-owned adapters. New grant IDs include UUIDs so revocation followed by mounting another folder cannot revive an old binding.
+- Mounted repository bindings — owner: Services/Repository/MountedRepositoryStore.swift; device-local, visible/executable only through a grant owned by the active Profile, no source copies or migration. Missing settings mean no connections; malformed or future versions are preserved and block binding mutations. Revoked grants leave unavailable bindings until explicitly disconnected. Older builds retain but do not discover these bindings; mounted-repository functionality is not downgrade-compatible.
 - Service repositories — owner: Services/Repository/Repository.swift
 - Service-search vector cache — owner: Services/Repository/ServiceSearchIndex.swift
 - App log file — owner: Diagnostics/LogFile.swift
@@ -501,7 +503,7 @@ Reads and searches are bounded; writes are atomic; writes and edits to the same
 file are serialized; edits require exact non-overlapping matches.
 
 User-selected Files folders appear separately as `files/<grant-id>/...` after
-the Files device service is attached. Security-scoped bookmarks live in
+the grant belongs to the conversation's Profile; no Files service is required. Security-scoped bookmarks live in
 `Application Support/device-folder-grants.json`, outside every Profile and outside
 backup. Each operation rejects traversal and symbolic links. `ox.vision.analyze` reads
 bounded image snapshots from these folders for on-device OCR and classification.
@@ -510,7 +512,7 @@ immutable native media publication path; binary format support depends on the se
 provider, and original external paths are never durable
 attachment references. Saved conversations retain published bytes in their Profile;
 temporary conversations use their purgeable Session. No new storage format is introduced.
-Writes, edits, and deletes require the attached Files service and existing folder grant. Built-in
+Writes, edits, and deletes require a valid folder grant owned by the requesting Profile. Built-in
 writes and edits default to Allow, while delete defaults to Ask. File import
 and rename default to Allow; artifact and filesystem deletion default to Ask.
 

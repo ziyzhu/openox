@@ -39,11 +39,11 @@ nonisolated enum ConversationPromptState {
             "attachedServices": .array(attachedServices.map { service in
                 var fields: [String: JSONValue] = ["domain": .string(service.domain), "signIn": .string(signIn(service.signIn))]
                 if let description = service.description { fields["description"] = .string(description) }
-                if service.domain == "ios:files" { fields["fileMounts"] = .array(fileMountPaths.map(JSONValue.string)) }
                 return .object(fields)
             }),
             "hostContext": hostContext(hostID: hostID, profileID: profileID),
             "filePaths": .array(filePaths.map(JSONValue.string)),
+            "fileMounts": .array(fileMountPaths.map(JSONValue.string)),
             "storageMode": .string(isTemporary ? "temporary" : "persisted"),
             "responseLanguage": responseLanguage,
         ])

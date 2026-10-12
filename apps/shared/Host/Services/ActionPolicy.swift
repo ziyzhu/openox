@@ -38,7 +38,6 @@ nonisolated struct ActionPolicyConfiguration: Codable, Equatable, Sendable {
         if action.hasPrefix(attachPrefix) {
             return String(action.dropFirst(attachPrefix.count))
         }
-        if action.hasPrefix("ox.fs.") { return "ios:files" }
         if action.hasPrefix("ox.") { return "ox" }
         guard let separator = action.lastIndex(of: ":") else { return "ox" }
         let namespace = String(action[..<separator])

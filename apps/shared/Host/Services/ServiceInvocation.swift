@@ -39,6 +39,8 @@ extension Service {
     ) async -> Result<JSONValue, Error> {
         let name = "\(domain):\(actionId)"
         guard hasWebRuntime else { return .failure(InvokeError.unknown(name)) }
+        do { try await manager.requireInvocationAccess(for: self) }
+        catch { return .failure(error) }
         let invocationID = UUID()
         let invocation = String(invocationID.uuidString.prefix(8))
         let started = Date()
@@ -98,6 +100,8 @@ extension Service {
                 return .failure(InvokeError.requiresAuth(name))
             }
         }
+        do { try await manager.requireInvocationAccess(for: self) }
+        catch { return .failure(error) }
         if actionId == WebConversationContract.actionID, ownedPage == nil {
             do { return .success(try await manager.invokeConversation(service: self, args: args, owner: .client)) }
             catch { return .failure(error) }
@@ -124,6 +128,7 @@ extension Service {
             }
             Log.service.info("Service.invoke start id=\(invocation) name=\(name) page=\(pageKind(for: session)) session=\(session.logLabel) nav=\(startingNavigation)/\(session.finishedNavigationGeneration) host=\(host) args=\(args.logShape)")
             do {
+                try await manager.requireInvocationAccess(for: self)
                 let raw = try await evalAsync(session, source, context: "invoke:\(invocation)")
                 let value = raw.map(JSONValue.from) ?? .null
                 let outputViolations = JSONSchemaValidator.validate(value, against: outputSchema, definitions: definitions)
@@ -179,6 +184,7 @@ extension Service {
             let host = page.page.url?.host ?? "blank"
             Log.service.info("Service.dangerousBrowser start id=\(invocation) domain=\(self.domain) session=\(page.logLabel) nav=\(startingNavigation)/\(page.finishedNavigationGeneration) host=\(host) bytes=\(script.utf8.count)")
             do {
+                try await self.manager.requireInvocationAccess(for: self)
                 let raw = try await self.evalAsync(page, script, context: "dangerous-web:\(invocation)")
                 let value = raw.map(JSONValue.from) ?? .null
                 Log.service.info("Service.dangerousBrowser result id=\(invocation) domain=\(self.domain) session=\(page.logLabel) nav=\(startingNavigation)->\(page.navigationGeneration)/\(page.finishedNavigationGeneration) ms=\(Int(Date().timeIntervalSince(started) * 1000)) value=\(value.logShape)")

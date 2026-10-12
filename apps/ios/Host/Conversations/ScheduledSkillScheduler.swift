@@ -51,6 +51,15 @@ final class ScheduledSkillScheduler {
         refresh()
     }
 
+    func stop() async {
+        active = false
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
+        work?.cancel()
+        await work?.value
+        work = nil
+        Log.app.info("ScheduledSkillScheduler.stop")
+    }
+
     func refresh() {
         guard active else { return }
         guard work == nil, !ScheduledSkills.shared.due(at: Date()).isEmpty else {

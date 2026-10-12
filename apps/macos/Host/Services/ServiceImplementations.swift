@@ -93,7 +93,7 @@ final class IOSService {
             showsDomain: false,
             supportsPageInspection: hasBrowserRuntime,
             supportsWebsiteDataManagement: false,
-            supportsFolderAccess: domain == "ios:files",
+            supportsFolderAccess: false,
             supportsRemoteManagement: false
         )
     }

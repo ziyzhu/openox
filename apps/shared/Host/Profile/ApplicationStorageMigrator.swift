@@ -32,6 +32,8 @@ nonisolated enum ApplicationStorageMigrator {
         do { try migrateProviderCatalog(defaults: .standard) }
         catch { Log.app.error("StorageMigrator.providerCatalog failed error=\(error.localizedDescription)") }
         migrateActionApprovalPolicies()
+        migrateFilesPolicies()
+        migrateFolderOwnership()
         migrateSavedServices()
         migrateTheme()
         CredentialMigrator.removeLegacyRepositoryAuthorization()
@@ -161,9 +163,46 @@ nonisolated enum ApplicationStorageMigrator {
         retired.contains(action) || BrowserFunctionCatalog.isLegacyApproval(action)
     }
 
+    private static func migrateFolderOwnership() {
+        let url = AppStoragePaths.deviceFolderGrants
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            _ = try JSONDecoder().decode([DeviceFolderStore.Grant].self, from: data)
+            guard var records = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return }
+            var changed = 0
+            for index in records.indices where records[index]["profileId"] == nil {
+                records[index]["profileId"] = NSNull()
+                changed += 1
+            }
+            guard changed > 0 else { return }
+            try JSONSerialization.data(withJSONObject: records, options: [.prettyPrinted, .sortedKeys]).write(to: url, options: .atomic)
+            Log.app.info("StorageMigrator.folderOwnership unassigned=\(changed) bookmarksPreserved=true")
+        } catch { Log.app.error("StorageMigrator.folderOwnership failed error=\(error.localizedDescription)") }
+    }
+
+    private static func migrateFilesPolicies(defaults: UserDefaults = .standard) {
+        guard let data = defaults.data(forKey: ServiceManager.actionPoliciesKey) else { return }
+        do {
+            var configuration = try JSONDecoder().decode(ActionPolicyConfiguration.self, from: data)
+            guard configuration.format == ActionPolicyConfiguration.currentFormat else { return }
+            let policy = configuration.sources.removeValue(forKey: "ios:files")
+            let attachment = configuration.actions.removeValue(forKey: "ox.service.attach:ios:files")
+            guard policy != nil || attachment != nil else { return }
+            if let policy {
+                for action in OxFileSystem.actions where configuration.actions[action] == nil {
+                    configuration.actions[action] = policy
+                }
+            }
+            defaults.set(try JSONEncoder().encode(configuration), forKey: ServiceManager.actionPoliciesKey)
+            defaults.synchronize()
+            Log.app.info("StorageMigrator.filesPolicies migrated=true")
+        } catch { Log.app.error("StorageMigrator.filesPolicies failed error=\(error.localizedDescription)") }
+    }
+
     private static func migrateSavedServices(defaults: UserDefaults = .standard) {
         guard let stored = defaults.stringArray(forKey: ServiceManager.savedKey) else { return }
-        let retained = stored.filter { $0 != BrowserFunctionCatalog.internalDomain }
+        let retained = stored.filter { $0 != BrowserFunctionCatalog.internalDomain && $0 != "ios:files" }
         guard retained != stored else { return }
         defaults.set(retained, forKey: ServiceManager.savedKey)
         defaults.synchronize()

@@ -9,6 +9,7 @@ final class DeviceFolderStore {
         let name: String
         var bookmark: Data
         let createdAt: Date
+        var profileId: UUID?
     }
 
     nonisolated enum AccessMode: Sendable {
@@ -43,40 +44,55 @@ final class DeviceFolderStore {
 
     private(set) var grants: [Grant]
     private let fileURL: URL
+    private let preparation: Result<Void, Error>
     private let mutationCoordinator = FileMutationCoordinator()
+    private var accessedURLs: [String: URL] = [:]
+    nonisolated static let didChange = Notification.Name("DeviceFolderStore.didChange")
 
     private init() {
         let url = AppStoragePaths.deviceFolderGrants
         fileURL = url
-        grants = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode([Grant].self, from: $0) } ?? []
+        do {
+            grants = FileManager.default.fileExists(atPath: url.path)
+                ? try JSONDecoder().decode([Grant].self, from: Data(contentsOf: url)) : []
+            preparation = .success(())
+        } catch {
+            grants = []
+            preparation = .failure(error)
+            Log.app.error("DeviceFolderStore preparation failed sourcePreserved=true error=\(error.localizedDescription)")
+        }
     }
 
     @discardableResult
-    func add(_ url: URL) async throws -> Grant {
+    func add(_ url: URL, profileId: UUID) async throws -> Grant {
         let prepared = try await Task.detached(priority: .userInitiated) {
             try Self.prepareGrant(url)
         }.value
         return try await mutationCoordinator.perform(key: "grants") {
             let id = uniqueID(for: prepared.name)
-            let grant = Grant(id: id, name: prepared.name, bookmark: prepared.bookmark, createdAt: Date())
+            let grant = Grant(id: id, name: prepared.name, bookmark: prepared.bookmark, createdAt: Date(), profileId: profileId)
             var updated = grants
             updated.append(grant)
             updated.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
             try await persist(updated)
             grants = updated
+            NotificationCenter.default.post(name: Self.didChange, object: nil)
             Log.app.info("DeviceFolderStore.add id=\(id) name=\(prepared.name)")
             return grant
         }
     }
 
-    func remove(_ id: String) async throws {
+    func remove(_ id: String, profileId: UUID) async throws {
         try await mutationCoordinator.perform(key: "grants") {
+            _ = try requireGrant(id, profileId: profileId)
             guard let index = grants.firstIndex(where: { $0.id == id }) else { throw StoreError.missingGrant(id) }
             let name = grants[index].name
             var updated = grants
             updated.remove(at: index)
             try await persist(updated)
             grants = updated
+            accessedURLs.removeValue(forKey: id)?.stopAccessingSecurityScopedResource()
+            NotificationCenter.default.post(name: Self.didChange, object: nil)
             Log.app.info("DeviceFolderStore.remove id=\(id) name=\(name)")
         }
     }
@@ -85,13 +101,53 @@ final class DeviceFolderStore {
         grants.first { $0.id == id }
     }
 
+    func grants(for profileId: UUID?) -> [Grant] {
+        guard let profileId else { return [] }
+        return grants.filter { $0.profileId == profileId }
+    }
+
+    func requireGrant(_ id: String, profileId: UUID?) throws -> Grant {
+        guard let grant = grant(id) else { throw StoreError.missingGrant(id) }
+        guard let profileId, grant.profileId == profileId else { throw StoreError.denied(grant.name) }
+        return grant
+    }
+
+    func assign(_ id: String, profileId: UUID) async throws {
+        try await mutationCoordinator.perform(key: "grants") {
+            guard let index = grants.firstIndex(where: { $0.id == id }) else { throw StoreError.missingGrant(id) }
+            guard grants[index].profileId == nil else { throw StoreError.denied(grants[index].name) }
+            var updated = grants
+            updated[index].profileId = profileId
+            try await persist(updated)
+            grants = updated
+            NotificationCenter.default.post(name: Self.didChange, object: nil)
+            Log.app.info("DeviceFolderStore.assign id=\(id) profile=\(profileId)")
+        }
+    }
+
+    func repositoryRoot(grantID: String, relativePath: [String], profileId: UUID?) throws -> URL {
+        let grant = try requireGrant(grantID, profileId: profileId)
+        let root: URL
+        if let accessed = accessedURLs[grantID] {
+            root = accessed
+        } else {
+            var stale = false
+            root = try FolderBookmarks.resolve(grant.bookmark, stale: &stale)
+            guard !stale else { throw StoreError.staleGrant(grant.name) }
+            guard root.startAccessingSecurityScopedResource() else { throw StoreError.denied(grant.name) }
+            accessedURLs[grantID] = root
+        }
+        return try Self.safeTarget(root: root, components: relativePath)
+    }
+
     func coordinate<T: Sendable>(
         grantID: String,
         relativePath: [String],
+        profileId: UUID?,
         mode: AccessMode,
         _ body: @escaping @Sendable (URL) throws -> T
     ) async throws -> T {
-        guard let grant = grant(grantID) else { throw StoreError.missingGrant(grantID) }
+        let grant = try requireGrant(grantID, profileId: profileId)
         return try await Task.detached(priority: .userInitiated) {
             try Self.coordinate(grant: grant, relativePath: relativePath, mode: mode, body)
         }.value
@@ -102,11 +158,7 @@ final class DeviceFolderStore {
         defer { url.stopAccessingSecurityScopedResource() }
         let values = try url.resourceValues(forKeys: [.isDirectoryKey, .localizedNameKey, .nameKey, .volumeNameKey])
         guard values.isDirectory == true else { throw StoreError.invalidFolder }
-        let bookmark = try url.bookmarkData(
-            options: .minimalBookmark,
-            includingResourceValuesForKeys: [.localizedNameKey, .nameKey, .volumeNameKey],
-            relativeTo: nil
-        )
+        let bookmark = try FolderBookmarks.make(url)
         let localizedName = values.localizedName ?? values.name ?? url.lastPathComponent
         let name = localizedName == "File Provider Storage" ? values.volumeName ?? localizedName : localizedName
         return (name, bookmark)
@@ -121,7 +173,7 @@ final class DeviceFolderStore {
         var stale = false
         let root: URL
         do {
-            root = try URL(resolvingBookmarkData: grant.bookmark, bookmarkDataIsStale: &stale)
+            root = try FolderBookmarks.resolve(grant.bookmark, stale: &stale)
         } catch {
             throw StoreError.unavailable(error.localizedDescription)
         }
@@ -173,12 +225,7 @@ final class DeviceFolderStore {
     }
 
     private func uniqueID(for name: String) -> String {
-        let base = Self.slug(name)
-        let existing = Set(grants.map(\.id))
-        if !existing.contains(base) { return base }
-        var suffix = 2
-        while existing.contains("\(base)-\(suffix)") { suffix += 1 }
-        return "\(base)-\(suffix)"
+        "\(Self.slug(name).prefix(48))-\(UUID().uuidString.lowercased())"
     }
 
     nonisolated private static func slug(_ value: String) -> String {
@@ -189,6 +236,7 @@ final class DeviceFolderStore {
     }
 
     private func persist(_ grants: [Grant]) async throws {
+        try preparation.get()
         let fileURL = fileURL
         try await Task.detached(priority: .utility) {
             try Self.persist(grants, to: fileURL)

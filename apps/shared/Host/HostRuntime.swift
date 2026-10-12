@@ -15,6 +15,7 @@ final class HostRuntime: OxHost {
 
     private let executionPolicy: @MainActor () -> Bool
     private let activateSchedules: @MainActor () throws -> Void
+    private let deactivateSchedules: @MainActor () async -> Void
     private var preparation: Preparation?
     private var optionalRecovery: Task<Void, Never>?
 
@@ -24,11 +25,13 @@ final class HostRuntime: OxHost {
         conversationExecution: any ConversationExecution,
         conversationFeedback: any ConversationFeedback,
         executionPolicy: @escaping @MainActor () -> Bool,
-        activateSchedules: @escaping @MainActor () throws -> Void
+        activateSchedules: @escaping @MainActor () throws -> Void,
+        deactivateSchedules: @escaping @MainActor () async -> Void = {}
     ) {
         services = serviceManager
         self.executionPolicy = executionPolicy
         self.activateSchedules = activateSchedules
+        self.deactivateSchedules = deactivateSchedules
         conversations = ConversationManager(
             repository: .shared,
             storage: .shared,
@@ -41,10 +44,37 @@ final class HostRuntime: OxHost {
         conversations.profilePreparation = { [weak self] in
             _ = try? await self?.preparation?.profile.value
         }
+        StorageRoot.shared.beforeProfileChange = { [weak self] in
+            guard let self else { return }
+            guard !conversations.activities.values.contains(where: {
+                if case .running = $0 { return true }
+                return false
+            }) else { throw RuntimeError.bridge("Stop running conversations before changing Profiles") }
+            guard await conversations.flushAllNow() else { throw RuntimeError.bridge("Profile writes could not be flushed") }
+            await deactivateSchedules()
+        }
+        StorageRoot.shared.profileDidChange = { [weak self] in
+            try await self?.refreshProfile()
+        }
     }
 
     deinit {
         optionalRecovery?.cancel()
+    }
+
+    private func refreshProfile() async throws {
+        conversations.reset()
+        await services.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
+        Soul.shared.reload()
+        UserMemory.shared.reload()
+        Skills.shared.refresh()
+        try await Soul.shared.waitUntilCurrent()
+        try await UserMemory.shared.waitUntilCurrent()
+        await Skills.shared.waitUntilCurrent()
+        conversations.startNewConversation()
+        await conversations.loadSummariesNow()
+        try activateSchedules()
+        Log.app.info("HostRuntime Profile changed id=\(StorageRoot.shared.activeId?.uuidString ?? "none")")
     }
 
     func listConversations() -> [HostConversationSummary] {

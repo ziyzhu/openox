@@ -161,6 +161,7 @@ struct RepositoriesView: View {
         case .local: String(localized: "Editable on this device")
         case .development: String(localized: "Development Server")
         case .remote: repository.origin?.host ?? String(localized: "Repository")
+        case .mounted: String(localized: "Files")
         }
         return String(localized: "\(repository.serviceCount) services · \(repository.skills.count) skills · \(source)")
     }
@@ -375,6 +376,8 @@ struct RepositoryDetailView: View {
                                 detailRow("Source", value: String(localized: "Included with Ox"))
                             case .local:
                                 detailRow("Source", value: String(localized: "Editable on this device"))
+                            case .mounted:
+                                detailRow("Source", value: String(localized: "Files"))
                             case .development, .remote:
                                 detailRow("Last Synced", value: lastSyncedText(repository))
                             }
@@ -590,7 +593,7 @@ private extension Repository.Descriptor.Provenance {
         switch self {
         case .bundled: "Services and shared skills included with Ox."
         case .local: "Services and shared skills you can edit on this device. Available across Profiles."
-        case .development, .remote: nil
+        case .development, .remote, .mounted: nil
         }
     }
 }

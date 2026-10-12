@@ -663,21 +663,8 @@ struct RootView: View {
             }
             .onChange(of: storage.switchEpoch) { _, _ in
                 Log.ui.info("RootView.profileSwitch epoch=\(storage.switchEpoch) root=\(storage.root.path)")
-                Soul.shared.reload()
-                UserMemory.shared.reload()
-                Skills.shared.refresh()
                 monitorActiveProfile()
-                conversations.reset()
-                Task {
-                    do {
-                        try await Soul.shared.waitUntilCurrent()
-                        try await UserMemory.shared.waitUntilCurrent()
-                        await Skills.shared.waitUntilCurrent()
-                        conversations.startNewConversation()
-                        await conversations.loadSummariesNow()
-                        refreshCompactSidebar()
-                    } catch { Log.app.error("RootView Profile documents unavailable: \(error.localizedDescription)") }
-                }
+                refreshCompactSidebar()
             }
             .onChange(of: AppLocale.shared.language) { _, _ in
                 reloadServiceLocale()

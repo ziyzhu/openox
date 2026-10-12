@@ -1162,6 +1162,8 @@ final class RemoteMCPService {
         receiveFiles: @MainActor ([RemoteMCPFile]) async throws -> Void = { _ in }
     ) async -> Result<JSONValue, Error> {
         let name = "\(service.domain):\(actionID)"
+        do { try await service.manager.requireInvocationAccess(for: service) }
+        catch { return .failure(error) }
         guard let action = service.definition.action(actionID),
               let inputSchema = action.inputSchema,
               let outputSchema = action.outputSchema else {
@@ -1173,11 +1175,13 @@ final class RemoteMCPService {
         Log.service.info("RemoteMCP.invoke approval name=\(name) allow=\(allowed)")
         guard allowed else { return .failure(Service.InvokeError.denied(name)) }
         do {
+            try await service.manager.requireInvocationAccess(for: service)
             let keepActive = isActive
             let client = try await activate()
             defer {
                 if !keepActive { Task { await self.deactivate() } }
             }
+            try await service.manager.requireInvocationAccess(for: service)
             let result = try await client.callTool(name: actionID, arguments: args)
             let outputViolations = JSONSchemaValidator.validate(result.value, against: outputSchema, definitions: [:])
             guard outputViolations.isEmpty else { return .failure(Service.InvokeError.invalidOutput(name, outputViolations)) }
@@ -1188,11 +1192,13 @@ final class RemoteMCPService {
         } catch RemoteMCPError.authorizationRequired {
             requiresAuthorization = true
             do {
+                try await service.manager.requireInvocationAccess(for: service)
                 guard let accessToken = try await RemoteMCPOAuth.accessToken(endpoint: endpoint, forceRefresh: true) else {
                     throw RemoteMCPError.authorizationRequired(RemoteMCPAuthorizationChallenge(header: nil))
                 }
                 let client = try await activate()
                 await client.setAccessToken(accessToken)
+                try await service.manager.requireInvocationAccess(for: service)
                 let result = try await client.callTool(name: actionID, arguments: args)
                 let outputViolations = JSONSchemaValidator.validate(result.value, against: outputSchema, definitions: [:])
                 guard outputViolations.isEmpty else { return .failure(Service.InvokeError.invalidOutput(name, outputViolations)) }

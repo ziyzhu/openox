@@ -11,7 +11,7 @@ command help before guessing flags.
 Commands are grouped by the resource they act on, and each group has one
 selector flag:
 
-- `ox profile` with `--profile <path>`: a Profile directory on disk.
+- `ox profile` with `--host <ws-url>`: Profiles owned by that Host; `--profile <id>` scopes inspection or updates. Without `--host`, `--profile <path>` selects a directory for read-only disk inspection.
 - `ox repository` with `--repository <path-or-url>`: a service repository.
 - `ox host` with `--host <ws-url>`: an Ox Host.
 - `ox conversation` and `ox vm` with `--host` and `--conversation <conversation-id>`: a conversation on that
@@ -97,7 +97,20 @@ behavior authored inside Ox.
 
 ## Administer a Profile
 
-Discover iCloud Profiles on macOS, then select one by directory:
+Manage Profiles through their owning Host:
+
+```sh
+ox --host <ws-url> profile list --json
+ox --host <ws-url> profile create --name <name> --json
+ox --host <ws-url> profile select <id>
+ox --host <ws-url> profile inspect <id> --json
+ox --host <ws-url> profile rename <id> --name <name>
+ox --host <ws-url> --profile <id> profile update --memory-file <path> --soul-file <path>
+```
+
+Create does not select the new Profile. Selection and updates reject running conversations; stop them explicitly first. Name, memory, and soul updates use existing Host persistence, not replacement of `profile.json`. Inspect after a failed update before retrying, because earlier writes may have succeeded.
+
+For offline inspection, discover iCloud Profiles on macOS and select one by directory:
 
 ```sh
 ox profile list [--json]
@@ -125,6 +138,20 @@ ox --repository <path-or-url> repository skills [name] [--json]
 
 Inspect an action's input schema, authentication requirement, and approval
 requirement before invoking it.
+
+## Connect a repository through Files
+
+```sh
+ox --host <ws-url> host files mount --timeout 120000
+ox --host <ws-url> host files list --json
+ox --host <ws-url> host repository connect files/<grant-id>[/subfolder]
+ox --host <ws-url> host repository list --json
+ox --host <ws-url> host service sync
+ox --host <ws-url> host repository disconnect <repository-id>
+ox --host <ws-url> host files unmount <grant-id>
+```
+
+The Host's native picker grants access; a CLI-local path cannot authorize remote access. Connection is explicit and persistent, separate from managed Local. Source must use the current repository version; it is read in place without migration or Git seeding. Edit through the granted Files mount or your editor, not the read-only mounted services view. Revocation makes connected services unavailable; disconnect does not delete their files. Grant IDs are stable for one grant and never reused for a new authorization. Mounts belong to the selected Profile; `--profile <id>` scopes `host files` commands without switching. Existing grants appear as unassigned until `host files assign <id>` or explicit assignment in Profile → Files. No Files service attachment is required. Mounted services follow the grant's Profile. Older builds do not enforce ownership and can discard ownership fields on writes; downgrade requires review.
 
 ## Exercise live services through a Host
 

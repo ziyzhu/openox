@@ -23,6 +23,7 @@ Profiles. Diagnostic RPCs remain DEBUG Simulator-only. SQLite copies must includ
 WAL/SHM; they are diagnostics, not Profile exports or power-loss evidence.
 
 Verify behavior or independent effects, not just taps, queued sends, or idle status.
+For native switches that ignore an idb default tap, verify the current hit target, use `idb ui tap --duration 0.15`, and assert the resulting AX value. Refresh frames after CLI mutations change a visible list.
 For transcript comparisons, use immutable historical turns: VM calls append receipts.
 
 Verify streaming-rendering changes in video across paragraph/fence boundaries and completion; content assertions and settled screenshots do not establish visual continuity.

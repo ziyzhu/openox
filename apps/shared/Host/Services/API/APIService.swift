@@ -64,12 +64,14 @@ final class APIService {
                 approve: @MainActor (String, Any?) async -> Bool) async -> Result<JSONValue, Error> {
         let name = definition.qualifiedActionName(actionID)
         do {
+            try await service.manager.requireInvocationAccess(for: service)
             guard let action = definition.action(actionID), let input = action.inputSchema,
                   let output = action.outputSchema else { throw Service.InvokeError.unknown(name) }
             let violations = JSONSchemaValidator.validate(args, against: input, definitions: definition.definitions)
             guard violations.isEmpty else { throw Service.InvokeError.invalidInput(name, violations) }
             guard await approve(name, args.toAny()) else { throw Service.InvokeError.denied(name) }
             try Task.checkCancellation()
+            try await service.manager.requireInvocationAccess(for: service)
             if action.requireAuth && !authorization.isConfigured { throw APIServiceError.authorizationRequired }
             if source == nil, let fetched = await service.manager.fetch(domain: definition.domain) {
                 source = Service.Resolved(actions: fetched.actions)
@@ -81,6 +83,7 @@ final class APIService {
                 + "return await __invokeAPI(\(JSONValue.string(actionID).jsonString()), \(args.jsonString()), \(JSONValue.array(definition.actions.map { .string($0.id) }).jsonString()));"
             let result = try await runtime.runAPI(source: script) { [self] args in
                 do {
+                    try await service.manager.requireInvocationAccess(for: service)
                     return try await request(args, authenticated: action.requireAuth, allowsMutation: action.requireApproval)
                 } catch APIServiceError.authorizationRequired {
                     service.setAuth(.observed(Service.AuthObservation(value: .signedOut, observedAt: Date())))

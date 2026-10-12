@@ -54,8 +54,6 @@ struct ServiceDetailView: View {
     @State private var descriptionLimitedHeight: CGFloat = 0
     @State private var confirmClearWebData = false
     @State private var showPageInspector = false
-    @State private var folderPickerPresented = false
-    @State private var folderError: String?
     @State private var authorizingMCP = false
     @State private var mcpAuthorizationError: String?
     @State private var confirmRemoveMCP = false
@@ -88,7 +86,6 @@ struct ServiceDetailView: View {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 header
                 descriptionSection
-                permissionsSection
                 actionsSection
                 domainSection
                 repositorySection
@@ -159,29 +156,6 @@ struct ServiceDetailView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(mcpAuthorizationError ?? "")
-        }
-        .alert("Couldn't update Files access", isPresented: Binding(
-            get: { folderError != nil },
-            set: { if !$0 { folderError = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(folderError ?? "")
-        }
-        .fileImporter(
-            isPresented: $folderPickerPresented,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            Task {
-                do {
-                    guard let url = try result.get().first else { return }
-                    try await DeviceFolderStore.shared.add(url)
-                } catch {
-                    Log.ui.error("ServiceDetail.files add failed \(error.localizedDescription)")
-                    folderError = error.localizedDescription
-                }
-            }
         }
         .task(id: service.id) {
             _ = await service.loadManifest(reason: .serviceDetail)
@@ -443,12 +417,6 @@ struct ServiceDetailView: View {
                 CellularAutomatonLoader.small
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Theme.Spacing.lg)
-            } else if capabilities.supportsFolderAccess {
-                VStack(spacing: Theme.Spacing.sm) {
-                    ForEach(OxFileSystem.actions, id: \.self) { action in
-                        fileSystemActionRow(action)
-                    }
-                }
             } else if actions.isEmpty {
                 Text("This service provides no actions.")
                     .font(Theme.Fonts.bodySm)
@@ -465,17 +433,6 @@ struct ServiceDetailView: View {
     }
 
     // MARK: - Manage
-
-    @ViewBuilder
-    private var permissionsSection: some View {
-        if capabilities.supportsFolderAccess {
-            SettingsSection("Folders", layout: .group) {
-                filesPermissionContent
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .settingsRowPadding()
-            }
-        }
-    }
 
     private var actionPolicySource: String {
         ActionPolicyConfiguration.sourceID(forServiceNamespace: service.definition.actionNamespace)
@@ -514,63 +471,6 @@ struct ServiceDetailView: View {
         case .signedIn: "Adds this service to a conversation, giving Ox its actions and your signed-in data."
         case .onDevice: "Its actions and permitted device data become available to this conversation."
         case .remote: "Its remote Actions can receive arguments from this conversation and return data to Ox."
-        }
-    }
-
-    private var filesPermissionContent: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("Ox can only access folders you add here.")
-                .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-            ChipFlowLayout(spacing: 6) {
-                ForEach(DeviceFolderStore.shared.grants) { grant in
-                    folderGrantChip(grant)
-                }
-                addFolderChip
-            }
-        }
-    }
-
-    private var addFolderChip: some View {
-        Button {
-            Log.ui.info("IOSService.files picker requested")
-            folderPickerPresented = true
-        } label: {
-            Chip {
-                Image(systemName: "plus")
-                    .font(Theme.Icons.xs)
-                Text("Add folder")
-                    .font(Theme.Fonts.labelMd)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(A11yID.ConversationControls.Attach.deviceFilesAdd)
-    }
-
-    private func folderGrantChip(_ grant: DeviceFolderStore.Grant) -> some View {
-        Chip {
-            Image(systemName: "folder")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-            Text(grant.name)
-                .font(Theme.Fonts.labelMd)
-                .lineLimit(1)
-            Button {
-                Task {
-                    do {
-                        try await DeviceFolderStore.shared.remove(grant.id)
-                    } catch {
-                        folderError = error.localizedDescription
-                    }
-                }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Remove \(grant.name)")
-            .accessibilityIdentifier(A11yID.ConversationControls.Attach.deviceFilesRemove(grant.id))
         }
     }
 
@@ -682,18 +582,6 @@ struct ServiceDetailView: View {
                         defaultPolicy: action.requireApproval ? .ask : .allow
                     )
                 }
-            }
-        }
-    }
-
-    private func fileSystemActionRow(_ action: String) -> some View {
-        actionCard {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(Actions.label(for: action) ?? action)
-                    .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                    .accessibilityIdentifier(A11yID.ConversationControls.Attach.action(action))
-                approvalControl(actionID: action, defaultPolicy: Actions.defaultPolicy(for: action))
             }
         }
     }

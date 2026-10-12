@@ -40,7 +40,7 @@ extension Conversation {
         args = fields
         let purpose = args.removeValue(forKey: "purpose")?.stringValue ?? "\(name.capitalized) \(path)"
         var roots = VirtualFileSystem.hostRoots
-        if attachedServices.contains(where: { $0.domain == "ios:files" }) { roots.append("files") }
+        roots.append("files")
         let mounts = roots.map { root in
             JSONValue.object(["path": .string(root), "access": .string(root == "history" ? "readOnly" : "readWrite")])
         } + [JSONValue.object(["path": .string("chats"), "access": .string("readOnly")]),

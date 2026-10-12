@@ -9,6 +9,102 @@
         "$ref": "./schema.json#/definitions/HostDescription"
       }
     },
+    "profiles.list": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ListProfilesResult"
+      }
+    },
+    "profiles.inspect": {
+      "params": {
+        "$ref": "./schema.json#/definitions/ProfileRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ProfileResult"
+      }
+    },
+    "profiles.create": {
+      "params": {
+        "$ref": "./schema.json#/definitions/CreateProfileRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ProfileResult"
+      }
+    },
+    "profiles.select": {
+      "params": {
+        "$ref": "./schema.json#/definitions/ProfileRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ProfileResult"
+      }
+    },
+    "profiles.update": {
+      "params": {
+        "$ref": "./schema.json#/definitions/UpdateProfileRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ProfileResult"
+      }
+    },
+    "files.list": {
+      "params": {
+        "$ref": "./schema.json#/definitions/FolderProfileRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ListFolderGrantsResult"
+      }
+    },
+    "files.mount": {
+      "params": {
+        "$ref": "./schema.json#/definitions/FolderProfileRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/FolderGrantResult"
+      }
+    },
+    "files.assign": {
+      "params": {
+        "$ref": "./schema.json#/definitions/FolderGrantRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "files.unmount": {
+      "params": {
+        "$ref": "./schema.json#/definitions/FolderGrantRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "repositories.list": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ListRepositoriesResult"
+      }
+    },
+    "repositories.connectFolder": {
+      "params": {
+        "$ref": "./schema.json#/definitions/MountedRepositoryRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/RepositoryResult"
+      }
+    },
+    "repositories.disconnectFolder": {
+      "params": {
+        "$ref": "./schema.json#/definitions/RepositoryIDRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
     "debug.durable.storage": {
       "params": {
         "$ref": "./schema.json#/definitions/DurableCommandParameters"

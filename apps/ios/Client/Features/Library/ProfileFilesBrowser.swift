@@ -44,7 +44,7 @@ struct ProfileFilesPicker: UIViewControllerRepresentable {
     }
 }
 
-private final class ProfileFileHandoff {
+final class ProfileFileHandoff {
     private enum Phase {
         case browsing
         case selected(URL)

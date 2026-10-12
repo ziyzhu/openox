@@ -96,9 +96,7 @@ extension Conversation {
                     fileSystemItem(path: "services", type: "directory", size: nil),
                     fileSystemItem(path: "history", type: "directory", size: nil),
                 ]
-                if self.attachedServices.contains(where: { $0.domain == "ios:files" }) {
-                    rootItems.append(fileSystemItem(path: "files", type: "directory", size: nil))
-                }
+                rootItems.append(fileSystemItem(path: "files", type: "directory", size: nil))
                 rootItems.append(contentsOf: try await resourceFiles().entries().map {
                     fileSystemItem(path: $0.path, type: $0.isDirectory ? "directory" : "file", size: $0.size)
                 })
@@ -170,7 +168,7 @@ extension Conversation {
                     fileSystemItem(path: "history/\(id)/turns.jsonl", type: "file", size: sizes.transcript),
                 ]
             case .files:
-                items = DeviceFolderStore.shared.grants.map {
+                items = DeviceFolderStore.shared.grants(for: scope.profileID).map {
                     fileSystemItem(path: "files/\($0.id)", type: "directory", size: nil)
                 }
             case .deviceFolder, .deviceItem:
@@ -393,12 +391,12 @@ extension Conversation {
         case .files:
             break
         case .deviceFolder(let id):
-            guard DeviceFolderStore.shared.grant(id) != nil else { throw DeviceFolderStore.StoreError.missingGrant(id) }
+            _ = try DeviceFolderStore.shared.requireGrant(id, profileId: scope.profileID)
         case .root, .memory, .soul, .artifacts, .resources, .skills, .services, .conversations:
             return
         }
-        try requireIOSService("ios:files")
-        Log.session.info("Conversation.fileAccess service=ios:files operation=\(operation.rawValue) path=\(location.path)")
+        try requireFileBackendScope()
+        Log.session.info("Conversation.fileAccess profile=\(scope.profileID?.uuidString ?? "temporary") operation=\(operation.rawValue) path=\(location.path)")
     }
 
     func requireWritableFileAction(_ action: String, args: Any?) async throws {
@@ -478,6 +476,7 @@ extension Conversation {
         return try await DeviceFolderStore.shared.coordinate(
             grantID: id,
             relativePath: components,
+            profileId: scope.profileID,
             mode: mode,
             body
         )

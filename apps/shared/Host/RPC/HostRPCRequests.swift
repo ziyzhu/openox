@@ -5,6 +5,18 @@ extension OxHostProtocol {
 
     enum Method: String, CaseIterable {
         case describe = "host.describe"
+        case listProfiles = "profiles.list"
+        case inspectProfile = "profiles.inspect"
+        case createProfile = "profiles.create"
+        case selectProfile = "profiles.select"
+        case updateProfile = "profiles.update"
+        case listFolderGrants = "files.list"
+        case mountFolder = "files.mount"
+        case assignFolder = "files.assign"
+        case unmountFolder = "files.unmount"
+        case listRepositories = "repositories.list"
+        case connectRepositoryFolder = "repositories.connectFolder"
+        case disconnectRepositoryFolder = "repositories.disconnectFolder"
         case durableStorage = "debug.durable.storage"
         case durableConversation = "debug.durable.chat"
         case invokeAction = "services.invoke"
@@ -44,6 +56,38 @@ extension OxHostProtocol {
     }
 
     struct EmptyRequest: Decodable {}
+
+    struct ProfileRequest: Decodable {
+        let profileId: String
+    }
+
+    struct CreateProfileRequest: Decodable {
+        let name: String
+    }
+
+    struct UpdateProfileRequest: Decodable {
+        let profileId: String
+        let name: String?
+        let memory: String?
+        let soul: String?
+    }
+
+    struct FolderProfileRequest: Decodable {
+        let profileId: String?
+    }
+
+    struct FolderGrantRequest: Decodable {
+        let grantId: String
+        let profileId: String?
+    }
+
+    struct MountedRepositoryRequest: Decodable {
+        let path: String
+    }
+
+    struct RepositoryIDRequest: Decodable {
+        let repositoryId: String
+    }
 
     struct DurableCommandParameters: Decodable {
         let caseID: String

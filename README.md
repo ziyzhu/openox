@@ -80,6 +80,29 @@ ox host list
 ox --host ws://<host-tailnet-address>:9876 host describe
 ```
 
+Use native folder mounting to authorize a folder for the selected Profile, then explicitly connect the repository inside it:
+
+```sh
+ox --host <ws-url> host files mount --timeout 120000
+ox --host <ws-url> host files list
+ox --host <ws-url> host repository connect files/<grant-id>/optional-subfolder
+ox --host <ws-url> host service sync
+```
+
+The folder picker runs on the Host device, not the CLI machine. Mounted repositories load current-version source in place without copying, Git seeding, or migration. They are separate from managed Local and available only in the owning Profile. Edit through your editor or the Files mount; the services mount remains read-only. Disconnecting preserves source files; unmounting revokes access. Use Profile → Files to manage mounts. Existing unassigned grants require explicit assignment. Older builds do not enforce Profile ownership; downgrade requires review.
+
+Manage Profiles owned by the selected Host:
+
+```sh
+ox --host <ws-url> profile list
+ox --host <ws-url> profile create --name CourtServices
+ox --host <ws-url> profile select <profile-id>
+ox --host <ws-url> --profile <profile-id> profile update --memory-file ./MEMORY.md
+ox --host <ws-url> profile rename <profile-id> --name Courts
+```
+
+Stop running conversations before selecting or updating Profiles. Updates use the existing local Profile storage and migration gates; inspect state after an I/O failure before retrying. `ox --profile <directory>` without `--host` retains read-only disk inspection.
+
 Use `ox --help` for commands and connection options.
 
 ## Architecture

@@ -149,7 +149,9 @@ actor ProfileRepository {
                 "reasoningEffort": nativeEffort ?? agent["thinkingLevel"] ?? .null])
         }
         let decoder = JSONDecoder(); decoder.userInfo[.profileScope] = scope
-        return try decoder.decode(ConversationMeta.self, from: Data(JSONValue.object(metadata).jsonString().utf8))
+        var meta = try decoder.decode(ConversationMeta.self, from: Data(JSONValue.object(metadata).jsonString().utf8))
+        meta.attachedServiceDomains = ProfileMigrator.retainedServiceDomains(meta.attachedServiceDomains)
+        return meta
     }
 
     func saveConversation(_ request: ConversationSaveRequest, in scope: ProfileScope) async -> ConversationSaveReceipt {

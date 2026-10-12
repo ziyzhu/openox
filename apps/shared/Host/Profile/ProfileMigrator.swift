@@ -1642,6 +1642,10 @@ nonisolated enum ProfileMigrator {
         Log.app.info("StorageMigrator.conversationProviders migrated=\(count)")
     }
 
+    static func retainedServiceDomains(_ domains: [String]) -> [String] {
+        domains.filter { $0 != "ios:files" }
+    }
+
     static func removeBrowserServiceAttachments(at root: URL) throws {
         let manager = FileManager.default
         let conversations = root.appendingPathComponent("chats", isDirectory: true)

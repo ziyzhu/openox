@@ -387,19 +387,26 @@ final class ServiceOperations {
 
     func connectRepository(origin: String, purpose: String) async throws -> JSONValue? {
         let origin = origin.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: origin), url.scheme == "https", url.host != nil,
-              url.user == nil, url.password == nil, url.fragment == nil else {
-            throw RuntimeError.bridge("ox.repository.connect: origin must be a public HTTPS Git URL without credentials or a fragment")
+        let mounted = origin.hasPrefix("files/")
+        if !mounted {
+            guard let url = URL(string: origin), url.scheme == "https", url.host != nil,
+                  url.user == nil, url.password == nil, url.fragment == nil else {
+                throw RuntimeError.bridge("ox.repository.connect: use a public HTTPS Git URL without credentials or a fragment, or files/<grant-id>[/subfolder]")
+            }
         }
         return try await tracked(
             Actions.repositoryConnect,
             .object(["origin": .string(origin)]),
             purpose: purpose
         ) {
-            let repository = try await self.serviceManager.connectRepository(
-                from: url,
-                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
-            )
+            let locale = AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+            let repository: Repository.Descriptor
+            if mounted {
+                repository = try await self.serviceManager.connectMountedRepository(path: origin, locale: locale)
+            } else {
+                guard let url = URL(string: origin) else { throw RuntimeError.bridge("Invalid repository origin") }
+                repository = try await self.serviceManager.connectRepository(from: url, locale: locale)
+            }
             return .object([
                 "id": .string(repository.id),
                 "name": .string(repository.name),
@@ -412,14 +419,15 @@ final class ServiceOperations {
     }
 
     func disconnectRepository(repository: String, purpose: String) async throws -> JSONValue? {
-        guard let selected = serviceManager.repositories.first(where: { $0.id == repository && $0.provenance == .remote }),
-              let origin = selected.origin else {
-            throw RuntimeError.bridge("ox.repository.disconnect: select an installed remote repository ID from ox.repository.list")
+        guard let selected = serviceManager.repositories.first(where: {
+            $0.id == repository && [.remote, .mounted].contains($0.provenance)
+        }) else {
+            throw RuntimeError.bridge("ox.repository.disconnect: select a remote or mounted repository ID from ox.repository.list")
         }
         let args: JSONValue = .object([
             "id": .string(selected.id),
             "name": .string(selected.name),
-            "origin": .string(origin.absoluteString),
+            "origin": selected.origin.map { .string($0.absoluteString) } ?? .null,
             "serviceCount": .int(selected.serviceCount),
         ])
         return try await tracked(Actions.repositoryDisconnect, args, purpose: purpose) {
@@ -459,8 +467,10 @@ final class ServiceOperations {
     }
 
     func syncRepository(repository: String, purpose: String) async throws -> JSONValue? {
-        guard let selected = serviceManager.repositories.first(where: { $0.id == repository && $0.provenance == .remote }) else {
-            throw RuntimeError.bridge("ox.repository.sync: select an installed remote repository ID from ox.repository.list")
+        guard let selected = serviceManager.repositories.first(where: {
+            $0.id == repository && [.remote, .mounted].contains($0.provenance)
+        }) else {
+            throw RuntimeError.bridge("ox.repository.sync: select a remote or mounted repository ID from ox.repository.list")
         }
         let args: JSONValue = .object([
             "id": .string(selected.id),

@@ -5,7 +5,6 @@
   "services": [
     "ios:calendar",
     "ios:contacts",
-    "ios:files",
     "ios:location",
     "ios:messages",
     "ios:notifications",

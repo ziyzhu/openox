@@ -40,7 +40,7 @@ extension OxHostProtocol {
                 return
             }
         }
-        if session?.attachedServices.contains(where: { $0.domain == "ios:files" }) == true {
+        if session != nil {
             roots.append("files")
         }
         let value = JSONValue.object([

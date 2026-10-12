@@ -26,9 +26,25 @@ enum OxHostProtocol {
             }
             return try JSONDecoder().decode(type, from: data)
         }
+        if HostProfileCommands.operation != nil, method != .describe, method != .getLogs, method != .stopConversation {
+            reply.failure("A Host administration operation is in progress; retry after it completes")
+            return
+        }
         let conversations = host.conversations
         let services = host.services
         switch method {
+        case .listProfiles: handleListProfiles(try decode(EmptyRequest.self), host: host, reply: reply)
+        case .inspectProfile: handleInspectProfile(try decode(ProfileRequest.self), host: host, reply: reply)
+        case .createProfile: handleCreateProfile(try decode(CreateProfileRequest.self), host: host, reply: reply)
+        case .selectProfile: handleSelectProfile(try decode(ProfileRequest.self), host: host, reply: reply)
+        case .updateProfile: handleUpdateProfile(try decode(UpdateProfileRequest.self), host: host, reply: reply)
+        case .listFolderGrants: handleListFolderGrants(try decode(FolderProfileRequest.self), host: host, reply: reply)
+        case .mountFolder: handleMountFolder(try decode(FolderProfileRequest.self), host: host, reply: reply)
+        case .assignFolder: handleAssignFolder(try decode(FolderGrantRequest.self), host: host, reply: reply)
+        case .unmountFolder: handleUnmountFolder(try decode(FolderGrantRequest.self), host: host, reply: reply)
+        case .listRepositories: handleListRepositories(try decode(EmptyRequest.self), host: host, reply: reply)
+        case .connectRepositoryFolder: handleConnectRepositoryFolder(try decode(MountedRepositoryRequest.self), host: host, reply: reply)
+        case .disconnectRepositoryFolder: handleDisconnectRepositoryFolder(try decode(RepositoryIDRequest.self), host: host, reply: reply)
         case .durableStorage, .durableConversation:
             try handleDurableExperiment(method, params: params, conversations: conversations, reply: reply)
         case .describe:

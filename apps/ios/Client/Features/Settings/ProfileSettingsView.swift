@@ -230,7 +230,6 @@ private struct ProfileContentsView: View {
     let profile: Profile
     @State private var editingSkill: SkillDraft?
     @State private var openingImportedSkill: Bool
-    @State private var filesPresented = false
 
     init(profile: Profile, initialSkillDraft: SkillDraft?) {
         self.profile = profile
@@ -245,7 +244,9 @@ private struct ProfileContentsView: View {
     var body: some View {
         SettingsSection("Profile", layout: .group) {
             VStack(spacing: 0) {
-                Button { filesPresented = true } label: {
+                NavigationLink {
+                    ProfileFilesPage(scope: scope)
+                } label: {
                     SettingsDisclosureRow(title: "Files", value: Text(""))
                 }
                 .buttonStyle(.plain)
@@ -285,7 +286,6 @@ private struct ProfileContentsView: View {
         .navigationDestination(isPresented: $openingImportedSkill) {
             destination(.skills)
         }
-        .profileFilesBrowser(scope: scope, isPresented: $filesPresented)
     }
 
     private func destination(_ kind: ProfileContentDestination.Kind) -> some View {
