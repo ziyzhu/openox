@@ -33,3 +33,5 @@ fixtures for A/B runs. Report stop acknowledgement separately from observed idle
 and inspection snapshots separately from embedded presentation reads. Use physical
 footprint, not RSS, for memory comparisons; run profiling separately from latency samples.
 Pass the Simulator UDID to `xctrace --device` when attaching to its app process.
+For bimodal RPC timings, compare mean and tail latency as well as median; distinguish
+native enqueue timestamps from wire acknowledgement.

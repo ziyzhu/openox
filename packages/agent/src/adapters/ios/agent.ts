@@ -39,7 +39,7 @@ type Command = CommandScope & (
   | ({ action: "conversationCreate"; entries?: EntryDraft[] } & ApplicationPresentationChange)
   | ({ action: "applicationSave" } & ApplicationPresentationChange)
   | { action: "conversationPopulate"; entries: EntryDraft[] }
-  | { action: "conversationFork"; entryID: EntryId; title?: string; replaceSource?: boolean }
+  | { action: "conversationFork"; entryID: EntryId; title?: string }
   | { action: "applicationList" | "conversationList"; limit?: number; listCursor?: ConversationListCursor | null }
   | { action: "conversationHistory"; limit?: number; historyCursor?: ConversationHistoryCursor | null }
   | { action: "conversationPresent"; presentation?: PresentationChange | null }
@@ -202,7 +202,7 @@ export class IOSAgentAdapter {
         return { files: Object.values((await session.files.state()).files).filter(file => file.hidden) };
       case "conversationCreate": return application.create(args);
       case "conversationPopulate": await application.populate(required(), args.entries); return {};
-      case "conversationFork": return this.fork(required(), args.entryID, args.title, args.replaceSource);
+      case "conversationFork": return this.fork(required(), args.entryID, args.title);
       case "applicationLoad": return application.load(required());
       case "applicationList": return application.list(args.limit, args.listCursor ?? undefined);
       case "applicationSave": await application.save(required(), args); return {};
@@ -409,7 +409,7 @@ export class IOSAgentAdapter {
   private route(id: ConversationId) {
     if (!this.attachments.has(id)) throw new Error("Native conversation is not attached");
   }
-  private async fork(reference: ConversationReference, entryID: EntryId, title?: string, replaceSource = false) {
+  private async fork(reference: ConversationReference, entryID: EntryId, title?: string) {
     const session = this.current.session;
     const id = session.conversations.id(reference);
     if (!Number.isSafeInteger(entryID) || entryID < 0) throw new Error("Invalid fork entry ID");
@@ -430,7 +430,6 @@ export class IOSAgentAdapter {
       if (title !== undefined) (await tx.doc(ConversationPresentation, forkID)).title = title;
     } }, context);
     await session.files.createConversation(conversation.id);
-    if (replaceSource) await session.conversations.present(reference, { visible: false });
     const forkReference = session.conversations.reference(conversation.id);
     return { conversationID: conversation.id, reference: forkReference };
   }

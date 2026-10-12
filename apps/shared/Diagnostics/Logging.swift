@@ -77,6 +77,7 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
         var usageSamples = 0
         var missingUsage = 0
         var compactionTurns = 0
+        var browserResultBytes = 0
         var turnID: UUID?
         var calls: [String: Call] = [:]
         var callCounts: [CallKind: [String: Int]] = [:]
@@ -177,7 +178,7 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
         }
     }
 
-    func recordCallCompleted(id: String, failed: Bool) {
+    func recordCallCompleted(id: String, failed: Bool, resultBytes: Int? = nil) {
         let elapsedMs = Self.milliseconds(startedAt.duration(to: clock.now))
         let completed = state.withLock { state -> (Call, Int64)? in
             guard !state.finished, let call = state.calls.removeValue(forKey: id) else { return nil }
@@ -185,12 +186,15 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
             state.callDurations[call.kind, default: 0] += duration
             if failed { state.callFailures[call.kind, default: 0] += 1 }
             if call.kind == .tool { state.toolIntervals.append(call.startedMs...max(call.startedMs, elapsedMs)) }
+            if call.kind == .function && call.name.hasPrefix("ox.web.browser.") {
+                state.browserResultBytes += resultBytes ?? 0
+            }
             return (call, duration)
         }
         guard let (call, duration) = completed else { return }
         if call.kind == .tool { mark(.toolCompleted) }
         LogContext.$latency.withValue(self) {
-            Log.agent.info("AgentCall.end kind=\(call.kind.rawValue) id=\(id) name=\(call.name) outcome=\(failed ? "failed" : "completed") durationMs=\(duration)")
+            Log.agent.info("AgentCall.end kind=\(call.kind.rawValue) id=\(id) name=\(call.name) outcome=\(failed ? "failed" : "completed") durationMs=\(duration) resultBytes=\(resultBytes.map(String.init) ?? "n/a")")
         }
     }
 
@@ -235,10 +239,11 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
                 (state.callCounts[kind] ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: ",")
             }
             func tokens(_ count: Int) -> String { state.usageSamples > 0 ? String(count) : "n/a" }
+            let browserCalls = (state.callCounts[.function] ?? [:]).filter { $0.key.hasPrefix("ox.web.browser.") }.values.reduce(0, +)
             let usageComplete = state.missingUsage == 0 && state.counts[.modelCompleted, default: 0] == state.counts[.modelStarted, default: 0]
             let timeline = state.events.map { "\($0.label):\($0.elapsedMs)" }.joined(separator: ",")
             let cacheWrite = state.cacheWriteSamples > 0 ? String(state.cacheWriteInputTokens) : "n/a"
-            return "AgentLatency.summary conversation=\(conversationID) submission=\(submissionID.uuidString) kind=\(kind) outcome=\(outcome) client=\(client) model=\(model) totalMs=\(totalMs) queueMs=\(value(queueMs)) prepareMs=\(value(prepareMs)) ttftMs=\(value(ttftMs)) firstThinkingMs=\(value(firstThinkingMs)) firstTextMs=\(value(firstTextMs)) firstVisibleMs=\(value(firstVisibleMs)) toolWallMs=\(toolWallMs) modelTurns=\(state.counts[.modelStarted, default: 0]) compactionTurns=\(state.compactionTurns) toolCalls=\(state.counts[.toolStarted, default: 0]) toolFailures=\(state.callFailures[.tool, default: 0]) toolMs=\(state.callDurations[.tool, default: 0]) tools=[\(calls(.tool))] functionCalls=\((state.callCounts[.function] ?? [:]).values.reduce(0, +)) functionFailures=\(state.callFailures[.function, default: 0]) functionMs=\(state.callDurations[.function, default: 0]) functions=[\(calls(.function))] unfinishedCalls=\(state.calls.count) usageSamples=\(state.usageSamples) missingUsage=\(state.missingUsage) usageComplete=\(usageComplete) tokens=\(tokens(state.totalTokens)) input=\(tokens(state.inputTokens)) cached=\(tokens(state.cachedInputTokens)) cacheWrite=\(cacheWrite) output=\(tokens(state.outputTokens)) timeline=\(timeline)"
+            return "AgentLatency.summary conversation=\(conversationID) submission=\(submissionID.uuidString) kind=\(kind) outcome=\(outcome) client=\(client) model=\(model) totalMs=\(totalMs) queueMs=\(value(queueMs)) prepareMs=\(value(prepareMs)) ttftMs=\(value(ttftMs)) firstThinkingMs=\(value(firstThinkingMs)) firstTextMs=\(value(firstTextMs)) firstVisibleMs=\(value(firstVisibleMs)) toolWallMs=\(toolWallMs) modelTurns=\(state.counts[.modelStarted, default: 0]) modelRoundTrips=\(state.counts[.modelStarted, default: 0] - state.compactionTurns) browserCalls=\(browserCalls) browserResultBytes=\(state.browserResultBytes) compactionTurns=\(state.compactionTurns) toolCalls=\(state.counts[.toolStarted, default: 0]) toolFailures=\(state.callFailures[.tool, default: 0]) toolMs=\(state.callDurations[.tool, default: 0]) tools=[\(calls(.tool))] functionCalls=\((state.callCounts[.function] ?? [:]).values.reduce(0, +)) functionFailures=\(state.callFailures[.function, default: 0]) functionMs=\(state.callDurations[.function, default: 0]) functions=[\(calls(.function))] unfinishedCalls=\(state.calls.count) usageSamples=\(state.usageSamples) missingUsage=\(state.missingUsage) usageComplete=\(usageComplete) tokens=\(tokens(state.totalTokens)) input=\(tokens(state.inputTokens)) cached=\(tokens(state.cachedInputTokens)) cacheWrite=\(cacheWrite) output=\(tokens(state.outputTokens)) timeline=\(timeline)"
         }
         if let summary { Log.perf.info(summary) }
     }

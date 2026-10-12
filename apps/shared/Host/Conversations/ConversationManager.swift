@@ -234,7 +234,7 @@ final class ConversationManager {
                     let prepared = await loaded.preparingDocument()
                     guard repositoryScope == scope else { throw CancellationError() }
                     conversation = restoredConversation(from: prepared, in: scope)
-                    register(conversation)
+                    register(conversation, as: reference.compatibilityID)
                 }
                 try await conversation.prepareDurableRecovery()
                 conversations[reference.conversationID] = conversation
@@ -266,7 +266,7 @@ final class ConversationManager {
         ensureRepositoryScope()
         if let current, current.transcript.isEmpty, !current.isTemporary { return current }
         let conversation = makeConversation()
-        register(conversation)
+        register(conversation, as: ConversationID(conversation.id))
         setCurrent(conversation)
         return conversation
     }
@@ -279,7 +279,7 @@ final class ConversationManager {
         let conversation = makeConversation()
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         if !title.isEmpty { conversation.rename(to: title) }
-        register(conversation)
+        register(conversation, as: ConversationID(conversation.id))
         conversation.enqueue(prompt)
         Log.session.info("bridge.chat.start caller=\(caller.id) target=\(conversation.id)")
         return conversation.id
@@ -306,7 +306,7 @@ final class ConversationManager {
             from: prepared,
             in: scope
         )
-        register(conversation)
+        register(conversation, as: state.conversationID)
         setCurrent(conversation)
         Log.session.info("ConversationManager.import chat=\(conversation.id) turns=\(state.turns.count)")
         return conversation
@@ -342,7 +342,7 @@ final class ConversationManager {
         )
         conversation.rename(to: "Scheduled /\(schedule.skill.displayName)")
         conversation.setAttachedServices(services)
-        register(conversation)
+        register(conversation, as: ConversationID(conversation.id))
         let invocation = UserSkillInvocation(skill: schedule.skill, argument: schedule.argument)
         let outcome = await conversation.submitUntilAttention(
             invocation.expandedIntent,
@@ -356,7 +356,7 @@ final class ConversationManager {
     func toggleTemporaryConversation() {
         guard let previous = current, previous.transcript.isEmpty, previous.queuedMessages.isEmpty, !previous.isBusy else { return }
         let conversation = makeConversation(retention: previous.isTemporary ? .persisted : .temporary)
-        register(conversation)
+        register(conversation, as: ConversationID(conversation.id))
         setCurrent(conversation)
         Log.session.info("ConversationManager.retention chat=\(conversation.id) temporary=\(conversation.isTemporary)")
     }
@@ -381,7 +381,7 @@ final class ConversationManager {
             retention: .temporary
         )
         attachPersistence(conversation)
-        register(conversation)
+        register(conversation, as: ConversationID(conversation.id))
         setCurrent(conversation)
         conversation.enqueue(
             continuation.intent,
@@ -491,8 +491,47 @@ final class ConversationManager {
         return branch(from: conversation, snapshot: result)
     }
 
-    func branch(from conversation: Conversation, snapshot result: ConversationContinuation, replacing: Bool = false) -> Conversation? {
-        guard let reference = conversation.conversationReference else { Log.session.error("ConversationManager.branch requires a qualified persisted conversation"); return nil }
+    private func branch(from conversation: Conversation, snapshot result: ConversationContinuation) -> Conversation? {
+        guard let branched = makeFork(from: conversation, snapshot: result) else { return nil }
+        attachPersistence(branched)
+        setCurrent(branched)
+        return branched
+    }
+
+    func replaceForRerun(from conversation: Conversation, snapshot result: ConversationContinuation) -> Conversation? {
+        guard let replacement = makeFork(from: conversation, snapshot: result) else { return nil }
+        attachPersistence(replacement) { [weak self, weak conversation, weak replacement] in
+            guard let self, let conversation, let replacement else { throw CancellationError() }
+            try await finishRerunReplacement(replacement, from: conversation)
+        }
+        return replacement
+    }
+
+    private func finishRerunReplacement(_ replacement: Conversation, from source: Conversation) async throws {
+        try Task.checkCancellation()
+        guard repositoryScope == replacement.scope,
+              let reference = source.conversationReference,
+              let target = replacement.conversationReference else { throw CancellationError() }
+        do {
+            _ = try await DurableProfileStore.shared.command(scope: replacement.scope, value: .object([
+                "action": .string("conversationPresent"), "reference": reference.value,
+                "presentation": .object(["visible": .bool(false)])
+            ]))
+        } catch {
+            Log.session.error("ConversationManager.rerun replacement failed source=\(source.id) target=\(replacement.id) error=\(error.localizedDescription)")
+            throw error
+        }
+        guard repositoryScope == replacement.scope else { throw CancellationError() }
+        let sourceID = reference.compatibilityID
+        if case .debouncing(_, let task) = records[sourceID]?.persistence { task.cancel() }
+        records.removeValue(forKey: sourceID)
+        accessOrdinals.removeValue(forKey: sourceID)
+        if current === source { setCurrent(replacement) }
+        Log.session.info("ConversationManager.rerun replaced source=\(sourceID.rawValue) target=\(target.compatibilityID.rawValue)")
+    }
+
+    private func makeFork(from conversation: Conversation, snapshot result: ConversationContinuation) -> Conversation? {
+        guard let reference = conversation.conversationReference else { Log.session.error("ConversationManager.fork requires a qualified persisted conversation"); return nil }
         let selection = result.meta.model ?? providerRegistry.sessionModel
         let client = providerRegistry.client(for: selection)
         let model = providerRegistry.model(for: selection, client: client)
@@ -510,11 +549,8 @@ final class ConversationManager {
             feedback: feedback,
             serviceManager: serviceManager
         )
-        branched.durableForkSource = (reference, result.turns.filter { if case .user = $0 { return true }; return false }.count, replacing)
-        attachPersistence(branched)
-        register(branched)
-        if branched.state.turns != result.turns { persist(branched) }
-        setCurrent(branched)
+        branched.durableForkSource = (reference, result.turns.filter { if case .user = $0 { return true }; return false }.count)
+        register(branched, as: ConversationID(branched.id))
         return branched
     }
 
@@ -787,7 +823,7 @@ final class ConversationManager {
         Log.session.info("ConversationManager.repository root=\(scope.root.path) generation=\(scope.generation)")
     }
 
-    private func attachPersistence(_ conversation: Conversation) {
+    private func attachPersistence(_ conversation: Conversation, afterPreparation: (@MainActor () async throws -> Void)? = nil) {
         conversation.conversationManager = self
         conversation.durablePreparation = Task { @MainActor [weak self, weak conversation] in
             guard let self, let conversation else { throw CancellationError() }
@@ -799,14 +835,7 @@ final class ConversationManager {
                 if let existing = try? DurableProfileStore.shared.reference(for: oldID, in: conversation.scope) { reference = existing }
                 else if let origin = conversation.durableForkSource {
                     reference = try await DurableProfileStore.shared.fork(in: conversation.scope, from: origin.reference,
-                        beforeUser: origin.users, title: conversation.metadata.title, replacing: origin.replacing)
-                    if origin.replacing {
-                        let sourceID = origin.reference.compatibilityID
-                        if case .debouncing(_, let task) = records[sourceID]?.persistence { task.cancel() }
-                        records.removeValue(forKey: sourceID)
-                        accessOrdinals.removeValue(forKey: sourceID)
-                        Log.session.info("ConversationManager.rerun replaced source=\(sourceID.rawValue) target=\(reference.compatibilityID.rawValue)")
-                    }
+                        beforeUser: origin.users, title: conversation.metadata.title)
                     conversation.durableForkSource = nil
                 } else { reference = try await DurableProfileStore.shared.create(in: conversation.scope) }
                 try Task.checkCancellation()
@@ -822,6 +851,7 @@ final class ConversationManager {
                 }
                 persist(conversation)
             }
+            try await afterPreparation?()
             conversation.durablePreparation = nil
         }
         if !conversation.isTemporary {
@@ -938,8 +968,7 @@ final class ConversationManager {
         trimHydrated()
     }
 
-    private func register(_ conversation: Conversation) {
-        let id = ConversationID(conversation.id)
+    private func register(_ conversation: Conversation, as id: ConversationID) {
         records[id] = Record(conversation: conversation)
         touch(id)
     }

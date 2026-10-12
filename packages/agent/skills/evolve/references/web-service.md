@@ -48,7 +48,7 @@ Inspect the selected manifest and relevant available source; Bundled `actions.js
 
 ## 2. Observe the website
 
-Use the smallest read-only Browser probes that reveal the required behavior; bootstrap execution follows the rules above.
+Use the smallest read-only Browser probes that reveal the required behavior; bootstrap execution follows the rules above. Batch predictable authorized steps in one execution and return compact outcome evidence. For same-document interaction, use one async page script to trigger the action, wait for a specific success or error condition with a bounded timeout, and extract relevant fields. Full-page navigation destroys page scripts; sequence it through awaited Browser calls. Navigation calls already wait for completion, so do not follow them with `waitForNavigation`, which waits for the next navigation. Stop at unexpected choices, confirmation boundaries, or human-only steps; inspect external state before retrying uncertain writes.
 
 1. Start Browser capture in the target state without bodies or a reload and add a named mark. Reload only when initial document-load traffic is required. Enable bounded bodies only for a targeted exchange whose structure cannot be established from metadata or a narrow repeatable probe.
 2. Exercise one representative interaction through an inspected Browser action or narrow page JavaScript.
