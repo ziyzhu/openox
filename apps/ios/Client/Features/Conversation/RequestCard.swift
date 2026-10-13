@@ -569,8 +569,8 @@ struct PermissionActionButtons: View {
         RequestActionButton(
             title: option,
             isPrimary: isPrimary,
-            secondaryFill: colorScheme == .light ? .white : Theme.Colors.surfaceSunken,
-            secondaryBorder: Theme.Colors.onSurface.opacity(0.25),
+            secondaryFill: colorScheme == .light ? Theme.Colors.surface : Theme.Colors.surfaceSunken,
+            secondaryBorder: Theme.Colors.onSurface.dynamic.opacity(0.25),
             cornerRadius: Theme.Radius.full,
             action: { onSelect(option) }
         )

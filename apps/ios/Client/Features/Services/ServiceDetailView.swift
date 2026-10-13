@@ -211,7 +211,7 @@ struct ServiceDetailView: View {
                         .accessibilityIdentifier(A11yID.ConversationControls.Attach.signOutProgress(service.domain))
                     } else {
                         Button("Sign out") { Task { await signOut() } }
-                            .buttonStyle(OxChipButton(filled: false, secondaryFill: colorScheme == .light ? .white : Theme.Colors.chipOnBackground))
+                            .buttonStyle(OxChipButton(filled: false, secondaryFill: colorScheme == .light ? Theme.Colors.surface : Theme.Colors.chipOnBackground))
                             .accessibilityIdentifier(A11yID.ConversationControls.Attach.signOut(service.domain))
                     }
                 case .notRequired:
