@@ -228,6 +228,7 @@ struct ThinkingRow: View {
     let sourceInvocations: [Invocation]
     let startedAt: Date
     let isLive: Bool
+    var allowsLoader = true
     @Environment(ServiceManager.self) private var serviceManager
 
     private struct LiveAnimation {
@@ -367,6 +368,8 @@ struct ThinkingRow: View {
             if showsLoader {
                 CellularAutomatonLoader.small
                     .frame(height: singleLineHeight)
+                    .opacity(allowsLoader ? 1 : 0)
+                    .accessibilityHidden(!allowsLoader)
                     .transition(.opacity)
             } else if !label.isEmpty {
                 if isLive {
@@ -1159,6 +1162,7 @@ struct BlockView: View, Equatable {
     let conversationID: UUID
     let browserPageMount: WebPageMountCoordinator
     let isThinkingTail: Bool
+    var allowsLoader = true
     let controls: MessageControls
     let artifactControls: FileControls
     let onOpenAttachment: (FileItem, String) -> Void
@@ -1170,6 +1174,7 @@ struct BlockView: View, Equatable {
             && lhs.isLatestCanvas == rhs.isLatestCanvas
             && lhs.isStreamingTail == rhs.isStreamingTail
             && lhs.isThinkingTail == rhs.isThinkingTail
+            && lhs.allowsLoader == rhs.allowsLoader
             && lhs.controls.isCopied == rhs.controls.isCopied
             && lhs.editMenuCanMutate == rhs.editMenuCanMutate
             && lhs.artifactControls.revision == rhs.artifactControls.revision
@@ -1194,7 +1199,8 @@ struct BlockView: View, Equatable {
                 trace: trace,
                 sourceInvocations: block.sourceInvocations,
                 startedAt: block.createdAt,
-                isLive: isThinkingTail
+                isLive: isThinkingTail,
+                allowsLoader: allowsLoader
             )
             .padding(.horizontal, 4)
         case .contextCompaction:

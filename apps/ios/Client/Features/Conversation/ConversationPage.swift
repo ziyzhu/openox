@@ -306,6 +306,20 @@ struct ConversationPage: View {
     @State private var sendHandoff = SendHandoff.idle
     @State private var composerInputFrame = CGRect.zero
     @State private var submissionFrame = CGRect.null
+    @State private var transcriptTail: CGFloat = 0
+    @State private var sendTranscriptTail: CGFloat = 0
+
+    private var transcriptRise: CGFloat {
+        guard case .positioned(_, _, let top) = sendHandoff, !reduceMotion else { return 0 }
+        return sendTranscriptTail - top
+    }
+
+    private var holdsTranscript: Bool {
+        switch sendHandoff {
+        case .waitingForAnchor, .positioned: !reduceMotion
+        case .idle, .animating: false
+        }
+    }
     @FocusState private var composerFocused: Bool
     @State private var editedBlockID: UUID?
     @State private var editDraft = AttributedString()
@@ -968,7 +982,8 @@ struct ConversationPage: View {
     }
 
     private var showsActivity: Bool {
-        switch conversation.activity {
+        guard sendHandoff == .idle else { return false }
+        return switch conversation.activity {
         case .running(.thinking):
             conversation.thinkingActivity == nil
         case .running(.awaiting(_)):
@@ -1092,7 +1107,7 @@ struct ConversationPage: View {
                     PermissionRequestCard(request: request) { option in
                         conversation.resolvePrompt(blockId: pending.id, answer: option)
                     }
-                } else {
+                } else if sendHandoff == .idle {
                     ActivityBubble()
                 }
             case .choice:
@@ -1243,6 +1258,7 @@ struct ConversationPage: View {
             conversationID: conversation.id,
             browserPageMount: browserPageMount,
             isThinkingTail: block.isLiveThinking,
+            allowsLoader: sendHandoff == .idle,
             controls: messageControls(
                 sourceBlockID: block.sourceBlockID,
                 editableBlock: editableBlock(block)
@@ -1271,10 +1287,18 @@ struct ConversationPage: View {
     private func blockRow(
         _ block: ConversationBlock,
         latestCanvasBlockIDs: [URL: UUID],
-        identified: Bool = true
+        identified: Bool = true,
+        recordsTail: Bool = false
     ) -> some View {
+        let measuresTail = recordsTail && sendHandoff == .idle
         let row = conversationBlockHost(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
             .padding(.top, block.spacingBefore)
+            .onGeometryChange(for: CGFloat?.self) {
+                measuresTail ? $0.frame(in: .global).maxY : nil
+            } action: {
+                guard let bottom = $0 else { return }
+                transcriptTail = bottom
+            }
 
         if identified {
             row.id(block.id)
@@ -1432,7 +1456,7 @@ struct ConversationPage: View {
             }
             .onChange(of: latestSubmissionID) { _, new in
                 guard new != nil else { return }
-                transcriptWindow.showLatest(total: totalBlockCount)
+                transcriptWindow.reconcile(total: totalBlockCount)
             }
             .onChange(of: submissionAnchor) { old, new in
                 guard old != new, let new else { return }
@@ -1482,32 +1506,40 @@ struct ConversationPage: View {
         anchoredViewportHeight: CGFloat,
         scrollToTurn: @escaping (TurnID) async -> Void
     ) -> some View {
-        VStack(spacing: 0) {
+        let holdsHistory = holdsTranscript
+        let historyTail = sendTranscriptTail
+        return VStack(spacing: 0) {
             if conversation.canChangeRetention {
                 emptyConversationState
             }
             earlierWindowBoundary(blocks: blocks)
             let anchorIndex = renderedBlocks.firstIndex { $0.id == anchoredTurnID }
-            if let submissionID = latestSubmissionID,
-               submissionAnchor != nil,
-               anchoredQueuedMessage != nil || anchorIndex != nil {
-                VStack(spacing: 0) {
-                    ForEach(Array(renderedBlocks.prefix(anchorIndex ?? renderedBlocks.count))) { block in
-                        blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
-                    }
-                    if let queued = anchoredQueuedMessage {
-                        activityRow(blocks: renderedBlocks)
-                        stoppedRow
-                        ForEach(conversation.queuedMessages.filter { $0.id != queued.id }) { queued in
-                            queuedRow(queued)
-                        }
-                    }
+            let hasAnchor = latestSubmissionID != nil && submissionAnchor != nil && (anchoredQueuedMessage != nil || anchorIndex != nil)
+            VStack(spacing: 0) {
+                ForEach(Array(renderedBlocks.prefix(hasAnchor ? anchorIndex ?? renderedBlocks.count : renderedBlocks.count))) { block in
+                    blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs, recordsTail: !hasAnchor && block.id == renderedBlocks.last?.id)
                 }
-                .scrollTargetLayout()
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { old, new in
-                    guard old != new, submissionAnchor != nil else { return }
-                    scroller.preserveTurn(submissionID)
+                if let queued = anchoredQueuedMessage {
+                    activityRow(blocks: renderedBlocks)
+                    stoppedRow
+                    ForEach(conversation.queuedMessages.filter { $0.id != queued.id }) { queued in
+                        queuedRow(queued)
+                    }
+                } else if !hasAnchor {
+                    activityRow(blocks: renderedBlocks)
+                    stoppedRow
+                    queuedRows
                 }
+            }
+            .scrollTargetLayout()
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { old, new in
+                guard old != new, hasAnchor, let submissionID = latestSubmissionID else { return }
+                scroller.preserveTurn(submissionID)
+            }
+            .visualEffect { content, geometry in
+                content.offset(y: holdsHistory ? historyTail - geometry.frame(in: .global).maxY : 0)
+            }
+            if let submissionID = latestSubmissionID, hasAnchor {
                 VStack(spacing: 0) {
                     if let queued = anchoredQueuedMessage {
                         queuedRow(queued, identified: false)
@@ -1515,10 +1547,11 @@ struct ConversationPage: View {
                         blockRow(
                             renderedBlocks[anchorIndex],
                             latestCanvasBlockIDs: latestCanvasBlockIDs,
-                            identified: false
+                            identified: false,
+                            recordsTail: anchorIndex == renderedBlocks.count - 1
                         )
                         ForEach(Array(renderedBlocks.dropFirst(anchorIndex + 1))) { block in
-                            blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs, identified: false)
+                            blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs, identified: false, recordsTail: block.id == renderedBlocks.last?.id)
                         }
                         activityRow(blocks: renderedBlocks)
                         stoppedRow
@@ -1535,6 +1568,10 @@ struct ConversationPage: View {
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
                     guard latestSubmissionID == submissionID else { return }
                     submissionFrame = $0
+                    if case .positioned(let id, _, let top) = sendHandoff,
+                       id == submissionID, abs($0.minY - top) >= 1 {
+                        scroller.preserveTurn(submissionID)
+                    }
                 }
                 .task(id: sendHandoff.riseRequestID(frame: submissionFrame)) {
                     guard let id = sendHandoff.riseRequestID(frame: submissionFrame) else { return }
@@ -1545,13 +1582,6 @@ struct ConversationPage: View {
                     guard !Task.isCancelled else { return }
                     await scrollToTurn(submissionID)
                 }
-            } else {
-                ForEach(renderedBlocks) { block in
-                    blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
-                }
-                activityRow(blocks: renderedBlocks)
-                stoppedRow
-                queuedRows
             }
             Color.clear
                 .frame(height: 1)
@@ -1582,7 +1612,7 @@ struct ConversationPage: View {
               id == submissionID,
               sendHandoff.riseRequestID(frame: submissionFrame) == id else { return }
         let anchorID = submissionID
-        Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=animating submission=\(submissionID) anchor=\(anchorID) rise=\(Int(offset))")
+        Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=animating submission=\(submissionID) anchor=\(anchorID) rise=\(Int(offset)) historyRise=\(Int(transcriptRise))")
         withAnimation(reduceMotion ? nil : .spring(duration: 0.45, bounce: 0), completionCriteria: .logicallyComplete) {
             sendHandoff = .animating(submissionID)
         } completion: {
@@ -1937,6 +1967,7 @@ struct ConversationPage: View {
     }
 
     private func enqueue(_ message: ConversationComposerModel.Message, skillInvocation: UserSkillInvocation? = nil) {
+        sendTranscriptTail = transcriptTail
         let receipt = conversation.enqueue(
             message.text,
             attachments: message.attachments,

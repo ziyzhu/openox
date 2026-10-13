@@ -33,6 +33,9 @@ Verify streaming-rendering changes in video across paragraph/fence boundaries an
 Verify Send handoffs in video for empty/populated chats, short/multiline/long drafts,
 keyboard visible/hidden, and scrolled history. Confirm non-queued cases have `posted`
 receipts; inspect rising motion separately from queue promotion and final anchoring.
+Track previous visible rows alongside the incoming bubble; a stable final anchor
+does not establish a continuous push through the handoff.
+Confirm activity and thinking loaders stay hidden until the Send handoff is anchored.
 
 Measure Client–Host latency over a warmed persistent RPC connection using identical fresh
 fixtures for A/B runs. Report stop acknowledgement separately from observed idle state,
