@@ -21,6 +21,9 @@
     "Use in this Profile" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "用于当前档案" } } } },
     "Couldn't access folder" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法访问文件夹" } } } },
     "Unmount %@" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消挂载 %@" } } } },
+    "Unmount %@?" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消挂载 %@？" } } } },
+    "Unmount" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消挂载" } } } },
+    "This Profile will lose access to the folder. The folder and its files will stay in their original location." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前档案将无法访问此文件夹。文件夹及其中的文件将保留在原位置。" } } } },
     "Background time ended" : {
       "extractionState" : "manual",
       "localizations" : {

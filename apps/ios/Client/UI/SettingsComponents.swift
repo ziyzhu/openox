@@ -94,6 +94,7 @@ struct SettingsDisclosureRow: View {
     var isLoading = false
     var indicator = "chevron.right"
     var icon: String?
+    var leadingInset: CGFloat = SettingsLayout.horizontalInset
 
     var body: some View {
         HStack(spacing: Theme.Spacing.xs) {
@@ -118,7 +119,9 @@ struct SettingsDisclosureRow: View {
                     .foregroundStyle(Theme.Colors.conversationSecondary)
             }
         }
-        .settingsRowPadding()
+        .padding(.leading, leadingInset)
+        .padding(.trailing, SettingsLayout.horizontalInset)
+        .padding(.vertical, SettingsLayout.rowVerticalInset)
         .contentShape(Rectangle())
     }
 }

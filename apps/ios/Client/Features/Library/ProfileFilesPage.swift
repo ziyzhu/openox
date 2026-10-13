@@ -10,6 +10,8 @@ struct ProfileFilesPage: View {
     @State private var previewFile: PreviewFile?
     @State private var operation: String?
     @State private var errorMessage: String?
+    @State private var editing = false
+    @State private var pendingUnmount: DeviceFolderStore.Grant?
 
     private struct MountedFolder: Identifiable {
         let id: String
@@ -91,6 +93,18 @@ struct ProfileFilesPage: View {
         .background(Theme.Colors.background)
         .navigationTitle("Files")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(editing ? "Done" : "Edit") {
+                    withAnimation(.spring(duration: 0.25, bounce: 0)) { editing.toggle() }
+                }
+                .disabled(mounts.isEmpty || operation != nil || scope.profileID == nil)
+                .accessibilityIdentifier("profile.files.edit")
+            }
+        }
+        .onChange(of: mounts.isEmpty) { _, empty in
+            if empty { editing = false }
+        }
         .profileFilesBrowser(scope: scope, isPresented: $profileFolderPresented)
         .sheet(item: $browsing, onDismiss: {
             if let url = handoff.dismiss() { openSelection(url) }
@@ -115,9 +129,44 @@ struct ProfileFilesPage: View {
         )) { Button("OK", role: .cancel) { errorMessage = nil } } message: {
             Text(errorMessage ?? "")
         }
+        .alert(Text("Unmount \(pendingUnmount?.name ?? "")?"), isPresented: Binding(
+            get: { pendingUnmount != nil }, set: { if !$0 { pendingUnmount = nil } }
+        ), presenting: pendingUnmount) { grant in
+            Button("Unmount", role: .destructive) {
+                perform("unmount.\(grant.id)") { profileId in
+                    try await store.remove(grant.id, profileId: profileId)
+                }
+            }
+            .accessibilityIdentifier("profile.files.confirmUnmount")
+            Button("Cancel", role: .cancel) { pendingUnmount = nil }
+                .accessibilityIdentifier("profile.files.cancelUnmount")
+        } message: { _ in
+            Text("This Profile will lose access to the folder. The folder and its files will stay in their original location.")
+        }
     }
 
     private func mountRow(_ grant: DeviceFolderStore.Grant) -> some View {
+        HStack(spacing: 0) {
+            if editing {
+                Button(role: .destructive) {
+                    pendingUnmount = grant
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.red)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, SettingsLayout.horizontalInset - 10)
+                .accessibilityLabel(Text(String.localizedStringWithFormat(String(localized: "Unmount %@"), grant.name)))
+                .accessibilityIdentifier("profile.files.remove.\(grant.id)")
+            }
+            mountDisclosure(grant)
+        }
+    }
+
+    private func mountDisclosure(_ grant: DeviceFolderStore.Grant) -> some View {
         let unavailable = mountError(grant)
         return Button {
             do {
@@ -126,7 +175,7 @@ struct ProfileFilesPage: View {
             } catch { errorMessage = error.localizedDescription }
         } label: {
             VStack(alignment: .leading, spacing: 0) {
-                SettingsDisclosureRow(title: LocalizedStringKey(grant.name), value: Text(""))
+                SettingsDisclosureRow(title: LocalizedStringKey(grant.name), value: Text(""), leadingInset: editing ? 2 : SettingsLayout.horizontalInset)
                 if let unavailable {
                     Text(unavailable)
                         .font(Theme.Fonts.caption)
