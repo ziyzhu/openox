@@ -1938,7 +1938,6 @@ struct ConversationPage: View {
 
     private func beginSpeech(accessible: Bool) {
         guard !composer.isImporting, !speechInput.isPresented else { return }
-        prepareComposerSubmission()
         let draftID = composer.draftID
         let draft = composer.attributedDraft
         composer.setAttachmentMenuPresented(false)

@@ -16,7 +16,6 @@ nonisolated struct PastedComposerImage: Sendable {
 
 private struct ComposerTextViewInstaller: UIViewRepresentable {
     let textViewReference: ComposerTextViewReference
-    let allowsSelection: Bool
     let onHeightChange: (CGFloat) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -37,9 +36,6 @@ private struct ComposerTextViewInstaller: UIViewRepresentable {
 
     func updateUIView(_ view: ProbeView, context: Context) {
         context.coordinator.onHeightChange = onHeightChange
-        context.coordinator.allowsSelection = allowsSelection
-        context.coordinator.installedTextView?.isSelectable = allowsSelection
-        context.coordinator.installedTextView?.isEditable = allowsSelection
         context.coordinator.scheduleHeightUpdate()
         view.scheduleInstallation()
     }
@@ -67,7 +63,6 @@ private struct ComposerTextViewInstaller: UIViewRepresentable {
         private let textViewReference: ComposerTextViewReference
         var onHeightChange: (CGFloat) -> Void
         weak var installedTextView: UITextView?
-        var allowsSelection = true
         private var heightUpdateScheduled = false
 
         init(
@@ -106,8 +101,6 @@ private struct ComposerTextViewInstaller: UIViewRepresentable {
                 )
             }
             textView.pasteDelegate = self
-            textView.isSelectable = allowsSelection
-            textView.isEditable = allowsSelection
             scheduleHeightUpdate()
         }
 
@@ -756,6 +749,7 @@ struct ConversationComposer: View, Equatable {
                 .padding(.top, -textEditorVerticalInset + textEditorOpticalOffset)
                 .padding(.bottom, -textEditorVerticalInset - textEditorOpticalOffset)
                 .focused(fieldFocused)
+                .allowsHitTesting(!speech.isPresented)
                 .accessibilityIdentifier(A11yID.ConversationControls.input)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
                     onInputFrameChange($0)
@@ -766,8 +760,7 @@ struct ConversationComposer: View, Equatable {
                 .foregroundStyle(Theme.Colors.onSurface)
                 .tint(Theme.Colors.primary.dynamic)
                 .background(ComposerTextViewInstaller(
-                    textViewReference: textViewReference,
-                    allowsSelection: !speech.isPresented
+                    textViewReference: textViewReference
                 ) { height in
                     guard abs(composerTextEditorHeight - height) > 0.5 else { return }
                     composerTextEditorHeight = height

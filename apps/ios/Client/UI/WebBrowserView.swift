@@ -364,6 +364,7 @@ struct WebContentView: View {
 
     var body: some View {
         WebView(page)
+            .excludesCompactPageSwitch()
             .webViewBackForwardNavigationGestures(mode == .browser ? .enabled : .disabled)
             .webViewLinkPreviews(.enabled)
             .webViewMagnificationGestures(.enabled)
