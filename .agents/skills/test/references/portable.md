@@ -15,3 +15,7 @@ Checkout fixtures must include untracked files and skip working-tree deletions;
 Device-template checks live in this skill's `apps/ios/template-*.test.ts`; `setup`
 owns the schema and launcher. Predecessor storage and website-session evidence remain
 private external files. Portable checks do not establish live upgrade, auth, or service coverage.
+
+CLI help checks should assert public flag names and value arity in the Flags section,
+not placeholder wording. Verify argument behavior through real CLI processes; keep
+package expectations independent of the help renderer so missing flags still fail.

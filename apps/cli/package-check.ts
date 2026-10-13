@@ -58,8 +58,8 @@ try {
   if (/^\s+serve\s/m.test(help)) throw new Error("installed ox help exposed the extracted Pi MCP server command");
   if (!help.includes("repository verify")) throw new Error("installed ox help omitted repository verification");
   if (!help.includes("vm inspect")) throw new Error("installed ox help omitted VM commands");
-  if (!help.includes("--conversation <conversation-id>")) throw new Error("installed ox help omitted conversation targeting");
-  if (!help.includes("--profile <path>")) throw new Error("installed ox help omitted Profile targeting");
+  if (!/^\s+--conversation <[^>\r\n]+>\s+\S/m.test(help)) throw new Error("installed ox help omitted valued conversation targeting flag");
+  if (!/^\s+--profile <[^>\r\n]+>\s+\S/m.test(help)) throw new Error("installed ox help omitted valued Profile targeting flag");
   if (help.includes("--runtime") || help.includes("--session <id>") || help.includes("--vm-session") || help.includes("--root")) {
     throw new Error("installed ox help exposed removed targeting flags");
   }
