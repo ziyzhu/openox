@@ -6,6 +6,8 @@ nonisolated enum Actions {
     static let providerDefault = "ox.provider.default"
     static let providerList = "ox.provider.list"
     static let providerGet = "ox.provider.get"
+    static let providerModels = "ox.provider.models"
+    static let providerGenerate = "ox.provider.generate"
     static let providerValidate = "ox.provider.validate"
     static let providerSave = "ox.provider.save"
     static let providerDelete = "ox.provider.delete"
@@ -94,7 +96,7 @@ nonisolated enum Actions {
     static let userReportProgress = "ox.user.reportProgress"
 
     static let builtIn = [
-        conversationStart, conversationDelete, providerDefault, providerList, providerGet, providerValidate, providerSave, providerDelete,
+        conversationStart, conversationDelete, providerDefault, providerList, providerGet, providerModels, providerGenerate, providerValidate, providerSave, providerDelete,
         providerAuthenticate, providerDeauthenticate, secretList, secretAdd, secretDelete,
         appInfo, appProfile, appProfiles, appNotifications, appLanguage, appTheme, appSetLanguage, appSetTheme,
         appModel, appDefaultModel, appSetModel, appSetDefaultModel, appActionPolicies, appRepositories,
@@ -117,7 +119,7 @@ nonisolated enum Actions {
 
     static func defaultPolicy(for action: String) -> ActionPolicy {
         guard builtIn.contains(action) else { return .ask }
-        return action.hasSuffix(".delete") || action == fsRmdir ? .ask : .allow
+        return action.hasSuffix(".delete") || action == fsRmdir || action == providerGenerate ? .ask : .allow
     }
 
     static func label(for action: String) -> String? {
@@ -129,6 +131,8 @@ nonisolated enum Actions {
         case conversationDelete: L10n.string("Delete Conversation")
         case providerDefault: L10n.string("Default model")
         case providerList: L10n.string("List model providers")
+        case providerModels: L10n.string("List model providers")
+        case providerGenerate: L10n.string("Model")
         case providerGet: L10n.string("View a model provider")
         case providerValidate: L10n.string("Validate a model provider")
         case providerSave: L10n.string("Save a model provider")

@@ -155,7 +155,7 @@ test("replacement catalog validates complete function and System workflow covera
   const fixture = await exercise();
   try {
     const result = await fixture.command(["--validate", "--suite", "all"]);
-    expect(result.code).toBe(0); expect(result.stdout).toContain("109 functions and 5 System skills");
+    expect(result.code).toBe(0); expect(result.stdout).toContain("111 functions and 5 System skills");
     const listed = await fixture.command(["--list", "--suite", "all", "--json"]);
     const cases = JSON.parse(listed.stdout);
     expect(cases.some((entry: { id: string }) => entry.id === "brief-answer")).toBe(false);

@@ -21,6 +21,11 @@ extension Conversation {
             case "list":
                 return .array(registry.definitions.map { providerSummary($0, registry: registry) })
             case "get": return try definition!.json
+            case "models": return ProviderGeneration.models(try registry.definition(id: definition!.id), client: registry.client(id: definition!.id))
+            case "generate":
+                guard let modelID = fields["model"]?.stringValue else { throw RuntimeError.bridge("A model ID is required") }
+                let selected = try registry.resolveSelection(ModelSelection(providerID: definition!.id, modelID: modelID, reasoningEffort: nil))
+                return try await ProviderGeneration.generate(fields, client: selected.client)
             case "validate": return .object(["id": .string(definition!.id), "valid": .bool(true)])
             case "save":
                 try requireProfileMutation(operation)

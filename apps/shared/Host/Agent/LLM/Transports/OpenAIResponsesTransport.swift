@@ -92,7 +92,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
         let serviceTier = serviceTier(model)
         let body = try buildBody(
             model: model, systemPrompt: systemPrompt, messages: messages,
-            tools: tools, promptCacheKey: promptCacheKey, serviceTier: serviceTier
+            tools: tools, promptCacheKey: promptCacheKey, serviceTier: serviceTier, maxTokens: options.maxTokens
         )
         LogContext.latency?.mark(.requestBodyReady)
         let label = "\(displayName).stream"
@@ -491,7 +491,8 @@ public struct OpenAIResponsesTransport: ProviderClient {
         messages: [Message],
         tools: [any AgentTool],
         promptCacheKey: String?,
-        serviceTier: String?
+        serviceTier: String?,
+        maxTokens: Int?
     ) throws -> Data {
         var input: [[String: Any]] = []
         for (messageIndex, m) in messages.enumerated() {
@@ -616,6 +617,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
             "include": ["reasoning.encrypted_content"],
         ]
         for (key, value) in extraBody { body[key] = value.toAny() }
+        if let maxTokens { body["max_output_tokens"] = maxTokens }
         if let serviceTier { body["service_tier"] = serviceTier }
         if let promptCacheKey { body["prompt_cache_key"] = promptCacheKey }
         if let sp = systemPrompt, !sp.isEmpty { body["instructions"] = sp }

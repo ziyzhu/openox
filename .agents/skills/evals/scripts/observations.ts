@@ -5,7 +5,7 @@ import type { Assertion, CaseBinding, Check, EvalResponse, EvalSnapshot, Observe
 
 export const readers = new Set([
   "ox.app.info", "ox.app.profile", "ox.app.profiles", "ox.app.notifications", "ox.app.language", "ox.app.theme", "ox.app.defaultModel", "ox.app.actionPolicies", "ox.app.logs",
-  "ox.conversation.model", "ox.provider.default", "ox.provider.list", "ox.provider.get", "ox.repository.list", "ox.repository.conflicts",
+  "ox.conversation.model", "ox.provider.default", "ox.provider.list", "ox.provider.get", "ox.provider.models", "ox.repository.list", "ox.repository.conflicts",
   "ox.repository.git.status", "ox.repository.git.log", "ox.repository.git.show", "ox.repository.git.diff", "ox.service.list", "ox.service.find", "ox.service.inspect", "ox.service.listAttached",
   "ox.fs.read", "ox.fs.list", "ox.fs.glob", "ox.fs.grep", "ox.schedule.list", "ox.secret.list",
   "ox.web.browser.getPageInfo", "ox.web.browser.getNavigationHistory", "ox.web.browser.listCapturedEvents",

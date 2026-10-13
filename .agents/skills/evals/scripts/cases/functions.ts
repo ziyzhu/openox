@@ -41,6 +41,8 @@ const groups: Record<string, Record<string, string>> = {
     default: "Inspect the read-only bundled provider definitions",
     list: "Report active provider sources, availability, authentication, regions, and capabilities",
     get: "Read the complete definition of the specified active provider",
+    models: "List configured models and distinguish catalog availability from verified authentication and upstream discovery",
+    generate: "Call only the authorized provider and model with explicit text inputs and an output-token limit, report actual output and usage, and preserve conversation model and context boundaries",
     validate: "Validate the candidate without claiming network or inference verification",
     save: "Save the complete candidate preserving unrelated customizations",
     delete: "Remove only the QA override or addition and explain credential clearing",
@@ -142,7 +144,7 @@ const groups: Record<string, Record<string, string>> = {
 
 const installation = new Set(["app.setLanguage", "app.setTheme", "app.setDefaultModel", "provider.save", "provider.delete", "provider.authenticate", "provider.deauthenticate"]);
 const profile = new Set(["conversation.rename", "conversation.setModel", "conversation.start", "conversation.delete", "fs.write", "fs.edit", "fs.delete", "fs.mkdir", "fs.rmdir", "fs.move", "fs.copy", "repository.resolve", "repository.connect", "repository.sync", "repository.enable", "repository.disconnect", "repository.git.checkout", "repository.git.commit", "repository.git.revert", "repository.git.restore", "service.create", "service.update", "service.copy", "service.delete", "service.attach", "service.detach", "skill.create", "skill.copy", "skill.share", "skill.delete", "schedule.create", "schedule.delete", "schedule.enable", "secret.add", "secret.delete"]);
-const external = new Set(["service.invoke", "service.signIn", "service.solve", "service.pay", "skill.run", "schedule.run", ...Object.keys(groups["web.browser"]!).map(name => `web.browser.${name}`)]);
+const external = new Set(["provider.generate", "service.invoke", "service.signIn", "service.solve", "service.pay", "skill.run", "schedule.run", ...Object.keys(groups["web.browser"]!).map(name => `web.browser.${name}`)]);
 
 export function effectFor(name: string): Effect {
   const short = name.replace(/^ox\./, "");

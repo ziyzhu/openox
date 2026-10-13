@@ -60,6 +60,8 @@ nonisolated enum OxProviders {
         ("default", ModelGuidance.text("ox.provider.default")),
         ("list", ModelGuidance.text("ox.provider.list")),
         ("get", ModelGuidance.text("ox.provider.get")),
+        ("models", ModelGuidance.text("ox.provider.models")),
+        ("generate", ModelGuidance.text("ox.provider.generate")),
         ("validate", ModelGuidance.text("ox.provider.validate")),
         ("save", ModelGuidance.text("ox.provider.save")),
         ("delete", ModelGuidance.text("ox.provider.delete")),
@@ -73,15 +75,16 @@ nonisolated enum OxProviders {
             operations.map { operation, description in
                 let fields: [String: JSONValue]
                 if ["save", "validate"].contains(operation) { fields = ["provider": ProviderDefinition.schema] }
+                else if operation == "generate" { fields = ProviderGeneration.inputFields }
                 else if operation == "list" || operation == "default" { fields = [:] }
                 else { fields = ["id": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(200)])] }
                 return ("ox.provider.\(operation)", .object([
                     "description": .string(description),
                     "inputSchema": .object([
                         "type": .string("object"), "properties": .object(fields),
-                        "required": .array(fields.keys.sorted().map(JSONValue.string)), "additionalProperties": .bool(false),
+                        "required": .array((operation == "generate" ? ["id", "model", "messages", "maxOutputTokens"] : fields.keys.sorted()).map(JSONValue.string)), "additionalProperties": .bool(false),
                     ]),
-                    "outputSchema": operation == "default" ? .object(["type": .string("array"), "items": ProviderDefinition.schema]) : operation == "list" ? .object(["type": .string("array"), "items": providerSummarySchema]) : operation == "get" ? ProviderDefinition.schema : .object(["description": .string("Operation result with provider id and status.")]),
+                    "outputSchema": operation == "models" ? ProviderGeneration.modelsSchema : operation == "generate" ? ProviderGeneration.outputSchema : operation == "default" ? .object(["type": .string("array"), "items": ProviderDefinition.schema]) : operation == "list" ? .object(["type": .string("array"), "items": providerSummarySchema]) : operation == "get" ? ProviderDefinition.schema : .object(["description": .string("Operation result with provider id and status.")]),
                 ]))
             }
         },
