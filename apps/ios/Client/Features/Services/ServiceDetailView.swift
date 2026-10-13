@@ -485,7 +485,7 @@ struct ServiceDetailView: View {
 
     @ViewBuilder
     private var manageSection: some View {
-        if canInspectPage || capabilities.supportsWebsiteDataManagement || capabilities.supportsRemoteManagement || service.isLocalService {
+        if canInspectPage || service.isLocalService {
             SettingsSection("Manage", layout: .group) {
                 VStack(spacing: 0) {
                     if canInspectPage {
@@ -494,23 +494,8 @@ struct ServiceDetailView: View {
                         }
                         .accessibilityIdentifier(A11yID.ConversationControls.Attach.inspectPage(service.domain))
                     }
-                    if capabilities.supportsWebsiteDataManagement {
-                        if canInspectPage {
-                            Divider().settingsContentInset()
-                        }
-                        manageRow("Clear website data", tint: AnyShapeStyle(Theme.Colors.error)) {
-                            confirmClearWebData = true
-                        }
-                        .accessibilityIdentifier(A11yID.ConversationControls.Attach.clearWebData(service.domain))
-                    }
-                    if capabilities.supportsRemoteManagement {
-                        manageRow("Remove MCP server", tint: AnyShapeStyle(Theme.Colors.error)) {
-                            confirmRemoveMCP = true
-                        }
-                        .accessibilityIdentifier(A11yID.ConversationControls.Attach.disconnectMCP(service.domain))
-                    }
                     if service.isLocalService {
-                        if canInspectPage || capabilities.supportsWebsiteDataManagement || capabilities.supportsRemoteManagement {
+                        if canInspectPage {
                             Divider().settingsContentInset()
                         }
                         ShareLink(
@@ -526,8 +511,32 @@ struct ServiceDetailView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier(A11yID.ConversationControls.Attach.shareLocalService(service.domain))
-                        Divider().settingsContentInset()
-                        manageRow("Delete Local service", tint: AnyShapeStyle(Theme.Colors.error)) {
+                    }
+                }
+            }
+        }
+        if capabilities.supportsWebsiteDataManagement {
+            SettingsSection("Website data", layout: .row) {
+                manageRow("Clear website data", tint: AnyShapeStyle(Theme.Colors.error), role: .destructive) {
+                    confirmClearWebData = true
+                }
+                .accessibilityIdentifier(A11yID.ConversationControls.Attach.clearWebData(service.domain))
+            }
+        }
+        if capabilities.supportsRemoteManagement || service.isLocalService {
+            SettingsSection("Remove", layout: .group) {
+                VStack(spacing: 0) {
+                    if capabilities.supportsRemoteManagement {
+                        manageRow("Remove MCP server", tint: AnyShapeStyle(Theme.Colors.error), role: .destructive) {
+                            confirmRemoveMCP = true
+                        }
+                        .accessibilityIdentifier(A11yID.ConversationControls.Attach.disconnectMCP(service.domain))
+                    }
+                    if service.isLocalService {
+                        if capabilities.supportsRemoteManagement {
+                            Divider().settingsContentInset()
+                        }
+                        manageRow("Delete Local service", tint: AnyShapeStyle(Theme.Colors.error), role: .destructive) {
                             confirmDeleteLocalService = true
                         }
                         .accessibilityIdentifier(A11yID.ConversationControls.Attach.deleteLocalService(service.domain))
@@ -545,8 +554,8 @@ struct ServiceDetailView: View {
         showPageInspector = true
     }
 
-    private func manageRow(_ label: LocalizedStringKey, tint: AnyShapeStyle, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private func manageRow(_ label: LocalizedStringKey, tint: AnyShapeStyle, role: ButtonRole? = nil, action: @escaping () -> Void) -> some View {
+        Button(role: role, action: action) {
             Text(label)
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(tint)

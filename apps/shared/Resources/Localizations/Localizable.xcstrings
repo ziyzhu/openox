@@ -11070,6 +11070,17 @@
         }
       }
     },
+    "Website data" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站数据"
+          }
+        }
+      }
+    },
     "Website sign-in" : {
       "extractionState" : "manual",
       "localizations" : {
