@@ -8,6 +8,7 @@ export type EvalCase = {
   suite: "functions" | "workflows" | "safety";
   description: string;
   function?: string;
+  functions?: string[];
   skill?: string;
   resources?: string[];
   variant: Variant;
@@ -22,7 +23,7 @@ export type EvalCase = {
 export type Reader = (
   | { kind: "vm"; name: string; args: Record<string, unknown> }
   | { kind: "skill"; name: string }
-  | { kind: "conversation"; id: string }
+  | { kind: "conversation"; id: string | { $receipt: string; path: string[] } }
   | { kind: "cli"; command: "providers" | "conversations" }
 ) & { phases?: Array<"before" | "after" | "cleanup"> };
 export type Assertion = {
@@ -64,6 +65,7 @@ export type Invocation = {
   name: string;
   args: Record<string, unknown>;
   outcome: { succeeded?: { _0?: unknown }; failed?: unknown; running?: unknown };
+  preview?: { argumentsTruncated: boolean; resultTruncated: boolean; purposeTruncated: boolean };
 };
 export type EvalBlock = { kind: { type: string; trace?: { entries: Array<{ invocation?: Invocation }>; omittedInvocations?: number } } };
 export type EvalSnapshot = Omit<ConversationSnapshot, "messages" | "blocks"> & { messages: EvalMessage[]; blocks: EvalBlock[] };

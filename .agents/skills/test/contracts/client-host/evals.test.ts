@@ -6,7 +6,7 @@ import { ROOT } from "../../../../lib.ts";
 import { RPC_VERSION, validateParams, validateResult } from "../../../../../packages/protocol/src/index.ts";
 import type { Assertion, CaseBinding, EvalBlock, EvalMessage, Fixture, Report } from "../../../evals/scripts/types.ts";
 
-type Scenario = "pass" | "fake" | "expected-error" | "unexpected-error" | "approval" | "missing" | "truncated" | "collateral" | "busy" | "provider-error" | "timeout" | "probe-wrong" | "cleanup-error" | "forged-guide" | "wrong-skill";
+type Scenario = "pass" | "fake" | "expected-error" | "unexpected-error" | "approval" | "missing" | "truncated" | "collateral" | "busy" | "provider-error" | "timeout" | "probe-wrong" | "cleanup-error" | "forged-guide" | "wrong-skill" | "ambiguous-reference";
 type Conversation = { messages: EvalMessage[]; blocks: EvalBlock[]; isBusy: boolean; temporary: boolean; pendingPrompt?: { id: string; prompt: string; options: string[]; allowsCustomAnswer: boolean; requiresApp: boolean } };
 
 const readerBinding = (): CaseBinding => ({
@@ -47,6 +47,20 @@ const skillBinding = (probe = false): CaseBinding => ({
   allowedActions: ["ox.fs.read", "ox.skill.create", "ox.skill.delete", "ox.user.choose"], cleanup: "Delete only the run-owned QA skill qa-created and preserve unrelated state.",
 });
 
+const childBinding = (): CaseBinding => ({
+  ...readerBinding(), context: "Start a QA child titled qa-child whose self-contained task is to answer 17 plus 25. Inspect its result before reporting completion.",
+  observations: { ...readerBinding().observations, child: { kind: "conversation", id: { $receipt: "ox.conversation.start", path: ["id"] }, phases: ["after", "cleanup"] } },
+  assertions: [
+    ...readerBinding().assertions.filter(rule => rule.evidence !== "outcome"),
+    { evidence: "outcome", phase: "after", observation: "child", path: ["messages", "0", "assistant", "content", "0", "text", "text"], operator: "equals", expected: "42" },
+    { evidence: "cleanup", phase: "cleanup", observation: "memory", path: ["text"], operator: "unchanged" },
+    { evidence: "child-removed", phase: "cleanup", observation: "child", path: [], operator: "equals", expected: null },
+  ],
+  actions: [{ name: "ox.conversation.start", outcome: "succeeded", minimum: 1, maximum: 1, args: { title: "qa-child" } },
+    { name: "ox.conversation.delete", outcome: "succeeded", minimum: 0, maximum: 1, args: { id: { $receipt: "ox.conversation.start", path: ["id"] } } }],
+  allowedActions: ["ox.conversation.start", "ox.conversation.delete"], cleanup: "Delete only the run-owned conversation with id {{receipt:ox.conversation.start:id}}. Preserve unrelated state.",
+});
+
 async function exercise(scenario: Scenario = "pass") {
   const directory = await mkdtemp(join(tmpdir(), "ox-eval-e2e-"));
   const requests: Array<{ method: string; params: Record<string, any> }> = [];
@@ -58,11 +72,11 @@ async function exercise(scenario: Scenario = "pass") {
   let serial = 0;
   const snapshot = (id: string) => ({ id, model, systemPrompt: "Controlled transport fixture", renderedSystemPrompt: "Controlled transport fixture", soul: "", memory: "", tools: [{ name: "execute", description: "Fixture tool", parameters: {}, strict: true }], ...chats.get(id) });
   const answer = (chat: Conversation, text: string) => { chat.messages.push({ type: "assistant", assistant: { content: [{ type: "text", text: { text } }], stopReason: "stop" } }); chat.isBusy = false; };
-  function executed(chat: Conversation, name: string, args: Record<string, unknown>, text: string, failed = false) {
+  function executed(chat: Conversation, name: string, args: Record<string, unknown>, text: string, failed = false, value: unknown = text) {
     const id = `tool-${chat.messages.length}`;
     chat.messages.push({ type: "assistant", assistant: { content: [{ type: "toolCall", toolCall: { id, name: "execute", arguments: { source: `console.log(await ${name}(${JSON.stringify(args)}));` } } }], stopReason: "toolUse" } },
       { type: "toolResult", toolResult: { toolCallId: id, toolName: "execute", content: [{ type: "text", text: { text } }], isError: failed } });
-    if (scenario !== "fake") chat.blocks.push({ kind: { type: "thinking", trace: { entries: [{ invocation: { name, args, outcome: failed ? { failed: { _0: text } } : { succeeded: { _0: text } } } }], omittedInvocations: scenario === "truncated" ? 1 : 0 } } });
+    if (scenario !== "fake") chat.blocks.push({ kind: { type: "thinking", trace: { entries: [{ invocation: { name, args, outcome: failed ? { failed: { _0: text } } : { succeeded: { _0: value } } } }], omittedInvocations: scenario === "truncated" ? 1 : 0 } } });
   }
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
     fetch(request, server) { if (!server.upgrade(request)) return new Response("WebSocket required", { status: 400 }); },
@@ -75,10 +89,11 @@ async function exercise(scenario: Scenario = "pass") {
       const chat = chats.get(id);
       let result: unknown;
       switch (request.method) {
-        case "host.describe": result = { implementation: { name: "Eval E2E Host", version: "1", build: "1" }, protocols: { rpc: [RPC_VERSION] }, methods: ["chats.new", "chats.send", "chats.get", "chats.stop", "chats.respond", "logs.list", "providers.list", "vm.call"] }; break;
+        case "host.describe": result = { implementation: { name: "Eval E2E Host", version: "1", build: "1" }, protocols: { rpc: [RPC_VERSION] }, methods: ["chats.new", "chats.send", "chats.get", "chats.stop", "chats.open", "chats.respond", "logs.list", "providers.list", "vm.call"] }; break;
         case "providers.list": result = { region: "global", providers }; break;
         case "chats.new": active = `qa-${chats.size + 1}`; chats.set(active, { messages: [], blocks: [], isBusy: false, temporary: request.params.temporary === true }); result = { chatId: active, temporary: request.params.temporary === true, model: "example:example" }; break;
         case "chats.get": result = chat ? { data: snapshot(id) } : scenario === "busy" ? { data: { ...snapshot("busy"), messages: [], blocks: [], isBusy: true } } : {}; break;
+        case "chats.open": if (!chat || chat.temporary) return reject("Saved QA conversation not found"); active = id; result = { data: snapshot(id) }; break;
         case "chats.send": {
           if (!chat) return reject("Unknown conversation");
           if (scenario === "provider-error") return reject("Provider unavailable");
@@ -86,8 +101,20 @@ async function exercise(scenario: Scenario = "pass") {
           const prompt = String(request.params.text);
           if (prompt.startsWith("Delete only")) {
             if (scenario === "cleanup-error") return reject("Cleanup unavailable");
-            delete files["skills/qa-created/SKILL.md"];
-            executed(chat, "ox.skill.delete", { name: "qa-created" }, "Deleted"); answer(chat, "Removed only the QA skill.");
+            if (prompt.includes("conversation")) {
+              if (!prompt.includes('"child-created"')) return reject("Cleanup did not resolve the actual native ID");
+              chats.delete("child-created");
+              executed(chat, "ox.conversation.delete", { id: "child-created" }, "Deleted"); answer(chat, "Removed only the QA child.");
+            } else {
+              delete files["skills/qa-created/SKILL.md"];
+              executed(chat, "ox.skill.delete", { name: "qa-created" }, "Deleted"); answer(chat, "Removed only the QA skill.");
+            }
+          } else if (prompt.startsWith("Start an independent task")) {
+            const child: Conversation = { messages: [], blocks: [], isBusy: false, temporary: false };
+            answer(child, "42"); chats.set("child-created", child);
+            executed(chat, "ox.conversation.start", { title: "qa-child", prompt: "Answer 17 plus 25." }, "Created child", false, { id: "child-created" });
+            if (scenario === "ambiguous-reference") executed(chat, "ox.conversation.start", { title: "qa-child", prompt: "Answer 17 plus 25." }, "Created another child", false, { id: "different-child" });
+            answer(chat, "The child completed its independent task.");
           } else if (prompt.startsWith("Use the QA skill")) {
             executed(chat, "ox.fs.read", { path: "skills/qa-created/SKILL.md" }, files["skills/qa-created/SKILL.md"]!);
             answer(chat, scenario === "probe-wrong" ? "WRONG" : "QA_TOKEN_7491");
@@ -158,8 +185,13 @@ test("replacement catalog validates complete function and System workflow covera
     expect(result.code).toBe(0); expect(result.stdout).toContain("111 functions and 5 System skills");
     const listed = await fixture.command(["--list", "--suite", "all", "--json"]);
     const cases = JSON.parse(listed.stdout);
+    expect(cases).toHaveLength(84);
+    expect(cases.filter((entry: { functions?: string[] }) => (entry.functions?.length ?? 0) > 1)).toHaveLength(20);
     expect(cases.some((entry: { id: string }) => entry.id === "brief-answer")).toBe(false);
     expect(cases.every((entry: { evidence: Record<string, string> }) => entry.evidence.outcome && entry.evidence.preserved)).toBe(true);
+    const smoke = JSON.parse((await fixture.command(["--list", "--json"])).stdout);
+    expect(smoke.map((entry: { id: string }) => entry.id)).toEqual(["app-profile-success", "provider-list-success", "repository-list-success", "schedule-list-success"]);
+    expect(smoke.every((entry: { effect: string }) => entry.effect === "read")).toBe(true);
     expect(fixture.requests).toHaveLength(0);
   } finally { await fixture.close(); }
 });
@@ -227,6 +259,7 @@ test("declared skill choices are distinct from native approvals and complete rea
     expect(result.code, result.stdout + result.stderr).toBe(2); expect(result.report?.results[0]?.status).toBe("unverified");
     const response = result.report!.results[0]!.response!;
     expect(response.choices[0]?.answer).toBe("Create skill"); expect(response.probe?.chatId).not.toBe(response.chatId);
+    expect(response.cleanup?.chatId).toBe(response.chatId);
     expect(response.probe?.initial?.messages).toEqual([]); expect(response.restored?.values.skill).toEqual(response.before?.values.skill);
     expect(fixture.files["skills/qa-created/SKILL.md"]).toBeUndefined();
     const probeRequest = fixture.requests.find(request => request.method === "chats.send" && String(request.params.text).startsWith("Use the QA skill"))!;
@@ -268,3 +301,18 @@ test("busy working conversations remain untouched", async () => {
     expect(fixture.requests.some(request => ["chats.new", "chats.send", "chats.stop"].includes(request.method))).toBe(false);
   } finally { await fixture.close(); }
 });
+
+test("generated IDs are independently observed and cleaned up through unambiguous native receipts", async () => {
+  for (const scenario of ["pass", "ambiguous-reference"] as const) {
+    const fixture = await exercise(scenario);
+    try {
+      const result = await fixture.run("conversation-start-success", childBinding(), ["--allow-profile-writes"]);
+      expect(result.code, result.stdout + result.stderr).toBe(scenario === "pass" ? 2 : 1);
+      expect(result.report?.results[0]?.status).toBe(scenario === "pass" ? "unverified" : "error");
+      if (scenario === "pass") {
+        expect(result.report?.results[0]?.response?.restored?.values.child).toBeNull();
+        expect(fixture.requests.some(request => request.method === "chats.get" && request.params.sessionId === "child-created")).toBe(true);
+      } else expect(fixture.requests.filter(request => request.method === "chats.send")).toHaveLength(1);
+    } finally { await fixture.close(); }
+  }
+}, 15000);

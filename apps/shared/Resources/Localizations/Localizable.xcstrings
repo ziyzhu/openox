@@ -1,6 +1,18 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Edit credential" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑凭据" } } } },
+    "Add credential" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加凭据" } } } },
+    "Open account page" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开账户页面"
+          }
+        }
+      }
+    },
     "Ox is thinking" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Ox 正在思考" } } } },
     "Ox is working" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Ox 正在处理" } } } },
     "Ox is writing" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Ox 正在撰写" } } } },

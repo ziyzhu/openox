@@ -1,6 +1,7 @@
 import { newConversation, ox, vmCall } from "./cli.ts";
 import { assertions, observeState, readers } from "./observations.ts";
 import { actionChecks, conversationChecks } from "./scoring.ts";
+import { receiptPrompt } from "./references.ts";
 import type { CaseBinding, Choice, ConversationEvidence, EvalCase, EvalResponse, EvalSnapshot, LogRow, TurnOutcome } from "./types.ts";
 
 export type RunOptions = { qaProfile: string; choices: boolean; humanWaitMs: number };
@@ -48,11 +49,11 @@ async function awaitTurn(host: string, target: ConversationEvidence, options: Ru
 }
 
 async function runConversation(host: string, provider: string, model: string, prompts: string[], temporary: boolean,
-  target: ConversationEvidence, response: EvalResponse, options: RunOptions, remaining: () => number, choice?: Choice): Promise<void> {
+  target: ConversationEvidence, response: EvalResponse, options: RunOptions, remaining: () => number, choice?: Choice, continuing = false): Promise<void> {
   try {
     if (!target.chatId) target.chatId = await newConversation(host, provider, model, temporary, remaining());
     target.initial = await inspect(host, target.chatId, remaining);
-    if (target.initial.messages.length || target.initial.isBusy !== false || target.initial.pendingPrompt) throw new Error("Expected a fresh empty and idle QA conversation");
+    if (!continuing && target.initial.messages.length || target.initial.isBusy !== false || target.initial.pendingPrompt) throw new Error("Expected an idle QA conversation with the declared history mode");
     for (const text of prompts) {
       const outcome = await ox<TurnOutcome>(host, ["conversation", "send", text], target.chatId, remaining(), true);
       if (outcome.chatId !== target.chatId || !["completed", "needsAttention", "failed", "cancelled"].includes(outcome.outcome)) throw new Error("Unexpected conversation outcome; input may have been submitted, never resubmitting");
@@ -108,7 +109,7 @@ export async function runCase(host: string, provider: string, model: string, tes
     const prompt = test.task.replaceAll("{{context}}", binding.context);
     await runConversation(host, provider, model, [prompt, ...(test.followups ?? []).map(text => text.replaceAll("{{context}}", binding.context))], test.effect === "read", response, response, options, remaining, test.choice);
     if (response.errors.length || response.blocked) return response;
-    response.after = await observeState(host, response.chatId, binding, remaining, "after");
+    response.after = await observeState(host, response.chatId, binding, remaining, "after", response.snapshot);
     response.observationChecks.push(...assertions(binding, response, "after"));
     if (response.systemSkill) {
       for (const [path, text] of Object.entries({ [response.systemSkill.path]: response.systemSkill.text, ...response.systemSkill.resources })) {
@@ -124,21 +125,22 @@ export async function runCase(host: string, provider: string, model: string, tes
       response.observationChecks.push(...assertions(binding, response, "probe"));
       const probeScope = { ...binding, allowedActions: binding.allowedActions.filter(name => readers.has(name) || name === "ox.tool.help") };
       if (response.errors.length || response.blocked || conversationChecks(response.probe, probeScope, false).some(check => !check.passed)) return response;
-      response.after = await observeState(host, response.chatId, binding, remaining, "after");
+      response.after = await observeState(host, response.chatId, binding, remaining, "after", response.snapshot);
       response.observationChecks.push(...assertions(binding, response, "after").map(check => ({ ...check, detail: `After probe: ${check.detail}` })));
       if (assertions(binding, response, "after").filter(check => check.detail.startsWith("after: preserved ")).some(check => !check.passed)) return response;
     }
     if (test.effect !== "read") {
-      response.cleanup = evidence();
+      response.cleanup = evidence(response.chatId);
       const cleanupDeadline = Date.now() + 30_000;
       const cleanupBudget = () => {
         const budget = cleanupDeadline - Date.now();
         if (budget <= 0) throw new Error("Cleanup deadline exceeded");
         return budget;
       };
-      await runConversation(host, provider, model, [binding.cleanup!], false, response.cleanup, response, { ...options, choices: false }, cleanupBudget);
-      if (response.errors.length || response.blocked || conversationChecks(response.cleanup, binding, false).some(check => !check.passed)) return response;
-      response.restored = await observeState(host, response.chatId, binding, cleanupBudget, "cleanup");
+      await ox(host, ["conversation", "open"], response.chatId, cleanupBudget());
+      await runConversation(host, provider, model, [receiptPrompt(binding.cleanup!, response.snapshot)], false, response.cleanup, response, { ...options, choices: false }, cleanupBudget, undefined, true);
+      if (response.errors.length || response.blocked || conversationChecks(response.cleanup, binding, false, response.snapshot).some(check => !check.passed)) return response;
+      response.restored = await observeState(host, response.chatId, binding, cleanupBudget, "cleanup", response.snapshot);
       response.observationChecks.push(...assertions(binding, response, "cleanup"));
     }
     if (response.observationChecks.every(check => check.passed)) response.continuation = "safe";

@@ -2,6 +2,7 @@ import { cases } from "./cases/index.ts";
 import { randomUUID } from "node:crypto";
 import { effectFor } from "./cases/functions.ts";
 import { readers } from "./observations.ts";
+import { coveredFunctions } from "./coverage.ts";
 import type { CaseBinding, EvalCase, Fixture } from "./types.ts";
 
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
@@ -20,7 +21,7 @@ export function validateBinding(test: EvalCase, binding: CaseBinding): void {
     } else if (reader.kind === "skill") {
       if (typeof reader.name !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(reader.name)) throw new Error(`Invalid observed skill: ${test.id}/${key}`);
     } else if (reader.kind === "conversation") {
-      if (typeof reader.id !== "string" || !reader.id) throw new Error(`Missing observed conversation: ${test.id}/${key}`);
+      if (typeof reader.id !== "string" && (!object(reader.id) || typeof reader.id.$receipt !== "string" || !strings(reader.id.path)) || !reader.id) throw new Error(`Missing observed conversation: ${test.id}/${key}`);
     } else if (reader.kind !== "cli" || !["providers", "conversations"].includes(reader.command)) throw new Error(`Invalid observer: ${test.id}/${key}`);
   }
   for (const rule of binding.assertions) {
@@ -47,8 +48,8 @@ export function validateBinding(test: EvalCase, binding: CaseBinding): void {
       || !Number.isInteger(action.minimum) || action.minimum < 0 || action.maximum !== undefined && (!Number.isInteger(action.maximum) || action.maximum < action.minimum)
       || action.args !== undefined && !object(action.args)) throw new Error(`Invalid Action expectation: ${test.id}`);
   }
-  if (test.function && test.variant === "success" && !binding.actions.some(action => action.name === test.function && action.outcome === "succeeded" && action.minimum > 0)) throw new Error(`Missing successful function receipt: ${test.id}`);
-  const known = new Set(cases.flatMap(entry => entry.function ? [entry.function] : []));
+  for (const name of coveredFunctions(test)) if (test.variant === "success" && !binding.actions.some(action => action.name === name && action.outcome === "succeeded" && action.minimum > 0)) throw new Error(`Missing successful function receipt: ${test.id}/${name}`);
+  const known = new Set(cases.flatMap(coveredFunctions));
   for (const name of binding.allowedActions) if (!known.has(name) && name !== "ox.tool.help") throw new Error(`Unknown allowed Action: ${name}`);
   for (const name of binding.allowedActions.filter(name => effectFor(name) !== "read")) {
     if (!binding.actions.some(action => action.name === name)) throw new Error(`State-changing Action needs an explicit scoped expectation: ${test.id}/${name}`);

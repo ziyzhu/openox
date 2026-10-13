@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { ROOT as root } from "../../../lib.ts";
-import { cases } from "./cases/index.ts";
+import { cases, smokeIds } from "./cases/index.ts";
 import { score } from "./scoring.ts";
-import { coverage, validateCoverage } from "./coverage.ts";
+import { coverage, coveredFunctions, validateCoverage } from "./coverage.ts";
 import { effects, fixtureTemplate, validateFixture } from "./fixtures.ts";
 import type { EvalCase, EvalSnapshot, Fixture, Report } from "./types.ts";
 import { compare } from "./compare.ts";
@@ -78,14 +78,14 @@ async function main(): Promise<void> {
     help: { type: "boolean" }, list: { type: "boolean" }, validate: { type: "boolean" }, json: { type: "boolean" }, template: { type: "boolean" },
     coverage: { type: "string" }, review: { type: "string" }, decision: { type: "string" }, note: { type: "string" }, repetition: { type: "string", default: "1" },
     host: { type: "string" }, provider: { type: "string" }, model: { type: "string" }, fixture: { type: "string" },
-    suite: { type: "string", default: "functions" }, case: { type: "string" }, repeat: { type: "string", default: "1" },
-    timeout: { type: "string", default: "120000" }, output: { type: "string" }, "human-wait-ms": { type: "string", default: "0" },
+    suite: { type: "string", default: "smoke" }, case: { type: "string" }, repeat: { type: "string", default: "1" },
+    timeout: { type: "string" }, output: { type: "string" }, "human-wait-ms": { type: "string", default: "0" },
     "allow-profile-writes": { type: "boolean" }, "allow-installation-writes": { type: "boolean" }, "allow-external-effects": { type: "boolean" },
     "allow-choices": { type: "boolean" }, "qa-profile": { type: "string" },
   }, strict: true });
   if (values.help) {
     console.log(`Usage: bun run evals --fixture <outside-repo.json> --host <ws-url> --provider <id> --model <id> [options]
-  --suite functions|workflows|safety|all (default functions)
+  --suite smoke|functions|workflows|safety|all (default smoke)
   --case <id> --repeat <1..20> --timeout <1..300000 ms>
   --list [--json] | --validate | --template --qa-profile <name>
   --coverage <report.json>       Show planned, blocked, failed, unverified and passed coverage
@@ -119,8 +119,8 @@ No provisioning, credential imports, policy changes, forced model replies or eva
     console.log(`Recorded ${values.decision} review for ${result.id}, repetition ${result.repetition}`);
     return;
   }
-  if (!["functions", "workflows", "safety", "all"].includes(values.suite!)) throw new Error(`Unknown suite: ${values.suite}`);
-  const selected = cases.filter(test => values.case ? test.id === values.case : values.suite === "all" || test.suite === values.suite);
+  if (!["smoke", "functions", "workflows", "safety", "all"].includes(values.suite!)) throw new Error(`Unknown suite: ${values.suite}`);
+  const selected = cases.filter(test => values.case ? test.id === values.case : values.suite === "smoke" ? smokeIds.has(test.id) : values.suite === "all" || test.suite === values.suite);
   if (!selected.length) throw new Error("No matching eval cases");
   if (values.template) {
     const template = fixtureTemplate(selected, values["qa-profile"] ?? "");
@@ -132,7 +132,7 @@ No provisioning, credential imports, policy changes, forced model replies or eva
     if (values.json) console.log(JSON.stringify(selected, null, 2));
     else {
       if (values.list) for (const test of selected) console.log(`${test.id}\t${test.suite}\t${test.effect}\t${test.description}`);
-      console.log(`Validated ${cases.length} scenarios covering ${new Set(cases.flatMap(test => test.function ? [test.function] : [])).size} functions and ${new Set(cases.flatMap(test => test.skill ? [test.skill] : [])).size} System skills`);
+      console.log(`Validated ${cases.length} scenarios covering ${new Set(cases.flatMap(coveredFunctions)).size} functions and ${new Set(cases.flatMap(test => test.skill ? [test.skill] : [])).size} System skills`);
     }
     if (values.fixture) validateFixture(await Bun.file(values.fixture).json());
     return;
@@ -144,7 +144,7 @@ No provisioning, credential imports, policy changes, forced model replies or eva
   const fixture: Fixture = validateFixture(await Bun.file(fixturePath).json());
   if (fixture.qaProfile !== values["qa-profile"]) throw new Error("Fixture and requested QA Profile differ");
   const repetitions = integer(values.repeat!, 1, 20);
-  const timeoutMs = integer(values.timeout!, 1, 300_000);
+  const timeoutMs = integer(values.timeout ?? (values.suite === "smoke" ? "30000" : "120000"), 1, 300_000);
   const humanWaitMs = integer(values["human-wait-ms"]!, 0, 300_000);
   const output = await outsideRepository(values.output ?? resolve(tmpdir(), `ox-evals-${Date.now()}.json`));
   await writeFile(output, "", { flag: "wx", mode: 0o600 });
@@ -166,7 +166,7 @@ No provisioning, credential imports, policy changes, forced model replies or eva
   try {
     if (selected.some(test => !blocked(test))) {
       const description = await ox<{ implementation: unknown; methods: string[] }>(values.host, ["host", "describe"]);
-      if (!["chats.new", "chats.send", "chats.get", "chats.stop", "logs.list", "vm.call", ...(report.authorization.choices ? ["chats.respond"] : [])].every(method => description.methods.includes(method))) throw new Error("Host lacks required ordinary conversation/VM/log commands");
+      if (!["chats.new", "chats.send", "chats.get", "chats.stop", "logs.list", "vm.call", ...(selected.some(test => test.effect !== "read" && !blocked(test)) ? ["chats.open"] : []), ...(report.authorization.choices ? ["chats.respond"] : [])].every(method => description.methods.includes(method))) throw new Error("Host lacks required ordinary conversation/VM/log commands");
       report.host = description.implementation;
       const providers = await ox<Array<{ id: string; models: Array<{ id: string }> }>>(values.host, ["host", "providers"]);
       const provider = providers.find(entry => entry.id === values.provider);

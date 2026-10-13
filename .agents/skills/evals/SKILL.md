@@ -9,9 +9,15 @@ Read [references/suite.md](references/suite.md) before running or modifying eval
 Cases, scoring, comparison, and the external runner live in `scripts/`.
 Portable case validation is invoked by the `test` skill's CI command.
 
+Default runs select four read-only smoke cases, one repetition, and a 30000 ms
+task limit. Use focused cases during iteration and explicitly select exhaustive
+suites for coverage audits. Keep native handoffs and costly mutations out of
+routine smoke runs. Smoke does not establish full System workflow coverage.
+
 Use `bun run evals --list --suite all` to inspect the scenario catalog and
 `bun run evals --coverage <report>` for observed coverage. Every `ox.*` function
-requires success, failure, and boundary scenarios; System skills require complete
+must be mapped to a realistic journey; do not generate per-function variant triples.
+Group related operations around one user outcome. System skills require complete
 task outcomes, not discovery-only reads. Select a configured
 real provider/model with `ox host providers` and an explicit QA Host. Reuse the
 user's authorized target and provider choices. Runs consume tokens and execute

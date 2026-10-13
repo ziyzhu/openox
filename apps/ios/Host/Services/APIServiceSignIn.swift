@@ -72,49 +72,26 @@ final class APIServiceSignIn: NSObject, ASWebAuthenticationPresentationContextPr
         }
     }
 
-    private func enterCredentials(title: String, authorization: APIServiceAuthorization) async throws -> APIServiceCredential {
-        var presenter = window.rootViewController
-        while let presented = presenter?.presentedViewController { presenter = presented }
-        guard let presenter else { throw APIServiceError.authorizationFailed }
-        return try await withCheckedThrowingContinuation { continuation in
-            let alert = UIAlertController(title: title, message: String(localized: "Authentication"), preferredStyle: .alert)
-            if case .basic = authorization.auth {
-                alert.addTextField { field in
-                    field.placeholder = String(localized: "Username")
-                    field.autocapitalizationType = .none
-                    field.autocorrectionType = .no
-                    field.accessibilityIdentifier = "service.api.username"
-                }
-            }
-            alert.addTextField { field in
-                switch authorization.auth {
-                case .basic: field.placeholder = String(localized: "Password")
-                case .apiKey: field.placeholder = String(localized: "API key")
-                default: field.placeholder = String(localized: "Token")
-                }
-                field.isSecureTextEntry = true
-                field.autocapitalizationType = .none
-                field.autocorrectionType = .no
-                field.accessibilityIdentifier = "service.api.secret"
-            }
-            alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel) { _ in
-                continuation.resume(throwing: CancellationError())
-            })
-            alert.addAction(UIAlertAction(title: String(localized: "Save"), style: .default) { _ in
-                let fields = alert.textFields ?? []
-                guard let secret = fields.last?.text, !secret.isEmpty,
-                      !secret.contains("\r"), !secret.contains("\n") else {
-                    continuation.resume(throwing: APIServiceError.invalidRequest)
-                    return
-                }
-                let username = fields.count == 2 ? fields.first?.text : nil
-                guard username?.contains(":") != true else {
-                    continuation.resume(throwing: APIServiceError.invalidRequest)
-                    return
-                }
-                continuation.resume(returning: APIServiceCredential(binding: authorization.binding, secret: secret, username: username))
-            })
-            presenter.present(alert, animated: true)
+    private func enterCredentials(title: String, authorization: APIServiceAuthorization, credentialURL: URL? = nil) async throws -> APIServiceCredential {
+        let basic: Bool
+        if case .basic = authorization.auth { basic = true } else { basic = false }
+        let label: String = switch authorization.auth {
+        case .basic: String(localized: "Password")
+        case .apiKey: String(localized: "API key")
+        default: String(localized: "Token")
         }
+        let fields = (basic ? [CredentialEntryPrompt.Field(label: String(localized: "Username"), value: "", secure: false, contentType: .username, accessibilityIdentifier: "service.api.username")] : [])
+            + [CredentialEntryPrompt.Field(label: label, value: "", secure: true, contentType: basic ? .password : nil, accessibilityIdentifier: "service.api.secret")]
+        let linkLabel: String = switch authorization.auth {
+        case .basic: String(localized: "Open account page")
+        case .apiKey: String(localized: "Get API Key")
+        default: String(localized: "Create token")
+        }
+        let website = credentialURL.map { CredentialEntryPrompt.Website(url: $0, label: linkLabel, accessibilityIdentifier: "service.api.credentialWebsite") }
+        let values = try await CredentialEntryPrompt.enter(title: title, fields: fields, website: website, accessibilityIdentifier: "service.api.authentication") { values in
+            guard let secret = values.last, !secret.isEmpty, !secret.contains("\r"), !secret.contains("\n") else { return false }
+            return !basic || (!values[0].isEmpty && !values[0].contains(":") && !values[0].contains("\r") && !values[0].contains("\n"))
+        }
+        return APIServiceCredential(binding: authorization.binding, secret: values.last!, username: basic ? values.first : nil)
     }
 }

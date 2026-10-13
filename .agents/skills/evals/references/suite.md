@@ -1,7 +1,15 @@
 # Ox evals
 
-The replacement catalog owns three suites: `functions`, `workflows`, and `safety`.
-Every exposed `ox.*` function has success, failure, and boundary scenarios.
+The default `smoke` selection runs four read-only conversations once: Profile,
+providers, repositories, and schedules. Each has a 30000 ms task limit; diagnostic
+calls add bounded overhead. This is a small regression signal, not full coverage.
+Use `--case` for a focused change and select the exhaustive suites explicitly.
+No live duration claim is established until measured against the chosen model.
+
+The replacement catalog owns three exhaustive suites: `functions`, `workflows`, and `safety`.
+Related functions are grouped into realistic journeys with one user outcome.
+Focused failure and boundary cases cover important risks rather than repeating
+three variants for every function. The catalog is capped at 86 scenarios.
 All five System skills have task scenarios with independent outcome, preservation,
 and applicable precondition, probe, and cleanup obligations. Reading a skill is
 required but never establishes workflow completion. The old 11 cases are retired.
@@ -10,11 +18,14 @@ model tool output; installed skill/resource text is included in comparison conte
 
 `scripts/cases/` is the executable scenario catalog. `scripts/coverage.ts` checks
 its function inventory against native catalogs and its skills against the System
-catalog. A new function without all three variants fails portable validation.
+catalog. A new function without a declared journey fails portable validation.
+Every successful journey binding requires actual successful receipts for each
+declared function, alongside independent outcome and preservation assertions.
 Scenario coverage is a specification, not evidence that a model passed it.
 
 ```sh
 bun run evals --list --suite all
+bun run evals --template --qa-profile EvalQA --output /tmp/ox-smoke-fixture.json
 bun run evals --validate --suite all
 bun run evals --list --suite workflows --json
 bun run evals --template --case app-profile-success --qa-profile EvalQA --output /tmp/ox-reader-fixture.json
@@ -87,6 +98,16 @@ use baseline equality. `probe` evaluates the fresh snapshot. Extra answer assert
 may inspect `task`/`probe` snapshots (including normalized `answer`), but cannot
 replace independent state evidence.
 
+For generated IDs, observer arguments and conversation IDs may use
+`{"$receipt":"ox.conversation.start","path":["id"]}` in after/cleanup phases.
+Action argument expectations accept the same reference. Cleanup prompts can use
+`{{receipt:ox.conversation.start:id}}`; scalar values are JSON-quoted. Resolution
+requires exactly one successful complete native receipt, never assistant prose.
+Ambiguous, missing, or truncated references fail closed. Cleanup runs as a later
+turn in the original task conversation so attachments, working files, model
+selection, and page-local handles keep their actual owner; its checks inspect
+only the newly submitted cleanup turn. Probe conversations remain fresh.
+
 Observers reject truncated inventories/text, dropped capture records, missing
 values, and oversized observations. Prepare bounded fixtures or scoped readers;
 never omit an affected surface to make observation pass. Observe complete provider
@@ -114,7 +135,8 @@ prints the conversation and checkpoint, never enters secrets or approves it.
 Deliberate web authoring and memory approval use declared later user turns.
 Unexpected choices remain human-controlled.
 
-`--timeout` defaults to 120000 ms, maximum 300000, bounding the task and its
+`--timeout` defaults to 30000 ms for smoke and 120000 ms for exhaustive suites,
+maximum 300000, bounding the task and its
 observations/probe. Cleanup has a separate 30000 ms budget; stop/snapshot/log CLI
 calls have bounded diagnostic deadlines. Inputs are never resubmitted after
 uncertain transport. Missing receipts, collateral effects, failed observation,

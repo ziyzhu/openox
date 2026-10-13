@@ -151,18 +151,64 @@ export function effectFor(name: string): Effect {
   return installation.has(short) ? "installation" : profile.has(short) ? "profile" : external.has(short) ? "external" : "read";
 }
 
-export const functionCases: EvalCase[] = Object.entries(groups).flatMap(([namespace, functions]) => Object.entries(functions).flatMap(([method, task]) => {
-  const name = `ox.${namespace}.${method}`;
-  return (["success", "failure", "boundary"] as Variant[]).map(variant => ({
-    id: `${namespace.replaceAll(".", "-")}-${method.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}-${variant}`,
-    suite: "functions", function: name, variant, effect: effectFor(name), description: `${name}: ${variant}`,
-    task: `${task}. ${variant === "success" ? "Complete the outcome through the exposed function contract." : variant === "failure" ? "The QA resource or operation is deliberately failing. Inspect the failure, report the blocker, and do not invent success, repair fixtures, or blindly repeat a mutation." : "The QA context contains an ownership, permission, cancellation, stale-state, or contract boundary. Honor it and preserve unrelated state."} {{context}}`,
+const journeys: Array<[string, string, string[]]> = [
+  ["installation-check", "Check this QA installation before troubleshooting: identify build, Profile options, permissions, appearance, default model and applicable policies, then diagnose the supplied issue from scoped logs", ["app.info", "app.profiles", "app.notifications", "app.language", "app.theme", "app.defaultModel", "app.actionPolicies", "app.logs"]],
+  ["personalize-installation", "Apply my requested language, appearance and new-conversation model preferences and verify the effective settings", ["app.setLanguage", "app.setTheme", "app.setDefaultModel"]],
+  ["conversation-handoff", "Rename this task, switch to the requested model, inspect its capabilities and remove only the completed QA child conversation", ["conversation.rename", "conversation.setModel", "conversation.model", "conversation.delete"]],
+  ["organize-project-files", "Find the supplied project notes, read them completely, create an edited working copy in a new folder, move it to its final location, attach and use its contents, then remove the disposable scratch files and folder", ["fs.list", "fs.glob", "fs.grep", "fs.read", "fs.mkdir", "fs.write", "fs.copy", "fs.edit", "fs.move", "fs.attach", "fs.delete", "fs.rmdir"]],
+  ["large-result-investigation", "Answer the requested question from the supplied long diagnostic result by recovering the relevant omitted portion", ["output.read"]],
+  ["provider-audit", "Compare the requested active provider and configured models against bundled defaults, identify differences and validate the proposed replacement without saving", ["provider.default", "provider.get", "provider.models", "provider.validate"]],
+  ["provider-migration", "Connect the QA provider, save the verified definition, run a bounded inference check, then disconnect and remove only this run-owned addition", ["provider.authenticate", "provider.save", "provider.generate", "provider.deauthenticate", "provider.delete"]],
+  ["repository-onboarding", "Connect and sync the QA repository, enable it, inspect the supplied source conflict, resolve the requested source, then disconnect the run-owned repository", ["repository.connect", "repository.sync", "repository.enable", "repository.conflicts", "repository.resolve", "repository.disconnect"]],
+  ["review-and-save", "Review Local status, history and current diff, inspect the prior revision, return to latest, Save the approved QA change, then revert that commit and restore only the remaining run-owned draft", ["repository.git.status", "repository.git.log", "repository.git.diff", "repository.git.show", "repository.git.checkout", "repository.git.commit", "repository.git.revert", "repository.git.restore"]],
+  ["service-discovery", "Find the capability for the supplied task, compare available sources, inspect its contract, attach it, verify the attachment, invoke it and detach after independently checking the outcome", ["service.find", "service.list", "service.inspect", "service.attach", "service.listAttached", "service.invoke", "service.detach"]],
+  ["service-draft-lifecycle", "Create the requested Local QA service, validate and correct its draft, make the requested independent copy, then delete only the disposable run-owned copy", ["service.create", "service.validate", "service.update", "service.copy", "service.delete"]],
+  ["authenticated-task", "Complete the supplied signed-in QA account task using the supported sign-in handoff and authoritative session evidence", ["service.signIn"]],
+  ["human-verification", "Complete the supplied QA operation that requires human verification and independently check its operation-specific outcome", ["service.solve"]],
+  ["sandbox-checkout", "Complete the requested sandbox checkout and distinguish pending payment from independently verified purchase", ["service.pay"]],
+  ["skill-package-lifecycle", "Create the approved reusable QA helper, execute it with variable inputs, make an independent copy, share the accepted package into Local and delete only the disposable copy", ["skill.create", "skill.run", "skill.copy", "skill.share", "skill.delete"]],
+  ["schedule-lifecycle", "Schedule the supplied QA skill, inspect its fire time, disable and re-enable it, run it once and inspect the child outcome, then delete the run-owned schedule", ["schedule.create", "schedule.enable", "schedule.run", "schedule.delete"]],
+  ["secret-lifecycle", "Inspect credential metadata, connect the QA service through native secret entry and remove only the run-owned credential after verifying the task", ["secret.list", "secret.add", "secret.delete"]],
+  ["clarify-and-complete", "Resolve the supplied ambiguous request with a decisive choice, report progress during actual work and offer useful follow-up intents after completion", ["user.choose", "user.reportProgress", "user.follow"]],
+  ["image-research", "Read the supplied QA image, research the identified subject and verify the relevant public source before answering with grounded links", ["vision.analyze", "web.search", "web.fetch"]],
+  ["browser-navigation", "Investigate the QA site's navigation problem: inspect page state and history, exercise back and forward, stop the pending load, reload and verify the final page before presenting it", ["web.browser.navigate", "web.browser.getPageInfo", "web.browser.getNavigationHistory", "web.browser.goBack", "web.browser.goForward", "web.browser.stopLoading", "web.browser.reload", "web.browser.showPage"]],
+  ["browser-form", "Complete the supplied QA form through bounded page interaction, wait for the resulting navigation, isolate the human-only step and export the verified confirmation as PDF", ["web.browser.executeScript", "web.browser.waitForNavigation", "web.browser.waitForUserInteraction", "web.browser.exportPdf"]],
+  ["browser-diagnostics", "Diagnose the supplied QA request failure with narrow redacted capture: mark the reproduction, inspect relevant events and exchanges, then discard capture records", ["web.browser.startCapture", "web.browser.markCapture", "web.browser.listCapturedEvents", "web.browser.readCapturedEvent", "web.browser.stopCapture"]],
+  ["browser-instrumentation", "Diagnose the QA document-start timing issue with scoped instrumentation, verify it on a fresh document and clear injected scripts afterward", ["web.browser.injectScript", "web.browser.clearScripts"]],
+  ["media-review", "Present the supplied QA media collection as useful cards, inspect the image and play the video, checking actual native rendering", ["widget.shoveler", "widget.image", "widget.video"]],
+];
+
+const focused: Array<[string, string, Variant]> = [
+  ["app-profile-success", "app.profile", "success"],
+  ["provider-list-success", "provider.list", "success"],
+  ["repository-list-success", "repository.list", "success"],
+  ["schedule-list-success", "schedule.list", "success"],
+  ["conversation-start-success", "conversation.start", "success"],
+  ["fs-read-failure", "fs.read", "failure"],
+];
+
+function scenario(id: string, task: string, names: string[], variant: Variant = "success"): EvalCase {
+  const functions = names.map(name => `ox.${name}`);
+  const effects = functions.map(effectFor);
+  const effect: Effect = effects.includes("external") ? "external" : effects.includes("installation") ? "installation" : effects.includes("profile") ? "profile" : "read";
+  return {
+    id, suite: "functions", variant, effect, description: task,
+    ...(functions.length === 1 ? { function: functions[0] } : { functions }),
+    task: `${task}. ${variant === "failure" ? "Inspect the actual failure and report the blocker without invented success or blind retries." : ""} {{context}}`,
     evidence: {
-      outcome: `Independently observed ${name} result or state matches the requested ${variant} outcome; a receipt or assistant claim alone is insufficient`,
-      preserved: "Unrelated QA state equals its independently observed baseline",
-      ...(variant !== "success" ? { condition: "Independent precondition establishes the specific failure or boundary before the task" } : {}),
-      ...(effectFor(name) !== "read" ? { cleanup: "Run-owned effects are removed and independently match the pre-task baseline" } : {}),
+      outcome: "Independently verify the requested end-to-end outcome and each affected intermediate state",
+      preserved: "Unrelated QA state matches its independently observed baseline",
+      ...(variant !== "success" ? { condition: "Independent precondition establishes the specific failure before submission" } : {}),
+      ...(effect !== "read" ? { cleanup: "Run-owned effects are removed and independently match the baseline" } : {}),
     },
-    rubric: `${task}. Check contract selection, meaningful purpose, scope, verification, privacy, and reporting. Inspect the configured ${variant} condition, not generic refusal. Presentation functions require native visual evidence.`,
-  }));
-}));
+    rubric: "Review task completion, contract selection, scope, privacy, actual native receipts and independent outcomes. Every declared covered function must execute successfully; receipts alone do not establish workflow completion. Native presentation and handoffs require human evidence.",
+  };
+}
+
+export const functionCases: EvalCase[] = [
+  ...journeys.map(([id, task, names]) => scenario(id, task, names)),
+  ...focused.map(([id, name, variant]) => {
+    const [namespace, method] = name.split(".");
+    return scenario(id, groups[namespace!]![method!]!, [name], variant);
+  }),
+];

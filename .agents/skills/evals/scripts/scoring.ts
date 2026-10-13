@@ -2,6 +2,7 @@ import * as ts from "typescript";
 import { isDeepStrictEqual } from "node:util";
 import { actions, includes } from "./observations.ts";
 import { effectFor } from "./cases/functions.ts";
+import { resolveReferences } from "./references.ts";
 import type { ActionExpectation, CaseBinding, Check, ConversationEvidence, EvalCase, EvalResponse, EvalSnapshot, Invocation } from "./types.ts";
 
 export function conversationActions(evidence: ConversationEvidence) {
@@ -11,8 +12,8 @@ export function conversationActions(evidence: ConversationEvidence) {
   return after.slice(before.length);
 }
 
-function matches(call: Invocation, rule: ActionExpectation) {
-  return call.name === rule.name && Object.hasOwn(call.outcome, rule.outcome) && (!rule.args || includes(call.args, rule.args));
+function matches(call: Invocation, rule: ActionExpectation, snapshot?: EvalSnapshot) {
+  return call.name === rule.name && Object.hasOwn(call.outcome, rule.outcome) && (!rule.args || includes(call.args, resolveReferences(rule.args, snapshot)));
 }
 
 function failureMessages(value: unknown): string[] {
@@ -20,10 +21,11 @@ function failureMessages(value: unknown): string[] {
   return value && typeof value === "object" ? Object.values(value).flatMap(failureMessages) : [];
 }
 
-export function history(snapshot?: EvalSnapshot) {
-  const assistants = (snapshot?.messages ?? []).flatMap(message => message.assistant ? [message.assistant] : []);
+export function history(snapshot?: EvalSnapshot, offset = 0) {
+  const messages = (snapshot?.messages ?? []).slice(offset);
+  const assistants = messages.flatMap(message => message.assistant ? [message.assistant] : []);
   const tools = assistants.flatMap(message => message.content.flatMap(block => block.toolCall ? [block.toolCall] : []));
-  const results = (snapshot?.messages ?? []).flatMap(message => message.toolResult ? [message.toolResult] : []);
+  const results = messages.flatMap(message => message.toolResult ? [message.toolResult] : []);
   const last = assistants.at(-1);
   return { assistants, tools, results, last };
 }
@@ -31,13 +33,13 @@ export function history(snapshot?: EvalSnapshot) {
 export function actionChecks(evidence: ConversationEvidence, binding: CaseBinding): Check[] {
   const invocations = conversationActions(evidence);
   return binding.actions.map(rule => {
-    const count = invocations.filter(call => matches(call, rule)).length;
+    const count = invocations.filter(call => matches(call, rule, evidence.snapshot)).length;
     return { detail: `${rule.name} ${rule.outcome}: ${rule.minimum}..${rule.maximum ?? "unbounded"} actual receipts`, passed: count >= rule.minimum && (rule.maximum === undefined || count <= rule.maximum) };
   });
 }
 
-export function conversationChecks(evidence: ConversationEvidence, binding: CaseBinding, allowExpectedFailures = true): Check[] {
-  const { assistants, tools, results, last } = history(evidence.snapshot);
+export function conversationChecks(evidence: ConversationEvidence, binding: CaseBinding, allowExpectedFailures = true, referenceSnapshot = evidence.snapshot): Check[] {
+  const { assistants, tools, results, last } = history(evidence.snapshot, evidence.initial?.messages.length ?? 0);
   const invocations = conversationActions(evidence);
   const failedCalls = invocations.filter(call => "failed" in call.outcome);
   const failedResults = results.filter(result => result.isError);
@@ -50,10 +52,10 @@ export function conversationChecks(evidence: ConversationEvidence, binding: Case
       const matching = results.filter(result => result.toolCallId === call.id);
       return matching.length === 1 && matching[0]!.toolName === call.name;
     }) && results.every(result => tools.some(call => call.id === result.toolCallId)) },
-    { detail: "Only declared, expected failed Actions occurred", passed: failedCalls.every(call => allowExpectedFailures && binding.actions.some(rule => rule.outcome === "failed" && matches(call, rule))) },
+    { detail: "Only declared, expected failed Actions occurred", passed: failedCalls.every(call => allowExpectedFailures && binding.actions.some(rule => rule.outcome === "failed" && matches(call, rule, referenceSnapshot))) },
     { detail: "Errored tool results have independently observed expected failures", passed: failedResults.length === 0 || allowExpectedFailures && failedResults.length <= failedCalls.length && failedResults.every(result => result.content.some(block => !!block.text?.text && failedCalls.some(call => failureMessages(call.outcome.failed).some(message => block.text!.text.includes(message))))) },
     { detail: "Only explicitly scoped Actions executed", passed: invocations.every(call => binding.allowedActions.includes(call.name) && !('running' in call.outcome)
-      && (effectFor(call.name) === "read" || binding.actions.some(rule => matches(call, rule)))) },
+      && (effectFor(call.name) === "read" || binding.actions.some(rule => matches(call, rule, referenceSnapshot)))) },
   ];
   for (const call of tools) {
     checks.push({ detail: `Declared tool: ${call.name}`, passed: evidence.initial?.tools.some(tool => tool.name === call.name) === true });
@@ -90,7 +92,7 @@ export function score(test: EvalCase, binding: CaseBinding, response: EvalRespon
   }
   if (test.effect !== "read") {
     checks.push({ detail: "Run-owned cleanup completed after outcome observation", passed: !!response.cleanup && !!response.restored });
-    if (response.cleanup) checks.push(...conversationChecks(response.cleanup, binding, false).map(check => ({ ...check, detail: `Cleanup: ${check.detail}` })));
+    if (response.cleanup) checks.push(...conversationChecks(response.cleanup, binding, false, response.snapshot).map(check => ({ ...check, detail: `Cleanup: ${check.detail}` })));
   }
   return checks;
 }

@@ -95,6 +95,7 @@ struct CustomLLMProviderEditor: View {
     @State private var name: String
     @State private var baseURL: String
     @State private var apiKey = ""
+    @State private var enteringCredential = false
     @State private var models: [CustomLLMModel]
     @State private var saving = false
     @State private var saveError: String?
@@ -194,12 +195,18 @@ struct CustomLLMProviderEditor: View {
                     .settingsRowPadding()
                     .accessibilityIdentifier(A11yID.Settings.customProviderURL)
                 Divider().settingsContentInset()
-                SecureField(provider == nil ? "API key (optional)" : "New API key (optional)", text: $apiKey)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                Button { enterCredential() } label: {
+                    HStack {
+                        Text(apiKey.isEmpty ? "Add credential" : "Edit credential")
+                        Spacer()
+                        if !apiKey.isEmpty { Image(systemName: "checkmark.circle.fill") }
+                    }
                     .font(Theme.Fonts.bodyMd)
                     .settingsRowPadding()
-                    .accessibilityIdentifier(A11yID.Settings.customProviderKey)
+                }
+                .buttonStyle(.plain)
+                .disabled(enteringCredential || saving)
+                .accessibilityIdentifier("settings.customProvider.credentialEntry")
             }
         }
     }
@@ -273,6 +280,27 @@ struct CustomLLMProviderEditor: View {
                 .font(Theme.Fonts.bodyMd.monospacedDigit())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func enterCredential() {
+        guard !enteringCredential else { return }
+        enteringCredential = true
+        Task {
+            defer { enteringCredential = false }
+            do {
+                let values = try await CredentialEntryPrompt.enter(
+                    title: name.isEmpty ? String(localized: "Provider") : name,
+                    fields: [.init(label: String(localized: "API key (optional)"), value: apiKey, secure: true, contentType: nil, accessibilityIdentifier: A11yID.Settings.customProviderKey)],
+                    website: nil,
+                    accessibilityIdentifier: "settings.customProvider.authentication",
+                    validate: { !$0[0].contains("\r") && !$0[0].contains("\n") }
+                )
+                apiKey = values[0].trimmingCharacters(in: .whitespacesAndNewlines)
+            } catch is CancellationError {
+            } catch {
+                saveError = error.localizedDescription
+            }
+        }
     }
 
     private func save() {

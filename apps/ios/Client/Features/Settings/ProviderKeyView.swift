@@ -12,7 +12,6 @@ struct ProviderAuthenticationView: View {
     var onAuthenticated: (() -> Void)? = nil
 
     @State private var authenticationMethod: AuthenticationMethod
-    @State private var apiKeySaved = false
     @State private var signedIn = false
     @State private var plan: String?
     @State private var accountLabel: String?
@@ -113,65 +112,18 @@ struct ProviderAuthenticationView: View {
 
     @ViewBuilder
     private var apiKeyContent: some View {
-        HStack {
-            APIKeySecureField(
-                placeholder: "\(credentialProviderName) \(client.credentialKind.name.lowercased())",
-                text: Binding(
-                    get: { apiKey },
-                    set: {
-                        apiKey = $0
-                        apiKeySaved = false
-                        signInError = nil
-                    }
-                )
-            )
-            .accessibilityIdentifier(A11yID.ConversationControls.modelKeyField)
-
-            Button {
-                do {
-                    try ProviderCredentialEntry.save(apiKey, for: client)
-                    signInError = nil
-                    apiKeySaved = true
-                    onChange()
-                    onAuthenticated?()
-                } catch { signInError = error.localizedDescription }
-            } label: {
-                Group {
-                    if apiKeySaved {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title3)
-                    } else {
-                        Text("Save")
-                            .font(Theme.Fonts.labelMd)
-                    }
-                }
-                .foregroundStyle(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    ? Theme.Colors.onSurfaceMuted : Theme.Colors.primary)
-                .fixedSize()
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
+        Button {
+            enterAPIKey()
+        } label: {
+            SettingsActionButtonLabel {
+                Text(apiKey.isEmpty ? "Add credential" : "Edit credential")
+                Spacer()
+                if !apiKey.isEmpty { Image(systemName: "checkmark.circle.fill") }
             }
-            .buttonStyle(.plain)
-            .disabled(apiKeySaved || apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .accessibilityLabel(apiKeySaved ? "Saved" : "Save")
-            .accessibilityIdentifier("provider.authentication.save")
         }
-        .padding(.horizontal, SettingsLayout.horizontalInset)
-        .padding(.vertical, Theme.Spacing.xs)
-        .settingsSurface(singleRow: true)
-
-        if let website = client.website {
-            Link(destination: website) {
-                SettingsActionButtonLabel {
-                    Text("Get API Key")
-                    Image(systemName: "arrow.up.right")
-                        .font(Theme.Icons.xs)
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Get API Key")
-            .accessibilityIdentifier(A11yID.ConversationControls.modelKeyWebsite)
-        }
+        .buttonStyle(.plain)
+        .disabled(busy)
+        .accessibilityIdentifier("provider.authentication.enter")
 
         Text(credentialDescription)
             .font(Theme.Fonts.caption)
@@ -251,6 +203,37 @@ struct ProviderAuthenticationView: View {
         return client.displayName.replacingOccurrences(of: " API ·", with: " ·")
     }
 
+    private func enterAPIKey() {
+        guard !busy else { return }
+        busy = true
+        Task {
+            defer { busy = false }
+            let website = client.website.map {
+                CredentialEntryPrompt.Website(url: $0, label: String(localized: "Get API Key"), accessibilityIdentifier: A11yID.ConversationControls.modelKeyWebsite)
+            }
+            do {
+                let values = try await CredentialEntryPrompt.enter(
+                    title: client.displayName,
+                    fields: [.init(label: "\(credentialProviderName) \(client.credentialKind.name.lowercased())", value: apiKey, secure: true, contentType: nil, accessibilityIdentifier: A11yID.ConversationControls.modelKeyField)],
+                    website: website,
+                    accessibilityIdentifier: "provider.authentication",
+                    validate: { values in
+                        !values[0].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            && !values[0].contains("\r") && !values[0].contains("\n")
+                    }
+                )
+                try ProviderCredentialEntry.save(values[0], for: client)
+                apiKey = values[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                signInError = nil
+                onChange()
+                onAuthenticated?()
+            } catch is CancellationError {
+            } catch {
+                signInError = error.localizedDescription
+            }
+        }
+    }
+
     private func signIn(_ account: any SubscriptionAccount) {
         guard !busy else { return }
         busy = true
@@ -296,88 +279,5 @@ struct ProviderAuthenticationView: View {
         account.signOut()
         refreshSubscription(account)
         onChange()
-    }
-}
-
-private struct APIKeySecureField: UIViewRepresentable {
-    let placeholder: String
-    @Binding var text: String
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
-    }
-
-    func makeUIView(context: Context) -> UITextField {
-        let field = EndCursorSecureTextField()
-        field.delegate = context.coordinator
-        field.isSecureTextEntry = true
-        field.clearsOnBeginEditing = false
-        field.autocapitalizationType = .none
-        field.autocorrectionType = .no
-        field.font = .preferredFont(forTextStyle: .body)
-        field.textColor = Theme.Colors.onSurface.uiColor
-        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        field.addTarget(context.coordinator, action: #selector(Coordinator.textChanged(_:)), for: .editingChanged)
-        return field
-    }
-
-    func updateUIView(_ field: UITextField, context: Context) {
-        field.placeholder = placeholder
-        if field.text != text { field.text = text }
-    }
-
-    final class Coordinator: NSObject, UITextFieldDelegate {
-        @Binding private var text: String
-        private var beganEditing = false
-
-        init(text: Binding<String>) {
-            _text = text
-        }
-
-        @objc func textChanged(_ field: UITextField) {
-            text = field.text ?? ""
-        }
-
-        func textFieldDidBeginEditing(_ field: UITextField) {
-            beganEditing = true
-            DispatchQueue.main.async {
-                let end = field.endOfDocument
-                field.selectedTextRange = field.textRange(from: end, to: end)
-            }
-        }
-
-        func textField(
-            _ field: UITextField,
-            shouldChangeCharactersIn _: NSRange,
-            replacementString string: String
-        ) -> Bool {
-            defer { beganEditing = false }
-            let current = field.text ?? ""
-            guard beganEditing, !current.isEmpty else { return true }
-            let updated = string.isEmpty ? String(current.dropLast()) : current + string
-            field.text = updated
-            text = updated
-            let end = field.endOfDocument
-            field.selectedTextRange = field.textRange(from: end, to: end)
-            return false
-        }
-    }
-}
-
-private final class EndCursorSecureTextField: UITextField {
-    private var placesCursorAtEnd = false
-
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        placesCursorAtEnd = !isFirstResponder
-        super.touchesBegan(touches, with: event)
-    }
-
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        super.touchesEnded(touches, with: event)
-        placesCursorAtEnd = false
-    }
-
-    override func closestPosition(to point: CGPoint) -> UITextPosition? {
-        placesCursorAtEnd ? endOfDocument : super.closestPosition(to: point)
     }
 }

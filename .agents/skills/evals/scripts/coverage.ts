@@ -19,12 +19,10 @@ export async function sourceFunctions(): Promise<string[]> {
 }
 
 export async function validateCoverage(cases: EvalCase[]): Promise<void> {
+  if (cases.length > 86) throw new Error("Catalog exceeds 86 scenarios; compose existing journeys before adding cases");
   const functions = await sourceFunctions();
-  const declared = [...new Set(cases.flatMap(test => test.function ? [test.function] : []))].sort();
+  const declared = [...new Set(cases.flatMap(coveredFunctions))].sort();
   if (JSON.stringify(functions) !== JSON.stringify(declared)) throw new Error(`Function coverage differs from source: missing ${functions.filter(name => !declared.includes(name)).join(", ")}; stale ${declared.filter(name => !functions.includes(name)).join(", ")}`);
-  for (const name of functions) for (const variant of ["success", "failure", "boundary"]) {
-    if (!cases.some(test => test.function === name && test.variant === variant)) throw new Error(`Missing ${variant} coverage: ${name}`);
-  }
   const skills = [...new Set(cases.flatMap(test => test.skill ? [test.skill] : []))].sort();
   if (JSON.stringify(skills) !== JSON.stringify([...SYSTEM_SKILL_NAMES].sort())) throw new Error("System skill workflow coverage differs from source");
   for (const path of new Set(cases.flatMap(test => test.resources ?? []))) {
@@ -38,9 +36,13 @@ export function coverage(cases: EvalCase[], report?: Report) {
     const status = !attempts.length ? "planned" : attempts.some(result => result.status === "error") ? "error"
       : attempts.some(result => result.status === "fail") ? "failed" : attempts.some(result => result.status === "blocked") ? "blocked"
       : attempts.length !== report?.limits.repetitions || attempts.some(result => result.status === "unverified") ? "unverified" : "passed";
-    return { id: test.id, function: test.function, skill: test.skill, variant: test.variant, status,
+    return { id: test.id, functions: coveredFunctions(test), skill: test.skill, variant: test.variant, status,
       fixture: attempts.some(result => result.fixture === "prepared") ? "prepared" : attempts.length ? "missing" : "unknown",
       attempts: attempts.length, executions: attempts.filter(result => result.response?.outcomes.length).length,
       reviews: attempts.filter(result => result.review.status !== "pending").length };
   });
+}
+
+export function coveredFunctions(test: EvalCase): string[] {
+  return [...new Set([...(test.function ? [test.function] : []), ...(test.functions ?? [])])];
 }

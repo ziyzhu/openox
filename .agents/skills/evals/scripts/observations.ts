@@ -1,6 +1,8 @@
 import { isDeepStrictEqual } from "node:util";
 import { parseSkill } from "../../../../packages/protocol/src/skills.ts";
 import { ox, vmCall } from "./cli.ts";
+import { at, resolveReferences } from "./references.ts";
+export { at, actions } from "./references.ts";
 import type { Assertion, CaseBinding, Check, EvalResponse, EvalSnapshot, ObservedState, Reader } from "./types.ts";
 
 export const readers = new Set([
@@ -11,25 +13,13 @@ export const readers = new Set([
   "ox.web.browser.getPageInfo", "ox.web.browser.getNavigationHistory", "ox.web.browser.listCapturedEvents",
 ]);
 
-export function at(value: unknown, path: string[]): unknown {
-  for (const key of path) {
-    if (!value || typeof value !== "object" || !Object.hasOwn(value, key)) return undefined;
-    value = (value as Record<string, unknown>)[key];
-  }
-  return value;
-}
-
 export function includes(value: unknown, expected: unknown): boolean {
   if (typeof value === "string" && typeof expected === "string") return value.includes(expected);
-  if (Array.isArray(value)) return value.some(item => isDeepStrictEqual(item, expected));
+  if (Array.isArray(value)) return value.some(item => isDeepStrictEqual(item, expected) || !!expected && typeof expected === "object" && !Array.isArray(expected) && includes(item, expected));
   if (value && expected && typeof value === "object" && typeof expected === "object" && !Array.isArray(expected)) {
-    return Object.entries(expected).every(([key, child]) => isDeepStrictEqual(at(value, [key]), child));
+    return Object.entries(expected).every(([key, child]) => isDeepStrictEqual(at(value, [key]), child) || !!child && typeof child === "object" && !Array.isArray(child) && includes(at(value, [key]), child));
   }
   return false;
-}
-
-export function actions(snapshot?: EvalSnapshot) {
-  return (snapshot?.blocks ?? []).flatMap(block => block.kind.trace?.entries.flatMap(entry => entry.invocation ? [entry.invocation] : []) ?? []);
 }
 
 function complete(value: unknown): boolean {
@@ -41,23 +31,27 @@ function complete(value: unknown): boolean {
   return true;
 }
 
-async function observe(host: string, chatId: string, reader: Reader, remaining: () => number): Promise<unknown> {
-  if (reader.kind === "vm") return vmCall(host, chatId, reader.name, reader.args, remaining());
+async function observe(host: string, chatId: string, reader: Reader, remaining: () => number, snapshot?: EvalSnapshot): Promise<unknown> {
+  if (reader.kind === "vm") return vmCall(host, chatId, reader.name, resolveReferences(reader.args, snapshot) as Record<string, unknown>, remaining());
   if (reader.kind === "skill") {
     const file = await vmCall<{ text: string; truncated: boolean; unsupported: string | null }>(host, chatId, "ox.fs.read", { path: `skills/${reader.name}/SKILL.md` }, remaining());
     if (!file || typeof file.text !== "string" || file.truncated !== false || file.unsupported) throw new Error("Missing complete skill text");
     return parseSkill(file.text, reader.name);
   }
-  if (reader.kind === "conversation") return ox(host, ["conversation", "inspect", "--full"], reader.id === "{{task}}" ? chatId : reader.id, remaining());
+  if (reader.kind === "conversation") {
+    const id = resolveReferences(reader.id, snapshot);
+    if (typeof id !== "string" || !id) throw new Error("Observed conversation reference is not an ID");
+    return ox(host, ["conversation", "inspect", "--full"], id === "{{task}}" ? chatId : id, remaining());
+  }
   return ox(host, reader.command === "providers" ? ["host", "providers"] : ["conversation", "list"], undefined, remaining());
 }
 
-export async function observeState(host: string, chatId: string, binding: CaseBinding, remaining: () => number, phase: "before" | "after" | "cleanup"): Promise<ObservedState> {
+export async function observeState(host: string, chatId: string, binding: CaseBinding, remaining: () => number, phase: "before" | "after" | "cleanup", snapshot?: EvalSnapshot): Promise<ObservedState> {
   const state: ObservedState = { values: {} };
   let bytes = 0;
   for (const [name, reader] of Object.entries(binding.observations)) {
     if (reader.phases && !reader.phases.includes(phase)) continue;
-    const value = await observe(host, chatId, reader, remaining);
+    const value = await observe(host, chatId, reader, remaining, snapshot);
     if (value === undefined || !complete(value)) throw new Error(`Missing or incomplete observation: ${name}`);
     bytes += Buffer.byteLength(JSON.stringify(value));
     if (bytes > 1_048_576) throw new Error(`Observations exceed total evidence budget at ${name}`);
