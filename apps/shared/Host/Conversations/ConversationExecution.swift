@@ -15,6 +15,23 @@ enum ConversationBackgroundPhase: String {
     case expired
     case failed
 
+    var title: String {
+        switch self {
+        case .thinking: String(localized: "Ox is thinking")
+        case .working: String(localized: "Ox is working")
+        case .responding: String(localized: "Ox is writing")
+        case .finishing: String(localized: "Ox is wrapping up")
+        case .inputNeeded: String(localized: "Ox needs your input")
+        case .permissionNeeded: String(localized: "Ox needs your approval")
+        case .signInNeeded: String(localized: "Sign in to continue")
+        case .verificationNeeded: String(localized: "Verify to continue")
+        case .paymentNeeded: String(localized: "Payment needed to continue")
+        case .stopped: String(localized: "Ox stopped")
+        case .expired: String(localized: "Open Ox to continue")
+        case .failed: String(localized: "Ox hit a problem")
+        }
+    }
+
     var subtitle: String {
         switch self {
         case .thinking: String(localized: "Plowing…")

@@ -4,7 +4,6 @@ import Foundation
 @MainActor
 final class IOSConversationBackgroundExecution: ConversationBackgroundExecution {
     private static let activityPulseInterval = Duration.seconds(5)
-    private static var title: String { String(localized: "Ox is on it") }
 
     private final class CompletionState {
         var outcome: Outcome?
@@ -61,7 +60,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         }
         let request = BGContinuedProcessingTaskRequest(
             identifier: identifier,
-            title: Self.title,
+            title: phase.title,
             subtitle: subtitle
         )
         request.strategy = .queue
@@ -93,7 +92,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         stepSubtitle = nil
         Log.session.info("ConversationBackground.phase chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) phase=\(phase.rawValue) presented=\(task != nil)")
         guard completion.outcome == nil else { return }
-        task?.updateTitle(Self.title, subtitle: subtitle)
+        task?.updateTitle(phase.title, subtitle: subtitle)
     }
 
     func updateStep(_ text: String) {
@@ -102,7 +101,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         let subtitle = value.count > 120 ? String(value.prefix(119)) + "…" : value
         guard stepSubtitle != subtitle else { return }
         stepSubtitle = subtitle
-        task?.updateTitle(Self.title, subtitle: subtitle)
+        task?.updateTitle(phase.title, subtitle: subtitle)
     }
 
     func finish(_ outcome: Outcome) {
@@ -114,6 +113,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         activityPulse = nil
         if let task {
             if case .completed = outcome {
+                task.updateTitle(String(localized: "Ox is done"), subtitle: String(localized: "Your response is ready"))
                 let total = max(completedUnits + 1, 1)
                 task.progress.totalUnitCount = total
                 task.progress.completedUnitCount = total
@@ -147,7 +147,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
                 self.advance()
             }
         }
-        task.updateTitle(Self.title, subtitle: subtitle)
+        task.updateTitle(phase.title, subtitle: subtitle)
         task.progress.totalUnitCount = max(completedUnits + 1, 1)
         task.progress.completedUnitCount = completedUnits
         advance()
