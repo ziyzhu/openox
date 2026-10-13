@@ -316,6 +316,7 @@ struct ConversationComposer: View, Equatable {
 
     var body: some View {
         inputBar
+            .background(ComposerKeyboardDiagnostics(conversationID: sessionID))
             .excludesCompactPageSwitch(includingAreaBelow: true)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
                 DispatchQueue.main.async {
