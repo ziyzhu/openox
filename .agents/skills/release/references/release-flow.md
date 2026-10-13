@@ -3,7 +3,7 @@
 ## Inspect
 
 1. Resolve the selected OpenOx commit, intended iOS version, and exact build. Require all `MARKETING_VERSION` configurations to agree and a clean reviewed revision before an official build or staging. Build/archive with `xcodebuild` using the reviewed project, scheme, signing configuration, and an explicit output path outside Git; inspect native help and do not invent an existing build or archive path.
-2. Follow the installed `asc-cli` skill and current command help. Use app `6802224502` explicitly, inspect its current versions and processed builds, and read the selected version's localized metadata and media from App Store Connect.
+2. Follow the installed `asc-cli` skill and current command help. Use app `6802224502` explicitly, inspect its current versions and processed builds, and read the selected version's localized metadata and media from App Store Connect. Before an official upload, require the intended marketing version to be numerically greater than the latest released iOS version; increasing the build number cannot reopen a released version train. Change `apps/ios/project.yml`, regenerate the Xcode project, and verify matching app and Share Extension versions in the archive. This release check is not required for ordinary commits.
 3. Use the last released version and selected source revision to establish the release's change range. Keep any downloads, drafts, CLI metadata layouts, and validation reports in a private temporary workspace, not Git. If working offline, report remote state as unchecked and stop at a provisional draft.
 
 ## What's New in This Version
