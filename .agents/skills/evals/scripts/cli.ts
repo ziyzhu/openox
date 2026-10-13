@@ -16,7 +16,7 @@ export async function ox<T>(host: string, args: string[], chatId?: string, timeo
 
 export async function vmCall<T>(host: string, chatId: string, name: string, args: Record<string, unknown>, timeoutMs: number): Promise<T> {
   const result = await ox<{ value: T }>(host, ["vm", "call", name, "--args", JSON.stringify({ purpose: "Observe eval state", ...args })], chatId, timeoutMs);
-  if (result.value === undefined || result.value === null) throw new Error(`Missing observation from ${name}`);
+  if (result.value === undefined) throw new Error(`Missing observation from ${name}`);
   return result.value;
 }
 

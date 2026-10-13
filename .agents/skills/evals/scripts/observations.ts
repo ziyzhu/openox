@@ -1,97 +1,83 @@
 import { isDeepStrictEqual } from "node:util";
 import { parseSkill } from "../../../../packages/protocol/src/skills.ts";
-import { newConversation, ox, vmCall } from "./cli.ts";
-import type { ConversationEvidence, Check, EvalCase, EvalResponse, EvalSnapshot, Invocation, ObservedState } from "./types.ts";
+import { ox, vmCall } from "./cli.ts";
+import type { Assertion, CaseBinding, Check, EvalResponse, EvalSnapshot, ObservedState, Reader } from "./types.ts";
 
-export function render(value: string, fixture: EvalResponse["fixture"]): string {
-  return fixture ? value.replaceAll("{{name}}", fixture.name).replaceAll("{{answer}}", fixture.answer) : value;
+export const readers = new Set([
+  "ox.app.info", "ox.app.profile", "ox.app.profiles", "ox.app.notifications", "ox.app.language", "ox.app.theme", "ox.app.defaultModel", "ox.app.actionPolicies", "ox.app.logs",
+  "ox.conversation.model", "ox.provider.default", "ox.provider.list", "ox.provider.get", "ox.repository.list", "ox.repository.conflicts",
+  "ox.repository.git.status", "ox.repository.git.log", "ox.repository.git.show", "ox.repository.git.diff", "ox.service.list", "ox.service.find", "ox.service.inspect", "ox.service.listAttached",
+  "ox.fs.read", "ox.fs.list", "ox.fs.glob", "ox.fs.grep", "ox.schedule.list", "ox.secret.list",
+  "ox.web.browser.getPageInfo", "ox.web.browser.getNavigationHistory", "ox.web.browser.listCapturedEvents",
+]);
+
+export function at(value: unknown, path: string[]): unknown {
+  for (const key of path) {
+    if (!value || typeof value !== "object" || !Object.hasOwn(value, key)) return undefined;
+    value = (value as Record<string, unknown>)[key];
+  }
+  return value;
 }
 
-export async function observeState(host: string, provider: string, model: string, test: EvalCase, remaining: () => number, qaProfile?: string): Promise<ObservedState> {
-  const chatId = await newConversation(host, provider, model, true, remaining());
-  const state: ObservedState = { chatId, values: {}, files: {} };
-  const fields = {
-    profile: ["name", "storage"], defaultModel: ["configured", "region", "provider", "model", "thinkingLevel", "supportsTools", "authentication"],
-    language: ["selection", "locale"], theme: ["selection", "appearance"], actionPolicies: ["defaultPolicy", "resolved", "overrides", "truncated"],
-  };
-  for (const [name, required] of Object.entries(fields)) {
-    const value = await vmCall<Record<string, unknown>>(host, chatId, `ox.app.${name}`, name === "actionPolicies" ? { limit: 100 } : {}, remaining());
-    if (typeof value !== "object" || Array.isArray(value) || !required.every(field => field in value && (value[field] !== null || ["thinkingLevel", "defaultPolicy", "resolved"].includes(field)))
-      || value.truncated === true) throw new Error(`Incomplete ${name} observation`);
-    state.values[name] = value;
+export function includes(value: unknown, expected: unknown): boolean {
+  if (typeof value === "string" && typeof expected === "string") return value.includes(expected);
+  if (Array.isArray(value)) return value.some(item => isDeepStrictEqual(item, expected));
+  if (value && expected && typeof value === "object" && typeof expected === "object" && !Array.isArray(expected)) {
+    return Object.entries(expected).every(([key, child]) => isDeepStrictEqual(at(value, [key]), child));
   }
-  const profile = state.values.profile as { name?: string; storage?: string };
-  if (!profile.name || !profile.storage || qaProfile && (profile.name !== qaProfile || profile.storage !== "local")) throw new Error("Expected the named local QA Profile; no mutation is authorized here");
-  const providers = await ox(host, ["host", "providers"], undefined, remaining());
-  if (!Array.isArray(providers)) throw new Error("Incomplete provider catalog");
-  state.values.providers = providers;
-  const artifacts = await vmCall<{ items: unknown[]; truncated: boolean }>(host, chatId, "ox.fs.list", { path: "artifacts", options: { limit: 100 } }, remaining());
-  if (!Array.isArray(artifacts.items) || artifacts.truncated !== false) throw new Error("Incomplete artifact inventory");
-  state.values.artifacts = artifacts.items;
-  const skills = await vmCall<{ paths: string[]; truncated: boolean }>(host, chatId, "ox.fs.glob", { path: "skills", pattern: "**/*", options: { limit: 1000 } }, remaining());
-  if (!Array.isArray(skills.paths) || skills.truncated !== false || skills.paths.some(path => !path.startsWith("skills/"))) throw new Error("Incomplete skill inventory");
+  return false;
+}
+
+export function actions(snapshot?: EvalSnapshot) {
+  return (snapshot?.blocks ?? []).flatMap(block => block.kind.trace?.entries.flatMap(entry => entry.invocation ? [entry.invocation] : []) ?? []);
+}
+
+function complete(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(complete);
+  if (value && typeof value === "object") return !Object.entries(value).some(([key, child]) =>
+    ["truncated", "recognizedTextTruncated", "hasMore"].includes(key) && child === true
+    || ["dropped", "evicted", "omittedInvocations"].includes(key) && typeof child === "number" && child > 0
+    || !complete(child));
+  return true;
+}
+
+async function observe(host: string, chatId: string, reader: Reader, remaining: () => number): Promise<unknown> {
+  if (reader.kind === "vm") return vmCall(host, chatId, reader.name, reader.args, remaining());
+  if (reader.kind === "skill") {
+    const file = await vmCall<{ text: string; truncated: boolean; unsupported: string | null }>(host, chatId, "ox.fs.read", { path: `skills/${reader.name}/SKILL.md` }, remaining());
+    if (!file || typeof file.text !== "string" || file.truncated !== false || file.unsupported) throw new Error("Missing complete skill text");
+    return parseSkill(file.text, reader.name);
+  }
+  if (reader.kind === "conversation") return ox(host, ["conversation", "inspect", "--full"], reader.id === "{{task}}" ? chatId : reader.id, remaining());
+  return ox(host, reader.command === "providers" ? ["host", "providers"] : ["conversation", "list"], undefined, remaining());
+}
+
+export async function observeState(host: string, chatId: string, binding: CaseBinding, remaining: () => number, phase: "before" | "after" | "cleanup"): Promise<ObservedState> {
+  const state: ObservedState = { values: {} };
   let bytes = 0;
-  for (const path of ["MEMORY.md", "SOUL.md", ...skills.paths]) {
-    const text = await readText(host, chatId, path, remaining());
-    bytes += Buffer.byteLength(text);
-    if (bytes > 1_048_576) throw new Error("Observed files exceed the 1 MiB evidence budget");
-    state.files[path] = text;
-  }
-  if (test.workflow?.kind === "readSkill") {
-    state.guide = await readText(host, chatId, test.workflow.path, remaining());
-    if (!state.guide.trim()) throw new Error("Missing independent skill contents");
+  for (const [name, reader] of Object.entries(binding.observations)) {
+    if (reader.phases && !reader.phases.includes(phase)) continue;
+    const value = await observe(host, chatId, reader, remaining);
+    if (value === undefined || !complete(value)) throw new Error(`Missing or incomplete observation: ${name}`);
+    bytes += Buffer.byteLength(JSON.stringify(value));
+    if (bytes > 1_048_576) throw new Error(`Observations exceed total evidence budget at ${name}`);
+    state.values[name] = value;
   }
   return state;
 }
 
-async function readText(host: string, chatId: string, path: string, timeoutMs: number): Promise<string> {
-  const file = await vmCall<{ path: string; text: string | null; truncated: boolean; unsupported: string | null }>(host, chatId, "ox.fs.read", { path, options: { maxBytes: 1_048_576 } }, timeoutMs);
-  if (file.path !== path || typeof file.text !== "string" || file.truncated !== false || file.unsupported) throw new Error(`Incomplete text observation: ${path}`);
-  return file.text;
-}
-
-export async function requireCleanupPolicy(host: string, state: ObservedState, remaining: () => number): Promise<void> {
-  for (const action of ["ox.skill.create", "ox.skill.delete"]) {
-    const policy = await vmCall<{ resolved: { action: string; policy: string } | null }>(host, state.chatId, "ox.app.actionPolicies", { action }, remaining());
-    if (policy.resolved?.action !== action || policy.resolved.policy !== "allow") throw new Error(`QA policy must already allow ${action}; no policies were changed`);
-  }
-}
-
-export function preserved(before: ObservedState, after: ObservedState, fixture?: EvalResponse["fixture"]): Check[] {
-  const files = (state: ObservedState) => Object.fromEntries(Object.entries(state.files).filter(([path]) => !fixture || !path.startsWith(`skills/${fixture.name}/`)));
-  return [
-    { detail: "Observed Profile, provider catalog, settings, policies, and artifact inventory preserved", passed: isDeepStrictEqual(before.values, after.values) },
-    { detail: "Observed memory, soul, and unrelated skill packages preserved", passed: isDeepStrictEqual(files(before), files(after)) },
-  ];
-}
-
-export function actions(snapshot: EvalSnapshot | undefined): Invocation[] {
-  return (snapshot?.blocks ?? []).flatMap(block => block.kind.trace?.entries.flatMap(entry => entry.invocation ? [entry.invocation] : []) ?? []);
-}
-
-const readActions = new Set([
-  "ox.fs.list", "ox.fs.read", "ox.fs.glob", "ox.fs.grep", "ox.tool.help", "ox.user.reportProgress",
-  "ox.app.info", "ox.app.profile", "ox.app.profiles", "ox.app.language", "ox.app.theme", "ox.app.model",
-  "ox.app.defaultModel", "ox.app.actionPolicies", "ox.app.repositories", "ox.app.logs", "ox.provider.get",
-]);
-
-export function ownedSkillWrite(call: Invocation, name: string): boolean {
-  return call.name === "ox.skill.create" && call.args.name === name
-    || ["ox.fs.write", "ox.fs.edit"].includes(call.name) && typeof call.args.path === "string" && call.args.path.startsWith(`skills/${name}/`);
-}
-
-export function permittedActions(evidence: ConversationEvidence, fixture?: EvalResponse["fixture"]): Check[] {
-  return [{ detail: "Only read-only/diagnostic Actions or authorized run-owned skill writes executed", passed: actions(evidence.snapshot).every(call => readActions.has(call.name) || !!fixture && ownedSkillWrite(call, fixture.name)) }];
-}
-
-export function skillMatches(test: EvalCase, response: EvalResponse): boolean {
-  if (test.workflow?.kind !== "createSkill" || !response.fixture || !response.after) return false;
-  const { name } = response.fixture;
-  const text = response.after.files[`skills/${name}/SKILL.md`];
-  if (text === undefined) return false;
-  try {
-    const skill = parseSkill(text, name);
-    return skill.description === test.workflow.description && skill.instructions === render(test.workflow.instructions, response.fixture)
-      && skill.services.length === 0 && Object.keys(response.after.files).filter(path => path.startsWith(`skills/${name}/`)).length === 1;
-  } catch { return false; }
+export function assertions(binding: CaseBinding, response: EvalResponse, phase: Assertion["phase"]): Check[] {
+  const state = phase === "before" ? response.before : phase === "after" ? response.after : phase === "cleanup" ? response.restored : undefined;
+  return binding.assertions.filter(rule => rule.phase === phase).map(rule => {
+    const snapshot = rule.observation === "probe" ? response.probe?.snapshot : rule.observation === "task" ? response.snapshot : undefined;
+    const answer = snapshot?.messages.flatMap(message => message.assistant ? [message.assistant] : []).at(-1)?.content.flatMap(block => block.text ? [block.text.text] : []).join("\n").trim();
+    const value = snapshot ? { ...snapshot, answer } : state?.values[rule.observation];
+    const actual = at(value, rule.path);
+    const baseline = at(response.before?.values[rule.observation], rule.path);
+    const parent = at(value, rule.path.slice(0, -1));
+    const passed = rule.operator === "absent" ? rule.path.length > 0 && actual === undefined && !!parent && typeof parent === "object"
+      : actual !== undefined && (rule.operator === "equals" ? isDeepStrictEqual(actual, rule.expected)
+        : rule.operator === "includes" ? includes(actual, rule.expected) : baseline !== undefined && isDeepStrictEqual(actual, baseline));
+    return { detail: `${phase}: ${rule.evidence} (${rule.observation}/${rule.path.join("/")}, ${rule.operator})`, passed };
+  });
 }

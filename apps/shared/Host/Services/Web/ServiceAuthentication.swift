@@ -1,6 +1,56 @@
 import Foundation
 
+nonisolated enum ServiceAuthenticationRecovery {
+    @TaskLocal static var serviceID: ObjectIdentifier?
+}
+
+@MainActor
+final class ServiceAuthenticationRecoveryStore {
+    private var allowances: [ObjectIdentifier: Date] = [:]
+
+    func acknowledge(_ service: Service) {
+        allowances[ObjectIdentifier(service)] = Date().addingTimeInterval(120)
+    }
+
+    func consume(_ service: Service, action: Manifest.Action) -> ObjectIdentifier? {
+        guard service.isWebService, action.requireAuth, !action.requireApproval else { return nil }
+        let id = ObjectIdentifier(service)
+        guard let expiresAt = allowances.removeValue(forKey: id), expiresAt > Date() else { return nil }
+        return id
+    }
+
+    func clear() {
+        allowances.removeAll()
+    }
+}
+
 extension Service {
+    enum AccessRequestOutcome: Equatable {
+        case completed
+        case acknowledged
+        case incomplete
+    }
+
+    func accessResult(acknowledged: Bool = false) -> JSONValue {
+        let completion: String
+        if acknowledged {
+            completion = "acknowledged"
+        } else if auth.observation?.evidence == .configured {
+            completion = "configured"
+        } else if auth == .authorized {
+            completion = "authorized"
+        } else {
+            completion = "verified"
+        }
+        return .object([
+            "domain": .string(domain),
+            "completed": .bool(true),
+            "signedIn": .bool(signInState.isAuthenticated),
+            "state": .string(signInState.rawValue),
+            "completion": .string(completion),
+        ])
+    }
+
     var supportsAuthentication: Bool {
         isAPIService || isMCPService || iOSService?.requiresPermission == true || supportsWebAuthentication
     }
@@ -156,33 +206,35 @@ extension Service {
         await manager.logAuthRetention(domain: domain, trigger: "silent-sign-in", outcome: "signedIn")
     }
 
-    func requestAccess(using presenter: (any ServiceAuthPresenting)? = nil, source: AuthSignInSource = .serviceDetail) async throws {
+    @discardableResult
+    func requestAccess(using presenter: (any ServiceAuthPresenting)? = nil, source: AuthSignInSource = .serviceDetail) async throws -> AccessRequestOutcome {
         try await access.request(self) {
             try await self.performAccessRequest(using: presenter, source: source)
         }
     }
 
-    private func performAccessRequest(using presenter: (any ServiceAuthPresenting)?, source: AuthSignInSource) async throws {
+    private func performAccessRequest(using presenter: (any ServiceAuthPresenting)?, source: AuthSignInSource) async throws -> AccessRequestOutcome {
         if let iOS = iOSService {
             let current = await iOS.permissionState()
             _ = await iOS.updatePermission(from: current)
             setAuth(await iOS.checkAccess())
-            return
+            return signInState.isAuthenticated ? .completed : .incomplete
         }
         if let mcp = remoteMCPService {
             await checkAccess(policy: .current, reason: .modelSignIn)
-            if source != .serviceDetail, signInState.isAuthenticated { return }
+            if source != .serviceDetail, signInState.isAuthenticated { return .completed }
             let descriptor = try await mcp.authorize()
             applyResolvedDefinition(ServiceDefinition(mcp: descriptor, metadata: definition), reason: .serviceDetail)
-            return
+            return signInState.isAuthenticated ? .completed : .incomplete
         }
         await checkAccess(policy: .current, reason: .modelSignIn)
-        guard !Task.isCancelled, !signInState.isAuthenticated, auth != .notRequired else { return }
+        guard !Task.isCancelled else { return .incomplete }
+        guard !signInState.isAuthenticated, auth != .notRequired else { return .completed }
         await attemptSilentSignIn(reason: .modelSignIn)
-        guard !signInState.isAuthenticated else { return }
+        guard !signInState.isAuthenticated else { return .completed }
 
         if let apiService {
-            guard !auth.isSigningIn else { return }
+            guard !auth.isSigningIn else { return .incomplete }
             let previous = auth.observation
             setAuth(.signingIn(previous: previous))
             do {
@@ -194,24 +246,26 @@ extension Service {
                 setAuth(.unavailable(previous: previous, error: error.localizedDescription))
                 throw error
             }
-            return
+            return signInState.isAuthenticated ? .completed : .incomplete
         }
         guard supportsWebAuthentication else {
             setAuth(.notRequired)
-            return
+            return .completed
         }
         guard let presenter else { throw InvokeError.requiresAuth(domain) }
         let previousAuth = auth
         let previous = auth.observation
         setAuth(.signingIn(previous: previous))
+        var requestOutcome: AccessRequestOutcome = .incomplete
         let outcome = await manager.sessionCoordinator.run(for: self, kind: .authentication) { [weak self] flowID in
             guard let self else { return .cancelled }
-            await self.performInteractiveSignIn(using: presenter, source: source, flowID: flowID)
+            requestOutcome = await self.performInteractiveSignIn(using: presenter, source: source, flowID: flowID)
             return .authentication
         }
         if case .cancelled = outcome, auth == .signingIn(previous: previous) {
             setAuth(previousAuth)
         }
+        return Task.isCancelled ? .incomplete : requestOutcome
     }
 
     private func presentAPIAuthentication() async throws {
@@ -222,7 +276,7 @@ extension Service {
         using presenter: any ServiceAuthPresenting,
         source: AuthSignInSource,
         flowID: UUID
-    ) async {
+    ) async -> AccessRequestOutcome {
         let started = Date()
         Log.service.info("Service.signIn requested domain=\(domain) source=\(source.rawValue) auth=\(auth.logLabel)")
         attemptedSilentSignIn = true
@@ -237,7 +291,7 @@ extension Service {
         ) else {
             setAuth(previous.map(Auth.observed) ?? .unavailable(previous: nil, error: "authentication page unavailable"))
             Log.service.error("Service.signIn action page unavailable domain=\(domain) source=\(source.rawValue)")
-            return
+            return .incomplete
         }
         defer { flowSession.close() }
         guard let url = await fetchAuthURL(in: flowSession),
@@ -246,15 +300,18 @@ extension Service {
               ServiceHandoffSession.allowsNavigation(to: url) else {
             setAuth(previous.map(Auth.observed) ?? .unavailable(previous: nil, error: "authentication URL unavailable"))
             Log.service.error("Service.signIn invalid auth URL domain=\(domain) source=\(source.rawValue) ms=\(Int(Date().timeIntervalSince(started) * 1000))")
-            return
+            return .incomplete
         }
         let authSession = ServiceAuthSession(service: self, url: url, flowSession: flowSession)
         let attempt = String(authSession.id.uuidString.prefix(8))
         Log.service.info("Service.signIn presenting domain=\(domain) source=\(source.rawValue) attempt=\(attempt) host=\(authHost)")
         let outcome = await authSession.present(using: presenter)
-        let next = outcome == .signedIn
-            ? Auth.observed(AuthObservation(value: .signedIn, observedAt: Date()))
-            : previous.map(Auth.observed) ?? .observed(AuthObservation(value: .signedOut, observedAt: Date()))
+        let next: Auth
+        switch outcome {
+        case .signedIn: next = .observed(AuthObservation(value: .signedIn, observedAt: Date()))
+        case .acknowledged: next = authSession.observedAccess
+        default: next = previous.map(Auth.observed) ?? .observed(AuthObservation(value: .signedOut, observedAt: Date()))
+        }
         setAuth(next)
         if outcome == .signedIn {
             manager.actionScheduler.invalidate(self)
@@ -262,6 +319,11 @@ extension Service {
         }
         Log.service.info("Service.signIn done domain=\(domain) source=\(source.rawValue) attempt=\(attempt) outcome=\(outcome.rawValue) ms=\(Int(Date().timeIntervalSince(started) * 1000))")
         await manager.logAuthRetention(domain: domain, trigger: "interactive-sign-in", outcome: outcome.rawValue)
+        switch outcome {
+        case .signedIn: return .completed
+        case .acknowledged: return .acknowledged
+        default: return .incomplete
+        }
     }
 
     func signOut() async {
@@ -297,13 +359,13 @@ final class ServiceAccess {
     private var checkedAt: Date?
     private var revision = UUID()
     private var task: Task<Void, Never>?
-    private var requestTask: Task<Void, Error>?
+    private var requestTask: Task<Service.AccessRequestOutcome, Error>?
 
-    func request(_ service: Service, operation: @escaping @MainActor () async throws -> Void) async throws {
+    func request(_ service: Service, operation: @escaping @MainActor () async throws -> Service.AccessRequestOutcome) async throws -> Service.AccessRequestOutcome {
         if let requestTask { return try await requestTask.value }
         let task = Task { @MainActor in
             do {
-                try await operation()
+                return try await operation()
             } catch {
                 Log.service.warning("Service.access request failed domain=\(service.domain) error=\(LogPrivacy.text(error.localizedDescription))")
                 throw error
@@ -311,7 +373,7 @@ final class ServiceAccess {
         }
         requestTask = task
         defer { requestTask = nil }
-        try await task.value
+        return try await task.value
     }
 
     func didUpdate(_ auth: Service.Auth) {

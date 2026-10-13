@@ -81,7 +81,7 @@ extension Service {
                 return .failure(error)
             }
         }
-        if action.requireAuth {
+        if action.requireAuth, action.requireApproval || ServiceAuthenticationRecovery.serviceID != ObjectIdentifier(self) {
             let initialAuth = auth.logLabel
             let previousObservation = auth.observation
             await checkAccess(reason: .requireAuth)

@@ -64,26 +64,34 @@ struct InlineServiceAuthView: View {
     }
 
     var body: some View {
-        LivePageCard(
-            service: service,
-            fallbackSystemImage: "person.badge.key.fill",
-            title: name,
-            subtitle: String(localized: "Sign in to continue"),
-            mount: nil,
-            inlinePageAnchorID: session.flatMap { session in
-                pageMount.isInline(page: session.page, ownerID: session.id) && !isPresentedInSheet
-                    ? session.id
-                    : nil
-            },
-            isPresented: isPresentedInSheet,
-            placeholder: .progress(String(localized: "Sign in to continue")),
-            activate: nil,
-            expand: session.map { session in { expand(session) } },
-            cancel: cancel,
-            accessibilityIdentifier: A11yID.ConversationControls.Attach.signIn(domain),
-            expandAccessibilityIdentifier: A11yID.ConversationControls.Attach.signIn(domain) + ".expand",
-            cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.signInDismiss(domain)
-        )
+        VStack(spacing: Theme.Spacing.sm) {
+            LivePageCard(
+                service: service,
+                fallbackSystemImage: "person.badge.key.fill",
+                title: name,
+                subtitle: String(localized: "Sign in to continue"),
+                mount: nil,
+                inlinePageAnchorID: session.flatMap { session in
+                    pageMount.isInline(page: session.page, ownerID: session.id) && !isPresentedInSheet
+                        ? session.id
+                        : nil
+                },
+                isPresented: isPresentedInSheet,
+                placeholder: .progress(String(localized: "Sign in to continue")),
+                activate: nil,
+                expand: session.map { session in { expand(session) } },
+                cancel: cancel,
+                accessibilityIdentifier: A11yID.ConversationControls.Attach.signIn(domain),
+                expandAccessibilityIdentifier: A11yID.ConversationControls.Attach.signIn(domain) + ".expand",
+                cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.signInDismiss(domain)
+            )
+            if let session, !isPresentedInSheet {
+                ServiceSignInAcknowledgmentButton(
+                    accessibilityIdentifier: A11yID.ConversationControls.Attach.signInAcknowledge(domain),
+                    action: session.acknowledgeSignIn
+                )
+            }
+        }
     }
 }
 

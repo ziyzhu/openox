@@ -87,9 +87,9 @@
     "This deletes the file. Existing conversation references will show it as deleted." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这会删除文件。现有对话中的引用将显示文件已删除。" } } } },
     "Filter and sort files" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "筛选和排序文件" } } } },
     "Files & images" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件与图片" } } } },
-    "Profiles hold conversations, files, character, and memory. Keep several, switch anytime, and store locally or sync with iCloud." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "档案包含对话、文件、性格和记忆。可保留多个档案，随时切换，并在本地储存或通过 iCloud 同步。" } } } },
-    "This removes it from iCloud and all your devices — conversations, files, character and memory. This can't be undone." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这会从 iCloud 和你的所有设备中移除档案，包括对话、文件、性格和记忆。此操作无法撤销。" } } } },
-    "This removes it from this device — conversations, files, character and memory. This can't be undone." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这会从此设备中移除档案，包括对话、文件、性格和记忆。此操作无法撤销。" } } } },
+    "Profiles hold conversations, files, voice, and memory. Keep several, switch anytime, and store locally or sync with iCloud." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "档案包含对话、文件、表达风格和记忆。可保留多个档案，随时切换，并在本地储存或通过 iCloud 同步。" } } } },
+    "This removes it from iCloud and all your devices — conversations, files, voice and memory. This can't be undone." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这会从 iCloud 和你的所有设备中移除档案，包括对话、文件、表达风格和记忆。此操作无法撤销。" } } } },
+    "This removes it from this device — conversations, files, voice and memory. This can't be undone." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这会从此设备中移除档案，包括对话、文件、表达风格和记忆。此操作无法撤销。" } } } },
     "%lld files" : {
       "localizations" : {
         "en" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld file" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld files" } } } } },
@@ -2195,13 +2195,13 @@
         }
       }
     },
-    "Character" : {
-      "comment" : "The title of a screen where a user can edit text that describes a character, in this case, Ox.",
+    "Voice" : {
+      "comment" : "The title of the screen for editing how Ox talks.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "角色"
+            "value" : "表达风格"
           }
         }
       }
@@ -7043,13 +7043,13 @@
         }
       }
     },
-    "Ox's voice - how it talks and carries itself in every conversation. Edit to reshape its character. Markdown is fine; clear it to fall back to the default." : {
+    "Ox's voice - how it talks and carries itself in every conversation. Edit to reshape its voice. Markdown is fine; clear it to fall back to the default." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 的声音-它在每次对话中如何说话、如何举止。编辑即可重塑它的性格。支持 Markdown；清空则恢复为默认。"
+            "value" : "Ox 的声音-它在每次对话中如何说话、如何举止。编辑即可调整它的表达风格。支持 Markdown；清空则恢复为默认。"
           }
         }
       }
@@ -9288,6 +9288,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "登录模型提供商"
+          }
+        }
+      }
+    },
+    "I’ve signed in" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我已登录"
           }
         }
       }

@@ -55,7 +55,7 @@ struct ProfileFilesPage: View {
                             HStack(spacing: Theme.Spacing.md) {
                                 Image(systemName: "plus")
                                     .font(.system(.body, weight: .medium))
-                                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                                    .foregroundStyle(Theme.Colors.primary)
                                     .frame(width: 24)
                                 Text("Add folder")
                                     .font(Theme.Fonts.bodyMd)

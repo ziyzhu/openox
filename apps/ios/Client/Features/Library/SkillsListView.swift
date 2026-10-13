@@ -216,7 +216,6 @@ struct SkillLibraryRow: View {
                 Text(verbatim: "/\(skill.displayName)")
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
-                Text(verbatim: skill.owner.name).font(Theme.Fonts.caption).foregroundStyle(Theme.Colors.onSurfaceMuted)
                 Text(verbatim: skill.description)
                     .font(Theme.Fonts.caption)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
@@ -438,7 +437,7 @@ struct SkillEditorView: View {
                 services.removeAll { $0 == domain }
             },
             removeAccessibilityIdentifier: A11yID.Settings.skillServiceRemove(domain),
-            fill: Theme.Colors.chipOnBackground
+            fill: Theme.Colors.surface
         )
     }
 
@@ -446,7 +445,7 @@ struct SkillEditorView: View {
         Button {
             pickingServices = true
         } label: {
-            Chip(fill: Theme.Colors.chipOnBackground) {
+            Chip(fill: Theme.Colors.surface) {
                 Image(systemName: "plus")
                     .font(Theme.Icons.xs)
                 Text("Add service")

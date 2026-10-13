@@ -18,6 +18,7 @@ final class ServiceOperations {
     let begin: (String, JSONValue, String) -> UUID
     let finish: (UUID, Result<JSONValue?, Error>) -> Void
     let native: NativeServiceOperations
+    let authenticationRecovery: ServiceAuthenticationRecoveryStore
 
     init(
         serviceManager: ServiceManager,
@@ -36,7 +37,8 @@ final class ServiceOperations {
         botControlRequired: @escaping (Service, JSONValue, Service.ServiceWebPage) -> Void = { _, _, _ in },
         begin: @escaping (String, JSONValue, String) -> UUID,
         finish: @escaping (UUID, Result<JSONValue?, Error>) -> Void,
-        native: NativeServiceOperations
+        native: NativeServiceOperations,
+        authenticationRecovery: ServiceAuthenticationRecoveryStore
     ) {
         self.serviceManager = serviceManager
         self.conversationOwner = conversationOwner
@@ -52,6 +54,7 @@ final class ServiceOperations {
         self.begin = begin
         self.finish = finish
         self.native = native
+        self.authenticationRecovery = authenticationRecovery
     }
 
     static func encodeToJSON<T: Encodable>(_ value: T) throws -> JSONValue {
@@ -143,14 +146,20 @@ final class ServiceOperations {
                     approve: approve, receiveFiles: receiveFiles
                 )
             } else {
-                result = await service.invokeAction(
-                    actionID,
-                    args: input,
-                    onBotControlRequired: { page in
-                        self.botControlRequired(service, input, page)
-                    },
-                    approve: approve
-                )
+                let serviceID = authenticationRecovery.consume(service, action: action)
+                if serviceID != nil {
+                    Log.service.info("Service.auth recovery domain=\(service.domain) action=\(actionID) scope=single-read")
+                }
+                result = await ServiceAuthenticationRecovery.$serviceID.withValue(serviceID) {
+                    await service.invokeAction(
+                        actionID,
+                        args: input,
+                        onBotControlRequired: { page in
+                            self.botControlRequired(service, input, page)
+                        },
+                        approve: approve
+                    )
+                }
             }
             return try result.get()
         }
@@ -728,26 +737,26 @@ final class ServiceOperations {
             throw RuntimeError.bridge("ox.service.signIn: \(domain) declares no sign-in handoff")
         }
         return try await tracked(Actions.serviceSignIn, .object(["domain": .string(domain)]), purpose: purpose) {
+            authenticationRecovery.clear()
             await service.checkAccess(policy: .current, reason: .modelSignIn)
             if service.auth.isSignedOut {
                 await service.attemptSilentSignIn(reason: .modelSignIn)
             }
             if service.signInState.isAuthenticated {
                 Log.session.info("bridge.service.signIn already authenticated domain=\(domain) auth=\(service.signInState.rawValue)")
-                return .object([
-                    "domain": .string(domain),
-                    "signedIn": .bool(true),
-                ])
+                return service.accessResult()
             }
             let control = ServiceControl.signIn(domain: domain, serviceName: service.title)
             Log.session.info("bridge.service.signIn handoff domain=\(domain) auth=\(service.signInState.rawValue)")
-            guard await presentControl(control, service) != nil else {
+            guard let result = await presentControl(control, service) else {
                 throw OxFunctionError(code: "handoff_incomplete", message: "ox.service.signIn: the user cancelled or sign-in failed.", recovery: "Do not reopen sign-in automatically. Ask the user whether to continue, then inspect the service's sign-in state before trying again.")
             }
-            return .object([
-                "domain": .string(domain),
-                "signedIn": .bool(true),
-            ])
+            try Task.checkCancellation()
+            if result.objectValue?["completion"]?.stringValue == "acknowledged", service.isWebService {
+                authenticationRecovery.acknowledge(service)
+                return result
+            }
+            return service.accessResult()
         }
     }
 

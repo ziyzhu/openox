@@ -29,7 +29,8 @@ export function iosTarget(device: string) {
         ? element.AXUniqueId === selector.id : element.AXLabel?.includes(selector.label ?? ""));
       const match = matches.find(element => element.frame && element.frame.width > 0 && element.frame.height > 0);
       const ready = options.missing ? matches.length === 0 : !!match;
-      const next = ready ? JSON.stringify(match?.frame ?? "missing") : undefined;
+      const frame = match?.frame;
+      const next = ready ? JSON.stringify(frame ? [frame.x, frame.y, frame.width, frame.height] : "missing") : undefined;
       if (next !== signature) { signature = next; since = Date.now(); }
       if (ready && Date.now() - since >= (options.stable ?? 0)) return match;
       await Bun.sleep(100);

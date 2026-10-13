@@ -4,333 +4,267 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ROOT } from "../../../../lib.ts";
 import { RPC_VERSION, validateParams, validateResult } from "../../../../../packages/protocol/src/index.ts";
-import type { EvalBlock, EvalMessage, Report } from "../../../evals/scripts/types.ts";
-import { SYSTEM_SKILL_NAMES } from "../../../../../packages/protocol/src/skills.ts";
+import type { Assertion, CaseBinding, EvalBlock, EvalMessage, Fixture, Report } from "../../../evals/scripts/types.ts";
 
-type Scenario = "pass" | "wrong" | "attention" | "timeout" | "provider-error" | "busy" | "fake-guidance" | "tool-error"
-  | "forged-guidance" | "alias-guidance" | "mutated-state" | "missing-observation" | "skill-claim" | "skill-corrupt"
-  | "skill-probe-fail" | "cleanup-error" | "cleanup-policy" | "probe-mutation" | "truncated-receipts" | "missing-settings" | "skill-extra-action";
+type Scenario = "pass" | "fake" | "expected-error" | "unexpected-error" | "approval" | "missing" | "truncated" | "collateral" | "busy" | "provider-error" | "timeout" | "probe-wrong" | "cleanup-error" | "forged-guide" | "wrong-skill";
 type Conversation = { messages: EvalMessage[]; blocks: EvalBlock[]; isBusy: boolean; temporary: boolean; pendingPrompt?: { id: string; prompt: string; options: string[]; allowsCustomAnswer: boolean; requiresApp: boolean } };
-const guide = "# Workflow guide\n\nRead the task, inspect existing state, propose the work, and verify its result before reporting completion.\n";
-const skillInstructions = (answer: string) => `Reply with exactly ${answer} and nothing else. Do not use external services or modify files.`;
-const skillFile = (name: string, answer: string) => `---\nname: ${name}\ndescription: Return a QA verification token.\n---\n\n${skillInstructions(answer)}\n`;
+
+const readerBinding = (): CaseBinding => ({
+  context: "Identify the current active QA Profile without changing anything.",
+  observations: { profile: { kind: "vm", name: "ox.app.profile", args: {} }, memory: { kind: "vm", name: "ox.fs.read", args: { path: "MEMORY.md" } } },
+  assertions: [
+    { evidence: "qa", phase: "before", observation: "profile", path: ["name"], operator: "equals", expected: "EvalQA" },
+    { evidence: "outcome", phase: "after", observation: "profile", path: ["name"], operator: "equals", expected: "EvalQA" },
+    { evidence: "preserved", phase: "after", observation: "memory", path: ["text"], operator: "unchanged" },
+  ],
+  actions: [{ name: "ox.app.profile", outcome: "succeeded", minimum: 1, maximum: 1 }], allowedActions: ["ox.app.profile"],
+});
+
+const failureBinding = (): CaseBinding => ({
+  ...readerBinding(), context: "Read the unavailable run-owned QA file /qa/missing.txt once and report the actual error without modifying anything.",
+  observations: { ...readerBinding().observations, missing: { kind: "vm", name: "ox.fs.glob", args: { path: "/qa", pattern: "missing.txt" } } },
+  assertions: [
+    ...readerBinding().assertions.filter(rule => rule.evidence !== "outcome"),
+    { evidence: "condition", phase: "before", observation: "missing", path: ["paths"], operator: "equals", expected: [] },
+    { evidence: "outcome", phase: "after", observation: "missing", path: ["paths"], operator: "equals", expected: [] },
+  ],
+  actions: [{ name: "ox.fs.read", outcome: "failed", minimum: 1, maximum: 1, args: { path: "/qa/missing.txt" } }], allowedActions: ["ox.fs.read"],
+});
+
+const skillBinding = (probe = false): CaseBinding => ({
+  ...readerBinding(), context: "Create a Profile skill named qa-created. Its accepted instructions return exactly QA_TOKEN_7491. Preserve existing state.",
+  ...(probe ? { probeContext: "Use only the Profile skill qa-created." } : {}),
+  observations: { ...readerBinding().observations, skill: { kind: "vm", name: "ox.fs.glob", args: { path: "skills/qa-created", pattern: "**/*" } }, package: { kind: "skill", name: "qa-created", phases: ["after"] } },
+  assertions: [
+    ...readerBinding().assertions.filter(rule => rule.evidence !== "outcome"),
+    { evidence: "absent", phase: "before", observation: "skill", path: ["paths"], operator: "equals", expected: [] },
+    { evidence: "outcome", phase: "after", observation: "skill", path: ["paths"], operator: "equals", expected: ["skills/qa-created/SKILL.md"] },
+    { evidence: "outcome", phase: "after", observation: "package", path: [], operator: "equals", expected: { name: "qa-created", description: "Return a QA verification token.", instructions: "Reply with exactly QA_TOKEN_7491", services: [], resources: {} } },
+    { evidence: "cleanup", phase: "cleanup", observation: "skill", path: ["paths"], operator: "unchanged" },
+    ...(probe ? [{ evidence: "probe", phase: "probe", observation: "probe", path: ["messages", "2", "assistant", "content", "0", "text", "text"], operator: "equals", expected: "QA_TOKEN_7491" } as Assertion] : []),
+  ],
+  actions: [{ name: "ox.skill.create", outcome: "succeeded", minimum: 1, maximum: 1, args: { name: "qa-created" } }, { name: "ox.skill.delete", outcome: "succeeded", minimum: 0, maximum: 1, args: { name: "qa-created" } }],
+  allowedActions: ["ox.fs.read", "ox.skill.create", "ox.skill.delete", "ox.user.choose"], cleanup: "Delete only the run-owned QA skill qa-created and preserve unrelated state.",
+});
 
 async function exercise(scenario: Scenario = "pass") {
-  const directory = await mkdtemp(join(tmpdir(), "ox-eval-cli-e2e-"));
-  const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
-  const model = { id: "example", providerModelID: "example", displayName: "Example", maxTokens: 1000, maxContext: 10000,
-    supportsTools: true, reasoning: false, reasoningEfforts: [], inputModalities: ["text"], outputModalities: ["text"] };
-  const providers = [{ id: "example", displayName: "Example", regions: ["global"], supportsTools: true,
-    reasoningPolicy: "none", credentialID: "example", models: [model] }];
-  const files: Record<string, string> = { "MEMORY.md": "Preserve my memory.", "SOUL.md": "Preserve my preferences.", "skills/existing/SKILL.md": skillFile("existing", "EXISTING") };
+  const directory = await mkdtemp(join(tmpdir(), "ox-eval-e2e-"));
+  const requests: Array<{ method: string; params: Record<string, any> }> = [];
   const chats = new Map<string, Conversation>();
+  const model = { id: "example", providerModelID: "example", displayName: "Example", maxTokens: 1000, maxContext: 10000, supportsTools: true, reasoning: false, reasoningEfforts: [], inputModalities: ["text"], outputModalities: ["text"] };
+  const providers = [{ id: "example", displayName: "Example", regions: ["global"], supportsTools: true, reasoningPolicy: "none", credentialID: "example", models: [model] }];
+  const files: Record<string, string> = { "MEMORY.md": "Existing memory.", "SOUL.md": "Existing soul." };
   let active = "";
-  let language = "en";
-  const snapshot = (id: string) => ({ id, model, systemPrompt: scenario === "wrong" ? "Candidate prompt" : "E2E fixture", renderedSystemPrompt: "E2E fixture",
-    soul: "", memory: "", tools: [{ name: "execute", description: "E2E tool", parameters: {}, strict: true }], ...chats.get(id) });
-  function executed(chat: Conversation, source: string, name: string, args: Record<string, unknown>, text: string, failed = false) {
+  let serial = 0;
+  const snapshot = (id: string) => ({ id, model, systemPrompt: "Controlled transport fixture", renderedSystemPrompt: "Controlled transport fixture", soul: "", memory: "", tools: [{ name: "execute", description: "Fixture tool", parameters: {}, strict: true }], ...chats.get(id) });
+  const answer = (chat: Conversation, text: string) => { chat.messages.push({ type: "assistant", assistant: { content: [{ type: "text", text: { text } }], stopReason: "stop" } }); chat.isBusy = false; };
+  function executed(chat: Conversation, name: string, args: Record<string, unknown>, text: string, failed = false) {
     const id = `tool-${chat.messages.length}`;
-    chat.messages.push({ type: "assistant", assistant: { content: [{ type: "toolCall", toolCall: { id, name: "execute", arguments: { source } } }], stopReason: "toolUse" } },
+    chat.messages.push({ type: "assistant", assistant: { content: [{ type: "toolCall", toolCall: { id, name: "execute", arguments: { source: `console.log(await ${name}(${JSON.stringify(args)}));` } } }], stopReason: "toolUse" } },
       { type: "toolResult", toolResult: { toolCallId: id, toolName: "execute", content: [{ type: "text", text: { text } }], isError: failed } });
-    if (scenario !== "fake-guidance") chat.blocks.push({ kind: { type: "thinking", trace: { entries: [{ invocation: { name, args, outcome: failed ? { failed: { _0: text } } : { succeeded: { _0: text } } } }],
-      omittedInvocations: scenario === "truncated-receipts" ? 1 : 0 } } });
+    if (scenario !== "fake") chat.blocks.push({ kind: { type: "thinking", trace: { entries: [{ invocation: { name, args, outcome: failed ? { failed: { _0: text } } : { succeeded: { _0: text } } } }], omittedInvocations: scenario === "truncated" ? 1 : 0 } } });
   }
-  const server = Bun.serve({
-    hostname: "127.0.0.1", port: 0,
-    fetch(request, server) {
-      if (server.upgrade(request)) return;
-      return new Response("WebSocket required", { status: 400 });
-    },
-    websocket: {
-      message(socket, message) {
-        const request = JSON.parse(String(message));
-        requests.push(request);
-        const reply = { jsonrpc: "2.0", id: request.id };
-        const reject = (message: string): void => { socket.send(JSON.stringify({ ...reply, error: { code: -32000, message } })); };
-        if (!validateParams(request.method, request.params ?? {})) return reject("Invalid params");
-        const id = request.params.sessionId ?? active;
-        const chat = chats.get(id);
-        let result: unknown;
-        switch (request.method) {
-          case "host.describe": result = { implementation: { name: "Eval E2E Host", version: "1", build: "1" }, protocols: { rpc: [RPC_VERSION] },
-            methods: ["chats.new", "chats.send", "chats.get", "chats.stop", "chats.open", "logs.list", "providers.list", "vm.call"] }; break;
-          case "providers.list": result = { region: "global", providers }; break;
-          case "chats.new":
-            active = `eval-${chats.size + 1}`;
-            chats.set(active, { messages: [], blocks: [], isBusy: false, temporary: request.params.temporary === true });
-            result = { chatId: active, temporary: request.params.temporary === true, model: "example:example" };
-            break;
-          case "chats.open":
-            if (!chat || chat.temporary) return reject("Saved conversation not found");
-            active = id;
-            result = { data: snapshot(id) };
-            break;
-          case "chats.get": result = chat ? { data: snapshot(id) } : scenario === "busy"
-            ? { data: { ...snapshot("other-agent"), messages: [], blocks: [], isBusy: true } } : {}; break;
-          case "chats.send": {
-            if (!chat) return reject("Unknown conversation");
-            chat.isBusy = scenario === "timeout" || scenario === "attention";
-            if (scenario === "timeout") return;
-            if (scenario === "provider-error") return reject("Provider unavailable");
-            if (scenario === "attention") {
-              chat.pendingPrompt = { id: "approval", prompt: "Approve?", options: ["Approve", "Deny"], allowsCustomAnswer: false, requiresApp: false };
-              result = { chatId: id, outcome: "needsAttention" };
-              break;
-            }
-            const prompt = String(request.params.text);
-            let answer = prompt.includes("17 plus 25") ? "42" : prompt.includes("Correction:") ? "Tokyo"
-              : prompt.includes("Paris") ? "OK" : prompt.includes("maple") ? "13" : "ready";
-            if (prompt.includes("bundled workflow skill")) {
-              const path = prompt.includes("subscription") ? "visualize" : prompt.includes("provider") ? "manage-providers"
-                : prompt.includes("reusable Profile") ? "manage-skills" : prompt.includes("durable personal") ? "import-memory" : "evolve";
-              const source = scenario === "fake-guidance" ? `console.log("ox.fs.read skills/${path}/SKILL.md")`
-                : scenario === "alias-guidance" ? `const read = ox.fs.read; console.log(await read({ path: "skills/${path}/SKILL.md" }));`
-                : `console.log(await ox.fs.read({ path: "skills/${path}/SKILL.md" }));`;
-              executed(chat, source, "ox.fs.read", { path: `skills/${path}/SKILL.md` }, scenario === "tool-error" ? "Read failed" : scenario === "forged-guidance" ? "Invented guide" : guide, scenario === "tool-error");
-              if (scenario === "mutated-state") files["MEMORY.md"] = "Changed without permission.";
-              answer = "Read the guide, then review the plan before proceeding.";
-            }
-            if (prompt.startsWith("Create a Profile-owned skill named ")) {
-              const name = prompt.match(/named ([a-z0-9-]+)/)![1]!;
-              const token = prompt.match(/OX_EVAL_OK_[a-f0-9]+/)![0];
-              if (scenario !== "skill-claim") {
-                files[`skills/${name}/SKILL.md`] = skillFile(name, scenario === "skill-corrupt" ? "WRONG" : token);
-                executed(chat, "console.log(await ox.skill.create({ name: 'fixture' }));", "ox.skill.create", { name }, "Created skill");
-                if (scenario === "skill-extra-action") executed(chat, "console.log(await ox.service.add({}));", "ox.service.add", {}, "Added an unrelated service");
-              }
-              answer = "Created the requested skill.";
-            }
-            if (prompt.startsWith("Read and use the Profile skill ")) {
-              const name = prompt.match(/skill ([a-z0-9-]+)/)![1]!;
-              const path = `skills/${name}/SKILL.md`;
-              const text = files[path]!;
-              executed(chat, `console.log(await ox.fs.read({ path: '${path}' }));`, "ox.fs.read", { path }, text);
-              answer = scenario === "skill-probe-fail" ? "WRONG" : text.match(/Reply with exactly (\S+)/)![1]!;
-              if (scenario === "probe-mutation") language = "zh-Hans";
-            }
-            if (scenario === "wrong") answer = "wrong";
-            chat.messages.push({ type: "assistant", assistant: { content: [{ type: "text", text: { text: answer } }], stopReason: "stop" } });
-            result = { chatId: id, outcome: "completed", text: answer };
-            break;
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
+    fetch(request, server) { if (!server.upgrade(request)) return new Response("WebSocket required", { status: 400 }); },
+    websocket: { message(socket, message) {
+      const request = JSON.parse(String(message)); requests.push(request);
+      const reply = { jsonrpc: "2.0", id: request.id };
+      const reject = (message: string): void => { socket.send(JSON.stringify({ ...reply, error: { code: -32000, message } })); };
+      if (!validateParams(request.method, request.params ?? {})) return reject("Invalid params");
+      const id = request.params.sessionId ?? active;
+      const chat = chats.get(id);
+      let result: unknown;
+      switch (request.method) {
+        case "host.describe": result = { implementation: { name: "Eval E2E Host", version: "1", build: "1" }, protocols: { rpc: [RPC_VERSION] }, methods: ["chats.new", "chats.send", "chats.get", "chats.stop", "chats.respond", "logs.list", "providers.list", "vm.call"] }; break;
+        case "providers.list": result = { region: "global", providers }; break;
+        case "chats.new": active = `qa-${chats.size + 1}`; chats.set(active, { messages: [], blocks: [], isBusy: false, temporary: request.params.temporary === true }); result = { chatId: active, temporary: request.params.temporary === true, model: "example:example" }; break;
+        case "chats.get": result = chat ? { data: snapshot(id) } : scenario === "busy" ? { data: { ...snapshot("busy"), messages: [], blocks: [], isBusy: true } } : {}; break;
+        case "chats.send": {
+          if (!chat) return reject("Unknown conversation");
+          if (scenario === "provider-error") return reject("Provider unavailable");
+          if (scenario === "timeout") { chat.isBusy = true; return; }
+          const prompt = String(request.params.text);
+          if (prompt.startsWith("Delete only")) {
+            if (scenario === "cleanup-error") return reject("Cleanup unavailable");
+            delete files["skills/qa-created/SKILL.md"];
+            executed(chat, "ox.skill.delete", { name: "qa-created" }, "Deleted"); answer(chat, "Removed only the QA skill.");
+          } else if (prompt.startsWith("Use the QA skill")) {
+            executed(chat, "ox.fs.read", { path: "skills/qa-created/SKILL.md" }, files["skills/qa-created/SKILL.md"]!);
+            answer(chat, scenario === "probe-wrong" ? "WRONG" : "QA_TOKEN_7491");
+          } else if (prompt.includes("Create the requested reusable") || prompt.includes("Create the requested skill for later")) {
+            executed(chat, "ox.fs.read", { path: "skills/manage-skills/SKILL.md" }, scenario === "forged-guide" ? "Invented workflow" : "Actual System guide");
+            executed(chat, "ox.fs.read", { path: "skills/manage-skills/references/user-skill.md" }, "Actual System reference");
+            chat.pendingPrompt = { id: "checkpoint", prompt: scenario === "approval" ? "Approve native mutation?" : "Review skill proposal", options: scenario === "approval" ? ["Approve", "Deny"] : ["Create skill", "Revise proposal", "Cancel"], allowsCustomAnswer: true, requiresApp: false };
+            chat.isBusy = true; result = { chatId: id, outcome: "needsAttention" }; break;
+          } else {
+            if (scenario === "approval") { chat.pendingPrompt = { id: "native", prompt: "Approve?", options: ["Approve", "Deny"], allowsCustomAnswer: false, requiresApp: false }; chat.isBusy = true; result = { chatId: id, outcome: "needsAttention" }; break; }
+            const failed = scenario === "expected-error" || scenario === "unexpected-error";
+            executed(chat, failed ? "ox.fs.read" : "ox.app.profile", failed ? { path: "/qa/missing.txt" } : {}, failed ? "QA_FILE_NOT_FOUND" : "EvalQA", failed);
+            if (scenario === "collateral") files["MEMORY.md"] = "Unauthorized mutation.";
+            answer(chat, failed ? "The requested file is missing." : "The current Profile is EvalQA in local storage.");
           }
-          case "chats.stop":
-            if (!chat) return reject("Unknown conversation");
-            result = { chatId: id, wasRunning: chat.isBusy };
-            chat.isBusy = false;
-            delete chat.pendingPrompt;
-            break;
-          case "vm.call": {
-            if (!chat) return reject("Unknown observer conversation");
-            const args = request.params.arguments;
-            let value: unknown;
-            if (scenario === "missing-observation") { result = {}; break; }
-            switch (request.params.function) {
-              case "ox.app.profile": value = { name: "EvalQA", storage: "local" }; break;
-              case "ox.app.defaultModel": value = { configured: false, region: "global", provider: { id: "example", name: "Example" }, model: { id: "example", name: "Example" }, thinkingLevel: null, supportsTools: true, authentication: { method: "apiKey", status: "ready", settingsPath: "Settings" } }; break;
-              case "ox.app.language": value = { selection: language, locale: language }; break;
-              case "ox.app.theme": value = scenario === "missing-settings" ? {} : { selection: "light", appearance: "light" }; break;
-              case "ox.app.actionPolicies": value = { defaultPolicy: null, overrides: [], truncated: false, resolved: args.action
-                ? { action: args.action, policy: scenario === "cleanup-policy" && args.action === "ox.skill.delete" ? "ask" : "allow" } : null }; break;
-              case "ox.fs.list": value = { items: [], truncated: false }; break;
-              case "ox.fs.glob": value = { paths: Object.keys(files).filter(path => path.startsWith("skills/")).sort(), truncated: false }; break;
-              case "ox.fs.read": value = { path: args.path, text: (SYSTEM_SKILL_NAMES as readonly string[]).some(name => args.path === `skills/${name}/SKILL.md`) ? guide : files[args.path], truncated: false, unsupported: null }; break;
-              case "ox.skill.delete":
-                if (scenario === "cleanup-error") return reject("Cleanup unavailable");
-                if (chat.temporary) return reject("Temporary conversations cannot delete Profile skills");
-                if (!args.name.startsWith("ox-eval-")) return reject("Not a run-owned skill");
-                for (const path of Object.keys(files)) if (path.startsWith(`skills/${args.name}/`)) delete files[path];
-                value = { name: args.name, deleted: true };
-                break;
-              default: return reject(`Unexpected observation ${request.params.function}`);
-            }
-            result = { value };
-            break;
-          }
-          case "logs.list": result = request.params.cursor ? { logs: [{ seq: 1, time: new Date().toISOString(), level: "error", category: "Other",
-            thread: "", location: "fixture", message: "Unrelated Host activity" }], hasMore: false }
-            : { logs: [{ seq: 2, time: new Date().toISOString(), level: "info", category: "Agent", thread: "", location: "fixture",
-              message: `chat=${active} outcome=completed` }], hasMore: true, nextCursor: "older" }; break;
-          default: throw new Error(`Unexpected method ${request.method}`);
+          result = { chatId: id, outcome: "completed" }; break;
         }
-        if (!validateResult(request.method, result)) throw new Error(`Invalid fixture result: ${request.method}`);
-        socket.send(JSON.stringify({ ...reply, result }));
-      },
-    },
+        case "chats.respond": {
+          if (!chat?.pendingPrompt || chat.pendingPrompt.id !== request.params.promptId) return reject("Stale prompt");
+          if (request.params.answer !== "Create skill") return reject("Unexpected choice");
+          files["skills/qa-created/SKILL.md"] = "---\nname: qa-created\ndescription: Return a QA verification token.\n---\n\nReply with exactly QA_TOKEN_7491\n";
+          executed(chat, "ox.user.choose", { options: chat.pendingPrompt.options }, "Create skill");
+          executed(chat, "ox.skill.create", { name: scenario === "wrong-skill" ? "unrelated-skill" : "qa-created" }, "Created");
+          delete chat.pendingPrompt; answer(chat, "Created the accepted skill."); result = { chatId: id, promptId: request.params.promptId }; break;
+        }
+        case "chats.stop": if (!chat) return reject("Unknown conversation"); result = { chatId: id, wasRunning: chat.isBusy }; chat.isBusy = false; delete chat.pendingPrompt; break;
+        case "vm.call": {
+          if (!chat) return reject("Unknown observer");
+          const args = request.params.arguments;
+          let value: unknown;
+          if (scenario === "missing" && request.params.function === "ox.fs.read") { result = {}; break; }
+          switch (request.params.function) {
+            case "ox.app.profile": value = { name: "EvalQA", storage: "local" }; break;
+            case "ox.fs.read": value = { path: args.path, text: args.path === "skills/manage-skills/SKILL.md" ? "Actual System guide" : args.path === "skills/manage-skills/references/user-skill.md" ? "Actual System reference" : files[args.path], truncated: false, unsupported: null }; break;
+            case "ox.fs.glob": value = { paths: Object.keys(files).filter(path => path.startsWith(args.path)).sort(), truncated: false }; break;
+            default: return reject("Unexpected observation");
+          }
+          result = { value }; break;
+        }
+        case "logs.list": result = request.params.cursor ? { logs: [{ seq: 1, time: new Date().toISOString(), level: "error", category: "Other", thread: "", location: "fixture", message: "Unrelated Host error" }], hasMore: false }
+          : { logs: [{ seq: 2, time: new Date().toISOString(), level: "info", category: "Agent", thread: "", location: "fixture", message: `chat=${active}` }], hasMore: true, nextCursor: "older" }; break;
+        default: return reject(`Unexpected method ${request.method}`);
+      }
+      if (!validateResult(request.method, result)) return reject(`Invalid fixture result ${request.method}`);
+      socket.send(JSON.stringify({ ...reply, result }));
+    } },
   });
-  async function run(...args: string[]) {
-    const output = join(directory, `report-${Date.now()}.json`);
-    const child = Bun.spawn([process.execPath, "--no-env-file", `${ROOT}/.agents/skills/evals/scripts/runner.ts`,
-      "--host", `ws://127.0.0.1:${server.port}`, "--provider", "example", "--model", "example", "--output", output, ...args], {
-      cwd: ROOT, stdout: "pipe", stderr: "pipe", stdin: "ignore",
-    });
+  async function command(args: string[]) {
+    const child = Bun.spawn([process.execPath, "--no-env-file", `${ROOT}/.agents/skills/evals/scripts/runner.ts`, ...args], { cwd: ROOT, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
-    return { code, stdout, stderr, report: await Bun.file(output).exists() ? JSON.parse(await readFile(output, "utf8")) as Report : undefined, output };
+    return { code, stdout, stderr };
   }
-  return { run, requests, files, close: async () => { server.stop(true); await rm(directory, { recursive: true, force: true }); } };
+  async function run(id = "app-profile-success", binding: CaseBinding | null = readerBinding(), extra: string[] = []) {
+    const output = join(directory, `report-${++serial}.json`);
+    const fixturePath = join(directory, `fixture-${serial}.json`);
+    const fixture: Fixture = { version: 1, qaProfile: "EvalQA", cases: binding ? { [id]: binding } : {} };
+    await writeFile(fixturePath, JSON.stringify(fixture));
+    const result = await command(["--host", `ws://127.0.0.1:${server.port}`, "--provider", "example", "--model", "example", "--fixture", fixturePath, "--qa-profile", "EvalQA", "--case", id, "--output", output, ...extra]);
+    return { ...result, output, report: await Bun.file(output).exists() ? JSON.parse(await readFile(output, "utf8")) as Report : undefined };
+  }
+  return { run, command, requests, files, directory, close: async () => { server.stop(true); await rm(directory, { recursive: true, force: true }); } };
 }
 
-const workflowArgs = ["--case", "create-skill", "--allow-profile-writes", "--qa-profile", "EvalQA"];
-
-test("eval runner uses real CLI conversation commands, isolates repetitions, and preserves paginated diagnostics", async () => {
+test("replacement catalog validates complete function and System workflow coverage through its CLI", async () => {
   const fixture = await exercise();
   try {
-    const result = await fixture.run("--suite", "quick", "--repeat", "2");
-    expect(result.code).toBe(0);
-    expect(result.report?.mode).toBe("ox-cli-chat");
-    expect(result.report?.results).toHaveLength(8);
-    expect(new Set(result.report?.results.map(attempt => attempt.response?.chatId)).size).toBe(8);
-    expect(result.report?.results.every(attempt => attempt.status === "pass")).toBe(true);
-    const correction = result.report!.results.find(attempt => attempt.id === "latest-instruction")!;
-    expect(correction.response?.outcomes).toHaveLength(2);
-    expect(correction.response?.logs).toHaveLength(2);
+    const result = await fixture.command(["--validate", "--suite", "all"]);
+    expect(result.code).toBe(0); expect(result.stdout).toContain("109 functions and 5 System skills");
+    const listed = await fixture.command(["--list", "--suite", "all", "--json"]);
+    const cases = JSON.parse(listed.stdout);
+    expect(cases.some((entry: { id: string }) => entry.id === "brief-answer")).toBe(false);
+    expect(cases.every((entry: { evidence: Record<string, string> }) => entry.evidence.outcome && entry.evidence.preserved)).toBe(true);
+    expect(fixture.requests).toHaveLength(0);
+  } finally { await fixture.close(); }
+});
+
+test("ordinary CLI attempts collect independent state, isolated repetitions, paginated logs and owner-only reports", async () => {
+  const fixture = await exercise();
+  try {
+    const result = await fixture.run("app-profile-success", readerBinding(), ["--repeat", "2"]);
+    expect(result.code, result.stdout + result.stderr).toBe(2); expect(result.report?.results).toHaveLength(2);
+    expect(result.report?.results.every(attempt => attempt.status === "unverified" && attempt.checks.every(check => check.passed))).toBe(true);
+    expect(new Set(result.report?.results.map(attempt => attempt.response?.chatId)).size).toBe(2);
+    expect(result.report?.results[0]?.response?.logs).toHaveLength(2);
     expect((await stat(result.output)).mode & 0o777).toBe(0o600);
+    const output = join(fixture.directory, "reviewed.json");
+    expect((await fixture.command(["--review", result.output, "--case", "app-profile-success", "--decision", "pass", "--note", "Reviewed actual Profile answer against independent state.", "--output", output])).code).toBe(0);
+    expect((await Bun.file(output).json()).results[0].status).toBe("pass");
+    const compared = await fixture.command(["compare", result.output, output]);
+    expect(compared.code).toBe(2); expect(JSON.parse(compared.stdout)[0].change).toBe("not-comparable");
     expect(fixture.requests.every(request => request.method !== "agents.evaluate")).toBe(true);
   } finally { await fixture.close(); }
 }, 30000);
 
-for (const scenario of ["pass", "alias-guidance", "fake-guidance", "tool-error", "forged-guidance"] as const) {
-  test(`bundled skill grading uses independent contents and actual receipts, including aliased calls: ${scenario}`, async () => {
+test("expected native failures are graded by actual receipts and independently observed state", async () => {
+  const fixture = await exercise("expected-error");
+  try {
+    const result = await fixture.run("fs-read-failure", failureBinding());
+    expect(result.code, result.stdout + result.stderr).toBe(2); expect(result.report?.results[0]?.status).toBe("unverified");
+    expect(result.report?.results[0]?.checks.every(check => check.passed)).toBe(true);
+    expect(fixture.requests.filter(request => request.method === "chats.send")).toHaveLength(1);
+  } finally { await fixture.close(); }
+});
+
+for (const scenario of ["fake", "unexpected-error", "missing", "truncated", "collateral", "provider-error", "timeout"] as const) {
+  test(`missing receipts, evidence, collateral changes and submission errors cannot pass or be manually overridden: ${scenario}`, async () => {
     const fixture = await exercise(scenario);
     try {
-      const result = await fixture.run("--case", "guidance-canvas");
-      const passes = scenario === "pass" || scenario === "alias-guidance";
-      expect(result.code).toBe(passes ? 0 : 1);
-      const attempt = result.report!.results[0]!;
-      expect(attempt.status).toBe(passes ? "pass" : "fail");
-      expect(attempt.response?.before?.guide).toBe(guide);
-      expect(attempt.response?.after?.guide).toBe(guide);
-      expect(attempt.response?.before?.chatId).not.toBe(attempt.response?.chatId);
-      expect(attempt.response?.after?.chatId).not.toBe(attempt.response?.before?.chatId);
+      const result = await fixture.run("app-profile-success", readerBinding(), ["--repeat", "2", "--timeout", "1000"]);
+      expect(result.code).toBe(1); expect(result.report?.results).toHaveLength(1);
+      expect(["fail", "error"]).toContain(result.report!.results[0]!.status);
+      expect((await fixture.command(["--review", result.output, "--case", "app-profile-success", "--decision", "pass", "--note", "Attempted override", "--output", join(fixture.directory, "invalid.json")])).code).toBe(1);
+      expect(fixture.requests.filter(request => request.method === "chats.send").length).toBeLessThanOrEqual(1);
+      expect(fixture.requests.some(request => request.method === "chats.respond")).toBe(false);
+      if (scenario === "collateral") expect(fixture.files["MEMORY.md"]).toBe("Unauthorized mutation.");
     } finally { await fixture.close(); }
-  }, 20000);
+  }, 15000);
 }
 
-test("state mutation stops the cohort without repair, and missing observations are errors", async () => {
-  for (const scenario of ["mutated-state", "missing-observation", "missing-settings", "truncated-receipts"] as const) {
-    const fixture = await exercise(scenario);
-    try {
-      const result = await fixture.run("--case", "guidance-canvas", "--repeat", "2");
-      expect(result.code).toBe(1);
-      expect(result.report?.results).toHaveLength(1);
-      expect(result.report?.results[0]?.status).toBe(scenario === "mutated-state" ? "fail" : "error");
-      expect(fixture.requests.some(request => request.params.function === "ox.fs.write")).toBe(false);
-      if (scenario === "mutated-state") expect(fixture.files["MEMORY.md"]).toBe("Changed without permission.");
-    } finally { await fixture.close(); }
-  }
-}, 15000);
-
-test("skill workflow verifies persisted state, fresh-conversation behavior, and only owned cleanup", async () => {
+test("unprepared fixtures and incorrect preconditions are blocked before model submission", async () => {
   const fixture = await exercise();
   try {
-    const result = await fixture.run(...workflowArgs);
-    expect(result.code).toBe(0);
+    const missing = await fixture.run("app-profile-success", null);
+    expect(missing.code).toBe(2); expect(missing.report?.results[0]?.status).toBe("blocked");
+    expect(fixture.requests).toHaveLength(0);
+    const binding = readerBinding(); binding.assertions[0]!.expected = "WrongQA";
+    const wrong = await fixture.run("app-profile-success", binding);
+    expect(wrong.code).toBe(2); expect(wrong.report?.results[0]?.status).toBe("blocked");
+    expect(fixture.requests.some(request => request.method === "chats.send")).toBe(false);
+  } finally { await fixture.close(); }
+});
+
+test("declared skill choices are distinct from native approvals and complete real creation, probing, and cleanup", async () => {
+  const fixture = await exercise();
+  try {
+    const result = await fixture.run("manage-skills-fresh-use", skillBinding(true), ["--allow-profile-writes", "--allow-choices"]);
+    expect(result.code, result.stdout + result.stderr).toBe(2); expect(result.report?.results[0]?.status).toBe("unverified");
     const response = result.report!.results[0]!.response!;
-    expect(response.probe?.status).toBe("ran");
-    expect(response.fixture?.name).toMatch(/^ox-eval-/);
-    expect(response.after?.files[`skills/${response.fixture!.name}/SKILL.md`]).toContain(response.fixture!.answer);
-    expect(response.restored?.files).toEqual(response.before?.files);
-    if (response.probe?.status === "ran") {
-      expect(response.probe.evidence.chatId).not.toBe(response.chatId);
-      expect(response.probe.evidence.initial?.messages).toEqual([]);
-    }
-    expect(fixture.requests.filter(request => request.method === "chats.new" && request.params.temporary !== true)).toHaveLength(1);
-    expect(fixture.requests.filter(request => request.params.function === "ox.skill.delete")).toHaveLength(1);
-    expect(fixture.files["skills/existing/SKILL.md"]).toBe(skillFile("existing", "EXISTING"));
-    expect(Object.keys(fixture.files).some(path => path.includes("ox-eval-"))).toBe(false);
+    expect(response.choices[0]?.answer).toBe("Create skill"); expect(response.probe?.chatId).not.toBe(response.chatId);
+    expect(response.probe?.initial?.messages).toEqual([]); expect(response.restored?.values.skill).toEqual(response.before?.values.skill);
+    expect(fixture.files["skills/qa-created/SKILL.md"]).toBeUndefined();
+    const probeRequest = fixture.requests.find(request => request.method === "chats.send" && String(request.params.text).startsWith("Use the QA skill"))!;
+    expect(probeRequest.params.text).not.toContain("QA_TOKEN_7491");
+    expect(fixture.requests.filter(request => request.method === "chats.respond")).toHaveLength(1);
   } finally { await fixture.close(); }
 }, 15000);
 
-for (const scenario of ["skill-claim", "skill-corrupt", "skill-probe-fail", "probe-mutation", "skill-extra-action", "cleanup-error"] as const) {
-  test(`skill claims, incorrect files, and failed behavior cannot pass; cleanup cannot hide collateral changes: ${scenario}`, async () => {
+for (const scenario of ["approval", "probe-wrong", "cleanup-error", "forged-guide", "wrong-skill"] as const) {
+  test(`native gates, failed probes and uncertain cleanup cannot establish coverage: ${scenario}`, async () => {
     const fixture = await exercise(scenario);
     try {
-      const result = await fixture.run(...workflowArgs);
-      expect(result.code).toBe(1);
-      expect(result.report?.results[0]?.status).toBe(scenario === "cleanup-error" ? "error" : "fail");
-      if (scenario !== "cleanup-error") expect(Object.keys(fixture.files).some(path => path.includes("ox-eval-"))).toBe(false);
-      if (["skill-claim", "skill-extra-action"].includes(scenario)) expect(result.report?.results[0]?.response?.probe?.status).toBe("skipped");
-      if (scenario === "skill-extra-action") expect(result.report?.results[0]?.response?.continuation).toBe("stop");
-      expect(fixture.requests.some(request => request.method === "chats.respond")).toBe(false);
+      const result = await fixture.run("manage-skills-fresh-use", skillBinding(true), ["--allow-profile-writes", "--allow-choices"]);
+      expect(result.code).toBe(scenario === "approval" ? 2 : 1);
+      expect(result.report?.results[0]?.status).toBe(scenario === "approval" ? "blocked" : scenario === "cleanup-error" ? "error" : "fail");
+      if (scenario === "approval") expect(fixture.requests.some(request => request.method === "chats.respond")).toBe(false);
     } finally { await fixture.close(); }
-  }, 30000);
+  }, 15000);
 }
 
-test("workflows require opt-in, the named QA Profile, and existing cleanup permission before mutation", async () => {
-  for (const args of [["--case", "create-skill"], [...workflowArgs.slice(0, 3)], [...workflowArgs.slice(0, 3), "--qa-profile", "WrongQA"]]) {
-    const fixture = await exercise();
-    try {
-      const result = await fixture.run(...args);
-      expect(result.code).toBe(1);
-      expect(fixture.requests.some(request => request.method === "chats.send" || request.method === "chats.new" && request.params.temporary !== true)).toBe(false);
-    } finally { await fixture.close(); }
-  }
-  const fixture = await exercise("cleanup-policy");
+test("write authorization, read-only observer contracts, independent oracles and nonleaking probes are enforced before dispatch", async () => {
+  const fixture = await exercise();
   try {
-    const result = await fixture.run(...workflowArgs);
-    expect(result.code).toBe(1);
-    expect(fixture.requests.some(request => request.method === "chats.send")).toBe(false);
-    expect(Object.keys(fixture.files).some(path => path.includes("ox-eval-"))).toBe(false);
+    expect((await fixture.run("manage-skills-create", skillBinding(), ["--allow-choices"])).report?.results[0]?.status).toBe("blocked");
+    const bad = readerBinding(); bad.observations.profile = { kind: "vm", name: "ox.fs.write", args: {} };
+    expect((await fixture.run("app-profile-success", bad)).code).toBe(1);
+    const noOracle = readerBinding(); noOracle.assertions = noOracle.assertions.filter(rule => rule.evidence !== "outcome");
+    expect((await fixture.run("app-profile-success", noOracle)).code).toBe(1);
+    const leaked = skillBinding(true); leaked.probeContext = "The answer is QA_TOKEN_7491";
+    expect((await fixture.run("manage-skills-fresh-use", leaked)).code).toBe(1);
+    expect(fixture.requests).toHaveLength(0);
   } finally { await fixture.close(); }
 });
 
-test("eval runner never approves pending prompts or retries errored submissions", async () => {
-  for (const scenario of ["attention", "provider-error", "timeout"] as const) {
-    const fixture = await exercise(scenario);
-    try {
-      const result = await fixture.run("--case", "brief-answer", "--timeout", "1000");
-      expect(result.code).toBe(1);
-      const response = result.report?.results[0]?.response;
-      expect(result.report?.results[0]?.status).toBe(scenario === "attention" ? "fail" : "error");
-      expect(fixture.requests.filter(request => request.method === "chats.send")).toHaveLength(1);
-      expect(fixture.requests.filter(request => request.method === "chats.stop")).toHaveLength(1);
-      expect(fixture.requests.some(request => request.method === "chats.respond")).toBe(false);
-      expect(response?.snapshot?.isBusy).toBe(false);
-      if (scenario === "attention") expect(response?.attention?.pendingPrompt?.id).toBe("approval");
-      expect(response?.logs).toHaveLength(2);
-    } finally { await fixture.close(); }
-  }
-}, 15000);
-
-test("eval runner leaves an already busy conversation untouched", async () => {
+test("busy working conversations remain untouched", async () => {
   const fixture = await exercise("busy");
   try {
-    const result = await fixture.run("--case", "brief-answer");
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain("leave it untouched");
+    const result = await fixture.run(); expect(result.code).toBe(1); expect(result.stderr).toContain("leave it untouched");
     expect(fixture.requests.some(request => ["chats.new", "chats.send", "chats.stop"].includes(request.method))).toBe(false);
   } finally { await fixture.close(); }
-});
-
-test("eval comparison detects regressions across prompt changes and rejects changed models and missing attempts", async () => {
-  const fixtures = [await exercise(), await exercise("wrong")];
-  try {
-    const baseline = await fixtures[0]!.run("--case", "brief-answer");
-    const candidate = await fixtures[1]!.run("--case", "brief-answer");
-    async function compare() {
-      const child = Bun.spawn([process.execPath, `${ROOT}/.agents/skills/evals/scripts/runner.ts`, "compare", baseline.output, candidate.output], { stdout: "pipe", stderr: "pipe" });
-      const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
-      return { code, changes: JSON.parse(stdout) };
-    }
-    expect((await compare()).changes[0]).toMatchObject({ change: "regression", contextChanged: true });
-    candidate.report!.model = "different";
-    await writeFile(candidate.output, JSON.stringify(candidate.report));
-    expect((await compare()).changes[0]).toMatchObject({ change: "not-comparable", modelChanged: true });
-    candidate.report!.model = baseline.report!.model;
-    candidate.report!.results[0]!.repetition = 2;
-    await writeFile(candidate.output, JSON.stringify(candidate.report));
-    expect((await compare()).code).toBe(2);
-    baseline.report!.limits.repetitions = candidate.report!.limits.repetitions = 2;
-    candidate.report!.results[0]!.repetition = 1;
-    await writeFile(baseline.output, JSON.stringify(baseline.report));
-    await writeFile(candidate.output, JSON.stringify(candidate.report));
-    expect((await compare()).code).toBe(2);
-    candidate.report!.results = [];
-    await writeFile(candidate.output, JSON.stringify(candidate.report));
-    expect((await compare()).changes[0]).toMatchObject({ change: "not-comparable", attempts: [1, 0] });
-    baseline.report!.plannedCases.push("never-executed");
-    candidate.report!.plannedCases.push("never-executed");
-    await writeFile(baseline.output, JSON.stringify(baseline.report));
-    await writeFile(candidate.output, JSON.stringify(candidate.report));
-    expect((await compare()).changes[1]).toMatchObject({ id: "never-executed", change: "not-comparable", attempts: [0, 0] });
-  } finally { await Promise.all(fixtures.map(fixture => fixture.close())); }
 });

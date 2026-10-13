@@ -1,94 +1,151 @@
 # Ox evals
 
-The external runner invokes this checkout's `ox` CLI to drive ordinary conversations.
-Models, tools, services, permissions, and runtime hooks behave as they do in Ox.
-There is no eval RPC, fixture tool executor, alternate agent, or native turn limit.
+The replacement catalog owns three suites: `functions`, `workflows`, and `safety`.
+Every exposed `ox.*` function has success, failure, and boundary scenarios.
+All five System skills have task scenarios with independent outcome, preservation,
+and applicable precondition, probe, and cleanup obligations. Reading a skill is
+required but never establishes workflow completion. The old 11 cases are retired.
+Required authoring references are also independently read and matched to actual
+model tool output; installed skill/resource text is included in comparison context.
 
-## Run
-
-Prepare an exclusively owned numbered QA simulator using the native-tool workflow in the `ios-simulator` skill. Rebuild/install the checkout, use bundled services and a sanitized QA
-Profile, configure a real provider, and enable normal Host access. The runner
-requires an explicit Host and provider/model; it does not provision or enable them.
-For local Debug Simulator access, launch with `SIMCTL_CHILD_OX_HOST_LOOPBACK=1` in the simctl launch environment and its
-assigned `OX_DEBUG_ENDPOINT` port, with Allow connections already enabled. Use the
-explicit `ws://127.0.0.1:<port>` Host; physical-device/Release access stays Tailscale-only.
-It refuses an active busy conversation or pending prompt but changes the active conversation and
-can discard an outgoing temporary conversation. Never run against personal working state.
+`scripts/cases/` is the executable scenario catalog. `scripts/coverage.ts` checks
+its function inventory against native catalogs and its skills against the System
+catalog. A new function without all three variants fails portable validation.
+Scenario coverage is a specification, not evidence that a model passed it.
 
 ```sh
 bun run evals --list --suite all
-ox host list
-ox --host <ws-url> host providers --json
-bun run evals --host <ws-url> --provider <id> --model <id>
-bun run evals --host <ws-url> --provider <id> --model <id> --suite tasks --repeat 3 --output /tmp/ox-tasks.json
-bun run evals --host <ws-url> --provider <id> --model <id> --suite all --allow-profile-writes --qa-profile EvalQA --repeat 3 --output /tmp/ox-candidate.json
-bun run evals compare /tmp/ox-baseline.json /tmp/ox-candidate.json
+bun run evals --validate --suite all
+bun run evals --list --suite workflows --json
+bun run evals --template --case app-profile-success --qa-profile EvalQA --output /tmp/ox-reader-fixture.json
+bun run evals --validate --suite all --fixture /tmp/ox-reader-fixture.json
+bun run evals --fixture /tmp/ox-reader-fixture.json --host <ws-url> --provider <id> --model <id> --qa-profile EvalQA --case app-profile-success --output /tmp/ox-reader-report.json
+bun run evals --coverage /tmp/ox-reader-report.json
 ```
 
-`quick` is the default: four text-only cases. `tasks` contains public web search
-and five guidance discovery cases. `workflows` contains skill creation and a
-fresh-conversation usage probe. `--case` selects one case; `--repeat` defaults to one.
-Workflows, including `--suite all`, require explicit write opt-in and an already
-active, named local QA Profile. Existing policies must allow `ox.skill.create`
-and `ox.skill.delete`; the runner neither changes policies nor answers approvals.
-Task conversations are saved and retained for diagnosis; observer/probe conversations are temporary.
-Cleanup removes only the uniquely named, run-owned skill, not unrelated state.
+The runner drives this checkout's ordinary Ox CLI conversations. No eval RPC,
+alternate agent, forced tool result, Mock quality score, or eval-only runtime hook
+is used. CLI E2E fixtures verify the runner rather than real-model quality.
 
-`--timeout` defaults to 120000 ms and bounds setup, initial/final observations,
-task prompts, and probes, not provider turn count. Stop/snapshot/log collection
-has separate bounded CLI deadlines; cleanup and its observations share a further
-30000 ms deadline. After uncertain submission the runner requests ordinary
-`conversation stop` without resubmission. Missing or truncated evidence and transport/
-provider/cleanup errors stop the suite. Approval/input requests fail and are
-stopped, never automatically answered. Unsettled conversations or violated monitored
-invariants block further attempts. Observers never repair results before probing.
+## Prepare QA bindings
 
-Reports are version 3, owner-only JSON at new paths outside the repository.
-They contain app identity, revision/dirty state, authorization, provider catalog,
-planned cohorts, initial context hashes, conversation histories with usage, native Action receipts, before/
-after/cleanup observations, probe evidence, durations, checks, and manual rubrics.
-They can contain private Profile context; never commit them. Host logs are paginated
-run-window diagnostics, not necessarily attributable to the task: correlate IDs,
-and never score unrelated log errors. A checkout revision does not establish
-which binary is installed; rebuild before comparisons.
+Use an exclusively owned numbered QA simulator or dedicated QA Host, a freshly
+built checkout, bundled services, and a sanitized named local QA Profile. Read
+`ios-simulator` and `ox-cli` for setup. Inspect `ox host list` and
+`ox --host <ws-url> host providers --json`; select an explicit real model.
+The runner neither provisions the Host nor imports credentials or changes policies.
+It refuses active work/pending prompts but changes the selected conversation and
+may discard an outgoing temporary conversation. Never target personal state.
 
-Keep Profile context, model/reasoning settings, cases, and limits stable.
-Comparison rejects earlier report formats, flags prompt/tool context changes,
-and marks changed model/limits/cases, incomplete planned cohorts, or errors not comparable.
-Cases skipped in both reports still appear as not comparable, never silently vanish.
-Pass-rate changes are descriptive, not established statistical improvements.
+Fixtures are version 1 JSON outside Git with `qaProfile` and `cases` keyed by
+scenario ID. `--template` produces ready bindings for simple read-only function
+successes and Profile skill creation/fresh-use, with independent random probe
+inputs. Other scenarios get incomplete scaffolds. Incomplete scaffolds are
+rejected; they must not be counted as implemented live coverage. Use `--list
+--json` to inspect each scenario's exact task and evidence obligations.
 
-## Cases and grading
+Each prepared binding contains:
 
-Cases live in `scripts/cases/index.ts`; validate with
-`bun run evals --validate --suite all`. Real runs reject Mock. Common checks require
-completed turns, settled conversations, complete model responses, declared tools, valid
-snippet syntax, and successful matching tool results. Generated source is not
-proof that a nested operation ran: tool behavior uses native Action receipts.
+- `context`: synthetic task inputs and environment details, never expected answers,
+  credentials, or production state. Prepare the actual website/API/service/files
+  through ordinary interfaces before running. The runner does not silently seed
+  or repair them. Use isolated accounts and sandbox payment, not real purchases.
+- `observations`: named read-only VM readers, explicit conversation snapshots, or
+  CLI provider/conversation lists. VM readers use `{kind: "vm", name, args}`;
+  conversation readers use `{kind: "conversation", id}` (`{{task}}` binds the task);
+  CLI readers use `{kind: "cli", command: "providers" | "conversations"}`.
+  `{kind: "skill", name}` independently parses complete canonical skill metadata
+  and instructions. Optional `phases` limit readers to before/after/cleanup, for
+  example reading a newly created package only after creation.
+- `assertions`: `{evidence, phase, observation, path, operator, expected?}`. `path`
+  is an array of literal object keys/array indexes; `[]` selects the whole result.
+  Phases are `before`, `after`, `probe`, and `cleanup`. Operators are exact JSON
+  `equals`, string/array/object-subset `includes`, baseline `unchanged`, and
+  `absent` under an observed parent. Missing parents never prove absence.
+- `actions`: actual native receipt expectations with `name`, `outcome`
+  (`succeeded`/`failed`), `minimum`, optional `maximum`, and optional exact argument
+  subset. Bound uncertain submissions and writes to one effect. Failed results
+  require matching expected native failure evidence, never a blanket exception.
+  Every state-changing allowed Action needs an explicit expectation; cleanup
+  Actions can have minimum zero in the task with run-owned argument constraints.
+- `allowedActions`: exact scoped names, including necessary discovery/read,
+  presentation, execution, and cleanup. This is an audit, not a runtime permission
+  grant. Read-only scenarios cannot authorize writes or external effects.
+- `cleanup`: a separate ordinary conversation prompt removing only run-owned
+  effects after outcome observation and probing. Existing state must not be
+  repaired or deleted. Include baseline restoration assertions for every changed
+  surface, not just fixture disappearance.
+- `probeContext` for fresh probes: only skill name and variable inputs, never the
+  expected answer or original creation context. Generate independent random test
+  values and calculate expected answers outside the agent.
 
-Guidance cases independently read the expected guide through `ox vm call`, require
-a successful model-initiated read and a matching 256-character excerpt in actual
-tool output, and compare monitored state before/after. Summary quality remains a
-manual rubric; these cases cover discovery, not the full guided workflow.
-Web search requires a successful search Action and the expected URL in tool output
-and the final answer; relevance and citation quality remain manual.
+Every binding requires an explicit independent QA precondition. Bind every named
+scenario evidence obligation to the correct phase. `outcome` and `preserved` must
+use independent observations, not task text or tool-source strings. `condition`
+establishes the actual failure/boundary before submission. `preserved` and `cleanup`
+use baseline equality. `probe` evaluates the fresh snapshot. Extra answer assertions
+may inspect `task`/`probe` snapshots (including normalized `answer`), but cannot
+replace independent state evidence.
 
-Skill creation requires exact independently parsed metadata/instructions, no
-service dependencies or extra resources, and a successful authorized skill write.
-A fresh conversation receives only the skill name, reads the saved skill, and must return
-its independent random token. State and Action audits detect collateral work;
-cleanup is independently re-observed. Monitored surfaces are Profile identity,
-provider catalog, default model, language/theme, policies, artifact inventory,
-memory/soul, and mounted skill text files. This is not a complete Profile export,
-credential-content audit, binary-resource comparison, or process-restart test.
-Truncated inventories, unsupported files, missing fields, or more than 1 MiB of
-observed memory/soul/skill text fail closed. Extend observations for new workflows.
+Observers reject truncated inventories/text, dropped capture records, missing
+values, and oversized observations. Prepare bounded fixtures or scoped readers;
+never omit an affected surface to make observation pass. Observe complete provider
+definitions, unrelated configuration, Local files/history/source selection,
+schedules, memory/soul/skills, file ownership, remote effect ledgers, and child
+conversation outcomes as applicable. Secret observers use metadata only.
+Native UI/media, HTML interactions, visual appearance, and human handoff outcomes
+need actual native/UI evidence reviewed against the rubric; file creation alone
+does not verify rendering or interaction. These requirements cannot be established
+by a controlled CLI transport or a receipt alone.
 
-Manual rubrics are stored, not automatically scored. Old synthetic grounding,
-forced retry/failure, injected web-result, and decision-only smoke coverage is
-retired, not represented as equivalent live coverage. Add controlled inputs and
-probes through ordinary APIs/services, never eval-only runtime hooks.
+## Execute and review
 
-Portable CLI E2E checks use a controlled Host transport. They establish runner
-behavior, not real-model quality or live iOS correctness. Ox Gym and simulator
-UI QA remain separate.
+State-changing cases use saved conversations. Opt in separately with
+`--allow-profile-writes`, `--allow-installation-writes`, and
+`--allow-external-effects` according to both the scenario and its allowed Actions.
+Installation changes include shared provider/settings state across Profiles.
+Opt-in never bypasses runtime gates or expands fixture scope.
+
+`--allow-choices` answers only a scenario-declared skill proposal choice with
+exact matching options. It never answers native Action approvals or credential
+entry. Other checkpoints are blocked by default. `--human-wait-ms <ms>` permits
+bounded waiting while the human completes a native gate in QA Ox; the runner
+prints the conversation and checkpoint, never enters secrets or approves it.
+Deliberate web authoring and memory approval use declared later user turns.
+Unexpected choices remain human-controlled.
+
+`--timeout` defaults to 120000 ms, maximum 300000, bounding the task and its
+observations/probe. Cleanup has a separate 30000 ms budget; stop/snapshot/log CLI
+calls have bounded diagnostic deadlines. Inputs are never resubmitted after
+uncertain transport. Missing receipts, collateral effects, failed observation,
+unsettled work, or uncertain cleanup stop the cohort and preserve evidence for
+the owner. Cleanup never repairs results before probing.
+
+Reports are version 4, owner-only JSON at new outside-repository paths. They
+include model/catalog, build/revision/dirty state, authorization, fixture hash,
+planned repetitions, context/case hashes, histories, actual receipts, choices,
+before/after/probe/cleanup evidence, checks, rubrics, and paginated Host logs.
+Host logs are run-window diagnostics; correlate IDs and never score unrelated
+errors. Reports and fixtures can contain private context; keep them out of Git.
+
+Automatic successes are `unverified`, not passed workflow coverage. Read the
+history, independent observations, and applicable native/UI evidence against the
+rubric, then record an explicit review in a new report:
+
+```sh
+bun run evals --review /tmp/ox-reader-report.json --case app-profile-success --repetition 1 --decision pass --note "Reviewed answer against the independently observed Profile and checked preservation." --output /tmp/ox-reader-reviewed.json
+bun run evals --coverage /tmp/ox-reader-reviewed.json
+bun run evals compare /tmp/ox-baseline-reviewed.json /tmp/ox-candidate-reviewed.json
+```
+
+Review cannot override failed/missing automatic checks. Coverage distinguishes
+planned, blocked, unverified, failed, error, and passed; partial repetitions never
+establish a passing cohort. Exit codes are 0 for all reviewed passes, 1 for failure
+or error, and 2 for blocked/unverified/incomplete coverage. Listing/validation are
+local and cost no model tokens.
+
+Comparisons reject earlier report formats and mark changed cases/fixtures,
+models, authorization/limits, incomplete repetitions, errors, blocked or
+unreviewed evidence as not comparable. Keep the same rebuilt app, QA environment,
+model/reasoning, fixtures, inputs, and repetitions. Context changes are reported;
+pass-rate differences are descriptive, not established statistical improvements.

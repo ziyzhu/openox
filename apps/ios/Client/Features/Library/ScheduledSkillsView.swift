@@ -38,7 +38,7 @@ struct SkillSchedulesSection: View {
             Button {
                 editor = ScheduledSkillEditorTarget(skill: skill, profileID: profileID)
             } label: {
-                Chip(fill: Theme.Colors.chipOnBackground) {
+                Chip(fill: Theme.Colors.surface) {
                     Image(systemName: "plus")
                         .font(Theme.Icons.xs)
                     Text("Add schedule")

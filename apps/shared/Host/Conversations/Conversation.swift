@@ -584,6 +584,7 @@ final class Conversation: Identifiable {
 
     @ObservationIgnored private var standaloneServiceInvocations: Set<UUID> = []
     @ObservationIgnored private let botControlSource = ServiceBotControlSourceStore()
+    @ObservationIgnored private let authenticationRecovery = ServiceAuthenticationRecoveryStore()
 
     var serviceOperations: ServiceOperations {
         ServiceOperations(
@@ -640,7 +641,8 @@ final class Conversation: Identifiable {
                     }
                 }
             },
-            native: nativeServiceOperations
+            native: nativeServiceOperations,
+            authenticationRecovery: authenticationRecovery
         )
     }
 
@@ -2107,22 +2109,24 @@ final class Conversation: Identifiable {
         domain: String,
         resumeAgent: Bool = true,
         using presenter: (any ServiceAuthPresenting)? = nil
-    ) async -> Bool {
+    ) async -> JSONValue? {
         guard let service = attachedService(domain: domain) else {
             Log.session.error("Conversation.signInService no service domain=\(domain)")
-            return false
+            return nil
         }
         Log.session.info("Conversation.signInService start id=\(id) domain=\(domain) auth=\(service.signInState.rawValue) resumeAgent=\(resumeAgent)")
-        try? await service.requestAccess(using: presenter ?? presentations.serviceSignIn, source: .conversationCard)
-        let ok = service.signInState.isAuthenticated
+        let outcome = try? await service.requestAccess(using: presenter ?? presentations.serviceSignIn, source: .conversationCard)
+        let acknowledged = outcome == .acknowledged
+        let ok = acknowledged || service.signInState.isAuthenticated
+        let result = ok ? service.accessResult(acknowledged: acknowledged) : nil
         Log.session.info("Conversation.signInService done id=\(id) domain=\(domain) ok=\(ok) auth=\(service.signInState.rawValue)")
         if ok, resumeAgent {
             enqueueSystemEvent(
-                .object(["type": .string("serviceSignIn"), "domain": .string(domain), "authorized": .bool(service.isMCPService)]),
+                .object(["type": .string("serviceSignIn"), "domain": .string(domain), "access": result ?? .null]),
                 source: .serviceSignIn(domain)
             )
         }
-        return ok
+        return result
     }
 
     func completeBotControl(
@@ -2204,6 +2208,7 @@ final class Conversation: Identifiable {
     }
 
     func stopCurrentTurn() {
+        authenticationRecovery.clear()
         guard isBusy else {
             Log.session.info("Conversation.stopCurrentTurn ignored id=\(id) reason=idle")
             return
@@ -2445,6 +2450,7 @@ final class Conversation: Identifiable {
 
     private func finishWorker(_ runID: RunID) {
         guard let run = activeRun, run.id == runID else { return }
+        authenticationRecovery.clear()
         defer { if !submissions.isEmpty { startWorker() } }
         let backgroundExecutionExpired = run.backgroundExecutionExpired
         let conversationFailed = notice.errorMessage != nil

@@ -60,3 +60,18 @@ struct ServiceSignInButton: View {
         }
     }
 }
+
+struct ServiceSignInAcknowledgmentButton: View {
+    let accessibilityIdentifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button("I’ve signed in", action: action)
+            .font(Theme.Fonts.labelMd)
+            .foregroundStyle(Theme.Colors.onPrimary)
+            .frame(maxWidth: .infinity, minHeight: Theme.Size.minimumTouchTarget)
+            .background(Theme.Colors.primary, in: Capsule())
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(accessibilityIdentifier)
+    }
+}

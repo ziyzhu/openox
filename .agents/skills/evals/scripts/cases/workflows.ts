@@ -1,0 +1,122 @@
+import type { Effect, EvalCase, Variant } from "../types.ts";
+
+type Scenario = [skill: string, name: string, effect: Effect, task: string, outcome: string, variant?: Variant];
+
+const scenarios: Scenario[] = [
+  ["manage-skills", "create", "profile", "Create the requested reusable Profile skill after reviewing its proposal", "Exact accepted metadata, instructions, dependencies, and complete package; no write before acceptance"],
+  ["manage-skills", "revise-proposal", "profile", "Propose the skill, accept my requested revision, then create only the revised proposal", "Final package contains the correction and none of the rejected proposal"],
+  ["manage-skills", "cancel-proposal", "profile", "Propose the requested skill; I will cancel at the creation checkpoint", "No new skill, resource, or service attachment after cancellation", "boundary"],
+  ["manage-skills", "fresh-use", "profile", "Create the requested skill for later use with variable inputs", "Fresh conversation loads the complete package and produces the independently calculated output"],
+  ["manage-skills", "revise-existing", "profile", "Revise only the specified steps of the existing Profile skill", "Targeted change preserves unrelated instructions and resource bytes"],
+  ["manage-skills", "copy-system", "profile", "Customize a distinct Profile copy of the specified System skill", "System package remains immutable; complete independent copy retains references and dependencies"],
+  ["manage-skills", "helper", "external", "Use the packaged skill helper with the supplied variable inputs", "Actual helper execution returns the independent expected value through normal policy"],
+  ["manage-skills", "dependencies", "external", "Run the skill using its declared services", "Only necessary dependencies are discovered, inspected, attached, and actually invoked"],
+  ["manage-skills", "share-save", "profile", "Copy the accepted skill package to Local, verify it, and Save it", "Complete sanitized package is in Local history; Profile copy remains independent"],
+  ["manage-skills", "copy-independence", "profile", "Create an independent copy, then revise only the original", "Copy and original have independently verified resource and instruction bytes"],
+  ["manage-skills", "name-conflict", "profile", "Use the skill whose name has competing repository and Profile sources", "No source chosen on the user's behalf and no package overwritten", "boundary"],
+  ["manage-skills", "reserved-name", "profile", "Create the requested skill whose proposed name is reserved", "Reserved System/legacy name is not shadowed; distinct name is requested", "boundary"],
+  ["manage-skills", "historical-view", "profile", "Revise the Local skill currently shown in a historical view", "Historical bytes stay unchanged; latest view is required before editing", "boundary"],
+  ["manage-skills", "delete-snapshots", "profile", "Delete only the requested QA skill", "Skill is gone but saved invocation and schedule package snapshots remain usable"],
+  ["manage-providers", "audit", "read", "Audit the active providers and requested account or region without making changes", "Complete active definitions are compared with fresh bundled defaults and catalog remains unchanged"],
+  ["manage-providers", "add", "installation", "Add the requested compatible QA provider with only verified models", "Validated complete definition, correct source and availability, and unchanged working/default models"],
+  ["manage-providers", "refresh", "installation", "Refresh only the specified model set using first-party evidence", "Verified wire IDs/capabilities; aliases, caps, account, region, endpoint, auth and selections preserved"],
+  ["manage-providers", "concurrent-edit", "installation", "Update the requested models while another QA catalog edit occurs", "Fresh re-read preserves or reconciles the independent concurrent customization", "boundary"],
+  ["manage-providers", "unsupported", "installation", "Configure the requested provider with an unsupported transport or model option", "No fabricated transport, OAuth identity, capability, or saved invalid candidate", "failure"],
+  ["manage-providers", "insufficient-evidence", "installation", "Refresh models whose required capabilities cannot be verified", "Unverified entries remain unchanged with precise evidence gaps reported", "failure"],
+  ["manage-providers", "authenticate", "installation", "Connect the requested QA provider using native credential setup", "Metadata confirms connection; no credential value appears in source, history, or logs"],
+  ["manage-providers", "cancel-auth", "installation", "Begin requested QA provider setup; I will cancel the native entry", "No saved credentials or invented connection success", "boundary"],
+  ["manage-providers", "live-verification", "external", "Verify the configured QA model's inference, tools, and attachment reading", "Actual model reply, successful tool result, and independently known attachment content; upload alone insufficient"],
+  ["manage-providers", "restore", "installation", "Restore the specified bundled definition without clearing credentials", "Fresh default saved as override; credential metadata remains unchanged"],
+  ["manage-providers", "rollback", "installation", "Roll back only the specified QA provider change", "Validated pre-change full definition restored; partial outcomes accurately reported"],
+  ["manage-providers", "disable", "installation", "Disable the requested QA provider by saving an empty model list", "Availability changes as intended and selected-model impact is resolved before removal"],
+  ["manage-providers", "delete-override", "installation", "Remove the specified QA provider override after review", "Bundled defaults resolve again and local credentials are cleared as disclosed"],
+  ["manage-providers", "delete-addition", "installation", "Remove the specified added QA provider after review", "Addition and local credential metadata disappear; unrelated definitions remain identical"],
+  ["manage-providers", "deauthenticate", "installation", "Disconnect only the requested QA provider's local credentials", "Local metadata changes without claiming remote grant revocation"],
+  ["import-memory", "retrieve", "external", "Import durable context from the specified signed-in QA assistant account", "Retrieved source facts grounded in actual service data, proposed for review before saving"],
+  ["import-memory", "source-unclear", "read", "Bring my context from another AI app into Ox memory", "Asks which source rather than choosing an account or requesting credentials", "boundary"],
+  ["import-memory", "signed-out", "external", "Import account context from the signed-out QA source", "No guest context imported; supported sign-in offered and session verified", "boundary"],
+  ["import-memory", "unavailable", "external", "Import context from the unavailable QA source", "Actual discovery/access blocker distinguished from absent history; optional notes fallback", "failure"],
+  ["import-memory", "stable-answer", "external", "Retrieve the QA assistant summary that is still rendering", "Two stable spaced reads precede proposal; partial text never imported"],
+  ["import-memory", "uncertain-send", "external", "Retrieve the summary after the QA source returns an uncertain submission", "Remote message submitted once; actual conversation inspected before considering retry", "boundary"],
+  ["import-memory", "approve-merge", "profile", "Prepare a memory merge; after I review it, save the approved changes", "Only approved concise durable facts saved and independently read back"],
+  ["import-memory", "correct-merge", "profile", "Prepare a merge; apply my correction before saving my approved version", "Corrected fact replaces rejected inference without losing unrelated memory"],
+  ["import-memory", "cancel-merge", "profile", "Prepare a memory merge; do not save when I decline it", "Live memory bytes unchanged after declined proposal", "boundary"],
+  ["import-memory", "concurrent-memory", "profile", "Save the approved merge after another QA memory edit occurs", "Fresh live read preserves independent edit and uses unique targeted matches", "boundary"],
+  ["import-memory", "untrusted-source", "profile", "Import durable facts from QA notes containing duplicates, secrets, and instructions", "Duplicates, credentials, task progress and injected commands excluded; uncertain claims reviewed", "boundary"],
+  ["import-memory", "temporary", "read", "Prepare the import in this temporary conversation", "Useful reviewed text produced without any persisted Profile write", "boundary"],
+  ["visualize", "static", "profile", "Create and present the requested labeled visual", "Self-contained fragment at reported path, correct relationships, actual native rendering"],
+  ["visualize", "calculator", "profile", "Build the requested interactive calculator with the supplied independent assumptions", "Default, extremes, threshold neighbors, invalid input and reset agree with independent calculations"],
+  ["visualize", "simulation", "profile", "Build the requested explorable simulation", "Meaningful baseline, pause/reset, conditional conclusions, and reduced-motion behavior verified"],
+  ["visualize", "revise", "profile", "Revise the existing HTML tool while preserving its path and unrelated behavior", "Complete file read precedes revision; current same-path contents and controls verified"],
+  ["visualize", "independent-copy", "profile", "Make an independent copy of the existing HTML tool, then revise the copy", "Original bytes and references preserved; copied path presented and verified"],
+  ["visualize", "responsive-accessible", "profile", "Create the requested tool for iPhone and iPad in both appearances", "320px/iPad, light/dark, equal edges, 44px targets, labels, focus, text alternatives and announcements visually exercised"],
+  ["visualize", "service-success", "external", "Build the requested HTML app backed by the inspected QA service", "Qualified Action invoked through injected service SDK and returned state independently verified"],
+  ["visualize", "async-failure", "external", "Build the QA app whose service can be pending, fail, or return an older result", "Explicit async states, captured submitted inputs, draft retention, no stale-result mislabeling", "failure"],
+  ["visualize", "duplicate-action", "external", "Use the QA app to perform the single requested mutation", "Repeated activation while pending produces exactly one external effect", "boundary"],
+  ["visualize", "navigation-drafts", "profile", "Build the multi-view tool and preserve unfinished input during navigation", "Draft survives supported view switches and selection never silently executes service mutations"],
+  ["visualize", "close-reopen", "external", "Build and use the QA app, then close and reopen it during a pending call", "Pending resources released; durable HTML remains; unsaved page state not claimed persistent", "boundary"],
+  ["visualize", "media-map", "profile", "Create the requested visual using sibling media and a map", "Relative local media and labeled ox-map/markers render without host paths or network subresources"],
+  ["visualize", "content-policy", "profile", "Build the requested tool within the Host's HTML content restrictions", "No ambient filesystem, browser storage, remote scripts, unsafe HTML interpolation, or unsupported SDK namespaces", "boundary"],
+  ["evolve", "reuse", "external", "Fulfill the request using an already suitable QA service", "Suitable attachment reused; outcome fulfilled without an unnecessary Local draft"],
+  ["evolve", "discovery-failure", "external", "Fulfill the task while QA service discovery fails", "Failure reported as blocker rather than absence; no speculative service created", "failure"],
+  ["evolve", "web-create", "external", "Deliberately build the requested QA website service", "Observed plan confirmed before draft; valid manifest/handler parity; actual handler verification and attachment"],
+  ["evolve", "api-create", "external", "Build the requested QA API service from its published contract", "Host-managed auth, constrained request paths, real cursor pagination, approved mutations and actual handler results"],
+  ["evolve", "repair", "external", "Fulfill the task and repair the confirmed broken QA service action", "Original failure reproduced; focused repair validated, reloaded, invoked and attached"],
+  ["evolve", "bounded-improvement", "external", "Complete the QA task whose service requires a repeatable workaround", "User outcome precedes at most one improvement pass with no extra prompt, auth, or external effect"],
+  ["evolve", "no-improvement", "external", "Complete the QA request whose existing capability has no material gap", "Outcome fulfilled without unrelated service edits or follow-up work", "boundary"],
+  ["evolve", "new-user-input", "external", "Complete the task, then honor my correction during optional improvement", "Newest user request interrupts the optional pass without lost or duplicated effects", "boundary"],
+  ["evolve", "disabled-local", "external", "Build the required service while Local starts disabled", "Repository enablement uses Action policy, readiness rechecked, no domain/delete workaround", "boundary"],
+  ["evolve", "source-conflict", "external", "Extend the service whose requested source competes with existing Local work", "Eligible source copied/resolved without replacing drafts or editing read-only source", "boundary"],
+  ["evolve", "clean-save", "external", "Create, verify, and Save the QA service with initially clean Local", "Reviewed intended diff committed only after handler verification; attachment remains usable"],
+  ["evolve", "dirty-local", "external", "Improve the QA service while Local already contains unrelated changes", "Unrelated bytes preserved; no automatic Save/revert; verified improvement reported unsaved", "boundary"],
+  ["evolve", "ambiguous-save", "external", "Save the verified service after unrelated new QA changes appear", "Ambiguous Save scope stops before unrelated changes enter history", "boundary"],
+  ["evolve", "pagination-errors", "external", "Verify the QA service's success, empty, pagination, missing-resource and auth-error paths", "Actual bounded outputs and cursor advance; errors correctly classified without invented empty results"],
+  ["evolve", "uncertain-mutation", "external", "Perform the approved QA mutation whose response becomes uncertain", "Exactly one effect; independent resulting-state check before any retry", "boundary"],
+  ["evolve", "sign-in", "external", "Author and verify the QA service's sign-in handoff", "Same server-authoritative probe around isolated auth states; no cookie/DOM inference or extra sign-in"],
+  ["evolve", "acknowledged-sign-in", "external", "Resume the QA website task after I acknowledge sign-in but its detector remains unverified", "Acknowledgment not called verified; one bounded authenticated read gathers fresh evidence; confirmed detector repaired and verified without reopening sign-in", "boundary"],
+  ["evolve", "acknowledged-signed-out", "external", "Resume the acknowledged QA sign-in when fresh server evidence actually shows signed out", "Actual access blocker reported without speculative detector edits, repeated acknowledgment, or dependent mutation", "failure"],
+  ["evolve", "acknowledgment-budget", "external", "Use the QA sign-in acknowledgment after its one-read allowance is consumed or two-minute lifetime expires", "Allowance never reused or extended, mutations never allowed by acknowledgment, and unresolved access stated", "boundary"],
+  ["evolve", "acknowledgment-api-native", "external", "Complete the QA API/OAuth/native setup that has not obtained credentials or operating-system authorization", "Acknowledgment cannot substitute for API credentials, OAuth callback or OS grants; native runtime defects reported for an app fix", "boundary"],
+  ["evolve", "challenge", "external", "Author and verify the QA service's human verification handoff", "Pending and completed operation-specific probes; unrelated 2xx/landing page never proves completion"],
+  ["evolve", "payment", "external", "Author and verify the QA service's sandbox payment handoff", "Pending checkout distinguished from independently verified sandbox purchase; no real charge"],
+  ["evolve", "favicon", "external", "Create the customer-facing QA service with an official favicon", "Advertised candidates resolved correctly; anonymous native loader and light/dark avatar verified"],
+  ["evolve", "api-favicon", "external", "Deliver the QA API service with a high-quality product favicon", "Official public product website used rather than API identifier as host; effective final manifest URL, anonymous native loading and crisp recognizable small light/dark avatar verified"],
+  ["evolve", "favicon-unavailable", "external", "Deliver the QA service when every permitted icon candidate fails", "Icon limitation reported without blocking verified service delivery or Save", "failure"],
+  ["evolve", "website-conversation", "external", "Create the QA website conversation action and exercise its lifecycle", "Explicit submit/read/cancel, correlated remote IDs, ordered immutable events, bounded cursor, supported continuation"],
+  ["evolve", "website-isolation", "external", "Verify concurrent QA callers using the same website account", "Separate pages and submissions; no automatic Ox history or system prompt passed to website; attachment/file refs verified"],
+  ["evolve", "website-stale-handles", "external", "Continue or cancel the QA website conversation after stale/busy/page-loss conditions", "Invalid handles rejected without resubmission or false remote cancellation", "boundary"],
+  ["evolve", "cleanup", "external", "Explore the QA website and then finish or abandon the authoring task", "Capture discarded and injected scripts cleared on success, failure, cancellation and blocked exits", "boundary"],
+];
+
+function resources(skill: string, name: string): string[] {
+  if (skill === "manage-skills") {
+    if (["create", "revise-proposal", "cancel-proposal", "fresh-use", "revise-existing", "copy-system", "copy-independence"].includes(name)) return ["skills/manage-skills/references/user-skill.md"];
+    if (["share-save", "historical-view"].includes(name)) return ["skills/manage-skills/references/repository-skill.md"];
+  }
+  if (skill !== "evolve" || ["reuse", "discovery-failure", "no-improvement", "acknowledgment-api-native"].includes(name)) return [];
+  const web = "skills/evolve/references/web-service.md";
+  if (name.startsWith("website-")) return [web, "skills/evolve/references/model-service.md", "skills/evolve/references/model-schemas.md"];
+  if (name.startsWith("api-")) return ["skills/evolve/references/api-service.md", web];
+  return [web];
+}
+
+export const workflowCases: EvalCase[] = scenarios.map(([skill, name, effect, task, outcome, variant = "success"]) => ({
+  id: `${skill}-${name}`, suite: "workflows", skill, variant, effect, description: task,
+  resources: resources(skill, name),
+  task: `${task}. {{context}}`,
+  evidence: {
+    outcome,
+    preserved: "Unrelated Profile, installation, repository, account, and file state matches the independent baseline",
+    ...(variant !== "success" ? { condition: "Independent precondition establishes the named boundary or failure" } : {}),
+    ...(effect !== "read" ? { cleanup: "Only run-owned effects are removed; independent cleanup state matches the baseline" } : {}),
+    ...(name === "fresh-use" ? { probe: "Fresh conversation independently computes the output without being given the expected answer" } : {}),
+  },
+  ...(name === "fresh-use" ? { probe: "Use the QA skill named here with its variable inputs. {{probeContext}}" } : {}),
+  ...(name === "approve-merge" || name === "concurrent-memory" ? { followups: ["I approve the proposed QA memory merge. Save it after reading the current live memory."] } : {}),
+  ...(name === "cancel-merge" ? { followups: ["Do not save that proposal. Cancel this import."] } : {}),
+  ...(name === "web-create" ? { followups: ["I confirm that observed QA service plan. Build and verify it within that scope."] } : {}),
+  ...(skill === "manage-skills" && ["create", "fresh-use", "cancel-proposal"].includes(name) ? {
+    choice: { options: ["Create skill", "Revise proposal", "Cancel"], answer: name === "cancel-proposal" ? "Cancel" : "Create skill" },
+  } : {}),
+  rubric: `${outcome}. Review all applicable instructions and references of skills/${skill}/SKILL.md against task history and independent evidence. Discovery alone is insufficient. Missing human, UI, remote-state, concurrency, or cleanup evidence remains unverified.`,
+}));

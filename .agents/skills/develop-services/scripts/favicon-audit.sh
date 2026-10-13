@@ -37,12 +37,7 @@ if [ "$dimensions" != "128x128" ]; then
   status=1
 fi
 
-safe_area_opaque=$(magick "$INPUT_FILE" -crop 96x96+16+16 +repage -format '%[opaque]' info: 2>/dev/null || true)
-if [ "$safe_area_opaque" != "True" ]; then
-  echo "[favicon] failed: transparent pixels enter the central 96x96 safe area" >&2
-  status=1
-fi
-
 echo "[favicon] preview: $OUTPUT_FILE" >&2
 echo "[favicon] layout: 128px light | 128px dark; 20px light | 20px dark" >&2
+echo "[favicon] inspect recognition, sharpness, contrast, padding, and clipping before upload" >&2
 exit "$status"

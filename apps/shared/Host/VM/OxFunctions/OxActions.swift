@@ -84,9 +84,12 @@ nonisolated enum OxActions {
                 "type": .string("object"),
                 "properties": .object([
                     "domain": .object(["type": .string("string")]),
-                    "signedIn": .object(["type": .string("boolean"), "const": .bool(true)]),
+                    "signedIn": .object(["type": .string("boolean")]),
+                    "completed": .object(["type": .string("boolean"), "const": .bool(true)]),
+                    "state": .object(["type": .string("string")]),
+                    "completion": .object(["type": .string("string"), "enum": .array(["verified", "configured", "authorized", "acknowledged"].map(JSONValue.string))]),
                 ]),
-                "required": .array([.string("domain"), .string("signedIn")]),
+                "required": .array(["domain", "completed", "signedIn", "state", "completion"].map(JSONValue.string)),
                 "additionalProperties": .bool(false),
             ]),
         ])

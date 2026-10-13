@@ -110,9 +110,9 @@ struct ProfileSettingsView: View {
             if profile?.location == .external {
                 Text("This closes the Profile in Ox. Its folder and contents stay in Files.")
             } else if profile?.location == .iCloud {
-                Text("This removes it from iCloud and all your devices — conversations, files, character and memory. This can't be undone.")
+                Text("This removes it from iCloud and all your devices — conversations, files, voice and memory. This can't be undone.")
             } else {
-                Text("This removes it from this device — conversations, files, character and memory. This can't be undone.")
+                Text("This removes it from this device — conversations, files, voice and memory. This can't be undone.")
             }
         }
     }
@@ -267,7 +267,7 @@ private struct ProfileContentsView: View {
                 NavigationLink {
                     destination(.character)
                 } label: {
-                    SettingsDisclosureRow(title: "Character", value: Text(""))
+                    SettingsDisclosureRow(title: "Voice", value: Text(""))
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier(A11yID.Settings.soul)
@@ -302,7 +302,7 @@ private struct ProfileContentDestination: View {
         var title: LocalizedStringKey {
             switch self {
             case .skills: "Skills"
-            case .character: "Character"
+            case .character: "Voice"
             case .memory: "Memory"
             }
         }

@@ -41,9 +41,11 @@ The former repository replay command, harness, and committed response fixtures a
 
 ## Icon
 
-Check that the Local manifest's stable HTTPS `faviconUrl` still loads anonymously as PNG, JPEG, or ICO through the native image loader, within its 1 MiB, 4096×4096, 32-frame, and five-public-HTTPS-redirect limits, and remains recognizable at 20 px. Local delivery may use a smaller verified official icon; promotion still requires the qualifying source below. The built-in hosted output must remain a direct, anonymous HTTPS PNG without redirects. Fetch the official compact mark with `.agents/skills/develop-services/scripts/favicon-128.sh <domain> <verified-favicon-url>` and audit it with `.agents/skills/develop-services/scripts/favicon-audit.sh <path-to-favicon.png>`.
+Reuse the verified Local icon; do not repeat discovery during promotion. If it no longer loads or does not qualify, return to Ox's Choose a favicon workflow for a replacement and a newly verified saved revision.
 
-Require an official square source that is at least 128×128, remains recognizable at 20 px, has an intentional background in the central safe area, and renders cleanly on light and dark backgrounds. Never upscale, reconstruct brand artwork, or accept a generic substitute.
+Fetch and convert that source from a temporary directory with `.agents/skills/develop-services/scripts/favicon-128.sh <domain> <verified-favicon-url>`, then run `.agents/skills/develop-services/scripts/favicon-audit.sh <path-to-favicon.png>` and inspect its 128 px and 20 px light/dark preview. Require an official square raster source at least 128×128 or an official vector source, a recognizable sharp mark, adequate contrast, balanced padding, and no clipped essential artwork. Transparency is acceptable when both previews pass. Never upscale raster artwork, reconstruct a brand mark, or accept a generic substitute. Script success verifies processing, not visual quality.
+
+Upload the reviewed 128×128 PNG to the canonical hosted URL. Fetch that URL anonymously without redirects, confirm a PNG response and bytes matching the reviewed file, then set the built-in `faviconUrl`. Reload and inspect one actual small Ox avatar in both themes using the hosted URL; Local-source evidence alone does not verify the hosted delivery.
 
 ## Verify and report
 

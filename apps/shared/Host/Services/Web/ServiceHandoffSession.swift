@@ -181,6 +181,10 @@ final class ServiceHandoffSession {
         return terminalOutcome
     }
 
+    func complete() {
+        finish(.completed)
+    }
+
     func cancel() {
         finish(.cancelled)
     }

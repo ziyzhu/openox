@@ -1160,7 +1160,7 @@ struct ConversationPage: View {
                     reflectsAuthentication: false,
                     signIn: { domain in
                         guard prepareServiceControl(control) else { return false }
-                        return await conversation.signInService(domain: domain, resumeAgent: false)
+                        return await conversation.signInService(domain: domain, resumeAgent: false) != nil
                     },
                     completeBotControl: { domain, args in
                         guard prepareServiceControl(control) else { return false }
@@ -1889,14 +1889,14 @@ struct ConversationPage: View {
         guard !Task.isCancelled else { return }
         Log.ui.info("ConversationPage.authProbe done conversation=\(conversation.id) domain=\(domain) state=\(service.signInState.rawValue)")
         if service.signInState.isAuthenticated {
-            conversation.resolveServiceControl(id: item.id, result: .null)
+            conversation.resolveServiceControl(id: item.id, result: service.accessResult())
         } else {
-            let signedIn = await conversation.signInService(
+            let result = await conversation.signInService(
                 domain: domain,
                 resumeAgent: false,
                 using: service.supportsWebAuthentication ? serviceAuthPresenter : nil
             )
-            conversation.resolveServiceControl(id: item.id, result: signedIn ? .null : nil)
+            conversation.resolveServiceControl(id: item.id, result: result)
         }
     }
 

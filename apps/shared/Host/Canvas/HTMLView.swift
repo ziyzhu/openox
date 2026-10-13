@@ -116,6 +116,7 @@ final class HTMLView {
     }
 
     private func cancelWork() {
+        authenticationRecovery.clear()
         botControlSource.release()
         pending.values.forEach { $0.cancel() }
         loading.values.forEach { $0.cancel() }
@@ -162,6 +163,8 @@ final class HTMLView {
         guard kind == parts[0] else { throw Service.InvokeError.unknown(name) }
         return (service, parts[2])
     }
+
+    private let authenticationRecovery = ServiceAuthenticationRecoveryStore()
 
     private var operations: ServiceOperations {
         ServiceOperations(
@@ -224,7 +227,8 @@ final class HTMLView {
                 choose: { [unowned self] prompt in
                     await waitForInteraction(.choice(UUID(), prompt.body, prompt.options))?.stringValue
                 }
-            )
+            ),
+            authenticationRecovery: authenticationRecovery
         )
     }
 
@@ -253,8 +257,9 @@ final class HTMLView {
         guard state == .running else { return nil }
         switch control {
         case .signIn:
-            try? await service.requestAccess(using: CanvasAuthPresenter(canvas: self), source: .canvas)
-            return service.signInState.isAuthenticated ? .null : nil
+            let outcome = try? await service.requestAccess(using: CanvasAuthPresenter(canvas: self), source: .canvas)
+            let acknowledged = outcome == .acknowledged
+            return acknowledged || service.signInState.isAuthenticated ? service.accessResult(acknowledged: acknowledged) : nil
         case .botControl(_, _, let args):
             let source: ServiceActionScheduler.BotControlLease?
             switch botControlSource.claim(service: service, args: args) {

@@ -71,6 +71,8 @@ Preserve a resource-scoped URL only when it is the observed opaque identifier re
 
 Use `ox.web.browser.waitForUserInteraction` for credentials, challenges, account choices, and other human-only steps.
 
+When the user manually acknowledges website sign-in, inspect fresh session evidence before deciding the detector is defective. Acknowledgment completes the handoff but does not verify access. Use the one bounded authenticated read only for read-only evidence, or inspect the existing Browser session. Repair a confirmed probe defect through the normal Local workflow, then verify the replacement on the hidden action page and after reload. Preserve previously observed signed-out classifications, leave unknown outcomes unclassified, and never sign out or repeat sign-in solely for testing. If repair is required for the original task, perform it before dependent mutations; otherwise finish verified work first and use the bounded improvement pass. Do not reopen the handoff automatically or claim an authenticated action result alone verifies the probe.
+
 When proposed actions require authentication, first inspect the current session without changing it. If already signed in, verify the session-authoritative probe and authenticated actions in that session. Preserve previously verified signed-out behavior; disclose any unverified signed-out branch and never invent its response classification. Do not sign out, clear website data, or ask for another sign-in solely to collect evidence. Testing another authentication state requires an isolated session or explicit authorization to change the current session.
 
 When naturally signed out, collect both sides of one session-authoritative probe around exactly one user interaction:
@@ -84,28 +86,20 @@ Inspect only the requests, redirects, statuses, and response shapes needed for t
 
 ### Choose a favicon
 
-Preserve an existing working icon unless the user requests a replacement. While Browser is on the service, collect and deduplicate official public icon candidates in this category order:
+Every newly authored customer-facing service needs a verified product favicon. For API services, discover artwork on the official product website; the API identifier need not be a hostname. Preserve an existing verified icon unless it is broken or the user requests a replacement.
 
-1. `apple-touch-icon` links.
-2. Icons advertised by a linked web-app manifest.
-3. `icon` links, including `shortcut icon`.
-4. Same-site `/apple-touch-icon.png` and `/favicon.ico`, only after advertised candidates fail.
+1. **Find.** Inspect official page `icon` and `apple-touch-icon` links and linked web-app manifest icons. Resolve page links against `document.baseURI` and manifest icon `src` against the manifest's final response URL. Prefer a square PNG at least 128×128; JPEG and ICO are supported, SVG is not. Choose a normal product mark usable in both themes, respecting link `media` and manifest `purpose`. Treat declared sizes and types as hints. Try the best candidate first and stop when it passes. Try smaller official candidates that remain recognizable at 20 px before using a third-party cache. If advertised candidates fail, try same-site `/apple-touch-icon.png` and `/favicon.ico`; never invent other paths.
+2. **Apply.** Set a stable public HTTPS `faviconUrl` before the service's normal final validation and attachment/reload. Read back `faviconUrl` from the source `service.json` and use `ox.service.inspect` to confirm the intended repository is selected. The native loader fetches anonymously, permits at most five public HTTPS redirects, and limits images to 1 MiB, 4096×4096, and 32 frames. It selects the largest ICO frame and produces a PNG thumbnail up to 256 px. Do not use credential-dependent, signed, or expiring URLs.
+3. **Inspect.** After loading settles, inspect one actual Ox service avatar at approximately 20 px in light and dark mode. Require a recognizable, sharp mark with adequate contrast, balanced padding, and no clipped essential artwork. Transparency is acceptable when it looks good in both themes. Reject blank images, generic fallbacks, persistent loading placeholders, and blurry enlargements. HTTP success, Browser display, manifest validation, and attachment alone do not verify the icon. If it fails, inspect available diagnostics, choose the next candidate, and repeat Apply and Inspect.
+4. **Record.** Keep the final source/effective URL and observed light/dark appearance internally; keep screenshot evidence outside service source. Evidence must correspond to the final URL after reload. If no candidate works, omit `faviconUrl` and preserve useful service work, but report icon verification as incomplete. If actual avatar inspection is unavailable, report it as pending; never claim full verification.
 
-Resolve document links against `document.baseURI`, which includes any HTML base element. Resolve manifest icon `src` values against the manifest's final response URL, not the document URL. A public CDN image explicitly advertised by the website is an official candidate; it need not share the website host. Treat declared `sizes` and `type` as hints, not proof of the actual image. Respect link `media` conditions and manifest `purpose`: prefer a normal full-color mark usable in both light and dark mode; maskable icons reserve space for cropping, and monochrome icons may need tinting the avatar does not provide. Do not choose an unrelated logo or invent image paths beyond the two conventional paths above.
-
-Try square official PNG, JPEG, or ICO candidates at least 128×128 first, using category order to break ties and preferring sufficient avatar resolution over the largest file. Then try smaller official candidates that remain recognizable at 20 px before using a third-party cache. The service image loader accepts at most 1 MiB, at most 32 image frames, and source dimensions at most 4096×4096; it decodes the largest ICO frame and produces a PNG thumbnail up to 256 px. SVG is not supported. Page JavaScript may load a candidate to inspect natural dimensions, but browser success is not native-loader verification and an image element's `src` does not reveal its final URL after redirects.
-
-Save a stable public HTTPS advertised URL as `faviconUrl`, reload the service, and visually confirm the actual service avatar renders and represents the product in light and dark mode. The native loader fetches without cookies or credentials and follows at most five redirects, each to a policy-allowed public HTTPS URL. Do not pin an expiring or signed CDN URL when a stable advertised URL works. If the avatar fails, inspect available icon diagnostics and try the next candidate; do not accept a cookie-dependent image merely because Browser can display it.
-
-When no first-party candidate qualifies, request Google's cached favicon for the product's public origin only:
+When official candidates fail, Google's cache is a last fallback unless the user prohibits third-party icon requests:
 
 ```text
-https://www.google.com/s2/favicons?domain_url=<percent-encoded-origin>&sz=128&alt=404
+https://www.google.com/s2/favicons?domain_url=<percent-encoded-public-origin>&sz=128&alt=404
 ```
 
-Strip credentials, path, query, and fragment from the submitted origin so the request discloses no private or user-specific URL state. This fallback still discloses the public product origin to Google; do not use it when the user prohibits third-party icon requests. Save the stable resolver URL and verify it through the actual service avatar, not only Browser. Accept only a successful square supported image that visibly matches the product. Google may return less than 128×128 despite the requested size; accept a smaller cached result only when it remains recognizable at 20 px. Reject a `404`, placeholder, generic letter, unrelated mark, or result that does not render.
-
-Always attempt to acquire a verified `faviconUrl` when creating a customer-facing web service, and repair missing or broken icons when updating one. Try suitable official images, including smaller usable ones, before Google's cache. Do not skip icon discovery or omit a valid verified icon. If no candidate works, omit `faviconUrl` and report the missing icon as a limitation without blocking service delivery or Save. Never fabricate an image URL or use an unrelated icon. Record the icon source internally.
+Submit only the public product origin, stripping credentials, path, query, and fragment. This discloses that origin to Google. Apply the same verification; a smaller result is acceptable only if recognizable at 20 px. Reject a placeholder, generic letter, unrelated mark, or failed response.
 
 ## 3. Explain the plan
 

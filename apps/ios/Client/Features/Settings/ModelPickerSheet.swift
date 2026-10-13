@@ -80,7 +80,7 @@ struct SettingsSheet: View {
                 VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                     SettingsSection(
                         "Profiles",
-                        footer: "Profiles hold conversations, files, character, and memory. Keep several, switch anytime, and store locally or sync with iCloud.",
+                        footer: "Profiles hold conversations, files, voice, and memory. Keep several, switch anytime, and store locally or sync with iCloud.",
                         layout: .group
                     ) {
                         VStack(spacing: 0) {
@@ -395,7 +395,7 @@ struct SettingsSheet: View {
         HStack(spacing: Theme.Spacing.md) {
             Image(systemName: systemImage)
                 .font(.system(.body, weight: .medium))
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.primary)
                 .frame(width: 24)
             Text(title)
                 .font(Theme.Fonts.bodyMd)
