@@ -4,6 +4,7 @@ import Observation
 
 struct StreamingMarkdownText: View {
     let source: String
+    let accessibilityIdentifier: String
     var isStreaming = true
     @Environment(ServiceManager.self) private var serviceManager
     @Environment(\.conversationLinkHandler) private var conversationLinkHandler
@@ -12,6 +13,10 @@ struct StreamingMarkdownText: View {
 
     var body: some View {
         let snapshot = buffer.snapshot
+        let hasInteractiveCode = snapshot.blocks.contains { block in
+            if case .code(let language, _) = block { return DiffDocument.supports(language) }
+            return false
+        }
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(snapshot.blocks.enumerated()), id: \.offset) { index, block in
                 MarkdownBlockView(
@@ -19,6 +24,7 @@ struct StreamingMarkdownText: View {
                     textColor: Theme.Colors.onSurface,
                     subtleColor: Theme.Colors.conversationSecondary,
                     availableWidth: availableWidth,
+                    accessibilityIdentifier: "\(accessibilityIdentifier).block.\(index)",
                     fadeKey: snapshot.fadeKey,
                     isStreaming: snapshot.input.isStreaming
                 )
@@ -30,6 +36,8 @@ struct StreamingMarkdownText: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: hasInteractiveCode ? .contain : .combine)
+        .accessibilityLabel(source, isEnabled: !isStreaming && !hasInteractiveCode)
         .environment(\.openURL, OpenURLAction { url in
             if let conversationLinkHandler { conversationLinkHandler(url) }
             else { LinkOpener.open(url: url, serviceManager: serviceManager) }
@@ -308,6 +316,7 @@ struct MarkdownText: View {
     let source: String
     let textColor: DynamicColor
     let subtleColor: DynamicColor
+    let accessibilityIdentifier: String
     @Environment(ServiceManager.self) private var serviceManager
     @Environment(\.conversationLinkHandler) private var conversationLinkHandler
     static let bodyFont = UIFont.preferredFont(forTextStyle: .body)
@@ -316,10 +325,12 @@ struct MarkdownText: View {
 
     init(
         _ source: String,
+        accessibilityIdentifier: String,
         textColor: DynamicColor = Theme.Colors.onSurface,
         subtleColor: DynamicColor = Theme.Colors.conversationSecondary
     ) {
         self.source = source
+        self.accessibilityIdentifier = accessibilityIdentifier
         self.textColor = textColor
         self.subtleColor = subtleColor
     }
@@ -328,7 +339,8 @@ struct MarkdownText: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
                 MarkdownRenderBlockView(block: block, textColor: textColor,
-                                        subtleColor: subtleColor, availableWidth: availableWidth)
+                                        subtleColor: subtleColor, availableWidth: availableWidth,
+                                        accessibilityIdentifier: "\(accessibilityIdentifier).block.\(index)")
                     .padding(
                         .top,
                         MarkdownText.spacing(
@@ -398,6 +410,7 @@ private struct MarkdownRenderBlockView: View {
     let textColor: DynamicColor
     let subtleColor: DynamicColor
     let availableWidth: CGFloat
+    let accessibilityIdentifier: String
 
     var body: some View {
         switch block {
@@ -416,7 +429,8 @@ private struct MarkdownRenderBlockView: View {
                 block: block,
                 textColor: textColor,
                 subtleColor: subtleColor,
-                availableWidth: availableWidth
+                availableWidth: availableWidth,
+                accessibilityIdentifier: accessibilityIdentifier
             )
         }
     }
@@ -427,6 +441,7 @@ private struct MarkdownBlockView: View {
     let textColor: DynamicColor
     let subtleColor: DynamicColor
     let availableWidth: CGFloat
+    let accessibilityIdentifier: String
     var fadeKey: Int? = nil
     var isStreaming = false
 
@@ -449,9 +464,9 @@ private struct MarkdownBlockView: View {
                 isStreaming: isStreaming
             )
         case .code(let language, let body):
-            CodeBlockSurface {
-                CodeBlockHeader(language: language) {
-                    CodeBlockCopyButton(code: body)
+            CodeBlockSurface(scrollsHorizontally: !DiffDocument.supports(language)) {
+                CodeBlockHeader(language: language, code: body, isStreaming: isStreaming) {
+                    CodeBlockCopyButton(code: body, accessibilityIdentifier: "\(accessibilityIdentifier).copy")
                 }
             } content: {
                 codeBody(body, language: language)
@@ -505,7 +520,10 @@ private struct MarkdownBlockView: View {
 
     @ViewBuilder
     private func codeBody(_ body: String, language: String?) -> some View {
-        if let fadeKey {
+        if DiffDocument.supports(language) {
+            DiffCodeBlockBody(code: body, accessibilityIdentifier: accessibilityIdentifier,
+                              fadeKey: fadeKey, isStreaming: isStreaming)
+        } else if let fadeKey {
             StreamingFadeSelectableText(code: body, language: language, resetKey: fadeKey)
         } else {
             SelectableText(code: body, language: language)
@@ -662,6 +680,7 @@ private struct MarkdownListView: View {
 
 private struct CodeBlockCopyButton: View {
     let code: String
+    let accessibilityIdentifier: String
     @State private var feedback = CopyFeedback()
 
     var body: some View {
@@ -678,6 +697,7 @@ private struct CodeBlockCopyButton: View {
         .frame(width: 22, height: 22, alignment: .topTrailing)
         .disabled(feedback.didCopy)
         .accessibilityLabel(A11yLabel.copyCode)
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
 

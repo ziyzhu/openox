@@ -106,9 +106,7 @@ struct OxDemoSceneView: View {
                     }
                     if !playback.reply.isEmpty {
                         VStack(alignment: .leading, spacing: ConversationTranscriptMetrics.responseFooterSpacing) {
-                            StreamingMarkdownText(source: playback.reply, isStreaming: playback.isStreaming)
-                                .accessibilityElement(children: .combine)
-                                .accessibilityLabel(playback.reply, isEnabled: !playback.isStreaming)
+                            StreamingMarkdownText(source: playback.reply, accessibilityIdentifier: "demo.reply", isStreaming: playback.isStreaming)
                                 .accessibilityIdentifier("demo.reply")
                             ResponseFooterBlockView(
                                 id: playback.sessionID,

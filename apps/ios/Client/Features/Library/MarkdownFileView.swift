@@ -55,7 +55,7 @@ struct MarkdownFileView: View {
                 case .viewing:
                     ScrollView {
                         VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                            MarkdownText(document.source)
+                            MarkdownText(document.source, accessibilityIdentifier: "file.\(artifact.id)")
                         }
                         .frame(maxWidth: Theme.ContainerWidth.readable, alignment: .leading)
                         .frame(maxWidth: .infinity, alignment: .leading)

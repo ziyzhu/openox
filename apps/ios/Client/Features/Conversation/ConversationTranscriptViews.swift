@@ -810,7 +810,7 @@ private struct InvocationDetailView: View {
                 emptyValue
             }
         } else {
-            CodeBlockView(code: InvocationFormat.clamp(InvocationFormat.prettyJSON(invocation.args)), language: "json")
+            CodeBlockView(code: InvocationFormat.clamp(InvocationFormat.prettyJSON(invocation.args)), accessibilityIdentifier: "invocation.\(invocation.id).input", language: "json")
         }
     }
 
@@ -818,7 +818,7 @@ private struct InvocationDetailView: View {
     private var outputValue: some View {
         switch invocation.outcome {
         case let .succeeded(result?):
-            CodeBlockView(code: InvocationFormat.clamp(InvocationFormat.prettyJSON(result)), language: "json")
+            CodeBlockView(code: InvocationFormat.clamp(InvocationFormat.prettyJSON(result)), accessibilityIdentifier: "invocation.\(invocation.id).output", language: "json")
         case .succeeded(nil):
             if invocation.preview?.resultTruncated == true {
                 Text("Result not retained.")
@@ -828,7 +828,7 @@ private struct InvocationDetailView: View {
                 emptyValue
             }
         case let .failed(error):
-            CodeBlockView(code: InvocationFormat.clamp(error))
+            CodeBlockView(code: InvocationFormat.clamp(error), accessibilityIdentifier: "invocation.\(invocation.id).error")
         case .running:
             HStack(spacing: Theme.Spacing.sm) {
                 CellularAutomatonLoader.small
@@ -1305,7 +1305,7 @@ struct BlockView: View, Equatable {
                     switch item {
                     case let .text(text), let .progress(text):
                         if !text.isEmpty {
-                            agentText(text)
+                            agentText(text, index: index)
                                 .font(Theme.Fonts.bodyMd)
                                 .foregroundStyle(Theme.Colors.onSurface)
                                 .padding(.horizontal, 4)
@@ -1393,11 +1393,9 @@ struct BlockView: View, Equatable {
         .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(artifact.id))
     }
 
-    private func agentText(_ text: String) -> some View {
-        StreamingMarkdownText(source: text, isStreaming: isStreamingTail)
+    private func agentText(_ text: String, index: Int) -> some View {
+        StreamingMarkdownText(source: text, accessibilityIdentifier: "message.\(block.id).item.\(index)", isStreaming: isStreamingTail)
             .environment(\.conversationLinkHandler, onOpenLink)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(text, isEnabled: !isStreamingTail)
             .accessibilityIdentifier(A11yID.ConversationControls.Message.agent)
     }
 
