@@ -68,6 +68,13 @@ nonisolated enum Secret {
         try index().entries
     }
 
+    static func userManagedEntries() throws -> [SecretEntry] {
+        try entries().filter { entry in
+            if case .generatedFor(.provider, _) = entry.origin { return false }
+            return true
+        }
+    }
+
     static func entry(key: String) throws -> SecretEntry? {
         try index().entries.first { $0.key == key }
     }

@@ -11,7 +11,6 @@ nonisolated enum Actions {
     static let providerDelete = "ox.provider.delete"
     static let providerAuthenticate = "ox.provider.authenticate"
     static let providerDeauthenticate = "ox.provider.deauthenticate"
-    static let providerConnect = "ox.provider.connect"
     static let secretList = "ox.secret.list"
     static let secretAdd = "ox.secret.add"
     static let secretDelete = "ox.secret.delete"
@@ -96,7 +95,7 @@ nonisolated enum Actions {
 
     static let builtIn = [
         conversationStart, conversationDelete, providerDefault, providerList, providerGet, providerValidate, providerSave, providerDelete,
-        providerAuthenticate, providerDeauthenticate, providerConnect, secretList, secretAdd, secretDelete,
+        providerAuthenticate, providerDeauthenticate, secretList, secretAdd, secretDelete,
         appInfo, appProfile, appProfiles, appNotifications, appLanguage, appTheme, appSetLanguage, appSetTheme,
         appModel, appDefaultModel, appSetModel, appSetDefaultModel, appActionPolicies, appRepositories,
         appLogs, appRenameConversation,
@@ -136,7 +135,6 @@ nonisolated enum Actions {
         case providerDelete: L10n.string("Delete a model provider")
         case providerAuthenticate: L10n.string("Sign in to a model provider")
         case providerDeauthenticate: L10n.string("Sign out of a model provider")
-        case providerConnect: L10n.string("Connect a model provider")
         case secretList: L10n.string("List secrets")
         case secretAdd: L10n.string("Add a secret")
         case secretDelete: L10n.string("Delete a secret")

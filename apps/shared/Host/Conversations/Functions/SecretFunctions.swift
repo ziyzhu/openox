@@ -7,7 +7,7 @@ extension Conversation {
         return try await tracked(operation, arguments, purpose: purpose) {
             switch name {
             case "list":
-                return .array(try Secret.entries().map { entry in
+                return .array(try Secret.userManagedEntries().map { entry in
                     let value = try Credentials.secretChecked(for: "secret:\(entry.key)")
                     let fieldNames: [String]
                     if let value {
@@ -38,7 +38,7 @@ extension Conversation {
                 return .object(["key": .string(key), "status": .string(status == "Saved" ? "saved" : "cancelled")])
             case "delete":
                 guard let key = fields["key"]?.stringValue,
-                      try Secret.entry(key: key) != nil else { throw RuntimeError.bridge("Secret entry was not found") }
+                      try Secret.userManagedEntries().contains(where: { $0.key == key }) else { throw RuntimeError.bridge("Secret entry was not found") }
                 let answer = await awaitPrompt(prompt: "Delete secret \(key)? Connections using it will need to be set up again.",
                                                 options: ["Delete", "Cancel"])
                 if answer == "Delete" {

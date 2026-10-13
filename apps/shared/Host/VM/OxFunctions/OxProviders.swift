@@ -25,11 +25,10 @@ nonisolated enum OxProviders {
             "access": .object([
                 "type": .string("object"),
                 "additionalProperties": .bool(false),
-                "required": .array(["methods", "credentialKind", "acceptsSecret", "optional", "notice"].map(JSONValue.string)),
+                "required": .array(["methods", "credentialKind", "optional", "notice"].map(JSONValue.string)),
                 "properties": .object([
                     "methods": .object(["type": .string("array"), "items": .object(["type": .string("string")])]),
                     "credentialKind": nullableString,
-                    "acceptsSecret": .object(["type": .string("boolean")]),
                     "optional": .object(["type": .string("boolean")]),
                     "notice": nullableString,
                 ]),
@@ -65,7 +64,6 @@ nonisolated enum OxProviders {
         ("save", ModelGuidance.text("ox.provider.save")),
         ("delete", ModelGuidance.text("ox.provider.delete")),
         ("authenticate", ModelGuidance.text("ox.provider.authenticate")),
-        ("connect", ModelGuidance.text("ox.provider.connect")),
         ("deauthenticate", ModelGuidance.text("ox.provider.deauthenticate")),
     ]
 
@@ -75,21 +73,6 @@ nonisolated enum OxProviders {
             operations.map { operation, description in
                 let fields: [String: JSONValue]
                 if ["save", "validate"].contains(operation) { fields = ["provider": ProviderDefinition.schema] }
-                else if operation == "connect" {
-                    fields = [
-                        "id": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(200)]),
-                        "credential": .object([
-                            "type": .string("object"),
-                            "properties": .object([
-                                "kind": .object(["type": .string("string"),
-                                                 "enum": .array([.string("secret"), .string("oauth")])]),
-                                "secretKey": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(128)]),
-                            ]),
-                            "required": .array([.string("kind")]),
-                            "additionalProperties": .bool(false),
-                        ]),
-                    ]
-                }
                 else if operation == "list" || operation == "default" { fields = [:] }
                 else { fields = ["id": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(200)])] }
                 return ("ox.provider.\(operation)", .object([

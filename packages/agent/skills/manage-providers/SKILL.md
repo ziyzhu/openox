@@ -41,7 +41,7 @@ Updating the catalog is not a request to switch the current conversation or new-
 
 ## Connect and verify
 
-Use `ox.provider.authenticate` for native user-entered setup, or `ox.provider.connect` for an existing Secret reference or managed OAuth flow. The agent never receives credential values. Honor destination confirmation, cancellation, and denied approvals; never collect API keys in conversation or extract them from website state.
+Use `ox.provider.authenticate({ purpose, id })` for all provider credential setup, including API keys the user already has and managed OAuth. The existing provider interface handles getting a key, entering its value, and saving it; the user does not define Secret field names. Never use `ox.secret.add` for provider setup. The agent never receives credential values. Honor cancellation and denied approvals; never collect API keys in conversation or extract them from website state.
 
 For requested live verification, explain any billable inference or attachment upload and stay within the authorized scope. Exercise the actual configured model through a supported Ox conversation/model selection path, not an invented provider-test API. Verify tools or attachments only when claimed: upload success alone does not prove the model can read a file. Authentication status and schema validation are not successful inference. Preserve drafts, existing conversations, and the user's working provider.
 

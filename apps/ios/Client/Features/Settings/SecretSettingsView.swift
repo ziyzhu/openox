@@ -80,7 +80,7 @@ struct SecretSettingsView: View {
 
     private func reload() {
         do {
-            entries = try Secret.entries().sorted {
+            entries = try Secret.userManagedEntries().sorted {
                 $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
             }
             error = nil
