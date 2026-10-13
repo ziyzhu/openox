@@ -103,7 +103,7 @@ struct ServiceAvatar: View {
                     .resizable()
                     .scaledToFit()
                     .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(service.domain == "ios:browser" ? Color.white : Theme.Colors.onPrimary.dynamic)
+                    .foregroundStyle(.white)
                     .padding(size * 0.12)
             }
         }

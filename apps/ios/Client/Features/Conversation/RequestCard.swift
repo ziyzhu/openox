@@ -568,7 +568,6 @@ struct PermissionActionButtons: View {
         RequestActionButton(
             title: option,
             isPrimary: isPrimary,
-            primaryFill: Theme.Colors.actionHighlight,
             cornerRadius: Theme.Radius.full,
             action: { onSelect(option) }
         )
