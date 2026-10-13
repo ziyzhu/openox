@@ -245,8 +245,10 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
 
         let helpCatalog = OxFunctionCatalog.build()
         let helpTextCatalog = OxFunctionCatalog.buildHelpText()
+        let namespaceHelpTextCatalog = OxFunctionCatalog.buildNamespaceHelpText()
         ctx.setObject(helpCatalog.toAny(), forKeyedSubscript: "__oxHelpCatalog" as NSString)
         ctx.setObject(helpTextCatalog.toAny(), forKeyedSubscript: "__oxHelpTextCatalog" as NSString)
+        ctx.setObject(namespaceHelpTextCatalog.toAny(), forKeyedSubscript: "__oxNamespaceHelpTextCatalog" as NSString)
         let helpTextCharacters = helpTextCatalog.objectValue?.values.reduce(0) { $0 + ($1.stringValue?.count ?? 0) } ?? 0
         Log.agent.debug("virtual machine help jsonChars=\(helpCatalog.jsonString().count) textChars=\(helpTextCharacters)")
 
@@ -359,6 +361,12 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
         };
         Object.defineProperty(ox, 'chat', { value: ox.conversation });
         const __oxAttachHelp = (value, prefix = 'ox') => {
+          Object.defineProperty(value, 'help', {
+            value: () => __oxNamespaceHelpTextCatalog[prefix],
+            enumerable: false,
+            writable: false,
+            configurable: false,
+          });
           for (const [key, member] of Object.entries(value)) {
             const name = `${prefix}.${key}`;
             if (typeof member === 'function') {

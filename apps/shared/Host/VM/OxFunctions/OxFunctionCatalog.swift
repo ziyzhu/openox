@@ -72,6 +72,31 @@ nonisolated enum OxFunctionCatalog {
         }))
     }
 
+    static func buildNamespaceHelpText() -> JSONValue {
+        let namespaces = Set(catalogEntries.flatMap { name, _ in
+            let parts = name.split(separator: ".")
+            return (1..<parts.count).map { parts.prefix($0).joined(separator: ".") }
+        })
+        return .object(Dictionary(uniqueKeysWithValues: namespaces.map { namespace in
+            let lines: [String]
+            if namespace == "ox" {
+                let functions = catalogEntries.compactMap { name, schema -> String? in
+                    guard name.dropFirst(3).contains(".") == false,
+                          let description = compactDescription(name: name, schema: schema, includesUsage: true) else { return nil }
+                    return "\(name) — \(description)"
+                }.sorted()
+                lines = functions + namespaceDescriptions.map { "ox.\($0.0) — \($0.1)" }
+            } else {
+                lines = catalogEntries.compactMap { name, schema -> String? in
+                    guard name.hasPrefix(namespace + "."),
+                          let description = compactDescription(name: name, schema: schema, includesUsage: true) else { return nil }
+                    return "\(name) — \(description)"
+                }.sorted()
+            }
+            return (namespace, .string(([namespace] + lines).joined(separator: "\n")))
+        }))
+    }
+
     static func helpTree(includesSummaries: Bool = false) -> String {
         let catalog = catalogEntries
         var lines = ["ox"]
