@@ -5,13 +5,14 @@ struct OxChipButton: ButtonStyle {
 
     var filled: Bool = true
     var primaryFill = Theme.Colors.primary
+    var secondaryFill = Theme.Colors.chipOnBackground
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(Theme.Fonts.labelMd)
             .foregroundStyle(filled ? Theme.Colors.onPrimary : Theme.Colors.onSurface)
             .padding(.horizontal, Theme.Spacing.md)
             .chipSurface(
-                (filled ? primaryFill : Theme.Colors.chipOnBackground)
+                (filled ? primaryFill : secondaryFill)
                     .opacity(configuration.isPressed ? 0.7 : 1.0)
             )
             .minimumTouchTarget()

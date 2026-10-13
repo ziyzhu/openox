@@ -38,6 +38,7 @@ struct ServiceDetailView: View {
     var browserSessionID: UUID? = nil
     @Environment(ServiceManager.self) private var serviceManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     private var service: Service {
         serviceManager.service(domain: initialService.domain) ?? initialService
@@ -210,7 +211,7 @@ struct ServiceDetailView: View {
                         .accessibilityIdentifier(A11yID.ConversationControls.Attach.signOutProgress(service.domain))
                     } else {
                         Button("Sign out") { Task { await signOut() } }
-                            .buttonStyle(OxChipButton(filled: false))
+                            .buttonStyle(OxChipButton(filled: false, secondaryFill: colorScheme == .light ? .white : Theme.Colors.chipOnBackground))
                             .accessibilityIdentifier(A11yID.ConversationControls.Attach.signOut(service.domain))
                     }
                 case .notRequired:

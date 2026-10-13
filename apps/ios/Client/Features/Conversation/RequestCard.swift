@@ -540,6 +540,7 @@ struct PermissionActionButtons: View {
     let options: [String]
     let onSelect: (String) -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
@@ -568,6 +569,8 @@ struct PermissionActionButtons: View {
         RequestActionButton(
             title: option,
             isPrimary: isPrimary,
+            secondaryFill: colorScheme == .light ? .white : Theme.Colors.surfaceSunken,
+            secondaryBorder: Theme.Colors.onSurface.opacity(0.25),
             cornerRadius: Theme.Radius.full,
             action: { onSelect(option) }
         )
@@ -579,6 +582,8 @@ private struct RequestActionButton: View {
     let title: String
     let isPrimary: Bool
     var primaryFill = Theme.Colors.primary
+    var secondaryFill = Theme.Colors.surfaceSunken
+    var secondaryBorder = Color.clear
     var cornerRadius = Theme.Radius.md
     let action: () -> Void
 
@@ -600,9 +605,14 @@ private struct RequestActionButton: View {
         .frame(maxWidth: .infinity, minHeight: 44)
         .padding(.horizontal, Theme.Spacing.sm)
         .background(
-            isPrimary ? AnyShapeStyle(primaryFill) : AnyShapeStyle(Theme.Colors.surfaceSunken),
+            isPrimary ? AnyShapeStyle(primaryFill) : AnyShapeStyle(secondaryFill),
             in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         )
+        .overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(isPrimary ? Color.clear : secondaryBorder, lineWidth: 1)
+                .allowsHitTesting(false)
+        }
     }
 }
 
