@@ -33,7 +33,7 @@ struct PersonalContextEditor: View {
                     .settingsSurface()
                     .accessibilityIdentifier(editorIdentifier)
             }
-            .padding(Theme.Spacing.lg)
+            .settingsPagePadding()
         }
         .scrollIndicators(.hidden)
         .background(Theme.Colors.background)

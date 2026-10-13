@@ -8,7 +8,7 @@ struct ShimmerText: View {
     nonisolated private static let band = 0.35
 
     var body: some View {
-        let shimmerColor = Theme.Colors.onSurfaceMuted.dynamic
+        let shimmerColor = Theme.Colors.conversationSecondary.dynamic
         Text(text)
             .font(Theme.Fonts.bodyMd)
             .lineLimit(lineLimit)

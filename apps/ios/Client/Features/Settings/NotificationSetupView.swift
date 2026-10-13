@@ -6,8 +6,10 @@ struct NotificationSetupView: View {
         ScrollView {
             NotificationSetupContent()
                 .frame(maxWidth: 560)
-                .padding(Theme.Spacing.xxl)
+                .frame(maxWidth: .infinity)
+                .settingsPagePadding()
         }
+        .scrollIndicators(.hidden)
         .background(Theme.Colors.background)
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
@@ -68,7 +70,7 @@ struct NotificationSetupContent: View {
         case .granted:
             Text("Notifications are already on")
                 .font(Theme.Fonts.bodyMd)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .accessibilityIdentifier(A11yID.NotificationSetup.permission)
         case .denied:
             Button(action: updatePermission) {

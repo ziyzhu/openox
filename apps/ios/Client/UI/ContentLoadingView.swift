@@ -20,10 +20,12 @@ struct ContentLoadingView: View {
 struct MonoRepositoryLoadingStatus: View {
     let minHeight: CGFloat
     let accessibilityIdentifier: String
+    let secondaryColor: DynamicColor
 
-    init(minHeight: CGFloat = 52, accessibilityIdentifier: String) {
+    init(minHeight: CGFloat = 52, accessibilityIdentifier: String, secondaryColor: DynamicColor = Theme.Colors.onSurfaceMuted) {
         self.minHeight = minHeight
         self.accessibilityIdentifier = accessibilityIdentifier
+        self.secondaryColor = secondaryColor
     }
 
     var body: some View {
@@ -32,7 +34,7 @@ struct MonoRepositoryLoadingStatus: View {
             Text("Loading services…")
                 .font(Theme.Fonts.bodySm)
         }
-        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+        .foregroundStyle(secondaryColor)
         .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .center)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Loading services…"))

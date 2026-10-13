@@ -395,7 +395,7 @@ struct SettingsSheet: View {
         HStack(spacing: Theme.Spacing.md) {
             Image(systemName: systemImage)
                 .font(.system(.body, weight: .medium))
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
                 .frame(width: 24)
             Text(title)
                 .font(Theme.Fonts.bodyMd)
@@ -422,7 +422,7 @@ struct SettingsSheet: View {
         HStack(spacing: Theme.Spacing.md) {
             Image(systemName: profileIcon(profile.location))
                 .font(.system(.body, weight: .medium))
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 1) {
                 Text(verbatim: profile.name)
@@ -430,7 +430,7 @@ struct SettingsSheet: View {
                     .foregroundStyle(Theme.Colors.onSurface)
                 Text(profileLocation(profile.location))
                     .font(Theme.Fonts.caption)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
             }
             Spacer(minLength: 0)
             if profile.id == storage.activeId {
@@ -440,7 +440,7 @@ struct SettingsSheet: View {
             }
             Image(systemName: "chevron.right")
                 .font(Theme.Icons.xs)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
         }
         .settingsRowPadding()
         .contentShape(Rectangle())
@@ -960,7 +960,7 @@ struct ModelPickerContent: View {
             if let indicator {
                 Image(systemName: indicator)
                     .font(Theme.Icons.xs)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
             }
         }
         .settingsRowPadding()
@@ -1329,14 +1329,14 @@ struct SettingsSelectionPickerView<Value: Hashable>: View {
                 if let subtitle = option.subtitle {
                     Text(LocalizedStringKey(subtitle))
                         .font(Theme.Fonts.caption)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .foregroundStyle(Theme.Colors.conversationSecondary)
                 }
             }
             Spacer(minLength: 0)
             if !option.children.isEmpty {
                 Image(systemName: "chevron.right")
                     .font(Theme.Icons.xs)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
             } else if selection == option.value {
                 Image(systemName: "checkmark")
                     .font(.system(.subheadline, weight: .semibold))

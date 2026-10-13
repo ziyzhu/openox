@@ -157,13 +157,13 @@ struct ProfileSettingsView: View {
             Spacer(minLength: 0)
             Text(verbatim: profile.name)
                 .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
             if profile.location != .external {
                 Image(systemName: "chevron.right")
                     .font(Theme.Icons.xs)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
             }
         }
         .settingsRowPadding()
@@ -187,7 +187,7 @@ struct ProfileSettingsView: View {
                     Spacer(minLength: 0)
                     Text("Opened in place")
                         .font(Theme.Fonts.bodySm)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .foregroundStyle(Theme.Colors.conversationSecondary)
                 }
                 .settingsRowPadding()
                 .settingsSurface(singleRow: true)

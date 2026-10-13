@@ -109,13 +109,13 @@ struct SettingsDisclosureRow: View {
             } else {
                 value
                     .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .truncationMode(.middle)
                 Image(systemName: indicator)
                     .font(Theme.Icons.xs)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
             }
         }
         .settingsRowPadding()
@@ -138,7 +138,7 @@ struct SettingsValueRow: View {
             Spacer(minLength: 0)
             Image(systemName: indicator)
                 .font(Theme.Icons.xs)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
         }
         .contentShape(Rectangle())
     }

@@ -66,7 +66,7 @@ struct CustomLLMProvidersView: View {
             } else {
                 Image(systemName: "server.rack")
                     .font(.system(.body, weight: .medium))
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
                     .frame(width: 24)
             }
             VStack(alignment: .leading, spacing: 2) {
@@ -75,13 +75,13 @@ struct CustomLLMProvidersView: View {
                     .foregroundStyle(Theme.Colors.onSurface)
                 Text(verbatim: "\(provider.models.count) \(provider.models.count == 1 ? "model" : "models") · \(provider.baseURL.host ?? provider.baseURL.absoluteString)")
                     .font(Theme.Fonts.caption)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
             Image(systemName: "chevron.right")
                 .font(Theme.Icons.xs)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
         }
         .settingsRowPadding()
         .contentShape(Rectangle())
@@ -222,7 +222,7 @@ struct CustomLLMProviderEditor: View {
             if models.isEmpty {
                 Text("Empty")
                     .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
                     .settingsRowPadding()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .settingsSurface(singleRow: true)
@@ -267,7 +267,7 @@ struct CustomLLMProviderEditor: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
             Text(label)
                 .font(Theme.Fonts.caption)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
             TextField(label, value: value, format: .number)
                 .keyboardType(.numberPad)
                 .font(Theme.Fonts.bodyMd.monospacedDigit())

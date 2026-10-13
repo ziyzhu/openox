@@ -376,13 +376,13 @@ struct ServiceDetailView: View {
                                 .lineLimit(1)
                             Text(verbatim: repositoryStatus(repository))
                                 .font(Theme.Fonts.bodySm)
-                                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                                .foregroundStyle(Theme.Colors.conversationSecondary)
                                 .lineLimit(1)
                         }
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.right")
                             .font(Theme.Icons.xs)
-                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                            .foregroundStyle(Theme.Colors.conversationSecondary)
                     }
                     .settingsRowPadding()
                     .contentShape(Rectangle())
@@ -459,7 +459,7 @@ struct ServiceDetailView: View {
                     .foregroundStyle(Theme.Colors.onSurface)
                 Text(attachPermissionDescription)
                     .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 approvalControl(actionID: Conversation.attachApproveKey(service.domain), defaultPolicy: Actions.defaultPolicy(for: Actions.serviceAttach))
             }
@@ -573,7 +573,7 @@ struct ServiceDetailView: View {
                 if let desc = action.description, !desc.isEmpty {
                     Text(desc)
                         .font(Theme.Fonts.bodySm)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .foregroundStyle(Theme.Colors.conversationSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if !isStandard {

@@ -133,7 +133,7 @@ struct PermissionRequestCard: View {
                         .accessibilityHidden(true)
                     Text(verbatim: request.actionName)
                         .font(Theme.Fonts.captionMd)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .foregroundStyle(Theme.Colors.conversationSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
@@ -147,7 +147,7 @@ struct PermissionRequestCard: View {
                     } label: {
                         Image(systemName: "info.circle")
                             .font(.system(size: 18))
-                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                            .foregroundStyle(Theme.Colors.conversationSecondary)
                             .frame(width: 18, height: 18)
                             .minimumTouchTarget()
                     }
@@ -257,7 +257,7 @@ private struct PermissionSourceIcon: View {
                 EmptyView()
             } else if sourceName == "Ox", let actionIconKind {
                 OxActionIcon(actionIconKind, size: 16)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
                     .frame(width: 18, height: 18)
             } else if sourceName == "Ox" {
                 Image(.oxIcon)
@@ -341,7 +341,7 @@ struct RequestCard<Content: View>: View {
                 if let message, !message.isEmpty {
                     Text(message)
                         .font(Theme.Fonts.bodySm)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .foregroundStyle(Theme.Colors.conversationSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -641,7 +641,7 @@ private struct RequestChoiceButton: View {
         } else {
             Image(systemName: "circle")
                 .font(Theme.Icons.md)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
                 .frame(width: 28, height: 28)
                 .accessibilityHidden(true)
         }

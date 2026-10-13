@@ -185,7 +185,7 @@ private struct ServicePickerPanel: View {
                 Spacer(minLength: 0)
                 OxActionIcon(.services, size: 20)
             }
-            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            .foregroundStyle(Theme.Colors.conversationSecondary)
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.top, Theme.Spacing.sm)
             .padding(.bottom, 2)
@@ -202,7 +202,8 @@ private struct ServicePickerPanel: View {
             if isLoadingServices {
                 MonoRepositoryLoadingStatus(
                     minHeight: rowHeight,
-                    accessibilityIdentifier: A11yID.ConversationControls.mentionLoading
+                    accessibilityIdentifier: A11yID.ConversationControls.mentionLoading,
+                    secondaryColor: Theme.Colors.conversationSecondary
                 )
                     .frame(minHeight: 72)
             } else {
@@ -211,7 +212,7 @@ private struct ServicePickerPanel: View {
                     Text("No services found")
                         .font(Theme.Fonts.bodySm)
                 }
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
                 .frame(maxWidth: .infinity, minHeight: 72, alignment: .center)
             }
         } else {
@@ -223,7 +224,8 @@ private struct ServicePickerPanel: View {
             if isLoadingServices {
                 MonoRepositoryLoadingStatus(
                     minHeight: rowHeight,
-                    accessibilityIdentifier: A11yID.ConversationControls.mentionLoading
+                    accessibilityIdentifier: A11yID.ConversationControls.mentionLoading,
+                    secondaryColor: Theme.Colors.conversationSecondary
                 )
             }
         }
@@ -308,7 +310,7 @@ private struct SlashPickerPanel: View {
                 .layoutPriority(1)
             Text(verbatim: skill.description)
                 .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)
