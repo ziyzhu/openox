@@ -25,66 +25,60 @@ struct ProfileFilesPage: View {
     private var unassigned: [DeviceFolderStore.Grant] { store.grants.filter { $0.profileId == nil } }
 
     var body: some View {
-        List {
-            Section {
-                Button { profileFolderPresented = true } label: {
-                    SettingsDisclosureRow(title: "Profile folder", value: Text(""))
+        ScrollView {
+            VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
+                SettingsSection("Profile", layout: .row) {
+                    Button { profileFolderPresented = true } label: {
+                        SettingsDisclosureRow(title: "Profile folder", value: Text(""))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("profile.files.profileFolder")
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("profile.files.profileFolder")
-            } header: {
-                sectionHeader("Profile")
-            }
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Rectangle().fill(Theme.Colors.surface))
-            Section {
-                ForEach(mounts) { grant in
-                    mountRow(grant)
-                }
-                Button { perform("mount") { profileId in
-                    let url = try await HostFolderPicker.choose()
-                    _ = try HostProfileCommands.profile(profileId.uuidString)
-                    try await store.add(url, profileId: profileId)
-                } } label: {
-                    Label("Add folder", systemImage: "plus")
-                        .font(Theme.Fonts.bodyMd)
-                        .foregroundStyle(Theme.Colors.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .settingsRowPadding()
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("profile.files.addFolder")
-            } header: {
-                sectionHeader("Mounted folders")
-            } footer: {
-                Text("Folders stay in their original location. Only this Profile can access them on this device.")
-                    .font(Theme.Fonts.caption)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-            }
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Rectangle().fill(Theme.Colors.surface))
-            if !unassigned.isEmpty {
-                Section {
-                    ForEach(unassigned) { grant in
-                        Button { perform(grant.id) { profileId in
-                            try await store.assign(grant.id, profileId: profileId)
+                SettingsSection(
+                    "Mounted folders",
+                    footer: "Folders stay in their original location. Only this Profile can access them on this device.",
+                    layout: mounts.isEmpty ? .row : .group
+                ) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(mounts.enumerated()), id: \.element.id) { index, grant in
+                            if index > 0 { Divider().settingsContentInset() }
+                            mountRow(grant)
+                        }
+                        if !mounts.isEmpty { Divider().settingsContentInset() }
+                        Button { perform("mount") { profileId in
+                            let url = try await HostFolderPicker.choose()
+                            _ = try HostProfileCommands.profile(profileId.uuidString)
+                            try await store.add(url, profileId: profileId)
                         } } label: {
-                            SettingsDisclosureRow(title: LocalizedStringKey(grant.name), value: Text("Use in this Profile"))
+                            Label("Add folder", systemImage: "plus")
+                                .font(Theme.Fonts.bodyMd)
+                                .foregroundStyle(Theme.Colors.primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .settingsRowPadding()
                         }
                         .buttonStyle(.plain)
-                        .accessibilityIdentifier("profile.files.assign.\(grant.id)")
+                        .accessibilityIdentifier("profile.files.addFolder")
                     }
-                } header: {
-                    sectionHeader("Unassigned folders")
                 }
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Rectangle().fill(Theme.Colors.surface))
+                if !unassigned.isEmpty {
+                    SettingsSection("Unassigned folders", layout: unassigned.count == 1 ? .row : .group) {
+                        VStack(spacing: 0) {
+                            ForEach(Array(unassigned.enumerated()), id: \.element.id) { index, grant in
+                                if index > 0 { Divider().settingsContentInset() }
+                                Button { perform(grant.id) { profileId in
+                                    try await store.assign(grant.id, profileId: profileId)
+                                } } label: {
+                                    SettingsDisclosureRow(title: LocalizedStringKey(grant.name), value: Text("Use in this Profile"))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("profile.files.assign.\(grant.id)")
+                            }
+                        }
+                    }
+                }
             }
+            .settingsPagePadding()
         }
-        .listStyle(.insetGrouped)
-        .listSectionSpacing(SettingsLayout.sectionSpacing)
-        .contentMargins(.horizontal, SettingsLayout.horizontalInset, for: .scrollContent)
-        .scrollContentBackground(.hidden)
         .disabled(operation != nil || scope.profileID == nil)
         .scrollIndicators(.hidden)
         .background(Theme.Colors.background)
@@ -137,13 +131,6 @@ struct ProfileFilesPage: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("profile.files.mount.\(grant.id)")
-    }
-
-    private func sectionHeader(_ title: LocalizedStringKey) -> some View {
-        Text(title)
-            .font(Theme.Fonts.labelMd)
-            .foregroundStyle(Theme.Colors.onSurfaceMuted)
-            .textCase(nil)
     }
 
     private func perform(_ name: String, action: @escaping @MainActor (UUID) async throws -> Void) {
