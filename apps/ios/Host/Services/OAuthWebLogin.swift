@@ -314,8 +314,8 @@ private final class LoopbackRedirectListener {
         return """
         <!doctype html><html><head><meta charset="utf-8">\
         <meta name="viewport" content="width=device-width,initial-scale=1"><title>Ox</title></head>\
-        <body style="font-family:-apple-system,system-ui,sans-serif;text-align:center;padding:3rem 1.5rem;color:#3a2a1a;background:#fff8ef">\
-        <h2>\(title)</h2><p>\(body)</p></body></html>
+        <body style="font:400 17px/1.45 -apple-system,system-ui,sans-serif;text-align:center;padding:3rem 1.5rem;color:#000000;background:#f5f5f5">\
+        <h2 style="font:600 22px/1.25 ui-rounded,-apple-system,system-ui,sans-serif">\(title)</h2><p>\(body)</p></body></html>
         """
     }
 }

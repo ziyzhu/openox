@@ -5,14 +5,14 @@ description: "A warm, provider-neutral personal assistant for iOS. Grounded, cap
 colors:
   primary: "#FFA500"
   primary-pressed: "#D87A0A"
-  surface: "#FFFDF7"
-  surface-sunken: "#FBE9C7"
-  chip-on-background: "#FBE9C7"
+  surface: "#FFFFFF"
+  surface-sunken: "#F2F2F7"
+  chip-on-background: "#F2F2F7"
   conversation-surface: "#FFFFFF"
-  bubble: "#FBE9C7"
-  background: "#FFF6E6"
-  on-surface: "#3A2410"
-  on-surface-muted: "#7A5A3A"
+  bubble: "#F3F3F3"
+  background: "#F2F2F7"
+  on-surface: "#000000"
+  on-surface-muted: "#8E8E93"
   on-primary: "#FFFDF7"
   error: "#B8422E"
 typography:
@@ -140,7 +140,7 @@ components:
 
 Ox is a provider-neutral personal assistant for iOS. Its primary surface is a streaming conversation connected to web, API, device, and MCP services, user-owned files, memory, and skills. The native app owns navigation, approvals, service handoffs, content libraries, Shoveler cards, inline video, and live-page previews. Agent-created interactive experiences are HTML canvases that can run inline in conversation or open in a dedicated screen. The design system must keep those varied surfaces coherent without making the shell feel heavy.
 
-The brand is steady, capable, and warm. **Ox feels grounded and strong without becoming heavy or stern** — a dependable working companion with an easy, informal voice. The default Ox theme uses cream surfaces, brown text, and harvest gold. Light and Dark offer neutral alternatives with the same warm accent.
+The brand is steady, capable, and warm. **Ox feels grounded and strong without becoming heavy or stern** — a dependable working companion with an easy, informal voice. Ox uses neutral surfaces and text with a bright orange accent in Light and Dark.
 
 The voice is curious and direct. Native screens and agent-created artifacts should prefer **a few large, legible elements over dense layouts**. When in doubt: bigger type, more breathing room, fewer chrome lines.
 
@@ -148,30 +148,30 @@ This document describes the current native implementation and provides defaults 
 
 ## Colors
 
-Ox has three explicit themes: **Ox** (`creatorPick`, the default), **Light**, and **Dark**. Ox and Light use the light color scheme; Dark uses the dark color scheme.
+Ox offers **Light** and **Dark** themes. The legacy `creatorPick` default resolves to Light.
 
-| Token | Ox | Light | Dark |
+| Token | Default (legacy Ox) | Light | Dark |
 | --- | --- | --- | --- |
 | `primary` | `#FFA500` | `#FFA500` | `#F5A030` |
 | `primary-pressed` | `#D87A0A` | `#D87A0A` | `#C77410` |
-| `surface` | `#FFFDF7` | `#FFFFFF` | `#1C1C1E` |
-| `surface-sunken` | `#FBE9C7` | `#F2F2F7` | `#2C2C2E` |
-| `chip-on-background` | `#FBE9C7` | `#FFFFFF` | `#2C2C2E` |
+| `surface` | `#FFFFFF` | `#FFFFFF` | `#1C1C1E` |
+| `surface-sunken` | `#F2F2F7` | `#F2F2F7` | `#2C2C2E` |
+| `chip-on-background` | `#F2F2F7` | `#F2F2F7` | `#2C2C2E` |
 | `conversation-surface` | `#FFFFFF` | `#FFFFFF` | `#0A0A0A` |
-| `bubble` | `#FBE9C7` | `#F2F2F7` | `#1C1C1E` |
-| `background` | `#FFF6E6` | `#F5F5F5` | `#0A0A0A` |
-| `on-surface` | `#3A2410` | `#000000` | `#ECECEC` |
-| `on-surface-muted` | `#7A5A3A` | `#8E8E93` | `#9A9A9A` |
+| `bubble` | `#F3F3F3` | `#F3F3F3` | `#1C1C1E` |
+| `background` | `#F2F2F7` | `#F2F2F7` | `#0A0A0A` |
+| `on-surface` | `#000000` | `#000000` | `#ECECEC` |
+| `on-surface-muted` | `#8E8E93` | `#8E8E93` | `#9A9A9A` |
 | `on-primary` | `#FFFDF7` | `#FFFDF7` | `#FFFDF7` |
 | `error` | `#B8422E` | `#B8422E` | `#E25A45` |
 
-Use `surface` for content and settings rows, `background` for grouped pages, and `conversation-surface` for the conversation canvas. `surface-sunken` supports small recessed accents; `bubble` is a separate message token. Chips on grouped pages use `chip-on-background`, which is white in Light and hay in Ox. Composer chips use glass instead of an opaque token fill.
+Use `surface` for content and settings rows, `background` for grouped pages, and `conversation-surface` for the conversation canvas. `surface-sunken` supports small recessed accents; `bubble` is a separate message token. Chips on grouped pages use `chip-on-background`, which uses a neutral grey fill. Composer chips use glass instead of an opaque token fill.
 
 Harvest gold marks primary actions, active states, and confirmation. Keep its emphasis selective. Body text uses `on-surface`; metadata and supporting text use `on-surface-muted`. Resolve colors through the selected theme rather than assuming that content is always white or text is always black.
 
 ## Typography
 
-The type system uses **SF Pro Rounded for display and label roles**, SF Pro for body text, and a monospaced system font for URLs, code, and diagnostics. Native tokens use SwiftUI semantic text styles, not fixed pixel sizes or custom line-height and tracking values.
+The type system uses **SF Pro Rounded for display and label roles**, SF Pro for body text, and a monospaced system font for URLs, code, and diagnostics. HTML uses `-apple-system, system-ui, sans-serif` for body text at 17 px and weight 400, and `ui-rounded, -apple-system, system-ui, sans-serif` for headings at 22 px and labels at 17 px, both at weight 600. Native tokens use SwiftUI semantic text styles, not fixed pixel sizes or custom line-height and tracking values.
 
 | Token | Native style | Design / weight |
 | --- | --- | --- |
@@ -252,7 +252,7 @@ Respect Reduce Motion and Reduce Transparency. The compact sidebar substitutes c
 
 ## Do's and Don'ts
 
-- **Do** use theme tokens: warm cream and brown in Ox, neutral surfaces in Light and Dark, and a distinct conversation canvas.
+- **Do** use theme tokens: neutral surfaces and text with bright orange accents in Light and Dark, and a distinct conversation canvas.
 - **Do** give primary emphasis a clear purpose. Avoid making adjacent controls compete for attention.
 - **Do** prefer larger type and fewer items. The agent has license to drop content the user didn't ask for.
 - **Do** use `on-surface` for text and `on-surface-muted` for metadata and disabled states.

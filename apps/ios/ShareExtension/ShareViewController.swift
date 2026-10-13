@@ -206,9 +206,9 @@ private enum ShareTheme {
     static let body = Font.body
     static let caption = Font.caption
     static let label = Font.system(.subheadline, design: .rounded).weight(.semibold)
-    static var background: Color { color(brand: 0xFFF6E6, light: 0xF5F5F5, dark: 0x0A0A0A) }
-    static var onSurface: Color { color(brand: 0x3A2410, light: 0x000000, dark: 0xECECEC) }
-    static var onSurfaceMuted: Color { color(brand: 0x7A5A3A, light: 0x8E8E93, dark: 0x9A9A9A) }
+    static var background: Color { color(brand: 0xF5F5F5, light: 0xF5F5F5, dark: 0x0A0A0A) }
+    static var onSurface: Color { color(brand: 0x000000, light: 0x000000, dark: 0xECECEC) }
+    static var onSurfaceMuted: Color { color(brand: 0x8E8E93, light: 0x8E8E93, dark: 0x9A9A9A) }
     static var primary: Color { color(brand: 0xFFA500, light: 0xFFA500, dark: 0xF5A030) }
     static var onPrimary: Color { Color(uiColor: UIColor(hex: 0xFFFDF7)) }
     static var error: Color { color(brand: 0xB8422E, light: 0xB8422E, dark: 0xE25A45) }

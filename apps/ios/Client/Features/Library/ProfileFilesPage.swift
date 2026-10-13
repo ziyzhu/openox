@@ -50,11 +50,18 @@ struct ProfileFilesPage: View {
                             _ = try HostProfileCommands.profile(profileId.uuidString)
                             try await store.add(url, profileId: profileId)
                         } } label: {
-                            Label("Add folder", systemImage: "plus")
-                                .font(Theme.Fonts.bodyMd)
-                                .foregroundStyle(Theme.Colors.primary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .settingsRowPadding()
+                            HStack(spacing: Theme.Spacing.md) {
+                                Image(systemName: "plus")
+                                    .font(.system(.body, weight: .medium))
+                                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                                    .frame(width: 24)
+                                Text("Add folder")
+                                    .font(Theme.Fonts.bodyMd)
+                                    .foregroundStyle(Theme.Colors.onSurface)
+                                Spacer(minLength: 0)
+                            }
+                            .settingsRowPadding()
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("profile.files.addFolder")
