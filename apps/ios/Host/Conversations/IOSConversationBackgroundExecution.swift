@@ -3,6 +3,7 @@ import Foundation
 
 @MainActor
 final class IOSConversationBackgroundExecution: ConversationBackgroundExecution {
+    private static let activityPulseInterval = Duration.seconds(5)
     private static var title: String { String(localized: "Ox is on it") }
 
     private final class CompletionState {
@@ -23,6 +24,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
     private let completion = CompletionState()
     private var completedUnits: Int64 = 0
     private var lastProgressAt: Date?
+    private var activityPulse: Task<Void, Never>?
     private var onExpiration: (() -> Void)?
 
     init(conversationID: UUID, runID: RunID, onExpiration: @escaping () -> Void) {
@@ -108,6 +110,8 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         if let phase = outcome.phase { updatePhase(phase) }
         completion.outcome = outcome
         onExpiration = nil
+        activityPulse?.cancel()
+        activityPulse = nil
         if let task {
             if case .completed = outcome {
                 let total = max(completedUnits + 1, 1)
@@ -132,9 +136,21 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
             return
         }
         self.task = task
+        activityPulse = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: Self.activityPulseInterval)
+                } catch {
+                    return
+                }
+                guard let self else { return }
+                self.advance()
+            }
+        }
         task.updateTitle(Self.title, subtitle: subtitle)
         task.progress.totalUnitCount = max(completedUnits + 1, 1)
         task.progress.completedUnitCount = completedUnits
+        advance()
         task.expirationHandler = { [weak self] in
             Task { @MainActor in
                 self?.expire()
