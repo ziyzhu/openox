@@ -11,10 +11,9 @@ struct ShovelerView: View {
                 ForEach(Array(shoveler.cards.enumerated()), id: \.offset) { index, card in
                     ShovelerCardContainer(
                         card: card,
-                        sourceID: "\(accessibilityPrefix).card.\(index):\(card.artifact?.id ?? "none")",
+                        sourceID: "\(accessibilityPrefix).card.\(card.artifact?.id ?? "none").\(index)",
                         onOpenFile: onOpenFile
                     )
-                        .accessibilityIdentifier("\(accessibilityPrefix).card.\(index)")
                 }
             }
             .scrollTargetLayout()
@@ -78,11 +77,21 @@ private struct ShovelerCardContainer: View {
     var body: some View {
         if let artifact = card.artifact, artifact.exists {
             Button { onOpenFile(artifact, sourceID) } label: {
-                ShovelerCardView(card: card)
+                cardView
                     .artifactPreviewTransitionSource(artifact, sourceID: sourceID)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier(sourceID)
             .accessibilityHint(String(format: L10n.string("Opens %@"), artifact.userFacingName))
+        } else {
+            cardView
+        }
+    }
+
+    @ViewBuilder
+    private var cardView: some View {
+        if let file = card.artifact {
+            FileCardView(file: file, title: card.title, description: card.description, badge: card.badge)
         } else {
             ShovelerCardView(card: card)
         }

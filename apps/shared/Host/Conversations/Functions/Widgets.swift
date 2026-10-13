@@ -3,20 +3,27 @@ import Foundation
 extension Conversation {
     public func presentShoveler(value: JSONValue?, purpose: String) async throws -> JSONValue? {
         guard let value else { throw RuntimeError.bridge("ox.widget.shoveler: widget is required") }
+        guard let cards = value.objectValue?["cards"]?.arrayValue, (1...20).contains(cards.count) else {
+            throw RuntimeError.bridge("ox.widget.shoveler: cards must contain between 1 and 20 cards")
+        }
+        var files: [String: FileItem] = [:]
+        for card in cards {
+            if let name = card.objectValue?["artifact"]?.stringValue, files[name] == nil {
+                files[name] = try await repository.artifact(named: name, in: scope)
+            }
+        }
         let data = try JSONEncoder().encode(value)
         let shoveler: Shoveler
         do {
             let decoder = JSONDecoder()
             decoder.userInfo[.profileScope] = scope
+            decoder.userInfo[.artifactDirectoryListing] = FileDirectoryListing(files: files)
             shoveler = try decoder.decode(Shoveler.self, from: data)
         } catch {
             throw RuntimeError.bridge("ox.widget.shoveler: invalid widget data")
         }
-        guard !shoveler.cards.isEmpty else {
-            throw RuntimeError.bridge("ox.widget.shoveler: cards must contain at least one card")
-        }
         for (index, card) in shoveler.cards.enumerated() {
-            guard card.image != nil || card.title != nil || card.description != nil || card.badge != nil else {
+            guard card.artifact != nil || card.image != nil || card.title != nil || card.description != nil || card.badge != nil else {
                 throw RuntimeError.bridge("ox.widget.shoveler: cards[\(index)] must contain display content")
             }
             if let image = card.image {
