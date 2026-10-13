@@ -39,6 +39,7 @@ struct ConversationSidebar: View {
                 .accessibilityIdentifier(A11yID.Sidebar.panel)
                 .safeAreaBar(edge: .top, alignment: .leading, spacing: 0) { header }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(Theme.Colors.conversationSurface, ignoresSafeAreaEdges: .all)
                 .toolbar {
                     DefaultToolbarItem(kind: .search, placement: .bottomBar)
                     ToolbarSpacer(.fixed, placement: .bottomBar)
@@ -55,7 +56,6 @@ struct ConversationSidebar: View {
             prompt: Text(A11yLabel.searchConversations),
             accessibilityIdentifier: A11yID.Sidebar.search
         )
-        .background(Theme.Colors.surface, ignoresSafeAreaEdges: .all)
         .onChange(of: searchQuery) { _, _ in visibleCount = pageSize }
         .alert(A11yLabel.renameConversation, isPresented: Binding(
             get: { renaming != nil },

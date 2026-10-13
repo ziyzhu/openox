@@ -34,31 +34,31 @@ private struct ConversationFileRow: View {
             } else {
                 Image(systemName: "trash")
                     .font(.title3)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
                     .frame(width: 44, height: 44)
-                    .background(Theme.Colors.background, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                    .background(Theme.Colors.conversationSurface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             }
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text(artifact.userFacingName)
                     .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(artifact.exists ? Theme.Colors.onSurface : Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(artifact.exists ? Theme.Colors.onSurface : Theme.Colors.conversationSecondary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 if let typeName = artifact.userFacingTypeName, artifact.exists {
                     Text(typeName)
                         .font(Theme.Fonts.caption)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .foregroundStyle(Theme.Colors.conversationSecondary)
                 } else if !artifact.exists {
                     Text("Deleted file")
                         .font(Theme.Fonts.caption)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .foregroundStyle(Theme.Colors.conversationSecondary)
                 }
             }
             Spacer(minLength: Theme.Spacing.sm)
             if artifact.exists {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
@@ -101,7 +101,7 @@ private struct TranscriptStatusDivider: View {
             line
         }
         .font(Theme.Fonts.caption)
-        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+        .foregroundStyle(Theme.Colors.conversationSecondary)
         .padding(.horizontal, 4)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
@@ -110,7 +110,7 @@ private struct TranscriptStatusDivider: View {
 
     private var line: some View {
         Rectangle()
-            .fill(Theme.Colors.onSurfaceMuted.opacity(0.2))
+            .fill(Theme.Colors.conversationSecondary.opacity(0.2))
             .frame(height: 1)
     }
 }
@@ -327,7 +327,7 @@ struct ThinkingRow: View {
             ThinkingSheet(trace: trace, startedAt: startedAt)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-                .presentationBackground(Theme.Colors.background)
+                .presentationBackground(Theme.Colors.conversationSurface)
         }
         .animation(Theme.Animation.standard, value: isLive)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -375,7 +375,7 @@ struct ThinkingRow: View {
                 } else {
                     Text(label)
                         .font(Theme.Fonts.bodyMd)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .foregroundStyle(Theme.Colors.conversationSecondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .contentTransition(.opacity)
@@ -385,7 +385,7 @@ struct ThinkingRow: View {
             if !isLive {
                 Image(systemName: "chevron.right")
                     .font(Theme.Icons.sm)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
                     .frame(height: singleLineHeight)
                     .transition(.opacity)
             }
@@ -502,7 +502,7 @@ private struct ThinkingSheet: View {
                 .padding(.vertical, Theme.Spacing.md)
             }
             .scrollIndicators(.hidden)
-            .background(Theme.Colors.background)
+            .background(Theme.Colors.conversationSurface)
             .navigationTitle(Text("Steps", comment: "Title of the sheet showing the agent's reasoning and the actions it took."))
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Invocation.self) { InvocationDetailView(invocation: $0) }
@@ -558,7 +558,7 @@ private struct TraceRow: View {
                 SelectableText(
                     plain: reasoning.text,
                     font: MarkdownText.bodyFont,
-                    color: Theme.Colors.onSurfaceMuted.uiColor,
+                    color: Theme.Colors.conversationSecondary.uiColor,
                     lineSpacing: 1
                 )
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -577,7 +577,7 @@ private struct TraceRow: View {
                             Spacer(minLength: 0)
                             Image(systemName: "chevron.right")
                                 .font(Theme.Icons.sm)
-                                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                                .foregroundStyle(Theme.Colors.conversationSecondary)
                         }
                         .frame(minHeight: 22)
                         .contentShape(
@@ -633,7 +633,7 @@ private struct TraceRow: View {
                 node()
                 if !isLast {
                     Rectangle()
-                        .fill(Theme.Colors.onSurfaceMuted.dynamic.opacity(0.25))
+                        .fill(Theme.Colors.conversationSecondary.dynamic.opacity(0.25))
                         .frame(width: 2)
                         .frame(maxHeight: .infinity)
                         .padding(.bottom, Theme.Spacing.xs)
@@ -651,7 +651,7 @@ private struct TraceRow: View {
 private struct ReasoningNode: View {
     var body: some View {
         Circle()
-            .fill(Theme.Colors.onSurfaceMuted.dynamic.opacity(0.5))
+            .fill(Theme.Colors.conversationSecondary.dynamic.opacity(0.5))
             .frame(width: 8, height: 8)
             .frame(width: 22, height: 22)
     }
@@ -660,12 +660,12 @@ private struct ReasoningNode: View {
 private struct InvocationNode: View {
     let invocation: Invocation
 
-    private var tint: Color { invocation.isFailed ? Theme.Colors.error.dynamic : Theme.Colors.onSurfaceMuted.dynamic }
+    private var tint: Color { invocation.isFailed ? Theme.Colors.error.dynamic : Theme.Colors.conversationSecondary.dynamic }
 
     var body: some View {
         Group {
             if invocation.isRunning {
-                CellularAutomatonLoader(size: 14, tint: Theme.Colors.onSurfaceMuted.dynamic)
+                CellularAutomatonLoader(size: 14, tint: Theme.Colors.conversationSecondary.dynamic)
             } else {
                 OxActionIcon(InvocationFormat.iconKind(invocation), size: 15)
                     .foregroundStyle(tint)
@@ -692,13 +692,13 @@ private struct SourceChip: View {
             }
             Text(source.label)
                 .font(Theme.Fonts.caption)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
         .padding(.leading, 8)
         .padding(.trailing, 10)
-        .chipSurface(Theme.Colors.onSurfaceMuted.opacity(0.1))
+        .chipSurface(Theme.Colors.conversationSecondary.opacity(0.1))
     }
 }
 
@@ -781,7 +781,7 @@ private struct InvocationDetailView: View {
         }
         .scrollIndicators(.hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Colors.background)
+        .background(Theme.Colors.conversationSurface)
         .navigationTitle(InvocationFormat.humanLabel(invocation))
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -831,7 +831,7 @@ private struct InvocationDetailView: View {
                 CellularAutomatonLoader.small
                 Text("Running…", comment: "Shown in a step's detail while the action is still in flight.")
                     .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
             }
         }
     }
@@ -846,7 +846,7 @@ private struct InvocationDetailView: View {
     private var emptyValue: some View {
         Text("Empty", comment: "Placeholder for a step that took no input or produced no output.")
             .font(Theme.Fonts.bodySm)
-            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            .foregroundStyle(Theme.Colors.conversationSecondary)
     }
 }
 
@@ -1141,7 +1141,7 @@ struct QueuedBubble: View {
                     Image(systemName: "xmark.circle.fill")
                 }
                 .font(Theme.Fonts.caption)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
             }
             .buttonStyle(.plain)
             .padding(.trailing, 4)
@@ -1474,7 +1474,7 @@ struct ResponseFooterBlockView: View, Equatable {
     private func controlIcon(systemName: String) -> some View {
         Image(systemName: systemName)
             .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            .foregroundStyle(Theme.Colors.conversationSecondary)
             .frame(width: 18, height: 28)
             .frame(width: 28, height: Theme.Size.minimumTouchTarget, alignment: .leading)
             .contentShape(Rectangle())

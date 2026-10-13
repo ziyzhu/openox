@@ -246,6 +246,7 @@ struct ConversationComposer: View, Equatable {
     let onSpeechBegin: (Bool) -> Void
     var serviceAuthSource = ServiceChip.AuthSource.live
     var serviceScrollProgress: CGFloat? = nil
+    var onInputFrameChange: (CGRect) -> Void = { _ in }
 
     private let textLineFragmentPadding: CGFloat = 5
     private let textEditorVerticalInset: CGFloat = 9
@@ -597,12 +598,12 @@ struct ConversationComposer: View, Equatable {
         } label: {
             followIntentTitle(intent)
                 .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
                 .lineLimit(1)
                 .padding(.horizontal, Theme.Spacing.md)
                 .frame(height: Theme.Size.chipHeight)
                 .overlay {
-                    Capsule().strokeBorder(Theme.Colors.onSurfaceMuted.opacity(0.4), lineWidth: 1)
+                    Capsule().strokeBorder(Theme.Colors.conversationSecondary.opacity(0.4), lineWidth: 1)
                 }
                 .contentShape(Capsule())
         }
@@ -650,7 +651,7 @@ struct ConversationComposer: View, Equatable {
                 Image(systemName: OxActionIconKind.artifacts.systemImage)
                 Text("Files")
                 Text(verbatim: "· \(conversationFiles.count)")
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
             }
             .font(Theme.Fonts.labelMd)
             .foregroundStyle(Theme.Colors.onSurface)
@@ -739,7 +740,7 @@ struct ConversationComposer: View, Equatable {
                     }
                 }
                     .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Color(uiColor: .placeholderText))
                     .padding(.leading, textLineFragmentPadding)
                     .transition(.identity)
                     .allowsHitTesting(false)
@@ -755,6 +756,9 @@ struct ConversationComposer: View, Equatable {
                 .padding(.bottom, -textEditorVerticalInset - textEditorOpticalOffset)
                 .focused(fieldFocused)
                 .accessibilityIdentifier(A11yID.ConversationControls.input)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                    onInputFrameChange($0)
+                }
                 .accessibilityValue(inputAccessibilityValue)
                 .accessibilityHint("Tap to type.")
                 .font(Theme.Fonts.bodyMd)
@@ -929,9 +933,9 @@ struct ConversationComposer: View, Equatable {
         } label: {
             Image(systemName: systemName)
                 .font(.system(.subheadline, weight: .bold))
-                .foregroundStyle(Theme.Colors.onPrimary)
+                .foregroundStyle(Theme.Colors.conversationControlLabel)
                 .frame(width: composerButtonSize, height: composerButtonSize)
-                .background(Theme.Colors.primary, in: Circle())
+                .background(Theme.Colors.conversationControl, in: Circle())
                 .padding(.leading, 4)
                 .padding(.trailing, 6)
                 .padding(.vertical, 5)
@@ -1093,7 +1097,7 @@ private struct PendingAttachmentChip: View {
         ) {
             CellularAutomatonLoader.small
                 .frame(width: 28, height: 28)
-                .background(Theme.Colors.background, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .background(Theme.Colors.conversationSurface, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
     }
 }
@@ -1119,7 +1123,7 @@ private struct ComposerAttachmentChip<Preview: View>: View {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 16, weight: .semibold))
                     .symbolRenderingMode(.palette)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted, Theme.Colors.surface)
+                    .foregroundStyle(Theme.Colors.conversationSecondary, Theme.Colors.surface)
                     .frame(
                         width: Theme.Size.minimumTouchTarget,
                         height: Theme.Size.minimumTouchTarget

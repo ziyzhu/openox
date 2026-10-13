@@ -573,7 +573,7 @@ struct SelectableText: UIViewRepresentable {
             if let intent = run.inlinePresentationIntent {
                 if intent.contains(.stronglyEmphasized) { attributes[.font] = font.bold }
                 if intent.contains(.code) {
-                    attributes[.foregroundColor] = Theme.Colors.onSurfaceMuted.uiColor
+                    attributes[.foregroundColor] = Theme.Colors.conversationInlineCode.uiColor
                 }
             }
             if let link = run.link { attributes[.link] = link }

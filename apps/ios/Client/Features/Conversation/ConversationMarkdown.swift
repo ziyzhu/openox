@@ -17,7 +17,7 @@ struct StreamingMarkdownText: View {
                 MarkdownBlockView(
                     block: block,
                     textColor: Theme.Colors.onSurface,
-                    subtleColor: Theme.Colors.onSurfaceMuted,
+                    subtleColor: Theme.Colors.conversationSecondary,
                     availableWidth: availableWidth,
                     fadeKey: snapshot.fadeKey,
                     isStreaming: snapshot.input.isStreaming
@@ -317,7 +317,7 @@ struct MarkdownText: View {
     init(
         _ source: String,
         textColor: DynamicColor = Theme.Colors.onSurface,
-        subtleColor: DynamicColor = Theme.Colors.onSurfaceMuted
+        subtleColor: DynamicColor = Theme.Colors.conversationSecondary
     ) {
         self.source = source
         self.textColor = textColor
@@ -449,48 +449,19 @@ private struct MarkdownBlockView: View {
                 isStreaming: isStreaming
             )
         case .code(let language, let body):
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: Theme.Spacing.sm) {
-                    if let language {
-                        Text(language)
-                            .font(Theme.Fonts.caption)
-                            .foregroundStyle(subtleColor)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .frame(minHeight: 22, alignment: .topLeading)
-                .padding(.horizontal, Theme.Spacing.md)
-                .padding(.vertical, Theme.Spacing.sm)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    Theme.Colors.background.opacity(0.55),
-                    in: UnevenRoundedRectangle(
-                        topLeadingRadius: Theme.Radius.md,
-                        topTrailingRadius: Theme.Radius.md,
-                        style: .continuous
-                    )
-                )
-                .overlay(alignment: .topTrailing) {
+            CodeBlockSurface {
+                CodeBlockHeader(language: language) {
                     CodeBlockCopyButton(code: body)
-                        .padding(Theme.Spacing.sm)
                 }
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    codeBody(body, language: language)
-                }
-                .excludesCompactPageSwitch()
-                .defaultScrollAnchor(nil, for: .sizeChanges)
+            } content: {
+                codeBody(body, language: language)
             }
-            .background(
-                Theme.Colors.background,
-                in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-            )
         case .quote(let text):
             prose(text, font: MarkdownText.bodyFont, color: subtleColor, lineSpacing: 2, fades: true)
                 .padding(.leading, 11)
                 .overlay(alignment: .leading) {
                     Rectangle()
-                        .fill(Theme.Colors.onSurfaceMuted)
+                        .fill(Theme.Colors.conversationSecondary)
                         .frame(width: 3)
                 }
         case let .table(header, rows):
@@ -536,14 +507,8 @@ private struct MarkdownBlockView: View {
     private func codeBody(_ body: String, language: String?) -> some View {
         if let fadeKey {
             StreamingFadeSelectableText(code: body, language: language, resetKey: fadeKey)
-                .fixedSize(horizontal: true, vertical: true)
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             SelectableText(code: body, language: language)
-                .fixedSize(horizontal: true, vertical: true)
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -573,7 +538,7 @@ private struct MarkdownBlockView: View {
                 attributed[range].underlineStyle = Text.LineStyle(pattern: .dot)
             }
             for range in code {
-                attributed[range].foregroundColor = Theme.Colors.onSurfaceMuted.dynamic
+                attributed[range].foregroundColor = Theme.Colors.conversationInlineCode.dynamic
                 if let intent = attributed[range].inlinePresentationIntent {
                     let remaining = intent.subtracting(.code)
                     attributed[range].inlinePresentationIntent = remaining.isEmpty ? nil : remaining
@@ -705,11 +670,12 @@ private struct CodeBlockCopyButton: View {
         } label: {
             Image(systemName: feedback.didCopy ? "checkmark" : "doc.on.doc")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.onSurface)
                 .frame(width: 22, height: 22)
                 .minimumTouchTarget(alignment: .topTrailing)
         }
         .buttonStyle(.plain)
+        .frame(width: 22, height: 22, alignment: .topTrailing)
         .disabled(feedback.didCopy)
         .accessibilityLabel(A11yLabel.copyCode)
     }

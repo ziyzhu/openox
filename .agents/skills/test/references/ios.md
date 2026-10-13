@@ -25,8 +25,14 @@ WAL/SHM; they are diagnostics, not Profile exports or power-loss evidence.
 Verify behavior or independent effects, not just taps, queued sends, or idle status.
 For native switches that ignore an idb default tap, verify the current hit target, use `idb ui tap --duration 0.15`, and assert the resulting AX value. Refresh frames after CLI mutations change a visible list.
 For transcript comparisons, use immutable historical turns: VM calls append receipts.
+For chat opening, verify the final visible tail after Markdown layout expands, then
+scroll away and reopen; an initial bottom geometry sample alone does not prove success.
 
 Verify streaming-rendering changes in video across paragraph/fence boundaries and completion; content assertions and settled screenshots do not establish visual continuity.
+
+Verify Send handoffs in video for empty/populated chats, short/multiline/long drafts,
+keyboard visible/hidden, and scrolled history. Confirm non-queued cases have `posted`
+receipts; inspect rising motion separately from queue promotion and final anchoring.
 
 Measure Client–Host latency over a warmed persistent RPC connection using identical fresh
 fixtures for A/B runs. Report stop acknowledgement separately from observed idle state,

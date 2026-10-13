@@ -94,6 +94,12 @@ enum SyntaxHighlighter {
         let key = DynamicColor(light: 0x326D74, dark: 0x67B7A4)
 
         switch language {
+        case "diff", "patch":
+            return [
+                Rule(pattern: #"(?m)^(?:\+\+\+|---|@@)[^\n]*"#, color: comment),
+                Rule(pattern: #"(?m)^\+[^\n]*"#, color: DynamicColor(light: 0x327F38, dark: 0x78C982)),
+                Rule(pattern: #"(?m)^-[^\n]*"#, color: DynamicColor(light: 0xC74455, dark: 0xF08090)),
+            ]
         case "json":
             return [
                 Rule(pattern: #""(?:[^"\\]|\\.)*"(?=\s*:)"#, color: key),

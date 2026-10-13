@@ -255,8 +255,27 @@ private struct ConversationTranscriptProjection<Content: View>: View {
 struct ConversationPage: View {
     private enum SendHandoff: Equatable {
         case idle
-        case waitingForAnchor(UUID)
-        case animating(submissionID: UUID, anchorID: UUID)
+        case waitingForAnchor(submissionID: UUID, originY: CGFloat)
+        case positioned(submissionID: UUID, offset: CGFloat, anchorTop: CGFloat)
+        case animating(UUID)
+
+        var offset: CGFloat {
+            if case .positioned(_, let offset, _) = self { return offset }
+            return 0
+        }
+
+        var opacity: Double {
+            switch self {
+            case .waitingForAnchor, .positioned: 0
+            case .idle, .animating: 1
+            }
+        }
+
+        func riseRequestID(frame: CGRect) -> UUID? {
+            guard case .positioned(let id, _, let top) = self,
+                  abs(frame.minY - top) < 1 else { return nil }
+            return id
+        }
     }
 
     let conversation: Conversation
@@ -285,6 +304,8 @@ struct ConversationPage: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var latestSubmissionID: UUID?
     @State private var sendHandoff = SendHandoff.idle
+    @State private var composerInputFrame = CGRect.zero
+    @State private var submissionFrame = CGRect.null
     @FocusState private var composerFocused: Bool
     @State private var editedBlockID: UUID?
     @State private var editDraft = AttributedString()
@@ -630,7 +651,7 @@ struct ConversationPage: View {
         }
         .onChange(of: ObjectIdentifier(conversation)) { _, _ in
             sendHandoff = .idle
-            scroller.endSendHandoff()
+            scroller.cancelSendHandoff()
             speechInput.cancel(reason: "chatChanged")
             cancelEditing(reason: "chatChanged", keepFocus: false)
         }
@@ -1333,127 +1354,135 @@ struct ConversationPage: View {
             max(viewportLayout.anchorFloor, viewportLayout.contentFloorHeight)
         )
         return GeometryReader { outer in
-            ScrollViewReader { proxy in
-                ScrollView {
-                    transcriptRows(
-                        blocks: blocks,
-                        renderedBlocks: blocks,
-                        latestCanvasBlockIDs: latestCanvasBlockIDs,
-                        anchoredViewportHeight: anchoredViewportHeight,
-                        scrollToTurn: { id in
-                            anchorBecameReady(id, proxy: proxy)
-                        }
-                    )
-                }
-                .overlayPreferenceValue(LivePageCardAnchorKey.self) { anchors in
-                    if let page = browserPage,
-                       let ownerID = browserPageMount.inlineOwnerID(for: page),
-                       let anchor = anchors[ownerID] {
-                        InlineServicePageHost(
-                            anchor: anchor,
-                            mount: WebPageMount(page: page, ownerID: ownerID, coordinator: browserPageMount)
+            ScrollView {
+                transcriptRows(
+                    blocks: blocks,
+                    renderedBlocks: blocks,
+                    latestCanvasBlockIDs: latestCanvasBlockIDs,
+                    anchoredViewportHeight: anchoredViewportHeight,
+                    scrollToTurn: { id in
+                        await anchorBecameReady(
+                            id,
+                            anchorTop: outer.frame(in: .global).minY
                         )
                     }
-                    if let session = serviceAuthPresenter.session,
-                       let ownerID = serviceAuthPresenter.pageMount.inlineOwnerID(for: session.page),
-                       let anchor = anchors[ownerID] {
-                        InlineServicePageHost(
-                            anchor: anchor,
-                            mount: WebPageMount(page: session.page, ownerID: ownerID, coordinator: serviceAuthPresenter.pageMount)
-                        )
-                    }
-                    if let session = botControlPresenter.session,
-                       let ownerID = botControlPresenter.pageMount.inlineOwnerID(for: session.page),
-                       let anchor = anchors[ownerID] {
-                        InlineServicePageHost(
-                            anchor: anchor,
-                            mount: WebPageMount(page: session.page, ownerID: ownerID, coordinator: botControlPresenter.pageMount)
-                        )
-                    }
-                }
-                .contentMargins(.bottom, dockClearance, for: .scrollContent)
-                .onScrollGeometryChange(for: ConversationViewportController.Frame?.self) { geo in
-                    let frame = ConversationViewportController.Frame(geo)
-                    return frame.insetTop == 0 && frame.insetBottom == 0 ? nil : frame
-                } action: { _, new in
-                    guard let new else { return }
-                    scroller.geometryChanged(new)
-                }
-                .onScrollPhaseChange { old, new in
-                    scroller.phaseChanged(from: old, to: new)
-                    if new == .interacting {
-                        requestEarlierReveal(blocks: blocks)
-                    }
-                    if new == .idle,
-                       let anchor = transcriptWindow.applyPendingEarlier() {
-                        scroller.preservePageAnchor(anchor)
-                        logTranscriptWindow(reason: "earlier", total: totalBlockCount)
-                    }
-                }
-                .onScrollTargetVisibilityChange(idType: UUID.self, threshold: 0.01) {
-                    scroller.visibleTargetsChanged($0)
-                }
-                .scrollPosition($scroller.position)
-                .modifier(SidebarScrollLockModifier())
-                .scrollEdgeEffectStyle(.soft, for: .top)
-                .scrollEdgeEffectStyle(.soft, for: .bottom)
-                .scrollBounceBehavior(.always, axes: .vertical)
-                .scrollDismissesKeyboard(.interactively)
-                .dismissesSelectableTextSelection {
-                    Log.ui.info("ConversationPage.dismissTextSelection conversation=\(conversation.id) via=transcriptTap")
-                }
-                .simultaneousGesture(TapGesture().onEnded {
-                    guard anyInputFocused else { return }
-                    Log.ui.info("ConversationUX.intent conversation=\(conversation.id) kind=dismissKeyboard via=transcriptTap")
-                    composerFocused = false
-                    if choiceInputFocused {
-                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                    }
-                })
-                .onChange(of: totalBlockCount) { _, total in
-                    transcriptWindow.reconcile(total: total)
-                    logTranscriptWindow(reason: "blocks", total: total)
-                }
-                .onChange(of: conversation.isBusy) { _, busy in
-                    logTranscriptWindow(reason: busy ? "busy" : "settled", total: totalBlockCount)
-                }
-                .onChange(of: submissionAnchor) { old, new in
-                    guard old != new, let new else { return }
-                    transcriptWindow.showLatest(total: totalBlockCount)
-                    transcriptWindow.anchor(
-                        on: new.id,
-                        in: sourceBlockIDs,
-                        startingAt: sourceRange.lowerBound
-                    )
-                    logTranscriptWindow(reason: "submissionAnchor", total: totalBlockCount)
-                }
-                .onChange(of: composerFocused) { _, _ in
-                    scroller.focusChanged(
-                        anyInputFocused,
-                        slack: anchorSlack,
-                        source: "composer"
+                )
+            }
+            .overlayPreferenceValue(LivePageCardAnchorKey.self) { anchors in
+                if let page = browserPage,
+                   let ownerID = browserPageMount.inlineOwnerID(for: page),
+                   let anchor = anchors[ownerID] {
+                    InlineServicePageHost(
+                        anchor: anchor,
+                        mount: WebPageMount(page: page, ownerID: ownerID, coordinator: browserPageMount)
                     )
                 }
-                .onChange(of: choiceInputFocused) { _, _ in
-                    scroller.focusChanged(
-                        anyInputFocused,
-                        slack: anchorSlack,
-                        source: "choice"
+                if let session = serviceAuthPresenter.session,
+                   let ownerID = serviceAuthPresenter.pageMount.inlineOwnerID(for: session.page),
+                   let anchor = anchors[ownerID] {
+                    InlineServicePageHost(
+                        anchor: anchor,
+                        mount: WebPageMount(page: session.page, ownerID: ownerID, coordinator: serviceAuthPresenter.pageMount)
                     )
                 }
-                .onChange(of: outer.size.height, initial: true) { _, height in
-                    viewportLayout.measureViewport(
-                        height,
-                        bottomMargin: dockClearance,
-                        focused: anyInputFocused
+                if let session = botControlPresenter.session,
+                   let ownerID = botControlPresenter.pageMount.inlineOwnerID(for: session.page),
+                   let anchor = anchors[ownerID] {
+                    InlineServicePageHost(
+                        anchor: anchor,
+                        mount: WebPageMount(page: session.page, ownerID: ownerID, coordinator: botControlPresenter.pageMount)
                     )
-                }
-                .onAppear {
-                    transcriptWindow.open(total: totalBlockCount)
-                    Log.ui.info("ConversationUX.lifecycle conversation=\(conversation.id) phase=viewportOpening target=bottom range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(totalBlockCount) anchor=\(submissionAnchor?.id.uuidString ?? "none") scale=\(displayScale) dynamicType=\(String(describing: dynamicTypeSize)) reduceMotion=\(reduceMotion) reduceTransparency=\(reduceTransparency)")
-                    scroller.openAtBottom(conversationID: "\(conversation.id)", onSettled: onInitialTranscriptPresented)
                 }
             }
+            .contentMargins(.bottom, dockClearance, for: .scrollContent)
+            .onScrollGeometryChange(for: ConversationViewportController.Frame?.self) { geo in
+                let frame = ConversationViewportController.Frame(geo)
+                return frame.insetTop == 0 && frame.insetBottom == 0 ? nil : frame
+            } action: { _, new in
+                guard let new else { return }
+                scroller.geometryChanged(new)
+            }
+            .onScrollPhaseChange { old, new in
+                scroller.phaseChanged(from: old, to: new)
+                if new == .interacting {
+                    requestEarlierReveal(blocks: blocks)
+                }
+                if new == .idle,
+                   let anchor = transcriptWindow.applyPendingEarlier() {
+                    scroller.preservePageAnchor(anchor)
+                    logTranscriptWindow(reason: "earlier", total: totalBlockCount)
+                }
+            }
+            .onScrollTargetVisibilityChange(idType: UUID.self, threshold: 0.01) {
+                scroller.visibleTargetsChanged($0)
+            }
+            .defaultScrollAnchor(.bottom, for: .initialOffset)
+            .scrollPosition($scroller.position, anchor: .top)
+            .modifier(SidebarScrollLockModifier())
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
+            .scrollBounceBehavior(.always, axes: .vertical)
+            .scrollDismissesKeyboard(.interactively)
+            .dismissesSelectableTextSelection {
+                Log.ui.info("ConversationPage.dismissTextSelection conversation=\(conversation.id) via=transcriptTap")
+            }
+            .simultaneousGesture(TapGesture().onEnded {
+                guard anyInputFocused else { return }
+                Log.ui.info("ConversationUX.intent conversation=\(conversation.id) kind=dismissKeyboard via=transcriptTap")
+                composerFocused = false
+                if choiceInputFocused {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
+            })
+            .onChange(of: totalBlockCount) { _, total in
+                transcriptWindow.reconcile(total: total)
+                logTranscriptWindow(reason: "blocks", total: total)
+            }
+            .onChange(of: conversation.isBusy) { _, busy in
+                logTranscriptWindow(reason: busy ? "busy" : "settled", total: totalBlockCount)
+            }
+            .onChange(of: latestSubmissionID) { _, new in
+                guard new != nil else { return }
+                transcriptWindow.showLatest(total: totalBlockCount)
+            }
+            .onChange(of: submissionAnchor) { old, new in
+                guard old != new, let new else { return }
+                transcriptWindow.anchor(
+                    on: new.id,
+                    in: sourceBlockIDs,
+                    startingAt: sourceRange.lowerBound
+                )
+                logTranscriptWindow(reason: "submissionAnchor", total: totalBlockCount)
+            }
+            .onChange(of: composerFocused) { _, _ in
+                scroller.focusChanged(
+                    anyInputFocused,
+                    slack: anchorSlack,
+                    source: "composer"
+                )
+            }
+            .onChange(of: choiceInputFocused) { _, _ in
+                scroller.focusChanged(
+                    anyInputFocused,
+                    slack: anchorSlack,
+                    source: "choice"
+                )
+            }
+            .onChange(of: outer.size.height, initial: true) { _, height in
+                viewportLayout.measureViewport(
+                    height,
+                    bottomMargin: dockClearance,
+                    focused: anyInputFocused
+                )
+            }
+            .onAppear {
+                latestSubmissionID = nil
+                sendHandoff = .idle
+                transcriptWindow.open(total: totalBlockCount)
+                Log.ui.info("ConversationUX.lifecycle conversation=\(conversation.id) phase=viewportOpening target=bottom range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(totalBlockCount) anchor=\(submissionAnchor?.id.uuidString ?? "none") scale=\(displayScale) dynamicType=\(String(describing: dynamicTypeSize)) reduceMotion=\(reduceMotion) reduceTransparency=\(reduceTransparency)")
+                scroller.openAtBottom(conversationID: "\(conversation.id)", onSettled: onInitialTranscriptPresented)
+            }
+            .onDisappear { scroller.close() }
         }
     }
 
@@ -1462,62 +1491,70 @@ struct ConversationPage: View {
         renderedBlocks: [ConversationBlock],
         latestCanvasBlockIDs: [URL: UUID],
         anchoredViewportHeight: CGFloat,
-        scrollToTurn: @escaping (TurnID) -> Void
+        scrollToTurn: @escaping (TurnID) async -> Void
     ) -> some View {
         VStack(spacing: 0) {
             if conversation.canChangeRetention {
                 emptyConversationState
             }
             earlierWindowBoundary(blocks: blocks)
-            if let anchor = anchoredQueuedMessage {
-                ForEach(renderedBlocks) { block in
-                    blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
-                }
-                activityRow(blocks: renderedBlocks)
-                stoppedRow
-                ForEach(conversation.queuedMessages.filter { $0.id != anchor.id }) { queued in
-                    queuedRow(queued)
-                }
+            let anchorIndex = renderedBlocks.firstIndex { $0.id == anchoredTurnID }
+            if let submissionID = latestSubmissionID,
+               submissionAnchor != nil,
+               anchoredQueuedMessage != nil || anchorIndex != nil {
                 VStack(spacing: 0) {
-                    queuedRow(anchor, identified: false)
-                        .id(anchor.id)
-                }
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
-                    scroller.measureAnchorContent($0)
-                }
-                .frame(minHeight: anchoredViewportHeight, alignment: .top)
-                .task(id: anchor.id) {
-                    await Task.yield()
-                    guard !Task.isCancelled else { return }
-                    scrollToTurn(anchor.id)
-                }
-            } else if let anchorID = anchoredTurnID,
-                      let anchorIndex = renderedBlocks.firstIndex(where: { $0.id == anchorID }) {
-                ForEach(Array(renderedBlocks[..<anchorIndex])) { block in
-                    blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
-                }
-                VStack(spacing: 0) {
-                    blockRow(
-                        renderedBlocks[anchorIndex],
-                        latestCanvasBlockIDs: latestCanvasBlockIDs,
-                        identified: false
-                    )
-                    .id(anchorID)
-                    ForEach(Array(renderedBlocks.dropFirst(anchorIndex + 1))) { block in
-                        blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs, identified: false)
+                    ForEach(Array(renderedBlocks.prefix(anchorIndex ?? renderedBlocks.count))) { block in
+                        blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
                     }
-                    activityRow(blocks: renderedBlocks)
-                    stoppedRow
-                    queuedRows
+                    if let queued = anchoredQueuedMessage {
+                        activityRow(blocks: renderedBlocks)
+                        stoppedRow
+                        ForEach(conversation.queuedMessages.filter { $0.id != queued.id }) { queued in
+                            queuedRow(queued)
+                        }
+                    }
+                }
+                .scrollTargetLayout()
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { old, new in
+                    guard old != new, submissionAnchor != nil else { return }
+                    scroller.preserveTurn(submissionID)
+                }
+                VStack(spacing: 0) {
+                    if let queued = anchoredQueuedMessage {
+                        queuedRow(queued, identified: false)
+                    } else if let anchorIndex {
+                        blockRow(
+                            renderedBlocks[anchorIndex],
+                            latestCanvasBlockIDs: latestCanvasBlockIDs,
+                            identified: false
+                        )
+                        ForEach(Array(renderedBlocks.dropFirst(anchorIndex + 1))) { block in
+                            blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs, identified: false)
+                        }
+                        activityRow(blocks: renderedBlocks)
+                        stoppedRow
+                        queuedRows
+                    }
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
                     scroller.measureAnchorContent($0)
                 }
+                .offset(y: sendHandoff.offset)
+                .opacity(sendHandoff.opacity)
                 .frame(minHeight: anchoredViewportHeight, alignment: .top)
-                .task(id: anchorID) {
+                .id(submissionID)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                    guard latestSubmissionID == submissionID else { return }
+                    submissionFrame = $0
+                }
+                .task(id: sendHandoff.riseRequestID(frame: submissionFrame)) {
+                    guard let id = sendHandoff.riseRequestID(frame: submissionFrame) else { return }
+                    animateSendRise(id)
+                }
+                .task(id: submissionID) {
                     await Task.yield()
                     guard !Task.isCancelled else { return }
-                    scrollToTurn(anchorID)
+                    await scrollToTurn(submissionID)
                 }
             } else {
                 ForEach(renderedBlocks) { block in
@@ -1529,8 +1566,6 @@ struct ConversationPage: View {
             }
             Color.clear
                 .frame(height: 1)
-                .onScrollVisibilityChange(threshold: 0.5, scroller.bottomVisibilityChanged)
-                .onDisappear { scroller.bottomVisibilityChanged(false) }
         }
         .scrollTargetLayout()
         .padding(.horizontal, Theme.Spacing.md)
@@ -1542,34 +1577,27 @@ struct ConversationPage: View {
         .background(KeyboardDismissPadding(padding: viewportLayout.composerHeight))
     }
 
-    private func anchorBecameReady(_ anchorID: TurnID, proxy: ScrollViewProxy) {
-        guard case .waitingForAnchor(let submissionID) = sendHandoff,
-              latestSubmissionID == submissionID,
-              submissionAnchor?.id == anchorID else {
-            scroller.rideToTurn(
-                anchorID,
-                animation: reduceMotion ? nil : Theme.Animation.ride
-            ) {
-                proxy.scrollTo(anchorID, anchor: .top)
-            }
-            return
-        }
+    private func anchorBecameReady(_ anchorID: TurnID, anchorTop: CGFloat) async {
+        guard latestSubmissionID == anchorID, submissionAnchor != nil,
+              case .waitingForAnchor(let submissionID, let originY) = sendHandoff,
+              submissionID == anchorID else { return }
 
-        scroller.beginSendHandoff()
-        sendHandoff = .animating(submissionID: submissionID, anchorID: anchorID)
-        Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=animating submission=\(submissionID) anchor=\(anchorID)")
-        let dismissesKeyboard = anyInputFocused
-        if dismissesKeyboard { prepareComposerSubmission() }
-        scroller.rideToTurn(
-            anchorID,
-            animation: reduceMotion ? nil : (dismissesKeyboard ? Theme.Animation.handoff : Theme.Animation.ride)
-        ) {
-            proxy.scrollTo(anchorID, anchor: .top)
+        let offset = reduceMotion ? 0 : max(0, originY - anchorTop - ConversationTranscriptMetrics.blockSpacing)
+        sendHandoff = .positioned(submissionID: submissionID, offset: offset, anchorTop: anchorTop)
+        scroller.beginSendHandoff(anchorID)
+        if anyInputFocused { prepareComposerSubmission() }
+    }
+
+    private func animateSendRise(_ submissionID: UUID) {
+        guard case .positioned(let id, let offset, _) = sendHandoff,
+              id == submissionID,
+              sendHandoff.riseRequestID(frame: submissionFrame) == id else { return }
+        let anchorID = submissionID
+        Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=animating submission=\(submissionID) anchor=\(anchorID) rise=\(Int(offset))")
+        withAnimation(reduceMotion ? nil : .spring(duration: 0.45, bounce: 0), completionCriteria: .logicallyComplete) {
+            sendHandoff = .animating(submissionID)
         } completion: {
-            guard sendHandoff == .animating(
-                submissionID: submissionID,
-                anchorID: anchorID
-            ) else { return }
+            guard sendHandoff == .animating(submissionID) else { return }
             sendHandoff = .idle
             scroller.endSendHandoff()
             Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=settled submission=\(submissionID) anchor=\(anchorID)")
@@ -1622,7 +1650,7 @@ struct ConversationPage: View {
                 .foregroundStyle(Theme.Colors.onSurface)
             Text("This conversation won’t be saved by Ox or synced with iCloud. Temporary mode changes Ox’s storage only; your selected model’s data policy still applies.")
                 .font(Theme.Fonts.bodyMd)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 340)
         }
@@ -1701,7 +1729,8 @@ struct ConversationPage: View {
                 Log.ui.info("ConversationPage.stop conversation=\(conversation.id)")
                 conversation.stopCurrentTurn()
             },
-            onSpeechBegin: beginSpeech
+            onSpeechBegin: beginSpeech,
+            onInputFrameChange: { composerInputFrame = $0 }
         )
         .equatable()
         .task(id: composerFocusRequestID) {
@@ -1783,7 +1812,7 @@ struct ConversationPage: View {
                 Text(verbatim: modelAccessNoticeTitle)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right")
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
             }
             .font(Theme.Fonts.bodySm)
             .foregroundStyle(Theme.Colors.onSurface)
@@ -1925,7 +1954,8 @@ struct ConversationPage: View {
             skillInvocation: skillInvocation
         )
         latestSubmissionID = receipt.id
-        sendHandoff = .waitingForAnchor(receipt.id)
+        submissionFrame = .null
+        sendHandoff = .waitingForAnchor(submissionID: receipt.id, originY: composerInputFrame.minY)
         Log.ui.info("ConversationPage.send conversation=\(conversation.id) draft=\(message.id) submission=\(receipt.id) disposition=\(receipt.disposition.rawValue) chars=\(message.text.count) attachments=\(message.attachments.count)")
     }
 

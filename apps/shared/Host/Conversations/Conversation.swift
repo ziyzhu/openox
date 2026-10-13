@@ -2171,6 +2171,9 @@ final class Conversation: Identifiable {
         guard let submission = submissions.first(where: { $0.id.rawValue == blockId && $0.needsPosting }) else { return }
         Log.session.info("Conversation.cancelQueued id=\(id) block=\(blockId) queueDepth=\(submissions.count)")
         submissions.removeAll { $0.id.rawValue == blockId && $0.needsPosting }
+        if activeRun?.activeSubmission?.id == submission.id {
+            activeRun?.task.cancel()
+        }
         submission.latency.finish(outcome: "cancelledQueued", client: client.id, model: model.id)
     }
 
@@ -2379,13 +2382,19 @@ final class Conversation: Identifiable {
         guard !isBusy, !submissions.isEmpty else { return }
         let runID = RunID()
         let queueDepth = submissions.count
-        let submission = submissions.removeFirst()
+        let submission = submissions[0]
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
             defer { finishWorker(runID) }
             await waitUntilProfilePrepared(runID: runID)
+            if Task.isCancelled {
+                submissions.removeAll { $0.id == submission.id }
+                submission.latency.finish(outcome: "cancelled", client: client.id, model: model.id)
+                return
+            }
+            guard let index = submissions.firstIndex(where: { $0.id == submission.id }) else { return }
             setRunPhase(.thinking)
-            var submission = submission
+            var submission = submissions.remove(at: index)
             if submission.needsPosting {
                 let at = Date()
                 document.apply(.appendUser(

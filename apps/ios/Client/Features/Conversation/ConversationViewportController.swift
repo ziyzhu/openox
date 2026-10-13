@@ -102,6 +102,14 @@ final class ConversationViewportController {
         }
     }
 
+    private enum Presentation {
+        case opening(() -> Void)
+        case followingBottom
+        case sending(UUID)
+        case followingTurn(UUID)
+        case reading
+    }
+
     private static let jumpThreshold: CGFloat = 32
 
     private(set) var showsJumpButton = false
@@ -122,9 +130,7 @@ final class ConversationViewportController {
     @ObservationIgnored private var inputFocused = false
     @ObservationIgnored private var visibleTargetID: UUID?
     @ObservationIgnored private var pendingFrame: Frame?
-    @ObservationIgnored private var pendingOpenCompletion: (() -> Void)?
-    @ObservationIgnored private var bottomVisible = false
-    @ObservationIgnored private var sendHandoffActive = false
+    @ObservationIgnored private var presentation = Presentation.reading
     @ObservationIgnored private var layoutLogStart: Frame?
     @ObservationIgnored private var layoutLogEnd: Frame?
     @ObservationIgnored private var layoutLogTask: Task<Void, Never>?
@@ -134,62 +140,67 @@ final class ConversationViewportController {
 
     func openAtBottom(conversationID: String, onSettled: @escaping () -> Void) {
         self.conversationID = conversationID
+        pendingFrame = pendingFrame ?? frame
         frame = nil
-        pendingFrame = nil
-        geometryFrameDriver.cancel()
         viewportHold = nil
-        sendHandoffActive = false
         inputFocused = false
         visibleTargetID = nil
-        pendingOpenCompletion = onSettled
+        presentation = .opening(onSettled)
         resetLayoutLog()
         showsJumpButton = false
         move(to: .bottom)
         position.scrollTo(edge: .bottom)
-        if bottomVisible { bottomBecameVisible() }
+        if pendingFrame != nil { geometryFrameDriver.schedule() }
     }
 
-    func bottomVisibilityChanged(_ visible: Bool) {
-        bottomVisible = visible
-        guard visible else { return }
-        bottomBecameVisible()
+    func close() {
+        presentation = .reading
+        frame = nil
+        pendingFrame = nil
+        geometryFrameDriver.cancel()
+        resetLayoutLog()
     }
 
-    private func bottomBecameVisible() {
-        guard let completion = pendingOpenCompletion else { return }
-        pendingOpenCompletion = nil
+    func beginSendHandoff(_ id: UUID) {
+        presentation = .sending(id)
         showsJumpButton = false
-        motion = .stationary
-        completion()
-        Log.ui.info("ConversationUX.lifecycle conversation=\(conversationID) phase=bottomVisible \(logSnapshot)")
+        viewportHold = nil
+        move(to: .turnTop(id))
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            position.scrollTo(id: id, anchor: .top)
+        }
+        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=sendPlacement target=\(id) \(logSnapshot)")
     }
 
-    func beginSendHandoff() {
-        sendHandoffActive = true
-        viewportHold = nil
+    func cancelSendHandoff() {
+        if case .sending = presentation { presentation = .reading }
     }
 
     func endSendHandoff() {
-        sendHandoffActive = false
+        guard case .sending(let id) = presentation else { return }
+        presentation = .followingTurn(id)
+        if let frame = pendingFrame ?? frame { updateJumpButton(frame) }
+        preserveTurn(id)
     }
 
-    func rideToTurn(
-        _ id: UUID,
-        animation: Animation?,
-        scroll: () -> Void,
-        completion: @escaping () -> Void = {}
-    ) {
-        let target = Target.turnTop(id)
-        move(to: target)
-        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=scroll target=\(target.label) anchor=top animated=\(animation != nil) \(logSnapshot)")
-        withAnimation(animation, completionCriteria: .logicallyComplete) {
-            scroll()
-        } completion: {
-            completion()
+    func preserveTurn(_ id: UUID) {
+        switch presentation {
+        case .sending(let targetID), .followingTurn(let targetID):
+            guard targetID == id else { return }
+        case .opening, .followingBottom, .reading: return
         }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            position.scrollTo(id: id, anchor: .top)
+        }
+        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=preserveSubmission target=\(id) \(logSnapshot)")
     }
 
     func rideToBottom() {
+        presentation = .reading
         guard frame?.jumpDistance ?? .infinity > 1 else {
             motion = .stationary
             position.scrollTo(edge: .bottom)
@@ -204,6 +215,7 @@ final class ConversationViewportController {
     }
 
     func preservePageAnchor(_ id: UUID) {
+        presentation = .reading
         position.scrollTo(id: id, anchor: .top)
         Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=pageAnchor target=\(id) anchor=top \(logSnapshot)")
     }
@@ -247,6 +259,10 @@ final class ConversationViewportController {
     func phaseChanged(from old: ScrollPhase, to new: ScrollPhase) {
         guard old != new else { return }
         if new.isUserDriven {
+            switch presentation {
+            case .followingBottom, .followingTurn, .sending: presentation = .reading
+            case .opening, .reading: break
+            }
             viewportHold = nil
             motion = .user(new)
         } else if new == .idle {
@@ -273,14 +289,21 @@ final class ConversationViewportController {
             Log.ui.info("ConversationUX.geometry conversation=\(conversationID) source=scroll \(new.summary) owner=\(motion.label)")
         }
         stageLayoutLog(from: old, to: new)
+        if case .opening(let completion) = presentation {
+            guard new.container > 0 else { return }
+            if followBottom(new) { return }
+            presentation = .followingBottom
+            motion = .stationary
+            showsJumpButton = false
+            completion()
+            Log.ui.info("ConversationUX.lifecycle conversation=\(conversationID) phase=viewportSettled \(logSnapshot)")
+            return
+        }
+        if case .followingBottom = presentation, followBottom(new) { return }
         updateJumpButton(new)
         applyViewportHold()
         if case .programmatic(.bottom) = motion, new.distanceFromEnd <= 1 {
             motion = .stationary
-            let completion = pendingOpenCompletion
-            pendingOpenCompletion = nil
-            completion?()
-            Log.ui.info("ConversationUX.lifecycle conversation=\(conversationID) phase=viewportSettled \(logSnapshot)")
         } else if case .programmatic(.viewportClearance) = motion {
             motion = .stationary
         }
@@ -289,6 +312,14 @@ final class ConversationViewportController {
            abs(new.visualTop - viewportHold.floorTop) <= 1 {
             self.viewportHold = nil
         }
+    }
+
+    private func followBottom(_ frame: Frame) -> Bool {
+        guard frame.container > 0, frame.distanceFromEnd > 1 else { return false }
+        move(to: .bottom)
+        position.scrollTo(edge: .bottom)
+        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=openingCorrection \(logSnapshot)")
+        return true
     }
 
     private func stageLayoutLog(from old: Frame?, to new: Frame) {
@@ -330,7 +361,7 @@ final class ConversationViewportController {
     }
 
     private func applyViewportHold() {
-        guard !sendHandoffActive else { return }
+        if case .sending = presentation { return }
         guard let frame, let viewportHold else { return }
         let top = viewportHold.expectedTop(in: frame)
         guard abs(top - frame.visualTop) > 0.5 else { return }
@@ -347,6 +378,7 @@ final class ConversationViewportController {
     }
 
     private func updateJumpButton(_ frame: Frame) {
+        if case .sending = presentation { return }
         let shows = frame.jumpDistance > Self.jumpThreshold
         guard shows != showsJumpButton else { return }
         showsJumpButton = shows
