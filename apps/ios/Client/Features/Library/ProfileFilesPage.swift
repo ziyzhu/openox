@@ -126,7 +126,7 @@ struct ProfileFilesPage: View {
             } catch { errorMessage = error.localizedDescription }
         } label: {
             VStack(alignment: .leading, spacing: 0) {
-                SettingsDisclosureRow(title: LocalizedStringKey(grant.name), value: Text(""), icon: "folder")
+                SettingsDisclosureRow(title: LocalizedStringKey(grant.name), value: Text(""))
                 if let unavailable {
                     Text(unavailable)
                         .font(Theme.Fonts.caption)
@@ -146,6 +146,9 @@ struct ProfileFilesPage: View {
         Task {
             defer { operation = nil }
             do { try await action(profileId) }
+            catch is CancellationError {
+                Log.ui.info("ProfileFiles operation=\(name) profile=\(profileId) cancelled")
+            }
             catch {
                 errorMessage = error.localizedDescription
                 Log.ui.error("ProfileFiles operation=\(name) profile=\(profileId) error=\(error.localizedDescription)")
