@@ -16,7 +16,7 @@ struct ServiceSignInButton: View {
         switch layout {
         case .compact:
             button
-                .buttonStyle(OxChipButton(filled: true))
+                .buttonStyle(OxChipButton(filled: true, primaryFill: Theme.Colors.actionHighlight))
         case .prompt:
             button
                 .buttonStyle(RequestButtonStyle())
@@ -41,7 +41,7 @@ struct ServiceSignInButton: View {
             content
                 .frame(minWidth: 72)
                 .frame(minHeight: 36)
-                .background(Theme.Colors.primary, in: Capsule(style: .continuous))
+                .background(Theme.Colors.actionHighlight, in: Capsule(style: .continuous))
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
         }

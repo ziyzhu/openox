@@ -568,6 +568,7 @@ struct PermissionActionButtons: View {
         RequestActionButton(
             title: option,
             isPrimary: isPrimary,
+            primaryFill: Theme.Colors.actionHighlight,
             cornerRadius: Theme.Radius.full,
             action: { onSelect(option) }
         )
@@ -578,6 +579,7 @@ struct PermissionActionButtons: View {
 private struct RequestActionButton: View {
     let title: String
     let isPrimary: Bool
+    var primaryFill = Theme.Colors.primary
     var cornerRadius = Theme.Radius.md
     let action: () -> Void
 
@@ -599,7 +601,7 @@ private struct RequestActionButton: View {
         .frame(maxWidth: .infinity, minHeight: 44)
         .padding(.horizontal, Theme.Spacing.sm)
         .background(
-            isPrimary ? AnyShapeStyle(Theme.Colors.primary) : AnyShapeStyle(Theme.Colors.surfaceSunken),
+            isPrimary ? AnyShapeStyle(primaryFill) : AnyShapeStyle(Theme.Colors.surfaceSunken),
             in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         )
     }

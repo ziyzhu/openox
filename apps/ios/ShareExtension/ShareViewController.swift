@@ -210,7 +210,7 @@ private enum ShareTheme {
     static var onSurface: Color { color(brand: 0x000000, light: 0x000000, dark: 0xECECEC) }
     static var onSurfaceMuted: Color { color(brand: 0x8E8E93, light: 0x8E8E93, dark: 0x9A9A9A) }
     static var primary: Color { color(brand: 0xFFA500, light: 0xFFA500, dark: 0xF5A030) }
-    static var onPrimary: Color { Color(uiColor: UIColor(hex: 0xFFFDF7)) }
+    static var onPrimary: Color { Color(uiColor: UIColor(hex: 0x000000)) }
     static var error: Color { color(brand: 0xB8422E, light: 0xB8422E, dark: 0xE25A45) }
     static var colorScheme: ColorScheme { selection == .dark ? .dark : .light }
 
