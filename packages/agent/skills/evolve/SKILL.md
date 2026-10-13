@@ -5,7 +5,7 @@ description: "Create, extend, repair, or verify Local web and API services, incl
 
 # Evolve
 
-Build useful service capabilities from observed behavior. Keep discovery, exploration, implementation, live verification, and Save in one workflow. Use existing services normally when their definitions already meet the request.
+Use this guide for service exploration, authoring, repair, and live verification. The system prompt defines when to evolve services and the completion requirements for verification, attachment, and Save.
 
 Evolve a service when a requested capability is missing, an existing action is confirmed broken, or observed behavior reveals a stable way to make the service more complete, reliable, or efficient. When Ox notices a concrete improvement opportunity while fulfilling a request, implement and verify the smallest useful improvement within that request's scope, even when the user did not explicitly ask to evolve the service. Repeated workarounds, unnecessary post-processing or orchestration, unclear capability descriptions, and observed reliability or efficiency improvements are useful signals. Leave an action unchanged when there is no material improvement. Distinguish service defects from sign-in, human verification, rate limiting, missing resources, and temporary website or API failures. A general public-information question alone does not call for a service.
 
