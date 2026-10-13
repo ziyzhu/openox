@@ -83,7 +83,6 @@ private struct AttachMenuCard: View {
             row("Camera", icon: .system("camera"), a11yID: A11yID.ConversationControls.Attach.camera) { onChoice(.camera) }
             row("Photos", icon: .system("photo.on.rectangle"), a11yID: A11yID.ConversationControls.Attach.photos) { onChoice(.photos) }
             row("Files", icon: .system("paperclip"), a11yID: A11yID.ConversationControls.Attach.files) { onChoice(.files) }
-            row("Files", icon: .action(.artifacts), a11yID: A11yID.ConversationControls.Attach.artifacts) { onChoice(.artifacts) }
             row("Services", icon: .action(.services), a11yID: A11yID.ConversationControls.Attach.services, action: onServices)
         }
         .padding(.vertical, Theme.Spacing.sm)

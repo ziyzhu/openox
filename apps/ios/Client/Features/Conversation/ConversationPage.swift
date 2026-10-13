@@ -324,7 +324,6 @@ struct ConversationPage: View {
         case files
         case attachment(URL)
         case artifacts
-        case artifactPicker
         case botControl(ServiceHandoffSession)
         case serviceAuth(ServiceAuthSession)
 
@@ -337,7 +336,6 @@ struct ConversationPage: View {
             case .files: "files"
             case .attachment(let url): "attachment:\(url.absoluteString)"
             case .artifacts: "artifacts"
-            case .artifactPicker: "artifactPicker"
             case .botControl(let session): "botControl:\(session.id)"
             case .serviceAuth(let session): "serviceAuth:\(session.id)"
             }
@@ -409,7 +407,7 @@ struct ConversationPage: View {
         Binding(
             get: {
                 switch modalPresentation {
-                case .modelPicker, .serviceDetail, .artifacts, .artifactPicker: modalPresentation
+                case .modelPicker, .serviceDetail, .artifacts: modalPresentation
                 default: nil
                 }
             },
@@ -743,12 +741,6 @@ struct ConversationPage: View {
                         Log.ui.info("ConversationPage.artifactPreview select conversation=\(conversation.id) filename=\(artifact.fileName)")
                     }
                     .presentationDetents([.medium, .large])
-                case .artifactPicker:
-                    FilePickerSheet(attachedIDs: composer.draftFileIDs) { picked in
-                        picked.forEach(composer.attachFile)
-                        Log.ui.info("ConversationPage.attachFiles conversation=\(conversation.id) count=\(picked.count)")
-                    }
-                    .presentationDetents([.medium, .large])
                 case .camera, .photos, .files, .attachment, .botControl, .serviceAuth:
                     EmptyView()
                 }
@@ -767,7 +759,7 @@ struct ConversationPage: View {
                 BotControlSheetView(session: session)
             case .serviceAuth(let session):
                 ServiceSessionSheetView(session: session, mode: .signIn, returnsInline: true)
-            case .modelPicker, .serviceDetail, .photos, .files, .attachment, .artifacts, .artifactPicker:
+            case .modelPicker, .serviceDetail, .photos, .files, .attachment, .artifacts:
                 EmptyView()
             }
         }
@@ -946,9 +938,6 @@ struct ConversationPage: View {
             modalPresentation = .photos
         case .files:
             modalPresentation = .files
-        case .artifacts:
-            composerFocused = false
-            modalPresentation = .artifactPicker
         case .service(let picked):
             attachService(picked)
         }

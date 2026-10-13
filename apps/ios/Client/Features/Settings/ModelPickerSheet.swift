@@ -201,7 +201,7 @@ struct SettingsSheet: View {
                             NavigationLink {
                                 NotificationSetupView()
                             } label: {
-                                SettingsDisclosureRow(title: "Notifications", value: Text("Set Up"))
+                                SettingsDisclosureRow(title: "Notifications", value: Text(""))
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier(A11yID.Settings.notifications)

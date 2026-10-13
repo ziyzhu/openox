@@ -219,21 +219,6 @@ final class ConversationComposerModel {
         }
     }
 
-    func attachFile(_ artifact: FileItem) {
-        guard !draftAttachments.contains(where: { $0.id == .artifact(artifact.id) }) else {
-            Log.ui.info("ConversationComposer.attachment duplicate draft=\(draftID) artifact=\(artifact.id)")
-            return
-        }
-        draftAttachments.append(.ready(artifact))
-        Log.ui.info("ConversationComposer.attachment artifact draft=\(draftID) artifact=\(artifact.id)")
-    }
-
-    var draftFileIDs: Set<String> {
-        Set(draftAttachments.compactMap { item in
-            if case .artifact(let id) = item.id { id } else { nil }
-        })
-    }
-
     func removeDraftAttachment(_ item: DraftAttachment) {
         draftAttachments.removeAll { $0.id == item.id }
         if case .operation(let id) = item.id { importTasks.removeValue(forKey: id)?.cancel() }
@@ -271,6 +256,5 @@ enum AttachmentChoice {
     case camera
     case photos
     case files
-    case artifacts
     case service(Service)
 }

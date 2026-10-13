@@ -211,15 +211,6 @@ nonisolated enum A11yID {
             static func item(_ filename: String) -> String { "conversation.artifact.item.\(filename)" }
         }
 
-        enum FilePicker {
-            static let list = "chat.artifactPicker.list"
-            static let search = "chat.artifactPicker.search"
-            static let attach = "chat.artifactPicker.attach"
-            static let cancel = "chat.artifactPicker.cancel"
-            static let empty = "chat.artifactPicker.empty"
-            static func item(_ filename: String) -> String { "conversation.artifactPicker.item.\(filename)" }
-        }
-
         enum Message {
             static let user = "chat.message.user"
             static let agent = "chat.message.agent"
@@ -242,7 +233,6 @@ nonisolated enum A11yID {
             static let camera = "chat.attach.camera"
             static let photos = "chat.attach.photos"
             static let files = "chat.attach.files"
-            static let artifacts = "chat.attach.artifacts"
             static let services = "chat.attach.services"
             static let explore = "chat.attach.explore"
             static let exploreBack = "chat.attach.exploreBack"
