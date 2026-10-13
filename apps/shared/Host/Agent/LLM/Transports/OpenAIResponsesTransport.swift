@@ -53,6 +53,17 @@ public struct OpenAIResponsesTransport: ProviderClient {
         self.streamingTransport = streamingTransport
     }
 
+    public func prepareAuthentication() async -> LLMPreparationOutcome {
+        guard auth.canRefresh else { return .unsupported }
+        do {
+            _ = try await auth.resolve(forceRefresh: false)
+            try Task.checkCancellation()
+            return .ready
+        } catch {
+            return .unavailable
+        }
+    }
+
     public func stream(
         model: ProviderModel,
         systemPrompt: String?,

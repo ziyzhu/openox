@@ -157,6 +157,10 @@ nonisolated private struct DefinedProviderClient: ProviderClient {
         try await native.loadModels()
     }
 
+    func prepareAuthentication() async -> LLMPreparationOutcome {
+        await native.prepareAuthentication()
+    }
+
     func prepare(model: ProviderModel, systemPrompt: String?, tools: [any AgentTool]) async -> LLMPreparationOutcome {
         await native.prepare(model: model, systemPrompt: systemPrompt, tools: tools)
     }

@@ -180,6 +180,8 @@ nonisolated public protocol ProviderClient: Sendable {
     func wireProtocol(for model: ProviderModel) -> LLMWireProtocol?
     func loadModels() async throws -> [ProviderModel]
 
+    func prepareAuthentication() async -> LLMPreparationOutcome
+
     func prepare(
         model: ProviderModel,
         systemPrompt: String?,
@@ -216,6 +218,10 @@ nonisolated extension ProviderClient {
 
     public func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { nil }
     public func loadModels() async throws -> [ProviderModel] { models }
+
+    public func prepareAuthentication() async -> LLMPreparationOutcome {
+        .unsupported
+    }
 
     public func prepare(
         model: ProviderModel,

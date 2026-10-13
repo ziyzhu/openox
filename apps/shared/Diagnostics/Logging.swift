@@ -113,13 +113,20 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
 
     func mark(_ milestone: Milestone) {
         let elapsedMs = Self.milliseconds(startedAt.duration(to: clock.now))
-        state.withLock { state in
-            guard !state.finished else { return }
+        let event = state.withLock { state -> (Event, Event?)? in
+            guard !state.finished else { return nil }
             let count = state.counts[milestone, default: 0] + 1
-            guard milestone.repeats || count == 1 else { return }
+            guard milestone.repeats || count == 1 else { return nil }
             state.counts[milestone] = count
             let label = milestone.repeats ? "\(milestone.rawValue)[\(count)]" : milestone.rawValue
-            state.events.append(Event(milestone: milestone, label: label, elapsedMs: elapsedMs))
+            let previous = state.events.last
+            let event = Event(milestone: milestone, label: label, elapsedMs: elapsedMs)
+            state.events.append(event)
+            return (event, previous)
+        }
+        guard let (event, previous) = event else { return }
+        LogContext.$latency.withValue(self) {
+            Log.perf.info("AgentLatency.milestone name=\(event.label) elapsedMs=\(event.elapsedMs) previous=\(previous?.label ?? "none") segmentMs=\(previous.map { max(0, event.elapsedMs - $0.elapsedMs) } ?? 0)")
         }
     }
 
@@ -230,6 +237,21 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
             let queueMs = delta(.submitted, .consumed)
             let prepareMs = delta(.consumed, .modelStarted)
             let ttftMs = delta(.modelStarted, .firstToken)
+            let segments: [(String, Milestone, Milestone)] = [
+                ("configure", .runStarted, .agentConfigured),
+                ("manifests", .manifestsStarted, .manifestsReady),
+                ("prompt", .manifestsReady, .promptReady),
+                ("agentQueue", .agentSubmitted, .agentStarted),
+                ("requestBody", .modelStarted, .requestBodyReady),
+                ("requestSetup", .modelStarted, .httpStarted),
+                ("responseHeaders", .httpStarted, .responseHeaders),
+                ("headersToToken", .responseHeaders, .firstToken),
+                ("modelToText", .modelStarted, .firstTextReceived),
+                ("textDelivery", .firstTextReceived, .firstTextVisible),
+            ]
+            let segmentSummary = segments.map { name, start, end in
+                "\(name)Ms=\(value(delta(start, end)))"
+            }.joined(separator: " ")
             let firstThinkingMs = first(.firstThinkingReceived)
             let firstTextMs = first(.firstTextReceived)
             let firstVisibleMs = first(.firstTextVisible)
@@ -243,7 +265,7 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
             let usageComplete = state.missingUsage == 0 && state.counts[.modelCompleted, default: 0] == state.counts[.modelStarted, default: 0]
             let timeline = state.events.map { "\($0.label):\($0.elapsedMs)" }.joined(separator: ",")
             let cacheWrite = state.cacheWriteSamples > 0 ? String(state.cacheWriteInputTokens) : "n/a"
-            return "AgentLatency.summary conversation=\(conversationID) submission=\(submissionID.uuidString) kind=\(kind) outcome=\(outcome) client=\(client) model=\(model) totalMs=\(totalMs) queueMs=\(value(queueMs)) prepareMs=\(value(prepareMs)) ttftMs=\(value(ttftMs)) firstThinkingMs=\(value(firstThinkingMs)) firstTextMs=\(value(firstTextMs)) firstVisibleMs=\(value(firstVisibleMs)) toolWallMs=\(toolWallMs) modelTurns=\(state.counts[.modelStarted, default: 0]) modelRoundTrips=\(state.counts[.modelStarted, default: 0] - state.compactionTurns) browserCalls=\(browserCalls) browserResultBytes=\(state.browserResultBytes) compactionTurns=\(state.compactionTurns) toolCalls=\(state.counts[.toolStarted, default: 0]) toolFailures=\(state.callFailures[.tool, default: 0]) toolMs=\(state.callDurations[.tool, default: 0]) tools=[\(calls(.tool))] functionCalls=\((state.callCounts[.function] ?? [:]).values.reduce(0, +)) functionFailures=\(state.callFailures[.function, default: 0]) functionMs=\(state.callDurations[.function, default: 0]) functions=[\(calls(.function))] unfinishedCalls=\(state.calls.count) usageSamples=\(state.usageSamples) missingUsage=\(state.missingUsage) usageComplete=\(usageComplete) tokens=\(tokens(state.totalTokens)) input=\(tokens(state.inputTokens)) cached=\(tokens(state.cachedInputTokens)) cacheWrite=\(cacheWrite) output=\(tokens(state.outputTokens)) timeline=\(timeline)"
+            return "AgentLatency.summary conversation=\(conversationID) submission=\(submissionID.uuidString) kind=\(kind) outcome=\(outcome) client=\(client) model=\(model) totalMs=\(totalMs) queueMs=\(value(queueMs)) prepareMs=\(value(prepareMs)) ttftMs=\(value(ttftMs)) \(segmentSummary) firstThinkingMs=\(value(firstThinkingMs)) firstTextMs=\(value(firstTextMs)) firstVisibleMs=\(value(firstVisibleMs)) toolWallMs=\(toolWallMs) modelTurns=\(state.counts[.modelStarted, default: 0]) modelRoundTrips=\(state.counts[.modelStarted, default: 0] - state.compactionTurns) browserCalls=\(browserCalls) browserResultBytes=\(state.browserResultBytes) compactionTurns=\(state.compactionTurns) toolCalls=\(state.counts[.toolStarted, default: 0]) toolFailures=\(state.callFailures[.tool, default: 0]) toolMs=\(state.callDurations[.tool, default: 0]) tools=[\(calls(.tool))] functionCalls=\((state.callCounts[.function] ?? [:]).values.reduce(0, +)) functionFailures=\(state.callFailures[.function, default: 0]) functionMs=\(state.callDurations[.function, default: 0]) functions=[\(calls(.function))] unfinishedCalls=\(state.calls.count) usageSamples=\(state.usageSamples) missingUsage=\(state.missingUsage) usageComplete=\(usageComplete) tokens=\(tokens(state.totalTokens)) input=\(tokens(state.inputTokens)) cached=\(tokens(state.cachedInputTokens)) cacheWrite=\(cacheWrite) output=\(tokens(state.outputTokens)) timeline=\(timeline)"
         }
         if let summary { Log.perf.info(summary) }
     }

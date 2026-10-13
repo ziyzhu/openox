@@ -10,6 +10,8 @@ Wait for `ox host describe` after relaunch. `ci:ios --loopback` opts a Debug Sim
 launch into loopback networking; relaunch without it to restore ordinary networking.
 This does not enable connections or widen physical-device/Release access.
 
+Restore simulator preferences with Ox stopped through `xcrun simctl spawn <UDID> defaults`, then verify them after relaunch. Host-side preference-file edits can be overwritten by the simulator's cached values; restore absent keys as well as saved values.
+
 `ci:ios` requires Xcode and idb, builds in evidence-local DerivedData, and verifies a
 Mock reply through Host APIs and visible UI. It does not cover composer/Send interaction.
 It attempts to restore the prior saved conversation and shuts down only a simulator it

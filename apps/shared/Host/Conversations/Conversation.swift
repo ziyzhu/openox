@@ -322,7 +322,7 @@ final class Conversation: Identifiable {
     private func scheduleModelPreparation() {
         modelPreparationTask?.cancel()
         modelPreparationTask = nil
-        guard modelPreparationIntent, isSelected else { return }
+        guard isSelected else { return }
         modelPreparationTask = Task { @MainActor [weak self] in
             do {
                 try await Task.sleep(for: .milliseconds(300))
@@ -330,9 +330,15 @@ final class Conversation: Identifiable {
             } catch {
                 return
             }
-            guard let self, self.modelPreparationIntent else { return }
+            guard let self, self.isSelected else { return }
             let client = self.client
             let model = self.model
+            let authenticationStarted = ContinuousClock.now
+            let authenticationOutcome = await client.prepareAuthentication()
+            guard !Task.isCancelled else { return }
+            let authenticationMs = TurnLatencyTrace.milliseconds(authenticationStarted.duration(to: .now))
+            Log.perf.info("LLM.auth.prepare chat=\(self.id) client=\(client.id) model=\(model.id) outcome=\(authenticationOutcome.rawValue) durationMs=\(authenticationMs)")
+            guard self.modelPreparationIntent else { return }
             let configuration = self.agentConfiguration(client: client, model: model)
             let prompt: RenderedConversationPrompt
             do {
