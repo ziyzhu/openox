@@ -454,14 +454,18 @@ struct ServiceDetailView: View {
     private var attachActionContent: some View {
         actionCard {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Attach to a conversation")
-                    .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
+                HStack(spacing: Theme.Spacing.sm) {
+                    Text("Attach to a conversation")
+                        .font(Theme.Fonts.bodyMd)
+                        .foregroundStyle(Theme.Colors.onSurface)
+                    Spacer(minLength: 0)
+                    approvalControl(actionID: Conversation.attachApproveKey(service.domain), defaultPolicy: Actions.defaultPolicy(for: Actions.serviceAttach))
+                }
+                Divider().padding(.vertical, 4)
                 Text(attachPermissionDescription)
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.conversationSecondary)
                     .fixedSize(horizontal: false, vertical: true)
-                approvalControl(actionID: Conversation.attachApproveKey(service.domain), defaultPolicy: Actions.defaultPolicy(for: Actions.serviceAttach))
             }
         }
     }
@@ -576,20 +580,25 @@ struct ServiceDetailView: View {
                         .foregroundStyle(Theme.Colors.onSurface)
                         .accessibilityIdentifier(A11yID.ConversationControls.Attach.action(action.id))
                     Spacer(minLength: 0)
-                    if isStandard { chip("Standard") }
-                    if action.requireAuth { chip("Authenticated") }
+                    if !isStandard {
+                        approvalControl(
+                            actionID: service.definition.qualifiedActionName(action.id),
+                            defaultPolicy: action.requireApproval ? .ask : .allow
+                        )
+                    }
                 }
                 if let desc = action.description, !desc.isEmpty {
+                    Divider().padding(.vertical, 4)
                     Text(desc)
                         .font(Theme.Fonts.bodySm)
                         .foregroundStyle(Theme.Colors.conversationSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if !isStandard {
-                    approvalControl(
-                        actionID: service.definition.qualifiedActionName(action.id),
-                        defaultPolicy: action.requireApproval ? .ask : .allow
-                    )
+                if isStandard || action.requireAuth {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        if isStandard { chip("Standard") }
+                        if action.requireAuth { chip("Authenticated") }
+                    }
                 }
             }
         }
@@ -598,9 +607,8 @@ struct ServiceDetailView: View {
     @ViewBuilder
     private func approvalControl(actionID: String, defaultPolicy: ActionPolicy) -> some View {
         let explicit = serviceManager.explicitActionPolicy(for: actionID)
-        Divider().padding(.vertical, 4)
         ActionPolicyPicker(
-            title: "Permission",
+            title: nil,
             selection: explicit,
             resolved: serviceManager.actionPolicy(for: actionID, default: defaultPolicy),
             inheritLabel: "Use Service Default",
