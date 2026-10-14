@@ -83,49 +83,55 @@ struct WebBrowserView: View {
 
     private var currentURL: URL? { page.url ?? initialURL }
 
+    private var chromeAnimation: Animation? {
+        reduceMotion ? nil : .spring(duration: 0.28, bounce: 0)
+    }
+
+    private var chromeFade: Animation? {
+        reduceMotion ? nil : .easeOut(duration: 0.16)
+    }
+
     var body: some View {
         GeometryReader { geometry in
             websiteContent
-                .ignoresSafeArea(.container, edges: .bottom)
                 .overlay { errorOverlay }
-                .padding(.top, Theme.Spacing.md)
-                .safeAreaInset(edge: .bottom, spacing: 0) {
+                .safeAreaBar(edge: .bottom, spacing: 0) {
                     browserBar
-                        .offset(y: scrollChrome.isCompact && !addressFocused ? max(0, geometry.safeAreaInsets.bottom - Theme.Spacing.lg) : 0)
-                        .animation(reduceMotion ? nil : Theme.Animation.handoff, value: addressFocused)
-                        .animation(reduceMotion ? nil : Theme.Animation.handoff, value: scrollChrome.isCompact)
-                }
-                .onChange(of: currentURL, initial: true) { _, _ in
-                    scrollChrome = .expanded(anchor: 0)
-                    guard !addressFocused else { return }
-                    syncAddress()
-                }
-                .onChange(of: addressFocused) { _, focused in
-                    syncAddress()
-                    if focused {
-                        scrollChrome = .expanded(anchor: 0)
-                        Task { @MainActor in
-                            await Task.yield()
-                            guard addressFocused else { return }
-                            UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
-                        }
-                    }
-                }
-                .alert("Couldn’t Load Page", isPresented: Binding(
-                    get: { addressError != nil },
-                    set: { if !$0 { addressError = nil } }
-                )) {
-                    Button("OK", role: .cancel) {}
-                } message: {
-                    if let addressError { Text(addressError.message) }
+                        .padding(.bottom, isCompact ? -min(20, geometry.safeAreaInsets.bottom) : 0)
                 }
         }
-        .toolbarBackground(.hidden, for: .navigationBar)
+            .animation(chromeAnimation, value: addressFocused)
+            .animation(chromeAnimation, value: scrollChrome.isCompact)
+            .onChange(of: currentURL, initial: true) { _, _ in
+                scrollChrome = .expanded(anchor: 0)
+                guard !addressFocused else { return }
+                syncAddress()
+            }
+            .onChange(of: addressFocused) { _, focused in
+                syncAddress()
+                if focused {
+                    scrollChrome = .expanded(anchor: 0)
+                    Task { @MainActor in
+                        await Task.yield()
+                        guard addressFocused else { return }
+                        UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
+                    }
+                }
+            }
+            .alert("Couldn’t Load Page", isPresented: Binding(
+                get: { addressError != nil },
+                set: { if !$0 { addressError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                if let addressError { Text(addressError.message) }
+            }
+            .toolbarBackground(.hidden, for: .navigationBar)
     }
 
     private var websiteContent: some View {
         WebContentView(page: page)
-            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.soft, for: [.top, .bottom])
             .simultaneousGesture(DragGesture().onChanged { _ in scrollChrome.beginScrolling() })
             .webViewOnScrollGeometryChange(for: CGFloat.self) { geometry in
                 let maximum = max(0, geometry.contentSize.height + geometry.contentInsets.top + geometry.contentInsets.bottom - geometry.containerSize.height)
@@ -149,40 +155,19 @@ struct WebBrowserView: View {
         }
     }
 
+    private var isCompact: Bool { scrollChrome.isCompact && !addressFocused }
+
     private var browserBar: some View {
         GlassEffectContainer(spacing: 8) {
-            if scrollChrome.isCompact, !addressFocused {
-                Button {
-                    if case .compact(let anchor) = scrollChrome {
-                        scrollChrome = .revealed(anchor: anchor)
-                    }
-                } label: {
-                    Text(currentURL?.host(percentEncoded: false) ?? fallbackHost)
-                        .font(.system(size: 13, weight: .medium))
-                        .lineLimit(1)
-                        .padding(.horizontal, 16)
-                        .frame(height: 28)
-                        .glassEffect(.regular.interactive(), in: Capsule())
-                        .glassEffectID("address", in: barNamespace)
-                        .glassEffectTransition(reduceMotion ? .identity : .matchedGeometry)
-                }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity, minHeight: 48, alignment: .bottom)
-                .contentShape(Rectangle())
-                .accessibilityLabel("Website address")
-                .accessibilityValue(currentURL?.host(percentEncoded: false) ?? fallbackHost)
-                .accessibilityIdentifier(identifier("collapsedAddress"))
-            } else {
-                expandedBar
-            }
+            expandedBar
         }
-        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.horizontal, 20)
         .padding(.top, 8)
         .padding(.bottom, Theme.Spacing.sm)
     }
 
     private var expandedBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: isCompact ? 0 : 8) {
             if !addressFocused {
                 HStack(spacing: 0) {
                     Button(action: goBack) {
@@ -199,9 +184,16 @@ struct WebBrowserView: View {
                         .accessibilityIdentifier(identifier("forward"))
                     }
                 }
-                .glassEffect(.regular.interactive(), in: Capsule())
+                .opacity(isCompact ? 0 : 1)
+                .glassEffect(isCompact ? .identity : .regular.interactive(), in: Capsule())
                 .glassEffectID("navigation", in: barNamespace)
-                .glassEffectTransition(reduceMotion ? .identity : .materialize)
+                .glassEffectTransition(.identity)
+                .animation(chromeFade, value: isCompact)
+                .scaleEffect(isCompact ? 0.65 : 1)
+                .frame(width: isCompact ? 0 : page.backForwardList.forwardList.isEmpty ? 48 : 80)
+                .allowsHitTesting(!isCompact)
+                .accessibilityHidden(isCompact)
+                .transition(reduceMotion ? .identity : .opacity)
             }
             addressBar
             if addressFocused {
@@ -231,11 +223,19 @@ struct WebBrowserView: View {
                 }
                 .accessibilityLabel(A11yLabel.more)
                 .accessibilityIdentifier(identifier("more"))
-                .glassEffect(.regular.interactive(), in: Circle())
+                .opacity(isCompact ? 0 : 1)
+                .glassEffect(isCompact ? .identity : .regular.interactive(), in: Circle())
                 .glassEffectID("more", in: barNamespace)
-                .glassEffectTransition(reduceMotion ? .identity : .materialize)
+                .glassEffectTransition(.identity)
+                .animation(chromeFade, value: isCompact)
+                .scaleEffect(isCompact ? 0.65 : 1)
+                .frame(width: isCompact ? 0 : 48)
+                .allowsHitTesting(!isCompact)
+                .accessibilityHidden(isCompact)
+                .transition(reduceMotion ? .identity : .opacity)
             }
         }
+        .frame(maxWidth: .infinity)
         .buttonStyle(.plain)
     }
 
@@ -246,62 +246,76 @@ struct WebBrowserView: View {
             .contentShape(Rectangle())
     }
 
+    private var domainLabel: some View {
+        Text(currentURL?.host(percentEncoded: false) ?? fallbackHost)
+            .lineLimit(1)
+    }
+
     private var addressBar: some View {
         HStack(spacing: 0) {
-            HStack(spacing: 0) {
-                Image(systemName: currentURL?.scheme == "https" && page.hasOnlySecureContent ? "lock.fill" : "globe")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 40, height: 48)
-                if mode.allowsAddressEditing {
-                    ZStack {
-                        TextField("Website address", text: $address)
-                            .textFieldStyle(.plain)
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.URL)
-                            .autocorrectionDisabled()
-                            .submitLabel(.go)
-                            .focused($addressFocused)
-                            .onSubmit(submitAddress)
-                            .accessibilityLabel("Website address")
-                            .accessibilityIdentifier(identifier("address"))
-                            .opacity(addressFocused ? 1 : 0)
-                            .accessibilityHidden(!addressFocused)
-                        if !addressFocused {
-                            Button { addressFocused = true } label: {
-                                Text(address)
-                                    .lineLimit(1)
-                                    .frame(maxWidth: .infinity, minHeight: 44)
-                            }
-                            .accessibilityLabel("Website address")
-                            .accessibilityValue(address)
-                            .accessibilityIdentifier(identifier("address"))
-                            .transition(.identity)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                } else {
-                    Text(currentURL?.host(percentEncoded: false) ?? fallbackHost)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity)
-                        .accessibilityIdentifier(identifier("address"))
+            Button {
+                if case .compact(let anchor) = scrollChrome {
+                    scrollChrome = .revealed(anchor: anchor)
+                    Log.webView.info("WebBrowser.chrome reveal mode=\(mode.accessibilityPrefix)")
+                } else if mode.allowsAddressEditing {
+                    addressFocused = true
                 }
+            } label: {
+                domainLabel
+                    .font(.system(size: isCompact ? 13 : 17, weight: isCompact ? .medium : .regular))
+                    .padding(.horizontal, isCompact ? 24 : 0)
+                    .frame(maxWidth: isCompact ? nil : .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if mode.allowsAddressEditing { addressFocused = true }
+            .disabled(!isCompact && !mode.allowsAddressEditing)
+            .accessibilityLabel("Website address")
+            .accessibilityValue(address)
+            .accessibilityIdentifier(identifier(isCompact ? "collapsedAddress" : "address"))
+            .opacity(addressFocused ? 0 : 1)
+            .animation(nil, value: addressFocused)
+            .accessibilityHidden(addressFocused)
+            .overlay {
+                TextField("Website address", text: $address)
+                    .textFieldStyle(.plain)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                    .autocorrectionDisabled()
+                    .submitLabel(.go)
+                    .focused($addressFocused)
+                    .onSubmit(submitAddress)
+                    .accessibilityLabel("Website address")
+                    .accessibilityIdentifier(identifier("address"))
+                    .frame(minHeight: 44)
+                    .opacity(addressFocused ? 1 : 0)
+                    .animation(nil, value: addressFocused)
+                    .accessibilityHidden(!addressFocused)
+                    .allowsHitTesting(addressFocused)
             }
-            if !addressFocused {
+            if addressFocused, !address.isEmpty {
+                Button {
+                    address = ""
+                } label: {
+                    controlSymbol("xmark.circle.fill", width: 40, font: .body)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityLabel("Clear address")
+                .accessibilityIdentifier(identifier("clearAddress"))
+            } else if !addressFocused {
                 Button(action: reloadOrStop) {
                     controlSymbol(page.isLoading ? "xmark" : "arrow.clockwise", width: 40)
                 }
                 .accessibilityLabel(page.isLoading ? A11yLabel.stop : String(localized: "Reload"))
                 .accessibilityIdentifier(identifier("reloadOrStop"))
+                .opacity(isCompact ? 0 : 1)
+                .animation(chromeFade, value: isCompact)
+                .frame(width: isCompact ? 0 : 40)
+                .allowsHitTesting(!isCompact)
+                .accessibilityHidden(isCompact)
             }
         }
-        .padding(.horizontal, 4)
-        .frame(minHeight: 48)
+        .padding(.leading, isCompact ? 0 : addressFocused ? 16 : 4)
+        .padding(.trailing, isCompact ? 0 : 4)
+        .frame(minHeight: isCompact ? 44 : 48)
         .overlay(alignment: .bottom) {
             if page.isLoading {
                 ProgressView(value: page.estimatedProgress)
@@ -309,7 +323,7 @@ struct WebBrowserView: View {
                     .padding(.horizontal, 20)
             }
         }
-        .glassEffect(.regular.interactive(), in: Capsule())
+        .glassEffect(.regular.interactive(), in: Capsule().inset(by: isCompact ? 8 : 0))
         .glassEffectID("address", in: barNamespace)
         .glassEffectTransition(reduceMotion ? .identity : .matchedGeometry)
     }

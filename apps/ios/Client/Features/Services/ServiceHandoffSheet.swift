@@ -39,10 +39,10 @@ struct BotControlSheetView: View {
                     }
                 }
             )
-            .navigationTitle(session.navigationTitle)
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ConversationControls.Attach.botControlCancel(session.serviceDomain)) {
                         session.cancel()
                         dismiss()
@@ -84,18 +84,13 @@ struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
                     }
                 }
             )
-                .navigationTitle(session.navigationTitle)
+                .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        if returnsInline {
-                            Button("Done") { dismiss() }
-                                .accessibilityIdentifier(A11yID.ServiceHandoff.done)
-                        } else {
-                            SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceHandoff.done) {
-                                session.cancel()
-                                dismiss()
-                            }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceHandoff.done) {
+                            if !returnsInline { session.cancel() }
+                            dismiss()
                         }
                     }
                 }

@@ -31,6 +31,8 @@ For chat opening, verify the final visible tail after Markdown layout expands, t
 scroll away and reopen; an initial bottom geometry sample alone does not prove success.
 
 Verify streaming-rendering changes in video across paragraph/fence boundaries and completion; content assertions and settled screenshots do not establish visual continuity.
+For Liquid Glass chrome, compare frame-by-frame geometry and material lifetimes, not just
+spring duration or settled screenshots. Hidden controls must disappear visually as well as from AX.
 
 Verify Send handoffs in video for empty/populated chats, short/multiline/long drafts,
 keyboard visible/hidden, and scrolled history. Confirm non-queued cases have `posted`

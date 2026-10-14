@@ -53,18 +53,14 @@ struct ServiceBrowserView: View {
     @State private var toast: Toast?
     @Environment(\.dismiss) private var dismiss
 
-    private var title: String {
-        session.page.title.isEmpty ? session.serviceTitle : session.page.title
-    }
-
     var body: some View {
         NavigationStack {
             browser
                 .toast($toast, accessibilityIdentifier: "serviceBrowser.navigationNotice")
-                .navigationTitle(title)
+                .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .confirmationAction) { doneButton }
+                    ToolbarItem(placement: .topBarTrailing) { doneButton }
                 }
         }
         .onAppear(perform: session.start)
@@ -92,7 +88,6 @@ struct ServiceBrowserView: View {
     }
 
     private var doneButton: some View {
-        Button("Done") { dismiss() }
-            .accessibilityIdentifier(A11yID.ServiceBrowser.done)
+        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceBrowser.done) { dismiss() }
     }
 }

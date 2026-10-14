@@ -40,7 +40,7 @@ struct ServicePageInspector: View {
                 CellularAutomatonLoader()
             }
         }
-        .navigationTitle(page?.title.isEmpty == false ? page?.title ?? service.title : service.title)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
         .toolbar {
