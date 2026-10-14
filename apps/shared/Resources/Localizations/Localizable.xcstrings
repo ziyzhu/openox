@@ -1,7 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Open Website" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开网站" } } } },
     "Open %@" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开 %@" } } } },
     "Websites" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "网站" } } } },
     "No Websites" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "没有网站" } } } },

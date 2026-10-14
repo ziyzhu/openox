@@ -34,19 +34,15 @@ struct BrowserStartPage: View {
                 .accessibilityIdentifier(A11yID.ServiceBrowser.startPageEmpty)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                        Text("Websites")
-                            .font(Theme.Fonts.title)
-                            .foregroundStyle(Theme.Colors.onSurface)
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: tileWidth), spacing: Theme.Spacing.md, alignment: .top)], spacing: Theme.Spacing.lg) {
-                            ForEach(websites, id: \.service.domain) { website in
-                                tile(website.service, url: website.url)
-                            }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: tileWidth), spacing: Theme.Spacing.md, alignment: .top)], spacing: Theme.Spacing.lg) {
+                        ForEach(websites, id: \.service.domain) { website in
+                            tile(website.service, url: website.url)
                         }
                     }
-                    .frame(maxWidth: Theme.ContainerWidth.readable, alignment: .leading)
+                    .frame(maxWidth: Theme.ContainerWidth.readable)
                     .padding(.horizontal, 20)
-                    .padding(.vertical, Theme.Spacing.lg)
+                    .padding(.top, Theme.Spacing.xs)
+                    .padding(.bottom, Theme.Spacing.lg)
                     .frame(maxWidth: .infinity)
                 }
                 .scrollDismissesKeyboard(.immediately)
