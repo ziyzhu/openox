@@ -135,11 +135,14 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
         guard preview != output else {
             return ModelOutput(text: output, truncated: false)
         }
-        let id = try await store.save(output)
+        let path = try await store.save(output)
         let marker = try ModelPromptRenderer.shared.render(.outputTruncation, input: .object([
-            "id": .string(id), "maxLines": .int(JavaScriptOutputLimits.maxLines), "maxBytes": .int(JavaScriptOutputLimits.maxBytes),
+            "path": .string(path), "maxLines": .int(JavaScriptOutputLimits.maxLines), "maxBytes": .int(JavaScriptOutputLimits.maxBytes),
         ]))
-        return ModelOutput(text: preview + marker, truncated: true)
+        let boundedPreview = JavaScriptOutputLimits.preview(output,
+            maxLines: JavaScriptOutputLimits.maxLines - marker.filter { $0 == "\n" }.count,
+            maxBytes: JavaScriptOutputLimits.maxBytes - marker.utf8.count)
+        return ModelOutput(text: boundedPreview + marker, truncated: true)
     }
 
     @concurrent

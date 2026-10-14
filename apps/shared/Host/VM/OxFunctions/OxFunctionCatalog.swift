@@ -29,7 +29,6 @@ nonisolated enum OxFunctionCatalog {
         OxRepositories.function,
         OxUser.function,
         OxFileSystem.function,
-        OxOutput.function,
         OxSkills.function,
         OxSchedules.function,
         OxVision.function,

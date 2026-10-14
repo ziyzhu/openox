@@ -11,6 +11,9 @@ extension Conversation {
 
     func fileBackend(operation: String, path: String, arguments: JSONValue) async throws -> JSONValue {
         try requireFileBackendScope()
+        if path == "tmp" || path.hasPrefix("tmp/") {
+            return .object(["value": try await javaScriptOutputs.operation(operation, path: path)])
+        }
         var path = path
         var parts = path.split(separator: "/").map(String.init)
         if parts.count == 3, parts[0] == "conversations", ["conversation.json", "turns.jsonl"].contains(parts[2]) {

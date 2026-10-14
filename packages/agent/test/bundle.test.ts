@@ -59,7 +59,7 @@ it("uses explicit prompt variants without inferring prose from capabilities and 
   runInContext(await Bun.file(new URL("../../../apps/shared/Resources/PiDurable.bundle/prompts.js", import.meta.url)).text(), realm);
   const scope = { hostID: "desktop-host", profileID: "profile-a" };
   realm.input = { soul: "## Voice\nBe direct.", memory: "frozen", hostContext: { active: scope,
-    hosts: [{ ...scope, functions: ["ox.fs.read", "ox.fs.edit", "ox.fs.write", "ox.output.read"], serviceKinds: [], presentation: "text", externalFiles: false }] } };
+    hosts: [{ ...scope, functions: ["ox.fs.read", "ox.fs.edit", "ox.fs.write"], serviceKinds: [], presentation: "text", externalFiles: false }] } };
   const prompt = runInContext("OxPrompts.composeOxPrompt(input).rendered", realm) as string;
   expect(prompt).toContain("text with Markdown support");
   expect(prompt).toContain("frozen");

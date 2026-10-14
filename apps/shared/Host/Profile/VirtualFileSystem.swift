@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated public struct VirtualFileSystem: Sendable {
-    static let hostRoots = ["MEMORY.md", "SOUL.md", "artifacts", "skills", "services", "history"]
+    static let hostRoots = ["MEMORY.md", "SOUL.md", "artifacts", "skills", "services", "history", "tmp"]
     static let maximumReadBytes = FileLimits.textBytes
     static let maximumSearchFiles = 1_000
 

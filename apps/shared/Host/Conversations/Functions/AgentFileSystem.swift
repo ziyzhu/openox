@@ -42,7 +42,7 @@ extension Conversation {
         var roots = VirtualFileSystem.hostRoots
         roots.append("files")
         let mounts = roots.map { root in
-            JSONValue.object(["path": .string(root), "access": .string(root == "history" ? "readOnly" : "readWrite")])
+            JSONValue.object(["path": .string(root), "access": .string(["history", "tmp"].contains(root) ? "readOnly" : "readWrite")])
         } + [JSONValue.object(["path": .string("chats"), "access": .string("readOnly")]),
              JSONValue.object(["path": .string(""), "access": .string("readOnly")])]
         return try await tracked(action, .object(args), purpose: purpose) {

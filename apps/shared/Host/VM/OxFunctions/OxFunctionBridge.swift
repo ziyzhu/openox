@@ -6,7 +6,6 @@ public protocol OxFunctionBridge: AnyObject {
     func deleteConversation(id: String, purpose: String) async throws -> JSONValue?
     func providerOperation(name: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?
     func secretOperation(name: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?
-    func readJavaScriptOutput(id: String, purpose: String) async throws -> JSONValue?
     func appInfo(purpose: String) async throws -> JSONValue?
     func appProfile(purpose: String) async throws -> JSONValue?
     func appProfiles(purpose: String) async throws -> JSONValue?

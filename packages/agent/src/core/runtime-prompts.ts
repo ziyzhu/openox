@@ -2,7 +2,7 @@ export type RuntimeEvent =
   | { type: "serviceSignIn"; domain: string; authorized: boolean }
   | { type: "botControl"; domain: string; argsJSON: string };
 export interface ReceiptInvocation { id: string; name: string; state: "succeeded" | "failed" | "running" }
-export interface OutputTruncation { id: string; maxLines: number; maxBytes: number }
+export interface OutputTruncation { path: string; maxLines: number; maxBytes: number }
 
 export function runtimeEvent(event: RuntimeEvent) {
   if (typeof event?.domain !== "string") throw new Error("Runtime event requires a service domain");
@@ -42,8 +42,8 @@ export function failureReceipt(input: { invocations: ReceiptInvocation[]; omitte
 }
 
 export function outputTruncation(input: OutputTruncation) {
-  if (typeof input?.id !== "string" || !Number.isSafeInteger(input.maxLines) || input.maxLines < 1 || !Number.isSafeInteger(input.maxBytes) || input.maxBytes < 1) throw new Error("Invalid output truncation state");
-  return `\n[Tool output truncated: showing the tail (${input.maxLines} lines or ${Math.floor(input.maxBytes / 1024)} KiB limit). Full output id: ${input.id}. Read with ox.output.read({ purpose: 'Read remaining output', id: '${input.id}' }), then filter or slice before printing. Reference expires when this conversation is unloaded.]`;
+  if (typeof input?.path !== "string" || !Number.isSafeInteger(input.maxLines) || input.maxLines < 1 || !Number.isSafeInteger(input.maxBytes) || input.maxBytes < 1) throw new Error("Invalid output truncation state");
+  return `\n[Tool output truncated: showing the tail (${input.maxLines} lines or ${Math.floor(input.maxBytes / 1024)} KiB limit). Full output file: ${input.path}. Read with ox.fs.read({ purpose: 'Read remaining output', path: '${input.path}', offset: 1 }), then continue with nextOffset or search with ox.fs.grep. File expires when this conversation is unloaded.]`;
 }
 
 export function imageReadGuidance(input: { path: string }) {

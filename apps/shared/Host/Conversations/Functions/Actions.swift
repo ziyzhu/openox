@@ -103,7 +103,7 @@ nonisolated enum Actions {
         appLogs, appRenameConversation,
         webSearch, webFetch,
     ] + BrowserFunctionCatalog.actionNames + [
-        fsList, fsRead, fsAttach, outputRead, fsWrite, fsEdit, fsDelete, fsMkdir, fsRmdir, fsMove, fsCopy, fsGlob, fsGrep,
+        fsList, fsRead, fsAttach, fsWrite, fsEdit, fsDelete, fsMkdir, fsRmdir, fsMove, fsCopy, fsGlob, fsGrep,
         visionAnalyze,
         serviceFind, serviceList, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryEnable, repositoryDisconnect,

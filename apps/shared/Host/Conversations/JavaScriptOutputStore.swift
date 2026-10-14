@@ -4,7 +4,7 @@ nonisolated enum JavaScriptOutputLimits {
     static let maxBytes = 50 * 1024
     static let maxLines = 2_000
 
-    static func preview(_ text: String) -> String {
+    static func preview(_ text: String, maxLines: Int = maxLines, maxBytes: Int = maxBytes) -> String {
         let bytes = text.utf8
         if bytes.count <= maxBytes {
             let lines = bytes.reduce(0) { $0 + ($1 == 10 ? 1 : 0) } + (bytes.last == 10 ? 0 : 1)
@@ -47,26 +47,45 @@ actor JavaScriptOutputStore {
             throw RuntimeError.bridge(ModelGuidance.text("output.cacheExceeded"))
         }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let id = UUID().uuidString
+        let id = UUID().uuidString + ".txt"
         try data.write(to: directory.appendingPathComponent(id), options: .atomic)
         storedBytes += data.count
-        return id
+        return "/tmp/" + id
     }
 
-    func read(_ id: String) throws -> String {
-        guard let uuid = UUID(uuidString: id) else { throw RuntimeError.bridge("Invalid output reference.") }
-        let url = directory.appendingPathComponent(uuid.uuidString)
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            throw RuntimeError.bridge(ModelGuidance.text("output.unavailable"))
+    func operation(_ operation: String, path: String) throws -> JSONValue {
+        let parts = path.split(separator: "/").map(String.init)
+        guard parts.first == "tmp", parts.count <= 2 else { throw VirtualFileSystem.Error.invalidPath(path) }
+        let name = parts.count == 2 ? parts[1] : nil
+        if let name {
+            guard name.hasSuffix(".txt"), UUID(uuidString: String(name.dropLast(4))) != nil else {
+                throw VirtualFileSystem.Error.invalidPath(path)
+            }
         }
-        return try String(contentsOf: url, encoding: .utf8)
-    }
-}
-
-extension Conversation {
-    public func readJavaScriptOutput(id: String, purpose: String) async throws -> JSONValue? {
-        try await tracked(Actions.outputRead, .object(["id": .string(id)]), purpose: purpose) {
-            return .string(try await javaScriptOutputs.read(id))
+        let url = name.map { directory.appendingPathComponent($0) }
+        func info(_ name: String, size: Int) -> JSONValue {
+            .object(["path": .string("tmp/" + name), "name": .string(name), "kind": .string("file"),
+                     "size": .int(size), "mtimeMs": .int(0)])
+        }
+        switch operation {
+        case "info":
+            guard let name, let url else {
+                return .object(["path": .string("tmp"), "name": .string("tmp"), "kind": .string("directory"),
+                                "size": .int(0), "mtimeMs": .int(0)])
+            }
+            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+            return info(name, size: size)
+        case "list":
+            guard name == nil else { throw VirtualFileSystem.Error.notDirectory(path) }
+            guard FileManager.default.fileExists(atPath: directory.path) else { return .array([]) }
+            return .array(try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted().map {
+                info($0, size: try directory.appendingPathComponent($0).resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
+            })
+        case "read":
+            guard let url else { throw VirtualFileSystem.Error.notFile(path) }
+            return .object(["text": .string(try String(contentsOf: url, encoding: .utf8)), "truncated": .bool(false), "unsupported": .null])
+        default:
+            throw VirtualFileSystem.Error.unsupportedMutation(path)
         }
     }
 }
