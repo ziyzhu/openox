@@ -111,7 +111,7 @@ private struct EmptyConversationMark: View {
     private func color(at index: Int) -> Color {
         strongCells.contains(index)
             ? Theme.Colors.primary.dynamic
-            : Theme.Colors.surfaceSunken.dynamic
+            : .clear
     }
 }
 
