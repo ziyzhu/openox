@@ -918,7 +918,7 @@ struct ConversationComposer: View, Equatable {
         systemName: String,
         label: String,
         id: String,
-        fill: DynamicColor = Theme.Colors.conversationControl,
+        fill: DynamicColor = Theme.Colors.composerSend,
         event: Haptics.Event? = nil,
         action: @escaping () -> Void
     ) -> some View {
