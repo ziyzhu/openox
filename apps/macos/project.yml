@@ -43,6 +43,7 @@ targets:
       properties:
         LSUIElement: true
         CFBundleDisplayName: Ox Host
+        CFBundleIconFile: AppIcon
         NSContactsUsageDescription: Ox Host accesses contacts when you request contact lookup.
         NSCalendarsWriteOnlyAccessUsageDescription: Ox Host adds calendar events when you request them.
         NSRemindersFullAccessUsageDescription: Ox Host adds reminders when you request them.

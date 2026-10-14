@@ -27,6 +27,7 @@
 1. Do not add unit tests; prefer E2E tests.
 1. For each commit, review lines of code and cyclomatic complexity, prefer low.
 1. Show screenshots after making UI changes for human to review.
+1. Do not introduce new abstractions without permission for simple changes.
 
 ## Commit Rules
 

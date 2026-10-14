@@ -54,14 +54,32 @@ Apple's public guidance does not specify whether entitlement assessment uses the
 
 ## 2. Complete the minimum browser experience
 
-Build on `apps/ios/Client/UI/WebBrowserView.swift`.
+Build on `apps/ios/Client/UI/WebBrowserView.swift`, `ServiceBrowserView`, and `LinkOpener`. Keep the conversation as the launch screen; add no top-bar chrome. Every entry path reuses `LinkOpener`/`AppPresentationCoordinator.presentBrowser` and creates no conversation.
 
-- [ ] Provide readily accessible URL entry, web search, or curated bookmarks from launch; Apple's criteria permit these alternatives.
-- [ ] Allow browsing without asking the agent first.
-- [ ] Clearly show the current website/domain and the Profile owning its session.
-- [ ] Provide back, forward, reload/stop, and navigation-error recovery.
-- [ ] Preserve ordinary website content and user navigation while keeping agent assistance available.
-- [ ] Assess existing behavior before adding UI; tabs, bookmarks, and history are product choices, not all explicit entitlement prerequisites.
+Existing: `.browse` mode already has editable address entry, back/forward, reload/stop, progress, a "Try Again" error overlay, Share, and Open in Safari.
+
+Entry points (approved direction: composer URL, "+" menu, empty start page with service websites; recent pages deferred):
+- [ ] Reproduce current state on a simulator: no launch path reaches the Browser without the agent or an external link.
+- [ ] Composer URL: when trimmed composer text is a single bare domain or `http(s)` URL, show an "Open <host>" suggestion using the existing composer suggestion-panel pattern. Selecting it opens the Browser and clears nothing; Send still goes to the agent. Ignore multi-word text and `sandbox:` links.
+- [ ] "+" menu: add an "Open Website" row to `AttachMenuCard` that opens an empty Browser with the address field focused.
+- [ ] Empty Browser: let `ServiceBrowserSession` start without an initial URL, auto-focus the address field, and show a start page instead of a blank web view.
+- [ ] Start page: list the selected Profile's web services (exclude API, MCP, and iOS services) by name, favicon, and manifest `baseUrl`. Tapping one navigates the same session through `ServiceBrowserSession`'s attached-service path. No new persisted state.
+- [ ] Show a neutral empty state when the Profile has no web services; address entry stays primary.
+- [ ] Address submission: resolve bare domains to `https://`; decide whether non-URL text is rejected or sent to a web search before shipping (search provider choice must stay neutral).
+
+Navigation audit:
+- [ ] Verify back/forward/reload/stop and "Try Again" stay reachable with collapsed chrome, a first-load failure, and an empty session.
+- [ ] Show the current domain (already shown) and the owning Profile name once Profile isolation lands; until then do not imply Profile-owned sessions.
+- [ ] Keep popups, downloads, tabs, and history out of this step; they are tracked in section 4 or deferred.
+
+Recent pages (deferred, needs approval): Profile-local capped list of URL, title, and last visit, recorded only for user-initiated top-level navigations, cleared with Profile website data, logged by domain only. It is a new persisted file, so it requires predecessor/changed-build evidence and should follow Profile isolation.
+
+Verification:
+- [ ] Simulator E2E on iPhone and iPad layouts with VoiceOver labels and stable identifiers for each new control and per-service row.
+- [ ] Screenshots of composer suggestion, "+" menu row, empty start page, and no-services state for review.
+- [ ] Report LOC, cyclomatic complexity, file-tree, and call-stack diffs.
+
+Gate: a reviewer can open Ox, reach a website in one or two taps without the agent, and recover from navigation errors.
 
 ## 3. Handle links opened by other apps
 
