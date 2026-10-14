@@ -23,17 +23,17 @@ struct OnboardingView: View {
 
                     VStack(spacing: Theme.Spacing.xxl) {
                         OnboardingDisclosureRow(
-                            symbol: "hammer",
+                            symbol: "globe",
                             title: "Connect anything",
                             description: "Ox works across AI assistants, apps, and websites to get things done for you."
                         )
                         OnboardingDisclosureRow(
-                            symbol: "chevron.left.forwardslash.chevron.right",
+                            symbol: "iphone",
                             title: "Local first",
                             description: "Ox runs on your device, keeping your conversations, credentials, and memory stored locally."
                         )
                         OnboardingDisclosureRow(
-                            symbol: "hand.raised",
+                            symbol: "person",
                             title: "Yours",
                             description: "Open source and malleable, Ox evolves with you and uses the models you choose."
                         )
