@@ -74,7 +74,7 @@ extension OxHostProtocol {
             }
             value = .object(["name": .string(name), "schema": schema, "help": text])
         } else {
-            value = .object(["functions": catalog])
+            value = .object(["functions": OxFunctionCatalog.buildCompact()])
         }
         reply.success(VMControlResult(value: value, logs: nil))
     }

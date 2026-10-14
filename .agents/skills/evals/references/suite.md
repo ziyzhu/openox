@@ -54,8 +54,9 @@ Bindings optionally contain `stubs`:
 Rules match argument subsets and current state. `$arg` and `$state` references
 resolve values without executing fixture code. `set` applies atomically after
 validating the result. An `error` contains `code`, `message`, and `recovery` and
-never applies mutations. No matching rule fails explicitly. All 110 functions use
-real input/output contracts; fixtures must prepare behavior beyond the default
+never applies mutations. No matching rule fails explicitly. All built-in functions use
+real input/output contracts; synchronous `ox.provider.schema()` returns the native
+provider-document schema and records an inspection receipt. Fixtures must prepare behavior beyond the default
 Profile/provider/repository/schedule readers and in-memory filesystem. Human choices
 are explicit fixture results for `ox.user.choose`, not real approvals. Browser,
 payment, service, and media results are simulated observations, not evidence of

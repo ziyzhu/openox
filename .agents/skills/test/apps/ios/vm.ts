@@ -13,6 +13,7 @@ const endpoint = new URL(config.values.host);
 if (!["ws:","wss:"].includes(endpoint.protocol) || Number(endpoint.port) !== config.debugPort) throw new Error("Use the assigned simulator port");
 const release = claimSimulator(config.device);
 const evidence = await mkdtemp(join(tmpdir(),"ox-vm-integration-"));
+const functionNames = Object.keys(contracts);
 const cli = ["bun","apps/cli/src/ox.ts","--host",endpoint.href];
 async function call(args: string[], chat?: string) {
   const result = await run([...cli,...chat ? ["--conversation",chat] : [],...args,"--json"],{capture:true});
@@ -33,12 +34,16 @@ try {
   for (const temporary of [true,false,true]) {
     const chat = await call(["conversation","new",...temporary ? ["--temporary"] : [],"--provider","mock","--model","mock"]);
     const source = `
-      const names = ${JSON.stringify(Object.keys(contracts))};
+      const names = ${JSON.stringify(functionNames)};
       for (const name of names) {
         const parts = name.split('.').slice(1); let target = ox;
         for (const part of parts) { if (typeof target.help !== 'function') throw Error('Missing namespace help: '+name); target = target[part]; }
         if (typeof target.help !== 'function' || typeof target.help() !== 'string') throw Error('Missing function help: '+name);
       }
+      const providerSchema = ox.provider.schema();
+      if (providerSchema instanceof Promise || !Array.isArray(providerSchema.anyOf)) throw Error('Provider schema must be synchronous and complete');
+      providerSchema.anyOf.length = 0;
+      if (!ox.provider.schema().anyOf.length) throw Error('Provider schema mutation escaped');
       const before = await ox.fs.read({path:'MEMORY.md',purpose:'Read QA memory'});
       const parallel = await Promise.all([ox.app.profile({purpose:'Inspect QA Profile'}),ox.fs.read({path:'SOUL.md',purpose:'Read QA soul'})]);
       const invalid = [];
@@ -53,7 +58,7 @@ try {
     const result = await call(["vm","eval","--script",source],chat.chatId);
     await writeFile(join(evidence,`${temporary ? "temporary" : "saved"}-${chat.chatId}.json`),JSON.stringify(result,null,2),{mode:0o600});
     assert.equal(result.value.profile.name,name);
-    assert.equal(result.value.count,Object.keys(contracts).length);
+    assert.equal(result.value.count,functionNames.length);
     assert.equal(result.value.aliases,true);
     assert.equal(result.value.memory.truncated,false);
     assert.equal(result.value.invalid.length,2);

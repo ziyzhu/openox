@@ -21,7 +21,9 @@ lines.on("line", line => {
         for (const [name, contract] of Object.entries(catalog)) {
           const parts = name.split('.').slice(1); let target = ox;
           for (const part of parts.slice(0,-1)) target = target[part] ??= {};
-          const fn = args => call(name, args);
+          const fn = name === 'ox.provider.schema'
+            ? () => { queue.push({name,args:{},inspection:true}); return JSON.parse(JSON.stringify(catalog['ox.provider.get'].outputSchema)); }
+            : args => call(name, args);
           fn.help = () => JSON.stringify(contract);
           target[parts.at(-1)] = fn;
         }
@@ -41,7 +43,7 @@ setInterval(() => {
   if (!realm) return;
   try {
     const state = JSON.parse(evaluate("JSON.stringify({calls:queue.splice(0),finished,result,failure,logs:logs.splice(0)})"));
-    for (const call of state.calls) emit({ call });
+    for (const call of state.calls) emit(call.inspection ? { inspection: call } : { call });
     if (state.logs.length) emit({ logs: state.logs });
     if (state.finished) { emit({ done: true, value: state.result, error: state.failure }); process.exit(0); }
   } catch (error) { emit({ done: true, error: String(error) }); process.exit(1); }

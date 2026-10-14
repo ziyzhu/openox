@@ -57,6 +57,7 @@ nonisolated enum OxProviders {
     ])
 
     static let operations: [(String, String)] = [
+        ("schema", ModelGuidance.text("ox.provider.schema")),
         ("default", ModelGuidance.text("ox.provider.default")),
         ("list", ModelGuidance.text("ox.provider.list")),
         ("get", ModelGuidance.text("ox.provider.get")),
@@ -76,7 +77,7 @@ nonisolated enum OxProviders {
                 let fields: [String: JSONValue]
                 if ["save", "validate"].contains(operation) { fields = ["provider": ProviderDefinition.schema] }
                 else if operation == "generate" { fields = ProviderGeneration.inputFields }
-                else if operation == "list" || operation == "default" { fields = [:] }
+                else if ["schema", "list", "default"].contains(operation) { fields = [:] }
                 else { fields = ["id": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(200)])] }
                 return ("ox.provider.\(operation)", .object([
                     "description": .string(description),
@@ -84,7 +85,7 @@ nonisolated enum OxProviders {
                         "type": .string("object"), "properties": .object(fields),
                         "required": .array((operation == "generate" ? ["id", "model", "messages", "maxOutputTokens"] : fields.keys.sorted()).map(JSONValue.string)), "additionalProperties": .bool(false),
                     ]),
-                    "outputSchema": operation == "models" ? ProviderGeneration.modelsSchema : operation == "generate" ? ProviderGeneration.outputSchema : operation == "default" ? .object(["type": .string("array"), "items": ProviderDefinition.schema]) : operation == "list" ? .object(["type": .string("array"), "items": providerSummarySchema]) : operation == "get" ? ProviderDefinition.schema : .object(["description": .string("Operation result with provider id and status.")]),
+                    "outputSchema": operation == "schema" ? .object(["type": .string("object"), "description": .string("Complete provider-document JSON Schema, including all protocol and authentication variants.")]) : operation == "models" ? ProviderGeneration.modelsSchema : operation == "generate" ? ProviderGeneration.outputSchema : operation == "default" ? .object(["type": .string("array"), "items": ProviderDefinition.schema]) : operation == "list" ? .object(["type": .string("array"), "items": providerSummarySchema]) : operation == "get" ? ProviderDefinition.schema : .object(["description": .string("Operation result with provider id and status.")]),
                 ]))
             }
         },
@@ -96,7 +97,8 @@ nonisolated enum OxProviders {
             context.setObject(operation, forKeyedSubscript: "__nativeProviderOperation" as NSString)
         },
         jsFragment: operations.map { name, _ in
-            "\(name): value => { const options = __oxOptions(value, 'ox.provider.\(name)'); return __nativeProviderOperation('\(name)', options, String(options.purpose)); }"
+            if name == "schema" { return "schema: () => (\(ProviderDefinition.schema.jsonString()))" }
+            return "\(name): value => { const options = __oxOptions(value, 'ox.provider.\(name)'); return __nativeProviderOperation('\(name)', options, String(options.purpose)); }"
         }.joined(separator: ",\n")
     )
 }

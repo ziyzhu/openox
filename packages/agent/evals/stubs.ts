@@ -1,8 +1,14 @@
 import { Value } from "typebox/value";
-import type { TSchema } from "typebox";
+import type { TObject, TSchema } from "typebox";
 import contracts from "./contracts.json";
+import providerSchema from "../../../apps/shared/Host/ModelProviders/provider-definition.schema.json";
 
-export const catalog = contracts as Record<string, { description: string; inputSchema: TSchema; outputSchema: TSchema }>;
+export const catalog = structuredClone(contracts) as Record<string, { description: string; inputSchema: TSchema; outputSchema: TSchema }>;
+catalog["ox.provider.get"]!.outputSchema = providerSchema as TSchema;
+catalog["ox.provider.default"]!.outputSchema = { type: "array", items: providerSchema } as TSchema;
+for (const name of ["ox.provider.save", "ox.provider.validate"]) {
+  (catalog[name]!.inputSchema as TObject).properties.provider = providerSchema as TSchema;
+}
 export type StubRule = { args?: Record<string, unknown>; when?: Record<string, unknown>; result?: unknown; error?: { code: string; message: string; recovery: string }; set?: Record<string, unknown> };
 export type StubFixture = { state?: Record<string, unknown>; functions?: Record<string, StubRule[]>; files?: Record<string, string>; denied?: string[] };
 export class StubError extends Error {
@@ -59,6 +65,7 @@ export class Stubs {
   }
   call(name: string, args: Record<string, unknown>) {
     this.validate(name, args);
+    if (name === "ox.provider.schema") return structuredClone(providerSchema);
     const rule = this.rules[name]?.find(rule => matches(args, rule.args) && matches(this.state, rule.when));
     if (rule) {
       if (rule.error) throw new StubError(rule.error.code, rule.error.message, rule.error.recovery);

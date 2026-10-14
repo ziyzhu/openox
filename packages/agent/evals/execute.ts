@@ -21,6 +21,7 @@ export async function execute(source: string, call: (name: string, args: Record<
       if (bytes > 262_144) throw new Error("Execution output exceeds 256 KiB");
       const message = JSON.parse(line);
       if (message.logs) logs.push(...message.logs);
+      if (message.inspection) await call(message.inspection.name, message.inspection.args);
       if (message.call) {
         const { id, name, args } = message.call;
         let reply;

@@ -37,7 +37,7 @@ nonisolated enum OxFunctionCatalog {
 
     private static let catalogEntries: [(String, JSONValue)] =
         all.flatMap { $0.schema() }.map { name, schema in
-            (name, name.hasPrefix("ox.fs.") ? schema : closeInputSchema(schema))
+            (name, name.hasPrefix("ox.fs.") || name == "ox.provider.schema" ? schema : closeInputSchema(schema))
         }
 
     private static let catalog = Dictionary(uniqueKeysWithValues: catalogEntries)
@@ -63,6 +63,24 @@ nonisolated enum OxFunctionCatalog {
 
     static func build() -> JSONValue {
         .object(catalog)
+    }
+
+    static func buildCompact() -> JSONValue {
+        .object(catalog.mapValues(compactingProviderDefinition))
+    }
+
+    private static func compactingProviderDefinition(_ value: JSONValue) -> JSONValue {
+        if value == ProviderDefinition.schema {
+            return .object([
+                "type": .string("object"),
+                "description": .string("Complete provider definition. Call ox.provider.schema() for its full JSON Schema before creating or editing a definition."),
+            ])
+        }
+        switch value {
+        case .object(let fields): return .object(fields.mapValues(compactingProviderDefinition))
+        case .array(let items): return .array(items.map(compactingProviderDefinition))
+        default: return value
+        }
     }
 
     static func buildHelpText() -> JSONValue {
