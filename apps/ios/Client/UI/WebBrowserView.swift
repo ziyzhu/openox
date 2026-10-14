@@ -77,6 +77,7 @@ struct WebBrowserView: View {
     let reloadOrStop: @MainActor () -> Void
     @State private var address = ""
     @State private var addressError: AddressError?
+    @State private var loadingProgress: Double?
     @State private var scrollChrome = ScrollChrome.expanded(anchor: 0)
     @FocusState private var addressFocused: Bool
     @Namespace private var barNamespace
@@ -113,6 +114,26 @@ struct WebBrowserView: View {
                 scrollChrome = .expanded(anchor: 0)
                 guard !addressFocused else { return }
                 syncAddress()
+            }
+            .onChange(of: page.isLoading, initial: true) { _, loading in
+                if loading {
+                    loadingProgress = max(0.05, page.estimatedProgress)
+                } else if loadingProgress != nil {
+                    withAnimation(reduceMotion ? nil : .linear(duration: 0.2), completionCriteria: .logicallyComplete) {
+                        loadingProgress = 1
+                    } completion: {
+                        guard !page.isLoading else { return }
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                            loadingProgress = nil
+                        }
+                    }
+                }
+            }
+            .onChange(of: page.estimatedProgress) { _, progress in
+                guard page.isLoading else { return }
+                withAnimation(reduceMotion ? nil : .linear(duration: 0.15)) {
+                    loadingProgress = max(loadingProgress ?? 0.05, progress)
+                }
             }
             .onChange(of: addressFocused) { _, focused in
                 syncAddress()
@@ -175,14 +196,15 @@ struct WebBrowserView: View {
 
     private var expandedBar: some View {
         HStack(spacing: isCompact ? 0 : 8) {
-            if !addressFocused {
+            if !addressFocused, !page.backForwardList.backList.isEmpty || !page.backForwardList.forwardList.isEmpty {
                 HStack(spacing: 0) {
-                    Button(action: goBack) {
-                        controlSymbol("chevron.left", width: page.backForwardList.forwardList.isEmpty ? 48 : 40, font: .system(size: 21))
+                    if !page.backForwardList.backList.isEmpty {
+                        Button(action: goBack) {
+                            controlSymbol("chevron.left", width: page.backForwardList.forwardList.isEmpty ? 48 : 40, font: .system(size: 21))
+                        }
+                        .accessibilityLabel(A11yLabel.back)
+                        .accessibilityIdentifier(identifier("back"))
                     }
-                    .accessibilityLabel(A11yLabel.back)
-                    .accessibilityIdentifier(identifier("back"))
-                    .disabled(page.backForwardList.backList.isEmpty)
                     if !page.backForwardList.forwardList.isEmpty {
                         Button(action: goForward) {
                             controlSymbol("chevron.right", width: 40, font: .system(size: 21))
@@ -197,7 +219,7 @@ struct WebBrowserView: View {
                 .glassEffectTransition(.identity)
                 .animation(chromeFade, value: isCompact)
                 .scaleEffect(isCompact ? 0.65 : 1)
-                .frame(width: isCompact ? 0 : page.backForwardList.forwardList.isEmpty ? 48 : 80)
+                .frame(width: isCompact ? 0 : page.backForwardList.forwardList.isEmpty ? 48 : page.backForwardList.backList.isEmpty ? 40 : 80)
                 .allowsHitTesting(!isCompact)
                 .accessibilityHidden(isCompact)
                 .transition(reduceMotion ? .identity : .opacity)
@@ -262,6 +284,8 @@ struct WebBrowserView: View {
 
     private var addressBar: some View {
         HStack(spacing: 0) {
+            Spacer(minLength: 0)
+                .frame(width: isCompact || addressFocused ? 0 : 40)
             Button {
                 if case .compact(let anchor) = scrollChrome {
                     scrollChrome = .revealed(anchor: anchor)
@@ -321,17 +345,27 @@ struct WebBrowserView: View {
                 .frame(width: isCompact ? 0 : 40)
                 .allowsHitTesting(!isCompact)
                 .accessibilityHidden(isCompact)
+            } else {
+                Spacer(minLength: 0)
+                    .frame(width: 40)
             }
         }
         .padding(.leading, isCompact ? 0 : addressFocused ? 16 : 4)
         .padding(.trailing, isCompact ? 0 : 4)
         .frame(minHeight: isCompact ? 44 : 48)
         .overlay(alignment: .bottom) {
-            if page.isLoading {
-                ProgressView(value: page.estimatedProgress)
-                    .progressViewStyle(.linear)
-                    .padding(.horizontal, 20)
+            GeometryReader { geometry in
+                if let loadingProgress {
+                    Rectangle()
+                        .fill(Theme.Colors.primary.dynamic)
+                        .frame(width: geometry.size.width * loadingProgress, height: 2)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .transition(.opacity)
+                }
             }
+            .clipShape(Capsule().inset(by: isCompact ? 8 : 0))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
         .glassEffect(.regular.interactive(), in: Capsule().inset(by: isCompact ? 8 : 0))
         .glassEffectID("address", in: barNamespace)
