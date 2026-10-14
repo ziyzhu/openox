@@ -66,7 +66,7 @@ final class NativeServiceOperations {
                   let scheme = url.scheme?.lowercased(),
                   scheme == "http" || scheme == "https",
                   url.host?.isEmpty == false,
-                  ServiceHandoffSession.allowsNavigation(to: url) else {
+                  BrowserNavigation.allowsServiceNavigation(url) else {
                 throw RuntimeError.bridge("ox.web.browser.navigate requires an absolute public HTTPS URL. Simulator builds also allow loopback HTTP.")
             }
             let landed: URL

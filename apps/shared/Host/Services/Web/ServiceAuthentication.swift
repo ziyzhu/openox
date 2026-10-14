@@ -185,7 +185,7 @@ extension Service {
         defer { flowSession.close() }
         guard let url = await fetchAuthURL(in: flowSession),
               let host = url.host?.lowercased(),
-              ServiceHandoffSession.allowsNavigation(to: url) else {
+              BrowserNavigation.allowsServiceNavigation(url) else {
             Log.service.info("Service.silentAuth skipped domain=\(domain) reason=\(reason.rawValue) authURL=false")
             return
         }
@@ -297,7 +297,7 @@ extension Service {
         guard let url = await fetchAuthURL(in: flowSession),
               ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
               let authHost = url.host?.lowercased(),
-              ServiceHandoffSession.allowsNavigation(to: url) else {
+              BrowserNavigation.allowsServiceNavigation(url) else {
             setAuth(previous.map(Auth.observed) ?? .unavailable(previous: nil, error: "authentication URL unavailable"))
             Log.service.error("Service.signIn invalid auth URL domain=\(domain) source=\(source.rawValue) ms=\(Int(Date().timeIntervalSince(started) * 1000))")
             return .incomplete

@@ -33,8 +33,7 @@ extension Service {
     ) async -> WKNavigationActionPolicy {
         guard action.target?.isMainFrame != false else { return .allow }
         let url = action.request.url
-        let allowed = url.map(ServiceHandoffSession.allowsNavigation) == true
-        guard allowed else {
+        guard url.map(BrowserNavigation.allowsServiceNavigation) == true else {
             let scheme = url?.scheme?.uppercased() ?? "unsupported"
             let failure = scheme == "HTTPS"
                 ? "Browser blocked navigation to a private-network or unsupported HTTPS destination"

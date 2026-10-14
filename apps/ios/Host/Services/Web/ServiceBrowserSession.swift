@@ -145,19 +145,28 @@ final class ServiceBrowserSession {
         navigationTask = Task { @MainActor [weak self] in
             guard let self else { return }
             defer { navigationTask = nil }
-            do {
-                for try await event in page.navigations {
-                    guard !Task.isCancelled else { return }
-                    if event == .startedProvisionalNavigation {
-                        errorMessage = nil
+            while !Task.isCancelled {
+                do {
+                    for try await event in page.navigations {
+                        guard !Task.isCancelled else { return }
+                        if event == .startedProvisionalNavigation {
+                            errorMessage = nil
+                        }
+                        Log.ui.info("ServiceBrowser.navigation domain=\(serviceDomain) event=\(String(describing: event)) host=\(page.url?.host?.lowercased() ?? "?")")
                     }
-                    Log.ui.info("ServiceBrowser.navigation domain=\(serviceDomain) event=\(String(describing: event)) host=\(page.url?.host?.lowercased() ?? "?")")
+                    return
+                } catch is CancellationError {
+                    return
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    if WebPage.NavigationError.isCancellation(error) {
+                        Log.ui.info("ServiceBrowser.navigation cancelled domain=\(serviceDomain)")
+                        continue
+                    }
+                    errorMessage = error.localizedDescription
+                    Log.ui.error("ServiceBrowser.navigation failed domain=\(serviceDomain) error=\(LogPrivacy.text(error.localizedDescription))")
+                    return
                 }
-            } catch is CancellationError {
-                return
-            } catch {
-                errorMessage = error.localizedDescription
-                Log.ui.error("ServiceBrowser.navigation failed domain=\(serviceDomain) error=\(LogPrivacy.text(error.localizedDescription))")
             }
         }
     }

@@ -74,7 +74,7 @@ struct ConversationSidebar: View {
             set: { if !$0 { pendingDelete = nil } }
         )) {
             Button("Cancel", role: .cancel) { pendingDelete = nil }
-            Button("Delete Conversation", role: .destructive) {
+            Button("Delete", role: .destructive) {
                 guard let meta = pendingDelete else { return }
                 pendingDelete = nil
                 onDelete(meta)
@@ -223,13 +223,13 @@ struct ConversationSidebar: View {
                     titleDraft = meta.displayTitle
                     renaming = meta
                 } label: {
-                    Label(A11yLabel.renameConversation, systemImage: "pencil")
+                    Label("Rename", systemImage: "pencil")
                 }
                 .accessibilityIdentifier(A11yID.Sidebar.renameRow(meta.id.uuidString))
                 Button(role: .destructive) {
                     pendingDelete = meta
                 } label: {
-                    Label(A11yLabel.deleteConversation, systemImage: "trash")
+                    Label("Delete", systemImage: "trash")
                 }
                 .accessibilityIdentifier(A11yID.Sidebar.deleteRow(meta.id.uuidString))
             } preview: {

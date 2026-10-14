@@ -46,7 +46,7 @@ struct ConversationPageTopBar: View {
             }
             if blockCount > 0 {
                 Button(action: onCopyTranscript) {
-                    Label("Copy Conversation", systemImage: "doc.on.doc")
+                    Label("Copy", systemImage: "doc.on.doc")
                         .onAppear { Haptics.prepareImpact() }
                 }
                 ShareLink(
@@ -61,7 +61,7 @@ struct ConversationPageTopBar: View {
                 .disabled(conversation.isBusy)
                 .accessibilityIdentifier(A11yID.ConversationControls.export)
                 Button(role: .destructive, action: onDeleteConversation) {
-                    Label("Delete Conversation", systemImage: "trash")
+                    Label("Delete", systemImage: "trash")
                 }
                 .accessibilityIdentifier(A11yID.ConversationControls.delete)
             }

@@ -64,7 +64,7 @@ extension Service {
         guard case .success(let value) = urlResult,
               let rawURL = Manifest.authURL(value),
               let url = URL(string: rawURL),
-              ServiceHandoffSession.allowsNavigation(to: url) else {
+              BrowserNavigation.allowsServiceNavigation(url) else {
             Log.service.error("Service.completeBotControl invalid URL domain=\(domain)")
             return false
         }

@@ -26,6 +26,11 @@ extension Service {
                 } catch is CancellationError {
                     return
                 } catch {
+                    guard !Task.isCancelled else { return }
+                    if WebPage.NavigationError.isCancellation(error) {
+                        Log.webView.info("Service.navigation cancelled domain=\(domain) session=\(session.logLabel)")
+                        continue
+                    }
                     if case WebPage.NavigationError.webContentProcessTerminated = error {
                         await self.receive(.webContentProcessTerminated, from: session)
                     } else {
@@ -265,7 +270,7 @@ extension Service {
         if dispatcherReady {
             guard transitionNavigation(.verified(load, url, .ready), on: session) else { return }
             Log.webView.info("Service.navigation ready domain=\(domain) session=\(session.logLabel) nav=\(generation) active=\(activeInvocationCount(in: session)) queued=\(queuedInvocationCount(in: session))")
-        } else if ServiceHandoffSession.allowsNavigation(to: url), !serviceHost {
+        } else if BrowserNavigation.allowsServiceNavigation(url), !serviceHost {
             guard transitionNavigation(.verified(load, url, .offDomain), on: session) else { return }
             Log.webView.info("Service.navigation off-domain domain=\(domain) session=\(session.logLabel) nav=\(generation) host=\(host ?? "?") queued=\(queuedInvocationCount(in: session))")
         } else {

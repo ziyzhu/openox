@@ -784,7 +784,7 @@ struct ConversationPage: View {
                     title: Text("Delete this conversation?"),
                     message: Text("This removes the conversation from your history. This can't be undone."),
                     primaryButton: .cancel(),
-                    secondaryButton: .destructive(Text("Delete Conversation")) {
+                    secondaryButton: .destructive(Text("Delete")) {
                         Log.ui.info("ConversationPage.deleteConversation conversation=\(conversation.id) blocks=\(conversation.transcript.count)")
                         conversation.cancelAll()
                         onDeleteConversation()

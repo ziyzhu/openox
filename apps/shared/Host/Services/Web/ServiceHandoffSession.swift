@@ -1,5 +1,4 @@
 import Foundation
-import Network
 import Observation
 import WebKit
 
@@ -35,7 +34,7 @@ final class ServiceHandoffSession {
         ) async -> WKNavigationActionPolicy {
             guard action.target?.isMainFrame != false else { return .allow }
             guard let url = action.request.url else { return .cancel }
-            let allowed = ServiceHandoffSession.allowsNavigation(to: url)
+            let allowed = BrowserNavigation.allowsServiceNavigation(url)
             router.recordDecision(url.host?.lowercased() ?? "?", allowed)
             guard allowed else { return .cancel }
             if action.target == nil {
@@ -207,7 +206,7 @@ final class ServiceHandoffSession {
 
     func navigate(to url: URL) -> Bool {
         guard phase == .running || phase == .verifying,
-              Self.allowsNavigation(to: url) else {
+              BrowserNavigation.allowsServiceNavigation(url) else {
             Log.service.warning("ServiceHandoffSession address rejected domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) host=\(url.host ?? "?") phase=\(phase.rawValue)")
             return false
         }
@@ -246,6 +245,11 @@ final class ServiceHandoffSession {
             } catch is CancellationError {
                 return
             } catch {
+                guard !Task.isCancelled else { return }
+                if WebPage.NavigationError.isCancellation(error) {
+                    Log.service.info("ServiceHandoffSession navigation cancelled domain=\(serviceDomain)")
+                    continue
+                }
                 if case WebPage.NavigationError.webContentProcessTerminated = error {
                     recoverWebContent()
                     continue
@@ -398,43 +402,5 @@ final class ServiceHandoffSession {
 
     private func isServiceHost(_ host: String) -> Bool {
         host == serviceDomain || host.hasSuffix("." + serviceDomain)
-    }
-
-    static func allowsNavigation(to url: URL) -> Bool {
-        guard let scheme = url.scheme?.lowercased() else { return false }
-        if scheme == "about" { return true }
-        guard let host = url.host?.lowercased() else { return false }
-        #if targetEnvironment(simulator)
-        if scheme == "http", isLoopback(host) { return true }
-        #endif
-        return scheme == "https" && !isPrivateNetwork(host)
-    }
-
-    private static func isLoopback(_ host: String) -> Bool {
-        if host == "localhost" || host == "::1" { return true }
-        guard let address = IPv4Address(host) else { return false }
-        return address.rawValue.first == 127
-    }
-
-    private static func isPrivateNetwork(_ host: String) -> Bool {
-        if host == "localhost" || host.hasSuffix(".local") { return true }
-        if let address = IPv4Address(host) {
-            let bytes = Array(address.rawValue)
-            guard bytes.count == 4 else { return true }
-            return bytes[0] == 10
-                || bytes[0] == 127
-                || bytes[0] == 0
-                || bytes[0] == 169 && bytes[1] == 254
-                || bytes[0] == 172 && (16...31).contains(bytes[1])
-                || bytes[0] == 192 && bytes[1] == 168
-        }
-        if let address = IPv6Address(host) {
-            let bytes = Array(address.rawValue)
-            guard bytes.count == 16 else { return true }
-            return bytes.dropFirst().allSatisfy { $0 == 0 } && bytes[0] == 0 && bytes[15] == 1
-                || bytes[0] & 0xfe == 0xfc
-                || bytes[0] == 0xfe && bytes[1] & 0xc0 == 0x80
-        }
-        return false
     }
 }
