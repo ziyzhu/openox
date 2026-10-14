@@ -1,6 +1,9 @@
 import { ROOT } from "../../../lib.ts";
 
-export async function ox<T>(host: string, args: string[], chatId?: string, timeoutMs = 10_000, allowOutcome = false): Promise<T> {
+export type EvalHost = string | { recordedChoices?(id: string): import("./types").ConversationEvidence["choices"]; request<T>(args: string[], chatId?: string, timeoutMs?: number): Promise<T> };
+
+export async function ox<T>(host: EvalHost, args: string[], chatId?: string, timeoutMs = 10_000, allowOutcome = false): Promise<T> {
+  if (typeof host !== "string") return host.request<T>(args, chatId, timeoutMs);
   const child = Bun.spawn([process.execPath, "--no-env-file", `${ROOT}/apps/cli/src/ox.ts`,
     "--host", host, ...(chatId ? ["--conversation", chatId] : []), ...args, "--json", "--timeout", String(timeoutMs)], {
     cwd: ROOT, stdin: "ignore", stdout: "pipe", stderr: "pipe",
@@ -14,13 +17,13 @@ export async function ox<T>(host: string, args: string[], chatId?: string, timeo
   } finally { clearTimeout(timer); }
 }
 
-export async function vmCall<T>(host: string, chatId: string, name: string, args: Record<string, unknown>, timeoutMs: number): Promise<T> {
+export async function vmCall<T>(host: EvalHost, chatId: string, name: string, args: Record<string, unknown>, timeoutMs: number): Promise<T> {
   const result = await ox<{ value: T }>(host, ["vm", "call", name, "--args", JSON.stringify({ purpose: "Observe eval state", ...args })], chatId, timeoutMs);
   if (result.value === undefined) throw new Error(`Missing observation from ${name}`);
   return result.value;
 }
 
-export async function newConversation(host: string, provider: string, model: string, temporary: boolean, timeoutMs: number): Promise<string> {
+export async function newConversation(host: EvalHost, provider: string, model: string, temporary: boolean, timeoutMs: number): Promise<string> {
   const result = await ox<{ chatId: string; temporary: boolean; model: string }>(host,
     ["conversation", "new", ...(temporary ? ["--temporary"] : []), "--provider", provider, "--model", model], undefined, timeoutMs);
   if (!result.chatId || result.temporary !== temporary || result.model !== `${provider}:${model}`) throw new Error("Unexpected new conversation identity, mode, or model");

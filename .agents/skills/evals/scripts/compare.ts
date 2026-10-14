@@ -2,7 +2,7 @@ import type { Report } from "./types.ts";
 
 export function compare(baseline: Report, candidate: Report) {
   for (const report of [baseline, candidate]) {
-    if (report.version !== 4 || report.mode !== "ox-cli-chat" || !Array.isArray(report.results) || !Array.isArray(report.plannedCases) || !report.plannedCases.length || !report.fixtureHash) throw new Error("Unsupported eval report");
+    if (report.version !== 4 || !["ox-cli-chat", "stubbed-ox"].includes(report.mode) || !Array.isArray(report.results) || !Array.isArray(report.plannedCases) || !report.plannedCases.length || !report.fixtureHash) throw new Error("Unsupported eval report");
     if (new Set(report.plannedCases).size !== report.plannedCases.length || report.results.some(result => !report.plannedCases.includes(result.id))) throw new Error("Invalid planned cohort");
     const keys = report.results.map(result => `${result.id}:${result.repetition}`);
     if (new Set(keys).size !== keys.length) throw new Error("Duplicate attempts in report");
@@ -19,7 +19,7 @@ export function compare(baseline: Report, candidate: Report) {
     const limitsChanged = baseline.limits.timeoutMs !== candidate.limits.timeoutMs || baseline.limits.repetitions !== candidate.limits.repetitions || JSON.stringify(baseline.authorization) !== JSON.stringify(candidate.authorization);
     const fixtureChanged = baseline.fixtureHash !== candidate.fixtureHash;
     const contextChanged = new Set([...before, ...after].map(result => result.contextHash)).size > 1;
-    const comparable = !modelChanged && !limitsChanged && !fixtureChanged && before.length > 0 && before.length === baseline.limits.repetitions && after.length === candidate.limits.repetitions
+    const comparable = baseline.mode === candidate.mode && !modelChanged && !limitsChanged && !fixtureChanged && before.length > 0 && before.length === baseline.limits.repetitions && after.length === candidate.limits.repetitions
       && before.every(result => result.repetition >= 1 && result.repetition <= baseline.limits.repetitions && after.some(attempt => attempt.repetition === result.repetition))
       && [...before, ...after].every(result => result.contextHash && result.caseHash === before[0]!.caseHash && ["pass", "fail"].includes(result.status));
     const rate = (results: typeof before) => results.length ? results.filter(result => result.status === "pass").length / results.length : null;

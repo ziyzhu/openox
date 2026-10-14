@@ -7,10 +7,11 @@ import { ROOT as root } from "../../../lib.ts";
 import { cases, smokeIds } from "./cases/index.ts";
 import { score } from "./scoring.ts";
 import { coverage, coveredFunctions, validateCoverage } from "./coverage.ts";
-import { effects, fixtureTemplate, validateFixture } from "./fixtures.ts";
-import type { EvalCase, EvalSnapshot, Fixture, Report } from "./types.ts";
+import { fixtureTemplate, validateFixture } from "./fixtures.ts";
+import type { EvalCase, Fixture, Report } from "./types.ts";
 import { compare } from "./compare.ts";
-import { ox } from "./cli.ts";
+import { EvalRuntime, evalModels } from "../../../../packages/agent/evals/runtime";
+import { catalog, Stubs } from "../../../../packages/agent/evals/stubs";
 import { runCase } from "./ox.ts";
 
 function canonical(value: unknown): unknown {
@@ -77,29 +78,24 @@ async function main(): Promise<void> {
   const { values } = parseArgs({ args: Bun.argv.slice(2), options: {
     help: { type: "boolean" }, list: { type: "boolean" }, validate: { type: "boolean" }, json: { type: "boolean" }, template: { type: "boolean" },
     coverage: { type: "string" }, review: { type: "string" }, decision: { type: "string" }, note: { type: "string" }, repetition: { type: "string", default: "1" },
-    host: { type: "string" }, provider: { type: "string" }, model: { type: "string" }, fixture: { type: "string" },
+    provider: { type: "string" }, model: { type: "string" }, fixture: { type: "string" },
     suite: { type: "string", default: "smoke" }, case: { type: "string" }, repeat: { type: "string", default: "1" },
-    timeout: { type: "string" }, output: { type: "string" }, "human-wait-ms": { type: "string", default: "0" },
-    "allow-profile-writes": { type: "boolean" }, "allow-installation-writes": { type: "boolean" }, "allow-external-effects": { type: "boolean" },
-    "allow-choices": { type: "boolean" }, "qa-profile": { type: "string" },
+    timeout: { type: "string" }, output: { type: "string" },
+    "qa-profile": { type: "string" },
   }, strict: true });
   if (values.help) {
-    console.log(`Usage: bun run evals --fixture <outside-repo.json> --host <ws-url> --provider <id> --model <id> [options]
+    console.log(`Usage: bun run evals --fixture <outside-repo.json> --provider <id> --model <id> [options]
   --suite smoke|functions|workflows|safety|all (default smoke)
   --case <id> --repeat <1..20> --timeout <1..300000 ms>
   --list [--json] | --validate | --template --qa-profile <name>
   --coverage <report.json>       Show planned, blocked, failed, unverified and passed coverage
   --review <report.json> --case <id> --repetition <n> --decision pass|fail --note <evidence> --output <new-report>
-  --allow-profile-writes        Permit run-owned QA Profile changes and cleanup
-  --allow-installation-writes   Permit QA-wide settings/provider changes and cleanup
-  --allow-external-effects      Permit explicitly scoped synthetic/sandbox service effects
-  --allow-choices               Answer only declared skill proposal choices; never native approvals
-  --human-wait-ms <0..300000>    Wait for human completion of native gates (default 0: blocked)
-  --qa-profile <name>           Must match fixture and active local QA Profile
+  --qa-profile <name>           Synthetic Profile name matching the fixture
+  Providers: openai, anthropic, google (standard API-key environment variables)
   --output <new-outside-path>   Owner-only report; never overwrite evidence
   compare <baseline.json> <candidate.json>
 Missing fixtures/preconditions are blocked. Successful automatic checks remain unverified until manual rubric review.
-No provisioning, credential imports, policy changes, forced model replies or eval-only runtime hooks.`);
+Real model and production agent loop; isolated stateful ox stubs. No Host or simulator. VM integration tests are separate.`);
     return;
   }
   await validateCases(cases);
@@ -134,10 +130,13 @@ No provisioning, credential imports, policy changes, forced model replies or eva
       if (values.list) for (const test of selected) console.log(`${test.id}\t${test.suite}\t${test.effect}\t${test.description}`);
       console.log(`Validated ${cases.length} scenarios covering ${new Set(cases.flatMap(coveredFunctions)).size} functions and ${new Set(cases.flatMap(test => test.skill ? [test.skill] : [])).size} System skills`);
     }
-    if (values.fixture) validateFixture(await Bun.file(values.fixture).json());
+    if (values.fixture) {
+      const fixture = validateFixture(await Bun.file(values.fixture).json());
+      for (const binding of Object.values(fixture.cases)) new Stubs(binding.stubs ?? {}, fixture.qaProfile);
+    }
     return;
   }
-  if (!values.fixture || !values.host || !values.provider || !values.model || !values["qa-profile"]?.trim()) throw new Error("Specify --fixture, --host, --provider, --model, and --qa-profile for a prepared QA environment");
+  if (!values.fixture || !values.provider || !values.model || !values["qa-profile"]?.trim()) throw new Error("Specify --fixture, --provider, --model, and --qa-profile for an isolated stub evaluation");
   if (values.provider.toLowerCase() === "mock") throw new Error("Mock cannot establish real-model quality");
   const fixturePath = await realpath(values.fixture);
   await outsideRepository(fixturePath);
@@ -145,37 +144,17 @@ No provisioning, credential imports, policy changes, forced model replies or eva
   if (fixture.qaProfile !== values["qa-profile"]) throw new Error("Fixture and requested QA Profile differ");
   const repetitions = integer(values.repeat!, 1, 20);
   const timeoutMs = integer(values.timeout ?? (values.suite === "smoke" ? "30000" : "120000"), 1, 300_000);
-  const humanWaitMs = integer(values["human-wait-ms"]!, 0, 300_000);
   const output = await outsideRepository(values.output ?? resolve(tmpdir(), `ox-evals-${Date.now()}.json`));
   await writeFile(output, "", { flag: "wx", mode: 0o600 });
   const report: Report = {
     version: 4, startedAt: new Date().toISOString(), revision: git("rev-parse", "HEAD"), dirty: git("status", "--porcelain").length > 0,
-    limits: { timeoutMs, repetitions }, authorization: { profileWrites: !!values["allow-profile-writes"], installationWrites: !!values["allow-installation-writes"], externalEffects: !!values["allow-external-effects"], choices: !!values["allow-choices"], qaProfile: fixture.qaProfile },
-    fixtureHash: hash(fixture), host: null, provider: values.provider, model: values.model, catalog: null, mode: "ox-cli-chat", plannedCases: selected.map(test => test.id), results: [],
+    limits: { timeoutMs, repetitions }, authorization: { profileWrites: false, installationWrites: false, externalEffects: false, choices: true, qaProfile: fixture.qaProfile },
+    fixtureHash: hash({ fixture, catalog }), host: null, provider: values.provider, model: values.model, catalog: null, mode: "stubbed-ox", plannedCases: selected.map(test => test.id), results: [],
   };
-  const blocked = (test: EvalCase) => {
-    const binding = fixture.cases[test.id];
-    if (!binding) return "QA fixture not prepared";
-    const required = effects(test, binding);
-    if (required.has("profile") && !report.authorization.profileWrites) return "Requires --allow-profile-writes";
-    if (required.has("installation") && !report.authorization.installationWrites) return "Requires --allow-installation-writes";
-    if (required.has("external") && !report.authorization.externalEffects) return "Requires --allow-external-effects";
-    if (test.choice && !report.authorization.choices && !humanWaitMs) return "Requires declared choice opt-in or human participation";
-    return undefined;
-  };
+  const models = evalModels(values.provider);
+  report.catalog = { functions: catalog };
+  const blocked = (test: EvalCase) => fixture.cases[test.id] ? undefined : "Stub fixture not prepared";
   try {
-    if (selected.some(test => !blocked(test))) {
-      const description = await ox<{ implementation: unknown; methods: string[] }>(values.host, ["host", "describe"]);
-      if (!["chats.new", "chats.send", "chats.get", "chats.stop", "logs.list", "vm.call", ...(selected.some(test => test.effect !== "read" && !blocked(test)) ? ["chats.open"] : []), ...(report.authorization.choices ? ["chats.respond"] : [])].every(method => description.methods.includes(method))) throw new Error("Host lacks required ordinary conversation/VM/log commands");
-      report.host = description.implementation;
-      const providers = await ox<Array<{ id: string; models: Array<{ id: string }> }>>(values.host, ["host", "providers"]);
-      const provider = providers.find(entry => entry.id === values.provider);
-      const model = provider?.models.find(entry => entry.id === values.model);
-      if (!model) throw new Error("Requested provider/model is not exposed by this Host");
-      report.catalog = { provider, model };
-      const active = await ox<EvalSnapshot | null>(values.host, ["conversation", "inspect"]);
-      if (active?.isBusy || active?.pendingPrompt) throw new Error("QA Host has active work or pending prompt; leave it untouched");
-    }
     let stop = false;
     for (const test of selected) {
       for (let repetition = 1; repetition <= repetitions; repetition++) {
@@ -188,7 +167,10 @@ No provisioning, credential imports, policy changes, forced model replies or eva
           continue;
         }
         try {
-          const response = await runCase(values.host, values.provider, values.model, test, binding!, timeoutMs, { qaProfile: fixture.qaProfile, choices: report.authorization.choices, humanWaitMs });
+          const runtime = await EvalRuntime.open(values.provider, values.model, binding!.stubs ?? {}, fixture.qaProfile, models);
+          let response;
+          try { response = await runCase(runtime, values.provider, values.model, test, binding!, timeoutMs, { qaProfile: fixture.qaProfile, choices: true, humanWaitMs: 0 }); }
+          finally { await runtime.close(); }
           const checks = response.snapshot ? score(test, binding!, response) : response.observationChecks;
           const status = response.errors.length ? "error" : response.blocked ? "blocked" : checks.length && checks.every(check => check.passed) ? "unverified" : "fail";
           const initial = response.initial;

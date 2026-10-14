@@ -2,6 +2,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { ROOT } from "../../../lib.ts";
 import { SYSTEM_SKILL_NAMES } from "../../../../packages/protocol/src/skills.ts";
+import { catalog } from "../../../../packages/agent/evals/stubs";
 import type { EvalCase, Report } from "./types.ts";
 
 export async function sourceFunctions(): Promise<string[]> {
@@ -21,6 +22,7 @@ export async function sourceFunctions(): Promise<string[]> {
 export async function validateCoverage(cases: EvalCase[]): Promise<void> {
   if (cases.length > 86) throw new Error("Catalog exceeds 86 scenarios; compose existing journeys before adding cases");
   const functions = await sourceFunctions();
+  if (JSON.stringify(functions) !== JSON.stringify(Object.keys(catalog).sort())) throw new Error("Stub function catalog differs from native source; refresh and review contracts");
   const declared = [...new Set(cases.flatMap(coveredFunctions))].sort();
   if (JSON.stringify(functions) !== JSON.stringify(declared)) throw new Error(`Function coverage differs from source: missing ${functions.filter(name => !declared.includes(name)).join(", ")}; stale ${declared.filter(name => !functions.includes(name)).join(", ")}`);
   const skills = [...new Set(cases.flatMap(test => test.skill ? [test.skill] : []))].sort();

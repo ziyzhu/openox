@@ -171,7 +171,7 @@ nonisolated enum OxWeb {
         jsFragment: """
           search: (value) => { const options = __oxOptions(value, 'ox.web.search'); return __nativeWebSearch(String(options.query), String(options.purpose)); },
           fetch: (value) => { const options = __oxOptions(value, 'ox.web.fetch'); return __nativeWebFetch(String(options.url), options.options ?? null, String(options.purpose)); },
-          browser: Object.freeze({
+          browser: {
             navigate: (value) => __nativeWebBrowser('navigate', __oxOptions(value, 'ox.web.browser.navigate')),
             reload: (value) => __nativeWebBrowser('reload', __oxOptions(value, 'ox.web.browser.reload')),
             stopLoading: (value) => __nativeWebBrowser('stopLoading', __oxOptions(value, 'ox.web.browser.stopLoading')),
@@ -191,7 +191,7 @@ nonisolated enum OxWeb {
             listCapturedEvents: (value) => __nativeWebBrowser('listCapturedEvents', __oxOptions(value, 'ox.web.browser.listCapturedEvents')),
             readCapturedEvent: (value) => __nativeWebBrowser('readCapturedEvent', __oxOptions(value, 'ox.web.browser.readCapturedEvent')),
             stopCapture: (value) => __nativeWebBrowser('stopCapture', __oxOptions(value, 'ox.web.browser.stopCapture'))
-          })
+          }
         """
     )
 }

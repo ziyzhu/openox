@@ -1,3 +1,4 @@
+import type { EvalHost } from "./cli.ts";
 import { newConversation, ox, vmCall } from "./cli.ts";
 import { assertions, observeState, readers } from "./observations.ts";
 import { actionChecks, conversationChecks } from "./scoring.ts";
@@ -7,19 +8,19 @@ import type { CaseBinding, Choice, ConversationEvidence, EvalCase, EvalResponse,
 export type RunOptions = { qaProfile: string; choices: boolean; humanWaitMs: number };
 const evidence = (chatId = ""): ConversationEvidence => ({ chatId, outcomes: [], choices: [] });
 
-async function readSystemSkill(host: string, chatId: string, path: string, remaining: () => number): Promise<string> {
-  const file = await vmCall<{ path: string; text: string; truncated: boolean; unsupported: string | null }>(host, chatId, "ox.fs.read", { path, options: { maxBytes: 1_048_576 } }, remaining());
+async function readSystemSkill(host: EvalHost, chatId: string, path: string, remaining: () => number): Promise<string> {
+  const file = await vmCall<{ path: string; text: string; truncated: boolean; unsupported: string | null }>(host, chatId, "ox.fs.read", { path }, remaining());
   if (file?.path !== path || typeof file.text !== "string" || !file.text.trim() || file.truncated !== false || file.unsupported) throw new Error("System skill observation is missing or incomplete");
   return file.text;
 }
 
-async function inspect(host: string, chatId: string, remaining: () => number): Promise<EvalSnapshot> {
+async function inspect(host: EvalHost, chatId: string, remaining: () => number): Promise<EvalSnapshot> {
   const snapshot = await ox<EvalSnapshot>(host, ["conversation", "inspect", "--full"], chatId, remaining());
   if (snapshot.id !== chatId || snapshot.blocks.some(block => (block.kind.trace?.omittedInvocations ?? 0) > 0)) throw new Error("Wrong conversation or incomplete Action receipts");
   return snapshot;
 }
 
-async function awaitTurn(host: string, target: ConversationEvidence, options: RunOptions, remaining: () => number, choice?: Choice): Promise<boolean> {
+async function awaitTurn(host: EvalHost, target: ConversationEvidence, options: RunOptions, remaining: () => number, choice?: Choice): Promise<boolean> {
   const snapshot = await inspect(host, target.chatId, remaining);
   target.attention = snapshot;
   const prompt = snapshot.pendingPrompt;
@@ -48,7 +49,7 @@ async function awaitTurn(host: string, target: ConversationEvidence, options: Ru
   return false;
 }
 
-async function runConversation(host: string, provider: string, model: string, prompts: string[], temporary: boolean,
+async function runConversation(host: EvalHost, provider: string, model: string, prompts: string[], temporary: boolean,
   target: ConversationEvidence, response: EvalResponse, options: RunOptions, remaining: () => number, choice?: Choice, continuing = false): Promise<void> {
   try {
     if (!target.chatId) target.chatId = await newConversation(host, provider, model, temporary, remaining());
@@ -77,14 +78,15 @@ async function runConversation(host: string, provider: string, model: string, pr
   }
   try {
     target.snapshot = await inspect(host, target.chatId, () => 10_000);
+    if (typeof host !== "string" && host.recordedChoices) target.choices = host.recordedChoices(target.chatId);
     if (target.snapshot.isBusy !== false || target.snapshot.pendingPrompt) response.errors.push("Conversation did not settle; no further task or cleanup is safe");
   } catch (error) { response.errors.push(`Snapshot failed: ${String(error)}`); }
 }
 
-export async function runCase(host: string, provider: string, model: string, test: EvalCase, binding: CaseBinding, timeoutMs: number, options: RunOptions): Promise<EvalResponse> {
+export async function runCase(host: EvalHost, provider: string, model: string, test: EvalCase, binding: CaseBinding, timeoutMs: number, options: RunOptions): Promise<EvalResponse> {
   const started = Date.now();
   const response: EvalResponse = { ...evidence(), startedAt: new Date(started).toISOString(), totalMs: 0,
-    observationChecks: [], continuation: "stop", logs: [], logScope: "host-run-window", errors: [] };
+    observationChecks: [], continuation: "stop", logs: [], logScope: typeof host === "string" ? "host-run-window" : "stub-run", errors: [] };
   const remaining = () => {
     const budget = timeoutMs - (Date.now() - started);
     if (budget <= 0) throw new Error("Case deadline exceeded");

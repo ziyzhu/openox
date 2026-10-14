@@ -1,3 +1,4 @@
+import type { EvalHost } from "./cli.ts";
 import { isDeepStrictEqual } from "node:util";
 import { parseSkill } from "../../../../packages/protocol/src/skills.ts";
 import { ox, vmCall } from "./cli.ts";
@@ -31,7 +32,7 @@ function complete(value: unknown): boolean {
   return true;
 }
 
-async function observe(host: string, chatId: string, reader: Reader, remaining: () => number, snapshot?: EvalSnapshot): Promise<unknown> {
+async function observe(host: EvalHost, chatId: string, reader: Reader, remaining: () => number, snapshot?: EvalSnapshot): Promise<unknown> {
   if (reader.kind === "vm") return vmCall(host, chatId, reader.name, resolveReferences(reader.args, snapshot) as Record<string, unknown>, remaining());
   if (reader.kind === "skill") {
     const file = await vmCall<{ text: string; truncated: boolean; unsupported: string | null }>(host, chatId, "ox.fs.read", { path: `skills/${reader.name}/SKILL.md` }, remaining());
@@ -46,7 +47,7 @@ async function observe(host: string, chatId: string, reader: Reader, remaining: 
   return ox(host, reader.command === "providers" ? ["host", "providers"] : ["conversation", "list"], undefined, remaining());
 }
 
-export async function observeState(host: string, chatId: string, binding: CaseBinding, remaining: () => number, phase: "before" | "after" | "cleanup", snapshot?: EvalSnapshot): Promise<ObservedState> {
+export async function observeState(host: EvalHost, chatId: string, binding: CaseBinding, remaining: () => number, phase: "before" | "after" | "cleanup", snapshot?: EvalSnapshot): Promise<ObservedState> {
   const state: ObservedState = { values: {} };
   let bytes = 0;
   for (const [name, reader] of Object.entries(binding.observations)) {

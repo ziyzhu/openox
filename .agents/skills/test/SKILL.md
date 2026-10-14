@@ -22,6 +22,7 @@ Run from the repository root, or use `bun run --cwd <checkout>`.
 | macOS Host | `bun run test:host-macos --app /absolute/OxHost.app --output /tmp/ox-macos-evidence` | Local macOS verification below |
 | Log pagination | `bun run test:logs` | Controlled Host fixture |
 | Host/conversation iOS smoke | `bun run ci:ios --device ox-1 --loopback` | [iOS verification](references/ios.md) |
+| VM integration | `bun run test:vm --device ox-1 --host ws://127.0.0.1:9101` | Fresh QA build; contracts, namespace help, errors, filesystem and Profile switching |
 | Native agent UI and reopen | `bun run test:agent-ui-ios --device ox-1 --app /absolute/Ox.app` | [iOS verification](references/ios.md) |
 | Native demo previews | `bun run test:demo --device ox-1` | [Demo coverage](references/ios-runners.md#demo-previews) |
 

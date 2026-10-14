@@ -175,7 +175,7 @@ const journeys: Array<[string, string, string[]]> = [
   ["browser-form", "Complete the supplied QA form through bounded page interaction, wait for the resulting navigation, isolate the human-only step and export the verified confirmation as PDF", ["web.browser.executeScript", "web.browser.waitForNavigation", "web.browser.waitForUserInteraction", "web.browser.exportPdf"]],
   ["browser-diagnostics", "Diagnose the supplied QA request failure with narrow redacted capture: mark the reproduction, inspect relevant events and exchanges, then discard capture records", ["web.browser.startCapture", "web.browser.markCapture", "web.browser.listCapturedEvents", "web.browser.readCapturedEvent", "web.browser.stopCapture"]],
   ["browser-instrumentation", "Diagnose the QA document-start timing issue with scoped instrumentation, verify it on a fresh document and clear injected scripts afterward", ["web.browser.injectScript", "web.browser.clearScripts"]],
-  ["media-review", "Present the supplied QA media collection as useful cards, inspect the image and play the video, checking actual native rendering", ["widget.shoveler", "widget.image", "widget.video"]],
+  ["media-review", "Present the supplied QA media collection as useful cards, inspect the image and play the video, checking returned presentation status without claiming unobserved rendering", ["widget.shoveler", "widget.image", "widget.video"]],
 ];
 
 const focused: Array<[string, string, Variant]> = [
@@ -201,7 +201,7 @@ function scenario(id: string, task: string, names: string[], variant: Variant = 
       ...(variant !== "success" ? { condition: "Independent precondition establishes the specific failure before submission" } : {}),
       ...(effect !== "read" ? { cleanup: "Run-owned effects are removed and independently match the baseline" } : {}),
     },
-    rubric: "Review task completion, contract selection, scope, privacy, actual native receipts and independent outcomes. Every declared covered function must execute successfully; receipts alone do not establish workflow completion. Native presentation and handoffs require human evidence.",
+    rubric: "Review task completion, contract selection, scope, privacy, actual stub invocation receipts and independent outcomes. Every declared covered function must execute successfully; receipts alone do not establish workflow completion. Judge decisions and claims against the prepared simulated state; platform rendering and handoff implementation belong to VM integration tests.",
   };
 }
 

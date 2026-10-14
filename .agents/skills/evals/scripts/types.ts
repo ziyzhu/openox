@@ -1,3 +1,4 @@
+import type { StubFixture } from "../../../../packages/agent/evals/stubs";
 import type { ConversationSnapshot } from "../../../../apps/cli/src/host-snapshot.ts";
 
 export type Variant = "success" | "failure" | "boundary";
@@ -42,6 +43,7 @@ export type ActionExpectation = {
   args?: Record<string, unknown>;
 };
 export type CaseBinding = {
+  stubs?: StubFixture;
   context: string;
   probeContext?: string;
   observations: Record<string, Reader>;
@@ -93,7 +95,7 @@ export type EvalResponse = ConversationEvidence & {
   continuation: "safe" | "stop";
   blocked?: string;
   logs: LogRow[];
-  logScope: "host-run-window";
+  logScope: "host-run-window" | "stub-run";
   errors: string[];
 };
 export type CaseResult = {
@@ -121,7 +123,7 @@ export type Report = {
   provider: string;
   model: string;
   catalog: unknown;
-  mode: "ox-cli-chat";
+  mode: "ox-cli-chat" | "stubbed-ox";
   plannedCases: string[];
   results: CaseResult[];
 };

@@ -7,6 +7,7 @@
     "ci": "./.agents/skills/test/scripts/ci.sh",
     "ci:ios": "bun .agents/skills/test/apps/ios/smoke.ts",
     "test:e2e": "bun test ./.agents/skills/test",
+    "test:vm": "bun .agents/skills/test/apps/ios/vm.ts",
     "test:logs": "bun .agents/skills/test/apps/cli/logs.ts",
     "test:host-macos": "bun .agents/skills/test/apps/macos/host.ts",
     "generate:ios": "xcodegen generate --spec apps/ios/project.yml",
