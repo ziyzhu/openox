@@ -353,20 +353,18 @@ struct WebBrowserView: View {
         .padding(.leading, isCompact ? 0 : addressFocused ? 16 : 4)
         .padding(.trailing, isCompact ? 0 : 4)
         .frame(minHeight: isCompact ? 44 : 48)
-        .overlay(alignment: .bottom) {
-            GeometryReader { geometry in
-                if let loadingProgress {
-                    Rectangle()
-                        .fill(Theme.Colors.primary.dynamic)
-                        .frame(width: geometry.size.width * loadingProgress, height: 2)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
-                        .transition(.opacity)
-                }
+        .overlay(alignment: .bottomLeading) {
+            if let loadingProgress {
+                Rectangle()
+                    .fill(Theme.Colors.primary.dynamic)
+                    .frame(height: 2)
+                    .scaleEffect(x: loadingProgress, y: 1, anchor: .leading)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                    .transition(.opacity)
             }
-            .clipShape(Capsule().inset(by: isCompact ? 8 : 0))
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
         }
+        .clipShape(Capsule().inset(by: isCompact ? 8 : 0))
         .glassEffect(.regular.interactive(), in: Capsule().inset(by: isCompact ? 8 : 0))
         .glassEffectID("address", in: barNamespace)
         .glassEffectTransition(reduceMotion ? .identity : .matchedGeometry)
