@@ -178,7 +178,8 @@ private final class OnboardingCellularFieldView: UIView {
                 let opacity: Float
                 if generations[generationIndex].contains(cell) {
                     opacity = 1
-                } else if visibleGenerations[generationIndex].contains(cell) {
+                } else if generations[generationIndex] != initialGeneration,
+                          visibleGenerations[generationIndex].contains(cell) {
                     opacity = 0.055
                 } else {
                     opacity = 0

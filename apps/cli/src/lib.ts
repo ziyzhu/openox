@@ -8,7 +8,7 @@ export const C = {
   reset: "\x1b[0m",
 };
 
-export const CLI_LOGO = "■ □ □ ■\n■ ■ ■ ■  Ox CLI\n□ ■ ■ □\n□ ■ ■ □";
+export const CLI_LOGO = "■     ■\n■ ■ ■ ■  Ox CLI\n  ■ ■\n  ■ ■";
 
 type TerminalStream = { isTTY?: boolean };
 type Environment = Record<string, string | undefined>;

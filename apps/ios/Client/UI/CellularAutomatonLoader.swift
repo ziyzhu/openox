@@ -143,7 +143,7 @@ private final class CellularAutomatonLoaderView: UIView {
         CATransaction.setDisableActions(true)
         for (index, cell) in cells.enumerated() {
             cell.removeAnimation(forKey: Self.animationKey)
-            let opacity: Float = Self.contains(Self.iconGeneration, index) ? 1 : 0.08
+            let opacity: Float = Self.contains(Self.iconGeneration, index) ? 1 : 0
             cell.opacity = opacity
             let scale = 0.72 + CGFloat(opacity) * 0.28
             cell.transform = CATransform3DMakeScale(scale, scale, 1)
@@ -154,7 +154,7 @@ private final class CellularAutomatonLoaderView: UIView {
     private static func animation(forCellAt index: Int, layer: CALayer) -> CAAnimationGroup {
         let generationCount = generations.count
         let opacities = (generations + [iconGeneration]).map {
-            contains($0, index) ? CGFloat(1) : CGFloat(0.08)
+            contains($0, index) ? CGFloat(1) : ($0 == iconGeneration ? CGFloat(0) : CGFloat(0.08))
         }
         let keyTimes = (0...generationCount).map {
             NSNumber(value: Double($0) / Double(generationCount))
