@@ -77,6 +77,7 @@ final class StorageRoot {
     }
 
     func refreshAvailability() async {
+        guard !isBusy else { return }
         cloudDocs = await ProfileRepository.cloudDocuments()
         loadSavedProfiles()
         await reconcileActive()
@@ -94,6 +95,7 @@ final class StorageRoot {
     }
 
     func switchTo(_ profile: Profile) async throws {
+        guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
         guard profile.id != activeId else { return }
         isBusy = true
         defer { isBusy = false }
@@ -104,6 +106,7 @@ final class StorageRoot {
     }
 
     func createProfile(name: String, location: Profile.Location) async throws {
+        guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
         guard let base = baseDir(for: location) else { return }
         isBusy = true
         defer { isBusy = false }
@@ -118,7 +121,36 @@ final class StorageRoot {
         }
     }
 
+    func exportProfile(_ profile: Profile) async throws -> Data {
+        guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
+        isBusy = true
+        defer { isBusy = false }
+        let active = profile.id == activeId
+        do {
+            if active { try await beforeProfileChange?() }
+            let data = try await DurableProfileStore.shared.exportProfile(profile)
+            if active { try await profileDidChange?() }
+            return data
+        } catch {
+            if active { try? await profileDidChange?() }
+            Log.app.error("StorageRoot.export failed profile=\(profile.id) error=\(error.localizedDescription)")
+            throw error
+        }
+    }
+
+    func importProfile(_ backup: ProfilePackage.Backup, name: String) async throws -> Profile {
+        guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
+        guard !nameTaken(name) else { throw ProfileError.nameExists(name) }
+        isBusy = true
+        defer { isBusy = false }
+        let profile = try await ProfileMigrator.importProfile(backup, name: name)
+        profiles.append(profile)
+        sortProfiles()
+        return profile
+    }
+
     func openProfile(at url: URL) async throws -> Profile {
+        guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
         isBusy = true
         defer { isBusy = false }
         do {
@@ -141,6 +173,7 @@ final class StorageRoot {
     }
 
     func rename(_ profile: Profile, to newName: String) async throws {
+        guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
         guard profile.location != .external, let base = baseDir(for: profile.location) else { return }
         isBusy = true
         defer { isBusy = false }
@@ -159,6 +192,7 @@ final class StorageRoot {
     }
 
     func move(_ profile: Profile, to location: Profile.Location) async throws {
+        guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
         guard profile.location != .external,
               location != .external,
               profile.location != location,
@@ -180,6 +214,7 @@ final class StorageRoot {
     }
 
     func remove(_ profile: Profile) async {
+        guard !isBusy else { return }
         isBusy = true
         defer { isBusy = false }
         do {

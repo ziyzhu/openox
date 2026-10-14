@@ -28,6 +28,18 @@ struct ModelPickerSheet: View {
 }
 
 struct SettingsSheet: View {
+    private enum ProfileFileKind {
+        case folder
+        case backup
+    }
+
+    private enum ProfileImportState {
+        case idle
+        case reading
+        case proposal(ProfilePackage.Backup)
+        case importing
+    }
+
     let ready: Bool
     let onSelectService: (Service) -> Void
 
@@ -38,6 +50,9 @@ struct SettingsSheet: View {
     @State private var showOnboarding = false
     @State private var creatingProfile = false
     @State private var openingProfile = false
+    @State private var profileFileKind = ProfileFileKind.folder
+    @State private var profileImportState = ProfileImportState.idle
+    @State private var importedProfileName = ""
     @State private var profileNameDraft = ""
     @State private var profileCreationErrorMessage: String?
     @State private var profileOpenErrorMessage: String?
@@ -80,7 +95,7 @@ struct SettingsSheet: View {
                 VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                     SettingsSection(
                         "Profiles",
-                        footer: "Profiles hold conversations, files, voice, and memory. Keep several, switch anytime, and store locally or sync with iCloud.",
+                        footer: "Profiles hold conversations, files, voice, and memory. Export a backup to keep a copy outside this device.",
                         layout: .group
                     ) {
                         VStack(spacing: 0) {
@@ -113,21 +128,30 @@ struct SettingsSheet: View {
                                     profileNameDraft = ""
                                     creatingProfile = true
                                 } label: {
-                                    Label("Create New Profile", systemImage: "plus")
+                                    Label("Create new", systemImage: "plus")
                                 }
                                 .accessibilityIdentifier(A11yID.Settings.profileCreate)
 
                                 Button {
+                                    profileFileKind = .folder
                                     openingProfile = true
                                 } label: {
-                                    Label("Open Existing Profile", systemImage: "folder")
+                                    Label("Open existing", systemImage: "folder")
                                 }
                                 .accessibilityIdentifier(A11yID.Settings.profileOpen)
+
+                                Button {
+                                    profileFileKind = .backup
+                                    openingProfile = true
+                                } label: {
+                                    Label("Import", systemImage: "square.and.arrow.down")
+                                }
+                                .accessibilityIdentifier(A11yID.Settings.profileImport)
                             } label: {
-                                profileActionRow("Add Profile", systemImage: "plus")
+                                profileActionRow(importInProgress ? "Importing…" : "Add Profile", systemImage: "plus")
                             }
                             .buttonStyle(.plain)
-                            .disabled(storage.isBusy)
+                            .disabled(storage.isBusy || importInProgress)
                             .accessibilityIdentifier(A11yID.Settings.profileAdd)
                         }
                     }
@@ -270,11 +294,15 @@ struct SettingsSheet: View {
         }
         .fileImporter(
             isPresented: $openingProfile,
-            allowedContentTypes: [.folder],
+            allowedContentTypes: profileFileKind == .backup ? [.zip] : [.folder],
             allowsMultipleSelection: false
         ) { result in
             do {
                 guard let url = try result.get().first else { return }
+                if profileFileKind == .backup {
+                    readProfileBackup(url)
+                    return
+                }
                 Task {
                     do {
                         _ = try await storage.openProfile(at: url)
@@ -291,17 +319,28 @@ struct SettingsSheet: View {
         .alert("New Profile", isPresented: $creatingProfile) {
             TextField("Name", text: $profileNameDraft)
             Button("Cancel", role: .cancel) {}
-            if storage.iCloudAvailable {
-                Button("Create in iCloud") { createProfile(in: .iCloud) }.disabled(profileNameUnavailable)
-                Button("Create on This Device") { createProfile(in: .local) }.disabled(profileNameUnavailable)
-            } else {
-                Button("Create") { createProfile(in: .local) }.disabled(profileNameUnavailable)
-            }
+            Button("Create") { createProfile(in: .local) }.disabled(profileNameUnavailable)
         } message: {
             if profileNameTaken {
                 Text("A Profile named “\(StorageRoot.cleanName(profileNameDraft))” already exists. Choose a different name.")
-            } else if storage.iCloudAvailable {
-                Text("iCloud syncs this Profile across your devices. On-device keeps it here only. You can move it either way later.")
+            } else {
+                Text("Profiles stored on this device are removed when you delete Ox. Export a copy to keep them.")
+            }
+        }
+        .alert("Import Profile", isPresented: Binding(
+            get: { if case .proposal = profileImportState { return true }; return false },
+            set: { if !$0, case .proposal = profileImportState { profileImportState = .idle } }
+        )) {
+            TextField("Name", text: $importedProfileName)
+                .accessibilityIdentifier(A11yID.Settings.profileImportName)
+            Button("Cancel", role: .cancel) { profileImportState = .idle }
+                .accessibilityIdentifier(A11yID.Settings.profileImportCancel)
+            Button("Import") { importProfileBackup() }
+                .disabled(importedProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || storage.nameTaken(importedProfileName))
+                .accessibilityIdentifier(A11yID.Settings.profileImportConfirm)
+        } message: {
+            if case .proposal(let backup) = profileImportState {
+                Text("Backup from \(backup.manifest.exportedAt.formatted(date: .abbreviated, time: .shortened)). Import creates a separate Profile. Credentials and device permissions must be set up again.")
             }
         }
         .alert("New Profile", isPresented: Binding(
@@ -312,7 +351,7 @@ struct SettingsSheet: View {
         } message: {
             Text(profileCreationErrorMessage ?? "")
         }
-        .alert("Open Profile", isPresented: Binding(
+        .alert(profileFileKind == .backup ? String(localized: "Import Profile") : String(localized: "Open Profile"), isPresented: Binding(
             get: { profileOpenErrorMessage != nil },
             set: { if !$0 { profileOpenErrorMessage = nil } }
         )) {
@@ -324,6 +363,49 @@ struct SettingsSheet: View {
 
     private var profileNameIsEmpty: Bool {
         profileNameDraft.allSatisfy(\.isWhitespace)
+    }
+
+    private var importInProgress: Bool {
+        switch profileImportState {
+        case .reading, .importing: true
+        case .idle, .proposal: false
+        }
+    }
+
+    private func readProfileBackup(_ url: URL) {
+        profileImportState = .reading
+        Task {
+            do {
+                let backup = try await Task.detached(priority: .userInitiated) { try ProfilePackage.read(url) }.value
+                let stem = StorageRoot.cleanName(backup.manifest.name)
+                var name = stem
+                var suffix = 2
+                while storage.nameTaken(name) { name = "\(stem) \(suffix)"; suffix += 1 }
+                importedProfileName = name
+                profileImportState = .proposal(backup)
+            } catch {
+                profileImportState = .idle
+                profileOpenErrorMessage = error.localizedDescription
+                Log.ui.error("ProfilePackage.read failed error=\(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func importProfileBackup() {
+        guard case .proposal(let backup) = profileImportState else { return }
+        let name = importedProfileName
+        profileImportState = .importing
+        Task {
+            do {
+                let profile = try await storage.importProfile(backup, name: name)
+                profileImportState = .idle
+                profilePath = [profile.id]
+            } catch {
+                profileImportState = .idle
+                profileOpenErrorMessage = error.localizedDescription
+                Log.ui.error("ProfilePackage.import failed error=\(error.localizedDescription)")
+            }
+        }
     }
 
     private var profileNameTaken: Bool {

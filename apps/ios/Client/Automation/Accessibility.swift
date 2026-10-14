@@ -117,6 +117,11 @@ nonisolated enum A11yID {
         static let profileAdd = "settings.profileAdd"
         static let profileCreate = "settings.profileCreate"
         static let profileOpen = "settings.profileOpen"
+        static let profileImport = "settings.profileImport"
+        static let profileImportName = "settings.profileImport.name"
+        static let profileImportConfirm = "settings.profileImport.confirm"
+        static let profileImportCancel = "settings.profileImport.cancel"
+        static func profileExport(_ id: String) -> String { "settings.profileExport.\(id)" }
         static func profileRow(_ id: String) -> String { "settings.profile.\(id)" }
         static func profileRename(_ id: String) -> String { "settings.profileRename.\(id)" }
         static func profileMove(_ id: String) -> String { "settings.profileMove.\(id)" }

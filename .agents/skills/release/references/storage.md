@@ -208,6 +208,10 @@ Physical image results use `oxAttachment`/`oxProfileID`, not image Base64 in his
 Temporary native routing still retains explicit `ox.chat` UUID compatibility.
 Local production Profiles now activate Pi after the storage gate. No live cloud/external database synchronization or raw active-database export is supported. Native UI testing uses direct simulator interaction; Host RPC still requires authorized VPN ingress without loopback exceptions.
 
+Manual Profile backups use a format-1 ZIP containing a versioned manifest, SHA-256 file inventory, public content, closed state.sqlite, and private payloads. Capture refuses pending tasks, submissions, and file changes, closes/checkpoints the runtime, and holds its file ownership lock while coordinating the public-folder read. Backups are bounded to 128 MiB and 10,000 entries. Credentials, folder grants, schedules, app settings, staging, temporary conversations, and migration journals are excluded. Files chooses the destination; a completed save does not establish completed iCloud upload.
+
+Import accepts the current Profile milestone, verifies paths and checksums, stages public/private storage, and rebinds the current Profile identity through a Pi document transaction. Historical receipts remain immutable. Validation rejects pending actions before publication; a fresh identity prevents importing device-bound schedules and permissions. The existing public Profile publication journal owns crash recovery. No new live Profile milestone or database schema is introduced. Archive compatibility is separate from live storage compatibility; older apps have no Profile backup importer.
+
 `ProfileMigrator.stageDurableProfile` now builds a separate caller-owned local
 staging folder containing `profile.json`, `state.sqlite` and `artifacts/`. It accepts
 only the current native representation, pins source-file reads without following

@@ -4,6 +4,176 @@
     "Open %@" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开 %@" } } } },
     "No Websites" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "没有网站" } } } },
     "Enter a website address below." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请在下方输入网站地址。" } } } },
+    "Create new": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建"
+          }
+        }
+      }
+    },
+    "Open existing": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开已有档案"
+          }
+        }
+      }
+    },
+    "This backup is saved inside Ox and will be removed if you delete the app. Export another copy to iCloud Drive or a location outside Ox.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此备份保存在 Ox 内，删除应用时也会被移除。请另行导出副本到 iCloud 云盘或 Ox 以外的位置。"
+          }
+        }
+      }
+    },
+    "Export Profile…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出档案…"
+          }
+        }
+      }
+    },
+    "Import Profile": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入档案"
+          }
+        }
+      }
+    },
+    "Import": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入"
+          }
+        }
+      }
+    },
+    "Importing…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在导入…"
+          }
+        }
+      }
+    },
+    "Preparing…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备…"
+          }
+        }
+      }
+    },
+    "Backup": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "备份"
+          }
+        }
+      }
+    },
+    "Profiles hold conversations, files, voice, and memory. Export a backup to keep a copy outside this device.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "档案包含对话、文件、表达风格和记忆。导出备份即可在此设备以外保留副本。"
+          }
+        }
+      }
+    },
+    "Profiles stored on this device are removed when you delete Ox. Export a copy to keep them.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除 Ox 时，本设备上的档案也会被移除。请导出副本以保留档案。"
+          }
+        }
+      }
+    },
+    "Export to iCloud Drive or another location outside Ox to keep a copy after deleting the app. Credentials and device permissions aren't included.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出到 iCloud 云盘或 Ox 以外的位置，即可在删除应用后保留副本。备份不包含凭据和设备权限。"
+          }
+        }
+      }
+    },
+    "Backup from %@. Import creates a separate Profile. Credentials and device permissions must be set up again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "备份时间：%@。导入将创建独立档案。凭据和设备权限需要重新设置。"
+          }
+        }
+      }
+    },
+    "This isn't a valid Profile backup.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这不是有效的档案备份。"
+          }
+        }
+      }
+    },
+    "This Profile backup requires a different version of Ox.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此档案备份需要其他版本的 Ox。"
+          }
+        }
+      }
+    },
+    "Profile backups must be smaller than 128 MB and contain fewer than 10,000 files.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "档案备份必须小于 128 MB，且文件数量少于 10,000 个。"
+          }
+        }
+      }
+    },
+    "Profile backups cannot contain symbolic links or special files.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "档案备份不能包含符号链接或特殊文件。"
+          }
+        }
+      }
+    },
     "Edit credential" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑凭据" } } } },
     "Add credential" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加凭据" } } } },
     "Open account page" : {

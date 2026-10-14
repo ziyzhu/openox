@@ -48,9 +48,11 @@ actor DurableProfileStore {
     }
 
     private var sessions: [URL: Task<Session, Error>] = [:]
+    private var exporting: Set<URL> = []
 
     func session(in scope: ProfileScope) async throws -> Session {
         let root = scope.root.standardizedFileURL
+        guard !exporting.contains(root) else { throw RuntimeError.bridge("Profile export is in progress. Try again when it finishes.") }
         if let opening = sessions[root] {
             let session = try await opening.value
             guard session.scope.profileID == scope.profileID else { throw RuntimeError.bridge("Profile database identity mismatch") }
@@ -116,6 +118,18 @@ actor DurableProfileStore {
         await session.runtime.dispose()
         sessions[root] = nil
         Log.agent.info("PiDurable Profile closed profile=\(scope.profileID?.uuidString ?? "nil")")
+    }
+
+    func exportProfile(_ profile: Profile) async throws -> Data {
+        let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
+        let session = try await session(in: scope)
+        let root = scope.root.standardizedFileURL
+        guard exporting.insert(root).inserted else { throw RuntimeError.bridge("Profile export is already in progress") }
+        defer { exporting.remove(root) }
+        _ = try await session.runtime.command(.object(["action": .string("profileExportCheck")]))
+        try await close(in: scope)
+        try await ProfileMigrator.validateProfileSnapshot(content: scope.root, state: scope.stateRoot, identity: profile.id)
+        return try ProfilePackage.encode(profile, scope: scope)
     }
 
     func create(in scope: ProfileScope, metadata: JSONValue = .object([:])) async throws -> DurableConversationReference {

@@ -108,7 +108,7 @@ Run this gate after every coordinator or scoped migrator change, including refac
 2. Force-build, install, and launch the DEBUG app on that simulator with bundled services.
 3. Run the before/after template matrix on isolated reserved targets, including upgrade, second-launch stability, and the explicit older-reader check. Store templates, snapshots, and evidence outside the repository.
 4. Run `bun run typecheck` and the retained portable checks.
-5. Confirm the installed app reaches its normal UI and logs `StorageMigrator.prepare done` followed by `IOSHost storage prepared` and `IOSHost profile prepared`.
+5. Confirm the installed app reaches its normal UI and logs `StorageMigrator.prepare done` followed by `HostRuntime storage prepared` and `HostRuntime profile prepared`.
 
 Use the shared `ios-simulator` skill for build/install/launch and container inspection,
 and `setup` for OpenOx's scheme, bundle identity, and assigned launch port.

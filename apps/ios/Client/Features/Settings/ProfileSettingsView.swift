@@ -1,4 +1,14 @@
 import SwiftUI
+import CoreTransferable
+import UniformTypeIdentifiers
+
+private struct ProfileBackupDocument: Transferable {
+    let data: Data
+
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(exportedContentType: .zip) { $0.data }
+    }
+}
 
 struct ProfileSettingsView: View {
     let profileID: UUID
@@ -9,6 +19,8 @@ struct ProfileSettingsView: View {
     @State private var nameDraft = ""
     @State private var operationErrorMessage: String?
     @State private var confirmingDelete = false
+    @State private var exportDocument: ProfileBackupDocument?
+    @State private var presentingExport = false
 
     private var storage: StorageRoot { .shared }
 
@@ -31,6 +43,7 @@ struct ProfileSettingsView: View {
                         }
                         ProfileContentsView(profile: profile, initialSkillDraft: initialSkillDraft)
                             .id(profile.url.path)
+                        exportSection(for: profile)
                         deleteSection(for: profile)
                     } else {
                         ContentUnavailableView("Use this Profile", systemImage: "person.crop.circle")
@@ -43,6 +56,17 @@ struct ProfileSettingsView: View {
         .background(Theme.Colors.background)
         .navigationTitle(Text(verbatim: profile?.name ?? "Profile"))
         .navigationBarTitleDisplayMode(.inline)
+        .fileExporter(isPresented: $presentingExport, item: exportDocument, contentTypes: [.zip],
+            defaultFilename: "\(profile?.name ?? "Profile")-\(Date().formatted(.iso8601.year().month().day().dateSeparator(.dash)))") { result in
+            if case .failure(let error) = result { operationErrorMessage = error.localizedDescription }
+            if case .success(let url) = result,
+               url.standardizedFileURL.resolvingSymlinksInPath().pathComponents.starts(with: ProfileRepository.localDocuments().standardizedFileURL.resolvingSymlinksInPath().pathComponents) {
+                operationErrorMessage = String(localized: "This backup is saved inside Ox and will be removed if you delete the app. Export another copy to iCloud Drive or a location outside Ox.")
+            }
+            exportDocument = nil
+        } onCancellation: {
+            exportDocument = nil
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(isSelected ? "✓" : String(localized: "Use")) {
@@ -204,6 +228,26 @@ struct ProfileSettingsView: View {
     private func manageSection(for profile: Profile) -> some View {
         SettingsSection("Manage", layout: .row) {
             nameRow(for: profile)
+        }
+    }
+
+    private func exportSection(for profile: Profile) -> some View {
+        SettingsSection("Backup", footer: "Export to iCloud Drive or another location outside Ox to keep a copy after deleting the app. Credentials and device permissions aren't included.", layout: .row) {
+            Button {
+                Task {
+                    do {
+                        exportDocument = ProfileBackupDocument(data: try await storage.exportProfile(profile))
+                        presentingExport = true
+                    } catch {
+                        operationErrorMessage = error.localizedDescription
+                    }
+                }
+            } label: {
+                SettingsDisclosureRow(title: "Export Profile…", value: Text(storage.isBusy ? "Preparing…" : ""), indicator: "square.and.arrow.up")
+            }
+            .buttonStyle(.plain)
+            .disabled(storage.isBusy || profile.location != .local)
+            .accessibilityIdentifier(A11yID.Settings.profileExport(profile.id.uuidString))
         }
     }
 

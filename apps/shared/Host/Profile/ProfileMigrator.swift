@@ -134,6 +134,93 @@ nonisolated enum ProfileMigrator {
         try await preparePublicFiles(content: root, state: root, profileID: identity)
     }
 
+    static func importProfile(_ backup: ProfilePackage.Backup, name: String) async throws -> Profile {
+        let started = Date()
+        let manager = FileManager.default
+        let candidate = ProfileRepository.cleanName(name)
+        guard !candidate.hasPrefix("."), candidate != ".", candidate != ".." else { throw ProfilePackage.Failure.invalid }
+        let destination = ProfileIO.publicProfiles.appendingPathComponent(candidate)
+        guard !manager.fileExists(atPath: destination.path) else { throw ProfileError.nameExists(candidate) }
+        let id = UUID()
+        Log.app.info("ProfilePackage.import staging profile=\(id) files=\(backup.files.count)")
+        let journalRoot = try durableJournalDirectory(id)
+        let content = journalRoot.appendingPathComponent("public-content-" + UUID().uuidString)
+        try manager.createDirectory(at: ProfileIO.privateProfiles, withIntermediateDirectories: true)
+        let state = ProfileIO.privateProfiles.appendingPathComponent(".public-state-" + UUID().uuidString)
+        try manager.createDirectory(at: content, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        try manager.createDirectory(at: state, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        var journalWritten = false
+        defer {
+            if !journalWritten {
+                for folder in [content, state] {
+                    do { try manager.removeItem(at: folder) }
+                    catch { Log.app.warning("ProfilePackage.import cleanup failed error=\(error.localizedDescription)") }
+                }
+            }
+        }
+        try await Task.detached(priority: .userInitiated) { try ProfilePackage.stage(backup, content: content, state: state) }.value
+        let runtime = DurableRuntime(databaseURL: state.appendingPathComponent("state.sqlite"), fileRoot: content) { _, _, _ in
+            throw RuntimeError.bridge("Profile import cannot execute native capabilities")
+        }
+        do {
+            _ = try await runtime.command(.object(["action": .string("open"), "profileID": .string(backup.manifest.profile.id.uuidString),
+                "physicalFiles": .bool(true), "prepareFiles": .bool(true), "publicFiles": .bool(true)]))
+            _ = try await runtime.command(.object(["action": .string("profileImportIdentity"), "identity": .string(id.uuidString)]))
+            _ = try await runtime.command(.object(["action": .string("close")]))
+            await runtime.dispose()
+            try await validateProfileSnapshot(content: content, state: state, identity: id)
+        } catch { await runtime.dispose(); throw error }
+        var config = backup.manifest.profile
+        config.id = id
+        config.contentDirectory = candidate
+        try ProfileIO.writeConfig(config, to: state)
+        try await Task.detached(priority: .userInitiated) {
+            try syncImportedTree(state)
+            try syncImportedTree(content)
+        }.value
+        try syncDurableDirectory(ProfileIO.privateProfiles)
+        try Task.checkCancellation()
+        let journal: [String: Any] = ["format": 1, "phase": "prepared", "profileID": id.uuidString,
+            "source": journalRoot.appendingPathComponent("import-source-" + id.uuidString).path,
+            "destination": destination.path, "content": content.path, "state": state.path,
+            "backup": journalRoot.appendingPathComponent("original-" + UUID().uuidString).path, "inventory": [String: String]()]
+        journalWritten = true
+        try writePublicProfileJournal(journal, profileID: id)
+        try publishPublicProfileJournal(journal)
+        guard let profile = ProfileIO.profile(at: destination, location: .local) else { throw ProfilePackage.Failure.invalid }
+        Log.app.info("ProfilePackage.import profile=\(id) files=\(backup.files.count) seconds=\(Date().timeIntervalSince(started))")
+        return profile
+    }
+
+    static func validateProfileSnapshot(content: URL, state: URL, identity: UUID) async throws {
+        let runtime = DurableRuntime(databaseURL: state.appendingPathComponent("state.sqlite"), fileRoot: content) { _, _, _ in
+            throw RuntimeError.bridge("Profile validation cannot execute native capabilities")
+        }
+        do {
+            _ = try await runtime.command(.object(["action": .string("open"), "profileID": .string(identity.uuidString),
+                "physicalFiles": .bool(true), "publicFiles": .bool(true)]))
+            _ = try await runtime.command(.object(["action": .string("profileExportCheck")]))
+            _ = try await runtime.command(.object(["action": .string("close")]))
+            await runtime.dispose()
+        } catch { await runtime.dispose(); throw error }
+    }
+
+    private static func syncImportedTree(_ root: URL) throws {
+        var directories = [root]
+        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else {
+            throw ProfilePackage.Failure.invalid
+        }
+        for case let file as URL in enumerator {
+            if try file.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true { directories.append(file); continue }
+            let fd = open(file.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+            guard fd >= 0 else { throw ProfilePackage.Failure.invalid }
+            let result = fsync(fd)
+            Darwin.close(fd)
+            guard result == 0 else { throw StorageMigrationError.invalidApplicationStorage("Profile import durability") }
+        }
+        for directory in directories.reversed() { try syncDurableDirectory(directory) }
+    }
+
     private static func prepareFiles(at root: URL, profileID: UUID) async throws {
         let runtime = DurableRuntime(databaseURL: root.appendingPathComponent("state.sqlite"), fileRoot: root) { method, _, _ in
             throw RuntimeError.bridge("Profile file preparation forbids native capabilities: \(method)")

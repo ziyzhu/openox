@@ -36,6 +36,7 @@ type Command = CommandScope & (
   | { action: "filesystemAbort"; capability: string }
   | { action: "filesystem"; capability: string; fileMounts: NativeFileMount[]; operation: FileOperation; arguments: FileRequest }
   | { action: "publicFilesPrepare"; splitStorage?: boolean }
+  | { action: "profileImportIdentity"; identity: string }
   | ({ action: "conversationCreate"; entries?: EntryDraft[] } & ApplicationPresentationChange)
   | ({ action: "applicationSave" } & ApplicationPresentationChange)
   | { action: "conversationPopulate"; entries: EntryDraft[] }
@@ -58,7 +59,7 @@ type Command = CommandScope & (
   | { action: "fileSaved"; path: string; saved: boolean }
   | { action: "fileMove"; path: string; prefix: string }
   | { action: "filesPrepare" | "publicFilesInventory" | "applicationLoad" | "applicationDelete" | "conversationMetadata" | "conversationContext"
-      | "observe" | "recoveryPlan" | "resume" | "abort" | "inspect" | "fileMounts" | "skillPackages" | "close" }
+      | "profileExportCheck" | "observe" | "recoveryPlan" | "resume" | "abort" | "inspect" | "fileMounts" | "skillPackages" | "close" }
 );
 interface OpenedSession {
   session: ProfileRuntime;
@@ -195,6 +196,21 @@ export class IOSAgentAdapter {
     };
     const attached = () => { const ref = required(); this.route(ref.conversationID); return ref; };
     switch (args.action) {
+      case "profileExportCheck": {
+        const inspection = await session.harness.inspect(context);
+        if (inspection.tasks.length || inspection.submissions.length) throw new Error("Stop running conversations and finish queued messages before exporting this Profile");
+        if (session.files.physical && (await session.files.state()).pending.length) throw new Error("Finish pending file changes before exporting this Profile");
+        await session.files.flush();
+        return {};
+      }
+      case "profileImportIdentity": {
+        if (!this.current.preparingFiles || !/^[0-9a-f-]{36}$/i.test(args.identity)) throw new Error("Profile import requires isolated storage preparation");
+        const inspection = await session.harness.inspect(context);
+        if (inspection.tasks.length || inspection.submissions.length) throw new Error("Backups containing pending actions cannot be imported");
+        if ((await session.files.state()).pending.length) throw new Error("Backups containing pending file changes cannot be imported");
+        await session.harness.commit(async tx => { (await tx.doc(ProfileIndex)).identity = args.identity; }, context);
+        return {};
+      }
       case "filesPrepare": return this.prepareFiles();
       case "publicFilesPrepare": return this.preparePublicFiles(args.splitStorage === true);
       case "publicFilesInventory":
