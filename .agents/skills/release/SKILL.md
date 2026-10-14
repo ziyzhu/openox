@@ -38,7 +38,7 @@ demo access also stay outside Git.
 
 Current English promotional text, supplied by the operator:
 
-> Connect anything, local, yours.
+> A self-evolving agent that runs on your phone
 
 Preserve it unless a change is explicitly requested. This is intended copy, not
 live verification. Do not automatically translate it or use it as release notes.
