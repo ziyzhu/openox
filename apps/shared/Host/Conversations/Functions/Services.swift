@@ -133,9 +133,9 @@ extension Conversation: OxFunctionBridge {
         let args: JSONValue = .object(kind.map { ["kind": .string($0)] } ?? [:])
         return try await tracked(Actions.serviceListAttached, args, purpose: purpose) {
             let snapshots = try self.attachedServices
-                .filter { kind == nil || self.serviceKind($0) == kind }
+                .filter { kind == nil || ServiceOperations.serviceKind($0) == kind }
                 .sorted { $0.domain < $1.domain }
-                .map { try self.serviceSnapshot($0) }
+                .map { JSONValue.object(try ServiceOperations.serviceSnapshotFields($0, attached: true)) }
             Log.session.info("bridge.service.listAttached kind=\(kind ?? "all") count=\(snapshots.count)")
             return .array(snapshots)
         }
@@ -145,34 +145,8 @@ extension Conversation: OxFunctionBridge {
         try await serviceOperations.inspectService(domain: domain, actions: actions, purpose: purpose)
     }
 
-    private func serviceSnapshot(_ service: Service) throws -> JSONValue {
-        guard case .object(var fields) = try Self.encodeToJSON(service.snapshot(attached: true)) else {
-            throw RuntimeError.bridge("service snapshot is not an object")
-        }
-        fields["kind"] = .string(serviceKind(service))
-        if let endpoint = service.definition.mcpEndpoint {
-            fields["endpoint"] = .string(endpoint.absoluteString)
-            fields["transport"] = .string(service.definition.mcpTransport?.rawValue ?? "auto")
-        }
-        if case .repository(let id, let provenance) = service.definition.source {
-            fields["repository"] = .string(id)
-            fields["repositoryProvenance"] = .string(provenance.rawValue)
-        }
-        return .object(fields)
-    }
-
-    private func serviceKind(_ service: Service) -> String {
-        if service.isIOSService { return "ios" }
-        if service.isAPIService { return "api" }
-        if service.isMCPService { return "mcp" }
-        return "web"
-    }
-
     public func invokeAction(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue? {
-        switch await callService(name: name, args: args ?? .object([:]), purpose: purpose) {
-        case .success(let value): return value
-        case .failure(let e): throw e
-        }
+        try await serviceOperations.invokeAction(name: name, args: args ?? .object([:]), purpose: purpose) ?? .null
     }
 }
 

@@ -732,7 +732,7 @@ final class ConversationManager {
         records.removeAll()
         accessOrdinals.removeAll()
         selection = .empty
-        ensureRepositoryScope(force: true)
+        ensureRepositoryScope()
         Log.session.info("ConversationManager.reset generation=\(repositoryScope.generation)")
     }
 
@@ -810,15 +810,9 @@ final class ConversationManager {
         return conversation
     }
 
-    private func ensureRepositoryScope(force: Bool = false) {
-        let currentScope = storage.scope
-        let sameProfile = currentScope.profileID == repositoryScope.profileID
-            && currentScope.root.standardizedFileURL == repositoryScope.root.standardizedFileURL
-            && currentScope.location == repositoryScope.location
-        guard force || !sameProfile else { return }
-        let scope = force
-            ? ProfileScope(profileID: currentScope.profileID, root: currentScope.root, location: currentScope.location)
-            : currentScope
+    private func ensureRepositoryScope() {
+        let scope = storage.scope
+        guard repositoryScope != scope else { return }
         repositoryScope = scope
         Log.session.info("ConversationManager.repository root=\(scope.root.path) generation=\(scope.generation)")
     }

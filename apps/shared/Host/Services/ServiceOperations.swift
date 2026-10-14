@@ -218,7 +218,7 @@ final class ServiceOperations {
         guard let service = exact ?? matches.first else {
             throw RuntimeError.bridge("ox.service.update: service '\(identifier)' does not exist; use ox.service.create for a new service.")
         }
-        let kind = serviceKind(service)
+        let kind = Self.serviceKind(service)
         let allowed: Set<String>
         switch kind {
         case "web": allowed = ["name", "description", "baseUrl", "faviconUrl", "actions", "$defs"]
@@ -301,7 +301,7 @@ final class ServiceOperations {
         guard let service = serviceManager.service(domain: cleanDomain) else {
             throw RuntimeError.bridge("ox.service.copy: service '\(cleanDomain)' does not exist.")
         }
-        let kind = serviceKind(service)
+        let kind = Self.serviceKind(service)
         let args: JSONValue = .object(["domain": .string(cleanDomain)])
         return try await tracked(Actions.serviceCopy, args, purpose: purpose) {
             try await self.serviceManager.copyServiceToLocal(
@@ -692,7 +692,7 @@ final class ServiceOperations {
                 throw RuntimeError.bridge("ox.service.list: Ox Server is still loading services. Try again later.")
             }
             let snapshots = try serviceManager.services
-                .filter { kind == nil || self.serviceKind($0) == kind }
+                .filter { kind == nil || Self.serviceKind($0) == kind }
                 .sorted { $0.domain < $1.domain }
                 .map { try self.serviceSnapshot($0) }
             Log.session.info("bridge.service.list kind=\(kind ?? "all") count=\(snapshots.count)")
@@ -721,7 +721,7 @@ final class ServiceOperations {
             ServiceFindResult(
                 match: $0,
                 attached: attached.contains($0.service.domain),
-                kind: serviceKind($0.service)
+                kind: Self.serviceKind($0.service)
             )
         }
         Log.session.info("bridge.service.suggestions chars=\(query.count) hits=\(results.count)")
@@ -829,23 +829,30 @@ final class ServiceOperations {
     }
 
     private func serviceSnapshot(_ service: Service) throws -> JSONValue {
-        guard case .object(var fields) = try Self.encodeToJSON(service.snapshot(attached: attachedDomains().contains(service.domain))) else {
+        var fields = try Self.serviceSnapshotFields(service, attached: attachedDomains().contains(service.domain))
+        if service.definition.mcpEndpoint != nil {
+            fields["faviconUrl"] = service.definition.faviconURL.map { .string($0.absoluteString) } ?? .null
+        }
+        return .object(fields)
+    }
+
+    static func serviceSnapshotFields(_ service: Service, attached: Bool) throws -> [String: JSONValue] {
+        guard case .object(var fields) = try encodeToJSON(service.snapshot(attached: attached)) else {
             throw RuntimeError.bridge("service snapshot is not an object")
         }
         fields["kind"] = .string(serviceKind(service))
         if let endpoint = service.definition.mcpEndpoint {
             fields["endpoint"] = .string(endpoint.absoluteString)
             fields["transport"] = .string(service.definition.mcpTransport?.rawValue ?? "auto")
-            fields["faviconUrl"] = service.definition.faviconURL.map { .string($0.absoluteString) } ?? .null
         }
         if case .repository(let id, let provenance) = service.definition.source {
             fields["repository"] = .string(id)
             fields["repositoryProvenance"] = .string(provenance.rawValue)
         }
-        return .object(fields)
+        return fields
     }
 
-    private func serviceKind(_ service: Service) -> String {
+    static func serviceKind(_ service: Service) -> String {
         if service.isIOSService { return "ios" }
         if service.isAPIService { return "api" }
         if service.isMCPService { return "mcp" }

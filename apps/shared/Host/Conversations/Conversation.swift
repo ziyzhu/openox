@@ -646,11 +646,6 @@ final class Conversation: Identifiable {
         )
     }
 
-    func callService(name: String, args: JSONValue, purpose: String) async -> Result<JSONValue, Error> {
-        do { return .success(try await serviceOperations.invokeAction(name: name, args: args, purpose: purpose) ?? .null) }
-        catch { return .failure(error) }
-    }
-
     var nativeServiceOperations: NativeServiceOperations {
         NativeServiceOperations(
             id: id,

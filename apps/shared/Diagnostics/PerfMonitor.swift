@@ -27,7 +27,7 @@ nonisolated enum ProcessStats {
 
     static func sample() -> Sample {
         let (cpu, threads) = cpuPercentAndThreadCount()
-        let availableMB: Double = 0
+        let availableMB = availableMemoryMB
         return Sample(cpuPercent: cpu,
                       footprintMB: footprintMB(),
                       availableMB: availableMB,

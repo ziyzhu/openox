@@ -56,13 +56,6 @@ actor ProfileRepository {
         deleted = deleted.filter { $0.key.profileID != profile.id }
     }
 
-    func ensureLayout(in scope: ProfileScope) async {
-        do { _ = try await DurableProfileStore.shared.session(in: scope) }
-        catch { Log.app.error("ProfileRepository.open failed=\(error.localizedDescription)") }
-    }
-
-    func startDownloads(in scope: ProfileScope) { }
-
     func artifactsDirectory(in scope: ProfileScope) throws -> URL {
         try requireProfile(in: scope)
         return scope.root.appendingPathComponent("artifacts")
@@ -210,7 +203,9 @@ actor ProfileRepository {
     }
 
     func virtualConversationFileSizes(_ id: ConversationID, in scope: ProfileScope, snapshot: ConversationState? = nil) async throws -> (metadata: Int, transcript: Int) {
-        (try await virtualConversationMetadata(id, in: scope, snapshot: snapshot).count, try await virtualConversationTranscript(id, in: scope, snapshot: snapshot).count)
+        let loaded = snapshot == nil ? await loadConversation(id, in: scope)?.state : nil
+        guard let state = snapshot ?? loaded else { throw RuntimeError.bridge("Conversation unavailable") }
+        return (try await virtualConversationMetadata(id, in: scope, snapshot: state).count, try await virtualConversationTranscript(id, in: scope, snapshot: state).count)
     }
 
     func export(_ state: ConversationState) throws -> Data {

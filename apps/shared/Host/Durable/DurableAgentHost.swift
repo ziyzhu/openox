@@ -94,6 +94,9 @@ actor DurableAgentHost {
               let operation = fields["op"]?.stringValue,
               capability.roots.contains(String(root)) || (operation == "read" && capability.roots.contains("")),
               ["info", "list", "read", "write", "delete", "activate"].contains(operation) else {
+            let fields = params.objectValue
+            let capability = fields?["capability"]?.stringValue.flatMap { fileCapabilities[$0] }
+            Log.agent.error("Filesystem.capability.rejected known=\(capability != nil) cancelled=\(capability?.cancelled.withLock { $0 } ?? false) scopeMatches=\(capability?.scope == StorageRoot.currentScope) operation=\(fields?["op"]?.stringValue ?? "missing") path=\(fields?["path"]?.stringValue ?? "missing") roots=\(capability?.roots.sorted().joined(separator: ",") ?? "missing")")
             throw RuntimeError.bridge("Filesystem backend capability is expired or outside its scope")
         }
         if operation == "write", !["write", "edit"].contains(capability.operation) {

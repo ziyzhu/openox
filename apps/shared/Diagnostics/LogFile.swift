@@ -1,7 +1,6 @@
 import Foundation
 import CryptoKit
 import os
-import AppKit
 
 nonisolated final class LogFile: @unchecked Sendable {
     static let shared = LogFile()
@@ -29,8 +28,7 @@ nonisolated final class LogFile: @unchecked Sendable {
     private var handle: FileHandle?
 
     private init() {
-        let notifications = [NSApplication.willTerminateNotification]
-        for name in notifications {
+        for name in Self.flushNotifications {
             NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
                 guard let self else { return }
                 self.queue.async { self.flush() }
@@ -108,7 +106,6 @@ nonisolated final class LogFile: @unchecked Sendable {
         }
     }
 
-    // Pages walk backward; each page retains the existing chronological wire order.
     func page(limit: Int = 2_000, cursor: String? = nil, level: Logger.Level = .debug,
               category: String? = nil, query: String? = nil, since: Date? = nil) async throws -> Page {
         try await read { data in
