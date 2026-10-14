@@ -19,7 +19,7 @@ async function command(args: string[]) {
 test("eval CLI validates the complete catalog and defaults to four stub smoke cases", async()=>{
   const result = await command(["--validate","--suite","all"]);
   expect(result.code,result.stderr).toBe(0);
-  expect(result.stdout).toContain("111 functions and 5 System skills");
+  expect(result.stdout).toContain("110 functions and 5 System skills");
   const listed = await command(["--list","--json"]);
   expect(JSON.parse(listed.stdout).map((test:{id:string})=>test.id)).toEqual([...smokeIds]);
   expect(new Set(cases.flatMap(coveredFunctions))).toEqual(new Set(Object.keys(catalog)));

@@ -36,7 +36,6 @@ const groups: Record<string, Record<string, string>> = {
     glob: "Locate the specified paths using a bounded glob search",
     grep: "Find requested content using a supported expression and explicit transcript scope",
   },
-  output: { read: "Recover the requested portion of a truncated output without reprinting it all" },
   provider: {
     default: "Inspect the read-only bundled provider definitions",
     list: "Report active provider sources, availability, authentication, regions, and capabilities",
@@ -156,7 +155,7 @@ const journeys: Array<[string, string, string[]]> = [
   ["personalize-installation", "Apply my requested language, appearance and new-conversation model preferences and verify the effective settings", ["app.setLanguage", "app.setTheme", "app.setDefaultModel"]],
   ["conversation-handoff", "Rename this task, switch to the requested model, inspect its capabilities and remove only the completed QA child conversation", ["conversation.rename", "conversation.setModel", "conversation.model", "conversation.delete"]],
   ["organize-project-files", "Find the supplied project notes, read them completely, create an edited working copy in a new folder, move it to its final location, attach and use its contents, then remove the disposable scratch files and folder", ["fs.list", "fs.glob", "fs.grep", "fs.read", "fs.mkdir", "fs.write", "fs.copy", "fs.edit", "fs.move", "fs.attach", "fs.delete", "fs.rmdir"]],
-  ["large-result-investigation", "Answer the requested question from the supplied long diagnostic result by recovering the relevant omitted portion", ["output.read"]],
+  ["large-result-investigation", "Answer the requested question from the supplied long diagnostic result by reading the relevant omitted portion from its temporary output file without reprinting it all", ["fs.read"]],
   ["provider-audit", "Compare the requested active provider and configured models against bundled defaults, identify differences and validate the proposed replacement without saving", ["provider.default", "provider.get", "provider.models", "provider.validate"]],
   ["provider-migration", "Connect the QA provider, save the verified definition, run a bounded inference check, then disconnect and remove only this run-owned addition", ["provider.authenticate", "provider.save", "provider.generate", "provider.deauthenticate", "provider.delete"]],
   ["repository-onboarding", "Connect and sync the QA repository, enable it, inspect the supplied source conflict, resolve the requested source, then disconnect the run-owned repository", ["repository.connect", "repository.sync", "repository.enable", "repository.conflicts", "repository.resolve", "repository.disconnect"]],
