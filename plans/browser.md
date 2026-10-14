@@ -59,13 +59,13 @@ Build on `apps/ios/Client/UI/WebBrowserView.swift`, `ServiceBrowserView`, and `L
 Existing: `.browse` mode already has editable address entry, back/forward, reload/stop, progress, a "Try Again" error overlay, Share, and Open in Safari.
 
 Entry points (approved direction: composer URL, "+" menu, empty start page with service websites; recent pages deferred):
-- [ ] Reproduce current state on a simulator: no launch path reaches the Browser without the agent or an external link.
-- [ ] Composer URL: when trimmed composer text is a single bare domain or `http(s)` URL, show an "Open <host>" suggestion using the existing composer suggestion-panel pattern. Selecting it opens the Browser and clears nothing; Send still goes to the agent. Ignore multi-word text and `sandbox:` links.
-- [ ] "+" menu: add an "Open Website" row to `AttachMenuCard` that opens an empty Browser with the address field focused.
-- [ ] Empty Browser: let `ServiceBrowserSession` start without an initial URL, auto-focus the address field, and show a start page instead of a blank web view.
-- [ ] Start page: list the selected Profile's web services (exclude API, MCP, and iOS services) by name, favicon, and manifest `baseUrl`. Tapping one navigates the same session through `ServiceBrowserSession`'s attached-service path. No new persisted state.
-- [ ] Show a neutral empty state when the Profile has no web services; address entry stays primary.
-- [ ] Address submission: resolve bare domains to `https://`; decide whether non-URL text is rejected or sent to a web search before shipping (search provider choice must stay neutral).
+- [x] Reproduce current state on a simulator: no launch path reaches the Browser without the agent or an external link.
+- [x] Composer URL: when trimmed composer text is a single bare domain or `http(s)` URL, show an "Open <host>" suggestion using the existing composer suggestion-panel pattern. Selecting it opens the Browser and keeps the draft; Send still goes to the agent. Ignore multi-word text and `sandbox:` links.
+- [x] "+" menu: add an "Open Website" row to `AttachMenuCard` that opens an empty Browser with the address field focused.
+- [x] Empty Browser: let `ServiceBrowserSession` start without an initial URL, auto-focus the address field, and show a start page instead of a blank web view.
+- [x] Start page: list web services (saved first) by name, favicon, and manifest `baseUrl`; tapping one navigates the same session. Saved services and website data are still app-wide, not Profile-owned. No new persisted state.
+- [x] Show a neutral empty state when no web services exist; address entry stays primary. Not simulator-verified because bundled services are always present.
+- [ ] Address submission: bare domains resolve to `https://`; non-URL text is rejected with an alert. Decide whether non-URL text is rejected or sent to a web search before shipping (search provider choice must stay neutral).
 
 Navigation audit:
 - [ ] Verify back/forward/reload/stop and "Try Again" stay reachable with collapsed chrome, a first-load failure, and an empty session.
@@ -75,7 +75,7 @@ Navigation audit:
 Recent pages (deferred, needs approval): Profile-local capped list of URL, title, and last visit, recorded only for user-initiated top-level navigations, cleared with Profile website data, logged by domain only. It is a new persisted file, so it requires predecessor/changed-build evidence and should follow Profile isolation.
 
 Verification:
-- [ ] Simulator E2E on iPhone and iPad layouts with VoiceOver labels and stable identifiers for each new control and per-service row.
+- [ ] Simulator E2E on iPhone and iPad layouts with VoiceOver labels and stable identifiers for each new control and per-service row. iPhone (ox-1, iOS 26) verified: "+" → start page, address entry, tile navigation, composer suggestion (`hello`/`hello world` show none; `Apple.com/iphone` opens www.apple.com), draft retained. iPad and dark mode pending.
 - [ ] Screenshots of composer suggestion, "+" menu row, empty start page, and no-services state for review.
 - [ ] Report LOC, cyclomatic complexity, file-tree, and call-stack diffs.
 

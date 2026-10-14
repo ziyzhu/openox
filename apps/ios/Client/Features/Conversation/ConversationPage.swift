@@ -649,6 +649,16 @@ struct ConversationPage: View {
                 slashPickerOverlay(floatsTopStrip: floatsTopStrip)
             }
         }
+        .overlay(alignment: .bottom) {
+            if showsComposer, editedBlockID == nil {
+                ComposerWebsiteSuggestion(
+                    composer: composer,
+                    isFocused: composerFocused,
+                    composerHeight: effectiveComposerHeight(floatsTopStrip: floatsTopStrip),
+                    onOpen: openWebsiteSuggestion
+                )
+            }
+        }
         let observedTranscript = composedTranscript
         .onChange(of: speechInput.notice) { _, message in
             guard let message else { return }
@@ -921,6 +931,12 @@ struct ConversationPage: View {
         }
     }
 
+    private func openWebsiteSuggestion(_ url: URL) {
+        Log.ui.info("ConversationPage.openWebsite conversation=\(conversation.id) host=\(url.host ?? "?")")
+        composerFocused = false
+        LinkOpener.open(url: url, serviceManager: serviceManager)
+    }
+
     private func effectiveComposerHeight(floatsTopStrip: Bool) -> CGFloat {
         viewportLayout.composerHeight
             + (floatsTopStrip ? ConversationComposer.floatingTopStripClearance : 0)
@@ -952,6 +968,9 @@ struct ConversationPage: View {
             modalPresentation = .photos
         case .files:
             modalPresentation = .files
+        case .website:
+            composerFocused = false
+            LinkOpener.openStartPage(serviceManager: serviceManager)
         case .service(let picked):
             attachService(picked)
         }

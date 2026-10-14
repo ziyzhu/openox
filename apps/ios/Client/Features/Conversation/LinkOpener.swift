@@ -46,6 +46,14 @@ enum LinkOpener {
         Log.ui.info("LinkOpener.open disposition=browser url=\(LogPrivacy.url(url.absoluteString))")
         return coordinator.presentBrowser(session)
     }
+
+    @discardableResult
+    static func openStartPage(serviceManager: ServiceManager) -> Bool {
+        let coordinator = AppPresentationCoordinator.shared
+        guard coordinator.canOpenBrowser else { return false }
+        Log.ui.info("LinkOpener.open disposition=start-page")
+        return coordinator.presentBrowser(ServiceBrowserSession(serviceManager: serviceManager))
+    }
 }
 
 struct ServiceBrowserView: View {
@@ -80,6 +88,10 @@ struct ServiceBrowserView: View {
             fallbackHost: session.serviceDomain,
             initialURL: session.initialURL,
             errorMessage: session.errorMessage,
+            startPage: AnyView(BrowserStartPage { url in
+                Log.ui.info("ServiceBrowser.startPage open host=\(url.host ?? "?")")
+                _ = session.navigate(to: url)
+            }),
             navigate: { session.navigate(to: $0) },
             goBack: session.goBack,
             goForward: session.goForward,

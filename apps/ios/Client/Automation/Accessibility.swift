@@ -150,6 +150,7 @@ nonisolated enum A11yID {
         static let more = "chat.more"
         static let attach = "chat.attach"
         static let input = "chat.input"
+        static let openWebsite = "chat.openWebsite"
         static let cancelEdit = "chat.cancelEdit"
         static let speechHold = "chat.speechHold"
         static let speechStatus = "chat.speechStatus"
@@ -234,6 +235,7 @@ nonisolated enum A11yID {
             static let photos = "chat.attach.photos"
             static let files = "chat.attach.files"
             static let services = "chat.attach.services"
+            static let website = "chat.attach.website"
             static let explore = "chat.attach.explore"
             static let exploreBack = "chat.attach.exploreBack"
             static let servicesLoading = "chat.attach.servicesLoading"
@@ -303,6 +305,9 @@ nonisolated enum A11yID {
         static let share = "serviceBrowser.share"
         static let openInSafari = "serviceBrowser.openInSafari"
         static let done = "serviceBrowser.done"
+        static let startPage = "serviceBrowser.startPage"
+        static let startPageEmpty = "serviceBrowser.startPageEmpty"
+        static func startPageService(_ domain: String) -> String { "serviceBrowser.startPage.\(domain)" }
     }
 
     enum ServiceInspector {

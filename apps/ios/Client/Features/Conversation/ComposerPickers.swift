@@ -56,6 +56,44 @@ struct ComposerSlashPicker: View {
     }
 }
 
+struct ComposerWebsiteSuggestion: View {
+    @Bindable var composer: ConversationComposerModel
+    let isFocused: Bool
+    let composerHeight: CGFloat
+    let onOpen: (URL) -> Void
+
+    var body: some View {
+        let url = isFocused ? composer.websiteSuggestion : nil
+        Group {
+            if let url {
+                Button { onOpen(url) } label: {
+                    HStack(spacing: Theme.Spacing.md) {
+                        Image(systemName: "globe")
+                            .font(.system(.body, weight: .medium))
+                        Text("Open \(url.host(percentEncoded: false)?.lowercased() ?? url.absoluteString)")
+                            .font(Theme.Fonts.bodyMd)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .foregroundStyle(Theme.Colors.onSurface)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
+                .accessibilityIdentifier(A11yID.ConversationControls.openWebsite)
+                .frame(maxWidth: Theme.ContainerWidth.readable)
+                .padding(.horizontal, Theme.Spacing.md)
+                .padding(.bottom, composerHeight + Theme.Spacing.xs)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(Theme.Animation.standard, value: url)
+    }
+}
+
 struct ComposerAttachMenu: View {
     let onChoice: (AttachmentChoice) -> Void
     let onServices: () -> Void
@@ -83,6 +121,7 @@ private struct AttachMenuCard: View {
             row("Camera", icon: .system("camera"), a11yID: A11yID.ConversationControls.Attach.camera) { onChoice(.camera) }
             row("Photos", icon: .system("photo.on.rectangle"), a11yID: A11yID.ConversationControls.Attach.photos) { onChoice(.photos) }
             row("Files", icon: .system("paperclip"), a11yID: A11yID.ConversationControls.Attach.files) { onChoice(.files) }
+            row("Open Website", icon: .system("globe"), a11yID: A11yID.ConversationControls.Attach.website) { onChoice(.website) }
             row("Services", icon: .action(.services), a11yID: A11yID.ConversationControls.Attach.services, action: onServices)
         }
         .padding(.vertical, Theme.Spacing.sm)

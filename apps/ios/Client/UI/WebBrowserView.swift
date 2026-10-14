@@ -70,6 +70,7 @@ struct WebBrowserView: View {
     let fallbackHost: String
     var initialURL: URL? = nil
     var errorMessage: String? = nil
+    var startPage: AnyView? = nil
     let navigate: @MainActor (URL) async -> Bool
     let goBack: @MainActor () -> Void
     let goForward: @MainActor () -> Void
@@ -95,6 +96,7 @@ struct WebBrowserView: View {
         GeometryReader { geometry in
             websiteContent
                 .overlay { errorOverlay }
+                .overlay { if currentURL == nil, let startPage { startPage } }
                 .safeAreaBar(edge: .bottom, spacing: 0) {
                     browserBar
                         .padding(.bottom, isCompact ? -min(20, geometry.safeAreaInsets.bottom) : 0)
@@ -102,7 +104,12 @@ struct WebBrowserView: View {
         }
             .animation(chromeAnimation, value: addressFocused)
             .animation(chromeAnimation, value: scrollChrome.isCompact)
-            .onChange(of: currentURL, initial: true) { _, _ in
+            .task {
+                guard currentURL == nil, startPage != nil, mode.allowsAddressEditing else { return }
+                addressFocused = true
+            }
+            .onChange(of: currentURL, initial: true) { previous, current in
+                if previous == nil, current != nil { addressFocused = false }
                 scrollChrome = .expanded(anchor: 0)
                 guard !addressFocused else { return }
                 syncAddress()
@@ -247,7 +254,9 @@ struct WebBrowserView: View {
     }
 
     private var domainLabel: some View {
-        Text(currentURL?.host(percentEncoded: false) ?? fallbackHost)
+        let host = currentURL?.host(percentEncoded: false) ?? fallbackHost
+        return Text(host.isEmpty ? String(localized: "Website address") : host)
+            .foregroundStyle(host.isEmpty ? .secondary : .primary)
             .lineLimit(1)
     }
 
@@ -306,6 +315,7 @@ struct WebBrowserView: View {
                 }
                 .accessibilityLabel(page.isLoading ? A11yLabel.stop : String(localized: "Reload"))
                 .accessibilityIdentifier(identifier("reloadOrStop"))
+                .disabled(currentURL == nil)
                 .opacity(isCompact ? 0 : 1)
                 .animation(chromeFade, value: isCompact)
                 .frame(width: isCompact ? 0 : 40)

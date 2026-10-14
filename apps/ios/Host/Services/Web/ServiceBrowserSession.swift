@@ -57,7 +57,7 @@ final class ServiceBrowserSession {
 
     let serviceDomain: String
     let serviceTitle: String
-    let initialURL: URL
+    let initialURL: URL?
     let page: WebPage
     private(set) var errorMessage: String?
     private(set) var navigationNotice: String?
@@ -65,31 +65,27 @@ final class ServiceBrowserSession {
     private var navigationTask: Task<Void, Never>?
     private var started = false
 
-    init(service: Service, url: URL, serviceManager: ServiceManager) {
-        let router = Router()
-        serviceDomain = service.domain
-        serviceTitle = service.title
-        initialURL = url
-        page = WebPage(
-            configuration: serviceManager.makeBrowserPageConfiguration(for: service.domain),
-            navigationDecider: NavigationDecider(router: router)
-        )
-        router.openPopup = { [weak self] request in self?.loadPopup(request) }
-        router.openExternal = { [weak self] url in self?.openExternal(url) }
-        router.rejectContent = { [weak self] message in self?.rejectContent(message) }
-        #if targetEnvironment(simulator)
-        page.isInspectable = true
-        #endif
+    convenience init(service: Service, url: URL, serviceManager: ServiceManager) {
+        self.init(domain: service.domain, title: service.title, url: url, serviceManager: serviceManager)
     }
 
-    init(url: URL, serviceManager: ServiceManager? = nil) {
+    convenience init(url: URL, serviceManager: ServiceManager? = nil) {
+        let host = url.host ?? url.absoluteString
+        self.init(domain: host, title: host, url: url, serviceManager: serviceManager)
+    }
+
+    convenience init(serviceManager: ServiceManager) {
+        self.init(domain: "", title: "", url: nil, serviceManager: serviceManager)
+    }
+
+    private init(domain: String, title: String, url: URL?, serviceManager: ServiceManager?) {
         let router = Router()
-        serviceDomain = url.host ?? url.absoluteString
-        serviceTitle = url.host ?? url.absoluteString
+        serviceDomain = domain
+        serviceTitle = title
         initialURL = url
         if let serviceManager {
             page = WebPage(
-                configuration: serviceManager.makeBrowserPageConfiguration(for: serviceDomain),
+                configuration: serviceManager.makeBrowserPageConfiguration(for: domain),
                 navigationDecider: NavigationDecider(router: router)
             )
         } else {
@@ -127,6 +123,10 @@ final class ServiceBrowserSession {
         guard !started else { return }
         started = true
         errorMessage = nil
+        guard let initialURL else {
+            Log.ui.info("ServiceBrowser.load disposition=start-page")
+            return
+        }
         observeNavigations()
         page.load(initialURL)
         Log.ui.info("ServiceBrowser.load domain=\(serviceDomain) url=\(LogPrivacy.url(initialURL.absoluteString))")
