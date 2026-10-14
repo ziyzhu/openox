@@ -61,7 +61,7 @@ Existing: `.browse` mode already has editable address entry, back/forward, reloa
 Entry points (approved direction: composer URL, "+" menu, empty start page with service websites; recent pages deferred):
 - [x] Reproduce current state on a simulator: no launch path reaches the Browser without the agent or an external link.
 - [x] Composer URL: when trimmed composer text is a single bare domain or `http(s)` URL, show an "Open <host>" suggestion using the existing composer suggestion-panel pattern. Selecting it opens the Browser and keeps the draft; Send still goes to the agent. Ignore multi-word text and `sandbox:` links.
-- [x] "+" menu: add a "Websites" row to `AttachMenuCard` that opens an empty Browser with the address field focused.
+- [x] "+" menu: add a "Browser" row to `AttachMenuCard` that opens an empty Browser with the address field focused.
 - [x] Empty Browser: let `ServiceBrowserSession` start without an initial URL, auto-focus the address field, and show a start page instead of a blank web view.
 - [x] Start page: list web services (saved first) by name, favicon, and manifest `baseUrl`; tapping one navigates the same session. Saved services and website data are still app-wide, not Profile-owned. No new persisted state.
 - [x] Show a neutral empty state when no web services exist; address entry stays primary. Not simulator-verified because bundled services are always present.
