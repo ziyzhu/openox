@@ -46,7 +46,7 @@ enum HostProfileCommands {
     static func result(_ profile: Profile, contents: Bool = false) async throws -> JSONValue {
         var result: [String: JSONValue] = ["profile": row(profile)]
         if contents {
-            guard profile.version == ProfileSchema.current, profile.location == .local else {
+            guard profile.version == ProfileSchema.current else {
                 throw RuntimeError.bridge("Select a supported local Profile before reading or updating its contents")
             }
             let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
@@ -109,11 +109,12 @@ extension OxHostProtocol {
             try HostProfileCommands.requireIdle(host)
             let storage = StorageRoot.shared
             var profile = try HostProfileCommands.profile(command.profileId)
-            guard profile.version == ProfileSchema.current, profile.location == .local else {
+            guard profile.version == ProfileSchema.current else {
                 throw RuntimeError.bridge("Select a supported local Profile before updating it")
             }
             guard command.name != nil || command.memory != nil || command.soul != nil else { throw RuntimeError.bridge("No Profile updates supplied") }
             if let name = command.name {
+                guard profile.location != .external else { throw RuntimeError.bridge("Rename this Profile folder in Files, then open it again.") }
                 guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                       name.count <= 100, !storage.nameTaken(name, excluding: profile.id) else { throw RuntimeError.bridge("Invalid or duplicate Profile name") }
             }

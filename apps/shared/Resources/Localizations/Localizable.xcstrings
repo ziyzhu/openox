@@ -34,12 +34,12 @@
         }
       }
     },
-    "Export Profile…": {
+    "Export Profile": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "导出档案…"
+            "value": "导出档案"
           }
         }
       }

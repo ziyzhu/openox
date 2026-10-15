@@ -92,7 +92,7 @@ struct SettingsDisclosureRow: View {
     let title: LocalizedStringKey
     let value: Text
     var isLoading = false
-    var indicator = "chevron.right"
+    var indicator: String? = "chevron.right"
     var icon: String?
     var leadingInset: CGFloat = SettingsLayout.horizontalInset
 
@@ -114,9 +114,11 @@ struct SettingsDisclosureRow: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .truncationMode(.middle)
-                Image(systemName: indicator)
-                    .font(Theme.Icons.xs)
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                if let indicator {
+                    Image(systemName: indicator)
+                        .font(Theme.Icons.xs)
+                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                }
             }
         }
         .padding(.leading, leadingInset)

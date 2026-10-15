@@ -8,7 +8,13 @@ final class StorageRoot {
     static let shared = StorageRoot()
 
     private(set) var profiles: [Profile] = []
+    private(set) var unavailableProfiles: [ProfileStore.ExternalRecord] = []
+    var unavailableActiveID: UUID? {
+        guard let id = storedActiveId, !profiles.contains(where: { $0.id == id }) else { return nil }
+        return id
+    }
     private(set) var isBusy = false
+    private(set) var exportProgress: Double?
     private(set) var switchEpoch = 0
     private(set) var activeScope: ProfileScope {
         didSet {
@@ -66,6 +72,7 @@ final class StorageRoot {
     func resolve() async throws {
         cloudDocs = await ProfileRepository.cloudDocuments()
         loadSavedProfiles()
+        if unavailableActiveID != nil { throw StorageMigrationError.activeProfileUnavailable }
         if profiles.isEmpty, let seeded = await seedDefaultProfile() { profiles = [seeded] }
         guard let chosen = profiles.first(where: { $0.id == storedActiveId }) ?? profiles.first else {
             throw StorageMigrationError.activeProfileUnavailable
@@ -105,16 +112,22 @@ final class StorageRoot {
         try await publishProfileChange()
     }
 
-    func createProfile(name: String, location: Profile.Location) async throws {
+    func accessDirectory(_ url: URL) throws { try profileStore.accessDirectory(url) }
+
+    func createProfile(name: String, location: Profile.Location = .local, parent: URL? = nil) async throws {
         guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
-        guard let base = baseDir(for: location) else { return }
+        guard let base = parent ?? baseDir(for: location) else { return }
+        if parent == nil { try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true) }
+        try profileStore.accessDirectory(base)
         isBusy = true
         defer { isBusy = false }
         do {
-            guard location == .local else { throw RuntimeError.bridge("Create a local Profile; live SQLite synchronization is unsupported") }
             let created = try await ProfileMigrator.createFreshProfile(name: name, base: base)
+            try profileStore.remember(created)
             profiles.append(created)
             sortProfiles()
+            try await activate(created)
+            try await publishProfileChange()
         } catch {
             Log.app.error("StorageRoot.create name=\(Self.cleanName(name)) location=\(location.rawValue) failed: \(error.localizedDescription)")
             throw error
@@ -125,10 +138,17 @@ final class StorageRoot {
         guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
         isBusy = true
         defer { isBusy = false }
+        exportProgress = 0.02
+        defer { exportProgress = nil }
         let active = profile.id == activeId
         do {
             if active { try await beforeProfileChange?() }
-            let data = try await DurableProfileStore.shared.exportProfile(profile)
+            let data = try await DurableProfileStore.shared.exportProfile(profile) { progress in
+                Task { @MainActor in
+                    guard let current = self.exportProgress else { return }
+                    self.exportProgress = max(current, progress)
+                }
+            }
             if active { try await profileDidChange?() }
             return data
         } catch {
@@ -149,13 +169,25 @@ final class StorageRoot {
         return profile
     }
 
-    func openProfile(at url: URL) async throws -> Profile {
+    func locateProfile(at url: URL, expectedID: UUID) throws {
+        let profile = try profileStore.open(url, local: localDocs, cloud: cloudDocs)
+        guard profile.id == expectedID else { throw RuntimeError.bridge("Choose the original folder for this Profile. The selected folder belongs to a different Profile.") }
+        try profileStore.remember(profile)
+        loadSavedProfiles()
+    }
+
+    func openProfile(at url: URL, expectedID: UUID? = nil) async throws -> Profile {
         guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
         isBusy = true
         defer { isBusy = false }
         do {
             let opened = try profileStore.open(url, local: localDocs, cloud: cloudDocs)
+            guard expectedID == nil || opened.id == expectedID else {
+                throw RuntimeError.bridge("Choose the original folder for this Profile. The selected folder belongs to a different Profile.")
+            }
             let migrated = try await ProfileMigrator.migrate(opened)
+            try profileStore.remember(migrated)
+            unavailableProfiles.removeAll { $0.id == migrated.id }
             if let index = profiles.firstIndex(where: { $0.id == migrated.id }) {
                 profiles[index] = migrated
             } else {
@@ -170,6 +202,47 @@ final class StorageRoot {
             Log.app.error("StorageRoot.open name=\(url.lastPathComponent) failed: \(error.localizedDescription)")
             throw error
         }
+    }
+
+    func moveProfile(_ profile: Profile, to parent: URL) async throws -> [String: String] {
+        guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
+        try profileStore.accessDirectory(parent)
+        isBusy = true
+        defer { isBusy = false }
+        let active = activeId == profile.id
+        do {
+            if active { try await beforeProfileChange?() }
+            try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
+            let (copied, inventory) = try await Task.detached(priority: .userInitiated) { try ProfileMigrator.copyProfile(profile, to: parent) }.value
+            let prepared = try await ProfileMigrator.migrate(copied)
+            try profileStore.remember(prepared)
+            update(profile.id) { $0 = prepared }
+            if active {
+                try await activate(prepared, previousProfileClosed: true)
+                try await publishProfileChange()
+            }
+            Log.app.info("StorageRoot.move copied id=\(profile.id) originalRetained=true")
+            return inventory
+        } catch {
+            if let current = profiles.first(where: { $0.id == profile.id }), current.url != profile.url {
+                try? profileStore.remember(profile)
+                update(profile.id) { $0 = profile }
+                if active { try? await activate(profile) }
+            }
+            if active { try? await profileDidChange?() }
+            Log.app.error("StorageRoot.move failed id=\(profile.id) error=\(error.localizedDescription)")
+            throw error
+        }
+    }
+
+    func removeMovedSource(_ profile: Profile, inventory: [String: String]) async throws {
+        guard !isBusy, let current = profiles.first(where: { $0.id == profile.id }),
+              current.url.standardizedFileURL != profile.url.standardizedFileURL else {
+            throw RuntimeError.bridge("The original folder is still in use.")
+        }
+        isBusy = true
+        defer { isBusy = false }
+        try await Task.detached(priority: .userInitiated) { try ProfileMigrator.removeMovedSource(profile, inventory: inventory) }.value
     }
 
     func rename(_ profile: Profile, to newName: String) async throws {
@@ -218,7 +291,12 @@ final class StorageRoot {
         isBusy = true
         defer { isBusy = false }
         do {
-            if profile.location != .external { try await repository.deleteProfile(profile) }
+            if profile.location != .external {
+                try await repository.deleteProfile(profile)
+            } else {
+                if profile.id == activeId { try await beforeProfileChange?() }
+                try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
+            }
             try profileStore.remove(profile)
             profiles.removeAll { $0.id == profile.id }
             Log.app.info("StorageRoot.remove id=\(profile.id) name=\(profile.name) location=\(profile.location.rawValue) remaining=\(self.profiles.count)")
@@ -235,6 +313,7 @@ final class StorageRoot {
 
     private func loadSavedProfiles() {
         profiles = profileStore.profiles(local: localDocs, cloud: cloudDocs)
+        unavailableProfiles = profileStore.unavailable
         sortProfiles()
     }
 
@@ -254,7 +333,6 @@ final class StorageRoot {
             return
         }
         Log.app.info("StorageRoot.activeUnavailable id=\(activeId)")
-        await fallbackToAnyProfile()
     }
 
     private func fallbackToAnyProfile() async {
@@ -294,12 +372,12 @@ final class StorageRoot {
         switchEpoch += 1
     }
 
-    private func activate(_ profile: Profile) async throws {
+    private func activate(_ profile: Profile, previousProfileClosed: Bool = false) async throws {
         let scope = isActive(profile) ? activeScope : ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
         let changingProfile = activeScope.profileID != nil && activeScope.root != scope.root
-        if changingProfile { try await beforeProfileChange?() }
+        if changingProfile && !previousProfileClosed { try await beforeProfileChange?() }
         do {
-            if changingProfile { try await DurableProfileStore.shared.close(in: activeScope) }
+            if changingProfile && !previousProfileClosed { try await DurableProfileStore.shared.close(in: activeScope) }
             _ = try await DurableProfileStore.shared.session(in: scope)
             try storeActiveProfile(profile.id)
         } catch {

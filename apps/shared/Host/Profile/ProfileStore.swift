@@ -4,16 +4,13 @@ import Foundation
 final class ProfileStore {
     enum StoreError: LocalizedError {
         case invalidFolder
-        case unmanagedLayout
         case denied(String)
         case unavailable(String)
 
         var errorDescription: String? {
             switch self {
             case .invalidFolder:
-                "Choose a Profile folder containing profile.json."
-            case .unmanagedLayout:
-                "Profiles inside Ox's folders must be directly inside the On My iPhone or iCloud Ox folder."
+                "Choose a complete Profile folder exported or created by Ox."
             case .denied(let name):
                 "Access to \(name) was denied. Choose the folder again or check Files and Folders in Settings."
             case .unavailable(let message):
@@ -25,12 +22,14 @@ final class ProfileStore {
     nonisolated struct ExternalRecord: Codable {
         let id: UUID
         let bookmark: Data
+        var name: String? = nil
     }
 
     static let shared = ProfileStore()
 
+    private(set) var unavailable: [ExternalRecord] = []
     private var records: [ExternalRecord]
-    private var accessedURLs: [UUID: URL] = [:]
+    private var accessedURLs: Set<URL> = []
     private let fileURL: URL
 
     private init() {
@@ -43,6 +42,7 @@ final class ProfileStore {
 
     func profiles(local: URL, cloud: URL?) -> [Profile] {
         records = loadRecords()
+        unavailable = []
         var profilesByID: [UUID: Profile] = [:]
         for profile in ProfileIO.registeredProfiles() + managedProfiles(in: local, location: .local) + managedProfiles(in: ProfileIO.publicProfiles, location: .local) + managedProfiles(in: cloud, location: .iCloud) {
             if let existing = profilesByID[profile.id] {
@@ -51,14 +51,17 @@ final class ProfileStore {
                 profilesByID[profile.id] = profile
             }
         }
-        for record in records where profilesByID[record.id] == nil {
-            guard let url = resolve(record) else {
+        for record in records {
+            guard let url = resolve(record, local: local, cloud: cloud) else {
+                profilesByID.removeValue(forKey: record.id)
+                unavailable.append(record)
                 Log.app.warning("ProfileStore.unavailable external id=\(record.id)")
                 continue
             }
-            guard !isInsideManagedRoot(url, local: local, cloud: cloud),
-                  let profile = ProfileIO.profile(at: url, location: .external),
+            guard let profile = ProfileIO.profile(at: url, location: managedLocation(for: url, local: local, cloud: cloud) ?? .external),
                   profile.id == record.id else {
+                profilesByID.removeValue(forKey: record.id)
+                unavailable.append(record)
                 Log.app.warning("ProfileStore.invalid external id=\(record.id)")
                 continue
             }
@@ -75,52 +78,62 @@ final class ProfileStore {
             Log.app.info("ProfileStore.open managed id=\(profile.id) location=\(location.rawValue) name=\(profile.name)")
             return profile
         }
-        if isInsideManagedRoot(url, local: local, cloud: cloud) { throw StoreError.unmanagedLayout }
-        guard url.startAccessingSecurityScopedResource() else { throw StoreError.denied(url.lastPathComponent) }
-        var keepAccess = false
-        defer {
-            if !keepAccess { url.stopAccessingSecurityScopedResource() }
-        }
+        try access(url)
         let values = try url.resourceValues(forKeys: [.isDirectoryKey])
-        guard values.isDirectory == true else { throw StoreError.invalidFolder }
-        guard let profile = ProfileIO.profile(at: url, location: .external) else {
-            throw StoreError.invalidFolder
-        }
-        let bookmark = try url.bookmarkData(
-            options: .minimalBookmark,
-            includingResourceValuesForKeys: [.isDirectoryKey],
-            relativeTo: nil
-        )
-        if let previous = accessedURLs[profile.id] { previous.stopAccessingSecurityScopedResource() }
-        accessedURLs[profile.id] = url
-        keepAccess = true
-        upsert(ExternalRecord(id: profile.id, bookmark: bookmark))
-        do {
-            try persist()
-        } catch {
-            accessedURLs.removeValue(forKey: profile.id)?.stopAccessingSecurityScopedResource()
-            throw StoreError.unavailable(error.localizedDescription)
-        }
-        Log.app.info("ProfileStore.open id=\(profile.id) name=\(profile.name)")
+        guard values.isDirectory == true,
+              let profile = ProfileIO.profile(at: url, location: .external) else { throw StoreError.invalidFolder }
         return profile
     }
 
-    func remove(_ profile: Profile) throws {
-        guard profile.location == .external else { return }
+    func remember(_ profile: Profile) throws {
+        let previous = records
         records.removeAll { $0.id == profile.id }
-        accessedURLs.removeValue(forKey: profile.id)?.stopAccessingSecurityScopedResource()
+        do {
+            let bookmark = try profile.url.bookmarkData(options: .minimalBookmark,
+                includingResourceValuesForKeys: [.isDirectoryKey], relativeTo: nil)
+            records.append(ExternalRecord(id: profile.id, bookmark: bookmark, name: profile.name))
+            try persist()
+        }
+        catch { records = previous; throw StoreError.unavailable(error.localizedDescription) }
+        Log.app.info("ProfileStore.open id=\(profile.id) location=\(profile.location.rawValue) name=\(profile.name)")
+    }
+
+    func accessDirectory(_ url: URL) throws {
+        try access(url)
+        guard try url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true else { throw StoreError.invalidFolder }
+    }
+
+    private func access(_ url: URL) throws {
+        if accessedURLs.contains(url) { return }
+        if url.startAccessingSecurityScopedResource() { accessedURLs.insert(url); return }
+        guard canonical(url).pathComponents.starts(with: canonical(ProfileRepository.localDocuments()).pathComponents) else {
+            throw StoreError.denied(url.lastPathComponent)
+        }
+    }
+
+    func remove(_ profile: Profile) throws {
+        records.removeAll { $0.id == profile.id }
+        if accessedURLs.remove(profile.url) != nil { profile.url.stopAccessingSecurityScopedResource() }
         try persist()
         Log.app.info("ProfileStore.remove id=\(profile.id) location=\(profile.location.rawValue)")
     }
 
-    private func resolve(_ record: ExternalRecord) -> URL? {
-        if let accessed = accessedURLs[record.id] { return accessed }
+    private func resolve(_ record: ExternalRecord, local: URL, cloud: URL?) -> URL? {
         var stale = false
-        guard let url = try? URL(resolvingBookmarkData: record.bookmark, bookmarkDataIsStale: &stale),
-              !stale,
-              url.startAccessingSecurityScopedResource() else { return nil }
-        accessedURLs[record.id] = url
-        return url
+        do {
+            let url = try URL(resolvingBookmarkData: record.bookmark, bookmarkDataIsStale: &stale)
+            if managedLocation(for: url, local: local, cloud: cloud) == nil { try access(url) }
+            if stale {
+                let bookmark = try url.bookmarkData(options: .minimalBookmark,
+                    includingResourceValuesForKeys: [.isDirectoryKey], relativeTo: nil)
+                upsert(ExternalRecord(id: record.id, bookmark: bookmark, name: record.name))
+                try persist()
+            }
+            return url
+        } catch {
+            Log.app.warning("ProfileStore.bookmark unavailable id=\(record.id) error=\(error.localizedDescription)")
+            return nil
+        }
     }
 
     private func managedProfiles(in root: URL?, location: Profile.Location) -> [Profile] {
@@ -149,13 +162,6 @@ final class ProfileStore {
 
     private func canonical(_ url: URL) -> URL {
         url.standardizedFileURL.resolvingSymlinksInPath()
-    }
-
-    private func isInsideManagedRoot(_ url: URL, local: URL, cloud: URL?) -> Bool {
-        let components = canonical(url).pathComponents
-        return [local, cloud].compactMap { $0 }.contains { root in
-            components.starts(with: canonical(root).pathComponents)
-        }
     }
 
     private func upsert(_ record: ExternalRecord) {

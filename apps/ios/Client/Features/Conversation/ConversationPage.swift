@@ -309,11 +309,6 @@ struct ConversationPage: View {
     @State private var transcriptTail: CGFloat = 0
     @State private var sendTranscriptTail: CGFloat = 0
 
-    private var transcriptRise: CGFloat {
-        guard case .positioned(_, _, let top) = sendHandoff, !reduceMotion else { return 0 }
-        return sendTranscriptTail - top
-    }
-
     private var holdsTranscript: Bool {
         switch sendHandoff {
         case .waitingForAnchor, .positioned: !reduceMotion
@@ -1526,7 +1521,11 @@ struct ConversationPage: View {
         scrollToTurn: @escaping (TurnID) async -> Void
     ) -> some View {
         let holdsHistory = holdsTranscript
-        let historyTail = sendTranscriptTail
+        let historyTail: CGFloat = if case .positioned(_, let offset, let top) = sendHandoff {
+            top + offset
+        } else {
+            sendTranscriptTail
+        }
         return VStack(spacing: 0) {
             if conversation.canChangeRetention {
                 emptyConversationState
@@ -1620,7 +1619,8 @@ struct ConversationPage: View {
               case .waitingForAnchor(let submissionID, let originY) = sendHandoff,
               submissionID == anchorID else { return }
 
-        let offset = reduceMotion ? 0 : max(0, originY - anchorTop - ConversationTranscriptMetrics.blockSpacing)
+        let startTop = max(sendTranscriptTail, originY - ConversationTranscriptMetrics.blockSpacing)
+        let offset = reduceMotion ? 0 : max(0, startTop - anchorTop)
         sendHandoff = .positioned(submissionID: submissionID, offset: offset, anchorTop: anchorTop)
         scroller.beginSendHandoff(anchorID)
         if anyInputFocused { prepareComposerSubmission() }
@@ -1631,7 +1631,7 @@ struct ConversationPage: View {
               id == submissionID,
               sendHandoff.riseRequestID(frame: submissionFrame) == id else { return }
         let anchorID = submissionID
-        Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=animating submission=\(submissionID) anchor=\(anchorID) rise=\(Int(offset)) historyRise=\(Int(transcriptRise))")
+        Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=animating submission=\(submissionID) anchor=\(anchorID) rise=\(Int(offset)) historyRise=\(Int(offset))")
         withAnimation(reduceMotion ? nil : .spring(duration: 0.45, bounce: 0), completionCriteria: .logicallyComplete) {
             sendHandoff = .animating(submissionID)
         } completion: {

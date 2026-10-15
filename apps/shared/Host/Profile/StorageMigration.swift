@@ -17,7 +17,7 @@ nonisolated enum StorageMigrationError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .activeProfileUnavailable: "No Profile is available to open."
+        case .activeProfileUnavailable: "This Profile’s folder couldn’t be found. Locate it to reconnect."
         case .collision(let path): "Migration destination conflicts with existing data: \(path)"
         case .invalidAttachment(let path): "Legacy attachment metadata is invalid: \(path)"
         case .invalidApplicationStorage(let component): "Stored \(component) data is not compatible with this version of Ox."

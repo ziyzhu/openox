@@ -27,13 +27,14 @@ nonisolated enum ZipArchiveCodec {
         let externalAttributes: UInt32
     }
 
-    static func encode(_ files: [File], maximumArchiveBytes: Int) throws -> Data {
+    static func encode(_ files: [File], maximumArchiveBytes: Int, progress: (Double) -> Void = { _ in }) throws -> Data {
         guard !files.isEmpty, files.count <= Int(UInt16.max) else { throw ZipArchiveError.invalidArchive }
         var archive = Data()
         var central = Data()
         var paths = Set<String>()
 
-        for file in files {
+        for (index, file) in files.enumerated() {
+            try Task.checkCancellation()
             try validate(path: file.path, externalAttributes: 0)
             guard !file.path.hasSuffix("/"),
                   paths.insert(file.path.lowercased()).inserted,
@@ -77,6 +78,7 @@ nonisolated enum ZipArchiveCodec {
             append(UInt32(0), to: &central)
             append(localOffset, to: &central)
             central.append(name)
+            progress(Double(index + 1) / Double(files.count))
 
             guard archive.count + central.count + 22 <= maximumArchiveBytes else {
                 throw ZipArchiveError.tooLarge

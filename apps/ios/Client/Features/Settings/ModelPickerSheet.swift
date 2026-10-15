@@ -28,18 +28,6 @@ struct ModelPickerSheet: View {
 }
 
 struct SettingsSheet: View {
-    private enum ProfileFileKind {
-        case folder
-        case backup
-    }
-
-    private enum ProfileImportState {
-        case idle
-        case reading
-        case proposal(ProfilePackage.Backup)
-        case importing
-    }
-
     let ready: Bool
     let onSelectService: (Service) -> Void
 
@@ -50,11 +38,7 @@ struct SettingsSheet: View {
     @State private var showOnboarding = false
     @State private var creatingProfile = false
     @State private var openingProfile = false
-    @State private var profileFileKind = ProfileFileKind.folder
-    @State private var profileImportState = ProfileImportState.idle
-    @State private var importedProfileName = ""
-    @State private var profileNameDraft = ""
-    @State private var profileCreationErrorMessage: String?
+    @State private var locatingProfileID: UUID?
     @State private var profileOpenErrorMessage: String?
     private var registry: ProviderRegistry { ProviderRegistry.shared }
     private var appLocale: AppLocale { AppLocale.shared }
@@ -119,13 +103,27 @@ struct SettingsSheet: View {
                                 )
                             }
 
+                            ForEach(storage.unavailableProfiles, id: \.id) { missing in
+                                Button {
+                                    locatingProfileID = missing.id
+                                    openingProfile = true
+                                } label: {
+                                    HStack {
+                                        Text(verbatim: missing.name ?? String(localized: "Profile"))
+                                        Spacer()
+                                        Text("Locate folder…")
+                                    }.settingsRowPadding()
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("settings.profileLocate.\(missing.id)")
+                            }
+
                             if !storage.profiles.isEmpty {
                                 Divider().settingsContentInset()
                             }
 
                             Menu {
                                 Button {
-                                    profileNameDraft = ""
                                     creatingProfile = true
                                 } label: {
                                     Label("Create new", systemImage: "plus")
@@ -133,25 +131,18 @@ struct SettingsSheet: View {
                                 .accessibilityIdentifier(A11yID.Settings.profileCreate)
 
                                 Button {
-                                    profileFileKind = .folder
+                                    locatingProfileID = nil
                                     openingProfile = true
                                 } label: {
                                     Label("Open existing", systemImage: "folder")
                                 }
                                 .accessibilityIdentifier(A11yID.Settings.profileOpen)
 
-                                Button {
-                                    profileFileKind = .backup
-                                    openingProfile = true
-                                } label: {
-                                    Label("Import", systemImage: "square.and.arrow.down")
-                                }
-                                .accessibilityIdentifier(A11yID.Settings.profileImport)
                             } label: {
-                                profileActionRow(importInProgress ? "Importing…" : "Add Profile", systemImage: "plus")
+                                profileActionRow("Add Profile", systemImage: "plus")
                             }
                             .buttonStyle(.plain)
-                            .disabled(storage.isBusy || importInProgress)
+                            .disabled(storage.isBusy)
                             .accessibilityIdentifier(A11yID.Settings.profileAdd)
                         }
                     }
@@ -294,18 +285,14 @@ struct SettingsSheet: View {
         }
         .fileImporter(
             isPresented: $openingProfile,
-            allowedContentTypes: profileFileKind == .backup ? [.zip] : [.folder],
+            allowedContentTypes: [.folder],
             allowsMultipleSelection: false
         ) { result in
             do {
                 guard let url = try result.get().first else { return }
-                if profileFileKind == .backup {
-                    readProfileBackup(url)
-                    return
-                }
                 Task {
                     do {
-                        _ = try await storage.openProfile(at: url)
+                        _ = try await storage.openProfile(at: url, expectedID: locatingProfileID)
                     } catch {
                         Log.ui.error("Settings.openProfile name=\(url.lastPathComponent) error=\(error.localizedDescription)")
                         profileOpenErrorMessage = error.localizedDescription
@@ -316,42 +303,10 @@ struct SettingsSheet: View {
                 profileOpenErrorMessage = error.localizedDescription
             }
         }
-        .alert("New Profile", isPresented: $creatingProfile) {
-            TextField("Name", text: $profileNameDraft)
-            Button("Cancel", role: .cancel) {}
-            Button("Create") { createProfile(in: .local) }.disabled(profileNameUnavailable)
-        } message: {
-            if profileNameTaken {
-                Text("A Profile named “\(StorageRoot.cleanName(profileNameDraft))” already exists. Choose a different name.")
-            } else {
-                Text("Profiles stored on this device are removed when you delete Ox. Export a copy to keep them.")
-            }
+        .sheet(isPresented: $creatingProfile) {
+            ProfileCreationSheet()
         }
-        .alert("Import Profile", isPresented: Binding(
-            get: { if case .proposal = profileImportState { return true }; return false },
-            set: { if !$0, case .proposal = profileImportState { profileImportState = .idle } }
-        )) {
-            TextField("Name", text: $importedProfileName)
-                .accessibilityIdentifier(A11yID.Settings.profileImportName)
-            Button("Cancel", role: .cancel) { profileImportState = .idle }
-                .accessibilityIdentifier(A11yID.Settings.profileImportCancel)
-            Button("Import") { importProfileBackup() }
-                .disabled(importedProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || storage.nameTaken(importedProfileName))
-                .accessibilityIdentifier(A11yID.Settings.profileImportConfirm)
-        } message: {
-            if case .proposal(let backup) = profileImportState {
-                Text("Backup from \(backup.manifest.exportedAt.formatted(date: .abbreviated, time: .shortened)). Import creates a separate Profile. Credentials and device permissions must be set up again.")
-            }
-        }
-        .alert("New Profile", isPresented: Binding(
-            get: { profileCreationErrorMessage != nil },
-            set: { if !$0 { profileCreationErrorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { profileCreationErrorMessage = nil }
-        } message: {
-            Text(profileCreationErrorMessage ?? "")
-        }
-        .alert(profileFileKind == .backup ? String(localized: "Import Profile") : String(localized: "Open Profile"), isPresented: Binding(
+        .alert("Open Profile", isPresented: Binding(
             get: { profileOpenErrorMessage != nil },
             set: { if !$0 { profileOpenErrorMessage = nil } }
         )) {
@@ -360,59 +315,6 @@ struct SettingsSheet: View {
             Text(profileOpenErrorMessage ?? "")
         }
     }
-
-    private var profileNameIsEmpty: Bool {
-        profileNameDraft.allSatisfy(\.isWhitespace)
-    }
-
-    private var importInProgress: Bool {
-        switch profileImportState {
-        case .reading, .importing: true
-        case .idle, .proposal: false
-        }
-    }
-
-    private func readProfileBackup(_ url: URL) {
-        profileImportState = .reading
-        Task {
-            do {
-                let backup = try await Task.detached(priority: .userInitiated) { try ProfilePackage.read(url) }.value
-                let stem = StorageRoot.cleanName(backup.manifest.name)
-                var name = stem
-                var suffix = 2
-                while storage.nameTaken(name) { name = "\(stem) \(suffix)"; suffix += 1 }
-                importedProfileName = name
-                profileImportState = .proposal(backup)
-            } catch {
-                profileImportState = .idle
-                profileOpenErrorMessage = error.localizedDescription
-                Log.ui.error("ProfilePackage.read failed error=\(error.localizedDescription)")
-            }
-        }
-    }
-
-    private func importProfileBackup() {
-        guard case .proposal(let backup) = profileImportState else { return }
-        let name = importedProfileName
-        profileImportState = .importing
-        Task {
-            do {
-                let profile = try await storage.importProfile(backup, name: name)
-                profileImportState = .idle
-                profilePath = [profile.id]
-            } catch {
-                profileImportState = .idle
-                profileOpenErrorMessage = error.localizedDescription
-                Log.ui.error("ProfilePackage.import failed error=\(error.localizedDescription)")
-            }
-        }
-    }
-
-    private var profileNameTaken: Bool {
-        !profileNameIsEmpty && storage.nameTaken(profileNameDraft)
-    }
-
-    private var profileNameUnavailable: Bool { profileNameIsEmpty || profileNameTaken }
 
     private var capabilitiesSettingsSection: some View {
         SettingsSection("Capabilities", layout: .group) {
@@ -486,18 +388,6 @@ struct SettingsSheet: View {
         }
         .settingsRowPadding()
         .contentShape(Rectangle())
-    }
-
-    private func createProfile(in location: Profile.Location) {
-        let name = profileNameDraft
-        Task {
-            do {
-                try await storage.createProfile(name: name, location: location)
-            } catch {
-                Log.ui.error("Settings.createProfile name=\(StorageRoot.cleanName(name)) location=\(location.rawValue) error=\(error.localizedDescription)")
-                profileCreationErrorMessage = error.localizedDescription
-            }
-        }
     }
 
     private func profileRow(_ profile: Profile) -> some View {
@@ -1429,5 +1319,74 @@ struct SettingsSelectionPickerView<Value: Hashable>: View {
         .padding(.vertical, SettingsLayout.rowVerticalInset)
         .frame(minHeight: 44)
         .contentShape(Rectangle())
+    }
+}
+
+private struct ProfileCreationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var parent: URL?
+    @State private var choosingLocation = false
+    @State private var errorMessage: String?
+    private var storage: StorageRoot { .shared }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: SettingsLayout.sectionSpacing) {
+                    SettingsSection("Name", layout: .row) {
+                        TextField("Profile name", text: $name)
+                            .settingsRowPadding()
+                            .accessibilityIdentifier("settings.profileCreate.name")
+                    }
+                    SettingsSection("Location", layout: .row) {
+                        Button { choosingLocation = true } label: {
+                            SettingsDisclosureRow(title: "Save in", value: Text(verbatim: parent?.lastPathComponent ?? String(localized: "On this device")))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("settings.profileCreate.location")
+                        if parent != nil {
+                            Button("Use On This Device") { parent = nil }
+                                .settingsRowPadding()
+                                .accessibilityIdentifier("settings.profileCreate.local")
+                        }
+                    }
+                }
+                .settingsPagePadding()
+            }
+            .background(Theme.Colors.background)
+            .navigationTitle("New Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .disabled(storage.isBusy)
+                        .accessibilityIdentifier("settings.profileCreate.cancel")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        Task {
+                            do {
+                                try await storage.createProfile(name: name, parent: parent)
+                                dismiss()
+                            } catch { errorMessage = error.localizedDescription }
+                        }
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || storage.isBusy)
+                    .accessibilityIdentifier("settings.profileCreate.confirm")
+                }
+            }
+            .interactiveDismissDisabled(storage.isBusy)
+            .fileImporter(isPresented: $choosingLocation, allowedContentTypes: [.folder]) { result in
+                do {
+                    let url = try result.get()
+                    try storage.accessDirectory(url)
+                    parent = url
+                } catch { errorMessage = error.localizedDescription }
+            }
+            .alert("Couldn't create Profile", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+                Button("OK", role: .cancel) { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
+        }
     }
 }

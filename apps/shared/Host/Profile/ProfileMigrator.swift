@@ -31,6 +31,9 @@ nonisolated enum ProfileSchema {
         "2026-10-10-workspace-binding",
         "2026-10-10-profile-files",
         "2026-10-11-public-profile-files",
+        "2026-10-14-portable-profile",
+        "2026-10-14-visible-profile",
+        "2026-10-14-internal-profile-state",
     ]
     static var current: String { versions.last! }
 
@@ -74,6 +77,12 @@ nonisolated enum ProfileMigrator {
 
     static let filesystemProfileVersion = "2026-10-10-profile-files"
 
+    static let internalStateVersion = "2026-10-14-internal-profile-state"
+
+    static let visibleProfileVersion = "2026-10-14-visible-profile"
+
+    static let portableProfileVersion = "2026-10-14-portable-profile"
+
     static let publicProfileVersion = "2026-10-11-public-profile-files"
 
     static let nativeProfileVersion = "2026-09-28-provider-skill"
@@ -97,6 +106,9 @@ nonisolated enum ProfileMigrator {
 
     static func createFreshProfile(name: String, base: URL, unique: Bool = false) async throws -> Profile {
         let manager = FileManager.default
+        if base.standardizedFileURL == ProfileIO.publicProfiles.standardizedFileURL {
+            try manager.createDirectory(at: base, withIntermediateDirectories: true)
+        }
         let stem = ProfileRepository.cleanName(name)
         var candidate = stem
         var suffix = 2
@@ -104,7 +116,6 @@ nonisolated enum ProfileMigrator {
             guard unique else { throw ProfileError.nameExists(name) }
             candidate = "\(stem) \(suffix)"; suffix += 1
         }
-        let destination = base.appendingPathComponent(candidate)
         var manifest = ProfileConfig.fresh()
         manifest.version = filesystemProfileVersion
         let stage = try durableJournalDirectory(manifest.id).appendingPathComponent("fresh-" + UUID().uuidString)
@@ -118,15 +129,98 @@ nonisolated enum ProfileMigrator {
             _ = try await runtime.command(JSONValue.object(["action": .string("installProfile"), "draft": draft]).jsonString())
             await runtime.dispose()
             try await prepareFiles(at: stage, profileID: manifest.id)
+            let state = ProfileIO.portableStateDirectory(stage)
+            try manager.createDirectory(at: state, withIntermediateDirectories: false)
+            for name in ["state.sqlite", "state.sqlite-wal", "state.sqlite-shm"] {
+                let source = stage.appendingPathComponent(name)
+                if manager.fileExists(atPath: source.path) { try manager.moveItem(at: source, to: state.appendingPathComponent(name)) }
+            }
+            let legacyStaging = stage.appendingPathComponent(".files")
+            if manager.fileExists(atPath: legacyStaging.path) { try manager.removeItem(at: legacyStaging) }
+            manifest.version = ProfileSchema.current
             try ProfileIO.writeConfig(manifest, to: stage)
-            try syncDurableDirectory(stage)
-            let profile = Profile(id: manifest.id, name: candidate, location: .local, url: stage, createdAt: manifest.createdAt, version: filesystemProfileVersion)
-            return try await migratePublicProfile(profile, config: manifest, destination: destination)
+            try await preparePublicFiles(content: stage, state: state, profileID: manifest.id)
+            try syncImportedTree(stage)
+            let draftProfile = Profile(id: manifest.id, name: candidate, location: .local, url: stage, createdAt: manifest.createdAt, version: manifest.version)
+            let (created, _) = try copyProfile(draftProfile, to: base)
+            Log.app.info("StorageMigrator.fresh published id=\(created.id) location=\(created.location.rawValue)")
+            return created
         } catch {
             await runtime.dispose()
             Log.app.error("StorageMigrator.fresh failed stage=\(stage.lastPathComponent) error=\(error.localizedDescription)")
             throw error
         }
+    }
+
+    static func copyProfile(_ profile: Profile, to parent: URL) throws -> (Profile, [String: String]) {
+        let manager = FileManager.default
+        let destination = parent.appendingPathComponent(profile.name, isDirectory: true)
+        let sourceParts = profile.url.standardizedFileURL.resolvingSymlinksInPath().pathComponents
+        guard !parent.standardizedFileURL.resolvingSymlinksInPath().pathComponents.starts(with: sourceParts) else {
+            throw RuntimeError.bridge("Choose a location outside this Profile folder.")
+        }
+        guard !manager.fileExists(atPath: destination.path) else { throw ProfileError.nameExists(profile.name) }
+        let stage = parent.appendingPathComponent(".ox-move-" + UUID().uuidString, isDirectory: true)
+        var result: Result<[String: String], Error>?
+        var coordinationError: NSError?
+        NSFileCoordinator().coordinate(readingItemAt: profile.url, options: [], writingItemAt: parent, options: [], error: &coordinationError) { source, target in
+            result = Result {
+                let working = target.appendingPathComponent(stage.lastPathComponent, isDirectory: true)
+                defer {
+                    if manager.fileExists(atPath: working.path) {
+                        do { try manager.removeItem(at: working) }
+                        catch { Log.app.warning("ProfileTransfer.cleanup failed stage=\(working.lastPathComponent)") }
+                    }
+                }
+                let inventory = try transferInventory(at: source)
+                try manager.copyItem(at: source, to: working)
+                guard try transferInventory(at: source) == inventory, try transferInventory(at: working) == inventory else {
+                    throw RuntimeError.bridge("The Profile changed while copying. The original folder has been kept.")
+                }
+                try syncImportedTree(working)
+                try manager.moveItem(at: working, to: target.appendingPathComponent(profile.name, isDirectory: true))
+                try syncDurableDirectory(target)
+                return inventory
+            }
+        }
+        if let coordinationError { throw coordinationError }
+        guard let result else { throw RuntimeError.bridge("The Profile folder could not be copied.") }
+        let inventory = try result.get()
+        var copied = profile
+        copied.url = destination
+        copied.location = parent.standardizedFileURL == ProfileIO.publicProfiles.standardizedFileURL ? .local : .external
+        Log.app.info("ProfileRepository.copy id=\(profile.id) files=\(inventory.count)")
+        return (copied, inventory)
+    }
+
+    private static func transferInventory(at root: URL) throws -> [String: String] {
+        var inventory = try StorageMigrationSupport.migrationSourceInventory(at: root)
+        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else {
+            throw RuntimeError.bridge("The Profile folder could not be read.")
+        }
+        for case let url as URL in enumerator {
+            if try url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true {
+                inventory[url.pathComponents.suffix(enumerator.level).joined(separator: "/") + "/"] = "directory"
+            }
+        }
+        return inventory
+    }
+
+    static func removeMovedSource(_ profile: Profile, inventory: [String: String]) throws {
+        var result: Result<Void, Error>?
+        var coordinationError: NSError?
+        NSFileCoordinator().coordinate(writingItemAt: profile.url, options: .forDeleting, error: &coordinationError) { source in
+            result = Result {
+                guard try transferInventory(at: source) == inventory else {
+                    throw RuntimeError.bridge("The original folder changed after copying. Both copies have been kept.")
+                }
+                try FileManager.default.removeItem(at: source)
+            }
+        }
+        if let coordinationError { throw coordinationError }
+        guard let result else { throw RuntimeError.bridge("The original folder could not be removed. Both copies have been kept.") }
+        try result.get()
+        Log.app.info("ProfileRepository.move removedOriginal id=\(profile.id)")
     }
 
     static func prepareTemporaryFiles(at root: URL, identity: UUID) async throws {
@@ -172,6 +266,7 @@ nonisolated enum ProfileMigrator {
         } catch { await runtime.dispose(); throw error }
         var config = backup.manifest.profile
         config.id = id
+        config.version = publicProfileVersion
         config.contentDirectory = candidate
         try ProfileIO.writeConfig(config, to: state)
         try await Task.detached(priority: .userInitiated) {
@@ -189,7 +284,7 @@ nonisolated enum ProfileMigrator {
         try publishPublicProfileJournal(journal)
         guard let profile = ProfileIO.profile(at: destination, location: .local) else { throw ProfilePackage.Failure.invalid }
         Log.app.info("ProfilePackage.import profile=\(id) files=\(backup.files.count) seconds=\(Date().timeIntervalSince(started))")
-        return profile
+        return try await migrate(profile)
     }
 
     static func validateProfileSnapshot(content: URL, state: URL, identity: UUID) async throws {
@@ -1099,6 +1194,162 @@ nonisolated enum ProfileMigrator {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
+    private static func preparePortableProfile(_ profile: Profile, config: ProfileConfig) async throws -> Profile {
+        let manager = FileManager.default
+        let destination = ProfileIO.portableStateDirectory(profile.url)
+        let stage = profile.url.appendingPathComponent(".ox-stage-" + profile.id.uuidString, isDirectory: true)
+        if !manager.fileExists(atPath: destination.path) {
+            guard profile.location == .local, config.contentDirectory == profile.name else {
+                throw StorageMigrationError.invalidApplicationStorage("This folder is missing its Profile database. Open the original Profile in Ox before moving its folder.")
+            }
+            let source = ProfileIO.stateDirectory(profile.id)
+            if !manager.fileExists(atPath: stage.path) {
+                guard config.version == publicProfileVersion else { throw StorageMigrationError.invalidApplicationStorage("portable Profile publication") }
+                try await validateProfileSnapshot(content: profile.url, state: source, identity: profile.id)
+                let working = profile.url.appendingPathComponent(".ox-stage-copy-" + UUID().uuidString, isDirectory: true)
+                _ = try await Task.detached(priority: .userInitiated) {
+                    try StorageMigrationSupport.copyMigrationSource(from: source, to: working)
+                }.value
+                try await validateProfileSnapshot(content: profile.url, state: working, identity: profile.id)
+                try syncImportedTree(working)
+                try manager.moveItem(at: working, to: stage)
+                try syncDurableDirectory(profile.url)
+            }
+            guard let staged = ProfileIO.readConfig(at: stage), staged.id == profile.id,
+                  [publicProfileVersion, portableProfileVersion].contains(staged.version) else {
+                throw StorageMigrationError.invalidApplicationStorage("portable Profile staging")
+            }
+            try await validateProfileSnapshot(content: profile.url, state: stage, identity: profile.id)
+            var portable = config
+            portable.version = portableProfileVersion
+            portable.contentDirectory = nil
+            try ProfileIO.writeConfig(portable, to: stage)
+            try syncImportedTree(stage)
+            var predecessor = config
+            predecessor.version = portableProfileVersion
+            try ProfileIO.writeConfig(predecessor, to: source)
+            try syncDurableDirectory(source)
+            try manager.moveItem(at: stage, to: destination)
+            try syncDurableDirectory(profile.url)
+            Log.app.info("StorageMigrator.portable published id=\(profile.id) predecessorStateRetained=true")
+        }
+        guard await materialize(at: profile.url),
+              let manifest = ProfileIO.readConfig(at: profile.url), manifest.id == profile.id,
+              manifest.version == portableProfileVersion,
+              manager.fileExists(atPath: destination.appendingPathComponent("state.sqlite").path) else {
+            throw StorageMigrationError.invalidApplicationStorage("portable Profile database")
+        }
+        return try await prepareVisibleProfile(profile, config: manifest)
+    }
+
+    private static func prepareVisibleProfile(_ profile: Profile, config: ProfileConfig) async throws -> Profile {
+        let manager = FileManager.default
+        let source = ProfileIO.portableStateDirectory(profile.url)
+        if manager.fileExists(atPath: source.appendingPathComponent(ProfileIO.configName).path) {
+            guard await materialize(at: profile.url) else {
+                throw StorageMigrationError.invalidApplicationStorage("Profile files are not available yet")
+            }
+            let entries = try manager.contentsOfDirectory(at: source, includingPropertiesForKeys: [.isSymbolicLinkKey])
+                .filter { $0.lastPathComponent != ProfileIO.configName }
+            for entry in entries + [source.appendingPathComponent(ProfileIO.configName)] {
+                guard try entry.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true,
+                      !manager.fileExists(atPath: profile.url.appendingPathComponent(entry.lastPathComponent).path) else {
+                    throw RuntimeError.bridge("This Profile already contains \(entry.lastPathComponent). Move that item aside in Files and open the Profile again.")
+                }
+            }
+            if config.version == portableProfileVersion {
+                try await validateProfileSnapshot(content: profile.url, state: source, identity: profile.id)
+                var manifest = config
+                manifest.version = visibleProfileVersion
+                try ProfileIO.writeConfig(manifest, to: source)
+                try syncImportedTree(source)
+            }
+            for entry in entries {
+                try manager.moveItem(at: entry, to: profile.url.appendingPathComponent(entry.lastPathComponent))
+                try syncDurableDirectory(profile.url)
+                try syncDurableDirectory(source)
+            }
+            try manager.moveItem(at: source.appendingPathComponent(ProfileIO.configName), to: profile.url.appendingPathComponent(ProfileIO.configName))
+            try syncDurableDirectory(profile.url)
+            Log.app.info("StorageMigrator.visible published id=\(profile.id) files=\(entries.count)")
+        }
+        if manager.fileExists(atPath: source.path), try manager.contentsOfDirectory(atPath: source.path).isEmpty {
+            try manager.removeItem(at: source)
+            try syncDurableDirectory(profile.url)
+        }
+        guard let manifest = ProfileIO.readConfig(at: profile.url), manifest.id == profile.id,
+              manifest.version == visibleProfileVersion,
+              manager.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
+            throw StorageMigrationError.invalidApplicationStorage("visible Profile database")
+        }
+        do {
+            let probe = profile.url.appendingPathComponent(".write-check-" + UUID().uuidString)
+            try Data().write(to: probe, options: .withoutOverwriting)
+            try manager.removeItem(at: probe)
+        } catch {
+            throw RuntimeError.bridge("This Profile folder must allow reading and writing. Check its permissions in Files and open it again.")
+        }
+        return try await prepareInternalState(profile, config: manifest)
+    }
+
+    private static func prepareInternalState(_ profile: Profile, config: ProfileConfig) async throws -> Profile {
+        let manager = FileManager.default
+        let destination = ProfileIO.portableStateDirectory(profile.url)
+        let names = ["state.sqlite", "payloads", "staging"]
+        guard await materialize(at: profile.url) else {
+            throw StorageMigrationError.invalidApplicationStorage("Profile files are not available yet")
+        }
+        if manager.fileExists(atPath: destination.path) {
+            let values = try destination.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            guard values.isDirectory == true, values.isSymbolicLink != true else {
+                throw StorageMigrationError.invalidApplicationStorage("Profile state directory")
+            }
+        }
+        for name in names where manager.fileExists(atPath: profile.url.appendingPathComponent(name).path) {
+            guard try profile.url.appendingPathComponent(name).resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true,
+                  !manager.fileExists(atPath: destination.appendingPathComponent(name).path) else {
+                throw RuntimeError.bridge("This Profile already contains .ox/\(name). Move that item aside in Files and open the Profile again.")
+            }
+        }
+        if config.version == visibleProfileVersion {
+            try await validateProfileSnapshot(content: profile.url, state: profile.url, identity: profile.id)
+            if !manager.fileExists(atPath: destination.path) {
+                try manager.createDirectory(at: destination, withIntermediateDirectories: false)
+            }
+            try syncDurableDirectory(profile.url)
+            var manifest = config
+            manifest.version = internalStateVersion
+            try ProfileIO.writeConfig(manifest, to: profile.url)
+            try syncDurableDirectory(profile.url)
+        }
+        for name in names {
+            let source = profile.url.appendingPathComponent(name)
+            if manager.fileExists(atPath: source.path) {
+                try manager.moveItem(at: source, to: destination.appendingPathComponent(name))
+                try syncDurableDirectory(destination)
+                try syncDurableDirectory(profile.url)
+            }
+        }
+        guard manager.fileExists(atPath: destination.appendingPathComponent("state.sqlite").path) else {
+            throw StorageMigrationError.invalidApplicationStorage("Profile database")
+        }
+        do {
+            for root in [profile.url, destination] {
+                let probe = root.appendingPathComponent(".write-check-" + UUID().uuidString)
+                try Data().write(to: probe, options: .withoutOverwriting)
+                try manager.removeItem(at: probe)
+            }
+        } catch {
+            throw RuntimeError.bridge("This Profile folder must allow reading and writing. Check its permissions in Files and open it again.")
+        }
+        if config.version == visibleProfileVersion {
+            Log.app.info("StorageMigrator.internalState published id=\(profile.id)")
+        }
+        var prepared = profile
+        prepared.version = internalStateVersion
+        return prepared
+    }
+
     static func migrate(_ profile: Profile) async throws -> Profile {
         try recoverDurablePublications()
         try recoverPublicProfilePublications()
@@ -1108,18 +1359,20 @@ nonisolated enum ProfileMigrator {
         }
         var migrated = profile
         migrated.version = config.version
-        if config.version == publicProfileVersion {
-            guard profile.location == .local, config.contentDirectory == profile.name,
-                  FileManager.default.fileExists(atPath: ProfileIO.stateDirectory(profile.id).appendingPathComponent("state.sqlite").path) else {
-                throw StorageMigrationError.invalidApplicationStorage("private Profile database")
-            }
-            return migrated
+        if config.version == internalStateVersion {
+            return try await prepareInternalState(migrated, config: config)
+        }
+        if config.version == visibleProfileVersion {
+            return try await prepareVisibleProfile(migrated, config: config)
+        }
+        if config.version == portableProfileVersion || config.version == publicProfileVersion {
+            return try await preparePortableProfile(migrated, config: config)
         }
         if config.version == filesystemProfileVersion {
             guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
                 throw StorageMigrationError.invalidApplicationStorage("local filesystem Profile database")
             }
-            return try await migratePublicProfile(migrated, config: config, destination: ProfileIO.publicProfiles.appendingPathComponent(profile.name))
+            return try await migrate(try await migratePublicProfile(migrated, config: config, destination: ProfileIO.publicProfiles.appendingPathComponent(profile.name)))
         }
         if config.version == fileBindingVersion {
             guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {

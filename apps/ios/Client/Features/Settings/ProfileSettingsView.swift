@@ -1,13 +1,16 @@
 import SwiftUI
-import CoreTransferable
 import UniformTypeIdentifiers
 
-private struct ProfileBackupDocument: Transferable {
-    let data: Data
+private struct ProfileFolderDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.folder] }
+    let folder: FileWrapper
 
-    static var transferRepresentation: some TransferRepresentation {
-        DataRepresentation(exportedContentType: .zip) { $0.data }
-    }
+    init(data: Data) throws { folder = try ProfilePackage.folder(data) }
+
+    init(configuration: ReadConfiguration) throws { folder = configuration.file }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { folder }
+
+
 }
 
 struct ProfileSettingsView: View {
@@ -19,8 +22,11 @@ struct ProfileSettingsView: View {
     @State private var nameDraft = ""
     @State private var operationErrorMessage: String?
     @State private var confirmingDelete = false
-    @State private var exportDocument: ProfileBackupDocument?
+    @State private var exportDocument: ProfileFolderDocument?
     @State private var presentingExport = false
+    @State private var showingFiles = false
+    @State private var choosingMoveLocation = false
+    @State private var movedSource: (profile: Profile, inventory: [String: String])?
 
     private var storage: StorageRoot { .shared }
 
@@ -33,14 +39,44 @@ struct ProfileSettingsView: View {
     }
 
     var body: some View {
+        profilePage
+        .profileFilesBrowser(scope: profile.map { ProfileScope(profileID: $0.id, root: $0.url, location: $0.location) }, isPresented: $showingFiles)
+        .fileImporter(isPresented: $choosingMoveLocation, allowedContentTypes: [.folder]) { result in
+            guard let profile else { return }
+            do {
+                let parent = try result.get()
+                Task {
+                    do {
+                        let inventory = try await storage.moveProfile(profile, to: parent)
+                        movedSource = (profile, inventory)
+                    } catch { operationErrorMessage = error.localizedDescription }
+                }
+            } catch { operationErrorMessage = error.localizedDescription }
+        }
+        .alert("Remove the original folder?", isPresented: Binding(get: { movedSource != nil }, set: { if !$0 { movedSource = nil } })) {
+            if let source = movedSource {
+                Button("Remove Original", role: .destructive) {
+                    Task {
+                        do { try await storage.removeMovedSource(source.profile, inventory: source.inventory) }
+                        catch { operationErrorMessage = "The Profile is at its new location, but the original folder was kept. " + error.localizedDescription }
+                    }
+                }
+                .accessibilityIdentifier("settings.profileMove.removeOriginal")
+                Button("Keep Both Copies", role: .cancel) { movedSource = nil }
+                    .accessibilityIdentifier("settings.profileMove.keepBoth")
+            }
+        } message: {
+            Text("Ox is now using the verified copy. Remove the original folder from \(movedSource?.profile.url.deletingLastPathComponent().lastPathComponent ?? "") to finish the move, or keep both copies.")
+        }
+    }
+
+    private var profilePage: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 if let profile {
                     if profile.version == ProfileSchema.current {
                         manageSection(for: profile)
-                        if profile.location == .external {
-                            storageSection
-                        }
+                        storageSection
                         ProfileContentsView(profile: profile, initialSkillDraft: initialSkillDraft)
                             .id(profile.url.path)
                         exportSection(for: profile)
@@ -56,7 +92,7 @@ struct ProfileSettingsView: View {
         .background(Theme.Colors.background)
         .navigationTitle(Text(verbatim: profile?.name ?? "Profile"))
         .navigationBarTitleDisplayMode(.inline)
-        .fileExporter(isPresented: $presentingExport, item: exportDocument, contentTypes: [.zip],
+        .fileExporter(isPresented: $presentingExport, document: exportDocument, contentType: .folder,
             defaultFilename: "\(profile?.name ?? "Profile")-\(Date().formatted(.iso8601.year().month().day().dateSeparator(.dash)))") { result in
             if case .failure(let error) = result { operationErrorMessage = error.localizedDescription }
             if case .success(let url) = result,
@@ -64,8 +100,9 @@ struct ProfileSettingsView: View {
                 operationErrorMessage = String(localized: "This backup is saved inside Ox and will be removed if you delete the app. Export another copy to iCloud Drive or a location outside Ox.")
             }
             exportDocument = nil
-        } onCancellation: {
-            exportDocument = nil
+        }
+        .onChange(of: presentingExport) { _, presented in
+            if !presented { exportDocument = nil }
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -196,31 +233,30 @@ struct ProfileSettingsView: View {
     }
 
     private var storageSection: some View {
-        VStack(alignment: .leading, spacing: SettingsLayout.headerSpacing) {
-            Text("Storage")
-                .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .settingsSectionHeaderInset()
-                .accessibilityIdentifier(A11yID.Settings.profileDetail)
-
-            if profile?.location == .external {
-                HStack(spacing: Theme.Spacing.xs) {
-                    Text("Files")
-                        .font(Theme.Fonts.bodyMd)
-                        .foregroundStyle(Theme.Colors.onSurface)
-                    Spacer(minLength: 0)
-                    Text("Opened in place")
-                        .font(Theme.Fonts.bodySm)
-                        .foregroundStyle(Theme.Colors.conversationSecondary)
-                }
-                .settingsRowPadding()
-                .settingsSurface(singleRow: true)
-
-                Text("Ox uses this Profile directly from its folder. Closing it does not delete its files.")
-                    .font(Theme.Fonts.caption)
+        SettingsSection("Location", layout: .row) {
+            if let profile {
+                Button { showingFiles = true } label: {
+                    HStack {
+                        Text(verbatim: "\(profile.url.deletingLastPathComponent().lastPathComponent) / \(profile.name)")
+                            .font(Theme.Fonts.caption)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(Theme.Icons.xs)
+                    }
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .settingsContentInset()
-                    .accessibilityIdentifier(A11yID.Settings.storeStatus)
+                    .settingsRowPadding()
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(storage.isBusy)
+                .accessibilityIdentifier(A11yID.Settings.profileDetail)
+                .accessibilityHint("Show in Files")
+                Button { choosingMoveLocation = true } label: {
+                    SettingsDisclosureRow(title: "Move Profile…", value: Text(""))
+                }
+                .buttonStyle(.plain)
+                .disabled(storage.isBusy)
+                .accessibilityIdentifier(A11yID.Settings.profileMove(profile.id.uuidString))
             }
         }
     }
@@ -236,18 +272,29 @@ struct ProfileSettingsView: View {
             Button {
                 Task {
                     do {
-                        exportDocument = ProfileBackupDocument(data: try await storage.exportProfile(profile))
+                        exportDocument = try ProfileFolderDocument(data: try await storage.exportProfile(profile))
                         presentingExport = true
                     } catch {
                         operationErrorMessage = error.localizedDescription
                     }
                 }
             } label: {
-                SettingsDisclosureRow(title: "Export Profile…", value: Text(storage.isBusy ? "Preparing…" : ""), indicator: "square.and.arrow.up")
+                SettingsDisclosureRow(title: "Export Copy…", value: Text(storage.exportProgress.map { $0.formatted(.percent.precision(.fractionLength(0))) } ?? ""), indicator: nil)
             }
             .buttonStyle(.plain)
-            .disabled(storage.isBusy || profile.location != .local)
+            .disabled(storage.isBusy)
             .accessibilityIdentifier(A11yID.Settings.profileExport(profile.id.uuidString))
+            .overlay(alignment: .bottomLeading) {
+                if let progress = storage.exportProgress {
+                    Rectangle()
+                        .fill(Theme.Colors.primary.dynamic)
+                        .frame(height: 2)
+                        .scaleEffect(x: progress, y: 1, anchor: .leading)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
+            .clipShape(DefaultGlassEffectShape())
         }
     }
 

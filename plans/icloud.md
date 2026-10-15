@@ -6,7 +6,7 @@ Manual import/export is implemented. Supersedes the earlier iCloud push/pull pro
 
 Profiles execute locally. Export creates one complete backup file; import creates a new local Profile. The system Files picker supports iCloud Drive, other file providers, and external drives. No automatic backup, synchronization, replacement, or remote snapshot catalog.
 
-- Profile details page: an “Export Profile…” row prepares a backup, then opens Files with a suggested Profile name and date. Show preparation progress, cancellation, completion, and actionable errors.
+- Profile details page: an “Export Profile” row prepares a backup, then opens Files with a suggested Profile name and date. Show preparation progress, cancellation, completion, and actionable errors.
 - Add Profile dropdown menu: “Create new”, “Open existing”, and “Import”. Import opens Files, downloads if needed, validates the backup, and previews its name and date. Confirm a new local name, resolve duplicate names without overwriting, and offer to open the imported Profile.
 - Explain: “Profiles stored on this device are removed when you delete Ox. Export a copy to keep them.” Recovery includes only data captured at export time. Credentials and device permissions require setup again.
 - Saving inside Ox's own folder does not protect against deletion. Picker completion does not prove an iCloud upload has finished; do not claim cloud protection from that alone.

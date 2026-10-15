@@ -62,7 +62,6 @@ actor DurableProfileStore {
               let manifest = ProfileIO.readConfig(at: root), manifest.id == profileID, manifest.version == ProfileSchema.current else {
             throw RuntimeError.bridge("Profile must pass storage preparation before Pi opens")
         }
-        guard scope.location == .local else { throw RuntimeError.bridge("Pi Profiles require local storage; import an offline snapshot into a local Profile") }
         let opening = Task<Session, Error> {
             let host = DurableAgentHost()
             let runtime = DurableRuntime(databaseURL: scope.stateRoot.appendingPathComponent("state.sqlite"), fileRoot: root) { method, params, stream in
@@ -120,7 +119,7 @@ actor DurableProfileStore {
         Log.agent.info("PiDurable Profile closed profile=\(scope.profileID?.uuidString ?? "nil")")
     }
 
-    func exportProfile(_ profile: Profile) async throws -> Data {
+    func exportProfile(_ profile: Profile, progress: @escaping @Sendable (Double) -> Void) async throws -> Data {
         let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
         let session = try await session(in: scope)
         let root = scope.root.standardizedFileURL
@@ -129,7 +128,8 @@ actor DurableProfileStore {
         _ = try await session.runtime.command(.object(["action": .string("profileExportCheck")]))
         try await close(in: scope)
         try await ProfileMigrator.validateProfileSnapshot(content: scope.root, state: scope.stateRoot, identity: profile.id)
-        return try ProfilePackage.encode(profile, scope: scope)
+        progress(0.2)
+        return try ProfilePackage.encode(profile, scope: scope, progress: progress)
     }
 
     func create(in scope: ProfileScope, metadata: JSONValue = .object([:])) async throws -> DurableConversationReference {

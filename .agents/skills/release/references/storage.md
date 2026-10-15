@@ -30,11 +30,11 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── service-repositories/local/      editable local git working tree
 │   │   ├── service-repositories/development/ simulator development HEAD snapshot
 │   │   ├── service-repositories/<uuid>/     installed public HEAD snapshots
-│   │   ├── external-profiles.json           external profile folder bookmarks
+│   │   ├── external-profiles.json           selected Profile folder bookmarks and optional display names
 │   │   ├── device-folder-grants.json         Profile-bound native folder bookmarks; nullable profileId means unassigned
 │   │   ├── scheduled-skills.json             device-owned scheduled skill snapshots
-│   │   ├── Profiles/<uuid>/profile.json    private identity, version, public-folder registration
-│   │   ├── Profiles/<uuid>/state.sqlite    conversations, settings, file references/derived metadata; WAL sidecars
+│   │   ├── Profiles/<uuid>/profile.json    predecessor registration and downgrade guard
+│   │   ├── Profiles/<uuid>/state.sqlite    retained predecessor database; inactive after portable migration
 │   │   ├── Profiles/<uuid>/staging/        private owner lock and recoverable transfer staging
 │   │   ├── Profiles/<uuid>/payloads/       private source/diagnostic archives, not attachment history
 │   │   ├── StorageMigration/RetainedStages/ abandoned predecessor working copies/stages
@@ -52,7 +52,10 @@ types remain authoritative in their `Codable` implementations.
 │   │   └── ServiceSearchVectors.plist       purgeable service-search embeddings
 │   └── ...                                  system-managed framework state
 ├── Documents/                               visible in Apple Files
-│   └── Profiles/<ProfileName>/              public Profile content
+│   └── Profiles/<ProfileName>/              complete portable Profile
+│       ├── profile.json                 identity and portable storage milestone
+│       ├── .ox/state.sqlite             conversations, settings, indexes; DELETE journal
+│       ├── .ox/payloads/, .ox/staging/ retained payloads, owner lock and file staging
 │       ├── MEMORY.md, SOUL.md               authoritative editable Profile documents
 │       ├── skills/<name>/...                authoritative editable user skill packages
 │       ├── conversations/<Pi-ID>/...        mutable conversation-owned files and directories
@@ -128,7 +131,7 @@ Ownership follows destination folders, not references. Conversation deletion rec
 
 Profile discovery reads manifests only. Startup migrates the selected Profile; inactive Profiles migrate when selected or opened. Settings defer old-format content and management until activation. Recovery journals for already-started publications are still completed before discovery.
 
-`StorageMigrator` appends `2026-10-10-profile-filesystem`, `2026-10-10-workspace-binding`, and `2026-10-10-profile-files` after the Pi milestone. Trusted preparation inventories predecessor metadata, preserves legacy aliases in the normalized file index, removes artifact entries from the text-document index, retires the predecessor lock, and binds `ox.filesystem` to `profile-files-v1`. The gate alone resumes the prototype journal format. Ambiguous/shared/saved predecessor files remain Profile-owned. Private generated archives receive conversation ownership only from matching canonical source descriptors and their producing entry IDs; ambiguous producers remain Profile-owned. Existing artifact UI, wire fields, and user-authored helpers are compatibility facades over the filesystem, not another store; artifact helpers are excluded from normal discovery. `2026-10-11-public-profile-files` adds a fingerprint-verified, recoverably published split: public `Documents/Profiles/<name>` and private `Application Support/Profiles/<UUID>`. The private manifest registers the public folder; backups and abandoned stages remain private. Hidden source payloads move to private `payloads/` with legacy aliases; preparation binds `public-profile-files-v1`. This is local-only and does not change the existing refusal of live Pi cloud/external activation. Public Profile folder relocation outside Ox is not followed automatically. A full file-manager UI remains deferred; current viewers resolve nested Profile files and refresh deleted references.
+`StorageMigrator` appends `2026-10-10-profile-filesystem`, `2026-10-10-workspace-binding`, and `2026-10-10-profile-files` after the Pi milestone. Trusted preparation inventories predecessor metadata, preserves legacy aliases in the normalized file index, removes artifact entries from the text-document index, retires the predecessor lock, and binds `ox.filesystem` to `profile-files-v1`. The gate alone resumes the prototype journal format. Ambiguous/shared/saved predecessor files remain Profile-owned. Private generated archives receive conversation ownership only from matching canonical source descriptors and their producing entry IDs; ambiguous producers remain Profile-owned. Existing artifact UI, wire fields, and user-authored helpers are compatibility facades over the filesystem, not another store; artifact helpers are excluded from normal discovery. `2026-10-11-public-profile-files` adds a fingerprint-verified, recoverably published split: public `Documents/Profiles/<name>` and private `Application Support/Profiles/<UUID>`. The private manifest registers the public folder; backups and abandoned stages remain private. Hidden source payloads move to private `payloads/` with legacy aliases; preparation binds `public-profile-files-v1`. The subsequent `2026-10-14-portable-profile` milestone stages and validates private state inside the Profile, stamps the retained predecessor registration to reject older readers, then atomically publishes `.ox/`. A prepared `.ox-stage-<id>` resumes after interruption. The original private database is retained for recovery. `2026-10-14-visible-profile` moves the contents of `.ox` into the Profile root after collision checks and snapshot validation. The source manifest is stamped first to guard older readers and moved last to publish; interrupted moves resume from the remaining source entries. The empty `.ox` directory is removed. `2026-10-14-internal-profile-state` subsequently keeps `profile.json` at the root and moves `state.sqlite`, `payloads/`, and `staging/` under `.ox/`. It checks collisions and validates state before stamping the root manifest, which guards older readers; partial moves resume at the new milestone. Portable Profiles open in place from Files; SQLite uses DELETE journaling and retains the local exclusive owner lock. Simultaneous editing across devices is unsupported. Cloud upload completion and third-party provider semantics require device verification. A full file-manager UI remains deferred; current viewers resolve nested Profile files and refresh deleted references.
 
 Conversation export verifies live metadata and bytes, maps references to current file types, and includes referenced local dependencies in the existing portable package format. Import first creates an empty conversation, publishes files directly into its final working directory, rewrites references and sibling dependencies, then populates turns. Failures attempt conversation-owned cleanup and log cleanup failures; this is not an atomic package transaction. Retained migration source backups remain private recovery material outside the active Profile, not attachment history.
 
@@ -206,11 +209,9 @@ fork-aware scrollback separately from active model context. Read-only virtual
 `conversations/<Pi-ID>/metadata` and `history` are generated from Pi, never disk transcripts. The native UUID projection uses `conversations/<uuid>/conversation.json` and `turns.jsonl`. Old `chats/` virtual paths and `ox.chat` calls remain compatibility aliases for user-authored code. `StorageMigrator` rewrites stored `ox.chat.start` and `ox.chat.delete` approval keys to `ox.conversation.start` and `ox.conversation.delete` before policy consumers initialize; existing destination policies win collisions, and subsequent launches are no-ops. Predecessor disk paths, document kinds, and UUID binding keys are unchanged.
 Physical image results use `oxAttachment`/`oxProfileID`, not image Base64 in history.
 Temporary native routing still retains explicit `ox.chat` UUID compatibility.
-Local production Profiles now activate Pi after the storage gate. No live cloud/external database synchronization or raw active-database export is supported. Native UI testing uses direct simulator interaction; Host RPC still requires authorized VPN ingress without loopback exceptions.
+Portable Profiles activate Pi after the storage gate at their selected folder. No simultaneous cross-device editing or raw active-database export is supported. Native UI testing uses direct simulator interaction; Host RPC still requires authorized VPN ingress without loopback exceptions.
 
-Manual Profile backups use a format-1 ZIP containing a versioned manifest, SHA-256 file inventory, public content, closed state.sqlite, and private payloads. Capture refuses pending tasks, submissions, and file changes, closes/checkpoints the runtime, and holds its file ownership lock while coordinating the public-folder read. Backups are bounded to 128 MiB and 10,000 entries. Credentials, folder grants, schedules, app settings, staging, temporary conversations, and migration journals are excluded. Files chooses the destination; a completed save does not establish completed iCloud upload.
-
-Import accepts the current Profile milestone, verifies paths and checksums, stages public/private storage, and rebinds the current Profile identity through a Pi document transaction. Historical receipts remain immutable. Validation rejects pending actions before publication; a fresh identity prevents importing device-bound schedules and permissions. The existing public Profile publication journal owns crash recovery. No new live Profile milestone or database schema is introduced. Archive compatibility is separate from live storage compatibility; older apps have no Profile backup importer.
+Profile export captures a complete, closed snapshot, validates its SHA-256 inventory, and returns a directory containing visible files plus `profile.json`, `.ox/state.sqlite`, and `.ox/payloads`. The format-1 ZIP is an internal temporary encoding, not the exported document. Capture refuses pending tasks, submissions, and file changes, closes/checkpoints the runtime, and holds its file ownership lock while coordinating the folder read. Exports retain the Profile identity and are bounded to 128 MiB and 10,000 entries. Credentials, folder grants, schedules, app settings, staging, temporary conversations, and migration journals are excluded. Files chooses the destination; a completed save does not establish completed iCloud upload. Open Existing opens the exported directory in place; there is no separate Import action. Create accepts a Files-selected parent and publishes a verified fresh Profile there. Move first closes the source, verifies a complete copy including empty directories, switches its bookmark, and retains the original until explicit removal confirmation. Removal checks the original inventory again; changed originals remain untouched. Missing remembered folders stay unavailable and can be reconnected only to the same Profile identity; they do not silently select another copy or create an empty replacement. Optional bookmark display names are additive; older records remain readable.
 
 `ProfileMigrator.stageDurableProfile` now builds a separate caller-owned local
 staging folder containing `profile.json`, `state.sqlite` and `artifacts/`. It accepts
@@ -308,9 +309,10 @@ Storage owners discover and persist only `profile.json` and
 
 Ox automatically discovers valid profiles that are immediate children of its
 local and iCloud Documents directories. It does not scan elsewhere in Files.
-Only security-scoped bookmarks for folders opened from outside Ox's app
-directories are persisted in `external-profiles.json`. When no external profiles
-are registered, that file does not exist.
+Bookmarks for explicitly opened folders are persisted in `external-profiles.json`,
+including local selections so reopening a copied Profile consistently selects the
+chosen folder. Selected bookmarks take precedence over discovered copies of the
+same identity. Stale bookmarks are renewed after successful resolution.
 
 Profiles can use three storage locations:
 
@@ -856,7 +858,7 @@ needed for diagnosis but never credentials or reusable secrets.
 | State | Location | Backup or sync | Removal |
 |---|---|---|---|
 | Local Profile content | Documents/Profiles/<name> | No device backup | Delete or move the Profile |
-| Local Profile state | Application Support/Profiles/<UUID> | No device backup or Files exposure | Delete the Profile |
+| Profile state | <selected folder>/.ox (identity manifest at root) | Travels with the folder; no cross-device editing coordination | Delete the Profile; closing an external Profile preserves it |
 | Profile migration recovery | Application Support/StorageMigration | Private retained source/stage material | Explicit recovery/diagnostic cleanup |
 | iCloud Profile content | iCloud Documents | iCloud Drive | Delete or move the Profile |
 | Temporary conversation | Memory and isolated filesystem cache | None; cache is purgeable | Leave conversation; private cache by eviction, app deletion, or explicit QA cleanup after close |

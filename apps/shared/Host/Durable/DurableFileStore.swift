@@ -24,10 +24,12 @@ nonisolated final class DurableFileStore {
     private var handles: [String: Handle] = [:]
     private var closed = false
     private let chunkSize = 128 * 1024
-    private var separated: Bool { stateRoot.standardizedFileURL.path != root.standardizedFileURL.path }
+    private let usesPayloadDirectory: Bool
 
     init(root: URL, stateRoot: URL? = nil) {
         self.root = root; self.stateRoot = stateRoot ?? root
+        usesPayloadDirectory = (stateRoot ?? root).standardizedFileURL.path != root.standardizedFileURL.path
+            || ProfileIO.readConfig(at: root)?.version == ProfileMigrator.visibleProfileVersion
         publicFiles = DurableFileDirectory(root: root, stateRoot: stateRoot)
         privateFiles = DurableFileDirectory(root: stateRoot ?? root, privateContent: true)
     }
@@ -139,7 +141,7 @@ nonisolated final class DurableFileStore {
                 let fd = openat(target, stage, O_CREAT | O_EXCL | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0o600)
                 guard fd >= 0 else { throw posix("Stage file") }
                 handles[token] = Handle(fd: fd, name: name, stage: stage, size: size,
-                    directory: target, namespace: isPrivate ? (separated ? "staging" : ".files") : "artifacts")
+                    directory: target, namespace: isPrivate ? (usesPayloadDirectory ? "staging" : ".files") : "artifacts")
             } else {
                 let fd = try openFile(target, name, flags: O_RDONLY)
                 try checkSize(fd, size: size)
@@ -219,7 +221,7 @@ nonisolated final class DurableFileStore {
         let parent = open(stateRoot.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard parent >= 0 else { throw posix("Open Profile state scope") }
         defer { Darwin.close(parent) }
-        let staging = separated ? "staging" : ".files"
+        let staging = usesPayloadDirectory ? "staging" : ".files"
         guard mkdirat(parent, staging, 0o700) == 0 || errno == EEXIST else { throw posix("Create private file scope") }
         let dir = openat(parent, staging, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard dir >= 0 else { throw posix("Pin private file scope") }
@@ -268,8 +270,8 @@ nonisolated final class DurableFileStore {
     }
 
     private func payloadPath(_ path: String) -> String? {
-        if separated, path.hasPrefix("payloads/") { return path }
-        guard separated, path.hasPrefix("artifacts/payload-"), path.hasSuffix(".json"),
+        if usesPayloadDirectory, path.hasPrefix("payloads/") { return path }
+        guard usesPayloadDirectory, path.hasPrefix("artifacts/payload-"), path.hasSuffix(".json"),
               path.dropFirst(18).dropLast(5).count == 64, path.dropFirst(18).dropLast(5).allSatisfy({ "0123456789abcdef".contains($0) }) else { return nil }
         return "payloads/" + path.dropFirst(10)
     }

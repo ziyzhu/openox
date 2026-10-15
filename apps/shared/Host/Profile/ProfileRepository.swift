@@ -27,14 +27,6 @@ actor ProfileRepository {
         guard !FileManager.default.fileExists(atPath: destination.path) else { throw ProfileError.nameExists(name) }
         try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
         try FileManager.default.moveItem(at: profile.url, to: destination)
-        do {
-            guard var config = ProfileIO.readPrivateConfig(profile.id) else { throw CocoaError(.fileReadCorruptFile) }
-            config.contentDirectory = destination.lastPathComponent
-            try ProfileIO.writeConfig(config, to: ProfileIO.stateDirectory(profile.id))
-        } catch {
-            try FileManager.default.moveItem(at: destination, to: profile.url)
-            throw error
-        }
         var renamed = profile; renamed.name = destination.lastPathComponent; renamed.url = destination
         return renamed
     }
@@ -52,7 +44,8 @@ actor ProfileRepository {
     func deleteProfile(_ profile: Profile) async throws {
         try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
         if FileManager.default.fileExists(atPath: profile.url.path) { try FileManager.default.removeItem(at: profile.url) }
-        try FileManager.default.removeItem(at: ProfileIO.stateDirectory(profile.id))
+        let predecessor = ProfileIO.stateDirectory(profile.id)
+        if FileManager.default.fileExists(atPath: predecessor.path) { try FileManager.default.removeItem(at: predecessor) }
         deleted = deleted.filter { $0.key.profileID != profile.id }
     }
 

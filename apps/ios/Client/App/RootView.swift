@@ -1,3 +1,4 @@
+import UniformTypeIdentifiers
 import SwiftUI
 import UIKit
 import WebKit
@@ -500,6 +501,8 @@ struct RootView: View {
     private let conversationImports: ConversationImportCoordinator
     private var manager: ServiceManager { client.services }
     private var storage: StorageRoot { .shared }
+    @State private var locatingMissingProfile = false
+    @State private var profileLocationError: String?
     @State private var conversations: ConversationManager
     @State private var compactPage: CompactPage = .workspace
     @State private var showSplitSidebar = true
@@ -872,6 +875,11 @@ struct RootView: View {
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .multilineTextAlignment(.center)
+            if StorageRoot.shared.unavailableActiveID != nil {
+                Button("Locate Folder…") { locatingMissingProfile = true }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("startup.locateProfile")
+            }
             if recovery != .updateBuild {
                 Button("Try Again") { bootstrap() }
                     .font(Theme.Fonts.labelMd)
@@ -881,6 +889,16 @@ struct RootView: View {
         .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Colors.conversationSurface)
+        .fileImporter(isPresented: $locatingMissingProfile, allowedContentTypes: [.folder]) { result in
+            do {
+                guard let id = StorageRoot.shared.unavailableActiveID else { return }
+                try StorageRoot.shared.locateProfile(at: result.get(), expectedID: id)
+                bootstrap()
+            } catch { profileLocationError = error.localizedDescription }
+        }
+        .alert("Couldn't locate Profile", isPresented: Binding(get: { profileLocationError != nil }, set: { if !$0 { profileLocationError = nil } })) {
+            Button("OK", role: .cancel) { profileLocationError = nil }
+        } message: { Text(profileLocationError ?? "") }
     }
 
     private func autoCloseSidebar() {

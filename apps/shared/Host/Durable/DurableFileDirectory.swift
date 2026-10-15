@@ -29,7 +29,7 @@ nonisolated final class DurableFileDirectory {
     private func components(_ path: String, privateStage: Bool = false) throws -> [String] {
         let parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         if privateStage, parts.count == 2, ["artifacts", ".files", "staging"].contains(parts[0]), parts[1].hasPrefix(".stage-"), UUID(uuidString: String(parts[1].dropFirst(7))) != nil { return parts }
-        let reserved = (privateContent ? [] : ["payloads"]) + ["profile.json", "state.sqlite", "state.sqlite-wal", "state.sqlite-shm", "skill-selections.json", "services", "files", "history", "chats"]
+        let reserved = (privateContent ? [] : ["payloads", "staging"]) + ["profile.json", "state.sqlite", "state.sqlite-wal", "state.sqlite-shm", "skill-selections.json", "services", "files", "history", "chats"]
         guard !path.isEmpty, path.utf8.count <= 4096, parts.count <= 64,
               !reserved.contains(parts[0].lowercased()), !parts[0].lowercased().hasPrefix("state.sqlite-"), parts.allSatisfy({ !$0.isEmpty && !$0.hasPrefix(".") && $0.utf8.count <= 240 && !$0.contains("\\") && !$0.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) }) else {
             throw failure("Invalid Profile file path", code: EACCES)

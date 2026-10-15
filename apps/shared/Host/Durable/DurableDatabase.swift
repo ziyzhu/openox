@@ -67,7 +67,10 @@ nonisolated final class DurableDatabase {
         let code = sqlite3_open_v2(url.path, &connection, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX, nil)
         do {
             try check(code)
-            try check(sqlite3_exec(connection, "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON;", nil, nil, nil))
+            let root = url.deletingLastPathComponent()
+            let portable = root.lastPathComponent == ".ox" || ProfileIO.readConfig(at: root)?.version == ProfileMigrator.visibleProfileVersion
+            let mode = portable ? "DELETE" : "WAL"
+            try check(sqlite3_exec(connection, "PRAGMA journal_mode=\(mode); PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON;", nil, nil, nil))
         } catch {
             sqlite3_close_v2(connection)
             connection = nil

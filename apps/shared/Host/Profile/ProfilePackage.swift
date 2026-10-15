@@ -35,20 +35,59 @@ nonisolated enum ProfilePackage {
         }
     }
 
-    static func encode(_ profile: Profile, scope: ProfileScope) throws -> Data {
+    static func folder(_ data: Data) throws -> FileWrapper {
+        let backup = try ProfilePackage.decode(data)
+        let folder = FileWrapper(directoryWithFileWrappers: [:])
+        for directory in backup.manifest.directories {
+            _ = Self.directory(Self.path(directory), in: folder)
+        }
+        for file in backup.files {
+            let parts = Self.path(file.path)
+            guard let name = parts.last else { throw ProfilePackage.Failure.invalid }
+            let parent = Self.directory(Array(parts.dropLast()), in: folder)
+            let entry = FileWrapper(regularFileWithContents: file.data)
+            entry.preferredFilename = name
+            parent.addFileWrapper(entry)
+        }
+        var config = backup.manifest.profile
+        config.contentDirectory = nil
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let manifest = FileWrapper(regularFileWithContents: try encoder.encode(config))
+        manifest.preferredFilename = ProfileIO.configName
+        folder.addFileWrapper(manifest)
+        return folder
+    }
+
+    private static func path(_ path: String) -> [String] {
+        let parts = path.split(separator: "/").map(String.init)
+        return (parts.first == "state" ? [".ox"] : []) + parts.dropFirst()
+    }
+
+    private static func directory(_ parts: [String], in root: FileWrapper) -> FileWrapper {
+        parts.reduce(root) { parent, name in
+            if let existing = parent.fileWrappers?[name] { return existing }
+            let child = FileWrapper(directoryWithFileWrappers: [:])
+            child.preferredFilename = name
+            parent.addFileWrapper(child)
+            return child
+        }
+    }
+
+    static func encode(_ profile: Profile, scope: ProfileScope, progress: @Sendable (Double) -> Void = { _ in }) throws -> Data {
         var result: Result<Data, Error>?
         var coordinationError: NSError?
         NSFileCoordinator().coordinate(readingItemAt: scope.root, options: .withoutChanges, error: &coordinationError) { _ in
-            result = Result { try capture(profile, scope: scope) }
+            result = Result { try capture(profile, scope: scope, progress: progress) }
         }
         if let coordinationError { throw coordinationError }
         guard let result else { throw Failure.invalid }
         return try result.get()
     }
 
-    private static func capture(_ profile: Profile, scope: ProfileScope) throws -> Data {
+    private static func capture(_ profile: Profile, scope: ProfileScope, progress: @Sendable (Double) -> Void) throws -> Data {
         let started = Date()
-        guard profile.location == .local, let config = ProfileIO.readPrivateConfig(profile.id),
+        guard let config = ProfileIO.readConfig(at: profile.url),
               config.version == ProfileSchema.current else { throw Failure.unsupported }
         let owner = DurableFileStore(root: scope.root, stateRoot: scope.stateRoot)
         try owner.acquire()
@@ -56,19 +95,34 @@ nonisolated enum ProfilePackage {
         var files: [ZipArchiveCodec.File] = []
         var directories: [String] = []
         var total = 0
-        for (prefix, root) in [("content", scope.root), ("state", scope.stateRoot)] {
+        for (index, source) in [("content", scope.root), ("state", scope.stateRoot)].enumerated() {
+            let (prefix, root) = source
             directories.append(prefix)
             var enumerationError: Error?
             guard let enumerator = FileManager.default.enumerator(at: root,
                 includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey],
                 errorHandler: { _, error in enumerationError = error; return false }) else { throw Failure.invalid }
+            var entries: [(URL, String)] = []
             for case let url as URL in enumerator {
                 try Task.checkCancellation()
-                let relative = url.pathComponents.dropFirst(root.pathComponents.count).joined(separator: "/")
+                let relative = url.pathComponents.suffix(enumerator.level).joined(separator: "/")
+                let first = relative.split(separator: "/").first.map(String.init) ?? ""
+                if prefix == "content", [".ox", "profile.json", "state.sqlite", "payloads", "staging"].contains(first) || first.hasPrefix("state.sqlite-") || first.hasPrefix(".ox-stage-") {
+                    enumerator.skipDescendants()
+                    continue
+                }
                 if prefix == "state", relative != "state.sqlite", !relative.hasPrefix("payloads/"), relative != "payloads" {
                     enumerator.skipDescendants()
                     continue
                 }
+                guard entries.count < maximumEntries else { throw Failure.tooLarge }
+                entries.append((url, relative))
+            }
+            if let enumerationError { throw enumerationError }
+            for (entryIndex, entry) in entries.enumerated() {
+                let (url, relative) = entry
+                try Task.checkCancellation()
+                progress(0.2 + 0.5 * (Double(index) + Double(entryIndex + 1) / Double(max(1, entries.count))) / 2)
                 let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey])
                 guard values.isSymbolicLink != true else { throw Failure.unsafeFile }
                 let path = prefix + "/" + relative
@@ -85,16 +139,19 @@ nonisolated enum ProfilePackage {
                 }
                 guard directories.count <= maximumEntries else { throw Failure.tooLarge }
             }
-            if let enumerationError { throw enumerationError }
         }
-        guard files.contains(where: { $0.path == "state/state.sqlite" }) else { throw Failure.invalid }
+        guard files.contains(where: { $0.path == "state/state.sqlite" }) else {
+            Log.app.error("ProfilePackage.export missingDatabase profile=\(profile.id) files=\(files.count)")
+            throw Failure.invalid
+        }
+        progress(0.7)
         let manifest = Manifest(format: 1, profile: config, name: profile.name, exportedAt: Date(),
             directories: directories.sorted(), checksums: Dictionary(uniqueKeysWithValues: files.map { ($0.path, digest($0.data)) }))
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.sortedKeys]
         files.append(.init(path: "manifest.json", data: try encoder.encode(manifest)))
-        let data = try ZipArchiveCodec.encode(files, maximumArchiveBytes: maximumBytes)
+        let data = try ZipArchiveCodec.encode(files, maximumArchiveBytes: maximumBytes) { progress(0.75 + 0.2 * $0) }
         Log.app.info("ProfilePackage.export profile=\(profile.id) files=\(files.count) bytes=\(data.count) seconds=\(Date().timeIntervalSince(started))")
         return data
     }
