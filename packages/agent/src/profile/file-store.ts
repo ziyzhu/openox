@@ -83,8 +83,15 @@ export class ProfileFileStore {
   private backend: ProfileFileBackend;
   private external: boolean;
   constructor(harness: Harness, backend: ProfileFileBackend, external = false) { this.harness = harness; this.backend = backend; this.external = external; }
-  private serialize<T>(body: () => Promise<T>) {
-    const next = this.tail.then(async () => { await this.recover(); if (this.external) await this.reconcile(); return body(); });
+  private serialize<T>(body: () => Promise<T>, signal?: AbortSignal) {
+    const next = this.tail.then(async () => {
+      signal?.throwIfAborted();
+      await this.recover();
+      signal?.throwIfAborted();
+      if (this.external) await this.reconcile();
+      signal?.throwIfAborted();
+      return body();
+    });
     this.tail = next.catch(() => {});
     return next;
   }
@@ -125,12 +132,14 @@ export class ProfileFileStore {
       catch { return false; }
     };
     const files = Object.fromEntries(Object.entries(state.files).filter(([, file]) => file.hidden));
+    const paths = new Set(Object.values(files).map(file => file.path));
     const previous = new Map(Object.values(state.files).filter(file => !file.hidden).map(file => [file.path, file]));
     for (const observed of snapshot.files.filter(file => accepted(file.path))) {
-      if (Object.values(files).some(file => file.path === observed.path)) continue;
+      if (paths.has(observed.path)) continue;
       const existing = previous.get(observed.path);
       const id = existing?.id ?? await this.identifier(observed.path);
       files[id] = { ...observed, id, aliases: existing?.aliases ?? [], saved: existing?.saved ?? false, owner: owner(observed.path) };
+      paths.add(observed.path);
     }
     const directories = snapshot.directories.filter(path => active(path) && (path === "conversations" || path === "skills" || accepted(path))).sort();
     const comparable = (value: unknown) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item)
@@ -227,20 +236,51 @@ export class ProfileFileStore {
     return missing;
   }
   info(input: string): Promise<FileInfo> {
-    return this.serialize(async () => {
-      const path = canonical(input), state = await this.state();
-      const file = Object.values(state.files).find(file => !file.hidden && file.path === path);
-      if (!path || state.directories.includes(path)) return { path: "/" + path, name: path.split("/").at(-1) ?? "", kind: "directory", size: 0, mtimeMs: 0 };
-      if (file) return { path: "/" + path, name: path.split("/").at(-1)!, kind: "file", size: file.size, mtimeMs: file.mtime };
-      throw new FileError("not_found", "File not found", input);
-    });
+    return this.serialize(async () => this.fileInfo(await this.state(), input));
+  }
+  private fileInfo(state: Awaited<ReturnType<ProfileFileStore["state"]>>, input: string): FileInfo {
+    const path = canonical(input);
+    const file = Object.values(state.files).find(file => !file.hidden && file.path === path);
+    if (!path || state.directories.includes(path)) return { path: "/" + path, name: path.split("/").at(-1) ?? "", kind: "directory", size: 0, mtimeMs: 0 };
+    if (file) return { path: "/" + path, name: path.split("/").at(-1)!, kind: "file", size: file.size, mtimeMs: file.mtime };
+    throw new FileError("not_found", "File not found", input);
   }
   async list(input: string) {
-    if ((await this.info(input)).kind !== "directory") throw new FileError("not_directory", "Not a directory", input);
+    return this.serialize(async () => this.directoryEntries(await this.state(), input));
+  }
+  private directoryEntries(state: Awaited<ReturnType<ProfileFileStore["state"]>>, input: string) {
     const path = canonical(input), prefix = path ? path + "/" : "";
-    const state = await this.state();
-    const children = [...state.directories, ...Object.values(state.files).filter(file => !file.hidden).map(file => file.path)].filter(child => child.startsWith(prefix) && child !== path && !child.slice(prefix.length).includes("/"));
-    return Promise.all(children.sort().map(child => this.info(child)));
+    const files = Object.values(state.files).filter(file => !file.hidden);
+    if (path && !state.directories.includes(path)) {
+      if (files.some(file => file.path === path)) throw new FileError("not_directory", "Not a directory", input);
+      throw new FileError("not_found", "File not found", input);
+    }
+    const immediate = (child: string) => child.startsWith(prefix) && child !== path && !child.slice(prefix.length).includes("/");
+    const directories: FileInfo[] = state.directories.filter(immediate).map(child => ({ path: "/" + child,
+      name: child.split("/").at(-1)!, kind: "directory", size: 0, mtimeMs: 0 }));
+    const entries: FileInfo[] = files.filter(file => immediate(file.path)).map(file => ({ path: "/" + file.path,
+      name: file.path.split("/").at(-1)!, kind: "file", size: file.size, mtimeMs: file.mtime }));
+    return [...directories, ...entries].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  }
+  snapshot(signal?: AbortSignal) {
+    return this.serialize(async () => {
+      signal?.throwIfAborted();
+      const state = await this.state();
+      return {
+        info: async (path: string) => { signal?.throwIfAborted(); return this.fileInfo(state, path); },
+        list: async (path: string) => { signal?.throwIfAborted(); return this.directoryEntries(state, path); },
+        record: async (path: string, reference = true) => { signal?.throwIfAborted(); return this.resolve(state, path, reference); },
+        read: async (path: string) => {
+          signal?.throwIfAborted();
+          const file = this.resolve(state, path, false);
+          if (!file || file.hidden) throw new FileError("not_found", "File unavailable", path);
+          this.assertActive(await this.state(), file.path);
+          const bytes = await this.backend.read(file);
+          signal?.throwIfAborted();
+          return file.binary ? bytes : new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+        },
+      };
+    }, signal);
   }
   read(input: string, reference = false): Promise<string | Uint8Array> {
     return this.serialize(async () => {

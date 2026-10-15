@@ -6,8 +6,8 @@ import { mountedFileSystem, type FileBackend, type FileMount } from "../core/fil
 import { bundledSkills } from "../core/bundled-skills";
 import { conversationRecordPath, workingFilePath } from "./file-store";
 
-export function profileMounts(files: ProfileFiles, conversations: OxConversations): FileMount[] {
-  const env = profileEnv(files, conversations);
+export function profileMounts(files: ProfileFiles, conversations: OxConversations, snapshot?: Awaited<ReturnType<ProfileFiles["snapshot"]>>, includeConversationRecords = true): FileMount[] {
+  const env = profileEnv(files, conversations, snapshot, includeConversationRecords);
   const system = mountedFileSystem("ox-bundled-skills", [{ path: "skills", access: "readOnly", source: { kind: "text", files: Object.fromEntries(
     bundledSkills.flatMap(skill => Object.entries(skill.files).map(([path, text]) => [`${skill.name}/${path}`, text])),
   ) } }]);
@@ -28,7 +28,7 @@ export function profileMounts(files: ProfileFiles, conversations: OxConversation
       return [...new Map([...entries, ...getOrThrow(await system.listDir(path, context))].map(entry => [entry.path, entry])).values()].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
     },
     read: async (path, context) => bundled(path) ? getOrThrow(await system.readTextFile(path, context)) : files.physical && !conversationRecordPath(path)
-      ? files.read(path) : (await files.index())[path]?.binary
+      ? (snapshot ?? files).read(path) : (await files.index())[path]?.binary
         ? getOrThrow(await env.readBinaryFile(path, context)) : getOrThrow(await env.readTextFile(path, context)),
     write: async (path, content, context, expected) => { writable(path); if (files.physical) await files.write(path, content, expected); else getOrThrow(await env.writeFile(path, content, context)); },
     edit: async (path, edits) => { writable(path); await files.edit(path, edits); },
@@ -48,7 +48,8 @@ export function profileMounts(files: ProfileFiles, conversations: OxConversation
   }));
 }
 
-export function profileEnv(files: ProfileFiles, conversations?: OxConversations): ExecutionEnv {
+export function profileEnv(files: ProfileFiles, conversations?: OxConversations, snapshot?: Awaited<ReturnType<ProfileFiles["snapshot"]>>, includeConversationRecords = true): ExecutionEnv {
+  const content = snapshot ?? files;
   const unsupported = async () => err<never, FileError>(new FileError("not_supported", "Operation is unavailable in the Profile filesystem"));
   async function result<T>(body: () => Promise<T>): Promise<Result<T, FileError>> {
     try { return ok(await body()); } catch (error) { return err(error instanceof FileError ? error : new FileError("unknown", String(error))); }
@@ -56,7 +57,7 @@ export function profileEnv(files: ProfileFiles, conversations?: OxConversations)
   const isConversation = (name: string) => name === "conversations" || /^conversations\/(0|[1-9][0-9]*)$/.test(name) || conversationRecordPath(name) || (!files.physical && /^conversations\/[0-9]+\/(metadata|history)$/.test(name));
   async function workingEntries(path: string): Promise<FileInfo[]> {
     if (!files.physical) return [];
-    try { return await files.list(path); }
+    try { return await content.list(path); }
     catch (error) { if (error instanceof FileError && error.code === "not_found") return []; throw error; }
   }
   function projectionPath(path: string) {
@@ -74,7 +75,7 @@ export function profileEnv(files: ProfileFiles, conversations?: OxConversations)
     try { metadata = await conversations.metadata(reference); }
     catch (error) { if (error instanceof Error && error.message === "Conversation not found") throw new FileError("not_found", error.message, path); throw error; }
     if (!metadata.presentation?.visible) throw new FileError("not_found", "Conversation projection not found", path);
-    if (files.physical && match[2] && (await files.record(projectionPath(path), false))) throw new FileError("invalid", "A retained working file conflicts with this virtual conversation record; storage preparation is required", path);
+    if (files.physical && match[2] && (await content.record(projectionPath(path), false))) throw new FileError("invalid", "A retained working file conflicts with this virtual conversation record; storage preparation is required", path);
     return { reference, metadata, file: match[2] };
   }
   async function info(path: string): Promise<FileInfo> {
@@ -85,7 +86,7 @@ export function profileEnv(files: ProfileFiles, conversations?: OxConversations)
       return { name: name.split("/").at(-1)!, path: "/" + name, kind: projection.file ? "file" : "directory",
         size: projection.file ? new TextEncoder().encode(await text(name)).length : 0, mtimeMs: 0 };
     }
-    if (files.physical) return files.info(name);
+    if (files.physical) return content.info(name);
     const index = await files.index();
     if (index[name]) return { name: name.split("/").at(-1)!, path: "/" + name, kind: "file", size: index[name].size, mtimeMs: index[name].mtime };
     if (!name || ["artifacts", "skills"].includes(name) || Object.keys(index).some(key => key.startsWith(name + "/"))) {
@@ -117,7 +118,7 @@ export function profileEnv(files: ProfileFiles, conversations?: OxConversations)
       if (new TextEncoder().encode(value).length > 200 * 1024) throw new FileError("invalid", "Projection exceeds read limit; use paginated history with a smaller page", path);
       return value;
     }
-    const value = await files.read(path);
+    const value = await content.read(path);
     if (typeof value !== "string") throw new FileError("invalid", "Binary files require a dedicated image/document operation", path);
     return value;
   }
@@ -147,6 +148,7 @@ export function profileEnv(files: ProfileFiles, conversations?: OxConversations)
       const name = projectionPath(path); const prefix = name ? name + "/" : "";
       if (isConversation(name)) {
         if (name !== "conversations") {
+          if (!includeConversationRecords) return workingEntries(name);
           const records = await Promise.all(["conversation.json", "turns.jsonl"].map(child => info(prefix + child)));
           return [...await workingEntries(name), ...records];
         }
@@ -161,7 +163,7 @@ export function profileEnv(files: ProfileFiles, conversations?: OxConversations)
         return [...new Map([...await workingEntries(name), ...children].map(entry => [entry.path, entry])).values()];
       }
       if (files.physical) {
-        const entries = await files.list(name);
+        const entries = await content.list(name);
         if (!name && conversations && !entries.some(entry => entry.name === "conversations")) entries.push(await info("conversations"));
         return entries;
       }

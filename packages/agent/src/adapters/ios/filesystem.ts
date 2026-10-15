@@ -6,6 +6,7 @@ import { canonical } from "../../core/file-paths";
 import type { FileOperation, FileRequest } from "../../core/filesystem";
 import { native } from "./bridge";
 import { conversationRecordPath } from "../../profile/file-store";
+import { profileMounts } from "../../profile/filesystem";
 
 export interface NativeFileMount { path: string; access: "readOnly" | "readWrite" }
 export async function invokeFilesystem(runtime: ProfileRuntime, capability: string, mounts: NativeFileMount[], operation: FileOperation, args: FileRequest, signal: AbortSignal) {
@@ -39,7 +40,11 @@ export async function invokeFilesystem(runtime: ProfileRuntime, capability: stri
   const inputs: FileMount[] = mounts.filter(mount => mount.path !== "" && (!runtime.files.physical || !["artifacts", "conversations"].includes(mount.path))).map(mount => ({ ...mount, visibility: ["chats", "history"].includes(mount.path) ? "unlisted" : "listed",
     source: { kind: "backend", backend, path: mount.path === "chats" ? "history" : mount.path } }));
   if (runtime.files.physical) {
-    for (const mount of runtime.env.mounts.filter(mount => mount.path === "")) {
+    const search = operation === "glob" || operation === "grep";
+    const base = canonical(args.path ?? "");
+    const includeConversationRecords = operation !== "grep" || base === "conversations" || base.startsWith("conversations/");
+    const profileInputs = search ? profileMounts(runtime.files, runtime.conversations, await runtime.files.snapshot(signal), includeConversationRecords) : runtime.env.mounts;
+    for (const mount of profileInputs.filter(mount => mount.path === "")) {
       if (mount.source.kind !== "backend") throw new Error("Invalid Profile file mount");
       const profile = mount.source.backend;
       inputs.push({ ...mount, source: { ...mount.source, backend: { ...profile,

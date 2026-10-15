@@ -67,6 +67,7 @@ export class ProfileFiles {
   listFiles() { return this.physicalStore().listFiles(); }
   info(path: string) { return this.physicalStore().info(path); }
   list(path: string) { return this.physicalStore().list(path); }
+  snapshot(signal?: AbortSignal) { return this.physicalStore().snapshot(signal); }
   readRange(path: string, offset: number, length: number) { return this.physicalStore().readRange(path, offset, length); }
   mkdir(path: string, recursive = false) { return this.physicalStore().mkdir(path, recursive); }
   move(from: string, to: string) { return this.physicalStore().move(from, to); }
