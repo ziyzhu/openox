@@ -362,7 +362,6 @@ export class IOSAgentAdapter {
       await session.files.installFileIndex(files);
       await session.files.assignArchiveOwners(await this.archiveOwners(files));
       await session.files.bindPhysicalFiles();
-      await fileRequest("retireLegacyOwner");
       return { prepared: true, files: files.length };
     }
     const backend = nativeFiles();
@@ -382,7 +381,6 @@ export class IOSAgentAdapter {
     await session.files.install(files, conversations);
     await session.files.assignArchiveOwners(await this.archiveOwners(files));
     await session.files.bindPhysicalFiles();
-    await fileRequest("retireLegacyOwner");
     return { prepared: true, files: files.length, conversations: conversations.length };
   }
 

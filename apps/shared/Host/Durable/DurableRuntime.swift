@@ -179,7 +179,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
                     do {
                         _ = try database.perform("close", sql: "", params: [])
                         files?.close()
-                    } catch { Log.agent.error("PiDurable database disposal failed; file ownership retained: \(error.localizedDescription)") }
+                    } catch { Log.agent.error("PiDurable database disposal failed: \(error.localizedDescription)") }
                 }
                 context = nil
                 continuation.resume()
@@ -288,8 +288,6 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
                 guard let files else { throw failure("Native filesystem is not installed in this runtime") }
                 deliver(id, value: try files.perform(params))
             case "sql":
-                // One folder owner precedes SQLite initialization, including failed opens,
-                // and remains held until the database closes.
                 if params["op"] as? String != "close" { try files?.acquire() }
                 guard let op = params["op"] as? String, let sql = params["sql"] as? String, let bindings = params["params"] as? [Any] else { throw failure("Invalid SQL request") }
                 deliver(id, value: try database.perform(op, sql: sql, params: bindings))

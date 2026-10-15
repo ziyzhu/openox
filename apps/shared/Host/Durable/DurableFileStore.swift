@@ -19,8 +19,6 @@ nonisolated final class DurableFileStore {
     private let privateFiles: DurableFileDirectory
     private var privateDirectory: Int32 = -1
     private var directory: Int32 = -1
-    private var lock: Int32 = -1
-    private var legacyLock: Int32 = -1
     private var handles: [String: Handle] = [:]
     private var closed = false
     private let chunkSize = 128 * 1024
@@ -90,15 +88,6 @@ nonisolated final class DurableFileStore {
         case "inventory":
             guard try legacyDirectory(create: false) else { return [String]() }
             return try publicFiles.entries(directory).filter { !$0.hasPrefix(".") }.map { "artifacts/" + $0 }
-        case "retireLegacyOwner":
-            if legacyLock >= 0 {
-                var info = stat()
-                guard fstat(legacyLock, &info) == 0, info.st_size == 0, info.st_nlink == 1,
-                      unlinkat(directory, ".owner", 0) == 0 else { throw failure("Invalid predecessor owner lock") }
-                try durable(directory)
-                Darwin.close(legacyLock); legacyLock = -1
-            }
-            return NSNull()
         case "filesApply", "filesValidate", "filesPreparePending":
             guard let operations = params["operations"] as? [[String: Any]] else { throw failure("Invalid file operations") }
             do {
@@ -261,14 +250,7 @@ nonisolated final class DurableFileStore {
         guard mkdirat(parent, staging, 0o700) == 0 || errno == EEXIST else { throw posix("Create private file scope") }
         let dir = openat(parent, staging, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard dir >= 0 else { throw posix("Pin private file scope") }
-        let owner = openat(dir, ".owner", O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0o600)
-        guard owner >= 0 else { Darwin.close(dir); throw posix("Open file ownership lock") }
-        var ownership = stat()
-        guard fstat(owner, &ownership) == 0, ownership.st_mode & S_IFMT == S_IFREG, ownership.st_nlink == 1 else {
-            Darwin.close(owner); Darwin.close(dir); throw failure("File owner lock must be an owned regular file")
-        }
-        guard flock(owner, LOCK_EX | LOCK_NB) == 0 else { Darwin.close(owner); Darwin.close(dir); throw failure("Profile files already have an owner") }
-        privateDirectory = dir; lock = owner
+        privateDirectory = dir
         _ = try legacyDirectory(create: false)
         try durable(parent)
     }
@@ -276,8 +258,8 @@ nonisolated final class DurableFileStore {
     func close() {
         guard !closed else { return }
         for token in Array(handles.keys) { release(token) }
-        for fd in [lock, legacyLock, directory, privateDirectory] where fd >= 0 { Darwin.close(fd) }
-        lock = -1; legacyLock = -1; directory = -1; privateDirectory = -1
+        for fd in [directory, privateDirectory] where fd >= 0 { Darwin.close(fd) }
+        directory = -1; privateDirectory = -1
         closed = true
     }
 
@@ -292,16 +274,7 @@ nonisolated final class DurableFileStore {
         let dir = openat(parent, "artifacts", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         if dir < 0, errno == ENOENT, !create { return false }
         guard dir >= 0 else { throw posix("Pin predecessor directory") }
-        let owner = openat(dir, ".owner", O_RDWR | O_NOFOLLOW | O_CLOEXEC)
-        if owner < 0, errno != ENOENT { Darwin.close(dir); throw posix("Open predecessor ownership lock") }
-        if owner >= 0 {
-            var info = stat()
-            guard fstat(owner, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_nlink == 1,
-                  flock(owner, LOCK_EX | LOCK_NB) == 0 else {
-                Darwin.close(owner); Darwin.close(dir); throw failure("Predecessor files already have an owner")
-            }
-        }
-        directory = dir; legacyLock = owner
+        directory = dir
         return true
     }
 
