@@ -1,5 +1,5 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { defineDoc, defineDocFamily, type Harness, type ConversationId } from "@earendil-works/pi-durable";
+import { defineDoc, defineDocFamily, type Harness, type ConversationId, type EntryDraft } from "@earendil-works/pi-durable";
 import { FileError } from "@earendil-works/pi-durable/env";
 import type { SqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite";
 import { legacyFilePath, validateFileRecord, type FilePayloadStore } from "./file-payloads";
@@ -64,10 +64,10 @@ export class ProfileFiles {
   record(path: string, reference = true) { return this.physicalStore().record(path, reference); }
   records(paths: string[]) { return this.physicalStore().records(paths); }
   writeStaged(path: string, file: FileRecord) { return this.physicalStore().writeStaged(path, file); }
-  listFiles() { return this.physicalStore().listFiles(); }
+  listFiles(prefix = "") { return this.physicalStore().listFiles(prefix); }
   info(path: string) { return this.physicalStore().info(path); }
   list(path: string) { return this.physicalStore().list(path); }
-  snapshot(signal?: AbortSignal) { return this.physicalStore().snapshot(signal); }
+  snapshot(signal?: AbortSignal, prefix = "") { return this.physicalStore().snapshot(signal, prefix); }
   readRange(path: string, offset: number, length: number) { return this.physicalStore().readRange(path, offset, length); }
   mkdir(path: string, recursive = false) { return this.physicalStore().mkdir(path, recursive); }
   move(from: string, to: string) { return this.physicalStore().move(from, to); }
@@ -80,6 +80,9 @@ export class ProfileFiles {
   install(files: ProfileFileRecord[] = [], conversations: number[] = []) { return this.physicalStore().install(files, conversations); }
   installFileIndex(files: ProfileFileRecord[]) { return this.physicalStore().installFileIndex(files); }
   assignArchiveOwners(owners: Map<string, number>) { return this.physicalStore().assignArchiveOwners(owners); }
+  publishConversation(id: ConversationId, entries: EntryDraft[], payloads: ProfileFileRecord[], newest: number | null) {
+    return this.physicalStore().publishConversation(id, entries, payloads, newest);
+  }
   async createConversation(id: ConversationId) { await this.store?.createConversation(id); }
   async deleteConversation(id: ConversationId) { await this.store?.deleteConversation(id); }
 

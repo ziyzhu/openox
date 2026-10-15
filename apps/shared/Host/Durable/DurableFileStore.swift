@@ -40,8 +40,34 @@ nonisolated final class DurableFileStore {
         if op == "close" { close(); return NSNull() }
         try acquire()
         switch op {
+        case "conversationDecode":
+            guard let profileID = (params["profileID"] as? String).flatMap(UUID.init(uuidString:)),
+                  let sourceValues = params["sources"] as? [String: Any], let names = params["names"] as? [String],
+                  ProfileIO.readConfig(at: root)?.id == profileID else { throw failure("Invalid native conversation scope") }
+            let sources = sourceValues.mapValues(JSONValue.from)
+            var descriptors: [String: Int32] = [:]
+            defer { for descriptor in descriptors.values { Darwin.close(descriptor) } }
+            for (key, source) in sources {
+                guard ["metadata", "transcript", "checkpoint"].contains(key), let fields = source.objectValue,
+                      let path = fields["path"]?.stringValue, let size = fields["size"]?.intValue, size >= 0,
+                      let digest = fields["sha256"]?.stringValue,
+                      path == "artifacts/payload-" + digest + ".json" else { throw failure("Invalid native conversation source") }
+                let physicalPath = payloadPath(path)
+                let descriptor = try (physicalPath == nil ? publicFiles : privateFiles).openFile(physicalPath ?? path)
+                descriptors[key] = descriptor
+                try DurablePayloadWriter.verify(descriptor, size: size, digest: digest)
+            }
+            func data(_ key: String) throws -> Data? {
+                guard let descriptor = descriptors[key], let size = sources[key]?.objectValue?["size"]?.intValue else { return nil }
+                guard size <= 64 * 1024 * 1024 else { throw failure("Native conversation document exceeds size limit") }
+                return try range(descriptor, size: size, offset: 0, length: size)
+            }
+            guard let metadata = try data("metadata") else { throw failure("Missing native conversation metadata") }
+            return try ConversationMigrator.decodeDurableConversation(metadata: metadata, transcript: descriptors["transcript"],
+                checkpoint: data("checkpoint"), sources: sources,
+                scope: ProfileScope(profileID: profileID, root: root, location: .local), names: Set(names.map { $0.lowercased() }), store: self).toAny()
         case "filesInventory":
-            return try publicFiles.inventory(previous: params["files"] as? [[String: Any]] ?? [])
+            return try publicFiles.inventory(previous: params["files"] as? [[String: Any]] ?? [], prefix: params["prefix"] as? String ?? "")
         case "filesVerify":
             guard let path = params["path"] as? String, let size = params["size"] as? Int, size >= 0,
                   let digest = params["sha256"] as? String else { throw failure("Invalid file verification") }
@@ -209,6 +235,16 @@ nonisolated final class DurableFileStore {
 
     func payloadWriter() throws -> DurablePayloadWriter {
         try acquire()
+        if usesPayloadDirectory {
+            let parent = open(stateRoot.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+            guard parent >= 0 else { throw posix("Pin payload scope") }
+            defer { Darwin.close(parent) }
+            guard mkdirat(parent, "payloads", 0o700) == 0 || errno == EEXIST else { throw posix("Create payload directory") }
+            let payloads = openat(parent, "payloads", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+            guard payloads >= 0 else { throw posix("Pin payload directory") }
+            defer { Darwin.close(payloads) }
+            return try DurablePayloadWriter(directory: payloads)
+        }
         _ = try legacyDirectory(create: true)
         return try DurablePayloadWriter(directory: directory)
     }

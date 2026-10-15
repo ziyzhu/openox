@@ -107,7 +107,7 @@ nonisolated final class DurableFileDirectory {
         return names
     }
 
-    func inventory(previous: [[String: Any]]) throws -> [String: Any] {
+    func inventory(previous: [[String: Any]], prefix: String = "") throws -> [String: Any] {
         do { try prepare() }
         catch {
             if (error as NSError).code == Int(ENOENT) { return ["files": [[String: Any]](), "directories": [String]()] }
@@ -122,12 +122,15 @@ nonisolated final class DurableFileDirectory {
         var count = 0
         var bytes = 0
         var ignored = 0
+        let selected = prefix.lowercased()
         func visit(_ directory: Int32, _ prefix: String) throws {
             for name in try entries(directory) {
                 count += 1
                 let path = prefix.isEmpty ? name : prefix + "/" + name
                 bytes += path.utf8.count
                 guard count <= 10_000, bytes <= 4 * 1024 * 1024 else { throw failure("Profile file inventory exceeds limit", code: EINVAL) }
+                let candidate = path.lowercased()
+                if !selected.isEmpty, candidate != selected, !candidate.hasPrefix(selected + "/"), !selected.hasPrefix(candidate + "/") { continue }
                 do { _ = try components(path) }
                 catch { ignored += 1; continue }
                 var info = stat()

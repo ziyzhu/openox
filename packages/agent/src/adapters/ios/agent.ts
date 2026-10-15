@@ -153,6 +153,8 @@ export class IOSAgentAdapter {
         }),
         createBlobID: args.artifactFiles ? undefined : () => native<string>("uuid", {}),
         settings: { retry: { enabled: true, maxRetries: 2 }, toolExecution: "parallel" },
+        decodeConversation: (sources, files) => fileRequest("conversationDecode", { profileID: args.profileID, sources,
+          names: files.filter(file => !file.hidden).flatMap(file => [file.path.split("/").at(-1)!, ...(file.aliases ?? []).map(alias => alias.replace(/^artifacts\//, ""))]) }),
         beforeProgress: reference => this.guardProgress(reference),
         onEvents: async (id, events) => {
           if (this.attachments.has(id)) await native("agentEvents", { conversationID: id, reference: session.conversations.reference(id), events });
@@ -227,6 +229,7 @@ export class IOSAgentAdapter {
       case "conversationMetadata": return session.conversations.metadata(required());
       case "conversationContext": {
         if (!reference) return { messages: [] };
+        await session.prepareConversation(reference);
         const conversation = await session.harness.conversation(session.conversations.id(reference), context);
         if (!conversation) throw new Error("Conversation not found");
         return { messages: (await conversation.context(context)).messages.filter(message => message.role !== "system") };
@@ -393,9 +396,11 @@ export class IOSAgentAdapter {
       for (const item of page.items) {
         let history;
         do {
-          const entries = await this.current.session.conversations.history(item.reference, 100, history);
+          const conversation = await this.current.session.harness.conversation(item.reference.conversationID, context);
+          if (!conversation) throw new Error("Conversation not found");
+          const entries = await conversation.entries({}, 100, history, context);
           for (const entry of entries.items) {
-            if (!["ox.native.metadata", "ox.native.context", "ox.native.turn", "pi.reset"].includes(entry.kind)) continue;
+            if (!["ox.native.conversation", "ox.native.transcript", "ox.native.metadata", "ox.native.context", "ox.native.turn", "pi.reset"].includes(entry.kind)) continue;
             if (!entry.data || typeof entry.data !== "object" || Array.isArray(entry.data)) continue;
             const source = entry.data.source;
             if (!source || typeof source !== "object" || Array.isArray(source)) continue;
@@ -430,6 +435,7 @@ export class IOSAgentAdapter {
     const id = session.conversations.id(reference);
     if (!Number.isSafeInteger(entryID) || entryID < 0) throw new Error("Invalid fork entry ID");
     if (title !== undefined && (typeof title !== "string" || title.length > 1024)) throw new Error("Invalid conversation title");
+    await session.prepareConversation(reference);
     const source = await session.harness.conversation(id, context);
     if (!source) throw new Error("Conversation not found");
     if (!(await source.entries({ minEntryId: entryID, maxEntryId: entryID }, 1, undefined, context)).items.length) throw new Error("Fork entry is not visible in the qualified source history");
@@ -573,7 +579,7 @@ export class IOSAgentAdapter {
     }));
     let listed = files;
     if (session.files.physical) {
-      const working = (await session.files.listFiles()).filter(file => !file.hidden && matching(file.path)).map(file => ({ ...file, reference: file.id }));
+      const working = (await session.files.listFiles(root)).filter(file => !file.hidden && matching(file.path)).map(file => ({ ...file, reference: file.id }));
       const physical = new Set(working.map(file => file.path));
       listed = [...files.filter(file => this.isDocument(file.path) && !physical.has(file.path)), ...working];
     }

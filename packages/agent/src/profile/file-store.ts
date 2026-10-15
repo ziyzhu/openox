@@ -1,9 +1,10 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { defineDoc, type Harness, type ConversationId } from "@earendil-works/pi-durable";
+import { defineDoc, type Harness, type ConversationId, type EntryDraft } from "@earendil-works/pi-durable";
 import { FileError, type FileInfo } from "@earendil-works/pi-durable/env";
 import { canonical } from "../core/file-paths";
 import type { FileRecord } from "./file-record";
 import { SYSTEM_SKILL_NAMES } from "@openox/protocol/skills";
+import { ConversationReadState } from "./conversations";
 
 export type FileMutation =
   | { op: "mkdir"; path: string }
@@ -13,7 +14,7 @@ export type FileMutation =
 export interface ProfileFileBackend {
   stage(bytes: Uint8Array): Promise<FileRecord>;
   apply(operations: FileMutation[]): Promise<void | { conflict: boolean }>;
-  snapshot(files: ProfileFileRecord[]): Promise<{ files: FileObservation[]; directories: string[] }>;
+  snapshot(files: ProfileFileRecord[], prefix?: string): Promise<{ files: FileObservation[]; directories: string[] }>;
   validate(operations: FileMutation[]): Promise<void>;
   read(record: FileRecord): Promise<Uint8Array>;
   readRange(record: FileRecord, offset: number, length: number): Promise<string>;
@@ -84,12 +85,18 @@ export class ProfileFileStore {
   private backend: ProfileFileBackend;
   private external: boolean;
   constructor(harness: Harness, backend: ProfileFileBackend, external = false) { this.harness = harness; this.backend = backend; this.external = external; }
-  private serialize<T>(body: () => Promise<T>, signal?: AbortSignal) {
+  private serialize<T>(body: () => Promise<T>, signal?: AbortSignal, paths?: string[], references = false) {
     const next = this.tail.then(async () => {
       signal?.throwIfAborted();
       await this.recover();
       signal?.throwIfAborted();
-      if (this.external) await this.reconcile();
+      if (this.external) {
+        if (paths === undefined) await this.reconcile();
+        else for (const input of paths) {
+          const file = references ? this.resolve(await this.state(), input) : undefined;
+          await this.reconcile(false, file?.path ?? canonical(input));
+        }
+      }
       signal?.throwIfAborted();
       return body();
     });
@@ -123,16 +130,16 @@ export class ProfileFileStore {
     const extension = new TextEncoder().encode(suffix).length <= 32 ? suffix : "";
     return `file-${await this.backend.identifier()}${extension ? "." + extension : ""}`;
   }
-  private async reconcile(clearPending = false) {
+  private async reconcile(clearPending = false, prefix = "") {
     const state = await this.state();
     if (!state.initialized) return;
-    const snapshot = await this.backend.snapshot(Object.values(state.files).filter(file => !file.hidden));
+    const snapshot = await this.backend.snapshot(Object.values(state.files).filter(file => !file.hidden), prefix);
     const active = (path: string) => !state.deletedConversations.some(id => beneath(path, `conversations/${id}`));
     const accepted = (path: string) => {
       try { publicDocument(path) ? documentPath(path) : workingFilePath(path); return active(path); }
       catch { return false; }
     };
-    const files = Object.fromEntries(Object.entries(state.files).filter(([, file]) => file.hidden));
+    const files = Object.fromEntries(Object.entries(state.files).filter(([, file]) => file.hidden || prefix && !beneath(file.path.toLowerCase(), prefix.toLowerCase())));
     const paths = new Set(Object.values(files).map(file => file.path));
     const previous = new Map(Object.values(state.files).filter(file => !file.hidden).map(file => [file.path, file]));
     for (const observed of snapshot.files.filter(file => accepted(file.path))) {
@@ -142,7 +149,8 @@ export class ProfileFileStore {
       files[id] = { ...observed, id, aliases: existing?.aliases ?? [], saved: existing?.saved ?? false, owner: owner(observed.path) };
       paths.add(observed.path);
     }
-    const directories = snapshot.directories.filter(path => active(path) && (path === "conversations" || path === "skills" || accepted(path))).sort();
+    const retained = prefix ? state.directories.filter(path => !beneath(path.toLowerCase(), prefix.toLowerCase()) && !beneath(prefix.toLowerCase(), path.toLowerCase())) : [];
+    const directories = [...new Set([...retained, ...snapshot.directories.filter(path => active(path) && (path === "conversations" || path === "skills" || accepted(path)))])].sort();
     const comparable = (value: unknown) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item)
       ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
     const changed = clearPending || comparable(files) !== comparable(state.files) || JSON.stringify(directories) !== JSON.stringify(state.directories);
@@ -205,7 +213,7 @@ export class ProfileFileStore {
     const path = canonical(input), files = Object.values(state.files);
     return reference ? files.find(file => file.id === path || file.aliases?.includes(path)) : files.find(file => file.path === path);
   }
-  record(input: string, reference = true) { return this.serialize(async () => this.resolve(await this.state(), input, reference)); }
+  record(input: string, reference = true) { return this.serialize(async () => this.resolve(await this.state(), input, reference), undefined, [input], reference); }
   records(inputs: string[]) {
     return this.serialize(async () => {
       const index = new Map<string, ProfileFileRecord>();
@@ -214,9 +222,9 @@ export class ProfileFileStore {
         for (const alias of file.aliases ?? []) if (!index.has(alias)) index.set(alias, file);
       }
       return inputs.map(input => index.get(canonical(input)));
-    });
+    }, undefined, inputs, true);
   }
-  listFiles() { return this.serialize(async () => Object.values((await this.state()).files)); }
+  listFiles(prefix = "") { return this.serialize(async () => Object.values((await this.state()).files).filter(file => !prefix || beneath(file.path, prefix)), undefined, [prefix]); }
   private assertActive(state: Awaited<ReturnType<ProfileFileStore["state"]>>, path: string) {
     const id = owner(path);
     if (id !== null && (!state.directories.includes(`conversations/${id}`) || state.deletedConversations.includes(id))) throw new FileError("not_found", "Conversation files unavailable", path);
@@ -237,7 +245,7 @@ export class ProfileFileStore {
     return missing;
   }
   info(input: string): Promise<FileInfo> {
-    return this.serialize(async () => this.fileInfo(await this.state(), input));
+    return this.serialize(async () => this.fileInfo(await this.state(), input), undefined, [input]);
   }
   private fileInfo(state: Awaited<ReturnType<ProfileFileStore["state"]>>, input: string): FileInfo {
     const path = canonical(input);
@@ -247,7 +255,7 @@ export class ProfileFileStore {
     throw new FileError("not_found", "File not found", input);
   }
   async list(input: string) {
-    return this.serialize(async () => this.directoryEntries(await this.state(), input));
+    return this.serialize(async () => this.directoryEntries(await this.state(), input), undefined, [input]);
   }
   private directoryEntries(state: Awaited<ReturnType<ProfileFileStore["state"]>>, input: string) {
     const path = canonical(input), prefix = path ? path + "/" : "";
@@ -263,7 +271,7 @@ export class ProfileFileStore {
       name: file.path.split("/").at(-1)!, kind: "file", size: file.size, mtimeMs: file.mtime }));
     return [...directories, ...entries].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
   }
-  snapshot(signal?: AbortSignal) {
+  snapshot(signal?: AbortSignal, prefix = "") {
     return this.serialize(async () => {
       signal?.throwIfAborted();
       const state = await this.state();
@@ -281,7 +289,7 @@ export class ProfileFileStore {
           return file.binary ? bytes : new TextDecoder("utf-8", { fatal: true }).decode(bytes);
         },
       };
-    }, signal);
+    }, signal, [prefix]);
   }
   read(input: string, reference = false): Promise<string | Uint8Array> {
     return this.serialize(async () => {
@@ -290,7 +298,7 @@ export class ProfileFileStore {
       this.assertActive(await this.state(), file.path);
       const bytes = await this.backend.read(file);
       return file.binary ? bytes : new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    });
+    }, undefined, [input], reference);
   }
   readRange(input: string, offset: number, length: number) {
     return this.serialize(async () => {
@@ -298,7 +306,7 @@ export class ProfileFileStore {
       if (!file || (file.owner !== null && state.deletedConversations.includes(file.owner))) throw new FileError("not_found", "File unavailable", input);
       if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length < 0 || length > 32 * 1024 * 1024 || offset > file.size || length > file.size - offset) throw new FileError("invalid", "Invalid bounded file range", input);
       return this.backend.readRange(file, offset, length);
-    });
+    }, undefined, [input], true);
   }
   private async writeLocked(path: string, content: string | Uint8Array, expected?: string) {
     const state = await this.state();
@@ -330,7 +338,7 @@ export class ProfileFileStore {
     const path = workingFilePath(input);
     if (managed(path)) throw new FileError("permission_denied", "Conversation directories are managed", path);
     const frozen = typeof content === "string" ? content : content.slice();
-    return this.serialize(() => this.writeLocked(path, frozen, expected));
+    return this.serialize(() => this.writeLocked(path, frozen, expected), undefined, [path]);
   }
   writeStaged(input: string, staged: FileRecord) {
     const path = workingFilePath(input), frozen = { ...staged };
@@ -345,11 +353,11 @@ export class ProfileFileStore {
       if (existing?.hidden) throw new FileError("permission_denied", "Private blobs are not editable", path);
       const directories = this.parents(state, path, true);
       return this.publishLocked(path, frozen, true, state, existing, directories, existing?.id ?? await this.identifier(path));
-    });
+    }, undefined, [path]);
   }
   writeDocument(input: string, content: string, expected?: string) {
     const path = documentPath(input);
-    return this.serialize(() => this.writeLocked(path, content, expected));
+    return this.serialize(() => this.writeLocked(path, content, expected), undefined, [path]);
   }
   seedDocument(input: string, text: string) {
     const path = documentPath(input);
@@ -361,7 +369,7 @@ export class ProfileFileStore {
       }
       await this.writeLocked(path, text);
       return { content: text };
-    });
+    }, undefined, [path]);
   }
   documentBatch(writes: { path: string; text: string }[], removes: string[]) {
     const changes = writes.map(file => ({ ...file, path: documentPath(file.path) }));
@@ -384,7 +392,7 @@ export class ProfileFileStore {
         operations.push({ op: "replace", path, source: staged.path, size: staged.size, sha256: staged.sha256, previous: existing ? { size: existing.size, sha256: existing.sha256 } : null });
       }
       await this.commit(files, [...directories], operations);
-    });
+    }, undefined, [...changes.map(file => file.path), ...deleted]);
   }
   edit(input: string, edits: { oldText: string; newText: string }[], document = false) {
     const path = document ? documentPath(input) : workingFilePath(input);
@@ -401,7 +409,7 @@ export class ProfileFileStore {
       let text = source;
       for (const range of ranges.reverse()) text = text.slice(0, range.start) + range.newText + text.slice(range.end);
       await this.writeLocked(path, text, source);
-    });
+    }, undefined, [path]);
   }
   mkdir(input: string, recursive = false) {
     const path = workingFilePath(input);
@@ -414,7 +422,7 @@ export class ProfileFileStore {
       }
       const directories = [...this.parents(state, path, recursive), path];
       await this.commit(state.files, [...state.directories, ...directories], directories.map(path => ({ op: "mkdir", path })));
-    });
+    }, undefined, [path]);
   }
   remove(input: string, directory = false, recursive = false) {
     const path = workingFilePath(input);
@@ -427,7 +435,7 @@ export class ProfileFileStore {
       if (!this.findPath(state, path)) throw new FileError("not_found", "File not found", path);
       if (directory && !recursive && [...state.directories, ...Object.values(state.files).map(file => file.path)].some(child => child !== path && beneath(child, path))) throw new FileError("invalid", "Directory is not empty", path);
       await this.removeLocked(state, path);
-    });
+    }, undefined, [path]);
   }
   private async removeLocked(state: Awaited<ReturnType<ProfileFileStore["state"]>>, path: string, conversation?: number) {
     const removed = Object.values(state.files).filter(file => beneath(file.path, path) || (conversation !== undefined && file.owner === conversation));
@@ -460,7 +468,7 @@ export class ProfileFileStore {
       }
       operations.push(...state.directories.filter(path => beneath(path, source)).sort((a, b) => b.length - a.length).map(path => ({ op: "remove" as const, path, directory: true })));
       await this.commit(files, [...state.directories.filter(path => !beneath(path, source)), ...added, ...renamedDirectories], operations);
-    });
+    }, undefined, [source, target]);
   }
   copy(input: string, destination: string) {
     const source = workingFilePath(input), target = workingFilePath(destination);
@@ -471,14 +479,14 @@ export class ProfileFileStore {
       if (!file || file.hidden) throw new FileError("not_supported", "Copy requires a visible file", source);
       const bytes = await this.backend.read(file);
       return this.writeLocked(target, file.binary ? bytes : new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-    });
+    }, undefined, [source, target]);
   }
   saved(input: string, saved: boolean) {
     return this.serialize(async () => {
       const state = await this.state(), file = this.resolve(state, input);
       if (!file || file.hidden) throw new FileError("not_found", "File unavailable", input);
       await this.commit({ ...state.files, [file.id]: { ...file, saved } }, state.directories, []);
-    });
+    }, undefined, [input], true);
   }
   installFileIndex(files: ProfileFileRecord[]) {
     return this.serialize(async () => {
@@ -498,6 +506,25 @@ export class ProfileFileStore {
       }, context);
     });
   }
+  publishConversation(id: ConversationId, entries: EntryDraft[], payloads: ProfileFileRecord[], newest: number | null) {
+    return this.serialize(async () => {
+      await this.harness.commit(async tx => {
+        const state = await tx.doc(ProfileFileState);
+        if (state.deletedConversations.includes(id)) throw new Error("Conversation not found");
+        if ((await tx.scanEntries({ conversationId: id }, 1)).items[0]?.id !== newest) throw new Error("Native conversation changed during conversion");
+        for (const file of payloads) {
+          const existing = Object.values(state.files).find(record => record.path === file.path || record.aliases?.includes(file.aliases![0]!));
+          if (existing) { if (existing.owner !== id) existing.owner = null; }
+          else state.files[file.id] = file;
+        }
+        const read = await tx.doc(ConversationReadState, id);
+        const wasRead = newest !== null && read.lastReadEntryID !== null && read.lastReadEntryID >= newest;
+        let latest = newest;
+        for (const entry of entries) latest = (await tx.appendEntry(id, entry)).id;
+        if (wasRead) read.lastReadEntryID = latest;
+      }, context);
+    }, undefined, []);
+  }
   createConversation(id: ConversationId) {
     return this.serialize(async () => {
       const state = await this.state(), path = `conversations/${id}`;
@@ -505,7 +532,7 @@ export class ProfileFileStore {
       if (state.directories.includes(path)) return;
       const directories = ["conversations", path].filter(path => !state.directories.includes(path));
       await this.commit(state.files, [...state.directories, ...directories], directories.map(path => ({ op: "mkdir", path })));
-    });
+    }, undefined, [`conversations/${id}`]);
   }
   deleteConversation(id: ConversationId) {
     return this.serialize(async () => {
@@ -514,6 +541,6 @@ export class ProfileFileStore {
         if (!state.deletedConversations.includes(id)) state.deletedConversations.push(id);
       }, context);
       await this.removeLocked(await this.state(), `conversations/${id}`, id);
-    });
+    }, undefined, [`conversations/${id}`]);
   }
 }

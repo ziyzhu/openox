@@ -1,7 +1,7 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import type { Models, AssistantMessage } from "@earendil-works/pi-ai";
+import type { Models, AssistantMessage, Message } from "@earendil-works/pi-ai";
 import { Harness, createRegistry, watchEvents, type AgentEvent, type AgentEventStream, type ConversationId,
-  type Conversation, type HarnessSettings, type InputSubmissionDraft, type Registry, type Submission, type SubmissionId } from "@earendil-works/pi-durable";
+  type Conversation, type EntryDraft, type HarnessSettings, type InputSubmissionDraft, type Registry, type Submission, type SubmissionId } from "@earendil-works/pi-durable";
 import { SqliteStorage, type SqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite";
 import { applyChanges } from "./committed-partial";
 import { ProfileFiles } from "./files";
@@ -12,7 +12,8 @@ import { bundledSkills } from "../core/bundled-skills";
 import { OxConversations, type ConversationReference } from "./conversations";
 import { profileTools } from "./tools";
 import { AgentFileSystem } from "../core/filesystem";
-import { type ProfileFileBackend } from "./file-store";
+import { type ProfileFileBackend, type ProfileFileRecord } from "./file-store";
+import type { FileRecord } from "./file-record";
 
 const context = BACKGROUND_CONTEXT;
 export type CommittedEvent = AgentEvent & { partial?: AssistantMessage };
@@ -27,6 +28,7 @@ export interface ProfileRuntimeOptions {
   mounts?: readonly FileMount[];
   /** Only for the explicitly retained, purgeable SQLite-blob fixtures. */
   createBlobID?(): Promise<string>;
+  decodeConversation?(sources: Record<string, FileRecord>, files: ProfileFileRecord[]): Promise<{ entries: EntryDraft[]; expectedContext: Message[]; payloads: FileRecord[] }>;
   beforeProgress?(reference: ConversationReference): Promise<void>;
   onEvents?(conversationId: ConversationId, events: CommittedEvent[]): Promise<void>;
   onReport?(error: unknown): void;
@@ -53,6 +55,8 @@ export class ProfileRuntime {
     return { scope: this.options.profileID, mounts: this.env.mounts.flatMap(mount => mount.source.kind === "text"
       ? [{ path: mount.path, access: "readOnly" as const, files: mount.source.files }] : []) };
   }
+  private preparedConversations = new Set<ConversationId>();
+  private preparingConversations = new Map<ConversationId, Promise<void>>();
   private projections = new Map<ConversationId, Projection>();
   private attaching = new Map<ConversationId, Promise<void>>();
   private closing?: Promise<void>;
@@ -66,7 +70,7 @@ export class ProfileRuntime {
     this.options = options;
     this.files = new ProfileFiles(harness, options.database, options.profileID, options.createBlobID, options.artifacts,
       options.fileStorage?.kind === "prepare" ? "prepare" : options.fileStorage ? "physical" : "legacy", options.fileStorage?.backend, options.fileStorage?.publicFiles);
-    this.conversations = new OxConversations(options.profileID, harness, () => this.ready());
+    this.conversations = new OxConversations(options.profileID, harness, () => this.ready(), reference => this.prepareConversation(reference));
     const mounts = profileMounts(this.files, this.conversations);
     this.env = mountedFileSystem(options.profileID, [...mounts, ...options.mounts ?? []]);
   }
@@ -90,8 +94,67 @@ export class ProfileRuntime {
   }
 
   private ready() { if (this.closing) throw new Error("Profile runtime closed or closing"); }
+  async prepareConversation(reference: ConversationReference) {
+    const id = this.conversations.id(reference);
+    if (this.preparedConversations.has(id)) return;
+    let pending = this.preparingConversations.get(id);
+    if (!pending) {
+      pending = this.decodeConversation(id).then(() => { this.preparedConversations.add(id); })
+        .finally(() => this.preparingConversations.delete(id));
+      this.preparingConversations.set(id, pending);
+    }
+    await pending;
+  }
+
+  private async decodeConversation(id: ConversationId) {
+    if ((await this.files.state()).deletedConversations.includes(id)) throw new Error("Conversation not found");
+    const conversation = await this.harness.conversation(id, context);
+    if (!conversation) throw new Error("Conversation not found");
+    const nativeEntries: EntryDraft[] = [];
+    let hasModel = false;
+    let cursor;
+    let newest: number | null = null;
+    do {
+      const page = await conversation.entries({}, 100, cursor, context);
+      newest ??= page.items[0]?.id ?? null;
+      for (const entry of page.items) {
+        if (entry.kind === "ox.native.metadata") return;
+        hasModel ||= !!entry.model?.length;
+        if (["ox.native.conversation", "ox.native.transcript", "ox.native.context"].includes(entry.kind)) nativeEntries.push({ kind: entry.kind, data: entry.data });
+      }
+      cursor = page.next;
+    } while (cursor);
+    if (!nativeEntries.some(entry => entry.kind === "ox.native.conversation")) return;
+    if (hasModel) throw new Error("Native conversation already contains model history without canonical metadata");
+    const sources: Record<string, FileRecord> = {};
+    for (const entry of nativeEntries) {
+      const key = ({ "ox.native.conversation": "metadata", "ox.native.transcript": "transcript", "ox.native.context": "checkpoint" } as Record<string, string>)[entry.kind]!;
+      const source = entry.data && typeof entry.data === "object" && !Array.isArray(entry.data) ? entry.data.source : undefined;
+      if (!source || typeof source !== "object" || Array.isArray(source) || typeof source.path !== "string"
+        || typeof source.size !== "number" || !Number.isSafeInteger(source.size) || source.size < 0 || typeof source.sha256 !== "string"
+        || source.path !== `artifacts/payload-${source.sha256}.json` || !/^[0-9a-f]{64}$/.test(source.sha256)) throw new Error("Invalid native conversation source");
+      if (sources[key]) throw new Error("Duplicate native conversation source");
+      sources[key] = { path: source.path, size: source.size, sha256: source.sha256 };
+    }
+    if (!this.options.decodeConversation || !this.options.fileStorage) throw new Error("Native conversation decoder is unavailable");
+    const decoded = await this.options.decodeConversation(sources, Object.values((await this.files.state()).files));
+    if (!decoded.entries.length || decoded.entries[0]?.kind !== "ox.native.metadata"
+      || decoded.entries.some(entry => !entry.kind || (entry.head !== undefined && entry.head !== "self") || entry.edits !== undefined)
+      || !Array.isArray(decoded.expectedContext) || !Array.isArray(decoded.payloads)) throw new Error("Invalid decoded conversation");
+    const payloads: ProfileFileRecord[] = [];
+    for (const file of decoded.payloads) {
+      if (!Number.isSafeInteger(file.size) || file.size < 0 || !/^[0-9a-f]{64}$/.test(file.sha256)
+        || file.path !== `artifacts/payload-${file.sha256}.json`) throw new Error("Invalid decoded conversation payload");
+      await this.options.fileStorage.backend.verify(file);
+      payloads.push({ ...file, path: `payloads/${file.path.slice(10)}`, aliases: [file.path],
+        id: `file-${await this.options.fileStorage.backend.identifier()}.json`, binary: true, saved: false, mtime: 0, owner: id, hidden: true });
+    }
+    await this.files.publishConversation(id, [...decoded.entries, { kind: "pi.reset", head: "self", model: decoded.expectedContext }], payloads, newest);
+  }
+
   private async conversation(id: ConversationId) {
     this.ready();
+    await this.prepareConversation(this.conversations.reference(id));
     if (this.files.physical && (await this.files.state()).deletedConversations.includes(id)) throw new Error("Conversation not found");
     const conversation = await this.harness.conversation(id, context);
     if (!conversation) throw new Error("Conversation not found");
@@ -217,6 +280,7 @@ export class ProfileRuntime {
   close(): Promise<void> {
     if (!this.closing) this.closing = (async () => {
       await this.filesystem.close();
+      await Promise.allSettled(this.preparingConversations.values());
       await this.files.flush();
       await Promise.allSettled(this.attaching.values());
       await this.harness.close(context);

@@ -35,11 +35,13 @@ export class OxConversations {
   readonly profileID: string;
   private harness: Harness;
   private ready: () => void;
+  private prepare: (reference: ConversationReference) => Promise<void>;
 
-  constructor(profileID: string, harness: Harness, ready: () => void) {
+  constructor(profileID: string, harness: Harness, ready: () => void, prepare: (reference: ConversationReference) => Promise<void> = async () => {}) {
     this.profileID = profileID;
     this.harness = harness;
     this.ready = ready;
+    this.prepare = prepare;
   }
 
   reference(conversationID: ConversationId): ConversationReference {
@@ -120,6 +122,7 @@ export class OxConversations {
       throw new Error("Conversation history cursor scope mismatch");
     }
     pageSize(limit);
+    await this.prepare(reference);
     const conversation = await this.handle(reference);
     const page = await conversation.entries({}, limit, cursor?.pi, context);
     return { reference: this.reference(conversation.id), order: "newest-first" as const, items: page.items,

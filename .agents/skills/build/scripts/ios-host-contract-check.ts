@@ -150,8 +150,12 @@ export async function check(): Promise<string> {
     failures.push("apps/ios: legacy DebugServer or OxHostAPI reference remains");
   }
 
-  const migrationOwners = ["StorageMigrator", "ProfileMigrator", "ApplicationStorageMigrator", "CredentialMigrator", "RepositoryMigrator", "StorageMigrationSupport"];
-  const migrationFiles = ["StorageMigration", ...migrationOwners.slice(1)].map(name => `apps/shared/Host/Profile/${name}.swift`);
+  const migrationOwners = ["StorageMigrator", "ProfileMigrator", "ApplicationStorageMigrator", "CredentialMigrator", "RepositoryMigrator", "StorageMigrationSupport", "ConversationMigrator"];
+  const migrationFiles = [
+    ...["StorageMigration", ...migrationOwners.slice(1, -1)].map(name => `apps/shared/Host/Profile/${name}.swift`),
+    "apps/shared/Host/Conversations/ConversationMigrator.swift",
+    "apps/shared/Host/Conversations/ConversationMigrator+Durable.swift",
+  ];
   const migrationCallers: Record<string, Set<string>> = {
     StorageMigrator: new Set([migrationFiles[0], "apps/ios/Host/IOSHost.swift", "apps/shared/Host/HostRuntime.swift"]),
     ProfileMigrator: new Set([...migrationFiles, "apps/shared/Host/Profile/ProfileRepository.swift", "apps/shared/Host/Profile/StorageRoot.swift", "apps/shared/Host/Durable/DurableProfileStore.swift", "apps/shared/Host/RPC/DebugDurableConversation.swift"]),
@@ -159,6 +163,7 @@ export async function check(): Promise<string> {
     CredentialMigrator: new Set(migrationFiles),
     RepositoryMigrator: new Set([...migrationFiles, "apps/shared/Host/Services/Repository/Repository.swift"]),
     StorageMigrationSupport: new Set(migrationFiles),
+    ConversationMigrator: new Set([...migrationFiles, "apps/shared/Host/Durable/DurableFileStore.swift"]),
   };
   for (const [index, source] of allSource.entries()) {
     const path = relative(ROOT, allSwiftFiles[index]);

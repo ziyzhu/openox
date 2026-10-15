@@ -71,10 +71,14 @@ export class ApplicationPresentation {
     this.runtime = runtime;
   }
   private async hasTranscript(reference: ConversationReference) {
-    let cursor: ConversationHistoryCursor | undefined;
+    const conversation = await this.runtime.harness.conversation(this.runtime.conversations.id(reference), context);
+    if (!conversation) throw new Error("Conversation not found");
+    let cursor: Cursor | undefined;
     do {
-      const page = await this.runtime.conversations.history(reference, 1, cursor);
-      if (page.items.some(entry => entry.kind !== "pi.reset" && entry.kind !== "pi.compaction"
+      const page = await conversation.entries({}, 20, cursor, context);
+      if (page.items.some(entry => entry.kind === "ox.native.transcript" && entry.data && typeof entry.data === "object" && !Array.isArray(entry.data)
+        && entry.data.source && typeof entry.data.source === "object" && !Array.isArray(entry.data.source) && Number(entry.data.source.size) > 0
+        || entry.kind !== "pi.reset" && entry.kind !== "pi.compaction"
         && entry.model?.some(message => message.role === "user" || message.role === "assistant"))) return true;
       cursor = page.next;
     } while (cursor);
@@ -123,6 +127,7 @@ export class ApplicationPresentation {
   }
   async populate(reference: ConversationReference, entries: EntryDraft[]) {
     if (!Array.isArray(entries) || entries.some(entry => entry.kind !== "ox.native.turn" || entry.head !== undefined || entry.edits !== undefined)) throw new Error("Imported entries require native turns without foreign identities");
+    await this.runtime.prepareConversation(reference);
     const id = this.runtime.conversations.id(reference), conversation = await this.runtime.harness.conversation(id, context);
     if (!conversation) throw new Error("Conversation not found");
     const frozen = JSON.parse(JSON.stringify(entries)) as EntryDraft[];
@@ -134,6 +139,7 @@ export class ApplicationPresentation {
     }, context);
   }
   async load(reference: ConversationReference) {
+    await this.runtime.prepareConversation(reference);
     const id = this.runtime.conversations.id(reference);
     const conversation = await this.runtime.harness.conversation(id, context);
     if (!conversation) throw new Error("Conversation not found");
@@ -148,6 +154,7 @@ export class ApplicationPresentation {
   async save(reference: ConversationReference, change: ApplicationPresentationChange) {
     validate(change);
     const frozen = JSON.parse(JSON.stringify(change)) as ApplicationPresentationChange;
+    if (frozen.turns !== undefined) await this.runtime.prepareConversation(reference);
     const id = this.runtime.conversations.id(reference);
     const conversation = await this.runtime.harness.conversation(id, context);
     if (!conversation) throw new Error("Conversation not found");
