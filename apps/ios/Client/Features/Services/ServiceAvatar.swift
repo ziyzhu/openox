@@ -283,13 +283,13 @@ struct ServiceChip: View {
                 case .signedIn:
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .foregroundStyle(Theme.Colors.onSurface)
                 case .signedOut:
                     Image(systemName: "circle")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .foregroundStyle(Theme.Colors.onSurface)
                 case .loading:
-                    CellularAutomatonLoader(size: 14, tint: Theme.Colors.onSurfaceMuted.dynamic)
+                    CellularAutomatonLoader(size: 14, tint: Theme.Colors.onSurface.dynamic)
                 }
             }
             .frame(width: 12, height: 12)
