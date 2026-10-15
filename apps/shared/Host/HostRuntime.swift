@@ -18,6 +18,7 @@ final class HostRuntime: OxHost {
     private let deactivateSchedules: @MainActor () async -> Void
     private var preparation: Preparation?
     private var optionalRecovery: Task<Void, Never>?
+    private var profileSummaryLoad: Task<Void, Never>?
 
     init(
         serviceManager: ServiceManager,
@@ -52,6 +53,9 @@ final class HostRuntime: OxHost {
             }) else { throw RuntimeError.bridge("Stop running conversations before changing Profiles") }
             guard await conversations.flushAllNow() else { throw RuntimeError.bridge("Profile writes could not be flushed") }
             await deactivateSchedules()
+            profileSummaryLoad?.cancel()
+            await profileSummaryLoad?.value
+            profileSummaryLoad = nil
         }
         StorageRoot.shared.profileDidChange = { [weak self] in
             try await self?.refreshProfile()
@@ -60,21 +64,27 @@ final class HostRuntime: OxHost {
 
     deinit {
         optionalRecovery?.cancel()
+        profileSummaryLoad?.cancel()
     }
 
     private func refreshProfile() async throws {
+        let startedAt = Date()
         conversations.reset()
-        await services.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
         Soul.shared.reload()
         UserMemory.shared.reload()
+        await services.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region), reuseApplicationRepositories: true)
         Skills.shared.refresh()
-        try await Soul.shared.waitUntilCurrent()
-        try await UserMemory.shared.waitUntilCurrent()
-        await Skills.shared.waitUntilCurrent()
         conversations.startNewConversation()
-        await conversations.loadSummariesNow()
+        let scope = StorageRoot.shared.scope
+        let conversations = conversations
+        profileSummaryLoad = Task { @MainActor in
+            guard !Task.isCancelled, StorageRoot.shared.scope == scope else { return }
+            let startedAt = Date()
+            await conversations.loadSummariesNow()
+            Log.app.info("HostRuntime Profile summaries id=\(scope.profileID?.uuidString ?? "none") durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1_000))")
+        }
         try activateSchedules()
-        Log.app.info("HostRuntime Profile changed id=\(StorageRoot.shared.activeId?.uuidString ?? "none")")
+        Log.app.info("HostRuntime Profile changed id=\(StorageRoot.shared.activeId?.uuidString ?? "none") durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1_000))")
     }
 
     func listConversations() -> [HostConversationSummary] {

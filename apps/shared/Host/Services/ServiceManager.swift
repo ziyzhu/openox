@@ -539,8 +539,8 @@ final class ServiceManager {
     }
 
     @discardableResult
-    func refreshServices(locale: String?) async -> [String] {
-        await loadRepositories(locale: locale)
+    func refreshServices(locale: String?, reuseApplicationRepositories: Bool = false) async -> [String] {
+        await loadRepositories(locale: locale, reuseApplicationRepositories: reuseApplicationRepositories)
     }
 
     func prepareServices(domains: [String], locale: String?) async throws -> [Service] {
@@ -584,13 +584,13 @@ final class ServiceManager {
         return required.compactMap { service(domain: $0) }
     }
 
-    private func loadRepositories(locale: String?) async -> [String] {
+    private func loadRepositories(locale: String?, reuseApplicationRepositories: Bool = false) async -> [String] {
         await acquireRepositoryLoad()
         defer { releaseRepositoryLoad() }
         let before = monoRepositoryHash
         repositoryState = .syncing
         do {
-            let monoRepository = try await repository.monoRepository()
+            let monoRepository = try await repository.monoRepository(reuseApplicationRepositories: reuseApplicationRepositories)
             self.monoRepository = monoRepository
             repositories = monoRepository.repositories
             repositoryConflicts = monoRepository.conflicts
@@ -610,7 +610,6 @@ final class ServiceManager {
             monoRepositoryHash = monoRepository.hash
             repositoryState = .ready
             guard before != monoRepository.hash || monoRepositoryState != .ready || monoRepositoryLocale != locale else {
-                invalidateFavicons()
                 Log.service.info("ServiceManager.refreshServices unchanged monoRepository=\(monoRepository.hash.prefix(12))")
                 return []
             }

@@ -669,6 +669,9 @@ struct RootView: View {
                 monitorActiveProfile()
                 refreshCompactSidebar()
             }
+            .onChange(of: conversations.summaries) { _, _ in
+                refreshCompactSidebar()
+            }
             .onChange(of: AppLocale.shared.language) { _, _ in
                 reloadServiceLocale()
             }

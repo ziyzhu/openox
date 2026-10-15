@@ -318,6 +318,9 @@ actor Repository {
     private var activeSources: [String: ActiveSource] = [:]
     private var localPreparation: StoragePreparation?
     private var mountedRepositories = MountedRepositoryStore()
+    private var applicationRepositories: [LoadedRepository]?
+    private var applicationSkills: [String: [Skill]] = [:]
+    private var unmountedCatalog: MonoRepository?
 
     init(root: URL? = nil, developmentRemote: URL? = nil) {
         bundledRoot = root ?? Bundle.main.url(forResource: "OxServices", withExtension: "bundle")
@@ -341,21 +344,35 @@ actor Repository {
         }
     }
 
-    func monoRepository() async throws -> MonoRepository {
+    func monoRepository(reuseApplicationRepositories: Bool = false) async throws -> MonoRepository {
         prepareStorage()
-        let localMaterializationFailure = localPreparation?.failureMessage
-        let bundled = loadBundledRepository()
-        let development = loadDevelopmentRepository()
-        let local = localMaterializationFailure.map(failedLocal) ?? loadLocalRepository()
-        let installed = configuration.repositories.map(loadInstalledRepository)
         let profileId = await StorageRoot.shared.activeId
         let grantIDs = Set(await DeviceFolderStore.shared.grants(for: profileId).map(\.id))
+        let mountedRecords = ((try? mountedRepositories.records()) ?? []).filter { grantIDs.contains($0.grantID) }
+        guard await StorageRoot.shared.activeId == profileId else { throw CancellationError() }
+        if reuseApplicationRepositories, mountedRecords.isEmpty, let cached = unmountedCatalog {
+            Log.service.info("Repository.profileSwitch reusedCatalog=true repositories=\(cached.repositories.count) skills=\(cached.skills.count)")
+            return cached
+        }
+        unmountedCatalog = nil
+        let application: [LoadedRepository]
+        if reuseApplicationRepositories, let cached = applicationRepositories {
+            application = cached
+            Log.service.info("Repository.profileSwitch reusedRepositories=\(cached.count) reusedSkillCatalogs=\(applicationSkills.count)")
+        } else {
+            let bundled = loadBundledRepository()
+            let development = loadDevelopmentRepository()
+            let local = localPreparation?.failureMessage.map(failedLocal) ?? loadLocalRepository()
+            application = [bundled, development, local].compactMap { $0 } + configuration.repositories.map(loadInstalledRepository)
+            applicationRepositories = application
+            applicationSkills = [:]
+        }
         var mounted: [LoadedRepository] = []
-        for record in (try? mountedRepositories.records()) ?? [] where grantIDs.contains(record.grantID) {
+        for record in mountedRecords {
             mounted.append(await loadMountedRepository(record, profileId: profileId))
         }
         guard await StorageRoot.shared.activeId == profileId else { throw CancellationError() }
-        let available = [bundled, development, local].compactMap { $0 } + installed + mounted
+        let available = application + mounted
         let loaded = available.compactMap { loaded in
             if case .ready = loaded.descriptor.state { return loaded }
             return nil
@@ -367,15 +384,23 @@ actor Repository {
         }
         var skills: [Skill] = []
         for loaded in loaded where loaded.descriptor.isEnabled {
+            let applicationOwned = loaded.descriptor.provenance != .mounted
+            if applicationOwned, let cached = applicationSkills[loaded.descriptor.id] {
+                skills.append(contentsOf: cached)
+                continue
+            }
+            var repositorySkills: [Skill] = []
             for name in loaded.package.skills {
                 do {
                     var skill = try SkillFiles.load(directory: loaded.contentRoot.appendingPathComponent("skills/\(name)"))
                     skill.source = .repository(id: loaded.descriptor.id, name: loaded.descriptor.name, writable: loaded.descriptor.provenance == .local && loaded.descriptor.view == .live)
-                    skills.append(skill)
+                    repositorySkills.append(skill)
                 } catch {
                     Log.service.error("Repository.skill invalid name=\(name) repository=\(loaded.descriptor.id) error=\(error.localizedDescription)")
                 }
             }
+            skills.append(contentsOf: repositorySkills)
+            if applicationOwned { applicationSkills[loaded.descriptor.id] = repositorySkills }
         }
         var candidates: [String: [Candidate]] = [:]
         for repository in loaded where repository.descriptor.isEnabled {
@@ -484,7 +509,7 @@ actor Repository {
         let skillInput = skills.map { "\($0.id):\(SkillFiles.serialize($0)):\(($0.resources ?? [:]).sorted { $0.key < $1.key }.map { $0.key + $0.value }.joined())" }.sorted().joined(separator: "\n")
         let hash = SHA256.hash(data: Data((input + skillInput).utf8)).map { String(format: "%02x", $0) }.joined()
         Log.service.info("Repository.monoRepository repositories=\(descriptors.count) enabled=\(descriptors.count(where: \.isEnabled)) services=\(selected.count) conflicts=\(conflicts.count) hash=\(hash.prefix(12))")
-        return MonoRepository(
+        let catalog = MonoRepository(
             repositories: descriptors,
             conflicts: conflicts,
             webManifests: web,
@@ -493,6 +518,8 @@ actor Repository {
             hash: hash,
             skills: skills
         )
+        if mountedRecords.isEmpty { unmountedCatalog = catalog }
+        return catalog
     }
 
     func source(domain: String) async -> Source? {

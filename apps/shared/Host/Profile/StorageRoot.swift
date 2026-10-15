@@ -118,12 +118,16 @@ final class StorageRoot {
     func switchTo(_ profile: Profile) async throws {
         guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
         guard profile.id != activeId else { return }
+        let startedAt = Date()
         isBusy = true
         defer { isBusy = false }
         let migrated = try await migrate(profile)
+        Log.app.info("StorageRoot.switch prepared id=\(profile.id) durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1_000))")
         update(migrated.id) { $0 = migrated }
         try await activate(migrated)
+        Log.app.info("StorageRoot.switch activated id=\(profile.id) durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1_000))")
         try await publishProfileChange()
+        Log.app.info("StorageRoot.switch completed id=\(profile.id) durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1_000))")
     }
 
     func accessDirectory(_ url: URL) throws { try profileStore.accessDirectory(url) }
