@@ -855,11 +855,18 @@ struct RootView: View {
                 || conversations.openingId != nil
                 || compactConversationTransition.isClosing
                 || pendingConversationPresentationId != nil {
-                CellularAutomatonLoader()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Theme.Colors.surface)
-                    .transition(.opacity)
-                    .zIndex(1)
+                Group {
+                    if let progress = storage.migrationProgress {
+                        ProfileMigrationProgressView(stage: progress,
+                                                     automationID: "startup.profileMigration")
+                    } else {
+                        CellularAutomatonLoader()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Theme.Colors.surface)
+                .transition(.opacity)
+                .zIndex(1)
             }
         }
     }

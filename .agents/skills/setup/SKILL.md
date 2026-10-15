@@ -120,6 +120,11 @@ run-owned name suffix; each application creates new Profiles rather than merging
 into existing data. Result manifests map template-local Profile/conversation IDs to actual
 IDs. Settings support the existing Ox themes, not an invented system theme.
 
+For manual Simulator preference edits, stop the app and target the current data
+container’s `Library/Preferences/<bundle-id>` path with `defaults`; a bare bundle
+domain can address different preferences. Re-resolve the container after installation
+and verify the preference in the app’s startup logs.
+
 UserDefaults supports strings, booleans, numbers, arrays, `{ "dictionary": {...} }`,
 `{ "data": "<base64>" }`, and `{ "date": "<UTC ISO timestamp>" }`; explicit `remove`
 clears keys. Typed settings and raw preferences cannot conflict. Profile files can

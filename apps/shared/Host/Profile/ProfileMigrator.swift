@@ -575,7 +575,7 @@ nonisolated enum ProfileMigrator {
         return value
     }
 
-    static func stageDurableProfile(_ profile: Profile, at destination: URL) async throws -> JSONValue {
+    static func stageDurableProfile(_ profile: Profile, at destination: URL, progress: @Sendable @escaping (String) async -> Void = { _ in }) async throws -> JSONValue {
         let sourcePath = profile.url.resolvingSymlinksInPath().standardizedFileURL.path.lowercased()
         let destinationPath = destination.resolvingSymlinksInPath().standardizedFileURL.path.lowercased()
         guard profile.location == .local, profile.version == nativeProfileVersion,
@@ -595,6 +595,7 @@ nonisolated enum ProfileMigrator {
                   (0..<prepared.conversationCount).contains(index) else {
                 throw StorageMigrationError.invalidApplicationStorage("staged conversation request")
             }
+            await progress(String(localized: "Migrating conversation \(index + 1) of \(prepared.conversationCount)…"))
             return try await Task.detached(priority: .userInitiated) {
                 let data = try durableSourceFile("\(index).json", at: prepared.conversationDirectory)
                 Log.app.info("StorageMigrator.pi installing conversation=\(index + 1)/\(prepared.conversationCount) bytes=\(data.count)")
@@ -1353,7 +1354,8 @@ nonisolated enum ProfileMigrator {
         return prepared
     }
 
-    static func migrate(_ profile: Profile) async throws -> Profile {
+    static func migrate(_ profile: Profile, progress: @Sendable @escaping (String) async -> Void = { _ in }) async throws -> Profile {
+        await progress(String(localized: "Checking Profile…"))
         try recoverDurablePublications()
         try recoverPublicProfilePublications()
         guard let config = ProfileIO.readConfig(at: profile.url), config.id == profile.id, sourceVersion(for: config.version) != nil else {
@@ -1363,21 +1365,26 @@ nonisolated enum ProfileMigrator {
         var migrated = profile
         migrated.version = config.version
         if config.version == internalStateVersion {
+            await progress(String(localized: "Preparing Profile files…"))
             return try await prepareInternalState(migrated, config: config)
         }
         if config.version == visibleProfileVersion {
+            await progress(String(localized: "Preparing portable Profile…"))
             return try await prepareVisibleProfile(migrated, config: config)
         }
         if config.version == portableProfileVersion || config.version == publicProfileVersion {
+            await progress(String(localized: "Verifying Profile…"))
             return try await preparePortableProfile(migrated, config: config)
         }
         if config.version == filesystemProfileVersion {
             guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
                 throw StorageMigrationError.invalidApplicationStorage("local filesystem Profile database")
             }
-            return try await migrate(try await migratePublicProfile(migrated, config: config, destination: ProfileIO.publicProfiles.appendingPathComponent(profile.name)))
+            await progress(String(localized: "Updating Profile storage…"))
+            return try await migrate(try await migratePublicProfile(migrated, config: config, destination: ProfileIO.publicProfiles.appendingPathComponent(profile.name)), progress: progress)
         }
         if config.version == fileBindingVersion {
+            await progress(String(localized: "Preparing Profile files…"))
             guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
                 throw StorageMigrationError.invalidApplicationStorage("local Profile filesystem database")
             }
@@ -1387,9 +1394,10 @@ nonisolated enum ProfileMigrator {
             try ProfileIO.writeConfig(manifest, to: profile.url)
             try syncDurableDirectory(profile.url)
             migrated.version = filesystemProfileVersion
-            return try await migrate(migrated)
+            return try await migrate(migrated, progress: progress)
         }
         if config.version == profileFilesystemVersion {
+            await progress(String(localized: "Preparing Profile files…"))
             guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
                 throw StorageMigrationError.invalidApplicationStorage("local Profile filesystem database")
             }
@@ -1399,9 +1407,10 @@ nonisolated enum ProfileMigrator {
             try ProfileIO.writeConfig(manifest, to: profile.url)
             try syncDurableDirectory(profile.url)
             migrated.version = fileBindingVersion
-            return try await migrate(migrated)
+            return try await migrate(migrated, progress: progress)
         }
         if config.version == durableProfileVersion {
+            await progress(String(localized: "Preparing Profile files…"))
             guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
                 throw StorageMigrationError.invalidApplicationStorage("local Pi Profile database")
             }
@@ -1411,19 +1420,22 @@ nonisolated enum ProfileMigrator {
             try ProfileIO.writeConfig(manifest, to: profile.url)
             try syncDurableDirectory(profile.url)
             migrated.version = profileFilesystemVersion
-            return try await migrate(migrated)
+            return try await migrate(migrated, progress: progress)
         }
         guard profile.location == .local else { throw StorageMigrationError.invalidApplicationStorage("Pi Profiles require an offline local import; live cloud/external database synchronization is unsupported") }
+        await progress(String(localized: "Copying Profile for migration…"))
         let working = profile.url.deletingLastPathComponent().appendingPathComponent(".pi-source-work-" + UUID().uuidString)
         let inventory = try await Task.detached(priority: .userInitiated) {
             try StorageMigrationSupport.copyMigrationSource(from: profile.url, to: working)
         }.value
         var draft = migrated
         draft.url = working
+        await progress(String(localized: "Updating legacy Profile…"))
         try await migrateProfile(draft)
         draft.version = nativeProfileVersion
         let destination = profile.url.deletingLastPathComponent().appendingPathComponent(".pi-stage-" + UUID().uuidString)
-        let staged = try await stageDurableProfile(draft, at: destination)
+        await progress(String(localized: "Migrating conversations and files…"))
+        let staged = try await stageDurableProfile(draft, at: destination, progress: progress)
         guard var fields = staged.objectValue, try StorageMigrationSupport.migrationSourceInventory(at: profile.url) == inventory else {
             throw StorageMigrationError.profileMigrationFailed(profile.name)
         }
@@ -1434,12 +1446,13 @@ nonisolated enum ProfileMigrator {
         let journal: [String: Any] = ["format": 1, "phase": "prepared", "profileID": profile.id.uuidString,
             "root": profile.url.path, "stage": destination.path, "backup": backup.path, "result": result.toAny()]
         try writeDurableJournal(journal, profileID: profile.id)
+        await progress(String(localized: "Publishing updated Profile…"))
         try publishDurableJournal(journal)
         do { try FileManager.default.removeItem(at: working) }
         catch { Log.app.warning("StorageMigrator.pi workingCopy cleanup deferred error=\(error.localizedDescription)") }
         migrated.version = durableProfileVersion
         Log.app.info("StorageMigrator.pi activated id=\(profile.id) sourcePreserved=true")
-        return try await migrate(migrated)
+        return try await migrate(migrated, progress: progress)
     }
 
     static func privatizeAbandonedProfileStages() throws {

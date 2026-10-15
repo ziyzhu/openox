@@ -15,6 +15,7 @@ final class StorageRoot {
     }
     private(set) var isBusy = false
     private(set) var exportProgress: Double?
+    private(set) var migrationProgress: String?
     private(set) var switchEpoch = 0
     private(set) var activeScope: ProfileScope {
         didSet {
@@ -69,6 +70,19 @@ final class StorageRoot {
         return profiles.contains { $0.id != id && $0.name.localizedCaseInsensitiveCompare(stem) == .orderedSame }
     }
 
+    private func migrate(_ profile: Profile) async throws -> Profile {
+        defer { migrationProgress = nil }
+        return try await ProfileMigrator.migrate(profile) { stage in
+            guard profile.version != ProfileSchema.current else { return }
+            await self.reportMigrationProgress(profile: profile, stage: stage)
+        }
+    }
+
+    private func reportMigrationProgress(profile: Profile, stage: String) {
+        migrationProgress = stage
+        Log.app.info("StorageRoot.migration profile=\(profile.id) stage=\(stage)")
+    }
+
     func resolve() async throws {
         cloudDocs = await ProfileRepository.cloudDocuments()
         loadSavedProfiles()
@@ -77,7 +91,7 @@ final class StorageRoot {
         guard let chosen = profiles.first(where: { $0.id == storedActiveId }) ?? profiles.first else {
             throw StorageMigrationError.activeProfileUnavailable
         }
-        let migrated = try await ProfileMigrator.migrate(chosen)
+        let migrated = try await migrate(chosen)
         update(migrated.id) { $0 = migrated }
         try await activate(migrated)
         Log.app.info("StorageRoot.resolve profiles=\(self.profiles.count) iCloud=\(self.iCloudAvailable) root=\(self.root.path)")
@@ -106,7 +120,7 @@ final class StorageRoot {
         guard profile.id != activeId else { return }
         isBusy = true
         defer { isBusy = false }
-        let migrated = try await ProfileMigrator.migrate(profile)
+        let migrated = try await migrate(profile)
         update(migrated.id) { $0 = migrated }
         try await activate(migrated)
         try await publishProfileChange()
@@ -185,7 +199,7 @@ final class StorageRoot {
             guard expectedID == nil || opened.id == expectedID else {
                 throw RuntimeError.bridge("Choose the original folder for this Profile. The selected folder belongs to a different Profile.")
             }
-            let migrated = try await ProfileMigrator.migrate(opened)
+            let migrated = try await migrate(opened)
             try profileStore.remember(migrated)
             unavailableProfiles.removeAll { $0.id == migrated.id }
             if let index = profiles.firstIndex(where: { $0.id == migrated.id }) {
@@ -214,7 +228,7 @@ final class StorageRoot {
             if active { try await beforeProfileChange?() }
             try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
             let (copied, inventory) = try await Task.detached(priority: .userInitiated) { try ProfileMigrator.copyProfile(profile, to: parent) }.value
-            let prepared = try await ProfileMigrator.migrate(copied)
+            let prepared = try await migrate(copied)
             try profileStore.remember(prepared)
             update(profile.id) { $0 = prepared }
             if active {
@@ -322,7 +336,7 @@ final class StorageRoot {
         if let current = profiles.first(where: { $0.id == activeId }) {
             if !isActive(current) || current.version != ProfileSchema.current {
                 do {
-                    let migrated = try await ProfileMigrator.migrate(current)
+                    let migrated = try await migrate(current)
                     update(migrated.id) { $0 = migrated }
                     try await activate(migrated)
                     try await publishProfileChange()
@@ -338,7 +352,7 @@ final class StorageRoot {
     private func fallbackToAnyProfile() async {
         if let next = profiles.first {
             do {
-                let migrated = try await ProfileMigrator.migrate(next)
+                let migrated = try await migrate(next)
                 update(migrated.id) { $0 = migrated }
                 try await activate(migrated)
                 try await publishProfileChange()
@@ -347,7 +361,7 @@ final class StorageRoot {
             }
         } else if let seeded = await seedDefaultProfile() {
             do {
-                let migrated = try await ProfileMigrator.migrate(seeded)
+                let migrated = try await migrate(seeded)
                 profiles = [migrated]
                 try await activate(migrated)
                 try await publishProfileChange()
