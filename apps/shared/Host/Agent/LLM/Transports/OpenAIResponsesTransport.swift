@@ -581,7 +581,15 @@ public struct OpenAIResponsesTransport: ProviderClient {
                             "filename": attachment.displayName,
                             "file_data": "data:\(pdf.mimeType);base64,\(pdf.data.base64EncodedString())",
                         ])
-                    case .text, .file:
+                    case .text:
+                        guard let text = String(data: attachment.data, encoding: .utf8) else {
+                            throw OpenAIClientError(message: "Text attachment is not valid UTF-8: \(attachment.displayName)")
+                        }
+                        output.append([
+                            "type": "input_text",
+                            "text": "``` filename=\(attachment.displayName)\n\(text)\n```",
+                        ])
+                    case .file:
                         output.append([
                             "type": "input_file",
                             "filename": attachment.displayName,
