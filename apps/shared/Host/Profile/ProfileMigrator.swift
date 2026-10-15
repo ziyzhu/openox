@@ -1249,7 +1249,7 @@ nonisolated enum ProfileMigrator {
             guard await materialize(at: profile.url) else {
                 throw StorageMigrationError.invalidApplicationStorage("Profile files are not available yet")
             }
-            let entries = try manager.contentsOfDirectory(at: source, includingPropertiesForKeys: [.isSymbolicLinkKey])
+            var entries = try manager.contentsOfDirectory(at: source, includingPropertiesForKeys: [.isSymbolicLinkKey])
                 .filter { $0.lastPathComponent != ProfileIO.configName }
             for entry in entries + [source.appendingPathComponent(ProfileIO.configName)] {
                 guard try entry.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true,
@@ -1263,7 +1263,10 @@ nonisolated enum ProfileMigrator {
                 manifest.version = visibleProfileVersion
                 try ProfileIO.writeConfig(manifest, to: source)
                 try syncImportedTree(source)
+                entries = try manager.contentsOfDirectory(at: source, includingPropertiesForKeys: [.isSymbolicLinkKey])
+                    .filter { $0.lastPathComponent != ProfileIO.configName }
             }
+            Log.app.info("StorageMigrator.visible start id=\(profile.id) resuming=\(config.version == visibleProfileVersion) files=\(entries.count)")
             for entry in entries {
                 try manager.moveItem(at: entry, to: profile.url.appendingPathComponent(entry.lastPathComponent))
                 try syncDurableDirectory(profile.url)
