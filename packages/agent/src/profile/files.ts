@@ -286,7 +286,7 @@ export class ProfileFiles {
   }
   async remove(path: string, directory = false, recursive = false) {
     path = canonical(path);
-    if (this.store && !this.isStoredDocument(path)) { await this.store.remove(path, directory, recursive); return; }
+    if (this.store && (!this.isStoredDocument(path) || this.publicFiles && directory)) { await this.store.remove(path, directory, recursive); return; }
     owned(path);
     if (this.publicFiles && publicDocument(path)) { await this.physicalStore().documentBatch([], [path]); return; }
     await this.serialize(() => this.harness.commit(async tx => {

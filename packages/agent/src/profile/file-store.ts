@@ -63,6 +63,7 @@ export function documentPath(input: string) {
 export const conversationRecordPath = (path: string) => /^conversations\/(0|[1-9][0-9]*)\/(conversation\.json|turns\.jsonl)(?:\/|$)/.test(path);
 export function workingFilePath(input: string) {
   const path = canonical(input);
+  if (path.startsWith("skills/")) return documentPath(path);
   const parts = path.split("/");
   if (!path || reserved.has(parts[0]!.toLowerCase()) || parts[0]!.toLowerCase().startsWith("state.sqlite-") || parts.some(part => new TextEncoder().encode(part).length > 240 || /[\x00-\x1f\x7f]/u.test(part)) || new TextEncoder().encode(path).length > 4096 || parts.length > 64) {
     throw new FileError("permission_denied", "Path is not writable Profile content", input);
