@@ -289,7 +289,7 @@ struct ServiceChip: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Theme.Colors.onSurface)
                 case .loading:
-                    CellularAutomatonLoader(size: 14, tint: Theme.Colors.onSurface.dynamic)
+                    CellularAutomatonLoader(size: 14)
                 }
             }
             .frame(width: 12, height: 12)
