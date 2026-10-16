@@ -27,9 +27,9 @@ types remain authoritative in their `Codable` implementations.
 │   ├── Application Support/
 │   │   ├── service-repositories.json        built-in, Local, Development, and installed repository enablement; conflict resolutions
 │   │   ├── mounted-repositories.json       version 1 repository bindings to Files grant IDs and relative folders
-│   │   ├── service-repositories/local/      editable local source files
 │   │   ├── service-repositories/development/ simulator development HEAD snapshot
-│   │   ├── service-repositories/<uuid>/     installed public HEAD snapshots
+│   │   ├── RepositoryStaging/              private repository downloads, recoverable snapshot backups, and mutation staging
+│   │   ├── RepositoryMigrationBackups/     retained predecessor repository-skill migration sources
 │   │   ├── external-profiles.json           selected Profile folder bookmarks and optional display names
 │   │   ├── device-folder-grants.json         Profile-bound native folder bookmarks; nullable profileId means unassigned
 │   │   ├── scheduled-skills.json             device-owned scheduled skill snapshots
@@ -52,6 +52,9 @@ types remain authoritative in their `Codable` implementations.
 │   │   └── ServiceSearchVectors.plist       purgeable service-search embeddings
 │   └── ...                                  system-managed framework state
 ├── Documents/                               visible in Apple Files
+│   ├── Repositories/Local/                  complete editable portable Local repository
+│   ├── Repositories/<uuid>/                 installed remote snapshots; stable installation folder IDs
+│   ├── Repositories/<uuid> Copy <uuid>/     preserved edited snapshots; not connected automatically
 │   └── Profiles/<ProfileName>/              complete portable Profile
 │       ├── profile.json                 identity and portable storage milestone
 │       ├── .ox/state.sqlite             conversations, settings, indexes; DELETE journal
@@ -270,6 +273,10 @@ Repository configuration keeps format version 1. The optional `localEnabled`
 field defaults to true when older configuration files omit it; disabling Local
 removes its services and skills from the active catalog without deleting its Git
 working tree or history.
+
+Repository packages live in `Documents/Repositories`, are user-owned, and remain eligible for device backup. `RepositoryMigrator` moves predecessor Local and UUID remote folders before repository preparation; it verifies source/destination file fingerprints, retains hidden Git state and empty directories through whole-folder moves, and refuses destination collisions. Development snapshots and predecessor migration backups remain private. Missing Local manifests fail without recreating a manifest over existing files. Remote origins, enablement, resolutions, and optional snapshot inventories remain in `service-repositories.json` format 1. Inventories include ordinary files and directories; a missing baseline is treated conservatively as potentially edited. Sync refuses changed snapshots unless the user chooses Keep Copy and Sync in Settings, which preserves a verified complete copy in Repositories before replacement. Changes during downloading or publication abort replacement. Startup restores interrupted snapshot backups when the active folder is missing, or preserves them as visible copies when a new snapshot is already present. Disconnect retains repository files; deletion is performed explicitly in Files. Repository settings reload after browsing or foregrounding.
+
+Older builds do not discover the new paths and can recreate stale private repositories. This location change is not downgrade-compatible; actual predecessor/changed-build verification and maintainer approval are required before release. Returning to the changed build refuses conflicting private/public folders rather than merging or overwriting them.
 
 ## Shared preferences
 

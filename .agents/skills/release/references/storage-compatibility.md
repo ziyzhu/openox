@@ -74,7 +74,7 @@ immutable inputs and collect separate results for every matrix row:
 The changed build reading `before` proves backward compatibility; the predecessor
 reading `after` proves forward compatibility of the older reader. Verify data
 completeness, ownership, retained edits, and bounded resource use, not just startup
-success. Compare complete before/after trees and structured migration logs.
+success. For directory moves, check whether older readers silently recreate an empty legacy directory; also verify returning to the changed build after older-reader writes. Compare complete before/after trees and structured migration logs.
 
 If an unsupported future milestone prevents the predecessor from reading `after`,
 verify actionable, fail-closed rejection without mutation. Report this as an

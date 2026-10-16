@@ -1,6 +1,64 @@
 import Foundation
 
 nonisolated enum RepositoryMigrator {
+    static func migrateRepositoryLocations() throws {
+        let manager = FileManager.default
+        let source = AppStoragePaths.applicationSupport.appendingPathComponent("service-repositories", isDirectory: true)
+        let destination = AppStoragePaths.repositories
+        try manager.createDirectory(at: destination, withIntermediateDirectories: true)
+        guard try destination.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
+            throw StorageMigrationError.invalidApplicationStorage("Repositories")
+        }
+        if manager.fileExists(atPath: AppStoragePaths.repositoryStaging.path) {
+            for backup in try manager.contentsOfDirectory(at: AppStoragePaths.repositoryStaging, includingPropertiesForKeys: nil) {
+                let prefix = "repository-backup-"
+                guard backup.lastPathComponent.hasPrefix(prefix) else { continue }
+                let id = String(backup.lastPathComponent.dropFirst(prefix.count))
+                guard UUID(uuidString: id) != nil || id == "development" else { continue }
+                let original = id == "development" ? AppStoragePaths.developmentRepositorySnapshot : destination.appendingPathComponent(id, isDirectory: true)
+                let target = manager.fileExists(atPath: original.path)
+                    ? destination.appendingPathComponent("\(id) Copy \(UUID().uuidString)", isDirectory: true)
+                    : original
+                _ = try StorageMigrationSupport.migrationSourceInventory(at: backup)
+                try manager.moveItem(at: backup, to: target)
+                Log.service.info("StorageMigrator.repositorySnapshot recovered id=\(id) folder=\(target.lastPathComponent)")
+            }
+        }
+        for directory in try manager.contentsOfDirectory(at: destination, includingPropertiesForKeys: nil) {
+            guard directory.lastPathComponent == "Local" || UUID(uuidString: directory.lastPathComponent) != nil else { continue }
+            guard try directory.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
+                throw StorageMigrationError.invalidApplicationStorage("Repositories/\(directory.lastPathComponent)")
+            }
+            var target = directory
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = false
+            try target.setResourceValues(values)
+        }
+        guard manager.fileExists(atPath: source.path) else { return }
+        guard try source.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
+            throw StorageMigrationError.invalidApplicationStorage("service-repositories")
+        }
+        for directory in try manager.contentsOfDirectory(at: source, includingPropertiesForKeys: nil) {
+            let id = directory.lastPathComponent
+            guard id == "local" || UUID(uuidString: id) != nil else { continue }
+            let target = destination.appendingPathComponent(id == "local" ? "Local" : id, isDirectory: true)
+            guard !manager.fileExists(atPath: target.path) else {
+                throw StorageMigrationError.collision("Repositories/\(target.lastPathComponent)")
+            }
+            Log.service.info("StorageMigrator.repositoryLocation start id=\(id)")
+            let inventory = try StorageMigrationSupport.migrationSourceInventory(at: directory)
+            try manager.moveItem(at: directory, to: target)
+            guard try StorageMigrationSupport.migrationSourceInventory(at: target) == inventory else {
+                throw StorageMigrationError.recoveryRequired("Repository migration could not verify Repositories/\(target.lastPathComponent). Your files have been retained.")
+            }
+            var backedUpTarget = target
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = false
+            try backedUpTarget.setResourceValues(values)
+            Log.service.info("StorageMigrator.repositoryLocation done id=\(id) files=\(inventory.count)")
+        }
+    }
+
     static func migrateLegacyLocalServiceManifests(at root: URL) throws {
         let manager = FileManager.default
         let webRoot = root.appendingPathComponent("web", isDirectory: true)
@@ -94,7 +152,16 @@ nonisolated enum RepositoryMigrator {
         guard var package = try JSONSerialization.jsonObject(with: Data(contentsOf: packageURL)) as? [String: Any] else { throw SkillError.invalidPackage }
         guard package["version"] as? Int == 2 else { return }
         guard let services = package["services"] as? [String], services.count <= 256 else { throw SkillError.invalidPackage }
-        let backup = root.deletingLastPathComponent().appendingPathComponent(".\(root.lastPathComponent)-repository-v2-backup", isDirectory: true)
+        let backup = AppStoragePaths.applicationSupport.appendingPathComponent("RepositoryMigrationBackups/\(root.lastPathComponent)-repository-v2", isDirectory: true)
+        let predecessorName = root.lastPathComponent == "Local" ? "local" : root.lastPathComponent
+        let predecessorBackup = root.deletingLastPathComponent() == AppStoragePaths.repositories
+            ? AppStoragePaths.applicationSupport.appendingPathComponent("service-repositories/.\(predecessorName)-repository-v2-backup", isDirectory: true)
+            : root.deletingLastPathComponent().appendingPathComponent(".\(root.lastPathComponent)-repository-v2-backup", isDirectory: true)
+        if !manager.fileExists(atPath: backup.path), manager.fileExists(atPath: predecessorBackup.path) {
+            try manager.createDirectory(at: backup.deletingLastPathComponent(), withIntermediateDirectories: true)
+            _ = try StorageMigrationSupport.migrationSourceInventory(at: predecessorBackup)
+            try manager.moveItem(at: predecessorBackup, to: backup)
+        }
         if !manager.fileExists(atPath: backup.path) { try manager.createDirectory(at: backup, withIntermediateDirectories: true) }
         let packageBackup = backup.appendingPathComponent(packageURL.lastPathComponent)
         if !manager.fileExists(atPath: packageBackup.path) { try manager.copyItem(at: packageURL, to: packageBackup) }

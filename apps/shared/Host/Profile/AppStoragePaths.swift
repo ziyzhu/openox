@@ -10,8 +10,10 @@ nonisolated enum AppStoragePaths {
         for: .cachesDirectory,
         in: .userDomainMask
     )[0]
-    static let repositories = applicationSupport.appendingPathComponent("service-repositories", isDirectory: true)
-    static let developmentRepositorySnapshot = repositories.appendingPathComponent("development", isDirectory: true)
+    static let repositories = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("Repositories", isDirectory: true)
+    static let repositoryStaging = applicationSupport.appendingPathComponent("RepositoryStaging", isDirectory: true)
+    static let developmentRepositorySnapshot = applicationSupport.appendingPathComponent("service-repositories/development", isDirectory: true)
     static let repositoriesConfiguration = applicationSupport.appendingPathComponent("service-repositories.json", isDirectory: false)
     static let mountedRepositories = applicationSupport.appendingPathComponent("mounted-repositories.json", isDirectory: false)
     static let logs = applicationSupport.appendingPathComponent("logs.jsonl", isDirectory: false)

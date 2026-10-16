@@ -1,7 +1,9 @@
+import QuickLook
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct RepositoriesView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(ServiceManager.self) private var manager
     @State private var addingRepository = false
 
@@ -44,6 +46,10 @@ struct RepositoriesView: View {
         .background(Theme.Colors.background)
         .navigationTitle("Repositories")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await manager.refreshServices(locale: locale) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await manager.refreshServices(locale: locale) } }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -316,6 +322,10 @@ struct RepositoryDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceManager.self) private var manager
     @State private var confirmingRemoval = false
+    @State private var confirmingUpdate = false
+    @State private var browsingFiles = false
+    @State private var fileHandoff = ProfileFileHandoff()
+    @State private var filePreview: URL?
     @State private var localExport: LocalRepositoryExport?
     @State private var preparingLocalExport = false
     @State private var presentingLocalExport = false
@@ -403,6 +413,19 @@ struct RepositoryDetailView: View {
                             }
                         }
                     }
+                    if repository.provenance == .local || repository.provenance == .remote {
+                        SettingsSection(footer: "These files belong to you. Copy the complete folder to back up or transfer this repository.", layout: .row) {
+                            Button { browsingFiles = true } label: {
+                                SettingsDisclosureRow(
+                                    title: "Location",
+                                    value: Text(verbatim: "Repositories / \(repositoryID == Repository.localID ? "Local" : repositoryID)")
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier(A11yID.Settings.repositoryFiles(repositoryID))
+                            .accessibilityHint("Browse repository files")
+                        }
+                    }
                     if repository.provenance == .local { localExportSection }
                     if canRemove { removalSection }
                 }
@@ -427,11 +450,32 @@ struct RepositoryDetailView: View {
         } onCancellation: {
             localExport = nil
         }
+        .sheet(isPresented: $browsingFiles, onDismiss: {
+            if let url = fileHandoff.dismiss() { filePreview = url }
+            Task { await manager.refreshServices(locale: locale) }
+        }) {
+            ProfileFilesPicker(directory: AppStoragePaths.repositories.appendingPathComponent(repositoryID == Repository.localID ? "Local" : repositoryID)) { url in
+                if let ready = fileHandoff.select(url) { filePreview = ready }
+                browsingFiles = false
+            } onCancel: {
+                fileHandoff.cancel()
+                browsingFiles = false
+            }
+            .onAppear { fileHandoff.begin() }
+            .ignoresSafeArea()
+        }
+        .quickLookPreview($filePreview)
         .toolbar {
             if canUpdate {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        Task { await manager.updateRepository(repositoryID, locale: locale) }
+                        Task {
+                            if await manager.repositoryHasChanges(repositoryID) {
+                                confirmingUpdate = true
+                            } else {
+                                await manager.updateRepository(repositoryID, locale: locale)
+                            }
+                        }
                     } label: {
                         if manager.repositoryState == .syncing {
                             ProgressView()
@@ -446,8 +490,16 @@ struct RepositoryDetailView: View {
                 }
             }
         }
-        .alert("Remove Repository?", isPresented: $confirmingRemoval) {
-            Button("Remove", role: .destructive) {
+        .alert("Keep a Copy Before Syncing?", isPresented: $confirmingUpdate) {
+            Button("Keep Copy and Sync") {
+                Task { await manager.updateRepository(repositoryID, locale: locale, preservingChanges: true) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This repository may contain edits made in Files. Ox will keep its current contents in a separate folder under Repositories before downloading the latest remote snapshot. The copy is not connected to the remote.")
+        }
+        .alert("Disconnect Repository?", isPresented: $confirmingRemoval) {
+            Button("Disconnect", role: .destructive) {
                 Task {
                     await manager.removeRepository(repositoryID, locale: locale)
                     if !manager.repositories.contains(where: { $0.id == repositoryID }) { dismiss() }
@@ -455,7 +507,7 @@ struct RepositoryDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes the local snapshot. Website sign-ins and data are kept.")
+            Text("This disconnects the repository from Ox. Its files, website sign-ins, and data are kept. Delete the folder in Files only when you no longer need it.")
         }
         .alert("Export Local Repository", isPresented: Binding(
             get: { localExportError != nil },
@@ -510,7 +562,7 @@ struct RepositoryDetailView: View {
                 confirmingRemoval = true
             } label: {
                 HStack {
-                    Text("Remove Repository")
+                    Text("Disconnect Repository")
                         .font(Theme.Fonts.bodyMd)
                         .foregroundStyle(Theme.Colors.error)
                     Spacer(minLength: 0)

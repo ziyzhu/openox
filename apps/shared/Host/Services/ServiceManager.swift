@@ -741,10 +741,14 @@ final class ServiceManager {
         }
     }
 
+    func repositoryHasChanges(_ repositoryID: String) async -> Bool {
+        await repository.hasSnapshotChanges(repositoryID: repositoryID)
+    }
+
     @discardableResult
-    func updateRepository(_ repositoryID: String, locale: String?) async -> [String] {
+    func updateRepository(_ repositoryID: String, locale: String?, preservingChanges: Bool = false) async -> [String] {
         await mutateRepositories(locale: locale) {
-            try await self.repository.update(repositoryID: repositoryID)
+            try await self.repository.update(repositoryID: repositoryID, preservingChanges: preservingChanges)
         }
     }
 

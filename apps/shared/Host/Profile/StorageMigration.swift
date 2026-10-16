@@ -57,6 +57,7 @@ nonisolated enum StorageMigrator {
         try await storage.resolve()
         try CredentialMigrator.migrateSecretProviderKeys()
         try CredentialMigrator.removeVerifiedLegacyProviderKeys()
+        try RepositoryMigrator.migrateRepositoryLocations()
         await services.prepareStorage()
         let manifests = try await services.storageManifestFiles()
         try CredentialMigrator.migrateAPIServiceOAuthAccounts(manifests: manifests)

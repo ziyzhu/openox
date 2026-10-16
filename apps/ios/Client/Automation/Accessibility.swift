@@ -141,6 +141,7 @@ nonisolated enum A11yID {
         static let repositoryStatus = "settings.repositoryStatus"
         static func repository(_ id: String) -> String { "settings.repository.\(id)" }
         static func repositoryEnabled(_ id: String) -> String { "settings.repositoryEnabled.\(id)" }
+        static func repositoryFiles(_ id: String) -> String { "settings.repositoryFiles.\(id)" }
         static func repositoryUpdate(_ id: String) -> String { "settings.repositoryUpdate.\(id)" }
         static func repositoryRemove(_ id: String) -> String { "settings.repositoryRemove.\(id)" }
         static let repositoryExport = "settings.repositoryExport"
