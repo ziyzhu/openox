@@ -6,18 +6,6 @@ import Observation
 @MainActor
 @Observable
 final class ServiceManager {
-    nonisolated struct PersistedRemoteMCP: Codable {
-        let endpoint: String
-        let transport: RemoteMCPTransport?
-        let faviconURL: String?
-
-        init(endpoint: String, transport: RemoteMCPTransport?, faviconURL: String? = nil) {
-            self.endpoint = endpoint
-            self.transport = transport
-            self.faviconURL = faviconURL
-        }
-    }
-
     enum RepositoryState: Equatable {
         case idle
         case syncing
@@ -73,8 +61,6 @@ final class ServiceManager {
     private(set) var faviconRevision: UInt64 = 0
     private let index = ServiceSearchIndex()
     @ObservationIgnored private var faviconData: [String: Data] = [:]
-    @ObservationIgnored private var persistedRemoteMCPServers: [PersistedRemoteMCP] = []
-    @ObservationIgnored private var monoRepositoryMCPEndpoints: Set<String> = []
     @ObservationIgnored private let repository: Repository
     @ObservationIgnored private var monoRepository: Repository.MonoRepository?
     @ObservationIgnored private var monoRepositoryLocale: String?
@@ -131,7 +117,6 @@ final class ServiceManager {
     nonisolated static let actionPoliciesKey = "actionApprovalPolicies"
     nonisolated static let legacyAutoApproveActionsKey = "autoApproveActions"
     nonisolated static let legacyAutoApproveAllKey = "autoApproveAll"
-    nonisolated static let remoteMCPKey = "remoteMCPServers"
     func makeHandoffPageConfiguration(for _: String) -> WebPage.Configuration {
         websiteData.makePageConfiguration()
     }
@@ -188,7 +173,6 @@ final class ServiceManager {
         repository = Repository(developmentRemote: Self.launchServerURL)
         savedDomains = Set(UserDefaults.standard.stringArray(forKey: Self.savedKey) ?? [])
         actionPolicies = Self.loadActionPolicies()
-        persistedRemoteMCPServers = Self.loadPersistedRemoteMCPServers()
         folderGrantObserver = NotificationCenter.default.addObserver(forName: DeviceFolderStore.didChange, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor [weak self] in
                 await self?.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
@@ -226,6 +210,7 @@ final class ServiceManager {
 
     func prepareStorage() async {
         await repository.prepareStorage()
+        reloadPersistedStorage()
     }
 
     var localRecoveryMessage: String? {
@@ -246,7 +231,8 @@ final class ServiceManager {
     }
 
     func reloadPersistedStorage() {
-        persistedRemoteMCPServers = Self.loadPersistedRemoteMCPServers()
+        savedDomains = Set(UserDefaults.standard.stringArray(forKey: Self.savedKey) ?? [])
+        actionPolicies = Self.loadActionPolicies()
     }
 
     deinit {
@@ -254,12 +240,6 @@ final class ServiceManager {
         if let memoryWarningObserver {
             NotificationCenter.default.removeObserver(memoryWarningObserver)
         }
-    }
-
-    private static func loadPersistedRemoteMCPServers() -> [PersistedRemoteMCP] {
-        UserDefaults.standard.data(forKey: remoteMCPKey).flatMap {
-            try? JSONDecoder().decode([PersistedRemoteMCP].self, from: $0)
-        } ?? []
     }
 
     // MARK: - Saved services
@@ -350,21 +330,26 @@ final class ServiceManager {
     ) async throws -> Service {
         let endpoint = try RemoteMCPService.endpoint(rawEndpoint)
         if let replacing {
-            guard replacing.isMCPService,
-                  persistedRemoteMCPServers.contains(where: { $0.endpoint == replacing.definition.mcpEndpoint?.absoluteString }),
-                  !monoRepositoryMCPEndpoints.contains(replacing.definition.mcpEndpoint?.absoluteString ?? "") else {
-                throw RuntimeError.bridge("Only directly connected MCP servers can be updated; repository definitions are read-only.")
+            guard replacing.isMCPService, replacing.isLocalService else {
+                throw RuntimeError.bridge("Only Local MCP services can be updated; copy a repository MCP service to Local first.")
             }
             guard !services.contains(where: { $0.definition.mcpEndpoint == endpoint && $0 !== replacing }) else {
                 throw RuntimeError.bridge("An MCP service already uses this endpoint.")
             }
         }
-        let existing = services.first(where: { $0.definition.mcpEndpoint == endpoint })
-        let service = (replacing == nil ? existing : nil)
-            ?? Service(
-                definition: ServiceDefinition(mcpEndpoint: endpoint, transport: transport, faviconURL: faviconURL),
-                manager: self
-            )
+        let existing = replacing == nil ? services.first(where: { $0.definition.mcpEndpoint == endpoint }) : nil
+        let id = replacing?.domain ?? MCPCatalogManifest.identifier(for: endpoint, excluding: Set(services.map(\.domain)))
+        let service = existing ?? Service(
+            definition: ServiceDefinition(
+                mcpEndpoint: endpoint,
+                domain: id,
+                transport: transport,
+                name: replacing?.definition.name,
+                repositoryID: Repository.localID,
+                faviconURL: faviconURL
+            ),
+            manager: self
+        )
         if await service.loadManifest(reason: .serviceDetail) == nil,
            service.auth == .authorizationRequired,
            allowsAuthorization {
@@ -374,45 +359,43 @@ final class ServiceManager {
             throw RemoteMCPError.protocolError("Ox could not load this MCP server's tools")
         }
         try Task.checkCancellation()
-        if let replacing {
-            if replacing.definition.mcpEndpoint != endpoint {
-                await removeRemoteMCP(replacing)
-            } else {
-                await replacing.remoteMCPService?.deactivate()
+        if existing == nil {
+            try await repository.saveMCPService(
+                MCPCatalogManifest(
+                    id: id,
+                    name: replacing?.definition.name ?? endpoint.host ?? id,
+                    endpoint: endpoint,
+                    faviconUrl: faviconURL?.absoluteString,
+                    transport: service.definition.mcpTransport
+                ),
+                creating: replacing == nil
+            )
+            if let replacing {
+                if replacing.definition.mcpEndpoint == endpoint {
+                    await replacing.remoteMCPService?.deactivate()
+                } else {
+                    await replacing.remoteMCPService?.remove()
+                }
                 clearMCPApprovals(replacing)
-                resolvedServices = ResolvedServices(services.filter { $0 !== replacing })
             }
+            resolvedServices = ResolvedServices(services.filter { $0.domain != id } + [service])
+            _ = await loadRepositories(locale: monoRepositoryLocale)
         }
-        if byDomain[service.domain] == nil {
-            resolvedServices = ResolvedServices(services + [service])
-            monoRepositoryRevision &+= 1
-            reindexMonoRepository()
-        }
-        persistedRemoteMCPServers.removeAll { $0.endpoint == endpoint.absoluteString }
-        persistedRemoteMCPServers.append(PersistedRemoteMCP(
-            endpoint: endpoint.absoluteString,
-            transport: service.definition.mcpTransport,
-            faviconURL: service.definition.faviconURL?.absoluteString
-        ))
-        persistRemoteMCPServers()
-        Log.service.info("RemoteMCP.save id=\(service.domain) updated=\(replacing != nil)")
+        Log.service.info("RemoteMCP.save id=\(service.domain) updated=\(replacing != nil) reused=\(existing != nil)")
         setSaved(service, true)
         return service
     }
 
-    func removeRemoteMCP(_ service: Service) async {
-        guard service.isMCPService, let endpoint = service.definition.mcpEndpoint else { return }
+    func removeRemoteMCP(_ service: Service) async throws {
+        guard service.isMCPService else { return }
+        if service.isLocalService {
+            _ = try await deleteLocalService(domain: service.domain, locale: monoRepositoryLocale)
+        }
         await service.remoteMCPService?.remove()
-        persistedRemoteMCPServers.removeAll { $0.endpoint == endpoint.absoluteString }
         savedDomains.remove(service.domain)
         clearMCPApprovals(service)
-        if monoRepositoryMCPEndpoints.contains(endpoint.absoluteString) {
-            service.resetMCPCapabilities()
-        } else {
-            resolvedServices = ResolvedServices(services.filter { $0.domain != service.domain })
-        }
+        if let remaining = self.service(domain: service.domain) { remaining.resetMCPCapabilities() }
         monoRepositoryRevision &+= 1
-        persistRemoteMCPServers()
         reindexMonoRepository()
         Log.service.info("RemoteMCP.remove id=\(service.domain) endpoint=\(LogPrivacy.url(service.url))")
     }
@@ -652,6 +635,9 @@ final class ServiceManager {
         guard !repositoryLoadActive, repositoryState != .syncing else {
             throw Repository.Failure(message: "Repositories are updating; wait before changing enablement")
         }
+        guard repositoryID != Repository.localID || enabled else {
+            throw Repository.Failure(message: "The Local repository is always enabled.")
+        }
         guard let selected = repositories.first(where: { $0.id == repositoryID }) else {
             throw Repository.Failure(message: "Repository not found")
         }
@@ -860,10 +846,6 @@ final class ServiceManager {
         try await repository.readSource(kind: kind.repositoryKind, id: domain, path: path)
     }
 
-    func requireServiceSourceMutationEnabled(kind: ServicesMount.Kind, domain: String, operation: String) async throws {
-        try await repository.requireSourceMutationEnabled(kind: kind.repositoryKind, id: domain, operation: operation)
-    }
-
     func writeServiceSource(kind: ServicesMount.Kind, domain: String, path: [String], data: Data) async throws {
         try await repository.writeLocalSource(kind: kind.repositoryKind, id: domain, path: path, data: data)
     }
@@ -887,7 +869,8 @@ final class ServiceManager {
     }
 
     func validateService(domain: String) async throws {
-        try await validateLocalService(kind: localScriptKind(domain), domain: domain)
+        let kind: ServicesMount.Kind = service(domain: domain)?.isMCPService == true ? .mcp : localScriptKind(domain)
+        try await validateLocalService(kind: kind, domain: domain)
         Log.service.info("ServiceManager.validate passed domain=\(domain)")
     }
 
@@ -1066,17 +1049,8 @@ final class ServiceManager {
     private func rebuildMonoRepository(locale: String?, generation: UInt64) async {
         let listings = await listServices(locale: locale) ?? []
         let iOSDefinitions = await listIOSServiceDefinitions(locale: locale)
-        let repositoryMCPDefinitions = await listMCPServiceDefinitions(locale: locale)
-        monoRepositoryMCPEndpoints = Set(repositoryMCPDefinitions.compactMap { $0.mcpEndpoint?.absoluteString })
-        let localMCPDefinitions = persistedRemoteMCPServers.compactMap { server -> ServiceDefinition? in
-            guard !monoRepositoryMCPEndpoints.contains(server.endpoint), let endpoint = URL(string: server.endpoint) else { return nil }
-            return ServiceDefinition(
-                mcpEndpoint: endpoint,
-                transport: server.transport,
-                faviconURL: try? ServiceDefinition.faviconURL(server.faviconURL)
-            )
-        }
-        let definitions = listings.map(\.definition) + iOSDefinitions + repositoryMCPDefinitions + localMCPDefinitions
+        let mcpDefinitions = await listMCPServiceDefinitions(locale: locale)
+        let definitions = listings.map(\.definition) + iOSDefinitions + mcpDefinitions
         guard monoRepositoryGeneration == generation else {
             Log.service.info("ServiceManager.rebuildMonoRepository superseded generation=\(generation)")
             return
@@ -1125,13 +1099,6 @@ final class ServiceManager {
             guard self.monoRepositoryRevision == revision, self.monoRepositoryGeneration == generation else { return }
             self.semanticState = .pending(generation, semanticBuild)
             self.monoRepositoryState = .ready
-        }
-    }
-
-    private func persistRemoteMCPServers() {
-        let servers = persistedRemoteMCPServers.sorted { $0.endpoint < $1.endpoint }
-        if let data = try? JSONEncoder().encode(servers) {
-            UserDefaults.standard.set(data, forKey: Self.remoteMCPKey)
         }
     }
 

@@ -14,7 +14,7 @@ async function command(args: string[], entry = cli) {
 }
 
 test("QA conversation flags and documented runner paths work without a target", async () => {
-  for (const name of ["image-widget", "profile-files", "ox-errors", "local-repository", "service-icons", "bundled-skills"]) {
+  for (const name of ["image-widget", "profile-files", "ox-errors", "service-icons", "bundled-skills"]) {
     const entry = new URL(`../ios/${name}.ts`, import.meta.url).pathname;
     for (const flag of ["--conversation", "--chat"]) {
       const args = [`${flag}=saved`, ...(name === "bundled-skills" ? ["--temporary-conversation=temporary"] : [])];

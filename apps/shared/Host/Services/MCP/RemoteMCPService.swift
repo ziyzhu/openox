@@ -1226,7 +1226,7 @@ final class RemoteMCPService {
         Log.service.info("RemoteMCP.remove id=\(RemoteMCPDescriptor.serviceID(for: endpoint))")
     }
 
-    nonisolated private static func allowsDevelopmentHTTP(_ endpoint: URL) -> Bool {
+    nonisolated static func allowsDevelopmentHTTP(_ endpoint: URL) -> Bool {
         #if DEBUG && targetEnvironment(simulator)
         endpoint.scheme?.lowercased() == "http"
         #else

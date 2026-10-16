@@ -51,9 +51,6 @@ extension Conversation {
                     let root = candidate.split(separator: "/").first.map(String.init) ?? ""
                     let temporaryFiles = isTemporary && route.artifactScope != nil && !["MEMORY.md", "SOUL.md", "skills", "history"].contains(root)
                     if !["files", "services"].contains(root), !temporaryFiles { try requireProfileMutation(action) }
-                    if root == "services", case .serviceItem(let kind, let domain, _) = try await fileSystemLocation(candidate) {
-                        try await serviceManager.requireServiceSourceMutationEnabled(kind: kind, domain: domain, operation: "ox.fs.\(name)")
-                    }
                 }
             }
             let result = try await route.session.host.fileSystem(owner: self, runtime: route.session.runtime,

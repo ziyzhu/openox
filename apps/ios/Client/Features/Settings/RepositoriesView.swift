@@ -101,26 +101,11 @@ struct RepositoriesView: View {
 
     private func repositoryRow(_ repository: Repository.Descriptor) -> some View {
         HStack(spacing: 0) {
-            Button {
-                Task {
-                    do {
-                        try await manager.setRepositoryEnabled(repository.id, enabled: !repository.isEnabled, locale: locale)
-                    } catch {
-                        Log.ui.error("Repositories.enable id=\(repository.id) failed=\(error.localizedDescription)")
-                    }
-                }
-            } label: {
-                Image(systemName: repository.isEnabled ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 21, weight: .medium))
-                    .foregroundStyle(repository.isEnabled ? Theme.Colors.primary : Theme.Colors.conversationSecondary)
-                    .frame(width: 44, height: 44, alignment: .leading)
-                    .contentShape(Rectangle())
+            if repository.id == Repository.localID {
+                Color.clear.frame(width: 44, height: 44)
+            } else {
+                enablementToggle(repository)
             }
-            .buttonStyle(.plain)
-            .disabled(isBusy)
-            .accessibilityLabel(Text(verbatim: repository.name))
-            .accessibilityValue(repository.isEnabled ? "Enabled" : "Disabled")
-            .accessibilityIdentifier(A11yID.Settings.repositoryEnabled(repository.id))
 
             NavigationLink {
                 RepositoryDetailView(repositoryID: repository.id)
@@ -154,6 +139,29 @@ struct RepositoriesView: View {
             .accessibilityIdentifier(A11yID.Settings.repository(repository.id))
         }
         .settingsRowPadding()
+    }
+
+    private func enablementToggle(_ repository: Repository.Descriptor) -> some View {
+        Button {
+            Task {
+                do {
+                    try await manager.setRepositoryEnabled(repository.id, enabled: !repository.isEnabled, locale: locale)
+                } catch {
+                    Log.ui.error("Repositories.enable id=\(repository.id) failed=\(error.localizedDescription)")
+                }
+            }
+        } label: {
+            Image(systemName: repository.isEnabled ? "checkmark.square.fill" : "square")
+                .font(.system(size: 21, weight: .medium))
+                .foregroundStyle(repository.isEnabled ? Theme.Colors.primary : Theme.Colors.conversationSecondary)
+                .frame(width: 44, height: 44, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isBusy)
+        .accessibilityLabel(Text(verbatim: repository.name))
+        .accessibilityValue(repository.isEnabled ? "Enabled" : "Disabled")
+        .accessibilityIdentifier(A11yID.Settings.repositoryEnabled(repository.id))
     }
 
     private func repositorySubtitle(_ repository: Repository.Descriptor) -> String {

@@ -59,6 +59,99 @@ nonisolated enum RepositoryMigrator {
         }
     }
 
+    struct LegacyRemoteMCP: Codable {
+        let endpoint: String
+        let transport: RemoteMCPTransport?
+        let faviconURL: String?
+    }
+
+    static let legacyRemoteMCPKey = "remoteMCPServers"
+
+    static func migrateRemoteMCPConnections(
+        at root: URL,
+        defaults: UserDefaults = .standard,
+        selectLocal: ([String]) throws -> Void
+    ) throws {
+        guard let data = defaults.data(forKey: legacyRemoteMCPKey) else { return }
+        let connections = try JSONDecoder().decode([LegacyRemoteMCP].self, from: data)
+        let manager = FileManager.default
+        let packageURL = root.appendingPathComponent("repository.json", isDirectory: false)
+        guard var package = try JSONSerialization.jsonObject(with: Data(contentsOf: packageURL)) as? [String: Any],
+              var services = package["services"] as? [String] else {
+            throw StorageMigrationError.invalidApplicationStorage("repository")
+        }
+        let mcpRoot = root.appendingPathComponent("mcp", isDirectory: true)
+        let directories = (try? manager.contentsOfDirectory(atPath: mcpRoot.path)) ?? []
+        var idsByEndpoint: [URL: String] = [:]
+        for id in directories {
+            let url = mcpRoot.appendingPathComponent("\(id)/service.json", isDirectory: false)
+            guard let manifest = try? JSONDecoder().decode(MCPCatalogManifest.self, from: Data(contentsOf: url)),
+                  manifest.id == id else { continue }
+            idsByEndpoint[manifest.endpoint] = id
+        }
+        var taken = Set(services.compactMap { $0.split(separator: ":", maxSplits: 1).last.map(String.init) }).union(directories)
+        var renamed: [String: String] = [:]
+        var created = 0
+        var skipped = 0
+        for connection in connections {
+            guard let endpoint = URL(string: connection.endpoint) else {
+                skipped += 1
+                continue
+            }
+            let id = idsByEndpoint[endpoint] ?? MCPCatalogManifest.identifier(for: endpoint, excluding: taken)
+            if idsByEndpoint[endpoint] == nil {
+                let manifest = MCPCatalogManifest(
+                    id: id,
+                    name: endpoint.host ?? id,
+                    endpoint: endpoint,
+                    faviconUrl: ((try? ServiceDefinition.faviconURL(connection.faviconURL)) ?? nil)?.absoluteString,
+                    transport: connection.transport
+                )
+                guard manifest.isValid else {
+                    skipped += 1
+                    continue
+                }
+                let directory = mcpRoot.appendingPathComponent(id, isDirectory: true)
+                try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+                try manifest.encoded().write(to: directory.appendingPathComponent("service.json"), options: .atomic)
+                idsByEndpoint[endpoint] = id
+                taken.insert(id)
+                created += 1
+            }
+            if !services.contains("mcp:\(id)") { services.append("mcp:\(id)") }
+            renamed[RemoteMCPDescriptor.serviceID(for: endpoint)] = id
+        }
+        services.sort { $0.localizedStandardCompare($1) == .orderedAscending }
+        package["services"] = services
+        var output = try JSONSerialization.data(withJSONObject: package, options: [.prettyPrinted, .sortedKeys])
+        output.append(0x0A)
+        try output.write(to: packageURL, options: .atomic)
+        try selectLocal(Array(Set(renamed.values)).sorted())
+        try renameServiceReferences(renamed, defaults: defaults)
+        defaults.removeObject(forKey: legacyRemoteMCPKey)
+        Log.service.info("StorageMigrator.remoteMCPConnections stored=\(connections.count) created=\(created) renamed=\(renamed.count) skipped=\(skipped)")
+    }
+
+    private static func renameServiceReferences(_ renamed: [String: String], defaults: UserDefaults) throws {
+        guard !renamed.isEmpty else { return }
+        if let saved = defaults.stringArray(forKey: ServiceManager.savedKey) {
+            defaults.set(saved.map { renamed[$0] ?? $0 }.sorted(), forKey: ServiceManager.savedKey)
+        }
+        guard let data = defaults.data(forKey: ServiceManager.actionPoliciesKey),
+              var policies = try? JSONDecoder().decode(ActionPolicyConfiguration.self, from: data) else { return }
+        func renamedAction(_ action: String) -> String {
+            for (legacy, id) in renamed {
+                if action == "ox.service.attach:\(legacy)" { return "ox.service.attach:\(id)" }
+                if action.hasPrefix("mcp:\(legacy):") { return "mcp:\(id):" + action.dropFirst("mcp:\(legacy):".count) }
+                if action.hasPrefix("\(legacy):") { return "\(id):" + action.dropFirst("\(legacy):".count) }
+            }
+            return action
+        }
+        policies.actions = Dictionary(policies.actions.map { (renamedAction($0.key), $0.value) }) { current, _ in current }
+        policies.sources = Dictionary(policies.sources.map { (renamed[$0.key] ?? $0.key, $0.value) }) { current, _ in current }
+        defaults.set(try JSONEncoder().encode(policies), forKey: ServiceManager.actionPoliciesKey)
+    }
+
     static func migrateLegacyLocalServiceManifests(at root: URL) throws {
         let manager = FileManager.default
         let webRoot = root.appendingPathComponent("web", isDirectory: true)

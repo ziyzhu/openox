@@ -33,7 +33,6 @@ Feature runners live in `apps/ios/`. Read the relevant section, then run
 | --- | --- |
 | `bundled-skills.ts` | [Skill boundaries](references/ios-runners.md#bundled-skills) |
 | `settings.ts` | [Settings and persistence](references/ios-runners.md#settings) |
-| `local-repository.ts` | [Disabled Local mutation safety](references/ios-runners.md#local-repository) |
 | `service-icons.ts` | [Native icon loading](references/ios-runners.md#service-icons) |
 | `durable-conversation.ts --models` | [Queued model selection](references/ios-runners.md#model-selection) |
 | `ox-errors.ts` | [Structured VM errors](references/ios-runners.md#structured-errors) |

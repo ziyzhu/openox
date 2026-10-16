@@ -173,6 +173,7 @@ nonisolated struct ServiceDefinition: Sendable {
     init(mcp manifest: MCPCatalogManifest, repositoryID: String? = nil) throws {
         self.init(
             mcpEndpoint: manifest.endpoint,
+            domain: manifest.id,
             transport: manifest.transport,
             name: manifest.name,
             description: manifest.description,
@@ -183,13 +184,13 @@ nonisolated struct ServiceDefinition: Sendable {
 
     init(
         mcpEndpoint endpoint: URL,
+        domain: String,
         transport: RemoteMCPTransport?,
         name: String? = nil,
         description: String? = nil,
         repositoryID: String? = nil,
         faviconURL: URL? = nil
     ) {
-        let domain = RemoteMCPDescriptor.serviceID(for: endpoint)
         let resolvedName = name ?? endpoint.host ?? "Remote MCP"
         let resolvedDescription = description ?? "Remote MCP server at \(endpoint.host ?? endpoint.absoluteString)"
         self.manifest = .object([
@@ -212,7 +213,7 @@ nonisolated struct ServiceDefinition: Sendable {
         self.remoteMCPIcons = []
     }
 
-    init(mcp descriptor: RemoteMCPDescriptor, metadata: ServiceDefinition? = nil) {
+    init(mcp descriptor: RemoteMCPDescriptor, metadata: ServiceDefinition) {
         let actions = descriptor.tools.compactMap { tool in
             Manifest.Action(.object([
                 "id": .string(tool.name),
@@ -224,23 +225,22 @@ nonisolated struct ServiceDefinition: Sendable {
                 "requireAuth": .bool(false),
             ]))
         }
-        let name = metadata?.name ?? descriptor.name
-        let description = metadata?.description ?? descriptor.instructions
-            ?? "Remote MCP server at \(descriptor.endpoint.host ?? descriptor.endpoint.absoluteString)"
+        let name = metadata.name
+        let description = metadata.description
         self.manifest = .object([
-            "domain": .string(descriptor.id),
+            "domain": .string(metadata.domain),
             "name": .string(name),
             "description": .string(description),
             "baseUrl": .string(descriptor.endpoint.absoluteString),
             "actions": .array(actions.map { .object($0.raw) }),
         ])
         self.source = .mcp(endpoint: descriptor.endpoint, transport: descriptor.transport, icon: .fallback)
-        self.repositoryID = metadata?.repositoryID
-        self.domain = descriptor.id
+        self.repositoryID = metadata.repositoryID
+        self.domain = metadata.domain
         self.name = name
         self.description = description
         self.baseURL = descriptor.endpoint
-        self.faviconURL = metadata?.faviconURL
+        self.faviconURL = metadata.faviconURL
         self.actions = actions
         self.actionIndex = Dictionary(uniqueKeysWithValues: actions.map { ($0.id, $0) })
         self.definitions = [:]

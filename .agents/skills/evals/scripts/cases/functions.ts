@@ -64,7 +64,7 @@ const groups: Record<string, Record<string, string>> = {
     inspect: "Inspect service and Action input, output, and handoff contracts",
     validate: "Validate the complete draft without claiming its handlers executed",
     create: "Create only the requested QA Local service draft of the specified kind",
-    update: "Update only requested Local configuration or direct MCP fields",
+    update: "Update only requested Local configuration or Local MCP fields",
     copy: "Copy an eligible service into Local without replacing existing work",
     delete: "Delete only the QA Local service after inspecting its current source",
     attach: "Attach or reload the current resolved service and verify usable Actions",

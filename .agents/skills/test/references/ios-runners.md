@@ -17,13 +17,6 @@ Checks preferences, model selection, repository enablement, and persistence acro
 relaunch. Requires a reachable Host, an idle saved conversation, and the supplied app.
 Restores preferences and the prior saved conversation.
 
-## Local repository
-
-Checks disabled Local mutation safety and unchanged source, Git, and configuration.
-Requires enabled Local, an empty run-owned `qa-` web draft, and a saved Mock conversation
-seeded with `QA Local repository enablement regression. Reply QA only.` Restores
-enablement; delete the prepared draft through the UI afterward.
-
 ## Service icons
 
 Checks native service icon loading. Attach a run-owned MCP fixture at

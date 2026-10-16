@@ -13,7 +13,6 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── app.hasCompletedOnboarding       onboarding completion
 │   │   ├── savedServices                    attached service domains
 │   │   ├── actionApprovalPolicies           versioned Automatic, Ask, Allow, or Block policies for Actions
-│   │   ├── remoteMCPServers                  directly connected MCP URLs, transports, and optional favicon URLs
 │   │   ├── api.url                          Ox service API override
 │   │   ├── llm.defaultModel                 new-conversation provider/model/thinking selection
 │   │   ├── llm.providerCatalog              added provider definitions and bundled overrides
@@ -269,14 +268,24 @@ requiring user action. Incompatible data is retained, never reset or replaced wi
 stale snapshot to force recovery. Resource readiness is reconstructed, not persisted
 in a separate status file.
 
-Repository configuration keeps format version 1. The optional `localEnabled`
-field defaults to true when older configuration files omit it; disabling Local
-removes its services and skills from the active catalog without deleting its Git
-working tree or history.
+Repository configuration keeps format version 1. Local is always enabled; new
+builds ignore and stop writing the legacy `localEnabled` field, and older builds
+default it to true when it is absent.
 
 Repository packages live in `Documents/Repositories`, are user-owned, and remain eligible for device backup. `RepositoryMigrator` moves predecessor Local and UUID remote folders before repository preparation; it verifies source/destination file fingerprints, retains hidden Git state and empty directories through whole-folder moves, and refuses destination collisions. Development snapshots and predecessor migration backups remain private. Missing Local manifests fail without recreating a manifest over existing files. Remote origins, enablement, resolutions, and optional snapshot inventories remain in `service-repositories.json` format 1. Inventories include ordinary files and directories; a missing baseline is treated conservatively as potentially edited. Sync refuses changed snapshots unless the user chooses Keep Copy and Sync in Settings, which preserves a verified complete copy in Repositories before replacement. Changes during downloading or publication abort replacement. Startup restores interrupted snapshot backups when the active folder is missing, or preserves them as visible copies when a new snapshot is already present. Disconnect retains repository files; deletion is performed explicitly in Files. Repository settings reload after browsing or foregrounding.
 
 Older builds do not discover the new paths and can recreate stale private repositories. This location change is not downgrade-compatible; actual predecessor/changed-build verification and maintainer approval are required before release. Returning to the changed build refuses conflicting private/public folders rather than merging or overwriting them.
+
+Remote MCP connections are Local services at `Documents/Repositories/Local/mcp/<id>/service.json`.
+The id is derived from the endpoint host, with a numeric suffix for collisions,
+and is the runtime service domain. Creating or migrating a connection selects Local
+for any same-id conflict. Local preparation converts the legacy
+`remoteMCPServers` (and its older `remoteMCPEndpoints` form) into these manifests,
+renames `savedServices` and `actionApprovalPolicies` references from the legacy
+`mcp.<endpoint hash>` domain, then deletes the preference. Conversation attachments
+keep their stored legacy domain until the conversation resolves its services, which
+rewrites it to the Local id. Older builds show migrated connections as repository
+MCP definitions that they cannot update.
 
 ## Shared preferences
 
@@ -867,7 +876,7 @@ needed for diagnosis but never credentials or reusable secrets.
 | Secret metadata and bindings | UserDefaults | Device backup policy | Sign out or delete entry |
 | Managed provider OAuth | Keychain | System policy | Sign out |
 | Service website state | Domain website store | Local persistent state | Sign out service family |
-| Remote MCP endpoints and transports | UserDefaults | Device backup policy | Disconnect the MCP server |
+| Remote MCP endpoints and transports | Documents/Repositories/Local | Device backup policy | Disconnect the MCP server |
 | Scheduled skill definitions | Application Support | Device backup policy | Delete the schedule or app |
 | Remote MCP OAuth registration and tokens | Keychain | System policy | Disconnect the MCP server |
 | Service repository configuration | Application Support | Device backup policy | Remove repository or reset choices |

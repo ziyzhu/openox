@@ -2778,6 +2778,12 @@ final class Conversation: Identifiable {
     }
 
     private func resolveAttachedServices() {
+        let migratedDomains = ConversationMigrator.migratedServiceDomains(attachedServiceDomains, services: serviceManager)
+        if migratedDomains != attachedServiceDomains {
+            Log.session.info("Conversation.resolveAttachedServices migrated id=\(id) from=\(attachedServiceDomains.joined(separator: ",")) to=\(migratedDomains.joined(separator: ","))")
+            attachedServiceDomains = migratedDomains
+            onPersistableChange?()
+        }
         let normalizedDomains = Self.uniqueServiceDomains(attachedServiceDomains)
         if normalizedDomains.count != attachedServiceDomains.count {
             Log.session.warning("Conversation.resolveAttachedServices deduplicated id=\(id) stored=\(attachedServiceDomains.count) unique=\(normalizedDomains.count)")

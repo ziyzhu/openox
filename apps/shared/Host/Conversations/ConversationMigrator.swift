@@ -3,6 +3,16 @@ import Foundation
 nonisolated enum ConversationMigrator {
     private static let legacyConversationSchemaVersion = 6
 
+    @MainActor
+    static func migratedServiceDomains(_ domains: [String], services: ServiceManager) -> [String] {
+        domains.map { domain in
+            guard services.service(domain: domain) == nil else { return domain }
+            return services.services.first {
+                $0.definition.mcpEndpoint.map(RemoteMCPDescriptor.serviceID(for:)) == domain
+            }?.domain ?? domain
+        }
+    }
+
     private static func legacyTurn(from data: Data, decoder: JSONDecoder) throws -> Turn {
         guard var root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw CocoaError(.fileReadCorruptFile)

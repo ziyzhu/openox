@@ -231,8 +231,8 @@ final class ServiceOperations {
             throw RuntimeError.bridge("ox.service.update: unsupported fields for \(kind): \(unsupported.joined(separator: ", ")); supported fields: \(allowed.sorted().joined(separator: ", ")).")
         }
         if let currentEndpoint = service.definition.mcpEndpoint {
-            guard service.definition.repositoryID == nil else {
-                throw RuntimeError.bridge("ox.service.update: repository MCP definitions are read-only.")
+            guard service.isLocalService else {
+                throw RuntimeError.bridge("ox.service.update: repository MCP definitions are read-only; copy the service to Local before editing it.")
             }
             return try await saveMCP(
                 endpoint: fields["endpoint"]?.stringValue ?? currentEndpoint.absoluteString,
@@ -326,7 +326,7 @@ final class ServiceOperations {
         let args: JSONValue = .object(fields)
         return try await tracked(Actions.serviceDelete, args, purpose: purpose) {
             if let currentService, currentService.isMCPService {
-                await self.serviceManager.removeRemoteMCP(currentService)
+                try await self.serviceManager.removeRemoteMCP(currentService)
                 serviceChanged(cleanDomain)
                 return .object(["domain": .string(cleanDomain), "kind": .string("mcp"), "deleted": .bool(true)])
             }

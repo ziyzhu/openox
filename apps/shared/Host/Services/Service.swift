@@ -846,9 +846,12 @@ final class Service: NSObject, Identifiable {
         capabilityTask = nil
         definition = ServiceDefinition(
             mcpEndpoint: endpoint,
+            domain: domain,
             transport: definition.mcpTransport,
             name: title,
-            description: summary
+            description: summary,
+            repositoryID: definition.repositoryID,
+            faviconURL: definition.faviconURL
         )
         capabilityState = .unloaded
         setAuth(.unknown)

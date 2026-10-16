@@ -188,7 +188,6 @@ actor Repository {
     struct Configuration: Codable {
         var formatVersion = 1
         var bundledEnabled = true
-        var localEnabled = true
         var developmentEnabled = true
         var repositories: [InstalledRepository] = []
         var resolutions: [String: String] = [:]
@@ -196,14 +195,12 @@ actor Repository {
         init(
             formatVersion: Int = 1,
             bundledEnabled: Bool = true,
-            localEnabled: Bool = true,
             developmentEnabled: Bool = true,
             repositories: [InstalledRepository] = [],
             resolutions: [String: String] = [:]
         ) {
             self.formatVersion = formatVersion
             self.bundledEnabled = bundledEnabled
-            self.localEnabled = localEnabled
             self.developmentEnabled = developmentEnabled
             self.repositories = repositories
             self.resolutions = resolutions
@@ -213,7 +210,6 @@ actor Repository {
             let values = try decoder.container(keyedBy: CodingKeys.self)
             formatVersion = try values.decodeIfPresent(Int.self, forKey: .formatVersion) ?? 1
             bundledEnabled = try values.decodeIfPresent(Bool.self, forKey: .bundledEnabled) ?? true
-            localEnabled = try values.decodeIfPresent(Bool.self, forKey: .localEnabled) ?? true
             developmentEnabled = try values.decodeIfPresent(Bool.self, forKey: .developmentEnabled) ?? true
             repositories = try values.decodeIfPresent([InstalledRepository].self, forKey: .repositories) ?? []
             resolutions = try values.decodeIfPresent([String: String].self, forKey: .resolutions) ?? [:]
@@ -489,7 +485,7 @@ actor Repository {
         if repositoryID == Self.bundledID {
             configuration.bundledEnabled = enabled
         } else if repositoryID == Self.localID {
-            configuration.localEnabled = enabled
+            throw Failure(message: "The Local repository is always enabled.")
         } else if repositoryID == "development", developmentRemote != nil {
             configuration.developmentEnabled = enabled
         } else if let index = configuration.repositories.firstIndex(where: { $0.id == repositoryID }) {
@@ -507,7 +503,6 @@ actor Repository {
     }
 
     func setResolution(serviceID: String, repositoryID: String) async throws {
-        if repositoryID == Self.localID { try requireLocalEnabled() }
         let catalog = try await monoRepository()
         guard let conflict = catalog.conflicts.first(where: { $0.serviceID == serviceID }),
               conflict.candidates.contains(where: { $0.repositoryID == repositoryID }) else {
@@ -689,6 +684,35 @@ actor Repository {
         configuration.resolutions[domain] = Self.localID
         try saveConfiguration()
         Log.service.info("Repository.local create domain=\(domain)")
+    }
+
+    func saveMCPService(_ manifest: MCPCatalogManifest, creating: Bool) throws {
+        guard manifest.isValid else { throw Failure(message: "Invalid MCP manifest.") }
+        try prepareLocalMutation()
+        var package = try Self.loadPackage(at: localRoot, provenance: .local)
+        let service = Package.Service(id: try ServiceID(kind: .mcp, runtimeID: manifest.id))
+        let serviceRoot = localRoot.appendingPathComponent(service.id.path, isDirectory: true)
+        let exists = package.services.contains { $0.id == service.id }
+        guard exists != creating, !creating || !FileManager.default.fileExists(atPath: serviceRoot.path) else {
+            throw Failure(message: creating ? "A Local service already exists for \(manifest.id)." : "No Local MCP service exists for \(manifest.id).")
+        }
+        do {
+            try FileManager.default.createDirectory(at: serviceRoot, withIntermediateDirectories: true)
+            try manifest.encoded().write(to: serviceRoot.appendingPathComponent("service.json"), options: .atomic)
+            if creating {
+                package.services.append(service)
+                package.services.sort { $0.id.rawValue.localizedStandardCompare($1.id.rawValue) == .orderedAscending }
+                try Self.writePackage(package, at: localRoot)
+            }
+        } catch {
+            if creating { try? FileManager.default.removeItem(at: serviceRoot) }
+            throw error
+        }
+        if creating {
+            configuration.resolutions[manifest.id] = Self.localID
+            try saveConfiguration()
+        }
+        Log.service.info("Repository.local saveMCP id=\(manifest.id) created=\(creating)")
     }
 
     func copyServiceToLocal(id: String) throws {
@@ -1038,15 +1062,7 @@ actor Repository {
         return paths.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
-    func requireLocalEnabled(operation: String = #function) throws {
-        guard configuration.localEnabled else {
-            Log.service.warning("Repository.mutation rejected repository=local operation=\(operation) reason=disabled")
-            throw Failure(message: "The Local repository is disabled. Enable Local in Settings > Repositories, then retry. This operation made no changes.")
-        }
-    }
-
-    private func prepareLocalMutation(operation: String = #function) throws {
-        try requireLocalEnabled(operation: operation)
+    private func prepareLocalMutation() throws {
         try materializeLocalRepository()
     }
 
@@ -1072,6 +1088,11 @@ actor Repository {
         try RepositoryMigrator.migrateLegacyLocalServiceActions(at: localRoot)
         try RepositoryMigrator.migrateLocalRepositoryVersion(at: localRoot)
         _ = try RepositoryMigrator.prepareRepository(at: localRoot)
+        try RepositoryMigrator.migrateRemoteMCPConnections(at: localRoot) { ids in
+            guard !ids.isEmpty else { return }
+            for id in ids { configuration.resolutions[id] = Self.localID }
+            try saveConfiguration()
+        }
         _ = try Self.loadPackage(at: localRoot, provenance: .local)
     }
 
@@ -1084,7 +1105,7 @@ actor Repository {
                     name: package.name,
                     origin: nil,
                     lastSyncedAt: nil,
-                    isEnabled: configuration.localEnabled,
+                    isEnabled: true,
                     provenance: .local,
                     serviceCount: package.services.count,
                     services: Self.serviceReferences(in: package),
@@ -1101,7 +1122,7 @@ actor Repository {
                     name: "Local",
                     origin: nil,
                     lastSyncedAt: nil,
-                    isEnabled: configuration.localEnabled,
+                    isEnabled: true,
                     provenance: .local,
                     serviceCount: 0,
                     services: [],
@@ -1120,7 +1141,7 @@ actor Repository {
                 name: "Local",
                 origin: nil,
                 lastSyncedAt: nil,
-                isEnabled: configuration.localEnabled,
+                isEnabled: true,
                 provenance: .local,
                 serviceCount: 0,
                 services: [],
@@ -1137,16 +1158,7 @@ actor Repository {
         return source
     }
 
-    func requireSourceMutationEnabled(kind: ServiceKind, id: String, operation: String) throws {
-        guard !configuration.localEnabled else { return }
-        let package = try Self.loadPackage(at: localRoot, provenance: .local)
-        if package.services.contains(where: { $0.id.kind == kind && $0.id.runtimeID == id }) {
-            try requireLocalEnabled(operation: operation)
-        }
-    }
-
     private func editableSource(kind: ServiceKind, id: String) throws -> ActiveSource {
-        try requireSourceMutationEnabled(kind: kind, id: id, operation: #function)
         let source = try activeSource(kind: kind, id: id)
         guard source.provenance == .local else {
             throw Failure(message: "Only Local services are editable. Copy this service to Local before editing it.")

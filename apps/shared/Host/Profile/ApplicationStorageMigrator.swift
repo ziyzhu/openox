@@ -20,7 +20,7 @@ nonisolated enum ApplicationStorageMigrator {
         )
         migrateRemoteMCPServers(
             defaults: .standard,
-            currentKey: ServiceManager.remoteMCPKey
+            currentKey: RepositoryMigrator.legacyRemoteMCPKey
         )
         migrateCustomLLMProviders(
             defaults: .standard,
@@ -266,9 +266,9 @@ nonisolated enum ApplicationStorageMigrator {
                 throw StorageMigrationError.invalidApplicationStorage("provider selection")
             }
         } catch { throw StorageMigrationError.invalidApplicationStorage("provider catalog") }
-        if defaults.object(forKey: ServiceManager.remoteMCPKey) != nil {
-            guard let data = defaults.data(forKey: ServiceManager.remoteMCPKey),
-                  (try? JSONDecoder().decode([ServiceManager.PersistedRemoteMCP].self, from: data)) != nil else {
+        if defaults.object(forKey: RepositoryMigrator.legacyRemoteMCPKey) != nil {
+            guard let data = defaults.data(forKey: RepositoryMigrator.legacyRemoteMCPKey),
+                  (try? JSONDecoder().decode([RepositoryMigrator.LegacyRemoteMCP].self, from: data)) != nil else {
                 throw StorageMigrationError.invalidApplicationStorage("remote MCP server")
             }
         }
@@ -374,12 +374,12 @@ nonisolated enum ApplicationStorageMigrator {
     ) {
         let legacyKey = "remoteMCPEndpoints"
         if let data = defaults.data(forKey: currentKey),
-           (try? JSONDecoder().decode([ServiceManager.PersistedRemoteMCP].self, from: data)) != nil {
+           (try? JSONDecoder().decode([RepositoryMigrator.LegacyRemoteMCP].self, from: data)) != nil {
             defaults.removeObject(forKey: legacyKey)
             return
         }
         let migrated = (defaults.stringArray(forKey: legacyKey) ?? []).map {
-            ServiceManager.PersistedRemoteMCP(endpoint: $0, transport: nil)
+            RepositoryMigrator.LegacyRemoteMCP(endpoint: $0, transport: nil, faviconURL: nil)
         }
         guard !migrated.isEmpty else { return }
         do {

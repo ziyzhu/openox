@@ -106,8 +106,10 @@ try {
     && !["model", "setModel", "renameChat", "repositories"].some(name => Object.keys(ox.app).includes(name));`);
   assert.equal(aliases.value, true, "Old helpers must remain hidden aliases with current validation and help");
   const repositories = await call("ox.repository.list");
-  const repository = repositories.repositories.find((candidate: Repository) => candidate.id === "local");
-  assert.ok(repository && repository.state === "ready", "A prepared Local repository is required");
+  const local = repositories.repositories.find((candidate: Repository) => candidate.id === "local");
+  assert.ok(local && local.state === "ready" && local.enabled, "A prepared, enabled Local repository is required");
+  const repository = repositories.repositories.find((candidate: Repository) => candidate.id === "bundled");
+  assert.ok(repository && repository.state === "ready", "A prepared Bundled repository is required");
   const defaultModel = await call("ox.app.defaultModel") as DefaultModel;
   assert.ok(!defaultModel.configured || ["ready", "notRequired"].includes(defaultModel.authentication.status), "The original default must be available for restoration");
   baseline = { language, theme, repository, defaultModel };
@@ -158,6 +160,7 @@ try {
   assert.equal((await call("ox.conversation.model")).model.id, selection.model);
   await rejected("ox.repository.enable", { repository: "local", enabled: "false" }, "enabled");
   await rejected("ox.repository.enable", { repository: "missing-settings-qa", enabled: false }, "existing repository ID");
+  await rejected("ox.repository.enable", { repository: "local", enabled: false }, "always enabled");
   const enabled = !repository.enabled;
   const updated = await call("ox.repository.enable", { repository: repository.id, enabled });
   assert.equal(updated.enabled, enabled);
@@ -195,7 +198,7 @@ try {
       try {
         await call(name, args);
         const restored = await call(reader);
-        assert.equal(reader === "ox.repository.list" ? restored.repositories.find((row: Repository) => row.id === "local").enabled : reader === "ox.app.defaultModel" ? restored.configured : restored.selection, expected);
+        assert.equal(reader === "ox.repository.list" ? restored.repositories.find((row: Repository) => row.id === baseline!.repository.id).enabled : reader === "ox.app.defaultModel" ? restored.configured : restored.selection, expected);
         if (reader === "ox.app.defaultModel" && baseline.defaultModel.configured) {
           assert.equal(restored.provider.id, baseline.defaultModel.provider.id);
           assert.equal(restored.model.id, baseline.defaultModel.model.id);

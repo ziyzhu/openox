@@ -117,7 +117,7 @@ End the response after this plan; continue only after a later user message confi
 
 ## 4. Author service.json
 
-Inspect `ox.repository.list` before authoring. If Local is disabled and needed for this work, call `ox.repository.enable({ repository: "local", enabled: true, purpose: "Enable Local repository" })` through the existing Action permission system without a separate consent prompt, then recheck `ox.repository.list` and resume only when Local is enabled and ready. If enablement fails, inspect state before retrying. Offer Settings > Repositories as a manual fallback, not a required step. Never use deletion, recreation, or another domain as a workaround.
+Inspect `ox.repository.list` before authoring. Local is always enabled; if it is not ready, report the state. Never use deletion, recreation, or another domain as a workaround.
 
 Read existing Local source before editing and preserve unrelated work. Local changes persist immediately, including incomplete drafts; there is no separate Save step. Create with `ox.service.create` or copy a non-Local candidate with `ox.service.copy`. Use the returned domain as the directory, manifest, and runtime identity; read the generated or copied files before editing.
 

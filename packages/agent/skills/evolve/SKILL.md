@@ -25,7 +25,7 @@ Read `references/model-service.md` when adding or editing website conversation A
 
 ## Ownership and safeguards
 
-- Before mutating Local services or repository skills, inspect `ox.repository.list`. If Local is disabled and needed for this work, call `ox.repository.enable({ repository: "local", enabled: true, purpose: "Enable Local repository" })` through the existing Action permission system without a separate consent prompt, recheck `ox.repository.list`, and resume only when Local is enabled and ready. If enablement fails, inspect state before retrying. Settings > Repositories is a manual fallback. Do not try another domain or delete/recreate drafts to work around disabled Local.
+- Before mutating Local services or repository skills, inspect `ox.repository.list`. Local is always enabled; if it is not ready, report the state instead of trying another domain or deleting and recreating drafts.
 - Local API source at `services/api/<id>/` is editable and uses Host-managed authentication.
 - Local web source at `services/web/<domain>/` is editable. Bundled source and Development/Remote manifests are read-only; copy eligible services with `ox.service.copy` before editing. iOS services are not authorable.
 - If a copy already exists or the wrong source resolves, use `ox.repository.conflicts` and `ox.repository.resolve` to select the intended source without replacing Local work.

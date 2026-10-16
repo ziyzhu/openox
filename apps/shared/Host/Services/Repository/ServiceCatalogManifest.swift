@@ -126,8 +126,8 @@ nonisolated struct IOSCatalogManifest: Decodable, Sendable {
     }
 }
 
-nonisolated struct MCPCatalogManifest: Decodable, Identifiable, Equatable, Sendable {
-    struct LocaleOverlay: Decodable, Equatable, Sendable {
+nonisolated struct MCPCatalogManifest: Codable, Identifiable, Equatable, Sendable {
+    struct LocaleOverlay: Codable, Equatable, Sendable {
         let name: String?
         let description: String?
     }
@@ -156,10 +156,51 @@ nonisolated struct MCPCatalogManifest: Decodable, Identifiable, Equatable, Senda
     var isValid: Bool {
         id.range(of: #"^[a-z0-9]+(?:[.-][a-z0-9]+)*$"#, options: .regularExpression) != nil
             && !name.isEmpty
-            && endpoint.scheme == "https"
+            && (endpoint.scheme == "https" || RemoteMCPService.allowsDevelopmentHTTP(endpoint))
             && endpoint.host != nil
             && endpoint.user == nil
             && endpoint.password == nil
             && endpoint.fragment == nil
+    }
+
+    init(
+        id: String,
+        name: String,
+        description: String? = nil,
+        endpoint: URL,
+        faviconUrl: String? = nil,
+        transport: RemoteMCPTransport? = nil,
+        locales: [String: LocaleOverlay]? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.endpoint = endpoint
+        self.faviconUrl = faviconUrl
+        self.transport = transport
+        self.locales = locales
+    }
+
+    static func identifier(for endpoint: URL, excluding taken: Set<String>) -> String {
+        let labels = (endpoint.host ?? "").lowercased().split(separator: ".").map {
+            $0.replacingOccurrences(of: "[^a-z0-9]+", with: "-", options: .regularExpression)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        }.filter { !$0.isEmpty }
+        let base = labels.isEmpty ? "mcp" : labels.joined(separator: ".")
+        var candidate = base
+        var suffix = 2
+        while taken.contains(candidate) {
+            candidate = "\(base)-\(suffix)"
+            suffix += 1
+        }
+        return candidate
+    }
+
+    func encoded() throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        var data = try encoder.encode(self)
+        data.append(0x0A)
+        return data
     }
 }

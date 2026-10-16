@@ -57,6 +57,7 @@ struct ServiceDetailView: View {
     @State private var showPageInspector = false
     @State private var authorizingMCP = false
     @State private var mcpAuthorizationError: String?
+    @State private var mcpRemovalError: String?
     @State private var confirmRemoveMCP = false
     @State private var confirmDeleteLocalService = false
     @State private var localServiceDeleteError: String?
@@ -142,13 +143,26 @@ struct ServiceDetailView: View {
         .alert("Remove MCP server?", isPresented: $confirmRemoveMCP) {
             Button("Remove", role: .destructive) {
                 Task {
-                    await serviceManager.removeRemoteMCP(service)
-                    dismiss()
+                    do {
+                        try await serviceManager.removeRemoteMCP(service)
+                        dismiss()
+                    } catch {
+                        Log.ui.error("ServiceDetail.removeMCP domain=\(service.domain) failed=\(error.localizedDescription)")
+                        mcpRemovalError = error.localizedDescription
+                    }
                 }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Removes this server, its discovered tools, and its local authorization from Ox. The server does not receive a revocation request.")
+        }
+        .alert("Couldn't remove MCP server", isPresented: Binding(
+            get: { mcpRemovalError != nil },
+            set: { if !$0 { mcpRemovalError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(mcpRemovalError ?? "")
         }
         .alert("Couldn't authorize MCP server", isPresented: Binding(
             get: { mcpAuthorizationError != nil },
@@ -501,7 +515,7 @@ struct ServiceDetailView: View {
 
     @ViewBuilder
     private var manageSection: some View {
-        if canInspectPage || service.isLocalService {
+        if canInspectPage || isLocalScriptService {
             SettingsSection(layout: .group) {
                 VStack(spacing: 0) {
                     if canInspectPage {
@@ -510,7 +524,7 @@ struct ServiceDetailView: View {
                         }
                         .accessibilityIdentifier(A11yID.ConversationControls.Attach.inspectPage(service.domain))
                     }
-                    if service.isLocalService {
+                    if isLocalScriptService {
                         if canInspectPage {
                             Divider().settingsContentInset()
                         }
@@ -539,7 +553,7 @@ struct ServiceDetailView: View {
                 .accessibilityIdentifier(A11yID.ConversationControls.Attach.clearWebData(service.domain))
             }
         }
-        if capabilities.supportsRemoteManagement || service.isLocalService {
+        if capabilities.supportsRemoteManagement || isLocalScriptService {
             SettingsSection(layout: .group) {
                 VStack(spacing: 0) {
                     if capabilities.supportsRemoteManagement {
@@ -548,7 +562,7 @@ struct ServiceDetailView: View {
                         }
                         .accessibilityIdentifier(A11yID.ConversationControls.Attach.disconnectMCP(service.domain))
                     }
-                    if service.isLocalService {
+                    if isLocalScriptService {
                         if capabilities.supportsRemoteManagement {
                             Divider().settingsContentInset()
                         }
@@ -560,6 +574,10 @@ struct ServiceDetailView: View {
                 }
             }
         }
+    }
+
+    private var isLocalScriptService: Bool {
+        service.isLocalService && !service.isMCPService
     }
 
     private var canInspectPage: Bool {
