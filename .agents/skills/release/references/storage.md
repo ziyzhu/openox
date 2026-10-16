@@ -52,8 +52,8 @@ types remain authoritative in their `Codable` implementations.
 │   └── ...                                  system-managed framework state
 ├── Documents/                               visible in Apple Files
 │   ├── Repositories/Local/                  complete editable portable Local repository
-│   ├── Repositories/<uuid>/                 installed remote snapshots; stable installation folder IDs
-│   ├── Repositories/<uuid> Copy <uuid>/     preserved edited snapshots; not connected automatically
+│   ├── Repositories/<repository name>/      installed remote snapshots; readable installation-stable folder names
+│   ├── Repositories/<name> Copy <uuid>/     interrupted-publication recovery copies; not connected automatically
 │   └── Profiles/<ProfileName>/              complete portable Profile
 │       ├── profile.json                 identity and portable storage milestone
 │       ├── .ox/state.sqlite             conversations, settings, indexes; DELETE journal
@@ -272,7 +272,7 @@ Repository configuration keeps format version 1. Local is always enabled; new
 builds ignore and stop writing the legacy `localEnabled` field, and older builds
 default it to true when it is absent.
 
-Repository packages live in `Documents/Repositories`, are user-owned, and remain eligible for device backup. `RepositoryMigrator` moves predecessor Local and UUID remote folders before repository preparation; it verifies source/destination file fingerprints, retains hidden Git state and empty directories through whole-folder moves, and refuses destination collisions. Development snapshots and predecessor migration backups remain private. Missing Local manifests fail without recreating a manifest over existing files. Remote origins, enablement, resolutions, and optional snapshot inventories remain in `service-repositories.json` format 1. Inventories include ordinary files and directories; a missing baseline is treated conservatively as potentially edited. Sync refuses changed snapshots unless the user chooses Keep Copy and Sync in Settings, which preserves a verified complete copy in Repositories before replacement. Changes during downloading or publication abort replacement. Startup restores interrupted snapshot backups when the active folder is missing, or preserves them as visible copies when a new snapshot is already present. Disconnect retains repository files; deletion is performed explicitly in Files. Repository settings reload after browsing or foregrounding.
+Repository packages live in `Documents/Repositories`, are user-owned, and remain eligible for device backup. `RepositoryMigrator` moves predecessor Local and UUID remote folders before repository preparation; it verifies source/destination file fingerprints, retains hidden Git state and empty directories through whole-folder moves, and refuses destination collisions. Development snapshots and predecessor migration backups remain private. Missing Local manifests fail without recreating a manifest over existing files. Remote origins, enablement, resolutions, and optional `directoryName` mappings remain in `service-repositories.json` format 1. New installations sanitize the repository manifest name, reserve Local, and add numeric suffixes for occupied or registered folder names. The chosen name is stable across syncs, even when the manifest name changes. `RepositoryMigrator` journals the chosen directory in configuration before moving each predecessor UUID folder; a restart resumes pending moves, and conflicting folders are never replaced. Publication backups remain keyed by private installation UUID and resolve through the saved directory mapping. Older readers ignore that mapping and cannot discover renamed remote folders; ordinary older writes can discard the mapping. This is another downgrade-incompatible path change requiring approval before release. Remote source is authoritative: sync replaces the entire downloaded snapshot, including local edits and extra files, without merging, prompting, or keeping an edit copy. Downloads are validated before publication; failed downloads leave the installed snapshot unchanged. Previously written optional snapshot inventories are ignored and omitted when configuration is next saved; predecessor readers accept their absence. Startup restores interrupted snapshot backups when the active folder is missing, or preserves them as visible copies when a new snapshot is already present. Disconnect retains repository files; deletion is performed explicitly in Files. Repository settings reload after browsing or foregrounding.
 
 Older builds do not discover the new paths and can recreate stale private repositories. This location change is not downgrade-compatible; actual predecessor/changed-build verification and maintainer approval are required before release. Returning to the changed build refuses conflicting private/public folders rather than merging or overwriting them.
 
@@ -669,13 +669,10 @@ The kind and relative path are derived from the ID; for example,
 repositories are enabled and the user's whole-service choice for each conflict.
 Public HTTPS Git repositories are cloned into temporary staging directories.
 After validation, their `.git` metadata is removed and the resulting `HEAD`
-snapshot replaces `service-repositories/<uuid>/`. These snapshots are
-reproducible app infrastructure outside Profiles, Files, and iCloud, and are
-excluded from device backup. Removing a repository deletes its snapshot and
-saved conflict choices without touching website data.
+snapshot replaces `Documents/Repositories/<repository name>/`. The folder name is chosen at installation, collision-safe, and stored alongside the private installation UUID. These snapshots are visible in Files and eligible for device backup. Sync replaces local edits; disconnecting removes the connection and saved conflict choices without deleting files or website data.
 
-The editable Local repository always exists at `service-repositories/local/`.
-It can be disabled in the active catalog but cannot be removed. Local edits persist
+The editable Local repository always exists at `Documents/Repositories/Local/`.
+It is always enabled and cannot be removed. Local edits persist
 directly without Git initialization, commits, checkout, or a separate Save step.
 Existing `.git` metadata is retained untouched for external recovery, but is not
 read or updated by Ox; the current source files are authoritative, including when

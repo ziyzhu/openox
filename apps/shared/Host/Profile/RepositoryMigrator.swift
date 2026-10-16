@@ -5,6 +5,7 @@ nonisolated enum RepositoryMigrator {
         let manager = FileManager.default
         let source = AppStoragePaths.applicationSupport.appendingPathComponent("service-repositories", isDirectory: true)
         let destination = AppStoragePaths.repositories
+        let configuration = try repositoryConfiguration()
         try manager.createDirectory(at: destination, withIntermediateDirectories: true)
         guard try destination.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
             throw StorageMigrationError.invalidApplicationStorage("Repositories")
@@ -15,17 +16,19 @@ nonisolated enum RepositoryMigrator {
                 guard backup.lastPathComponent.hasPrefix(prefix) else { continue }
                 let id = String(backup.lastPathComponent.dropFirst(prefix.count))
                 guard UUID(uuidString: id) != nil || id == "development" else { continue }
-                let original = id == "development" ? AppStoragePaths.developmentRepositorySnapshot : destination.appendingPathComponent(id, isDirectory: true)
+                let name = configuration.repositories.first { $0.id == id }?.directoryName ?? id
+                let original = id == "development" ? AppStoragePaths.developmentRepositorySnapshot : destination.appendingPathComponent(name, isDirectory: true)
                 let target = manager.fileExists(atPath: original.path)
-                    ? destination.appendingPathComponent("\(id) Copy \(UUID().uuidString)", isDirectory: true)
+                    ? destination.appendingPathComponent("\(name) Copy \(UUID().uuidString)", isDirectory: true)
                     : original
                 _ = try StorageMigrationSupport.migrationSourceInventory(at: backup)
                 try manager.moveItem(at: backup, to: target)
                 Log.service.info("StorageMigrator.repositorySnapshot recovered id=\(id) folder=\(target.lastPathComponent)")
             }
         }
+        let managedNames = Set(["Local"] + configuration.repositories.map { $0.directoryName ?? $0.id })
         for directory in try manager.contentsOfDirectory(at: destination, includingPropertiesForKeys: nil) {
-            guard directory.lastPathComponent == "Local" || UUID(uuidString: directory.lastPathComponent) != nil else { continue }
+            guard managedNames.contains(directory.lastPathComponent) || UUID(uuidString: directory.lastPathComponent) != nil else { continue }
             guard try directory.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
                 throw StorageMigrationError.invalidApplicationStorage("Repositories/\(directory.lastPathComponent)")
             }
@@ -56,6 +59,67 @@ nonisolated enum RepositoryMigrator {
             values.isExcludedFromBackup = false
             try backedUpTarget.setResourceValues(values)
             Log.service.info("StorageMigrator.repositoryLocation done id=\(id) files=\(inventory.count)")
+        }
+    }
+
+    private static func repositoryConfiguration() throws -> Repository.Configuration {
+        let url = AppStoragePaths.repositoriesConfiguration
+        guard FileManager.default.fileExists(atPath: url.path) else { return Repository.Configuration() }
+        let configuration = try JSONDecoder().decode(Repository.Configuration.self, from: Data(contentsOf: url))
+        guard configuration.formatVersion == 1 else { throw StorageMigrationError.invalidApplicationStorage("repository configuration") }
+        var names = Set(["local"])
+        var ids = Set<String>()
+        for record in configuration.repositories {
+            guard UUID(uuidString: record.id) != nil, ids.insert(record.id).inserted else {
+                throw StorageMigrationError.invalidApplicationStorage("repository identity")
+            }
+            if let name = record.directoryName {
+                guard Repository.isDirectoryName(name), names.insert(name.precomposedStringWithCanonicalMapping.lowercased()).inserted else {
+                    throw StorageMigrationError.invalidApplicationStorage("repository directory")
+                }
+            }
+        }
+        return configuration
+    }
+
+    static func migrateRemoteRepositoryDirectories() throws {
+        let manager = FileManager.default
+        var configuration = try repositoryConfiguration()
+        for index in configuration.repositories.indices {
+            let id = configuration.repositories[index].id
+            let source = AppStoragePaths.repositories.appendingPathComponent(id, isDirectory: true)
+            if configuration.repositories[index].directoryName == nil {
+                var name = configuration.repositories[index].origin.deletingPathExtension().lastPathComponent
+                if manager.fileExists(atPath: source.path) {
+                    guard try source.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
+                        throw StorageMigrationError.invalidApplicationStorage("repository directory")
+                    }
+                    let manifest = source.appendingPathComponent("repository.json")
+                    if manager.fileExists(atPath: manifest.path) {
+                        let values = try manifest.resourceValues(forKeys: [.isSymbolicLinkKey, .fileSizeKey])
+                        guard values.isSymbolicLink != true, (values.fileSize ?? 0) <= 512_000 else {
+                            throw StorageMigrationError.invalidApplicationStorage("repository manifest")
+                        }
+                        if let package = try? JSONSerialization.jsonObject(with: Data(contentsOf: manifest)) as? [String: Any] {
+                            name = package["name"] as? String ?? name
+                            if package["version"] as? Int == 2 { _ = try prepareRepository(at: source) }
+                        }
+                    }
+                }
+                configuration.repositories[index].directoryName = try Repository.availableDirectoryName(for: name, excluding: configuration.repositories.compactMap(\.directoryName))
+                try Repository.writeConfiguration(configuration, to: AppStoragePaths.repositoriesConfiguration)
+            }
+            guard let name = configuration.repositories[index].directoryName else { continue }
+            let destination = AppStoragePaths.repositories.appendingPathComponent(name, isDirectory: true)
+            guard manager.fileExists(atPath: source.path), source != destination else { continue }
+            guard !manager.fileExists(atPath: destination.path) else { throw StorageMigrationError.collision("Repositories/\(name)") }
+            let inventory = try StorageMigrationSupport.migrationSourceInventory(at: source)
+            Log.service.info("StorageMigrator.repositoryDirectory start id=\(id) folder=\(name)")
+            try manager.moveItem(at: source, to: destination)
+            guard try StorageMigrationSupport.migrationSourceInventory(at: destination) == inventory else {
+                throw StorageMigrationError.recoveryRequired("Repository directory migration could not verify Repositories/\(name). Your files have been retained.")
+            }
+            Log.service.info("StorageMigrator.repositoryDirectory done id=\(id) folder=\(name) files=\(inventory.count)")
         }
     }
 

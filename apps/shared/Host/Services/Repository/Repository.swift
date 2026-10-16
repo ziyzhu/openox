@@ -80,6 +80,7 @@ actor Repository {
         let services: [ServiceReference]
         let state: State
         var skills: [String] = []
+        var directoryName: String? = nil
     }
 
     struct Conflict: Identifiable, Equatable, Sendable {
@@ -182,7 +183,7 @@ actor Repository {
         let id: String
         var origin: URL
         var isEnabled: Bool
-        var snapshotInventory: [String: String]? = nil
+        var directoryName: String? = nil
     }
 
     struct Configuration: Codable {
@@ -269,6 +270,7 @@ actor Repository {
         if retry { localPreparation = nil }
         else if localPreparation?.failureMessage != nil { return }
         do {
+            if localPreparation == nil { configuration = Self.loadConfiguration(from: configurationURL) }
             try materializeLocalRepository()
             localPreparation = .ready
         } catch {
@@ -528,11 +530,13 @@ actor Repository {
         try FileManager.default.createDirectory(at: repositoriesRoot, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: AppStoragePaths.repositoryStaging, withIntermediateDirectories: true)
         let staging = AppStoragePaths.repositoryStaging.appendingPathComponent("installing-\(id)", isDirectory: true)
-        let destination = repositoryDirectory(id)
         do {
             Log.service.info("Repository.install origin=\(Self.redacted(origin)) id=\(id)")
-            let inventory = try await replaceSnapshot(from: origin, at: destination, staging: staging, provenance: .remote)
-            configuration.repositories.append(InstalledRepository(id: id, origin: origin, isEnabled: true, snapshotInventory: inventory))
+            let package = try await downloadSnapshot(from: origin, to: staging, provenance: .remote)
+            let directoryName = try Self.availableDirectoryName(for: package.name, excluding: configuration.repositories.compactMap(\.directoryName))
+            let destination = repositoriesRoot.appendingPathComponent(directoryName, isDirectory: true)
+            try publishSnapshot(at: destination, staging: staging, repositoryID: id, provenance: .remote, replacingExisting: false)
+            configuration.repositories.append(InstalledRepository(id: id, origin: origin, isEnabled: true, directoryName: directoryName))
             try saveConfiguration()
         } catch {
             try? FileManager.default.removeItem(at: staging)
@@ -540,14 +544,7 @@ actor Repository {
         }
     }
 
-    func hasSnapshotChanges(repositoryID: String) -> Bool {
-        guard let stored = configuration.repositories.first(where: { $0.id == repositoryID }) else { return false }
-        guard let baseline = stored.snapshotInventory,
-              let current = try? Self.snapshotInventory(at: repositoryDirectory(repositoryID)) else { return true }
-        return current != baseline
-    }
-
-    func update(repositoryID: String, preservingChanges: Bool = false) async throws {
+    func update(repositoryID: String) async throws {
         if (try? mountedRepositories.records().contains(where: { $0.id == repositoryID })) == true { return }
         if repositoryID == "development", let developmentRemote {
             Log.service.info("Repository.update origin=\(Self.redacted(developmentRemote)) id=development")
@@ -560,26 +557,9 @@ actor Repository {
         let destination = repositoryDirectory(repositoryID)
         try FileManager.default.createDirectory(at: AppStoragePaths.repositoryStaging, withIntermediateDirectories: true)
         let staging = AppStoragePaths.repositoryStaging.appendingPathComponent("updating-\(repositoryID)", isDirectory: true)
-        let previous = FileManager.default.fileExists(atPath: destination.path) ? try Self.snapshotInventory(at: destination) : nil
-        if let previous, previous != stored.snapshotInventory {
-            guard preservingChanges else {
-                throw Failure(message: "This repository may contain edits made in Files. Sync it in Settings > Repositories to keep a copy before replacing it.")
-            }
-            let copy = repositoriesRoot.appendingPathComponent("\(repositoryID) Copy \(UUID().uuidString)", isDirectory: true)
-            try FileManager.default.copyItem(at: destination, to: copy)
-            guard try Self.snapshotInventory(at: destination) == previous,
-                  try Self.snapshotInventory(at: copy) == previous else {
-                throw Failure(message: "Repository files changed while preserving a copy. Nothing was replaced. Try syncing again.")
-            }
-            Log.service.info("Repository.update preservedCopy id=\(repositoryID) folder=\(copy.lastPathComponent)")
-        }
         do {
             Log.service.info("Repository.update origin=\(Self.redacted(stored.origin)) id=\(repositoryID)")
-            let inventory = try await replaceSnapshot(from: stored.origin, at: destination, staging: staging, provenance: .remote, expectedPrevious: previous)
-            if let index = configuration.repositories.firstIndex(where: { $0.id == repositoryID }) {
-                configuration.repositories[index].snapshotInventory = inventory
-                try saveConfiguration()
-            }
+            try await replaceSnapshot(from: stored.origin, at: destination, staging: staging, repositoryID: repositoryID, provenance: .remote)
         } catch {
             try? FileManager.default.removeItem(at: staging)
             throw Failure(message: Self.errorMessage(error))
@@ -1378,7 +1358,8 @@ actor Repository {
                     provenance: .remote,
                     serviceCount: package.services.count,
                     services: Self.serviceReferences(in: package),
-                    state: .ready
+                    state: .ready,
+                    directoryName: stored.directoryName
                 ),
                 root: root,
                 package: package
@@ -1394,7 +1375,8 @@ actor Repository {
                     provenance: .remote,
                     serviceCount: 0,
                     services: [],
-                    state: .failed(error.localizedDescription)
+                    state: .failed(error.localizedDescription),
+                    directoryName: stored.directoryName
                 ),
                 root: root,
                 package: Package(version: HostProtocols.repository.last!, name: "Invalid", contentHash: nil, services: [])
@@ -1517,119 +1499,111 @@ actor Repository {
         let root = AppStoragePaths.developmentRepositorySnapshot
         let staging = root.deletingLastPathComponent().appendingPathComponent(".updating-development", isDirectory: true)
         do {
-            try await replaceSnapshot(from: developmentRemote, at: root, staging: staging, provenance: .development)
+            try await replaceSnapshot(from: developmentRemote, at: root, staging: staging, repositoryID: "development", provenance: .development)
         } catch {
             throw Failure(message: Self.errorMessage(error))
         }
     }
 
-    private static func snapshotInventory(at root: URL) throws -> [String: String] {
-        let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey, .isRegularFileKey]
-        guard try root.resourceValues(forKeys: keys).isSymbolicLink != true else {
-            throw Failure(message: "Repository folders cannot be symbolic links.")
-        }
-        var inventory: [String: String] = [:]
-        var directories = [(root, "")]
-        while let (directory, prefix) = directories.popLast() {
-            for entry in try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: Array(keys)) {
-                let values = try entry.resourceValues(forKeys: keys)
-                guard values.isSymbolicLink != true else { throw Failure(message: "Repository files cannot be symbolic links.") }
-                let path = prefix + entry.lastPathComponent
-                if values.isDirectory == true {
-                    inventory[path + "/"] = "directory"
-                    directories.append((entry, path + "/"))
-                } else {
-                    guard values.isRegularFile == true else { throw Failure(message: "Repository content must be ordinary files.") }
-                    let file = try FileHandle(forReadingFrom: entry)
-                    defer { try? file.close() }
-                    var hash = SHA256()
-                    while let data = try file.read(upToCount: 128 * 1024), !data.isEmpty { hash.update(data: data) }
-                    inventory[path] = hash.finalize().map { String(format: "%02x", $0) }.joined()
-                }
-            }
-        }
-        return inventory
+    private func downloadSnapshot(from origin: URL, to staging: URL, provenance: Descriptor.Provenance) async throws -> Package {
+        try? FileManager.default.removeItem(at: staging)
+        let repository = try await SwiftGitX.Repository.clone(from: origin, to: staging)
+        guard let head = try repository.HEAD.target as? Commit else { throw Failure(message: "Repository HEAD is not a commit") }
+        let package = try Self.loadPackage(at: staging, provenance: provenance)
+        try FileManager.default.removeItem(at: staging.appendingPathComponent(".git", isDirectory: true))
+        Log.service.info("Repository.snapshot downloaded provenance=\(provenance.rawValue) head=\(head.id.abbreviated)")
+        return package
     }
 
-    @discardableResult
-    private func replaceSnapshot(
-        from origin: URL,
-        at destination: URL,
-        staging: URL,
-        provenance: Descriptor.Provenance,
-        expectedPrevious: [String: String]? = nil
-    ) async throws -> [String: String] {
-        let manager = FileManager.default
-        let previous = manager.fileExists(atPath: destination.path) ? try Self.snapshotInventory(at: destination) : nil
-        guard provenance != .remote || previous == expectedPrevious else {
-            throw Failure(message: "Repository files changed before sync. Nothing was replaced. Try syncing again.")
-        }
-        let backup = staging.deletingLastPathComponent()
-            .appendingPathComponent("repository-backup-\(destination.lastPathComponent)", isDirectory: true)
-        guard !manager.fileExists(atPath: backup.path) else {
-            throw Failure(message: "A repository update needs recovery. Reopen Ox to recover its files before syncing again.")
-        }
-        try? manager.removeItem(at: staging)
-        var movedExisting = false
+    private func replaceSnapshot(from origin: URL, at destination: URL, staging: URL, repositoryID: String, provenance: Descriptor.Provenance) async throws {
         do {
-            let repository = try await SwiftGitX.Repository.clone(from: origin, to: staging)
-            guard let head = try repository.HEAD.target as? Commit else {
-                throw Failure(message: "Repository HEAD is not a commit")
-            }
-            _ = try Self.loadPackage(at: staging, provenance: provenance)
-            try manager.removeItem(at: staging.appendingPathComponent(".git", isDirectory: true))
-            let inventory = try Self.snapshotInventory(at: staging)
-            if manager.fileExists(atPath: destination.path) {
-                guard try Self.snapshotInventory(at: destination) == previous else {
-                    throw Failure(message: "Repository files changed during download. Nothing was replaced. Try syncing again.")
-                }
-                try manager.moveItem(at: destination, to: backup)
-                movedExisting = true
-            } else if previous != nil {
-                throw Failure(message: "The repository folder moved during download. Nothing was replaced.")
-            }
-            do {
-                if movedExisting, try Self.snapshotInventory(at: backup) != previous {
-                    throw Failure(message: "Repository files changed during sync. Try syncing again.")
-                }
-                try manager.moveItem(at: staging, to: destination)
-            } catch {
-                if movedExisting {
-                    do {
-                        try manager.moveItem(at: backup, to: destination)
-                    } catch let rollbackError {
-                        throw Failure(message: "Repository snapshot publication failed and rollback failed: \(rollbackError.localizedDescription)")
-                    }
-                }
-                throw error
-            }
-            if provenance == .development { try? AppStoragePaths.excludeFromBackup(destination) }
-            if movedExisting {
-                do {
-                    try manager.removeItem(at: backup)
-                } catch {
-                    Log.service.warning("Repository.snapshot backup cleanup failed error=\(error.localizedDescription)")
-                }
-            }
-            Log.service.info("Repository.snapshot installed provenance=\(provenance.rawValue) head=\(head.id.abbreviated)")
-            return inventory
+            _ = try await downloadSnapshot(from: origin, to: staging, provenance: provenance)
+            try publishSnapshot(at: destination, staging: staging, repositoryID: repositoryID, provenance: provenance)
         } catch {
-            try? manager.removeItem(at: staging)
+            try? FileManager.default.removeItem(at: staging)
             throw error
         }
     }
 
+    private func publishSnapshot(at destination: URL, staging: URL, repositoryID: String, provenance: Descriptor.Provenance, replacingExisting: Bool = true) throws {
+        let manager = FileManager.default
+        let backup = staging.deletingLastPathComponent().appendingPathComponent("repository-backup-\(repositoryID)", isDirectory: true)
+        guard !manager.fileExists(atPath: backup.path) else {
+            throw Failure(message: "A repository update needs recovery. Reopen Ox to recover its files before syncing again.")
+        }
+        var movedExisting = false
+        if manager.fileExists(atPath: destination.path) {
+            guard replacingExisting else { throw Failure(message: "A folder already exists at Repositories/\(destination.lastPathComponent). Try connecting again.") }
+            try manager.moveItem(at: destination, to: backup)
+            movedExisting = true
+        }
+        do {
+            try manager.moveItem(at: staging, to: destination)
+        } catch {
+            if movedExisting {
+                do {
+                    try manager.moveItem(at: backup, to: destination)
+                } catch let rollbackError {
+                    throw Failure(message: "Repository snapshot publication failed and rollback failed: \(rollbackError.localizedDescription)")
+                }
+            }
+            throw error
+        }
+        if provenance == .development { try? AppStoragePaths.excludeFromBackup(destination) }
+        if movedExisting {
+            do {
+                try manager.removeItem(at: backup)
+            } catch {
+                Log.service.warning("Repository.snapshot backup cleanup failed error=\(error.localizedDescription)")
+            }
+        }
+        Log.service.info("Repository.snapshot installed provenance=\(provenance.rawValue) id=\(repositoryID) folder=\(destination.lastPathComponent)")
+    }
+
     private func repositoryDirectory(_ id: String) -> URL {
-        repositoriesRoot.appendingPathComponent(id == Self.localID ? "Local" : id, isDirectory: true)
+        let name = id == Self.localID ? "Local" : configuration.repositories.first { $0.id == id }?.directoryName ?? id
+        return repositoriesRoot.appendingPathComponent(name, isDirectory: true)
+    }
+
+    nonisolated static func isDirectoryName(_ name: String) -> Bool {
+        !name.isEmpty && !name.hasPrefix(".") && name.utf8.count <= 240
+            && name.rangeOfCharacter(from: .controlCharacters.union(CharacterSet(charactersIn: "/\\:<>\"|?*"))) == nil
+            && name == name.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".")))
+    }
+
+    nonisolated static func availableDirectoryName(for name: String, excluding reserved: [String]) throws -> String {
+        let invalid = CharacterSet.controlCharacters.union(CharacterSet(charactersIn: "/\\:<>\"|?*"))
+        let cleaned = name.components(separatedBy: invalid).filter { !$0.isEmpty }.joined(separator: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".")))
+        var base = ""
+        for character in cleaned {
+            guard base.utf8.count + String(character).utf8.count <= 120 else { break }
+            base.append(character)
+        }
+        base = base.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".-")))
+        if base.isEmpty { base = "Repository" }
+        let names = try FileManager.default.contentsOfDirectory(atPath: AppStoragePaths.repositories.path) + reserved + ["Local"]
+        let taken = Set(names.map { $0.precomposedStringWithCanonicalMapping.lowercased() })
+        var candidate = base
+        var suffix = 2
+        while taken.contains(candidate.precomposedStringWithCanonicalMapping.lowercased()) {
+            candidate = "\(base) \(suffix)"
+            suffix += 1
+        }
+        return candidate
     }
 
     private func saveConfiguration() throws {
-        try FileManager.default.createDirectory(at: configurationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Self.writeConfiguration(configuration, to: configurationURL)
+    }
+
+    nonisolated static func writeConfiguration(_ configuration: Configuration, to url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         var data = try encoder.encode(configuration)
         data.append(0x0A)
-        try data.write(to: configurationURL, options: .atomic)
+        try data.write(to: url, options: .atomic)
     }
 
     private static func loadConfiguration(from url: URL) -> Configuration {

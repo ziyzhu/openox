@@ -330,7 +330,6 @@ struct RepositoryDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceManager.self) private var manager
     @State private var confirmingRemoval = false
-    @State private var confirmingUpdate = false
     @State private var browsingFiles = false
     @State private var fileHandoff = ProfileFileHandoff()
     @State private var filePreview: URL?
@@ -345,6 +344,10 @@ struct RepositoryDetailView: View {
 
     private var locale: String? {
         AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+    }
+
+    private var directoryName: String {
+        repository?.directoryName ?? (repositoryID == Repository.localID ? "Local" : repositoryID)
     }
 
     private var canUpdate: Bool {
@@ -422,11 +425,13 @@ struct RepositoryDetailView: View {
                         }
                     }
                     if repository.provenance == .local || repository.provenance == .remote {
-                        SettingsSection(footer: "These files belong to you. Copy the complete folder to back up or transfer this repository.", layout: .row) {
+                        SettingsSection(footer: repository.provenance == .remote
+                            ? "The remote repository is the source of truth. Sync replaces these files, including local edits. Copy the folder elsewhere to keep your changes."
+                            : "These files belong to you. Copy the complete folder to back up or transfer this repository.", layout: .row) {
                             Button { browsingFiles = true } label: {
                                 SettingsDisclosureRow(
                                     title: "Location",
-                                    value: Text(verbatim: "Repositories / \(repositoryID == Repository.localID ? "Local" : repositoryID)")
+                                    value: Text(verbatim: "Repositories / \(directoryName)")
                                 )
                             }
                             .buttonStyle(.plain)
@@ -462,7 +467,7 @@ struct RepositoryDetailView: View {
             if let url = fileHandoff.dismiss() { filePreview = url }
             Task { await manager.refreshServices(locale: locale) }
         }) {
-            ProfileFilesPicker(directory: AppStoragePaths.repositories.appendingPathComponent(repositoryID == Repository.localID ? "Local" : repositoryID)) { url in
+            ProfileFilesPicker(directory: AppStoragePaths.repositories.appendingPathComponent(directoryName)) { url in
                 if let ready = fileHandoff.select(url) { filePreview = ready }
                 browsingFiles = false
             } onCancel: {
@@ -477,13 +482,7 @@ struct RepositoryDetailView: View {
             if canUpdate {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        Task {
-                            if await manager.repositoryHasChanges(repositoryID) {
-                                confirmingUpdate = true
-                            } else {
-                                await manager.updateRepository(repositoryID, locale: locale)
-                            }
-                        }
+                        Task { await manager.updateRepository(repositoryID, locale: locale) }
                     } label: {
                         if manager.repositoryState == .syncing {
                             ProgressView()
@@ -497,14 +496,6 @@ struct RepositoryDetailView: View {
                     .accessibilityIdentifier(A11yID.Settings.repositoryUpdate(repositoryID))
                 }
             }
-        }
-        .alert("Keep a Copy Before Syncing?", isPresented: $confirmingUpdate) {
-            Button("Keep Copy and Sync") {
-                Task { await manager.updateRepository(repositoryID, locale: locale, preservingChanges: true) }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This repository may contain edits made in Files. Ox will keep its current contents in a separate folder under Repositories before downloading the latest remote snapshot. The copy is not connected to the remote.")
         }
         .alert("Disconnect Repository?", isPresented: $confirmingRemoval) {
             Button("Disconnect", role: .destructive) {
