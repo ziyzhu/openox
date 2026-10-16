@@ -1,7 +1,7 @@
 import type { EvalHost } from "./cli.ts";
 import { newConversation, ox, vmCall } from "./cli.ts";
 import { assertions, observeState, readers } from "./observations.ts";
-import { actionChecks, conversationChecks } from "./scoring.ts";
+import { actionChecks, conversationActions, conversationChecks, history } from "./scoring.ts";
 import { receiptPrompt } from "./references.ts";
 import type { CaseBinding, Choice, ConversationEvidence, EvalCase, EvalResponse, EvalSnapshot, LogRow, TurnOutcome } from "./types.ts";
 
@@ -51,6 +51,7 @@ async function awaitTurn(host: EvalHost, target: ConversationEvidence, options: 
 
 async function runConversation(host: EvalHost, provider: string, model: string, prompts: string[], temporary: boolean,
   target: ConversationEvidence, response: EvalResponse, options: RunOptions, remaining: () => number, choice?: Choice, continuing = false): Promise<void> {
+  const started = Date.now();
   try {
     if (!target.chatId) target.chatId = await newConversation(host, provider, model, temporary, remaining());
     target.initial = await inspect(host, target.chatId, remaining);
@@ -78,6 +79,27 @@ async function runConversation(host: EvalHost, provider: string, model: string, 
   }
   try {
     target.snapshot = await inspect(host, target.chatId, () => 10_000);
+    const { assistants, tools } = history(target.snapshot, target.initial?.messages.length ?? 0);
+    const calls = conversationActions(target);
+    const failed = calls.filter(call => "failed" in call.outcome);
+    const browserCalls: Record<string, number> = {};
+    const serviceInvocations: Record<string, number> = {};
+    for (const call of calls) {
+      if (call.name.startsWith("ox.web.browser.")) browserCalls[call.name] = (browserCalls[call.name] ?? 0) + 1;
+      if (call.name === "ox.service.invoke" && typeof call.args.name === "string") {
+        serviceInvocations[call.args.name] = (serviceInvocations[call.args.name] ?? 0) + 1;
+      }
+    }
+    target.metrics = {
+      elapsedMs: Date.now() - started,
+      modelResponses: assistants.length,
+      toolCalls: tools.length,
+      actionCalls: calls.length,
+      failedActionCalls: failed.length,
+      failedServiceValidations: failed.filter(call => call.name === "ox.service.validate").length,
+      browserCalls,
+      serviceInvocations,
+    };
     if (typeof host !== "string" && host.recordedChoices) target.choices = host.recordedChoices(target.chatId);
     if (target.snapshot.isBusy !== false || target.snapshot.pendingPrompt) response.errors.push("Conversation did not settle; no further task or cleanup is safe");
   } catch (error) { response.errors.push(`Snapshot failed: ${String(error)}`); }

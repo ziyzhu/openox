@@ -74,6 +74,16 @@ export type EvalSnapshot = Omit<ConversationSnapshot, "messages" | "blocks"> & {
 export type TurnOutcome = { chatId: string; outcome: string; text?: string; error?: string };
 export type ConversationEvidence = {
   chatId: string;
+  metrics?: {
+    elapsedMs: number;
+    modelResponses: number;
+    toolCalls: number;
+    actionCalls: number;
+    failedActionCalls: number;
+    failedServiceValidations: number;
+    browserCalls: Record<string, number>;
+    serviceInvocations: Record<string, number>;
+  };
   initial?: EvalSnapshot;
   attention?: EvalSnapshot;
   snapshot?: EvalSnapshot;

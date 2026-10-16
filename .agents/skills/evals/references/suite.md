@@ -74,3 +74,22 @@ Update that snapshot from the native catalog only for reviewed contract changes.
 The runner uses a new QA Profile, exercises temporary and saved conversations,
 restores the previous Profile, and retains evidence outside Git. It requires the
 normal QA simulator preparation and uses Mock without model inference.
+
+Conversation evidence includes `metrics` for the task, probe, and cleanup separately:
+elapsed milliseconds, recorded model responses, model tool calls, underlying Action
+calls, failed Actions, and failed service validations. Elapsed time includes conversation
+setup/inspection and any handoff wait, but excludes independent case observations and
+other conversation phases. These are observed responses, not hidden provider retries.
+Failed validation counts indicate repair overhead, not all repair attempts; inspect the
+trace for implementation edits and retries. Missing metrics mean unavailable, not zero.
+Compare the same successful service fixture and model before/after guidance changes;
+record verification outcomes alongside call counts and timing. Do not call a shorter
+failed or partially verified run an improvement.
+
+`browserCalls` counts attempted calls by exact `ox.web.browser.*` name, including
+failed calls. Compare navigation/reload, page-script, capture-list/read and handoff
+calls separately. Counts do not include clicks, fetches or navigation inside a page
+script, redirects, or implicit reloads; one capture read is not one network request.
+`serviceInvocations` counts attempted `ox.service.invoke` calls by qualified handler
+name. These include fulfillment and verification; use the trace and fixture outcomes
+to distinguish them. Do not infer successful handler coverage from counts alone.

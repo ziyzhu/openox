@@ -23,6 +23,18 @@ Read `references/api-service.md` for direct HTTP API services with API-key, Basi
 
 Read `references/model-service.md` when adding or editing website conversation Actions. Websites remain services, not Ox model providers; never build a browser bridge for the agent loop. API-backed providers are managed through `skills/manage-providers/SKILL.md`.
 
+## Efficient execution
+
+The workflow steps are checks, not separate model turns. For a simple service, batch predictable work into a few executions and return to reasoning only when evidence, a failure, or a human decision changes the next step. Do not sacrifice verification to meet a turn target.
+
+1. Read the applicable authoring reference, discover existing coverage, and inspect repository enablement and relevant Local source together when their contracts are known. Reuse results within this run unless intervening changes invalidate them.
+2. Gather the smallest sufficient website or official API evidence for the requested actions. Discover the product favicon alongside this work. Batch independent reads and return only the fields needed to implement or decide.
+3. Once evidence supports implementation, create or copy, read the generated files, write the complete manifest and handlers, validate, and attach in one execution when budgets allow. Await each dependent operation and stop on failure; never attach an invalid draft. Runtime approval gates still apply.
+4. Inspect all needed action contracts together. Then batch bounded read-only verification, final source reads, and attachment confirmation. Verify each changed handler; exercise pagination, authentication, concurrency, and handoffs only when the service exposes or depends on them. Keep mutations approval-gated and never repeat completed effects.
+5. Review the returned evidence and report completion. Local edits persist immediately; no separate Save step is needed. Repair only evidenced failures and rerun affected checks.
+
+Use these batches for both web and API authoring. Keep sequential writes and dependent reads awaited, parallelize only independent reads, and respect execution time and output limits. Do not refetch unchanged contracts or source merely because another numbered workflow step mentions them. Fresh-state requirements for authentication, concurrent edits, and final source review still apply.
+
 ## Ownership and safeguards
 
 - Before mutating Local services or repository skills, inspect `ox.repository.list`. Local is always enabled; if it is not ready, report the state instead of trying another domain or deleting and recreating drafts.

@@ -8,7 +8,7 @@ Use when a website task has no suitable service or action after successful disco
 
 1. Inspect the needed `ox.web.browser.*` contracts. Fulfill the original request while collecting evidence for only the needed actions and handoffs.
 2. As soon as a read or confirmed effect is supported, put a complete user-facing answer before any subsequent authoring tool calls in the same response; do not wait for service creation. For mutations, prefer observation followed by one approved service invocation; Browser may execute instead when practical. Preserve approval and human-handoff boundaries either way.
-3. Compare the requested outcome with what the current service supplied. Create, extend, or repair the smallest action that removes a clear stable gap, even when the original task succeeded through a workaround. Prefer improving an implementation without changing its contract; add an action for a distinct capability and improve metadata when routing was the problem. Stop when there is no material improvement. The original request establishes minimal action scope, so skip separate plan confirmation unless a decision or expanded scope needs it. Runtime attachment policies and live-mutation approval still apply.
+3. Compare the requested outcome with what the current service supplied. Create, extend, or repair the smallest action that removes a clear stable gap, even when the original task succeeded through a workaround. Prefer improving an implementation without changing its contract; add an action for a distinct capability and improve metadata when routing was the problem. Stop when there is no material improvement. Use the original request to establish minimal action scope without asking for scope confirmation. Ask only for missing information needed to proceed. Runtime attachment policies and live-mutation approval still apply.
 4. Validate and verify the service using the workflow below. Browser success alone does not verify a handler. If creation or editing is blocked, continue authorized Browser fulfillment and report the persistence limitation.
 
 Run at most one bounded improvement pass after fulfilling the request. Optional improvement must not cause another user prompt, approval, sign-in, or external effect, and new user input takes priority. Never repeat a completed mutation for evidence or testing. Track pending, completed, and uncertain effects; inspect resulting state before retrying uncertain effects, and ask if uncertainty remains. Disclose unexecuted handlers as partially verified at completion.
@@ -28,7 +28,7 @@ services/web/<domain>/
 5. Choose a bare lowercase service domain that equals or is a parent suffix of every base URL host. Keep distinct products or account surfaces as separate services.
 6. When the service already exists, inspect its manifest and source read-only. Do not copy or edit it yet.
 
-Defer creation or copying until evidence supports the established action scope. Deliberate authoring also requires plan confirmation below. Discovery alone must not leave a Local draft.
+Defer creation or copying until evidence supports the established action scope. Discovery alone must not leave a Local draft.
 
 Use the recognizable product name, such as `Outlook`, rather than a hostname-derived label. Include a domain suffix only when it is part of the official name or distinguishes otherwise ambiguous products.
 
@@ -50,9 +50,20 @@ Inspect the selected manifest and relevant available source; Bundled `actions.js
 
 Use the smallest read-only Browser probes that reveal the required behavior; bootstrap execution follows the rules above. Batch predictable authorized steps in one execution and return compact outcome evidence. For same-document interaction, use one async page script to trigger the action, wait for a specific success or error condition with a bounded timeout, and extract relevant fields. Full-page navigation destroys page scripts; sequence it through awaited Browser calls. Navigation calls already wait for completion, so do not follow them with `waitForNavigation`, which waits for the next navigation. Stop at unexpected choices, confirmation boundaries, or human-only steps; inspect external state before retrying uncertain writes.
 
+Before each probe, identify the unresolved question that could change the implementation, such as which identifier opens a detail record or how the server signals another page. Reuse current evidence when it already answers the question. Batch independent read-only questions into one bounded probe; return structured facts rather than a broad page dump. Stop exploration once the requested capabilities have sufficient evidence, and leave unrelated capabilities for later.
+
+Keep this compact evidence checklist in working context, not a new user checkpoint or required file:
+
+- Observed method, origin, path and request fields; response field names, types and optionality.
+- Resource identifiers and their list-to-detail relationship; units, time zones and cursor semantics when relevant.
+- Execution prerequisites: page readiness, session cookies, page-owned state or signing, and the origin where requests actually work. Record requirements without copying credential or signature values.
+- Applicable success, empty, terminal pagination, missing-resource and authentication outcomes, with unknown or unobserved cases marked explicitly.
+
+Explore one representative read-only journey, such as list followed by detail, to discover shared behavior before implementing related actions. Use identifiers returned by the actual list response. Reuse shared findings only where evidence supports them; do not assume every endpoint has the same pagination or error contract. Prefer the existing session and page over repeated navigation or reloads unless a fresh-page or authentication check requires one. Browser findings guide implementation but never replace invocation of the generated handlers on their actual execution pages.
+
 1. Start Browser capture in the target state without bodies or a reload and add a named mark. Reload only when initial document-load traffic is required. Enable bounded bodies only for a targeted exchange whose structure cannot be established from metadata or a narrow repeatable probe.
-2. Exercise one representative interaction through an inspected Browser action or narrow page JavaScript.
-3. Inspect only relevant exchanges.
+2. Exercise one representative interaction through an inspected Browser action or narrow page JavaScript. Observe its relevant requests during the same interaction rather than repeating it just for capture.
+3. Inspect only exchanges relevant to the unresolved question; use metadata to select them before reading bounded bodies.
 4. Record method, host, path shape, request shape, status, MIME type, response fields, authentication state, and pagination behavior.
 5. Stop capture when the evidence supports the action surface. After inspecting the needed records, discard the capture unless another immediate authoring step still needs it.
 
@@ -82,7 +93,7 @@ When naturally signed out, collect both sides of one session-authoritative probe
 3. After the user finishes, start a fresh capture only as needed for discovery, then repeat the exact same request from the same execution origin and record the exact result that establishes `true`. A successful sign-in page, local application state, or a different authenticated action is not equivalent evidence.
 4. If the request cannot be repeated directly, does not distinguish both states, or depends on captured credentials, signatures, or private bodies, try another observed read-only candidate without asking the user to sign in again. If none works, keep the authentication handoff and dependent actions provisional.
 
-Inspect only the requests, redirects, statuses, and response shapes needed for the decision table; never inspect or retain credential fields, authorization values, cookies, private bodies, or reusable tokens. If the user cannot complete sign-in, present the findings as provisional and clearly separate unverified actions rather than asking for plan confirmation.
+Inspect only the requests, redirects, statuses, and response shapes needed for the decision table; never inspect or retain credential fields, authorization values, cookies, private bodies, or reusable tokens. If the user cannot complete sign-in, present the findings as provisional, clearly separate unverified actions, and continue any work that does not require sign-in.
 
 ### Choose a favicon
 
@@ -103,17 +114,17 @@ Submit only the public product origin, stripping credentials, path, query, and f
 
 ## 3. Explain the plan
 
-For deliberate service authoring, present:
+For deliberate service authoring, briefly explain the plan and continue working:
 
 - The recognizable product name and what Ox will be able to do there.
 - What information the user will provide and what results Ox will return, including whether more results can be fetched.
 - Any sign-in, human verification, review, approval, or payment the user will need to complete.
 - What was observed on the website, what remains unverified, and useful capabilities left for later.
-- Any decision the user must make about the proposed scope.
+- Any missing information needed to proceed.
 
-Keep action IDs, domains, base URLs, schemas, and icon sourcing out of the plan unless the user requests them or needs a specific detail to decide. Include only capabilities with an observed way to obtain the result in every sign-in state needed for implementation. Describe uncertain or inaccessible capabilities as unverified or leave them out of the confirmed plan.
+Keep action IDs, domains, base URLs, schemas, and icon sourcing out of the plan unless the user requests them or needs a specific detail to decide. Include only capabilities with an observed way to obtain the result in every sign-in state needed for implementation. Describe uncertain or inaccessible capabilities as unverified or leave them out of the plan.
 
-End the response after this plan; continue only after a later user message confirms it. Task-driven evolution skips this checkpoint within the original request's scope. Plan confirmation does not replace runtime attachment policies or live-mutation approval.
+Do not pause for plan or scope confirmation. Proceed from the user's request and observed evidence, asking only for missing information needed to proceed. Runtime attachment policies and live-mutation approval still apply.
 
 ## 4. Author service.json
 

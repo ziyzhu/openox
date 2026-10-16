@@ -35,7 +35,7 @@ const scenarios: Scenario[] = [
   ["visualize", "content-policy", "profile", "Build the requested tool within the Host's HTML content restrictions", "No ambient filesystem, browser storage, remote scripts, unsafe HTML interpolation, or unsupported SDK namespaces", "boundary"],
   ["evolve", "reuse", "external", "Fulfill the request using an already suitable QA service", "Suitable attachment reused; outcome fulfilled without an unnecessary Local draft"],
   ["evolve", "discovery-failure", "external", "Fulfill the task while QA service discovery fails", "Failure reported as blocker rather than absence; no speculative service created", "failure"],
-  ["evolve", "web-create", "external", "Deliberately build the requested QA website service", "Observed plan confirmed before draft; valid manifest/handler parity; actual handler verification and attachment"],
+  ["evolve", "web-create", "external", "Deliberately build the requested QA website service", "Evidence-backed service created without a plan or scope confirmation turn; valid manifest/handler parity; actual handler verification and attachment"],
   ["evolve", "api-create", "external", "Build the requested QA API service from its published contract", "Host-managed auth, constrained request paths, real cursor pagination, approved mutations and actual handler results"],
   ["evolve", "repair", "external", "Fulfill the task and repair the confirmed broken QA service action", "Original failure reproduced; focused repair validated, reloaded, invoked and attached"],
   ["evolve", "dirty-local", "external", "Improve the QA service while Local already contains unrelated changes", "Unrelated bytes preserved; improvement persisted directly and independently verified without a separate Save step", "boundary"],
@@ -75,7 +75,6 @@ export const workflowCases: EvalCase[] = scenarios.map(([skill, name, effect, ta
   ...(name === "fresh-use" ? { probe: "Use the QA skill named here with its variable inputs. {{probeContext}}" } : {}),
   ...(name === "approve-merge" || name === "concurrent-memory" ? { followups: ["I approve the proposed QA memory merge. Save it after reading the current live memory."] } : {}),
   ...(name === "cancel-merge" ? { followups: ["Do not save that proposal. Cancel this import."] } : {}),
-  ...(name === "web-create" ? { followups: ["I confirm that observed QA service plan. Build and verify it within that scope."] } : {}),
   ...(skill === "manage-skills" && ["create", "fresh-use", "cancel-proposal"].includes(name) ? {
     choice: { options: ["Create skill", "Revise proposal", "Cancel"], answer: name === "cancel-proposal" ? "Cancel" : "Create skill" },
   } : {}),
