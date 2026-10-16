@@ -27,7 +27,10 @@ Use the installed `asc-cli` skill for App Store Connect operations and
 [demo](../demo/SKILL.md) for requested screenshots or video capture. The app ID
 is `6802224502`. Follow [references/release-flow.md](references/release-flow.md)
 for inspection, release notes, approved staging, and manual review handoff.
-This workflow is not for TestFlight-only distribution.
+This workflow is not for TestFlight-only distribution. Start with
+`bun .agents/skills/release/scripts/ios-inspect.ts --help`, then follow the
+inspection step in the release flow. The script is read-only; its report is
+evidence, not approval or proof of submission readiness.
 
 App Store Connect owns current listing metadata, screenshots, and previews.
 Read its live state during a release; do not keep local metadata copies, media

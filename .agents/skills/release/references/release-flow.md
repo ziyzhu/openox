@@ -2,14 +2,17 @@
 
 ## Inspect
 
-1. Resolve the selected OpenOx commit, intended iOS version, and exact build. Require all `MARKETING_VERSION` configurations to agree and a clean reviewed revision before an official build or staging. Build/archive with `xcodebuild` using the reviewed project, scheme, signing configuration, and an explicit output path outside Git; inspect native help and do not invent an existing build or archive path.
-2. Follow the installed `asc-cli` skill and current command help. Use app `6802224502` explicitly, inspect its current versions and processed builds, and read the selected version's localized metadata and media from App Store Connect. Before an official upload, require the intended marketing version to be numerically greater than the latest released iOS version; increasing the build number cannot reopen a released version train. Change `apps/ios/project.yml`, regenerate the Xcode project, and verify matching app and Share Extension versions in the archive. This release check is not required for ordinary commits.
-3. Use the last released version and selected source revision to establish the release's change range. Keep any downloads, drafts, CLI metadata layouts, and validation reports in a private temporary workspace, not Git. If working offline, report remote state as unchecked and stop at a provisional draft.
+```sh
+bun .agents/skills/release/scripts/ios-inspect.ts --since <verified-released-commit> --build-id <asc-build-id>
+```
+
+1. Supply the verified source commit of the last released iOS build and explicitly select the intended build. Use `--help` for options. Resolve the report's blockers before the affected build/upload or staging step, then rerun inspection. Missing builds or version records allow preparation only; released-baseline metadata is not staged metadata. Offline reports allow only provisional drafts. Keep reports and release working files in a private temporary workspace outside Git.
+2. Confirm the selected source revision is reviewed and the remote build came from it; the script cannot prove either. For an authorized official build/upload, use `xcodebuild` with the reviewed project, scheme, signing configuration, and explicit output paths outside Git. Inspect native help; do not invent existing archive paths. Make version changes in `apps/ios/project.yml`, regenerate the Xcode project, and verify matching app and Share Extension versions in the archive. Complete storage compatibility checks when applicable. These release checks are not required for ordinary commits.
 
 ## What's New in This Version
 
 1. Draft the App Store Connect `whatsNew` field from actual user-visible changes since the last released version. Do not include unshipped work, internal implementation details, or screenshot-only fixtures as shipped features.
-2. Enumerate every configured version locale from App Store Connect, following pagination, and read its existing notes. For app updates, What's New is required in each locale, including locales whose other metadata was copied from the previous version. English notes do not satisfy `zh-Hans`; report null, empty, or whitespace-only notes as blockers. Write concise release-specific improvements and fixes; do not substitute the promotional tagline, silently carry forward old notes, or remove a locale to bypass validation.
+2. Use the report's locale inventory and existing notes; if it contains only released-baseline metadata, refresh inspection after the intended version exists. Write concise, release-specific notes for every configured locale, including `zh-Hans` and locales with copied metadata. Do not substitute the promotional tagline, silently carry forward old notes, or remove a locale to bypass validation.
 3. Present the complete proposed text for each locale for human review. Translate the approved release notes consistently without inventing additional features. Translations remain draft until approved; do not add or remove locales without an explicit request.
 4. Validate the approved text against current Apple field requirements and available offline CLI validation. If a CLI metadata layout is required, populate it from the current remote state plus the approved changes in the temporary workspace; verify every intended locale and field is covered.
 
