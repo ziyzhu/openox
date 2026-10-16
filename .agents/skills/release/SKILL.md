@@ -6,9 +6,12 @@ description: Prepare and verify OpenOx iOS App Store, npm, and standalone CLI re
 # Release
 
 Run from the selected OpenOx checkout on `main` and follow its `AGENTS.md`.
-Choose the storage compatibility, App Store, or package workflow below. Remote writes and publication
-require explicit user authorization. Never publish as a verification step or
-invoke this skill's publisher from ordinary CI. App Review submission is manual.
+Choose the storage compatibility, App Store, or package workflow below. A requested
+App Store release authorizes preparation, build/upload, release-note translation,
+and staging within the requested scope without additional approval prompts.
+App Review submission and final release are manual. Package publication requires
+explicit user authorization. Never publish as a verification step or invoke this
+skill's publisher from ordinary CI.
 Website and infrastructure deployment remain in `openox-dev`.
 
 ## Storage compatibility
@@ -26,11 +29,11 @@ unsupported downgrade boundaries explicitly and require approval before release.
 Use the installed `asc-cli` skill for App Store Connect operations and
 [demo](../demo/SKILL.md) for requested screenshots or video capture. The app ID
 is `6802224502`. Follow [references/release-flow.md](references/release-flow.md)
-for inspection, release notes, approved staging, and manual review handoff.
+for inspection, release notes, staging, and manual review handoff.
 This workflow is not for TestFlight-only distribution. Start with
 `bun .agents/skills/release/scripts/ios-inspect.ts --help`, then follow the
 inspection step in the release flow. The script is read-only; its report is
-evidence, not approval or proof of submission readiness.
+evidence, not proof of submission readiness.
 
 App Store Connect owns current listing metadata, screenshots, and previews.
 Read its live state during a release; do not keep local metadata copies, media
@@ -48,7 +51,7 @@ live verification. Do not automatically translate it or use it as release notes.
 For app updates, require saved, nonempty **What's New in This Version** text in
 every configured locale, including `zh-Hans`; English text alone is insufficient.
 Review translations before staging and verify all locales afterward. Preserve
-other metadata and media unless changes are requested and approved.
+other metadata and media unless changes are requested.
 
 ## Prepare packages
 

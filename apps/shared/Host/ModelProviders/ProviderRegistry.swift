@@ -78,7 +78,7 @@ final class ProviderRegistry {
     private var catalogDefinitions: [ProviderDefinition] {
         let replacements = Dictionary(uniqueKeysWithValues: catalog.providers.map { ($0.id, $0) })
         let bundledIDs = Set(bundled.map { $0.definition.id })
-        return bundled.map { replacements[$0.definition.id] ?? withDiscoveredModels($0.definition) }
+        return bundled.map { withDiscoveredModels(replacements[$0.definition.id] ?? $0.definition) }
             + catalog.providers.filter { !bundledIDs.contains($0.id) }
     }
 
@@ -91,7 +91,7 @@ final class ProviderRegistry {
     }
 
     func canDiscoverModels(id: String) -> Bool {
-        source(id: id) == .bundled && bundled.contains { $0.definition.id == id && $0.discovery != nil }
+        bundled.contains { $0.definition.id == id && $0.discovery != nil }
     }
 
     @discardableResult
@@ -101,7 +101,8 @@ final class ProviderRegistry {
             throw RuntimeError.bridge("Model discovery is unavailable for this provider")
         }
         await refreshModelCatalogIfStale()
-        let models = try await discovery.models(for: entry.definition, known: modelCatalog?.models(for: discovery.catalog) ?? [:])
+        let active = catalog.providers.first { $0.id == id } ?? entry.definition
+        let models = try await discovery.models(for: active, known: modelCatalog?.models(for: discovery.catalog) ?? [:])
         discovered[id] = DiscoveredModels(fetchedAt: Date(), models: models)
         UserDefaults.standard.set(try JSONEncoder().encode(discovered), forKey: Self.discoveredModelsKey)
         rebuildClients()
@@ -264,13 +265,15 @@ final class ProviderRegistry {
         _ = try ProviderDefinition.decode(definition.json)
         try ProviderClientFactory.validateAdapter(definition)
         _ = try ProviderClientFactory.make(definition, presentation: presentation(for: definition))
+        var stored = definition
+        if let found = discovered[definition.id]?.models { stored.models.removeAll { found.contains($0) } }
         var next = catalog
         if let index = next.providers.firstIndex(where: { $0.id == definition.id }) {
-            next.providers[index] = definition
-        } else { next.providers.append(definition) }
+            next.providers[index] = stored
+        } else { next.providers.append(stored) }
         try persist(next)
         rebuildClients()
-        Log.agent.info("ProviderRegistry.save provider=\(definition.id) models=\(definition.models.count)")
+        Log.agent.info("ProviderRegistry.save provider=\(definition.id) models=\(stored.models.count)")
     }
 
     func delete(id: String) throws {
