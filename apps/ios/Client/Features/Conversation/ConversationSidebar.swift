@@ -259,7 +259,7 @@ private struct SidebarRow: View {
                     TimelineView(.periodic(from: .now, by: 60)) { context in
                         Text(lastModifiedText(relativeTo: context.date))
                             .font(Theme.Fonts.captionSm)
-                            .foregroundStyle(Theme.Colors.conversationSecondary)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .lineLimit(1)
                     }
                 }
