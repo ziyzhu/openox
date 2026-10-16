@@ -347,12 +347,18 @@ struct ServiceDetailView: View {
     @ViewBuilder
     private var domainSection: some View {
         if capabilities.showsDomain {
-            SettingsSection(service.isMCPService ? "Endpoint" : "Domain") {
-                Text(verbatim: service.isMCPService ? service.url : service.domain)
-                    .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityIdentifier(A11yID.ConversationControls.Attach.domain(service.domain))
+            SettingsSection {
+                HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.md) {
+                    Text(service.isMCPService ? "Endpoint" : "Domain")
+                        .font(Theme.Fonts.bodyMd)
+                        .foregroundStyle(Theme.Colors.onSurface)
+                    Spacer(minLength: 0)
+                    Text(verbatim: service.isMCPService ? service.url : service.domain)
+                        .font(Theme.Fonts.bodySm)
+                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                        .multilineTextAlignment(.trailing)
+                        .accessibilityIdentifier(A11yID.ConversationControls.Attach.domain(service.domain))
+                }
             }
         }
     }
@@ -365,22 +371,27 @@ struct ServiceDetailView: View {
     @ViewBuilder
     private var repositorySection: some View {
         if let repository {
-            SettingsSection("Repository", layout: .row) {
+            SettingsSection(layout: .row) {
                 NavigationLink {
                     RepositoryDetailView(repositoryID: repository.id)
                 } label: {
                     HStack(spacing: Theme.Spacing.md) {
-                        VStack(alignment: .leading, spacing: 3) {
+                        Text("Repository")
+                            .font(Theme.Fonts.bodyMd)
+                            .foregroundStyle(Theme.Colors.onSurface)
+                        Spacer(minLength: 0)
+                        VStack(alignment: .trailing, spacing: 3) {
                             Text(verbatim: repository.name)
                                 .font(Theme.Fonts.bodyMd)
                                 .foregroundStyle(Theme.Colors.onSurface)
                                 .lineLimit(1)
-                            Text(verbatim: repositoryStatus(repository))
-                                .font(Theme.Fonts.bodySm)
-                                .foregroundStyle(Theme.Colors.conversationSecondary)
-                                .lineLimit(1)
+                            if let status = repositoryStatus(repository) {
+                                Text(verbatim: status)
+                                    .font(Theme.Fonts.bodySm)
+                                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                                    .lineLimit(1)
+                            }
                         }
-                        Spacer(minLength: 0)
                         Image(systemName: "chevron.right")
                             .font(Theme.Icons.xs)
                             .foregroundStyle(Theme.Colors.conversationSecondary)
@@ -394,9 +405,9 @@ struct ServiceDetailView: View {
         }
     }
 
-    private func repositoryStatus(_ repository: Repository.Descriptor) -> String {
+    private func repositoryStatus(_ repository: Repository.Descriptor) -> String? {
         if repository.provenance == .bundled { return String(localized: "Included with Ox") }
-        if repository.provenance == .local { return String(localized: "Editable on this device") }
+        if repository.provenance == .local { return nil }
         guard let date = repository.lastSyncedAt else { return String(localized: "Last sync unavailable") }
         return String(localized: "Last synced \(date.formatted(date: .abbreviated, time: .shortened))")
     }
@@ -491,7 +502,7 @@ struct ServiceDetailView: View {
     @ViewBuilder
     private var manageSection: some View {
         if canInspectPage || service.isLocalService {
-            SettingsSection("Manage", layout: .group) {
+            SettingsSection(layout: .group) {
                 VStack(spacing: 0) {
                     if canInspectPage {
                         manageRow("Inspect service page", tint: AnyShapeStyle(Theme.Colors.onSurface)) {
@@ -521,7 +532,7 @@ struct ServiceDetailView: View {
             }
         }
         if capabilities.supportsWebsiteDataManagement {
-            SettingsSection("Website data", layout: .row) {
+            SettingsSection(layout: .row) {
                 manageRow("Clear website data", tint: AnyShapeStyle(Theme.Colors.error), role: .destructive) {
                     confirmClearWebData = true
                 }
@@ -529,7 +540,7 @@ struct ServiceDetailView: View {
             }
         }
         if capabilities.supportsRemoteManagement || service.isLocalService {
-            SettingsSection("Remove", layout: .group) {
+            SettingsSection(layout: .group) {
                 VStack(spacing: 0) {
                     if capabilities.supportsRemoteManagement {
                         manageRow("Remove MCP server", tint: AnyShapeStyle(Theme.Colors.error), role: .destructive) {
