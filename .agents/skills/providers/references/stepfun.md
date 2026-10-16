@@ -12,5 +12,4 @@ Ox currently presents StepFun only in China.
 
 ## Runtime sources
 
-- Provider composition: [StepFunProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/StepFunProvider.swift)
-- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
+- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)

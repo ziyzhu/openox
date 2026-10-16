@@ -20,4 +20,4 @@ Gemini Website remains an ordinary service using its signed-in website session, 
 
 - Website service Actions: [Gemini service](../../../../apps/shared/Resources/OxServices.bundle/web/gemini.google.com/actions.js)
 - Provider and Gemini GenerateContent implementation: [GeminiProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/GeminiProvider.swift)
-- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
+- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)

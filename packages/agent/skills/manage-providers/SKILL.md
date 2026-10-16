@@ -7,7 +7,7 @@ description: "Inspect, add, connect, customize, refresh, or restore model provid
 
 Manage provider and model data through the Ox VM's `ox.provider.*` APIs. Do not assume a terminal, Node.js, a host filesystem, or access to the app's source code. Read the current function contracts before unfamiliar operations; operational calls include a meaningful `purpose`. `ox.provider.schema()` is synchronous, requires no arguments or `purpose`, and returns the complete provider-document JSON Schema.
 
-Changes affect this installation's active provider catalog across Profiles, not the read-only app bundle or other users. The built-in catalog is a starting point, not a live upstream directory. This workflow cannot ship new defaults, implement transports, or add native authentication mechanisms. Explain unsupported runtime requirements instead of fabricating configuration.
+Changes affect this installation's active provider catalog across Profiles, not the read-only app bundle or other users. Built-in providers with `capabilities.canLoadModels` add the provider's own listed models after authentication, and `get` includes them; saving a built-in provider turns it into an override whose model list no longer updates, so save only requested changes. This workflow cannot ship new defaults, implement transports, or add native authentication mechanisms. Explain unsupported runtime requirements instead of fabricating configuration.
 
 ## Inspect and plan
 
@@ -35,7 +35,7 @@ Start from `get` for an existing provider, or a compatible bundled definition as
 1. Build the complete candidate with only the requested changes; never put credential values in the document, headers, options, files, or conversation.
 2. Call `ox.provider.validate({ provider: candidate, purpose })`. This checks structure/runtime compatibility without network requests; it does not verify credentials, availability, or model capability.
 3. Re-read the active definition before saving. If it changed since inspection, reconcile against fresh state rather than overwriting another edit.
-4. Call `ox.provider.save({ provider: candidate, purpose })`, then `get` and `list` to verify the intended definition/source and availability. Save models explicitly; saving does not perform discovery.
+4. Call `ox.provider.save({ provider: candidate, purpose })`, then `get` and `list` to verify the intended definition/source and availability. Save models explicitly; saving does not perform discovery, and saved overrides stop discovery for that provider.
 
 Updating the catalog is not a request to switch the current conversation or new-conversation default. Explain any selected model that would become unavailable and resolve the user's intent before removing it. A model-list update alone should not require reconnecting unchanged credentials.
 

@@ -1,0 +1,3274 @@
+[
+  {
+    "definition": {
+      "api": "openai-responses",
+      "auth": {
+        "adapter": "chatgpt",
+        "kind": "custom"
+      },
+      "id": "chatgpt",
+      "models": [
+        {
+          "contextTokens": 272000,
+          "id": "gpt-6-sol",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Sol",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 272000,
+          "id": "gpt-6-sol@fast",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Sol · Fast",
+          "options": {
+            "serviceTier": "priority"
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "wireID": "gpt-6-sol"
+        },
+        {
+          "contextTokens": 272000,
+          "id": "gpt-6-astra",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Astra",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 272000,
+          "id": "gpt-6-astra@fast",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Astra · Fast",
+          "options": {
+            "serviceTier": "priority"
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "wireID": "gpt-6-astra"
+        },
+        {
+          "contextTokens": 272000,
+          "id": "gpt-6-luna",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Luna",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 272000,
+          "id": "gpt-6-luna@fast",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Luna · Fast",
+          "options": {
+            "serviceTier": "priority"
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "wireID": "gpt-6-luna"
+        }
+      ],
+      "name": "ChatGPT",
+      "options": {
+        "accountHeader": "ChatGPT-Account-Id",
+        "sessionHeader": "session-id",
+        "streaming": "websocket-with-sse-fallback"
+      },
+      "url": "https://chatgpt.com/backend-api/codex/"
+    },
+    "discovery": {
+      "catalog": "openai",
+      "format": "chatgpt",
+      "rules": [
+        {
+          "match": "*",
+          "outputTokens": 16384
+        }
+      ]
+    },
+    "legacyCredentialID": "chatgpt",
+    "legacyID": "chatgpt",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/openai/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://chatgpt.com/codex"
+    }
+  },
+  {
+    "definition": {
+      "api": "gemini-generate-content",
+      "auth": {
+        "header": "x-goog-api-key",
+        "kind": "api-key"
+      },
+      "id": "gemini",
+      "models": [
+        {
+          "contextTokens": 1048576,
+          "id": "gemini-3.8-flash",
+          "input": [
+            "audio",
+            "image",
+            "pdf",
+            "text",
+            "video"
+          ],
+          "name": "Gemini 3.8 Flash",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 65536,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "contextTokens": 1048576,
+          "id": "gemini-3.5-flash-lite",
+          "input": [
+            "audio",
+            "image",
+            "pdf",
+            "text",
+            "video"
+          ],
+          "name": "Gemini 3.5 Flash Lite",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 65536,
+          "reasoningEfforts": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      ],
+      "name": "Gemini API",
+      "url": "https://generativelanguage.googleapis.com/v1beta"
+    },
+    "discovery": {
+      "catalog": "google",
+      "format": "gemini"
+    },
+    "legacyCredentialID": "gemini",
+    "legacyID": "gemini",
+    "presentation": {
+      "authNotice": "Gemini's free tier is available for eligible models with usage limits. Google may use free-tier prompts and responses to improve its products.",
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/gemini/favicon.png",
+      "inferenceLocation": "remote",
+      "offer": {
+        "priority": 1,
+        "regions": [
+          "global",
+          "china"
+        ],
+        "summary": "API key · Free tier"
+      },
+      "regions": [
+        "global"
+      ],
+      "website": "https://aistudio.google.com/apikey"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-responses",
+      "auth": {
+        "adapter": "github-copilot",
+        "kind": "custom"
+      },
+      "id": "github-copilot",
+      "models": [
+        {
+          "contextTokens": 1050000,
+          "id": "gpt-6-sol",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Sol",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1050000,
+          "id": "gpt-6-astra",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Astra",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1050000,
+          "id": "gpt-6-luna",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Luna",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 500000,
+          "id": "grok-4.7",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Grok 4.7",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ]
+        }
+      ],
+      "name": "GitHub Copilot",
+      "url": "https://api.githubcopilot.com"
+    },
+    "discovery": {
+      "catalog": "github-copilot",
+      "format": "openai"
+    },
+    "legacyCredentialID": "github-copilot",
+    "legacyID": "github-copilot",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/github-copilot/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://github.com/features/copilot"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "opencode-go",
+      "models": [
+        {
+          "contextTokens": 1000000,
+          "id": "deepseek-v4.1-flash",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "DeepSeek V4.1 Flash",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "deepseek-v4-pro",
+          "input": [
+            "text"
+          ],
+          "name": "DeepSeek V4 Pro (New)",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "high",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1048576,
+          "id": "kimi-k3",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Kimi K3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "glm-5.3",
+          "input": [
+            "text"
+          ],
+          "name": "GLM-5.3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1048576,
+          "id": "space-bunny-free",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Space Bunny Free",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        }
+      ],
+      "name": "OpenCode Go",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_tokens",
+        "reasoningFormat": "provider-default"
+      },
+      "url": "https://opencode.ai/zen/go/v1"
+    },
+    "discovery": {
+      "catalog": "opencode-go",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "opencode-go",
+    "legacyID": "opencode-go",
+    "presentation": {
+      "credentialKind": "subscription-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/opencode/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://opencode.ai/go"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "qwen-coding-plan:global",
+      "models": [
+        {
+          "contextTokens": 1000000,
+          "id": "qwen3.7-plus",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Qwen3.7 Plus",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 64000
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "qwen3.7-max",
+          "input": [
+            "text"
+          ],
+          "name": "Qwen3.7 Max",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 65536
+        }
+      ],
+      "name": "Qwen Coding Plan",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": true,
+        "maxTokensField": "max_tokens",
+        "reasoningFormat": "disable-qwen"
+      },
+      "url": "https://coding-intl.dashscope.aliyuncs.com/v1"
+    },
+    "discovery": {
+      "catalog": "alibaba-coding-plan",
+      "format": "openai"
+    },
+    "legacyCredentialID": "qwen-coding-plan",
+    "legacyID": "qwen-coding-plan",
+    "legacyRegion": "global",
+    "presentation": {
+      "credentialKind": "subscription-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/qwen/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://modelstudio.console.alibabacloud.com/coding-plan"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "qwen-coding-plan:china",
+      "models": [
+        {
+          "contextTokens": 1000000,
+          "id": "qwen3.7-plus",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Qwen3.7 Plus",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 64000
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "qwen3.7-max",
+          "input": [
+            "text"
+          ],
+          "name": "Qwen3.7 Max",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 65536
+        }
+      ],
+      "name": "Qwen Coding Plan",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": true,
+        "maxTokensField": "max_tokens",
+        "reasoningFormat": "disable-qwen"
+      },
+      "url": "https://coding.dashscope.aliyuncs.com/v1"
+    },
+    "discovery": {
+      "catalog": "alibaba-coding-plan-cn",
+      "format": "openai"
+    },
+    "legacyCredentialID": "qwen-coding-plan:china",
+    "legacyID": "qwen-coding-plan",
+    "legacyRegion": "china",
+    "presentation": {
+      "credentialKind": "subscription-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/qwen/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "china"
+      ],
+      "website": "https://bailian.console.aliyun.com/?tab=model#/efm/coding_plan"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "minimax-token-plan:global",
+      "models": [
+        {
+          "contextTokens": 1048576,
+          "id": "MiniMax-M3",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "MiniMax M3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 512000
+        }
+      ],
+      "name": "MiniMax Token Plan",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "extraBody": {
+          "reasoning_split": true
+        },
+        "maxTokensField": "max_completion_tokens",
+        "reasoningFormat": "disable-thinking"
+      },
+      "url": "https://api.minimax.io/v1"
+    },
+    "discovery": {
+      "catalog": "minimax-coding-plan",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "minimax-token-plan",
+    "legacyID": "minimax-token-plan",
+    "legacyRegion": "global",
+    "presentation": {
+      "credentialKind": "subscription-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/minimax/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://platform.minimax.io/subscribe/coding-plan"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "minimax-token-plan:china",
+      "models": [
+        {
+          "contextTokens": 1048576,
+          "id": "MiniMax-M3",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "MiniMax M3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 512000
+        }
+      ],
+      "name": "MiniMax Token Plan",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "extraBody": {
+          "reasoning_split": true
+        },
+        "maxTokensField": "max_completion_tokens",
+        "reasoningFormat": "disable-thinking"
+      },
+      "url": "https://api.minimaxi.com/v1"
+    },
+    "discovery": {
+      "catalog": "minimax-cn-coding-plan",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "minimax-token-plan:china",
+    "legacyID": "minimax-token-plan",
+    "legacyRegion": "china",
+    "presentation": {
+      "credentialKind": "subscription-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/minimax/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "china"
+      ],
+      "website": "https://platform.minimaxi.com/subscribe/coding-plan"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "adapter": "openrouter",
+        "kind": "custom"
+      },
+      "id": "openrouter",
+      "models": [
+        {
+          "contextTokens": 200000,
+          "id": "openrouter/free",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "Free Models Router",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 8000
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "stealth/space-bunny-alpha",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Space Bunny Alpha",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "anthropic/claude-sonnet-5",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Claude Sonnet 5",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1050000,
+          "id": "openai/gpt-6-astra",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Astra",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1048576,
+          "id": "google/gemini-3.8-flash",
+          "input": [
+            "audio",
+            "image",
+            "pdf",
+            "text",
+            "video"
+          ],
+          "name": "Gemini 3.8 Flash",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "contextTokens": 1048576,
+          "id": "deepseek/deepseek-v4.1-flash",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "DeepSeek V4.1 Flash",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "qwen/qwen3.8-max-prime",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Qwen 3.8 Max Prime",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ]
+        },
+        {
+          "contextTokens": 1048576,
+          "id": "moonshotai/kimi-k3",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Kimi K3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1310720,
+          "id": "z-ai/glm-5.3",
+          "input": [
+            "text"
+          ],
+          "name": "GLM-5.3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        }
+      ],
+      "name": "OpenRouter API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "extraBody": {
+          "provider": {
+            "sort": "latency"
+          }
+        },
+        "maxTokensField": "max_tokens",
+        "reasoningFormat": "reasoning_object"
+      },
+      "url": "https://openrouter.ai/api/v1"
+    },
+    "discovery": {
+      "catalog": "openrouter",
+      "format": "openai",
+      "rules": [
+        {
+          "exclude": true,
+          "match": "*:batch"
+        },
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "openrouter",
+    "legacyID": "openrouter",
+    "presentation": {
+      "authNotice": "The Free Models Router automatically chooses a compatible model at no token charge. Availability and rate limits can vary. Other OpenRouter models may charge your account.",
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/openrouter/favicon.png",
+      "inferenceLocation": "remote",
+      "offer": {
+        "priority": 0,
+        "regions": [
+          "china",
+          "global"
+        ],
+        "summary": "OAuth · Free Models Router"
+      },
+      "regions": [
+        "global"
+      ],
+      "website": "https://openrouter.ai/settings/keys"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "ark:global",
+      "models": [
+        {
+          "contextTokens": 256000,
+          "id": "dola-seed-2-1-turbo-260628",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Dola Seed 2.1 Turbo",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 256000
+        },
+        {
+          "contextTokens": 262144,
+          "id": "seed-2-0-code-preview-260328",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Dola Seed 2.0 Code",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 131072,
+          "reasoningEfforts": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "contextTokens": 256000,
+          "id": "seed-2-0-pro-260328",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Dola Seed 2.0 Pro",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 128000,
+          "reasoningEfforts": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "contextTokens": 256000,
+          "id": "seed-2-0-lite-260428",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Dola Seed 2.0 Lite",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 32000,
+          "reasoningEfforts": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "contextTokens": 256000,
+          "id": "seed-2-0-mini-260428",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Dola Seed 2.0 Mini",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 32000,
+          "reasoningEfforts": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      ],
+      "name": "BytePlus ModelArk API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_tokens",
+        "reasoningFormat": "provider-default"
+      },
+      "url": "https://ark.ap-southeast.bytepluses.com/api/v3"
+    },
+    "discovery": {
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "ark",
+    "legacyID": "ark",
+    "legacyRegion": "global",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/byteplus/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://console.byteplus.com/ark/region:ark+ap-southeast-1/apikey"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "ark:china",
+      "models": [
+        {
+          "contextTokens": 256000,
+          "id": "doubao-seed-2-1-pro-260628",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Doubao Seed 2.1 Pro",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 256000
+        },
+        {
+          "contextTokens": 256000,
+          "id": "doubao-seed-2-1-turbo",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Doubao Seed 2.1 Turbo",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 256000
+        },
+        {
+          "contextTokens": 256000,
+          "id": "doubao-seed-character",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Doubao Seed Character",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 256000
+        },
+        {
+          "contextTokens": 256000,
+          "id": "doubao-seed-evolving",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Doubao Seed Evolving",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 256000
+        },
+        {
+          "contextTokens": 262144,
+          "id": "doubao-seed-2-0-code-preview-260328",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Doubao Seed 2.0 Code",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 131072,
+          "reasoningEfforts": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "contextTokens": 256000,
+          "id": "doubao-seed-2-0-pro-260328",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Doubao Seed 2.0 Pro",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 128000,
+          "reasoningEfforts": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "contextTokens": 256000,
+          "id": "doubao-seed-2-0-lite-260428",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Doubao Seed 2.0 Lite",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 32000,
+          "reasoningEfforts": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "contextTokens": 256000,
+          "id": "doubao-seed-2-0-mini-260428",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Doubao Seed 2.0 Mini",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 32000,
+          "reasoningEfforts": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      ],
+      "name": "Volcengine Ark API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_tokens",
+        "reasoningFormat": "provider-default"
+      },
+      "url": "https://ark.cn-beijing.volces.com/api/v3"
+    },
+    "discovery": {
+      "catalog": "volcengine",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "ark:china",
+    "legacyID": "ark",
+    "legacyRegion": "china",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/volcengine/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "china"
+      ],
+      "website": "https://console.volcengine.com/ark/region:ark+cn-beijing/apikey"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-responses",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "openai",
+      "models": [
+        {
+          "contextTokens": 1050000,
+          "id": "gpt-6-sol",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Sol",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1050000,
+          "id": "gpt-6-astra",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Astra",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1050000,
+          "id": "gpt-6-luna",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Luna",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        }
+      ],
+      "name": "OpenAI API",
+      "options": {
+        "reasoningEffort": "none"
+      },
+      "url": "https://api.openai.com/v1"
+    },
+    "discovery": {
+      "catalog": "openai",
+      "format": "openai"
+    },
+    "legacyCredentialID": "openai",
+    "legacyID": "openai",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/openai/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://platform.openai.com/api-keys"
+    }
+  },
+  {
+    "definition": {
+      "api": "anthropic-messages",
+      "auth": {
+        "header": "x-api-key",
+        "kind": "api-key"
+      },
+      "id": "anthropic",
+      "models": [
+        {
+          "contextTokens": 1000000,
+          "id": "claude-sonnet-5",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Claude Sonnet 5",
+          "options": {
+            "adaptiveThinking": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "claude-opus-5-5",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Claude Opus 5.5",
+          "options": {
+            "adaptiveThinking": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "claude-fable-5-1",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Claude Fable 5.1",
+          "options": {
+            "adaptiveThinking": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 200000,
+          "id": "claude-haiku-4.5",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Claude Haiku 4.5 (latest)",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "wireID": "claude-haiku-4-5"
+        }
+      ],
+      "name": "Anthropic API",
+      "url": "https://api.anthropic.com/v1/"
+    },
+    "discovery": {
+      "catalog": "anthropic",
+      "format": "anthropic",
+      "rules": [
+        {
+          "match": "claude-sonnet-5*",
+          "options": {
+            "adaptiveThinking": true
+          }
+        },
+        {
+          "match": "claude-opus-5*",
+          "options": {
+            "adaptiveThinking": true
+          }
+        },
+        {
+          "match": "claude-fable-5*",
+          "options": {
+            "adaptiveThinking": true
+          }
+        },
+        {
+          "match": "claude-haiku-5*",
+          "options": {
+            "adaptiveThinking": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "anthropic",
+    "legacyID": "anthropic",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/anthropic/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://console.anthropic.com/settings/keys"
+    }
+  },
+  {
+    "definition": {
+      "api": "anthropic-messages",
+      "auth": {
+        "authorizeParams": {
+          "code": "true"
+        },
+        "authorizeURL": "https://claude.ai/oauth/authorize",
+        "clientID": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
+        "flow": "authorization-code",
+        "kind": "oauth",
+        "redirectURI": "http://localhost:53692/callback",
+        "requestEncoding": "json",
+        "scopes": [
+          "org:create_api_key",
+          "user:profile",
+          "user:inference",
+          "user:sessions:claude_code",
+          "user:mcp_servers",
+          "user:file_upload"
+        ],
+        "tokenURL": "https://platform.claude.com/v1/oauth/token"
+      },
+      "id": "claude-subscription",
+      "models": [
+        {
+          "contextTokens": 1000000,
+          "id": "claude-sonnet-5",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Claude Sonnet 5",
+          "options": {
+            "adaptiveThinking": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "claude-opus-5-5",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Claude Opus 5.5",
+          "options": {
+            "adaptiveThinking": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "claude-fable-5-1",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Claude Fable 5.1",
+          "options": {
+            "adaptiveThinking": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 200000,
+          "id": "claude-haiku-4.5",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Claude Haiku 4.5 (latest)",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "wireID": "claude-haiku-4-5"
+        }
+      ],
+      "name": "Claude Pro/Max",
+      "options": {
+        "beta": [
+          "claude-code-20250219",
+          "oauth-2025-04-20"
+        ],
+        "headers": {
+          "User-Agent": "claude-cli/2.1.280",
+          "anthropic-dangerous-direct-browser-access": "true",
+          "x-app": "cli"
+        }
+      },
+      "url": "https://api.anthropic.com/v1/"
+    },
+    "discovery": {
+      "catalog": "anthropic",
+      "format": "anthropic",
+      "rules": [
+        {
+          "match": "claude-sonnet-5*",
+          "options": {
+            "adaptiveThinking": true
+          }
+        },
+        {
+          "match": "claude-opus-5*",
+          "options": {
+            "adaptiveThinking": true
+          }
+        },
+        {
+          "match": "claude-fable-5*",
+          "options": {
+            "adaptiveThinking": true
+          }
+        },
+        {
+          "match": "claude-haiku-5*",
+          "options": {
+            "adaptiveThinking": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "claude-subscription",
+    "legacyID": "claude-subscription",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/anthropic/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://claude.ai/upgrade"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-responses",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "amazon-bedrock:responses",
+      "models": [
+        {
+          "contextTokens": 272000,
+          "id": "gpt-6-sol",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Sol",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "wireID": "openai.gpt-6-sol"
+        },
+        {
+          "contextTokens": 272000,
+          "id": "gpt-6-astra",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Astra",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "wireID": "openai.gpt-6-astra"
+        },
+        {
+          "contextTokens": 272000,
+          "id": "gpt-6-luna",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "GPT-6 Luna",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "wireID": "openai.gpt-6-luna"
+        }
+      ],
+      "name": "Amazon Bedrock API · Responses",
+      "url": "https://bedrock-mantle.us-east-1.api.aws/openai/v1"
+    },
+    "legacyCredentialID": "amazon-bedrock",
+    "legacyID": "amazon-bedrock",
+    "presentation": {
+      "authNotice": "Ox connects to Amazon Bedrock in US East (N. Virginia). Use a Bedrock API key that can access these models in us-east-1.",
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/amazon-bedrock/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://console.aws.amazon.com/bedrock/home?region=us-east-1#/api-keys"
+    }
+  },
+  {
+    "definition": {
+      "api": "anthropic-messages",
+      "auth": {
+        "header": "x-api-key",
+        "kind": "api-key"
+      },
+      "id": "amazon-bedrock:messages",
+      "models": [
+        {
+          "contextTokens": 1000000,
+          "id": "claude-sonnet-5",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Claude Sonnet 5",
+          "options": {
+            "adaptiveThinking": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "wireID": "anthropic.claude-sonnet-5"
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "claude-opus-5-5",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Claude Opus 5.5",
+          "options": {
+            "adaptiveThinking": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "wireID": "anthropic.claude-opus-5-5"
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "claude-fable-5-1",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Claude Fable 5.1",
+          "options": {
+            "adaptiveThinking": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "wireID": "anthropic.claude-fable-5-1"
+        },
+        {
+          "contextTokens": 200000,
+          "id": "claude-haiku-4.5",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Claude Haiku 4.5",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "wireID": "anthropic.claude-haiku-4-5-20251001-v1:0"
+        }
+      ],
+      "name": "Amazon Bedrock API · Messages",
+      "url": "https://bedrock-mantle.us-east-1.api.aws/anthropic/v1/"
+    },
+    "legacyCredentialID": "amazon-bedrock",
+    "legacyID": "amazon-bedrock",
+    "presentation": {
+      "authNotice": "Ox connects to Amazon Bedrock in US East (N. Virginia). Use a Bedrock API key that can access these models in us-east-1.",
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/amazon-bedrock/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://console.aws.amazon.com/bedrock/home?region=us-east-1#/api-keys"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-responses",
+      "auth": {
+        "adapter": "xai",
+        "kind": "custom"
+      },
+      "id": "xai",
+      "models": [
+        {
+          "contextTokens": 500000,
+          "id": "grok-4.7",
+          "input": [
+            "image",
+            "pdf",
+            "text"
+          ],
+          "name": "Grok 4.7",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ]
+        }
+      ],
+      "name": "xAI API",
+      "url": "https://api.x.ai/v1"
+    },
+    "discovery": {
+      "catalog": "xai",
+      "format": "openai"
+    },
+    "legacyCredentialID": "xai",
+    "legacyID": "xai",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/xai/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://console.x.ai/team/default/api-keys"
+    }
+  },
+  {
+    "definition": {
+      "api": "anthropic-messages",
+      "auth": {
+        "clientID": "17e5f671-d194-4dfb-9706-5516cb48c098",
+        "deviceAuthorizationURL": "https://auth.kimi.com/api/oauth/device_authorization",
+        "flow": "device-code",
+        "kind": "oauth",
+        "tokenURL": "https://auth.kimi.com/api/oauth/token"
+      },
+      "id": "kimi-coding",
+      "models": [
+        {
+          "contextTokens": 1048576,
+          "id": "kimi-for-coding",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "Kimi For Coding",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        },
+        {
+          "contextTokens": 1048576,
+          "id": "k3",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "Kimi K3",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        },
+        {
+          "contextTokens": 262144,
+          "id": "k3-256k",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "Kimi K3 256K",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        },
+        {
+          "contextTokens": 262144,
+          "id": "kimi-for-coding-highspeed",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "Kimi For Coding HighSpeed",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        }
+      ],
+      "name": "Kimi For Coding",
+      "options": {
+        "headers": {
+          "User-Agent": "Ox/iOS"
+        }
+      },
+      "url": "https://api.kimi.com/coding"
+    },
+    "discovery": {
+      "catalog": "kimi-code-plan-global",
+      "format": "openai"
+    },
+    "legacyCredentialID": "kimi-coding",
+    "legacyID": "kimi-coding",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/kimi/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://www.kimi.com/code"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "zai-coding-plan:global",
+      "models": [
+        {
+          "contextTokens": 1000000,
+          "id": "glm-5.3",
+          "input": [
+            "text"
+          ],
+          "name": "GLM-5.3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "glm-5.3-highspeed",
+          "input": [
+            "text"
+          ],
+          "name": "GLM-5.3 Highspeed",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        }
+      ],
+      "name": "Z.AI Coding Plan",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_tokens",
+        "reasoningEffort": "low",
+        "reasoningFormat": "reasoning_effort"
+      },
+      "url": "https://api.z.ai/api/coding/paas/v4"
+    },
+    "discovery": {
+      "catalog": "zai-coding-plan",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "zai-coding-plan",
+    "legacyID": "zai-coding-plan",
+    "legacyRegion": "global",
+    "presentation": {
+      "credentialKind": "subscription-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/zai/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://z.ai/subscribe"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "zai-coding-plan:china",
+      "models": [
+        {
+          "contextTokens": 1000000,
+          "id": "glm-5.3",
+          "input": [
+            "text"
+          ],
+          "name": "GLM-5.3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "glm-5.3-highspeed",
+          "input": [
+            "text"
+          ],
+          "name": "GLM-5.3 Highspeed",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        }
+      ],
+      "name": "Z.AI Coding Plan",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_tokens",
+        "reasoningEffort": "low",
+        "reasoningFormat": "reasoning_effort"
+      },
+      "url": "https://open.bigmodel.cn/api/coding/paas/v4"
+    },
+    "discovery": {
+      "catalog": "zhipuai-coding-plan",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "zai-coding-plan:china",
+    "legacyID": "zai-coding-plan",
+    "legacyRegion": "china",
+    "presentation": {
+      "credentialKind": "subscription-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/zai/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "china"
+      ],
+      "website": "https://open.bigmodel.cn/glm-coding"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "mistral",
+      "models": [
+        {
+          "contextTokens": 262144,
+          "id": "mistral-medium-2604",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "Mistral Medium 3.5",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "none",
+            "high"
+          ]
+        },
+        {
+          "contextTokens": 256000,
+          "id": "mistral-small-2603",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "Mistral Small 4",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "none",
+            "high"
+          ]
+        }
+      ],
+      "name": "Mistral API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_tokens",
+        "reasoningEffort": "none",
+        "reasoningFormat": "reasoning_effort"
+      },
+      "url": "https://api.mistral.ai/v1"
+    },
+    "discovery": {
+      "catalog": "mistral",
+      "format": "openai"
+    },
+    "legacyCredentialID": "mistral",
+    "legacyID": "mistral",
+    "presentation": {
+      "authNotice": "Mistral Free mode includes limited API usage without a credit card. Usage and rate limits apply.",
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/mistral/favicon.png",
+      "inferenceLocation": "remote",
+      "offer": {
+        "priority": 2,
+        "regions": [
+          "china",
+          "global"
+        ],
+        "summary": "API key · Free mode"
+      },
+      "regions": [
+        "global"
+      ],
+      "website": "https://console.mistral.ai/api-keys"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "kimi:global",
+      "models": [
+        {
+          "contextTokens": 1048576,
+          "id": "kimi-k3",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Kimi K3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        }
+      ],
+      "name": "Kimi API",
+      "options": {
+        "cacheRouting": "prompt_cache_key",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_completion_tokens",
+        "reasoningEffort": "low",
+        "reasoningFormat": "reasoning_effort"
+      },
+      "url": "https://api.moonshot.ai/v1"
+    },
+    "discovery": {
+      "catalog": "moonshotai",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "kimi",
+    "legacyID": "kimi",
+    "legacyRegion": "global",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/kimi/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://platform.kimi.ai/console/api-keys"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "kimi:china",
+      "models": [
+        {
+          "contextTokens": 1048576,
+          "id": "kimi-k3",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Kimi K3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        }
+      ],
+      "name": "Kimi API",
+      "options": {
+        "cacheRouting": "prompt_cache_key",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_completion_tokens",
+        "reasoningEffort": "low",
+        "reasoningFormat": "reasoning_effort"
+      },
+      "url": "https://api.moonshot.cn/v1"
+    },
+    "discovery": {
+      "catalog": "moonshotai-cn",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "kimi:china",
+    "legacyID": "kimi",
+    "legacyRegion": "china",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/kimi/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "china"
+      ],
+      "website": "https://platform.moonshot.cn/console/api-keys"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "deepseek",
+      "models": [
+        {
+          "contextTokens": 1000000,
+          "id": "deepseek-flash",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "DeepSeek V4.1 Flash",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "deepseek-v4-pro",
+          "input": [
+            "text"
+          ],
+          "name": "DeepSeek V4 Pro",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        }
+      ],
+      "name": "DeepSeek API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_tokens",
+        "reasoningFormat": "disable-thinking"
+      },
+      "url": "https://api.deepseek.com/v1"
+    },
+    "discovery": {
+      "catalog": "deepseek",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "deepseek",
+    "legacyID": "deepseek",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/deepseek/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global",
+        "china"
+      ],
+      "website": "https://platform.deepseek.com/api_keys"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "zai:global",
+      "models": [
+        {
+          "contextTokens": 1000000,
+          "id": "glm-5.3",
+          "input": [
+            "text"
+          ],
+          "name": "GLM-5.3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        }
+      ],
+      "name": "Z.ai (GLM) API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_tokens",
+        "reasoningEffort": "low",
+        "reasoningFormat": "reasoning_effort"
+      },
+      "url": "https://api.z.ai/api/paas/v4"
+    },
+    "discovery": {
+      "catalog": "zai",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "zai",
+    "legacyID": "zai",
+    "legacyRegion": "global",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/zai/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://z.ai/manage-apikey/apikey-list"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "zai:china",
+      "models": [
+        {
+          "contextTokens": 200000,
+          "id": "glm-4.7-flash",
+          "input": [
+            "text"
+          ],
+          "name": "GLM-4.7-Flash",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "glm-5.3",
+          "input": [
+            "text"
+          ],
+          "name": "GLM-5.3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "high",
+            "max"
+          ]
+        }
+      ],
+      "name": "Z.ai (GLM) API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_tokens",
+        "reasoningEffort": "low",
+        "reasoningFormat": "reasoning_effort"
+      },
+      "url": "https://open.bigmodel.cn/api/paas/v4"
+    },
+    "discovery": {
+      "catalog": "zhipuai",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "zai:china",
+    "legacyID": "zai",
+    "legacyRegion": "china",
+    "presentation": {
+      "authNotice": "GLM-4.7 Flash is free. Other Z.AI models may charge your account. Usage and rate limits apply.",
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/zai/favicon.png",
+      "inferenceLocation": "remote",
+      "offer": {
+        "priority": 0,
+        "regions": [
+          "china"
+        ],
+        "summary": "API key · Free GLM-4.7 Flash"
+      },
+      "regions": [
+        "china"
+      ],
+      "website": "https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "qwen:global",
+      "models": [
+        {
+          "contextTokens": 1000000,
+          "id": "qwen3.7-plus",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Qwen3.7 Plus",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 8192
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "qwen3.8-max",
+          "input": [
+            "image",
+            "pdf",
+            "text",
+            "video"
+          ],
+          "name": "Qwen3.8 Max",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 8192,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "xhigh"
+          ]
+        }
+      ],
+      "name": "Qwen API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": true,
+        "maxTokensField": "max_tokens",
+        "reasoningFormat": "disable-qwen"
+      },
+      "url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    },
+    "discovery": {
+      "catalog": "alibaba",
+      "format": "openai"
+    },
+    "legacyCredentialID": "qwen",
+    "legacyID": "qwen",
+    "legacyRegion": "global",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/qwen/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://modelstudio.console.alibabacloud.com/?tab=model#/api-key"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "qwen:china",
+      "models": [
+        {
+          "contextTokens": 1000000,
+          "id": "qwen3.7-plus",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Qwen3.7 Plus",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 8192
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "qwen3.8-max",
+          "input": [
+            "image",
+            "pdf",
+            "text",
+            "video"
+          ],
+          "name": "Qwen3.8 Max",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 8192,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "xhigh"
+          ]
+        }
+      ],
+      "name": "Qwen API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": true,
+        "maxTokensField": "max_tokens",
+        "reasoningFormat": "disable-qwen"
+      },
+      "url": "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    },
+    "discovery": {
+      "catalog": "alibaba-cn",
+      "format": "openai"
+    },
+    "legacyCredentialID": "qwen:china",
+    "legacyID": "qwen",
+    "legacyRegion": "china",
+    "presentation": {
+      "authNotice": "New Model Studio accounts receive time-limited free quotas on eligible models. Free quotas expire after 90 days. Verified accounts may be charged after quotas are exhausted unless stop-when-free-quota-ends is enabled.",
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/qwen/favicon.png",
+      "inferenceLocation": "remote",
+      "offer": {
+        "priority": 2,
+        "regions": [
+          "china"
+        ],
+        "summary": "API key · 90-day free trial"
+      },
+      "regions": [
+        "china"
+      ],
+      "website": "https://bailian.console.aliyun.com/?tab=model#/api-key"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "minimax:china",
+      "models": [
+        {
+          "contextTokens": 1000000,
+          "id": "MiniMax-M3",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "MiniMax M3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        }
+      ],
+      "name": "MiniMax API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "extraBody": {
+          "reasoning_split": true
+        },
+        "maxTokensField": "max_completion_tokens",
+        "reasoningFormat": "disable-thinking"
+      },
+      "url": "https://api.minimaxi.com/v1"
+    },
+    "discovery": {
+      "catalog": "minimax-cn",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "minimax:china",
+    "legacyID": "minimax",
+    "legacyRegion": "china",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/minimax/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "china"
+      ],
+      "website": "https://platform.minimaxi.com/user-center/basic-information/interface-key"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "stepfun",
+      "models": [
+        {
+          "contextTokens": 256000,
+          "id": "step-3.7-flash",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Step 3.7 Flash",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      ],
+      "name": "StepFun API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_tokens",
+        "reasoningFormat": "provider-default"
+      },
+      "url": "https://api.stepfun.com/v1"
+    },
+    "discovery": {
+      "catalog": "stepfun",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "stepfun",
+    "legacyID": "stepfun",
+    "presentation": {
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/stepfun/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "china"
+      ],
+      "website": "https://platform.stepfun.com/interface-key"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "siliconflow",
+      "models": [
+        {
+          "contextTokens": 262144,
+          "id": "Qwen/Qwen3.5-4B",
+          "input": [
+            "image",
+            "text",
+            "video"
+          ],
+          "name": "Qwen 3.5 4B",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        },
+        {
+          "contextTokens": 1000000,
+          "id": "deepseek-ai/DeepSeek-V4-Flash",
+          "input": [
+            "text"
+          ],
+          "name": "DeepSeek V4 Flash",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        },
+        {
+          "contextTokens": 1049000,
+          "id": "deepseek-ai/DeepSeek-V4-Pro",
+          "input": [
+            "text"
+          ],
+          "name": "DeepSeek V4 Pro",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        },
+        {
+          "contextTokens": 1049000,
+          "id": "zai-org/GLM-5.2",
+          "input": [
+            "text"
+          ],
+          "name": "GLM-5.2",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "high",
+            "max"
+          ]
+        }
+      ],
+      "name": "SiliconFlow API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_tokens",
+        "reasoningFormat": "provider-default"
+      },
+      "url": "https://api.siliconflow.cn/v1"
+    },
+    "discovery": {
+      "catalog": "siliconflow-cn",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "siliconflow",
+    "legacyID": "siliconflow",
+    "presentation": {
+      "authNotice": "Qwen 3.5 4B is free after identity verification. Other SiliconFlow models may charge your account. Fixed rate limits apply.",
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/siliconflow/favicon.png",
+      "inferenceLocation": "remote",
+      "offer": {
+        "priority": 1,
+        "regions": [
+          "china"
+        ],
+        "summary": "API key · Free Qwen 3.5 4B"
+      },
+      "regions": [
+        "china"
+      ],
+      "website": "https://cloud.siliconflow.cn/account/ak"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "tencent-tokenhub",
+      "models": [
+        {
+          "contextTokens": 256000,
+          "id": "hy3",
+          "input": [
+            "text"
+          ],
+          "name": "Hy3",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384,
+          "reasoningEfforts": [
+            "none",
+            "high"
+          ]
+        }
+      ],
+      "name": "Tencent TokenHub API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_tokens",
+        "reasoningFormat": "provider-default"
+      },
+      "url": "https://tokenhub.tencentmaas.com/v1"
+    },
+    "discovery": {
+      "catalog": "tencent-tokenhub",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "tencent-tokenhub",
+    "legacyID": "tencent-tokenhub",
+    "presentation": {
+      "authNotice": "New accounts can claim 1M free tokens per language model for 90 days. Calls stop at the limit unless you enable postpaid billing.",
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/tencent-tokenhub/favicon.png",
+      "inferenceLocation": "remote",
+      "offer": {
+        "priority": 3,
+        "regions": [
+          "china"
+        ],
+        "summary": "API key · 1M-token trial"
+      },
+      "regions": [
+        "china"
+      ],
+      "website": "https://console.cloud.tencent.com/tokenhub/apikey"
+    }
+  },
+  {
+    "definition": {
+      "api": "openai-chat-completions",
+      "auth": {
+        "kind": "bearer"
+      },
+      "id": "modelscope",
+      "models": [
+        {
+          "contextTokens": 202752,
+          "id": "ZhipuAI/GLM-4.6",
+          "input": [
+            "text"
+          ],
+          "name": "GLM-4.6",
+          "options": {
+            "replayReasoning": true
+          },
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        }
+      ],
+      "name": "ModelScope API",
+      "options": {
+        "cacheRouting": "x-session-id",
+        "cachesSystemPrompt": false,
+        "maxTokensField": "max_tokens",
+        "reasoningFormat": "provider-default"
+      },
+      "url": "https://api-inference.modelscope.cn/v1"
+    },
+    "discovery": {
+      "catalog": "modelscope",
+      "format": "openai",
+      "rules": [
+        {
+          "match": "*",
+          "options": {
+            "replayReasoning": true
+          }
+        }
+      ]
+    },
+    "legacyCredentialID": "modelscope",
+    "legacyID": "modelscope",
+    "presentation": {
+      "authNotice": "Free for development: 2,000 calls/day total, typically 200/model. Requires a verified, linked Alibaba Cloud account; limits can change.",
+      "credentialKind": "api-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/modelscope/favicon.png",
+      "inferenceLocation": "remote",
+      "offer": {
+        "priority": 4,
+        "regions": [
+          "china"
+        ],
+        "summary": "SDK token · 2,000 calls/day"
+      },
+      "regions": [
+        "china"
+      ],
+      "website": "https://modelscope.cn/my/myaccesstoken"
+    }
+  }
+]

@@ -81,10 +81,10 @@ nonisolated struct ModelSelection: Codable, Equatable, Sendable {
     @MainActor var region: LLMRegion { ProviderRegistry.shared.region(for: providerID) }
 }
 
-nonisolated public enum LLMInferenceLocation: Sendable, Equatable {
+nonisolated public enum LLMInferenceLocation: String, Sendable, Equatable, Codable {
     case remote
-    case userHosted
-    case onDevice
+    case userHosted = "user-hosted"
+    case onDevice = "on-device"
 }
 
 nonisolated public enum LLMFailureKind: String, Sendable, Codable, Equatable {
@@ -116,10 +116,10 @@ nonisolated public struct LLMProtocolDiagnostics: Sendable {
     }
 }
 
-nonisolated public enum LLMCredentialKind: Sendable, Equatable {
-    case apiKey
-    case subscriptionKey
-    case bearerToken
+nonisolated public enum LLMCredentialKind: String, Sendable, Equatable, Codable {
+    case apiKey = "api-key"
+    case subscriptionKey = "subscription-key"
+    case bearerToken = "bearer-token"
 
     public var name: String {
         switch self {
@@ -130,7 +130,7 @@ nonisolated public enum LLMCredentialKind: Sendable, Equatable {
     }
 }
 
-nonisolated public struct ProviderGettingStartedOffer: Sendable {
+nonisolated public struct ProviderGettingStartedOffer: Sendable, Codable {
     public let summary: String
     public let priority: Int
     public let regions: Set<LLMRegion>
@@ -146,7 +146,7 @@ nonisolated public struct ProviderGettingStartedOffer: Sendable {
     }
 }
 
-nonisolated public struct ProviderPresentation: Sendable {
+nonisolated public struct ProviderPresentation: Sendable, Codable {
     var regions: Set<LLMRegion> = [.global, .china]
     var website: URL?
     var iconURL: URL?
@@ -175,10 +175,8 @@ nonisolated public protocol ProviderClient: Sendable {
     var inferenceLocation: LLMInferenceLocation { get }
     var reasoningPolicy: LLMReasoningPolicy { get }
     var protocolDiagnostics: LLMProtocolDiagnostics { get }
-    var canLoadModels: Bool { get }
 
     func wireProtocol(for model: ProviderModel) -> LLMWireProtocol?
-    func loadModels() async throws -> [ProviderModel]
 
     func prepareAuthentication() async -> LLMPreparationOutcome
 
@@ -214,10 +212,8 @@ nonisolated extension ProviderClient {
     public var inferenceLocation: LLMInferenceLocation { presentation.inferenceLocation }
     public var reasoningPolicy: LLMReasoningPolicy { .unavailable }
     public var protocolDiagnostics: LLMProtocolDiagnostics { LLMProtocolDiagnostics() }
-    public var canLoadModels: Bool { false }
 
     public func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { nil }
-    public func loadModels() async throws -> [ProviderModel] { models }
 
     public func prepareAuthentication() async -> LLMPreparationOutcome {
         .unsupported

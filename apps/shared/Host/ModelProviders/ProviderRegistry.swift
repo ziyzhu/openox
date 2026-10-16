@@ -29,15 +29,25 @@ final class ProviderRegistry {
     nonisolated static let defaultModelKey = "llm.defaultModel"
     nonisolated static let customProvidersKey = "llm.customProviders"
     nonisolated static let catalogKey = "llm.providerCatalog"
+    nonisolated static let discoveredModelsKey = "llm.discoveredModels"
+    private static let discoveryInterval: TimeInterval = 24 * 60 * 60
+
+    struct DiscoveredModels: Codable {
+        let fetchedAt: Date
+        let models: [ProviderDefinition.Model]
+    }
 
     private let bundled: [BundledProviderDefinition]
     private var catalog: ProviderCatalog
     private var catalogAvailable = true
+    private var discovered: [String: DiscoveredModels]
     private(set) var allClients: [any ProviderClient] = []
     private(set) var defaultModel: ModelSelection?
 
     private init() {
         bundled = Self.bundledDefinitions()
+        discovered = UserDefaults.standard.data(forKey: Self.discoveredModelsKey)
+            .flatMap { try? JSONDecoder().decode([String: DiscoveredModels].self, from: $0) } ?? [:]
         do {
             if let data = UserDefaults.standard.data(forKey: Self.catalogKey) {
                 catalog = try JSONDecoder().decode(ProviderCatalog.self, from: data)
@@ -54,34 +64,56 @@ final class ProviderRegistry {
     }
 
     nonisolated static func bundledDefinitions() -> [BundledProviderDefinition] {
-        struct File: Decodable {
-            struct Provider: Decodable {
-                struct Regional: Decodable {
-                    struct Entry: Decodable { let model: ProviderModel }
-                    let models: [Entry]
-                }
-                let global: Regional?
-                let china: Regional?
-            }
-            let providers: [String: Provider]
+        guard let url = Bundle.main.url(forResource: "providers", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let entries = try? JSONDecoder().decode([BundledProviderDefinition].self, from: data) else {
+            fatalError("Missing bundled providers")
         }
-        guard let url = Bundle.main.url(forResource: "provider-models", withExtension: "json"),
-              let data = try? Data(contentsOf: url), let file = try? JSONDecoder().decode(File.self, from: data) else {
-            fatalError("Missing bundled provider models")
-        }
-        return BuiltInProviders.definitions { id, region in
-            let entry = file.providers[id]
-            let models = region == .global ? entry?.global?.models : entry?.china?.models
-            guard let models else { fatalError("Missing provider models \(id)/\(region.rawValue)") }
-            return models.map(\.model)
-        }
+        return entries
     }
 
     private var catalogDefinitions: [ProviderDefinition] {
         let replacements = Dictionary(uniqueKeysWithValues: catalog.providers.map { ($0.id, $0) })
         let bundledIDs = Set(bundled.map { $0.definition.id })
-        return bundled.map { replacements[$0.definition.id] ?? $0.definition }
+        return bundled.map { replacements[$0.definition.id] ?? withDiscoveredModels($0.definition) }
             + catalog.providers.filter { !bundledIDs.contains($0.id) }
+    }
+
+    private func withDiscoveredModels(_ definition: ProviderDefinition) -> ProviderDefinition {
+        guard let found = discovered[definition.id]?.models else { return definition }
+        let pinned = Set(definition.models.flatMap { [$0.id, $0.wireID ?? $0.id] })
+        var merged = definition
+        merged.models += found.filter { !pinned.contains($0.id) }
+        return merged
+    }
+
+    func canDiscoverModels(id: String) -> Bool {
+        source(id: id) == .bundled && bundled.contains { $0.definition.id == id && $0.discovery != nil }
+    }
+
+    @discardableResult
+    func refreshModels(id: String) async throws -> Int {
+        guard canDiscoverModels(id: id), let entry = bundled.first(where: { $0.definition.id == id }),
+              let discovery = entry.discovery else {
+            throw RuntimeError.bridge("Model discovery is unavailable for this provider")
+        }
+        let models = try await discovery.models(for: entry.definition)
+        discovered[id] = DiscoveredModels(fetchedAt: Date(), models: models)
+        UserDefaults.standard.set(try JSONEncoder().encode(discovered), forKey: Self.discoveredModelsKey)
+        rebuildClients()
+        Log.agent.info("ProviderRegistry.discover provider=\(id) models=\(models.count)")
+        return models.count
+    }
+
+    func refreshModelsIfStale(id: String) async {
+        guard canDiscoverModels(id: id), ["authenticated", "credential-stored"].contains(authenticationStatus(id: id)),
+              discovered[id].map({ Date().timeIntervalSince($0.fetchedAt) > Self.discoveryInterval }) ?? true else { return }
+        do { try await refreshModels(id: id) }
+        catch { Log.agent.warning("ProviderRegistry.discover provider=\(id) error=\(error.localizedDescription)") }
+    }
+
+    func refreshStaleModels() async {
+        for entry in bundled { await refreshModelsIfStale(id: entry.definition.id) }
     }
     var definitions: [ProviderDefinition] { catalogDefinitions }
     var defaultDefinitions: [ProviderDefinition] { bundled.map(\.definition) }
@@ -215,17 +247,6 @@ final class ProviderRegistry {
         try persist(next)
         rebuildClients()
         Log.agent.info("ProviderRegistry.save provider=\(definition.id) models=\(definition.models.count)")
-    }
-
-    func updateDiscoveredModels(_ models: [ProviderModel], for clientID: String) throws {
-        guard client(id: clientID)?.canLoadModels == true,
-              let bundledDefinition = bundled.first(where: { $0.definition.id == clientID })?.definition,
-              let defaultModel = bundledDefinition.models.first else {
-            throw RuntimeError.bridge("Model discovery is unavailable for this provider")
-        }
-        var definition = try definition(id: clientID)
-        definition.models = [defaultModel] + models.map { ProviderDefinition.Model($0) }
-        try save(definition)
     }
 
     func delete(id: String) throws {

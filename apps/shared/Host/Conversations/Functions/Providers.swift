@@ -88,7 +88,7 @@ extension Conversation {
             "access": providerAccess(definition, client: client),
             "capabilities": .object([
                 "supportsTools": .bool(client?.supportsTools ?? false),
-                "canLoadModels": .bool(client?.canLoadModels ?? false),
+                "canLoadModels": .bool(registry.canDiscoverModels(id: definition.id)),
                 "reasoningPolicy": .string((client?.reasoningPolicy ?? .unavailable).rawValue),
             ]),
             "gettingStarted": offer.map {

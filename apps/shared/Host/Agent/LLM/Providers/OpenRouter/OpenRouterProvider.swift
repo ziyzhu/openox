@@ -21,38 +21,3 @@ nonisolated struct OpenRouterAuth: OpenAITransportAuth {
         )
     }
 }
-
-nonisolated enum OpenRouterProvider {
-    private static let reasoningReplayModelIDs: Set<String> = [
-        "stealth/space-bunny-alpha",
-        "anthropic/claude-sonnet-5",
-        "openai/gpt-6-astra",
-        "google/gemini-3.8-flash",
-        "deepseek/deepseek-v4.1-flash",
-        "qwen/qwen3.8-max-prime",
-        "moonshotai/kimi-k3",
-        "z-ai/glm-5.3",
-    ]
-
-    static func client(models: [ProviderModel]) -> OpenAIChatTransport {
-        OpenAIChatTransport(
-            id: "openrouter",
-            displayName: "OpenRouter API",
-            models: models,
-            regions: [.global],
-            auth: OpenRouterAuth(),
-            subscriptionAccount: OpenRouterSubscriptionAccount.shared,
-            extraBody: ["provider": .object(["sort": .string("latency")])],
-            reasoningReplayModelIDs: reasoningReplayModelIDs,
-            reasoningControl: .reasoningObject,
-            iconURL: URL(string: "https://openox.ai/assets/services/model-providers/openrouter/favicon.png"),
-            website: URL(string: "https://openrouter.ai/settings/keys"),
-            authNotice: "The Free Models Router automatically chooses a compatible model at no token charge. Availability and rate limits can vary. Other OpenRouter models may charge your account.",
-            gettingStartedOffer: ProviderGettingStartedOffer(
-                summary: "OAuth · Free Models Router",
-                priority: 0
-            ),
-            diagnosticsEndpoint: OpenRouterOAuth.apiBaseURL
-        )
-    }
-}

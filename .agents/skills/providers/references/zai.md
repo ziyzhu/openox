@@ -16,5 +16,4 @@ The China general API is a first-run option because its curated catalog begins w
 
 ## Runtime sources
 
-- Provider composition and regional account mapping: [ZAIProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/ZAIProvider.swift)
-- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
+- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)

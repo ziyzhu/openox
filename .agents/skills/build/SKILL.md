@@ -21,7 +21,7 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | `bun run generate:ios` / `bun run generate:macos` | Generate Xcode projects from each app's `project.yml`; include generated iOS changes for Xcode Cloud. |
 | `bun run build:macos` | Generate the native host-only project with XcodeGen and build for macOS 26+. |
 | `bun run build:agent` | Rebuild native bundles, the portable prompt renderer, default SOUL, package-owned bundled skills, and TS-owned `ModelGuidance.generated.swift`. |
-| `bun run update:llms` | Refresh already-selected models from models.dev; requires network access. |
+| `bun run update:llms` | Snapshot models.dev capabilities for the catalogs `providers.json` references; requires network access. |
 
 `typecheck` validates public/private-content boundaries, iOS Client-Host layering,
 protocol schema consistency, unsafe absolute-path slicing, bundled skill packages and links, translations, provider models,

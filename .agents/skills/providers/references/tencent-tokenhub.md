@@ -15,5 +15,4 @@ The general API is a first-run trial option. Free quotas are time-limited, and u
 
 ## Runtime sources
 
-- Provider composition: [TencentTokenHubProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/TencentTokenHubProvider.swift)
-- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
+- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)

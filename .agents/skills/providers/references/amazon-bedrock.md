@@ -13,7 +13,6 @@ Ox presents Bedrock in Global and deliberately routes through Amazon Bedrock in 
 
 ## Runtime sources
 
-- Provider composition and selected AWS region: [AmazonBedrockProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/AmazonBedrockProvider.swift)
-- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
+- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
 
 Bedrock is one provider that composes OpenAI Responses and Anthropic Messages transports. Keep that routing in code.

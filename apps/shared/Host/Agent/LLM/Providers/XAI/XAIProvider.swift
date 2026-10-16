@@ -19,18 +19,3 @@ nonisolated struct XAIResponsesAuth: OpenAITransportAuth {
         )
     }
 }
-
-nonisolated enum XAIProvider {
-    static func client(models: [ProviderModel]) -> OpenAIResponsesTransport {
-        OpenAIResponsesTransport(
-            id: "xai",
-            displayName: "xAI API",
-            models: models,
-            iconURL: URL(string: "https://openox.ai/assets/services/model-providers/xai/favicon.png"),
-            website: URL(string: "https://console.x.ai/team/default/api-keys"),
-            subscriptionAccount: XAISubscriptionAccount.shared,
-            auth: XAIResponsesAuth(),
-            reasoningEffort: .low
-        )
-    }
-}

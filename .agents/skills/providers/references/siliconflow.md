@@ -16,5 +16,4 @@ Its curated catalog begins with a documented free model for first-run use. Free 
 
 ## Runtime sources
 
-- Provider composition: [SiliconFlowProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/SiliconFlowProvider.swift)
-- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
+- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)

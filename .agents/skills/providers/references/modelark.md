@@ -14,5 +14,4 @@ Ox uses one provider identity with different display names and separate credenti
 
 ## Runtime sources
 
-- Provider composition and regional mapping: [ModelArkProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/ModelArkProvider.swift)
-- Curated models: [CuratedProviderModels.swift](../../../../apps/shared/Host/ModelProviders/CuratedProviderModels.swift)
+- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)

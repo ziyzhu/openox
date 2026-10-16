@@ -14,10 +14,10 @@ The provider picker uses the official GitHub Copilot extension mark, hosted on O
 
 ## Runtime sources
 
-- Provider composition and entitlement filtering: [GitHubCopilotProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/GitHubCopilot/GitHubCopilotProvider.swift)
+- Request authentication: [GitHubCopilotProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/GitHubCopilot/GitHubCopilotProvider.swift)
 - OAuth: [GitHubCopilotOAuth.swift](../../../../apps/shared/Host/Agent/LLM/Providers/GitHubCopilot/GitHubCopilotOAuth.swift)
 - Account state: [GitHubCopilotSubscriptionAccount.swift](../../../../apps/shared/Host/Agent/LLM/Providers/GitHubCopilot/GitHubCopilotSubscriptionAccount.swift)
-- Curated candidate models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
+- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
 
 ## Implementation comparison
 

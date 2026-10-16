@@ -15,9 +15,9 @@ Claude Pro/Max follows Pi's OAuth flow using its public CLI client identity and 
 
 ## Runtime sources
 
-- Provider composition: [AnthropicProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/AnthropicProvider.swift)
+- Subscription system identity: [AnthropicProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/AnthropicProvider.swift)
 - Wire protocol: [AnthropicMessagesTransport.swift](../../../../apps/shared/Host/Agent/LLM/Transports/AnthropicMessagesTransport.swift)
-- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
+- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
 
 ## Implementation comparison
 

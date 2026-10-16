@@ -13,5 +13,4 @@ Ox exposes the subscription-backed Token Plan in Global and China with separate 
 
 ## Runtime sources
 
-- Provider composition and account mapping: [MiniMaxProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/MiniMaxProvider.swift)
-- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
+- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)

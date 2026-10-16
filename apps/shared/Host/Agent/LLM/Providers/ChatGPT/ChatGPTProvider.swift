@@ -26,24 +26,3 @@ nonisolated struct ChatGPTResponsesAuth: OpenAITransportAuth {
         )
     }
 }
-
-nonisolated enum ChatGPTProvider {
-    static func client(models: [ProviderModel]) -> OpenAIResponsesTransport {
-        OpenAIResponsesTransport(
-            id: "chatgpt",
-            displayName: "ChatGPT",
-            models: models,
-            iconURL: URL(string: "https://openox.ai/assets/services/model-providers/openai/favicon.png"),
-            website: URL(string: "https://chatgpt.com/codex"),
-            usesAPIKey: false,
-            acceptsAPIKey: false,
-            subscriptionAccount: ChatGPTSubscriptionAccount.shared,
-            auth: ChatGPTResponsesAuth(),
-            sessionHeaderName: "session-id",
-            serviceTier: { model in
-                model.variant == .fast ? "priority" : nil
-            },
-            streamingTransport: .webSocketWithServerSentEventsFallback(accountHeader: "ChatGPT-Account-Id")
-        )
-    }
-}

@@ -16,9 +16,7 @@ Kimi Website remains an ordinary service using the signed-in browser session for
 
 ## Runtime sources
 
-- Provider composition and regional account mapping: [KimiProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/KimiProvider.swift)
-- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)
-- Kimi For Coding models: [CuratedProviderModels.swift](../../../../apps/shared/Host/ModelProviders/CuratedProviderModels.swift)
+- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
 - Website service: [www.kimi.com/actions.js](../../../../apps/shared/Resources/OxServices.bundle/web/www.kimi.com/actions.js)
 
 ## Implementation comparison

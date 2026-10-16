@@ -202,6 +202,7 @@ final class HostRuntime: OxHost {
                 guard self.preparation?.id == id else { return }
                 state = .running
                 Log.app.info("HostRuntime profile prepared")
+                Task { await ProviderRegistry.shared.refreshStaleModels() }
                 resumeOptionalStorageRecovery()
             } catch {
                 if self.preparation?.id == id {

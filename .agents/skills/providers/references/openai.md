@@ -12,6 +12,5 @@ Ox presents the OpenAI API in Global. Keep this API-key provider separate from t
 
 ## Runtime sources
 
-- Provider composition: [OpenAIProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/OpenAIProvider.swift)
+- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
 - Wire protocol: [OpenAIResponsesTransport.swift](../../../../apps/shared/Host/Agent/LLM/Transports/OpenAIResponsesTransport.swift)
-- Models: [provider-models.json](../../../../apps/shared/Host/ModelProviders/provider-models.json)

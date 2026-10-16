@@ -2,287 +2,123 @@ import { join } from "node:path";
 import { ROOT, runCheck } from "../../../lib.ts";
 
 const source = "https://models.dev/catalog.json";
-const manifestPath = join(ROOT, "apps/shared/Host/ModelProviders/provider-models.json");
-const expectedClients = {
-  global: [
-    "chatgpt", "openai", "anthropic", "gemini", "github-copilot", "xai", "opencode-go",
-    "qwen-coding-plan", "minimax-token-plan", "openrouter", "amazon-bedrock", "mistral",
-    "kimi", "deepseek", "zai-coding-plan", "zai", "qwen",
-  ],
-  china: [
-    "qwen-coding-plan", "minimax-token-plan", "kimi", "deepseek", "zai-coding-plan",
-    "zai", "qwen", "minimax", "stepfun", "siliconflow", "tencent-tokenhub", "modelscope",
-  ],
-} as const;
-
-type Catalog = {
-  providers?: Record<string, CatalogProvider>;
-};
-
-type CatalogProvider = {
-  models?: Record<string, CatalogModel>;
-};
+const providersPath = join(ROOT, "apps/shared/Host/ModelProviders/providers.json");
+const catalogPath = join(ROOT, "apps/shared/Host/ModelProviders/provider-catalog.json");
+const formats = new Set(["openai", "gemini", "chatgpt", "anthropic"]);
+const ruleOptions = new Set(["serviceTier", "adaptiveThinking", "replayReasoning"]);
 
 type CatalogModel = {
-  id?: string;
   name?: string;
   status?: string;
   tool_call?: boolean;
   reasoning?: boolean;
-  reasoning_options?: Array<{
-    type?: string;
-    values?: Array<string | null>;
-  }>;
-  modalities?: ModelModalities;
-  limit?: {
-    context?: number;
-    output?: number;
-  };
+  reasoning_options?: Array<{ type?: string; values?: Array<string | null> }>;
+  modalities?: { input?: string[]; output?: string[] };
+  limit?: { context?: number; output?: number };
 };
 
-type ProviderModelsFile = {
-  providers?: Record<string, ProviderSelection>;
+type Rule = { match?: unknown; exclude?: unknown; options?: Record<string, unknown>; outputTokens?: unknown };
+type BundledProvider = {
+  definition?: { id?: unknown };
+  legacyID?: unknown;
+  legacyCredentialID?: unknown;
+  discovery?: { format?: unknown; catalog?: unknown; rules?: Rule[] };
 };
 
-type ProviderSelection = {
-  global?: RegionalSelection;
-  china?: RegionalSelection;
-};
-
-type RegionalSelection = {
-  catalogProvider?: string;
-  models?: ModelEntry[];
-};
-
-type ModelEntry = {
-  source?: string;
-  overrides?: ModelOverrides;
-  model?: ResolvedModel;
-};
-
-type ModelOverrides = {
-  id?: string;
-  providerModelID?: string;
-  displayName?: string;
-  variant?: string;
-  maxTokens?: number;
-  maxContext?: number;
-};
-
-type ModelModalities = {
-  input?: string[];
-  output?: string[];
-};
-
-type ResolvedModel = {
+type SnapshotModel = {
   id: string;
-  providerModelID?: string;
-  variant?: string;
   displayName: string;
   maxTokens: number;
   maxContext: number;
-  supportsTools: boolean;
+  supportsTools: true;
   reasoning: boolean;
   reasoningEfforts: string[];
-  modalities: {
-    input: string[];
-    output: string[];
-  };
-};
-
-type ProviderModelsSummary = {
-  providers: number;
-  selectedModels: number;
+  modalities: { input: string[]; output: string[] };
 };
 
 function fail(message: string): never {
   throw new Error(message);
 }
 
-function object(value: unknown, label: string): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) fail(`${label} must be an object`);
-  return value as Record<string, unknown>;
+async function readJSON<T>(path: string): Promise<T> {
+  const file = Bun.file(path);
+  if (!await file.exists()) fail(`missing ${path}`);
+  return JSON.parse(await file.text()) as T;
 }
 
-function positiveInteger(value: unknown, label: string): number {
-  if (!Number.isInteger(value) || Number(value) <= 0) fail(`${label} must be a positive integer`);
-  return Number(value);
+function catalogIDs(providers: BundledProvider[]): string[] {
+  return [...new Set(providers.flatMap((entry) => typeof entry.discovery?.catalog === "string" ? [entry.discovery.catalog] : []))].sort();
 }
 
-function nonEmptyString(value: unknown, label: string): string {
-  if (typeof value !== "string" || value.trim().length === 0) fail(`${label} must be a non-empty string`);
-  return String(value);
-}
-
-function parse<T>(text: string, label: string): T {
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch (error) {
-    fail(`${label} is invalid JSON: ${(error as Error).message}`);
-  }
-  return object(value, label) as T;
-}
-
-function validateStructure(manifest: ProviderModelsFile): ProviderModelsSummary {
-  const providers = object(manifest.providers, "provider models.providers") as Record<string, ProviderSelection>;
-  let selectedModels = 0;
-
-  for (const [clientID, providerSelection] of Object.entries(providers)) {
-    const unknownRegions = Object.keys(providerSelection).filter((region) => region !== "global" && region !== "china");
-    if (unknownRegions.length > 0) fail(`provider ${clientID} has unknown regions ${unknownRegions.join(", ")}`);
-    const regionalSelections = Object.entries(providerSelection).filter(
-      (entry): entry is [string, RegionalSelection] => entry[0] === "global" || entry[0] === "china",
-    );
-    if (regionalSelections.length === 0) fail(`provider ${clientID} must include a region`);
-    for (const [region, regionalSelection] of regionalSelections) {
-      const label = `${clientID}.${region}`;
-      nonEmptyString(regionalSelection.catalogProvider, `${label}.catalogProvider`);
-      const models = Array.isArray(regionalSelection.models) && regionalSelection.models.length > 0
-        ? regionalSelection.models
-        : fail(`${label} must include models`);
-      const ids = new Set<string>();
-      for (const entry of models) {
-        const sourceID = nonEmptyString(entry.source, `${label}.source`);
-        const model = entry.model ?? fail(`${label}/${sourceID} has no resolved model`);
-        const id = nonEmptyString(model.id, `${label}/${sourceID}.id`);
-        if (ids.has(id)) fail(`${label} repeats model id ${id}`);
-        ids.add(id);
-        nonEmptyString(model.displayName, `${label}/${id}.displayName`);
-        positiveInteger(model.maxTokens, `${label}/${id}.maxTokens`);
-        positiveInteger(model.maxContext, `${label}/${id}.maxContext`);
-        if (model.supportsTools !== true) fail(`${label}/${id} does not support tools`);
-        if (typeof model.reasoning !== "boolean") fail(`${label}/${id} has no reasoning capability`);
-        if (!Array.isArray(model.reasoningEfforts)) fail(`${label}/${id}.reasoningEfforts must be an array`);
-        if (!model.modalities?.input?.includes("text") || !model.modalities.output?.includes("text")) {
-          fail(`${label}/${id} must accept and produce text`);
-        }
-        selectedModels += 1;
-      }
-    }
-  }
-
-  for (const [region, expected] of Object.entries(expectedClients)) {
-    const actual = Object.entries(providers)
-      .filter(([, providerSelection]) => providerSelection[region as keyof ProviderSelection] !== undefined)
-      .map(([clientID]) => clientID);
-    if (actual.join(",") !== expected.join(",")) {
-      fail(`provider models ${region} clients differ: expected ${expected.join(",")}; received ${actual.join(",")}`);
-    }
-  }
-
-  return { providers: Object.keys(providers).length, selectedModels };
-}
-
-function resolve(catalog: Catalog, configuration: ProviderModelsFile): ProviderModelsFile {
-  const catalogProviders = object(catalog.providers, "catalog.providers") as Record<string, CatalogProvider>;
-  const providers = object(configuration.providers, "provider models.providers") as Record<string, ProviderSelection>;
-  const resolvedProviders: Record<string, ProviderSelection> = {};
-
-  for (const [clientID, providerSelection] of Object.entries(providers)) {
-    const resolvedSelection: ProviderSelection = {};
-    for (const region of ["global", "china"] as const) {
-      const regionalSelection = providerSelection[region];
-      if (!regionalSelection) continue;
-      const catalogProviderID = nonEmptyString(regionalSelection.catalogProvider, `${clientID}.${region}.catalogProvider`);
-      const catalogModels = object(
-        catalogProviders[catalogProviderID]?.models,
-        `catalog.providers.${catalogProviderID}.models`,
-      ) as Record<string, CatalogModel>;
-      const models = Array.isArray(regionalSelection.models) && regionalSelection.models.length > 0
-        ? regionalSelection.models
-        : fail(`${clientID}.${region} must include models`);
-      resolvedSelection[region] = {
-        catalogProvider: catalogProviderID,
-        models: models.map((entry) => resolveModel(clientID, region, catalogProviderID, catalogModels, entry)),
-      };
-    }
-    resolvedProviders[clientID] = resolvedSelection;
-  }
-  return { providers: resolvedProviders };
-}
-
-function resolveModel(
-  clientID: string,
-  region: string,
-  catalogProviderID: string,
-  catalogModels: Record<string, CatalogModel>,
-  entry: ModelEntry,
-): ModelEntry {
-  const sourceID = nonEmptyString(entry.source, `${clientID}.${region}.source`);
-  const sourceModel = catalogModels[sourceID] ?? fail(`${catalogProviderID}/${sourceID} is missing`);
-  const overrides = entry.overrides ?? {};
-  if (sourceModel.status && sourceModel.status !== "active") {
-    fail(`${catalogProviderID}/${sourceID} has unsupported status ${sourceModel.status}`);
-  }
-  if (sourceModel.tool_call !== true) fail(`${catalogProviderID}/${sourceID} does not support tools`);
-  if (typeof sourceModel.reasoning !== "boolean") fail(`${catalogProviderID}/${sourceID} has no reasoning capability`);
-  if (!sourceModel.modalities?.input?.includes("text") || !sourceModel.modalities.output?.includes("text")) {
-    fail(`${catalogProviderID}/${sourceID} must accept and produce text`);
-  }
-  const sourceContext = positiveInteger(sourceModel.limit?.context, `${catalogProviderID}/${sourceID} context limit`);
-  const sourceOutput = positiveInteger(sourceModel.limit?.output, `${catalogProviderID}/${sourceID} output limit`);
-  const maxContext = overrides.maxContext === undefined
-    ? sourceContext
-    : positiveInteger(overrides.maxContext, `${clientID}.${region}/${sourceID} maxContext`);
-  const maxTokens = overrides.maxTokens === undefined
-    ? sourceOutput
-    : positiveInteger(overrides.maxTokens, `${clientID}.${region}/${sourceID} maxTokens`);
-  if (maxContext > sourceContext) fail(`${clientID}.${region}/${sourceID} maxContext exceeds the catalog limit`);
-  if (maxTokens > sourceOutput) fail(`${clientID}.${region}/${sourceID} maxTokens exceeds the catalog limit`);
-  if (overrides.variant !== undefined && overrides.variant !== "fast") {
-    fail(`${clientID}.${region}/${sourceID} uses unsupported variant ${overrides.variant}`);
-  }
-  const id = overrides.id ?? sourceModel.id ?? sourceID;
-  const providerModelID = overrides.providerModelID ?? (id === sourceID ? undefined : sourceID);
-  const baseDisplayName = overrides.displayName ?? nonEmptyString(sourceModel.name, `${catalogProviderID}/${sourceID}.name`);
-  const displayName = overrides.variant === "fast" ? `${baseDisplayName} · Fast` : baseDisplayName;
-  const reasoningEfforts = sourceModel.reasoning_options
+function snapshotModel(id: string, model: CatalogModel): SnapshotModel | undefined {
+  const input = model.modalities?.input ?? [];
+  const output = model.modalities?.output ?? [];
+  const context = model.limit?.context ?? 0;
+  const limit = model.limit?.output ?? 0;
+  if ((model.status && model.status !== "active") || model.tool_call !== true) return undefined;
+  if (!input.includes("text") || !output.includes("text") || context <= 0 || limit <= 0) return undefined;
+  const reasoningEfforts = model.reasoning_options
     ?.filter((option) => option.type === "effort")
     .flatMap((option) => option.values ?? [])
     .filter((value): value is string => value !== null) ?? [];
-  const model: ResolvedModel = {
-    id,
-    displayName,
-    maxTokens,
-    maxContext,
-    supportsTools: true,
-    reasoning: Boolean(sourceModel.reasoning),
-    reasoningEfforts,
-    modalities: {
-      input: [...(sourceModel.modalities?.input ?? [])],
-      output: [...(sourceModel.modalities?.output ?? [])],
-    },
-  };
-  if (providerModelID !== undefined) model.providerModelID = providerModelID;
-  if (overrides.variant !== undefined) model.variant = overrides.variant;
   return {
-    source: sourceID,
-    ...(Object.keys(overrides).length > 0 ? { overrides } : {}),
-    model,
+    id,
+    displayName: model.name || id,
+    maxTokens: Math.min(limit, context),
+    maxContext: context,
+    supportsTools: true,
+    reasoning: Boolean(model.reasoning),
+    reasoningEfforts,
+    modalities: { input: [...input].sort(), output: [...output].sort() },
   };
 }
 
-async function loadManifest(): Promise<ProviderModelsFile> {
-  const manifest = Bun.file(manifestPath);
-  if (!await manifest.exists()) fail(`missing ${manifestPath}`);
-  return parse<ProviderModelsFile>(await manifest.text(), "provider models");
+function validateProviders(providers: BundledProvider[], snapshot: Record<string, SnapshotModel[]>): number {
+  const ids = new Set<string>();
+  for (const entry of providers) {
+    const id = entry.definition?.id;
+    if (typeof id !== "string" || ids.has(id)) fail(`providers.json has a missing or repeated id: ${String(id)}`);
+    ids.add(id);
+    if (typeof entry.legacyID !== "string" || typeof entry.legacyCredentialID !== "string") fail(`${id} needs legacy identifiers`);
+    const discovery = entry.discovery;
+    if (!discovery) continue;
+    if (!formats.has(String(discovery.format))) fail(`${id} uses unknown discovery format ${String(discovery.format)}`);
+    if (discovery.catalog !== undefined && !snapshot[String(discovery.catalog)]) fail(`${id} references missing catalog ${String(discovery.catalog)}`);
+    for (const rule of discovery.rules ?? []) {
+      if (typeof rule.match !== "string" || rule.match.length === 0) fail(`${id} has a rule without match`);
+      if (rule.exclude !== undefined && typeof rule.exclude !== "boolean") fail(`${id} has an invalid exclude rule`);
+      if (rule.outputTokens !== undefined && !(Number.isInteger(rule.outputTokens) && Number(rule.outputTokens) > 0)) fail(`${id} has an invalid outputTokens rule`);
+      for (const key of Object.keys(rule.options ?? {})) if (!ruleOptions.has(key)) fail(`${id} has an unsupported rule option ${key}`);
+    }
+  }
+  return ids.size;
 }
 
 export async function check(): Promise<string> {
-  const summary = validateStructure(await loadManifest());
-  return `provider models providers=${summary.providers} selected=${summary.selectedModels}`;
+  const providers = await readJSON<BundledProvider[]>(providersPath);
+  const snapshot = await readJSON<Record<string, SnapshotModel[]>>(catalogPath);
+  const missing = catalogIDs(providers).filter((id) => !snapshot[id]);
+  if (missing.length > 0) fail(`provider catalog is missing ${missing.join(", ")}; run bun run update:llms`);
+  const count = validateProviders(providers, snapshot);
+  const models = Object.values(snapshot).reduce((total, list) => total + list.length, 0);
+  return `providers=${count} catalogs=${Object.keys(snapshot).length} catalogModels=${models}`;
 }
 
 async function update(): Promise<void> {
-  const [response, configuration] = await Promise.all([
+  const [response, providers] = await Promise.all([
     fetch(source, { headers: { Accept: "application/json" } }),
-    loadManifest(),
+    readJSON<BundledProvider[]>(providersPath),
   ]);
   if (!response.ok) fail(`${source} returned HTTP ${response.status}`);
-  const resolved = resolve(parse<Catalog>(await response.text(), "models.dev catalog"), configuration);
-  validateStructure(resolved);
-  await Bun.write(manifestPath, `${JSON.stringify(resolved, null, 2)}\n`);
+  const catalog = (await response.json() as { providers?: Record<string, { models?: Record<string, CatalogModel> }> }).providers ?? {};
+  const snapshot: Record<string, SnapshotModel[]> = {};
+  for (const id of catalogIDs(providers)) {
+    const models = catalog[id]?.models ?? fail(`models.dev has no provider ${id}`);
+    snapshot[id] = Object.entries(models)
+      .flatMap(([modelID, model]) => snapshotModel(modelID, model) ?? [])
+      .sort((a, b) => a.id.localeCompare(b.id));
+  }
+  await Bun.write(catalogPath, `${JSON.stringify(snapshot, null, 1)}\n`);
 }
 
 if (import.meta.main) {

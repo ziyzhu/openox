@@ -105,11 +105,7 @@ nonisolated enum StorageMigrationSupport {
         if id == "amazon-bedrock" {
             return "amazon-bedrock:\(modelID.hasPrefix("claude") || modelID.hasPrefix("anthropic.") ? "messages" : "responses")"
         }
-        let profiles = BuiltInProviders.planProfiles + [ModelArkProvider.profile] + BuiltInProviders.trailingProfiles
-        if let profile = profiles.first(where: { $0.id == id }),
-           profile.regionalCredentials || !profile.endpoint.overrides.isEmpty || !(profile.models?.overrides.isEmpty ?? true) {
-            return "\(id):\(region.rawValue)"
-        }
-        return id
+        let isRegional = ProviderRegistry.bundledDefinitions().contains { $0.legacyID == id && $0.legacyRegion != nil }
+        return isRegional ? "\(id):\(region.rawValue)" : id
     }
 }

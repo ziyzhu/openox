@@ -176,6 +176,7 @@ nonisolated enum A11yID {
         static let modelProvider = "chat.modelProvider"
         static func modelProviderOption(_ clientId: String) -> String { "conversation.modelProviderOption.\(clientId)" }
         static let modelSelection = "chat.modelSelection"
+        static let modelSearch = "chat.modelSearch"
         static let modelThinkingLevel = "chat.modelThinkingLevel"
         static let modelAuthAPIKey = "chat.modelAuth.apiKey"
         static let modelAuthOAuth = "chat.modelAuth.oauth"

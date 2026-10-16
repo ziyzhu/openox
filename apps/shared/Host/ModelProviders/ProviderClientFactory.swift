@@ -103,7 +103,7 @@ nonisolated enum ProviderClientFactory {
         }
     }
 
-    private static func customAuth(_ definition: ProviderDefinition) throws -> any OpenAITransportAuth {
+    static func customAuth(_ definition: ProviderDefinition) throws -> any OpenAITransportAuth {
         try validateAdapter(definition)
         switch definition.auth.adapter {
         case "chatgpt": return ChatGPTResponsesAuth()
@@ -149,13 +149,8 @@ nonisolated private struct DefinedProviderClient: ProviderClient {
     var supportsTools: Bool { native.supportsTools }
     var reasoningPolicy: LLMReasoningPolicy { native.reasoningPolicy }
     var protocolDiagnostics: LLMProtocolDiagnostics { native.protocolDiagnostics }
-    var canLoadModels: Bool { native.canLoadModels }
 
     func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { definition.api }
-
-    func loadModels() async throws -> [ProviderModel] {
-        try await native.loadModels()
-    }
 
     func prepareAuthentication() async -> LLMPreparationOutcome {
         await native.prepareAuthentication()

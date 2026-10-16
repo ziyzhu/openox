@@ -68,20 +68,6 @@ nonisolated struct CustomLLMProvider: Codable, Equatable, Identifiable, Sendable
                            auth: .init(kind: .bearer, optional: true),
                            models: models.map { ProviderDefinition.Model($0.modelInfo) })
     }
-
-    var profile: OpenAICompatibleProvider {
-        OpenAICompatibleProvider(
-            id: clientID,
-            displayName: RegionalValue(name),
-            models: RegionalValue(models.map(\.modelInfo)),
-            regions: [.global, .china],
-            endpoint: RegionalValue(baseURL),
-            auth: .optionalBearer,
-            inferenceLocation: .userHosted
-        )
-    }
-
-    var client: OpenAIChatTransport { profile.client(for: .global, models: []) }
 }
 
 nonisolated enum CustomLLMProviderError: LocalizedError {

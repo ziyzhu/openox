@@ -615,6 +615,10 @@ struct ModelPickerContent: View {
                 }
             }
             .onChange(of: authRevision) { _, _ in selectAvailableModel() }
+            .task(id: "\(selectedClientID ?? "")#\(authRevision)") {
+                guard let selectedClientID, isAuthenticated else { return }
+                await registry.refreshModelsIfStale(id: selectedClientID)
+            }
             .onChange(of: registry.customProviders) { _, _ in selectAvailableClient() }
             .toolbar {
                 if case .authentication(let session) = mode {
@@ -763,10 +767,11 @@ struct ModelPickerContent: View {
                         selectDefaultReasoningEffort()
                         applySelection()
                     }
-                )
+                ),
+                searchAccessibilityIdentifier: A11yID.ConversationControls.modelSearch
             )
             .toolbar {
-                if let selectedClient, selectedClient.canLoadModels {
+                if let selectedClient, registry.canDiscoverModels(id: selectedClient.id) {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { loadProviderModels(selectedClient) } label: {
                             if providerModelsLoading {
@@ -792,7 +797,7 @@ struct ModelPickerContent: View {
             selectionRow("Model", selectedModel?.displayName ?? "No models available", indicator: "chevron.right")
         }
         .buttonStyle(.plain)
-        .disabled(selectedClient?.models.isEmpty != false && selectedClient?.canLoadModels != true)
+        .disabled(selectedClient?.models.isEmpty != false)
         .accessibilityLabel("Model")
         .accessibilityValue(selectedModel?.displayName ?? "")
         .accessibilityIdentifier(A11yID.ConversationControls.modelSelection)
@@ -1055,14 +1060,13 @@ struct ModelPickerContent: View {
     }
 
     private func loadProviderModels(_ client: any ProviderClient) {
-        guard client.canLoadModels, !providerModelsLoading else { return }
+        guard registry.canDiscoverModels(id: client.id), !providerModelsLoading else { return }
         providerModelsLoading = true
         providerModelsError = nil
         Task {
             defer { providerModelsLoading = false }
             do {
-                let models = try await client.loadModels()
-                try registry.updateDiscoveredModels(models, for: client.id)
+                try await registry.refreshModels(id: client.id)
                 if selectedClientID == client.id { selectAvailableModel() }
             } catch {
                 if selectedClientID == client.id { providerModelsError = error.localizedDescription }
@@ -1234,17 +1238,39 @@ struct SettingsSelectionPickerView<Value: Hashable>: View {
     let options: [SettingsSelectionOption<Value>]
     @Binding var selection: Value
     var onSelect: ((Value) -> Void)? = nil
+    var searchAccessibilityIdentifier: String? = nil
     @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
 
     var body: some View {
+        if let searchAccessibilityIdentifier {
+            page.oxSearchable(text: $query, accessibilityIdentifier: searchAccessibilityIdentifier)
+        } else {
+            page
+        }
+    }
+
+    private var page: some View {
         ScrollView {
-            optionGroup(options)
-                .settingsPagePadding()
+            if displayedOptions.isEmpty && !options.isEmpty {
+                ContentUnavailableView.search(text: query)
+            } else {
+                optionGroup(displayedOptions)
+                    .settingsPagePadding()
+            }
         }
         .scrollIndicators(.hidden)
         .background(Theme.Colors.background, ignoresSafeAreaEdges: .all)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var displayedOptions: [SettingsSelectionOption<Value>] {
+        let needle = query.trimmingCharacters(in: .whitespaces)
+        guard !needle.isEmpty else { return options }
+        return options.filter {
+            $0.title.localizedCaseInsensitiveContains(needle) || $0.id.localizedCaseInsensitiveContains(needle)
+        }
     }
 
     private func optionGroup(_ options: [SettingsSelectionOption<Value>]) -> some View {
