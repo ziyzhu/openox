@@ -55,6 +55,12 @@ final class ChatGPTSubscriptionAccount: SubscriptionAccount, @unchecked Sendable
         } catch is CancellationError {
             throw CancellationError()
         } catch {
+            if let authError = error as? ChatGPTAuthError, authError.sessionExpired {
+                let invalidated = store.persist(nil, expectedGeneration: refresh.generation)
+                Log.network.info("ChatGPTAccount.validToken session expired invalidated=\(invalidated) refresh=\(refresh.id.uuidString.prefix(8))")
+                if !invalidated, let latest = current() { return Self.credentials(latest) }
+                throw authError
+            }
             store.clear(refresh)
             Log.network.error("ChatGPTAccount.validToken refresh failed: \(LogPrivacy.text(error.localizedDescription, limit: 2_048))")
             if forceRefresh { throw error }

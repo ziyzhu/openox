@@ -9,6 +9,7 @@ nonisolated struct ChatGPTTokens: Codable, Sendable {
 
 nonisolated struct ChatGPTAuthError: ProviderClientError {
     let message: String
+    var sessionExpired = false
     let failureKind: LLMFailureKind = .authentication
 }
 
@@ -71,9 +72,17 @@ nonisolated enum ChatGPTOAuth {
         let (data, response) = try await URLSession.shared.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
         guard (200..<300).contains(status) else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            Log.network.error("ChatGPTOAuth.token grant=\(form["grant_type"] ?? "?") HTTP \(status): \(LogPrivacy.text(body, limit: 300))")
-            throw ChatGPTAuthError(message: "ChatGPT token endpoint HTTP \(status)")
+            let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let error = body?["error"]
+            let code = (error as? String) ?? (error as? [String: Any])?["code"] as? String
+            let sessionExpired = form["grant_type"] == "refresh_token"
+                && [400, 401].contains(status)
+                && ["invalid_grant", "refresh_token_expired", "refresh_token_revoked", "refresh_token_reused"].contains(code ?? "")
+            Log.network.error("ChatGPTOAuth.token grant=\(form["grant_type"] ?? "?") status=\(status) sessionExpired=\(sessionExpired)")
+            throw ChatGPTAuthError(
+                message: sessionExpired ? "ChatGPT session expired. Sign in again." : "ChatGPT token endpoint HTTP \(status)",
+                sessionExpired: sessionExpired
+            )
         }
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw ChatGPTAuthError(message: "Malformed ChatGPT token response")
