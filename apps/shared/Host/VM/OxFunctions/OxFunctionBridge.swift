@@ -43,14 +43,6 @@ public protocol OxFunctionBridge: AnyObject {
     func syncRepository(repository: String, purpose: String) async throws -> JSONValue?
     func enableRepository(repository: String, enabled: Bool, purpose: String) async throws -> JSONValue?
     func disconnectRepository(repository: String, purpose: String) async throws -> JSONValue?
-    func repositoryGitStatus(repository: String, purpose: String) async throws -> JSONValue?
-    func repositoryGitLog(repository: String, limit: Int, cursor: String?, purpose: String) async throws -> JSONValue?
-    func repositoryGitShow(repository: String, commitHash: String, path: String?, purpose: String) async throws -> JSONValue?
-    func repositoryGitDiff(repository: String, commitHash: String?, baseCommitHash: String?, path: String?, purpose: String) async throws -> JSONValue?
-    func repositoryGitCheckout(repository: String, commitHash: String, purpose: String) async throws -> JSONValue?
-    func repositoryGitCommit(message: String, purpose: String) async throws -> JSONValue?
-    func repositoryGitRevert(commitHash: String, message: String, purpose: String) async throws -> JSONValue?
-    func repositoryGitRestore(path: String?, purpose: String) async throws -> JSONValue?
     func attachService(domain: String, purpose: String) async throws -> JSONValue?
     func detachService(domain: String, purpose: String) async throws -> JSONValue?
     func signInService(domain: String, purpose: String) async throws -> JSONValue?

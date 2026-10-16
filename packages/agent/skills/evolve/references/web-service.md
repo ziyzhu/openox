@@ -1,17 +1,17 @@
 # Web Service
 
-Deliver a useful Local service from live website evidence and report its verified boundaries. Work inside Ox with awaited `ox.*` calls, `ox.web.browser`, the virtual filesystem, and Local Git. Author plain JavaScript against the service installer directly; the iOS workflow has no shell, build, TypeScript, HAR, or replay step.
+Deliver a useful Local service from live website evidence and report its verified boundaries. Work inside Ox with awaited `ox.*` calls, `ox.web.browser`, and the virtual filesystem. Author plain JavaScript against the service installer directly; the iOS workflow has no shell, build, TypeScript, HAR, or replay step.
 
 ## Task-driven evolution
 
 Use when a website task has no suitable service or action after successful discovery, when an existing action is confirmed broken, or when ordinary service use or Browser reveals a stable improvement to an existing service. Act on concrete improvements within the request's scope even without an explicit evolution request. Extra Browser steps, repeated post-processing or orchestration, unclear capability descriptions, and a faster or more reliable observed implementation are useful improvement signals. Leave the service unchanged when there is no material improvement. If discovery fails, report that blocker instead of claiming a capability is missing. Diagnose sign-in, human verification, rate limiting, missing resources, and temporary website failures before treating an action as broken. General public-information questions need no service.
 
 1. Inspect the needed `ox.web.browser.*` contracts. Fulfill the original request while collecting evidence for only the needed actions and handoffs.
-2. As soon as a read or confirmed effect is supported, put a complete user-facing answer before any subsequent authoring tool calls in the same response; do not wait for creation or Save. For mutations, prefer observation followed by one approved service invocation; Browser may execute instead when practical. Preserve approval and human-handoff boundaries either way.
+2. As soon as a read or confirmed effect is supported, put a complete user-facing answer before any subsequent authoring tool calls in the same response; do not wait for service creation. For mutations, prefer observation followed by one approved service invocation; Browser may execute instead when practical. Preserve approval and human-handoff boundaries either way.
 3. Compare the requested outcome with what the current service supplied. Create, extend, or repair the smallest action that removes a clear stable gap, even when the original task succeeded through a workaround. Prefer improving an implementation without changing its contract; add an action for a distinct capability and improve metadata when routing was the problem. Stop when there is no material improvement. The original request establishes minimal action scope, so skip separate plan confirmation unless a decision or expanded scope needs it. Runtime attachment policies and live-mutation approval still apply.
-4. Validate and verify the service using the workflow below. Browser success alone does not verify a handler. If creation or Save is blocked, continue authorized Browser fulfillment and report the persistence limitation.
+4. Validate and verify the service using the workflow below. Browser success alone does not verify a handler. If creation or editing is blocked, continue authorized Browser fulfillment and report the persistence limitation.
 
-Run at most one bounded improvement pass after fulfilling the request. Optional improvement must not cause another user prompt, approval, sign-in, or external effect, and new user input takes priority. Never repeat a completed mutation for evidence or testing. Track pending, completed, and uncertain effects; inspect resulting state before retrying uncertain effects, and ask if uncertainty remains. Disclose unexecuted handlers as partially verified at Save and completion.
+Run at most one bounded improvement pass after fulfilling the request. Optional improvement must not cause another user prompt, approval, sign-in, or external effect, and new user input takes priority. Never repeat a completed mutation for evidence or testing. Track pending, completed, and uncertain effects; inspect resulting state before retrying uncertain effects, and ask if uncertainty remains. Disclose unexecuted handlers as partially verified at completion.
 
 ```text
 services/web/<domain>/
@@ -119,9 +119,9 @@ End the response after this plan; continue only after a later user message confi
 
 Inspect `ox.repository.list` before authoring. If Local is disabled and needed for this work, call `ox.repository.enable({ repository: "local", enabled: true, purpose: "Enable Local repository" })` through the existing Action permission system without a separate consent prompt, then recheck `ox.repository.list` and resume only when Local is enabled and ready. If enablement fails, inspect state before retrying. Offer Settings > Repositories as a manual fallback, not a required step. Never use deletion, recreation, or another domain as a workaround.
 
-Inspect complete Local Git status before creating, copying, or editing, and remember whether it already contains uncommitted changes. If it does, preserve the pre-existing changes and skip automatic Save at the end of this workflow; unrelated changes do not block authorized draft edits. Create with `ox.service.create` or copy a non-Local candidate with `ox.service.copy`. Use the returned domain as the directory, manifest, and runtime identity; read the generated or copied files before editing.
+Read existing Local source before editing and preserve unrelated work. Local changes persist immediately, including incomplete drafts; there is no separate Save step. Create with `ox.service.create` or copy a non-Local candidate with `ox.service.copy`. Use the returned domain as the directory, manifest, and runtime identity; read the generated or copied files before editing.
 
-Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. File operations enforce filesystem safety without validating service contents or changing running attachments. Local source is a working draft: files may temporarily be incomplete, missing, or inconsistent while you edit them in any order. Finish the complete set of edits, then call `ox.service.validate({ domain, purpose })` to check the whole service without changing or activating it. Fix any reported error and retry. Attach and Save use the same service validator and reject invalid drafts. A successful file write alone does not mean the service is ready to run or Save.
+Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. File operations enforce filesystem safety without validating service contents or changing running attachments. Local source is a working draft: files may temporarily be incomplete, missing, or inconsistent while you edit them in any order. Finish the complete set of edits, then call `ox.service.validate({ domain, purpose })` to check the whole service without changing or activating it. Fix any reported error and retry. Attachment uses the same service validator and rejects invalid drafts. A successful file write alone does not mean the service is ready to run.
 
 Author `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl` (include a verified icon whenever one can be obtained), optional local `$defs`, `actions`, and optional locale overlays. Skills belong at the repository root, not in service manifests or directories. Preserve repository skills that depend on this service; author new ones through `skills/manage-skills/SKILL.md` after actions are verified.
 
@@ -245,23 +245,19 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 10. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
 11. Inspect repository skills that depend on this service when action IDs or contracts changed and identify skills that need revision through `skills/manage-skills/SKILL.md`.
 12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this conversation.
-13. For customer-facing services, verify the stable HTTPS favicon URL loads anonymously through the native image loader within its format, size, and redirect limits. Reload the service and visually confirm its avatar represents the product in light and dark mode. Preserve a working icon; otherwise try official candidates, including usable smaller images, before Google's cache. If none works, report the limitation without blocking service delivery or Save.
-14. Stop capture with `discard: true` and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion, saving, or ending an abandoned or blocked run.
+13. For customer-facing services, verify the stable HTTPS favicon URL loads anonymously through the native image loader within its format, size, and redirect limits. Reload the service and visually confirm its avatar represents the product in light and dark mode. Preserve a working icon; otherwise try official candidates, including usable smaller images, before Google's cache. If none works, report the limitation without blocking service delivery.
+14. Stop capture with `discard: true` and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion or ending an abandoned or blocked run.
 
 Evaluate semantic usefulness as well as contract validity. The persisted catalog and search index provide routing in current and future conversations.
 
-## 8. Review and save
+## 8. Review and finish
 
-1. Inspect complete Local Git status and diff.
-2. Re-read the final manifest and actions.
-3. Correct unintended changes.
-4. If Local was already dirty before this work began, skip automatic Save and report that the verified changes remain unsaved. Do not commit, revert, or overwrite pre-existing changes. Otherwise, Save the intended verified Local changes without a separate confirmation. If new unrelated pending changes make the Save scope ambiguous, stop and resolve the scope before committing. Keep Git mechanics internal; use a purpose such as `Save Outlook service`.
-5. When Save is allowed, use Local Git internally to persist the reviewed service with a concise message describing what changed and why. Honor any runtime Action policy gate.
-6. Tell the user what improved, whether the capability was saved or remains unsaved, what it can now do, what was tried, what still needs sign-in or human interaction, and any limitations. Report a missing or unverified avatar as a non-blocking limitation for a customer-facing service. Keep action IDs, files, revision identifiers, and implementation details internal unless the user asks for them.
+1. Re-read the final manifest and actions and correct unintended changes without overwriting unrelated work.
+2. Confirm validation, handler verification, and attachment reflect the final source. Local edits are already persisted; no separate Save operation is needed.
+3. Tell the user what improved, what it can now do, what was tried, what still needs sign-in or human interaction, and any limitations. Distinguish persisted drafts from verified capabilities. Report a missing or unverified avatar as a non-blocking limitation for a customer-facing service. Keep action IDs, files, and implementation details internal unless the user asks for them.
 
 ## Recovery
 
-- After an activation failure, inspect Git status once and search once for the exact domain; creation may already have written the draft. Continue from discovered Local state or report the repository blocker.
-- If Local is showing history, check out `latest` before authoring.
-- Restore one mistakenly deleted source file by passing its `services/` path to `ox.repository.git.restore`. Correct a mistaken identity by showing every pending path and requesting approval for a pathless restore, which erases all uncommitted Local work.
-- Use Git `diff`, `log`, and `show` for inspection, `revert` for a committed inverse change, and `restore` only for an intentionally abandoned draft.
+- After an activation failure, search once for the exact domain and inspect its current source; creation may already have written the draft. Continue from discovered Local state or report the repository blocker.
+- There is no built-in version history. Recover source only from known prior bytes or an exported copy; do not claim conversation history is an exact backup. Read current files before applying a repair and preserve unrelated work.
+- Correct a mistaken identity by creating the intended service and removing only the mistaken draft through the normal Action policy.

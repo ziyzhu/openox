@@ -844,67 +844,6 @@ final class ServiceManager {
         return kind
     }
 
-    func repositoryGitStatus(repositoryID: String) async throws -> Repository.GitStatus {
-        try await repository.gitStatus(repositoryID: repositoryID)
-    }
-
-    func repositoryGitLog(repositoryID: String, limit: Int, cursor: String?) async throws -> Repository.GitLog {
-        try await repository.gitLog(repositoryID: repositoryID, limit: limit, cursor: cursor)
-    }
-
-    func repositoryGitShow(repositoryID: String, commitHash: String, path: String?) async throws -> Repository.GitShow {
-        try await repository.gitShow(repositoryID: repositoryID, commitHash: commitHash, path: path)
-    }
-
-    func repositoryGitDiff(
-        repositoryID: String,
-        commitHash: String?,
-        baseCommitHash: String?,
-        path: String?
-    ) async throws -> Repository.GitDiff {
-        try await repository.gitDiff(
-            repositoryID: repositoryID,
-            commitHash: commitHash,
-            baseCommitHash: baseCommitHash,
-            path: path
-        )
-    }
-
-    func checkoutRepository(repositoryID: String, commitHash: String, locale: String?) async throws -> Repository.GitStatus {
-        let status = try await repository.gitCheckout(repositoryID: repositoryID, commitHash: commitHash)
-        _ = await loadRepositories(locale: locale)
-        return status
-    }
-
-    func commitLocalRepository(message: String, locale: String?) async throws -> Repository.GitCommit {
-        try await repository.requireLocalEnabled()
-        try await validateLocalRepository()
-        let commit = try await repository.gitCommitLocal(message: message)
-        _ = await loadRepositories(locale: locale)
-        return commit
-    }
-
-    func revertLocalRepository(commitHash: String, message: String, locale: String?) async throws -> Repository.GitCommit {
-        try await repository.prepareLocalRevert(commitHash: commitHash)
-        do {
-            _ = await loadRepositories(locale: locale)
-            try await validateLocalRepository()
-            let commit = try await repository.commitPreparedLocalRevert(message: message)
-            _ = await loadRepositories(locale: locale)
-            return commit
-        } catch {
-            await repository.abortPreparedLocalMutation()
-            _ = await loadRepositories(locale: locale)
-            throw error
-        }
-    }
-
-    func restoreLocalRepository(path: String?, locale: String?) async throws -> Repository.GitStatus {
-        let status = try await repository.gitRestoreLocal(path: path)
-        _ = await loadRepositories(locale: locale)
-        return status
-    }
-
     func listServiceSource(kind: ServicesMount.Kind, domain: String, path: [String]) async throws -> [Repository.Entry] {
         try await repository.listSource(kind: kind.repositoryKind, id: domain, path: path)
     }
@@ -1044,28 +983,6 @@ final class ServiceManager {
             }
         case .iOS:
             throw Repository.Failure(message: "Native iOS services cannot be edited in Local.")
-        }
-    }
-
-    private func validateLocalRepository() async throws {
-        try await repository.validateLocalSkills()
-        guard let local = monoRepository?.repositories.first(where: { $0.id == Repository.localID }) else {
-            throw Repository.Failure(message: "The Local repository is unavailable.")
-        }
-        for service in local.services {
-            guard let separator = service.id.firstIndex(of: ":"),
-                  let kind = ServicesMount.Kind(rawValue: String(service.id[..<separator])) else {
-                throw Repository.Failure(message: "Local contains an invalid service identity")
-            }
-            do {
-                try await validateLocalService(kind: kind, domain: service.runtimeID)
-            } catch let error as CancellationError {
-                throw error
-            } catch {
-                throw Repository.Failure(
-                    message: "Validation failed for services/\(kind.rawValue)/\(service.runtimeID): \(error.localizedDescription)"
-                )
-            }
         }
     }
 

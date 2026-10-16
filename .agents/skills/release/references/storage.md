@@ -27,7 +27,7 @@ types remain authoritative in their `Codable` implementations.
 │   ├── Application Support/
 │   │   ├── service-repositories.json        built-in, Local, Development, and installed repository enablement; conflict resolutions
 │   │   ├── mounted-repositories.json       version 1 repository bindings to Files grant IDs and relative folders
-│   │   ├── service-repositories/local/      editable local git working tree
+│   │   ├── service-repositories/local/      editable local source files
 │   │   ├── service-repositories/development/ simulator development HEAD snapshot
 │   │   ├── service-repositories/<uuid>/     installed public HEAD snapshots
 │   │   ├── external-profiles.json           selected Profile folder bookmarks and optional display names
@@ -481,8 +481,8 @@ The mount resolves permissions from the selected source, never frontmatter.
 System, enabled repository, and active Profile packages share one catalog before
 service attachment. Duplicate non-System names require a Profile source selection;
 System packages always own their reserved names. Untrusted packages cannot shadow
-System names or grant mutation permissions. Local packages are writable only at
-its current Git branch; installed, bundled, and historical packages are read-only. Every selected service exposes
+System names or grant mutation permissions. Local packages are writable;
+installed and bundled packages are read-only. Every selected service exposes
 its manifest for discovery. Bundled, Remote, and Development source files remain
 hidden and read-only; Local exposes its additional source files at the same
 `services/<kind>/<id>/` path. Repository host paths, markers,
@@ -575,7 +575,7 @@ syncs and exports with the Profile. Packages read during a run are frozen togeth
 with all references and helpers for that run.
 
 Customizing makes an independent complete Profile copy. Sharing into Local copies
-the complete package for Git review. `.skill` exports contain every supported
+the complete package for direct editing. `.skill` exports contain every supported
 resource and strip source ownership; imports create a Profile package after user
 confirmation. The archive itself is transient.
 
@@ -584,10 +584,9 @@ and API names in authored instructions and renames reserved user names to
 `user-<name>`, failing on unequal collisions. Transcript bytes remain unchanged.
 Repository version 2 conversion preserves original manifests and packages in a
 sibling `.<directory>-repository-v2-backup` journal. The journal is retained for
-recovery. A clean Local upgrade adds a commit; a dirty upgrade leaves its index
-and HEAD intact. A clean historical checkout is normalized in purgeable
-`Caches/RepositoryViews/<hash>/` without altering the original checkout. Invalid
-legacy drafts defer migration with originals retained. Future versions fail closed.
+recovery. Conversion operates on the current source files without reading or
+updating retained Git metadata. Invalid legacy drafts defer migration with
+originals retained. Future versions fail closed.
 The existing `service-repositories` disk paths, configuration filename, and PAT
 Keychain account remain stable despite the product/API rename to Repository.
 
@@ -660,17 +659,15 @@ excluded from device backup. Removing a repository deletes its snapshot and
 saved conflict choices without touching website data.
 
 The editable Local repository always exists at `service-repositories/local/`.
-It can be disabled in the active catalog but cannot be removed. It receives preinitialized metadata for an empty
-repository only when `.git` is absent; existing metadata, commits, index state, and
-working-tree changes are never replaced when valid. Legacy metadata with an unborn
-`master` reference is repaired by restoring `HEAD` to an existing `main` tip or,
-when it has no references, replacing only its metadata with the empty seed.
-Local source files remain untouched as working-tree changes against that seed.
-Legacy Local source without Git metadata follows the same working-tree path. The
-repository never introduces another virtual directory: its selected services
+It can be disabled in the active catalog but cannot be removed. Local edits persist
+directly without Git initialization, commits, checkout, or a separate Save step.
+Existing `.git` metadata is retained untouched for external recovery, but is not
+read or updated by Ox; the current source files are authoritative, including when
+an older build left a detached checkout. There is no built-in version history or
+automatic rollback. The repository never introduces another virtual directory: its selected services
 resolve directly into `services/<kind>/<id>/`. Local file writes are atomic and
 enforce write permissions, path containment, symbolic-link rejection, and the
-general file size limit without validating service contents. Working-tree drafts
+general file size limit without validating service contents. Local drafts
 may contain incomplete, missing, or inconsistent service files across app restarts.
 Their paths and encoding are unchanged. Local discovery validates repository
 metadata separately from draft contents and retains source access for repairing
@@ -687,9 +684,8 @@ by the repository-skill migration before loading. Version 1 is retired for exter
 repositories. `service.json` carries no version. `actions.js`
 calls `window.ox.install(installer)`, and the installer receives only `action` for
 web and `action` plus `request` for API. On preparation, `StorageMigrator`
-rewrites a Local `repository.json` at version 1 to version 2 and commits it when
-that file and the index are clean; otherwise it leaves the change uncommitted and
-logs `pending=true`. The app does not rewrite Action implementation source: sources that pass a
+rewrites a Local `repository.json` at version 1 to version 2 without changing
+retained Git metadata. The app does not rewrite Action implementation source: sources that pass a
 version to `install` or use the retired `retryFetch`, `log`, `lib`, or fetch
 capture fail validation with an actionable error and must be repaired by hand.
 Builds older than iOS 1.0.7 reject version 2 Local repositories and
@@ -697,19 +693,16 @@ single-argument installers instead of interpreting them.
 `ox.service.validate` checks a complete Local draft, including file structure,
 manifest, action registration, and service size limits. Root skill packages are
 validated separately with the shared package loader. The same
-validator runs before Save and before loading Local source for a caller. Failed
+validator runs before loading Local source for a caller. Failed
 validation leaves the draft untouched and cannot replace a conversation's running
 attachment. `ox.service.attach` validates and replaces that conversation's attachment when
 the draft is ready to test. No validation result is persisted.
 
-Only Local exposes Git status, history, diff, checkout, commit, revert, and
-restore operations. Checkout detaches its working view without moving `main`;
-historical views are read-only until returning to the latest tip. Development
-and installed sources are read-only `HEAD` snapshots without Git metadata.
-Local Git objects and all service snapshots are excluded from device backup.
-Exporting Local creates a transient Files-shareable folder copy containing the
-complete working tree and `.git` directory, including history, index state,
-uncommitted changes, repository-root skills, and incomplete service drafts. The
+Development and installed sources are read-only `HEAD` snapshots without Git metadata.
+Local source and all service snapshots are excluded from device backup.
+Exporting Local creates a transient Files-shareable folder copy containing all
+current source, repository-root skills, incomplete drafts, and any retained legacy
+`.git` directory. Retained Git history does not track edits made by this build. The
 copy excludes repository enablement, conflict choices, credentials, and installed
 repository snapshots. Export does not validate or modify the source repository.
 

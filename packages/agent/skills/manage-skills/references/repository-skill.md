@@ -10,4 +10,4 @@ Review the skill's trigger, inputs, steps, expected result, and stopping conditi
 
 If another source provides the same skill name, ask the user to select Local in the Skills library before testing Local content. Read back `skills/<name>/SKILL.md`, references, and helpers. Exercise the workflow in Ox and verify its result.
 
-Review `ox.repository.git.status` and `ox.repository.git.diff`. Save the verified Local changes with `ox.repository.git.commit` when the user authorizes saving. A Local historical view is read-only; return to latest before editing.
+Read the complete Local package back and verify its instructions and resources. Local changes persist immediately; there is no separate Save step or built-in version history. Preserve unrelated packages and existing source.

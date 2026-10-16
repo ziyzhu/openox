@@ -70,17 +70,9 @@ actor Repository {
             case failed(String)
         }
 
-        enum View: String, Equatable, Sendable {
-            case live
-            case historical
-        }
-
         let id: String
         let name: String
         let origin: URL?
-        let commitHash: String?
-        let tipCommitHash: String?
-        let view: View
         let lastSyncedAt: Date?
         let isEnabled: Bool
         let provenance: Provenance
@@ -111,60 +103,6 @@ actor Repository {
         let mcpManifests: [RepositoryManifestFile]
         let hash: String
         let skills: [Skill]
-    }
-
-    struct GitStatus: Encodable, Sendable {
-        let repository: String
-        let provenance: String
-        let view: String
-        let commitHash: String
-        let tipCommitHash: String
-        let staged: [String]
-        let unstaged: [String]
-        let untracked: [String]
-        let dirty: Bool
-    }
-
-    struct GitCommit: Encodable, Sendable {
-        let commitHash: String
-        let parentCommitHash: String?
-        let summary: String
-        let message: String
-        let committedAt: String
-    }
-
-    struct GitLog: Encodable, Sendable {
-        let repository: String
-        let commits: [GitCommit]
-        let nextCursor: String?
-    }
-
-    struct GitShow: Encodable, Sendable {
-        let repository: String
-        let commit: GitCommit
-        let path: String?
-        let content: String?
-        let size: Int?
-    }
-
-    struct GitDiff: Encodable, Sendable {
-        let repository: String
-        let fromCommitHash: String?
-        let toCommitHash: String?
-        let workingTree: Bool
-        let files: [GitDiffFile]
-        let patch: String
-        let truncated: Bool
-    }
-
-    struct GitDiffFile: Encodable, Sendable {
-        let path: String
-        let previousPath: String?
-        let change: String
-        let additions: Int
-        let deletions: Int
-        let binary: Bool
-        let patchIncluded: Bool
     }
 
     struct Failure: LocalizedError, Sendable {
@@ -393,7 +331,7 @@ actor Repository {
             for name in loaded.package.skills {
                 do {
                     var skill = try SkillFiles.load(directory: loaded.contentRoot.appendingPathComponent("skills/\(name)"))
-                    skill.source = .repository(id: loaded.descriptor.id, name: loaded.descriptor.name, writable: loaded.descriptor.provenance == .local && loaded.descriptor.view == .live)
+                    skill.source = .repository(id: loaded.descriptor.id, name: loaded.descriptor.name, writable: loaded.descriptor.provenance == .local)
                     repositorySkills.append(skill)
                 } catch {
                     Log.service.error("Repository.skill invalid name=\(name) repository=\(loaded.descriptor.id) error=\(error.localizedDescription)")
@@ -643,7 +581,7 @@ actor Repository {
     }
 
     func saveSkill(_ skill: Skill, replacing: String? = nil, createOnly: Bool = false) throws {
-        _ = try editableLocalRepository()
+        try prepareLocalMutation()
         guard !SkillFiles.reservedNames.contains(skill.name) else { throw SkillError.reserved(skill.name) }
         try SkillFiles.validate(skill)
         var package = try Self.loadPackage(at: localRoot, provenance: .local)
@@ -664,7 +602,7 @@ actor Repository {
     }
 
     func deleteSkill(name: String) throws {
-        _ = try editableLocalRepository()
+        try prepareLocalMutation()
         guard SkillFiles.isLocalName(name) else { throw SkillError.invalidName }
         var package = try Self.loadPackage(at: localRoot, provenance: .local)
         guard package.skills.contains(name) else { throw SkillError.missing(name) }
@@ -672,12 +610,6 @@ actor Repository {
         try Self.writePackage(package, at: localRoot)
         try FileManager.default.removeItem(at: localRoot.appendingPathComponent("skills/\(name)"))
         Log.service.info("Repository.skill delete name=\(name)")
-    }
-
-    func validateLocalSkills() throws {
-        try materializeLocalRepository()
-        let package = try Self.loadPackage(at: localRoot, provenance: .local)
-        for name in package.skills { _ = try SkillFiles.load(directory: localRoot.appendingPathComponent("skills/\(name)")) }
     }
 
     func createService(kind: ServiceKind, id: String) throws {
@@ -691,7 +623,7 @@ actor Repository {
         guard Self.isServiceID(domain), kind == .api || domain.contains(".") else {
             throw Failure(message: "Use a lowercase website domain for the Local service.")
         }
-        _ = try editableLocalRepository()
+        try prepareLocalMutation()
         var package = try Self.loadPackage(at: localRoot, provenance: .local)
         guard !package.services.contains(where: { $0.id.runtimeID == domain }) else {
             throw Failure(message: "A Local service already exists for \(domain).")
@@ -734,7 +666,7 @@ actor Repository {
     }
 
     func copyServiceToLocal(id: String) throws {
-        _ = try editableLocalRepository()
+        try prepareLocalMutation()
         guard let source = activeSources[id] else { throw Failure(message: "Service not found") }
         guard source.provenance != .local else { return }
         guard source.kind != .iOS else { throw Failure(message: "Native iOS services cannot be copied to Local.") }
@@ -807,7 +739,7 @@ actor Repository {
     }
 
     func importLocalService(_ payload: ServicePackagePayload, replacing: Bool) throws {
-        _ = try editableLocalRepository()
+        try prepareLocalMutation()
         let originalPackage = try Self.loadPackage(at: localRoot, provenance: .local)
         let service = Package.Service(id: try ServiceID(kind: payload.kind, runtimeID: payload.domain))
         let existing = originalPackage.services.first(where: { $0.id.runtimeID == payload.domain })
@@ -819,13 +751,6 @@ actor Repository {
         }
         guard existing != nil || !replacing else {
             throw Failure(message: "There is no Local service to replace.")
-        }
-        if existing != nil {
-            let status = try Self.gitStatus(repositoryID: Self.localID, provenance: .local, root: localRoot)
-            let prefix = service.id.path + "/"
-            guard !(status.staged + status.unstaged + status.untracked).contains(where: {
-                $0 == service.id.path || $0.hasPrefix(prefix)
-            }) else { throw Failure(message: "Save or discard this Local service's changes before replacing it.") }
         }
         let destination = localRoot.appendingPathComponent(service.id.path, isDirectory: true)
         guard existing != nil || !FileManager.default.fileExists(atPath: destination.path) else {
@@ -889,7 +814,7 @@ actor Repository {
     }
 
     func deleteLocalService(id: String) throws -> ServiceKind {
-        _ = try editableLocalRepository()
+        try prepareLocalMutation()
         let originalPackage = try Self.loadPackage(at: localRoot, provenance: .local)
         guard let index = originalPackage.services.firstIndex(where: { $0.id.runtimeID == id }) else {
             throw Failure(message: "No Local service exists for \(id).")
@@ -1085,235 +1010,6 @@ actor Repository {
         return paths.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
-    func gitStatus(repositoryID: String) throws -> GitStatus {
-        let loaded = try gitRepository(repositoryID)
-        return try Self.gitStatus(repositoryID: repositoryID, provenance: loaded.descriptor.provenance, root: loaded.root)
-    }
-
-    func gitLog(repositoryID: String, limit: Int, cursor: String?) throws -> GitLog {
-        let loaded = try gitRepository(repositoryID)
-        let repository = try SwiftGitX.Repository.open(at: loaded.root)
-        let tip = try Self.tipCommit(in: repository)
-        var commits: [GitCommit] = []
-        var include = cursor == nil
-        var foundCursor = cursor == nil
-        var hasMore = false
-        for commit in repository.log(from: tip, sorting: .time) {
-            if !include {
-                if commit.id.hex == cursor {
-                    include = true
-                    foundCursor = true
-                }
-                continue
-            }
-            if commits.count == limit {
-                hasMore = true
-                break
-            }
-            commits.append(try Self.gitCommit(commit))
-        }
-        guard foundCursor else { throw Failure(message: "Git log cursor is not in the repository history") }
-        return GitLog(
-            repository: repositoryID,
-            commits: commits,
-            nextCursor: hasMore ? commits.last?.commitHash : nil
-        )
-    }
-
-    func gitShow(repositoryID: String, commitHash: String, path: String?) throws -> GitShow {
-        let loaded = try gitRepository(repositoryID)
-        let repository = try SwiftGitX.Repository.open(at: loaded.root)
-        let commit = try Self.historyCommit(commitHash, in: repository)
-        guard let path else {
-            return GitShow(
-                repository: repositoryID,
-                commit: try Self.gitCommit(commit),
-                path: nil,
-                content: nil,
-                size: nil
-            )
-        }
-        let normalized = try Self.gitPath(path)
-        let blob = try Self.blob(at: normalized, commit: commit, repository: repository)
-        guard blob.content.count <= 1_000_000 else { throw Failure(message: "Historical file is too large to show") }
-        guard let content = String(data: blob.content, encoding: .utf8) else {
-            throw Failure(message: "Historical file is not UTF-8 text")
-        }
-        return GitShow(
-            repository: repositoryID,
-            commit: try Self.gitCommit(commit),
-            path: normalized,
-            content: content,
-            size: blob.content.count
-        )
-    }
-
-    func gitDiff(
-        repositoryID: String,
-        commitHash: String?,
-        baseCommitHash: String?,
-        path: String?
-    ) throws -> GitDiff {
-        guard commitHash != nil || baseCommitHash == nil else {
-            throw Failure(message: "commitHash is required when baseCommitHash is provided")
-        }
-        let loaded = try gitRepository(repositoryID)
-        let repository = try SwiftGitX.Repository.open(at: loaded.root)
-        let path = try path.map(Self.gitPath)
-        if let commitHash {
-            let commit = try Self.historyCommit(commitHash, in: repository)
-            if let baseCommitHash {
-                let base = try Self.historyCommit(baseCommitHash, in: repository)
-                return try Self.gitDiff(
-                    repositoryID: repositoryID,
-                    fromCommitHash: base.id.hex,
-                    toCommitHash: commit.id.hex,
-                    workingTree: false,
-                    diff: repository.diff(from: base, to: commit),
-                    repository: repository,
-                    root: loaded.root,
-                    path: path
-                )
-            }
-            if let parent = try commit.parents.first {
-                return try Self.gitDiff(
-                    repositoryID: repositoryID,
-                    fromCommitHash: parent.id.hex,
-                    toCommitHash: commit.id.hex,
-                    workingTree: false,
-                    diff: repository.diff(from: parent, to: commit),
-                    repository: repository,
-                    root: loaded.root,
-                    path: path
-                )
-            }
-            return try Self.gitRootDiff(
-                repositoryID: repositoryID,
-                commit: commit,
-                repository: repository,
-                path: path
-            )
-        }
-        guard let head = try repository.HEAD.target as? Commit else {
-            throw Failure(message: "Repository HEAD is not a commit")
-        }
-        return try Self.gitDiff(
-            repositoryID: repositoryID,
-            fromCommitHash: head.id.hex,
-            toCommitHash: nil,
-            workingTree: true,
-            diff: repository.diff(to: [.workingTree, .index]),
-            repository: repository,
-            root: loaded.root,
-            path: path
-        )
-    }
-
-    func gitCheckout(repositoryID: String, commitHash: String) throws -> GitStatus {
-        try requireLocalEnabled()
-        let loaded = try gitRepository(repositoryID)
-        let repository = try SwiftGitX.Repository.open(at: loaded.root)
-        guard try repository.status().isEmpty else {
-            throw Failure(message: "Restore or save current changes before viewing repository history")
-        }
-        guard let previous = try repository.HEAD.target as? Commit else {
-            throw Failure(message: "Repository HEAD is not a commit")
-        }
-        let wasHistorical = repository.isHEADDetached
-        do {
-            if commitHash == "latest" {
-                let main = try repository.branch.get(named: "main", type: .local)
-                try repository.switch(to: main)
-            } else {
-                let commit = try Self.historyCommit(commitHash, in: repository)
-                let tip = try Self.tipCommit(in: repository)
-                if commit.id == tip.id {
-                    let main = try repository.branch.get(named: "main", type: .local)
-                    try repository.switch(to: main)
-                } else {
-                    try repository.switch(to: commit)
-                }
-            }
-            _ = try Self.loadPackage(at: loaded.root, provenance: loaded.descriptor.provenance)
-        } catch {
-            if wasHistorical {
-                try? repository.switch(to: previous)
-            } else if let main = repository.branch["main", type: .local] {
-                try? repository.switch(to: main)
-            }
-            throw error
-        }
-        let status = try Self.gitStatus(repositoryID: repositoryID, provenance: loaded.descriptor.provenance, root: loaded.root)
-        Log.service.info("Repository.git checkout repository=\(repositoryID) commit=\(status.commitHash.prefix(12)) view=\(status.view)")
-        return status
-    }
-
-    func gitCommitLocal(message: String) throws -> GitCommit {
-        let repository = try editableLocalRepository()
-        let before = try repository.status()
-        guard !before.isEmpty else { throw Failure(message: "Local has no changes to save") }
-        try Self.stageAllChanges(in: repository)
-        let commit = try repository.commit(message: message)
-        Log.service.info("Repository.git commit repository=local commit=\(commit.id.abbreviated) files=\(before.count)")
-        return try Self.gitCommit(commit)
-    }
-
-    func prepareLocalRevert(commitHash: String) throws {
-        let repository = try editableLocalRepository()
-        guard try repository.status().isEmpty else {
-            throw Failure(message: "Restore or save Local changes before undoing a saved version")
-        }
-        let commit = try Self.historyCommit(commitHash, in: repository)
-        guard !(try commit.parents).isEmpty else { throw Failure(message: "The initial Local version cannot be undone") }
-        do {
-            try repository.revert(commit)
-            let status = try repository.status()
-            guard !status.contains(where: { $0.status.contains(.conflicted) }) else {
-                throw Failure(message: "Undoing this version conflicts with later Local changes")
-            }
-            _ = try Self.loadPackage(at: localRoot, provenance: .local)
-        } catch {
-            try? Self.restoreAll(in: repository)
-            throw error
-        }
-    }
-
-    func commitPreparedLocalRevert(message: String) throws -> GitCommit {
-        let repository = try editableLocalRepository()
-        let commit = try repository.commit(message: message)
-        Log.service.info("Repository.git revert repository=local commit=\(commit.id.abbreviated)")
-        return try Self.gitCommit(commit)
-    }
-
-    func abortPreparedLocalMutation() {
-        guard let repository = try? SwiftGitX.Repository.open(at: localRoot) else { return }
-        try? Self.restoreAll(in: repository)
-    }
-
-    func gitRestoreLocal(path: String?) throws -> GitStatus {
-        let repository = try editableLocalRepository()
-        if let path {
-            try Self.restore(path: path, in: repository)
-        } else {
-            try Self.restoreAll(in: repository)
-        }
-        _ = try Self.loadPackage(at: localRoot, provenance: .local)
-        Log.service.info("Repository.git restore repository=local path=\(path ?? "all")")
-        return try Self.gitStatus(repositoryID: Self.localID, provenance: .local, root: localRoot)
-    }
-
-    private func gitRepository(_ id: String) throws -> LoadedRepository {
-        guard id == Self.localID else {
-            throw Failure(message: "Only Local services have Git history")
-        }
-        try materializeLocalRepository()
-        let loaded = loadLocalRepository()
-        guard case .ready = loaded.descriptor.state else {
-            throw Failure(message: "Repository is unavailable")
-        }
-        return loaded
-    }
-
     func requireLocalEnabled(operation: String = #function) throws {
         guard configuration.localEnabled else {
             Log.service.warning("Repository.mutation rejected repository=local operation=\(operation) reason=disabled")
@@ -1321,24 +1017,13 @@ actor Repository {
         }
     }
 
-    private func editableLocalRepository(operation: String = #function) throws -> SwiftGitX.Repository {
+    private func prepareLocalMutation(operation: String = #function) throws {
         try requireLocalEnabled(operation: operation)
         try materializeLocalRepository()
-        let repository = try SwiftGitX.Repository.open(at: localRoot)
-        guard !repository.isHEADDetached else {
-            throw Failure(message: "Local is viewing a saved version; return to latest before editing history")
-        }
-        return repository
     }
 
     private var localRoot: URL {
         repositoryDirectory(Self.localID)
-    }
-
-    private var localRepositorySeed: URL? {
-        bundledRoot?
-            .appendingPathComponent("Repositories.bundle", isDirectory: true)
-            .appendingPathComponent("Local.git", isDirectory: true)
     }
 
     private func materializeLocalRepository() throws {
@@ -1352,28 +1037,21 @@ actor Repository {
             )
             Log.service.info("Repository.local materialized")
         }
-        try RepositoryMigrator.migrateLegacyLocalRepository(at: localRoot, seed: localRepositorySeed)
-        try installLocalRepositoryMetadata()
         try RepositoryMigrator.migrateLegacyLocalServiceManifests(at: localRoot)
         try RepositoryMigrator.migrateLegacyLocalServiceActions(at: localRoot)
         try RepositoryMigrator.migrateLocalRepositoryVersion(at: localRoot)
-        _ = try RepositoryMigrator.prepareRepository(at: localRoot, local: true)
+        _ = try RepositoryMigrator.prepareRepository(at: localRoot)
         _ = try Self.loadPackage(at: localRoot, provenance: .local)
-        _ = try Self.gitState(at: localRoot)
     }
 
     private func loadLocalRepository() -> LoadedRepository {
         do {
             let package = try Self.loadPackage(at: localRoot, provenance: .local)
-            let git = try Self.gitState(at: localRoot)
             return LoadedRepository(
                 descriptor: Descriptor(
                     id: Self.localID,
                     name: package.name,
                     origin: nil,
-                    commitHash: git.commitHash,
-                    tipCommitHash: git.tipCommitHash,
-                    view: git.view,
                     lastSyncedAt: nil,
                     isEnabled: configuration.localEnabled,
                     provenance: .local,
@@ -1383,7 +1061,7 @@ actor Repository {
                 ),
                 root: localRoot,
                 package: package,
-                contentRoot: try RepositoryMigrator.prepareRepository(at: localRoot, local: true)
+                contentRoot: try RepositoryMigrator.prepareRepository(at: localRoot)
             )
         } catch {
             return LoadedRepository(
@@ -1391,9 +1069,6 @@ actor Repository {
                     id: Self.localID,
                     name: "Local",
                     origin: nil,
-                    commitHash: nil,
-                    tipCommitHash: nil,
-                    view: .live,
                     lastSyncedAt: nil,
                     isEnabled: configuration.localEnabled,
                     provenance: .local,
@@ -1413,9 +1088,6 @@ actor Repository {
                 id: Self.localID,
                 name: "Local",
                 origin: nil,
-                commitHash: nil,
-                tipCommitHash: nil,
-                view: .live,
                 lastSyncedAt: nil,
                 isEnabled: configuration.localEnabled,
                 provenance: .local,
@@ -1448,7 +1120,7 @@ actor Repository {
         guard source.provenance == .local else {
             throw Failure(message: "Only Local services are editable. Copy this service to Local before editing it.")
         }
-        _ = try editableLocalRepository()
+        try prepareLocalMutation()
         return source
     }
 
@@ -1528,9 +1200,6 @@ actor Repository {
                     id: Self.bundledID,
                     name: package.name,
                     origin: nil,
-                    commitHash: nil,
-                    tipCommitHash: nil,
-                    view: .live,
                     lastSyncedAt: nil,
                     isEnabled: configuration.bundledEnabled,
                     provenance: .bundled,
@@ -1552,9 +1221,6 @@ actor Repository {
                 id: Self.bundledID,
                 name: "Built-in",
                 origin: nil,
-                commitHash: nil,
-                tipCommitHash: nil,
-                view: .live,
                 lastSyncedAt: nil,
                 isEnabled: configuration.bundledEnabled,
                 provenance: .bundled,
@@ -1577,9 +1243,6 @@ actor Repository {
                     id: "development",
                     name: package.name,
                     origin: developmentRemote,
-                    commitHash: nil,
-                    tipCommitHash: nil,
-                    view: .live,
                     lastSyncedAt: Self.snapshotDate(at: root),
                     isEnabled: configuration.developmentEnabled,
                     provenance: .development,
@@ -1596,9 +1259,6 @@ actor Repository {
                     id: "development",
                     name: "Development Server",
                     origin: developmentRemote,
-                    commitHash: nil,
-                    tipCommitHash: nil,
-                    view: .live,
                     lastSyncedAt: Self.snapshotDate(at: root),
                     isEnabled: configuration.developmentEnabled,
                     provenance: .development,
@@ -1644,8 +1304,8 @@ actor Repository {
             let package = try Self.loadPackage(at: root, provenance: .mounted)
             return LoadedRepository(
                 descriptor: Descriptor(
-                    id: record.id, name: package.name, origin: nil, commitHash: nil, tipCommitHash: nil,
-                    view: .live, lastSyncedAt: nil, isEnabled: record.isEnabled, provenance: .mounted,
+                    id: record.id, name: package.name, origin: nil,
+                    lastSyncedAt: nil, isEnabled: record.isEnabled, provenance: .mounted,
                     serviceCount: package.services.count, services: Self.serviceReferences(in: package), state: .ready
                 ), root: root, package: package
             )
@@ -1653,8 +1313,8 @@ actor Repository {
             Log.service.error("Repository.mounted unavailable id=\(record.id) grant=\(record.grantID) error=\(error.localizedDescription)")
             return LoadedRepository(
                 descriptor: Descriptor(
-                    id: record.id, name: "files/\(record.grantID)", origin: nil, commitHash: nil, tipCommitHash: nil,
-                    view: .live, lastSyncedAt: nil, isEnabled: record.isEnabled, provenance: .mounted,
+                    id: record.id, name: "files/\(record.grantID)", origin: nil,
+                    lastSyncedAt: nil, isEnabled: record.isEnabled, provenance: .mounted,
                     serviceCount: 0, services: [], state: .failed(error.localizedDescription)
                 ), root: repositoriesRoot, package: Package(version: HostProtocols.repository.last!, name: "Files", contentHash: nil, services: [])
             )
@@ -1670,9 +1330,6 @@ actor Repository {
                     id: stored.id,
                     name: package.name,
                     origin: stored.origin,
-                    commitHash: nil,
-                    tipCommitHash: nil,
-                    view: .live,
                     lastSyncedAt: Self.snapshotDate(at: root),
                     isEnabled: stored.isEnabled,
                     provenance: .remote,
@@ -1689,9 +1346,6 @@ actor Repository {
                     id: stored.id,
                     name: stored.origin.host ?? "Repository",
                     origin: stored.origin,
-                    commitHash: nil,
-                    tipCommitHash: nil,
-                    view: .live,
                     lastSyncedAt: Self.snapshotDate(at: root),
                     isEnabled: stored.isEnabled,
                     provenance: .remote,
@@ -1709,7 +1363,7 @@ actor Repository {
         guard FileManager.default.fileExists(atPath: repositoryManifestURL(at: root).path) else {
             throw Failure(message: "The repository is missing repository.json at its root.")
         }
-        let root = provenance == .mounted ? root : try RepositoryMigrator.prepareRepository(at: root, local: provenance == .local)
+        let root = provenance == .mounted ? root : try RepositoryMigrator.prepareRepository(at: root)
         let packageURL = repositoryManifestURL(at: root)
         let values = try packageURL.resourceValues(forKeys: [.isSymbolicLinkKey, .fileSizeKey])
         guard values.isSymbolicLink != true, (values.fileSize ?? 0) <= 512_000 else {
@@ -1902,498 +1556,9 @@ actor Repository {
         }
     }
 
-    private struct GitState {
-        let commitHash: String
-        let tipCommitHash: String
-        let view: Descriptor.View
-    }
-
-    private static func gitState(at root: URL) throws -> GitState {
-        let repository = try SwiftGitX.Repository.open(at: root)
-        guard let commit = try repository.HEAD.target as? Commit else {
-            throw Failure(message: "Repository HEAD is not a commit")
-        }
-        let tip = try tipCommit(in: repository)
-        return GitState(
-            commitHash: commit.id.hex,
-            tipCommitHash: tip.id.hex,
-            view: repository.isHEADDetached ? .historical : .live
-        )
-    }
-
-    private static func tipCommit(in repository: SwiftGitX.Repository) throws -> Commit {
-        let main = try repository.branch.get(named: "main", type: .local)
-        guard let commit = main.target as? Commit else {
-            throw Failure(message: "Repository main tip is not a commit")
-        }
-        return commit
-    }
-
-    private func installLocalRepositoryMetadata() throws {
-        let manager = FileManager.default
-        let destination = localRoot.appendingPathComponent(".git", isDirectory: true)
-        guard !manager.fileExists(atPath: destination.path) else { return }
-        guard let source = localRepositorySeed,
-              manager.fileExists(atPath: source.path) else {
-            throw Failure(message: "Preinitialized Local Git metadata is missing")
-        }
-        let staging = localRoot.deletingLastPathComponent().appendingPathComponent(".git-seed-\(UUID().uuidString)", isDirectory: true)
-        do {
-            try manager.copyItem(at: source, to: staging)
-            try manager.moveItem(at: staging, to: destination)
-        } catch {
-            try? manager.removeItem(at: staging)
-            throw error
-        }
-        Log.service.info("Repository.git seeded repository=local")
-    }
-
     private static func errorMessage(_ error: Error) -> String {
         guard let git = error as? SwiftGitXError else { return error.localizedDescription }
         return "\(git.message) operation=\(git.operation?.rawValue ?? "unknown") code=\(git.code.rawValue) category=\(git.category.rawValue)"
-    }
-
-    private static func stageAllChanges(in repository: SwiftGitX.Repository) throws {
-        let paths = try repository.status().compactMap { entry -> String? in
-            entry.workingTree?.newFile.path ?? entry.index?.newFile.path ?? entry.index?.oldFile.path
-        }
-        if !paths.isEmpty { try repository.add(paths: Array(Set(paths)).sorted()) }
-    }
-
-    private static func restoreAll(in repository: SwiftGitX.Repository) throws {
-        let untracked = try repository.status().compactMap { entry -> String? in
-            guard entry.status.contains(.workingTreeNew) else { return nil }
-            return entry.workingTree?.newFile.path
-        }
-        try repository.restore([.workingTree, .staged])
-        let root = try repository.workingDirectory.standardizedFileURL
-        for path in untracked {
-            let normalized = try gitPath(path)
-            let url = root.appendingPathComponent(normalized).standardizedFileURL
-            guard url.path.hasPrefix(root.path + "/") else { throw Failure(message: "Invalid untracked path") }
-            if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
-            var parent = url.deletingLastPathComponent()
-            while parent.path != root.path,
-                  (try? FileManager.default.contentsOfDirectory(atPath: parent.path).isEmpty) == true {
-                try FileManager.default.removeItem(at: parent)
-                parent.deleteLastPathComponent()
-            }
-        }
-    }
-
-    private static func restore(path: String, in repository: SwiftGitX.Repository) throws {
-        let path = try gitPath(path)
-        let entries = try repository.status()
-        let matching = entries.filter { entry in
-            let candidate = entry.workingTree?.newFile.path ?? entry.index?.newFile.path ?? entry.index?.oldFile.path
-            return candidate == path
-        }
-        guard !matching.isEmpty else {
-            throw Failure(message: "No Local change exists at \(path)")
-        }
-        let untracked = matching.contains { $0.status.contains(.workingTreeNew) }
-        if !untracked {
-            try repository.restore([.workingTree, .staged], paths: [path])
-        } else {
-            let root = try repository.workingDirectory.standardizedFileURL
-            let url = root.appendingPathComponent(path).standardizedFileURL
-            guard url.path.hasPrefix(root.path + "/") else { throw Failure(message: "Invalid untracked path") }
-            if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
-        }
-    }
-
-    private struct PreparedGitDiffFile {
-        let path: String
-        let previousPath: String?
-        let change: String
-        let additions: Int
-        let deletions: Int
-        let binary: Bool
-        let patch: String
-    }
-
-    private static func gitDiff(
-        repositoryID: String,
-        fromCommitHash: String?,
-        toCommitHash: String?,
-        workingTree: Bool,
-        diff: Diff,
-        repository: SwiftGitX.Repository,
-        root: URL,
-        path: String?
-    ) throws -> GitDiff {
-        let patches = Dictionary(uniqueKeysWithValues: diff.patches.map { ($0.delta, $0) })
-        var prepared: [PreparedGitDiffFile] = []
-        for delta in diff.changes {
-            let filePath = delta.type == .deleted ? delta.oldFile.path : delta.newFile.path
-            guard gitPath(filePath, matches: path) else { continue }
-            let patch = workingTree
-                ? workingTreePatch(delta: delta, repository: repository, root: root) ?? patches[delta]
-                : historicalPatch(delta: delta, repository: repository) ?? patches[delta]
-            prepared.append(preparedGitDiffFile(delta: delta, patch: patch))
-        }
-        if workingTree {
-            let included = Set(prepared.map(\.path))
-            for entry in try repository.status() where entry.status.contains(.workingTreeNew) {
-                guard let filePath = entry.workingTree?.newFile.path,
-                      !included.contains(filePath),
-                      gitPath(filePath, matches: path) else { continue }
-                let fileURL = root.appendingPathComponent(filePath)
-                let data = try Data(contentsOf: fileURL)
-                let patch = try repository.patch(from: nil, to: fileURL)
-                prepared.append(preparedGitDiffFile(
-                    path: filePath,
-                    previousPath: nil,
-                    change: "untracked",
-                    data: data,
-                    patch: patch
-                ))
-            }
-        }
-        return finalizedGitDiff(
-            repositoryID: repositoryID,
-            fromCommitHash: fromCommitHash,
-            toCommitHash: toCommitHash,
-            workingTree: workingTree,
-            prepared: prepared
-        )
-    }
-
-    private static func gitRootDiff(
-        repositoryID: String,
-        commit: Commit,
-        repository: SwiftGitX.Repository,
-        path: String?
-    ) throws -> GitDiff {
-        let blobs = try gitBlobs(in: commit.tree, repository: repository)
-        let prepared = try blobs.compactMap { filePath, blob -> PreparedGitDiffFile? in
-            guard gitPath(filePath, matches: path) else { return nil }
-            return preparedGitDiffFile(
-                path: filePath,
-                previousPath: nil,
-                change: "added",
-                data: blob.content,
-                patch: try repository.patch(from: nil, to: blob)
-            )
-        }
-        return finalizedGitDiff(
-            repositoryID: repositoryID,
-            fromCommitHash: nil,
-            toCommitHash: commit.id.hex,
-            workingTree: false,
-            prepared: prepared
-        )
-    }
-
-    private static func finalizedGitDiff(
-        repositoryID: String,
-        fromCommitHash: String?,
-        toCommitHash: String?,
-        workingTree: Bool,
-        prepared: [PreparedGitDiffFile]
-    ) -> GitDiff {
-        let maximumPatchBytes = 500_000
-        var patch = ""
-        var files: [GitDiffFile] = []
-        var truncated = false
-        for item in prepared.sorted(by: { $0.path.localizedStandardCompare($1.path) == .orderedAscending }) {
-            let included = !item.patch.isEmpty && patch.utf8.count + item.patch.utf8.count <= maximumPatchBytes
-            if included {
-                patch += item.patch
-            } else if !item.patch.isEmpty {
-                truncated = true
-            }
-            files.append(GitDiffFile(
-                path: item.path,
-                previousPath: item.previousPath,
-                change: item.change,
-                additions: item.additions,
-                deletions: item.deletions,
-                binary: item.binary,
-                patchIncluded: included
-            ))
-        }
-        return GitDiff(
-            repository: repositoryID,
-            fromCommitHash: fromCommitHash,
-            toCommitHash: toCommitHash,
-            workingTree: workingTree,
-            files: files,
-            patch: patch,
-            truncated: truncated
-        )
-    }
-
-    private static func preparedGitDiffFile(delta: Diff.Delta, patch: Patch?) -> PreparedGitDiffFile {
-        let filePath = delta.type == .deleted ? delta.oldFile.path : delta.newFile.path
-        let previousPath = [.renamed, .copied].contains(delta.type) && delta.oldFile.path != delta.newFile.path
-            ? delta.oldFile.path
-            : nil
-        let binary = delta.flags.contains(.binary)
-            || delta.oldFile.flags.contains(.binary)
-            || delta.newFile.flags.contains(.binary)
-        let rendered = renderGitPatch(
-            oldPath: delta.oldFile.path,
-            newPath: delta.newFile.path,
-            change: gitChange(delta.type),
-            binary: binary,
-            patch: patch
-        )
-        return PreparedGitDiffFile(
-            path: filePath,
-            previousPath: previousPath,
-            change: gitChange(delta.type),
-            additions: rendered.additions,
-            deletions: rendered.deletions,
-            binary: binary,
-            patch: rendered.text
-        )
-    }
-
-    private static func preparedGitDiffFile(
-        path: String,
-        previousPath: String?,
-        change: String,
-        data: Data,
-        patch: Patch
-    ) -> PreparedGitDiffFile {
-        let binary = data.contains(0) || String(data: data, encoding: .utf8) == nil
-        let rendered = renderGitPatch(
-            oldPath: path,
-            newPath: path,
-            change: change,
-            binary: binary,
-            patch: patch
-        )
-        return PreparedGitDiffFile(
-            path: path,
-            previousPath: previousPath,
-            change: change,
-            additions: rendered.additions,
-            deletions: rendered.deletions,
-            binary: binary,
-            patch: rendered.text
-        )
-    }
-
-    private static func renderGitPatch(
-        oldPath: String,
-        newPath: String,
-        change: String,
-        binary: Bool,
-        patch: Patch?
-    ) -> (text: String, additions: Int, deletions: Int) {
-        let oldLabel = ["added", "untracked"].contains(change) ? "/dev/null" : "a/\(oldPath)"
-        let newLabel = change == "deleted" ? "/dev/null" : "b/\(newPath)"
-        var text = "diff --git a/\(oldPath) b/\(newPath)\n--- \(oldLabel)\n+++ \(newLabel)\n"
-        guard !binary else {
-            text += "Binary files \(oldLabel) and \(newLabel) differ\n"
-            return (text, 0, 0)
-        }
-        var additions = 0
-        var deletions = 0
-        for hunk in patch?.hunks ?? [] {
-            text += hunk.header
-            if !hunk.header.hasSuffix("\n") { text += "\n" }
-            for line in hunk.lines {
-                switch line.type {
-                case .context:
-                    text += " " + line.content
-                case .addition:
-                    additions += 1
-                    text += "+" + line.content
-                case .deletion:
-                    deletions += 1
-                    text += "-" + line.content
-                case .contextEOF, .additionEOF, .deletionEOF:
-                    if !text.hasSuffix("\\ No newline at end of file\n") {
-                        text += "\\ No newline at end of file\n"
-                    }
-                    continue
-                }
-                if !line.content.hasSuffix("\n") { text += "\n" }
-            }
-        }
-        return (text, additions, deletions)
-    }
-
-    private static func historicalPatch(delta: Diff.Delta, repository: SwiftGitX.Repository) -> Patch? {
-        do {
-            let oldBlob: Blob? = delta.type == .added ? nil : try repository.show(id: delta.oldFile.id)
-            let newBlob: Blob? = delta.type == .deleted ? nil : try repository.show(id: delta.newFile.id)
-            return try repository.patch(from: oldBlob, to: newBlob)
-        } catch {
-            return nil
-        }
-    }
-
-    private static func workingTreePatch(
-        delta: Diff.Delta,
-        repository: SwiftGitX.Repository,
-        root: URL
-    ) -> Patch? {
-        do {
-            switch delta.type {
-            case .added, .untracked:
-                return try repository.patch(from: nil, to: root.appendingPathComponent(delta.newFile.path))
-            case .deleted:
-                let oldBlob: Blob = try repository.show(id: delta.oldFile.id)
-                return try repository.patch(from: oldBlob, to: nil)
-            case .modified, .renamed, .copied, .typeChange:
-                let oldBlob: Blob = try repository.show(id: delta.oldFile.id)
-                return try repository.patch(from: oldBlob, to: root.appendingPathComponent(delta.newFile.path))
-            default:
-                return nil
-            }
-        } catch {
-            return nil
-        }
-    }
-
-    private static func gitChange(_ type: Diff.DeltaType) -> String {
-        switch type {
-        case .unmodified: "unmodified"
-        case .added: "added"
-        case .deleted: "deleted"
-        case .modified: "modified"
-        case .renamed: "renamed"
-        case .copied: "copied"
-        case .ignored: "ignored"
-        case .untracked: "untracked"
-        case .typeChange: "typeChange"
-        case .unreadable: "unreadable"
-        case .conflicted: "conflicted"
-        }
-    }
-
-    private static func gitPath(_ candidate: String, matches filter: String?) -> Bool {
-        guard let filter else { return true }
-        return candidate == filter || candidate.hasPrefix(filter + "/")
-    }
-
-    private static func gitBlobs(
-        in tree: Tree,
-        repository: SwiftGitX.Repository,
-        prefix: String = ""
-    ) throws -> [(String, Blob)] {
-        var blobs: [(String, Blob)] = []
-        for entry in tree.entries {
-            let path = prefix.isEmpty ? entry.name : "\(prefix)/\(entry.name)"
-            switch entry.type {
-            case .blob:
-                let blob: Blob = try repository.show(id: entry.id)
-                blobs.append((path, blob))
-            case .tree:
-                let subtree: Tree = try repository.show(id: entry.id)
-                blobs += try gitBlobs(in: subtree, repository: repository, prefix: path)
-            default:
-                continue
-            }
-        }
-        return blobs
-    }
-
-    private static func gitStatus(
-        repositoryID: String,
-        provenance: Descriptor.Provenance,
-        root: URL
-    ) throws -> GitStatus {
-        let repository = try SwiftGitX.Repository.open(at: root)
-        let state = try gitState(at: root)
-        let entries = try repository.status()
-        var staged = Set<String>()
-        var unstaged = Set<String>()
-        var untracked = Set<String>()
-        for entry in entries {
-            let path = entry.workingTree?.newFile.path ?? entry.index?.newFile.path ?? entry.index?.oldFile.path
-            guard let path else { continue }
-            if entry.status.contains(.workingTreeNew) { untracked.insert(path) }
-            if entry.status.contains(where: { [.indexNew, .indexModified, .indexDeleted, .indexRenamed, .indexTypeChange, .conflicted].contains($0) }) {
-                staged.insert(path)
-            }
-            if entry.status.contains(where: { [.workingTreeModified, .workingTreeDeleted, .workingTreeRenamed, .workingTreeTypeChange, .workingTreeUnreadable, .conflicted].contains($0) }) {
-                unstaged.insert(path)
-            }
-        }
-        return GitStatus(
-            repository: repositoryID,
-            provenance: provenance.rawValue,
-            view: state.view.rawValue,
-            commitHash: state.commitHash,
-            tipCommitHash: state.tipCommitHash,
-            staged: staged.sorted(),
-            unstaged: unstaged.sorted(),
-            untracked: untracked.sorted(),
-            dirty: !staged.isEmpty || !unstaged.isEmpty || !untracked.isEmpty
-        )
-    }
-
-    private static func historyCommit(_ commitHash: String, in repository: SwiftGitX.Repository) throws -> Commit {
-        guard commitHash.range(of: "^[a-f0-9]{40}$", options: .regularExpression) != nil else {
-            throw Failure(message: "commitHash must be a full 40-character Git commit hash")
-        }
-        let requested: Commit
-        do {
-            requested = try repository.show(id: OID(hex: commitHash))
-        } catch {
-            throw Failure(message: "Commit was not found in the repository")
-        }
-        let tip = try tipCommit(in: repository)
-        guard repository.log(from: tip).contains(where: { $0.id == requested.id }) else {
-            throw Failure(message: "Commit is not in the repository's linear main history")
-        }
-        return requested
-    }
-
-    private static func gitCommit(_ commit: Commit) throws -> GitCommit {
-        GitCommit(
-            commitHash: commit.id.hex,
-            parentCommitHash: try commit.parents.first?.id.hex,
-            summary: commit.summary,
-            message: commit.message,
-            committedAt: ISO8601DateFormatter().string(from: commit.date)
-        )
-    }
-
-    private static func gitPath(_ path: String) throws -> String {
-        let components = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-        guard !components.isEmpty,
-              components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.hasPrefix(".") && !$0.contains("\\") }) else {
-            throw Failure(message: "Invalid repository path")
-        }
-        return components.joined(separator: "/")
-    }
-
-    private static func blob(
-        at path: String,
-        commit: Commit,
-        repository: SwiftGitX.Repository
-    ) throws -> Blob {
-        var tree = try commit.tree
-        let components = path.split(separator: "/").map(String.init)
-        for (index, component) in components.enumerated() {
-            guard let entry = tree.entries.first(where: { $0.name == component }) else {
-                throw Failure(message: "Path does not exist at that commit")
-            }
-            if index == components.count - 1 {
-                guard entry.type == .blob else { throw Failure(message: "Path is not a file") }
-                let blob: Blob = try repository.show(id: entry.id)
-                return blob
-            }
-            guard entry.type == .tree else { throw Failure(message: "Path is not a directory") }
-            tree = try repository.show(id: entry.id)
-        }
-        throw Failure(message: "Path is not a file")
-    }
-
-    private static func package(at commit: Commit, in repository: SwiftGitX.Repository) throws -> Package {
-        let blob: Blob
-        do {
-            blob = try self.blob(at: "repository.json", commit: commit, repository: repository)
-        } catch {
-            blob = try self.blob(at: "ox.json", commit: commit, repository: repository)
-        }
-        return try JSONDecoder().decode(Package.self, from: blob.content)
     }
 
     private static func snapshotDate(at root: URL) -> Date? {

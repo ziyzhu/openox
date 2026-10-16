@@ -13,7 +13,7 @@ All skills execute through the agent in the Ox VM. Use its `ox.*` APIs, virtual 
 
 Bundled System skills, enabled repository skills, and active Profile skills share one catalog. Read `skills/<name>/SKILL.md` to activate a resolved skill. Names have no owner prefix. System names always resolve to the trusted bundled skill and cannot be shadowed by Profile or repository content. Other conflicts require the user to choose a source in the Skills library; never select one on their behalf.
 
-Bundled System skills are read-only. Copy one to a distinct, nonreserved name to customize it; the copy is a Profile skill, not trusted System policy. Installed repository skills are read-only. Profile skills and skills in the Local repository's latest view are editable. Check the source in the library before mutation. A historical Local view is read-only.
+Bundled System skills are read-only. Copy one to a distinct, nonreserved name to customize it; the copy is a Profile skill, not trusted System policy. Installed repository skills are read-only. Profile skills and skills in the Local repository are editable. Check the source in the library before mutation. Local edits persist immediately; there is no separate Save step or built-in version history.
 
 ## Create and customize
 

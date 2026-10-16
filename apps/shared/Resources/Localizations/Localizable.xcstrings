@@ -3688,12 +3688,12 @@
         }
       }
     },
-    "Deletes this service's editable source from Local. The deletion remains an uncommitted Local Git change, and website sign-ins and data are kept." : {
+    "Permanently deletes this service's editable source from Local. Website sign-ins and data are kept." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "删除此服务在本地的可编辑源代码。此次删除会保留为未提交的本地 Git 更改；网站登录状态和数据将保留。"
+            "value" : "永久删除此服务在本地的可编辑源代码。网站登录状态和数据将保留。"
           }
         }
       }
@@ -3834,16 +3834,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "丢弃"
-          }
-        }
-      }
-    },
-    "Discard Local changes" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "丢弃本地更改"
           }
         }
       }
@@ -10801,16 +10791,6 @@
         }
       }
     },
-    "Undo a saved Local version" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "撤销已保存的本地版本"
-          }
-        }
-      }
-    },
     "Unpin" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12197,56 +12177,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加到本地仓库"
-          }
-        }
-      }
-    },
-    "Check repository changes" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "检查仓库更改"
-          }
-        }
-      }
-    },
-    "Read repository history" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "读取仓库历史记录"
-          }
-        }
-      }
-    },
-    "Read a saved repository version" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "读取已保存的仓库版本"
-          }
-        }
-      }
-    },
-    "View a saved repository version" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "查看已保存的仓库版本"
-          }
-        }
-      }
-    },
-    "Save Local repository" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存本地仓库"
           }
         }
       }

@@ -2,7 +2,7 @@
 
 Websites are services, never Ox model providers. Adding `conversation` or `listModels` Actions does not register a provider. The Ox agent runs through API-backed providers; an AI website receives only explicit service inputs, not automatic Ox history, system instructions, or tool declarations.
 
-Use the normal web-service discovery, copy-to-Local, conflict resolution, validation, and Save workflow. Built-ins remain read-only. Preserve unrelated Local edits and existing website drafts.
+Use the normal web-service discovery, copy-to-Local, conflict resolution, validation, and verification workflow. Built-ins remain read-only. Preserve unrelated Local edits and existing website drafts.
 
 Read `references/model-schemas.md` for the exact `conversation` schema. It supports `submit`, `read`, and `cancel` on one Host-owned page. Keep the normal label, authentication, and approval fields; do not change the manifest format or standard schemas. Legacy model-generation Actions remain reserved for installed-service validation, not agent execution or ordinary tool discovery. Do not author new ones.
 

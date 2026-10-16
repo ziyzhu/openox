@@ -64,22 +64,6 @@ extension ServiceOperations {
             return try await syncRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
         case "ox.repository.disconnect":
             return try await disconnectRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
-        case "ox.repository.git.status":
-            return try await repositoryGitStatus(repository: fields["repository"]?.stringValue ?? "local", purpose: purpose)
-        case "ox.repository.git.log":
-            return try await repositoryGitLog(repository: fields["repository"]?.stringValue ?? "local", limit: fields["limit"]?.intValue ?? 20, cursor: fields["cursor"]?.stringValue, purpose: purpose)
-        case "ox.repository.git.show":
-            return try await repositoryGitShow(repository: fields["repository"]?.stringValue ?? "local", commitHash: fields["commitHash"]?.stringValue ?? "", path: fields["path"]?.stringValue, purpose: purpose)
-        case "ox.repository.git.diff":
-            return try await repositoryGitDiff(repository: fields["repository"]?.stringValue ?? "local", commitHash: fields["commitHash"]?.stringValue, baseCommitHash: fields["baseCommitHash"]?.stringValue, path: fields["path"]?.stringValue, purpose: purpose)
-        case "ox.repository.git.checkout":
-            return try await repositoryGitCheckout(repository: fields["repository"]?.stringValue ?? "local", commitHash: fields["commitHash"]?.stringValue ?? "", purpose: purpose)
-        case "ox.repository.git.commit":
-            return try await repositoryGitCommit(message: fields["message"]?.stringValue ?? "", purpose: purpose)
-        case "ox.repository.git.revert":
-            return try await repositoryGitRevert(commitHash: fields["commitHash"]?.stringValue ?? "", message: fields["message"]?.stringValue ?? "", purpose: purpose)
-        case "ox.repository.git.restore":
-            return try await repositoryGitRestore(path: fields["path"]?.stringValue, purpose: purpose)
         case "ox.service.signIn":
             return try await signInService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.solve":

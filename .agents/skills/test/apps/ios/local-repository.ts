@@ -8,7 +8,7 @@ import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulat
 import { iosTarget } from "../../../setup/scripts/ios.ts";
 
 const qa = qaCommand({
-  usage: "bun .agents/skills/test/apps/ios/local-repository.ts --device ox-N --host <ws-url> --conversation <saved-QA-conversation> --bundle <bundle-id> --domain <qa-draft-domain> [--output /tmp/directory]\nRequires enabled Local and an existing empty run-owned qa- web draft. Temporarily disables Local, verifies mutation refusals and unchanged source/configuration/Git bytes, then reenables and writes identical source. Restores enablement; creates no drafts or commits.",
+  usage: "bun .agents/skills/test/apps/ios/local-repository.ts --device ox-N --host <ws-url> --conversation <saved-QA-conversation> --bundle <bundle-id> --domain <qa-draft-domain> [--output /tmp/directory]\nRequires enabled Local and an existing empty run-owned qa- web draft. Temporarily disables Local, verifies mutation refusals and unchanged source/configuration/Git bytes, then reenables and writes identical source. Restores enablement; creates no drafts.",
   options: { host: { type: "string" }, chat: { type: "string" }, bundle: { type: "string" }, domain: { type: "string" }, output: { type: "string" } },
 });
 const ios = iosTarget(qa.device);
@@ -78,7 +78,6 @@ try {
   checks.push("bundled authoring guidance uses runtime permissions without duplicate consent");
   const source = (await call("ox.fs.read", { path })).text as string;
   assert.equal(source.trim(), "window.ox.install(() => {});", "Use only an empty run-owned draft");
-  const status = await call("ox.repository.git.status");
   await enabled(false);
   const before = await snapshot("before");
   for (const [name, args] of [
@@ -87,19 +86,13 @@ try {
     ["ox.service.copy", { domain: "news.ycombinator.com" }],
     ["ox.fs.write", { path, content: source }],
     ["ox.fs.edit", { path, edits: [{ oldText: source.trim(), newText: source.trim() }] }],
-    ["ox.repository.git.checkout", { commitHash: "latest" }],
-    ["ox.repository.git.commit", { message: "QA forbidden save" }],
-    ["ox.repository.git.revert", { commitHash: status.commitHash, message: "QA forbidden revert" }],
-    ["ox.repository.git.restore", { path }],
     ["ox.repository.resolve", { service: "news.ycombinator.com", repository: "local" }],
   ] as const) await refused(name, args);
   assert.deepEqual(await snapshot("after"), before, "Rejected operations changed Local source, Git, or repository configuration");
-  assert.deepEqual(await call("ox.repository.git.status"), status, "Rejected operations changed Git status");
   checks.push("all Local source, Git, and configuration bytes unchanged");
   await enabled(true);
   await call("ox.fs.write", { path, content: source });
   assert.equal((await call("ox.fs.read", { path })).text, source);
-  assert.deepEqual(await call("ox.repository.git.status"), status);
   checks.push("same source write succeeds after explicit enablement without changing existing work");
 } finally {
   try {

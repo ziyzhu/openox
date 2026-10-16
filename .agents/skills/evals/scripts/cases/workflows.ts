@@ -9,7 +9,7 @@ const scenarios: Scenario[] = [
   ["manage-skills", "fresh-use", "profile", "Create the requested skill for later use with variable inputs", "Fresh conversation loads the complete package and produces the independently calculated output"],
   ["manage-skills", "revise-existing", "profile", "Revise only the specified steps of the existing Profile skill", "Targeted change preserves unrelated instructions and resource bytes"],
   ["manage-skills", "copy-system", "profile", "Customize a distinct Profile copy of the specified System skill", "System package remains immutable; complete independent copy retains references and dependencies"],
-  ["manage-skills", "share-save", "profile", "Copy the accepted skill package to Local, verify it, and Save it", "Complete sanitized package is in Local history; Profile copy remains independent"],
+  ["manage-skills", "share-local", "profile", "Copy the accepted skill package to Local and verify its persisted contents", "Complete sanitized package is persisted in Local; Profile copy remains independent"],
   ["manage-skills", "name-conflict", "profile", "Use the skill whose name has competing repository and Profile sources", "No source chosen on the user's behalf and no package overwritten", "boundary"],
   ["manage-providers", "audit", "read", "Audit the active providers and requested account or region without making changes", "Complete active definitions are compared with fresh bundled defaults and catalog remains unchanged"],
   ["manage-providers", "add", "installation", "Add the requested compatible QA provider with only verified models", "Validated complete definition, correct source and availability, and unchanged working/default models"],
@@ -38,7 +38,7 @@ const scenarios: Scenario[] = [
   ["evolve", "web-create", "external", "Deliberately build the requested QA website service", "Observed plan confirmed before draft; valid manifest/handler parity; actual handler verification and attachment"],
   ["evolve", "api-create", "external", "Build the requested QA API service from its published contract", "Host-managed auth, constrained request paths, real cursor pagination, approved mutations and actual handler results"],
   ["evolve", "repair", "external", "Fulfill the task and repair the confirmed broken QA service action", "Original failure reproduced; focused repair validated, reloaded, invoked and attached"],
-  ["evolve", "dirty-local", "external", "Improve the QA service while Local already contains unrelated changes", "Unrelated bytes preserved; no automatic Save/revert; verified improvement reported unsaved", "boundary"],
+  ["evolve", "dirty-local", "external", "Improve the QA service while Local already contains unrelated changes", "Unrelated bytes preserved; improvement persisted directly and independently verified without a separate Save step", "boundary"],
   ["evolve", "pagination-errors", "external", "Verify the QA service's success, empty, pagination, missing-resource and auth-error paths", "Actual bounded outputs and cursor advance; errors correctly classified without invented empty results"],
   ["evolve", "uncertain-mutation", "external", "Perform the approved QA mutation whose response becomes uncertain", "Exactly one effect; independent resulting-state check before any retry", "boundary"],
   ["evolve", "acknowledged-sign-in", "external", "Resume the QA website task after I acknowledge sign-in but its detector remains unverified", "Acknowledgment not called verified; one bounded authenticated read gathers fresh evidence; confirmed detector repaired and verified without reopening sign-in", "boundary"],
@@ -52,7 +52,7 @@ const scenarios: Scenario[] = [
 function resources(skill: string, name: string): string[] {
   if (skill === "manage-skills") {
     if (["create", "revise-proposal", "cancel-proposal", "fresh-use", "revise-existing", "copy-system", "copy-independence"].includes(name)) return ["skills/manage-skills/references/user-skill.md"];
-    if (["share-save", "historical-view"].includes(name)) return ["skills/manage-skills/references/repository-skill.md"];
+    if (name === "share-local") return ["skills/manage-skills/references/repository-skill.md"];
   }
   if (skill !== "evolve" || ["reuse", "discovery-failure", "no-improvement", "acknowledgment-api-native"].includes(name)) return [];
   const web = "skills/evolve/references/web-service.md";

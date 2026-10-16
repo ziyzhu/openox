@@ -162,6 +162,6 @@ With an attached Browser capability, an Ox can navigate and inspect a website, p
 2. The Agent uses `ox.fs` to write or revise the service manifest, actions, and repository-root skills in its Local Repository.
 3. The Host validates each source mutation, and the Agent uses `ox.service.attach` to load or reload the service for the conversation.
 4. The Agent can invoke new actions later in the same turn or in subsequent turns. New skills guide subsequent agent work.
-5. Local Git can record the changes for inspection, reversal, and publication.
+5. Local edits persist immediately. Validate and verify the service before using it; there is no separate Save step or built-in version history.
 
 An Ox can therefore gain and apply a capability independently, without rebuilding or updating the Host or Client. Co-evolution is optional: an Ox can publish capabilities to shared repositories and install capabilities created by other Ox.

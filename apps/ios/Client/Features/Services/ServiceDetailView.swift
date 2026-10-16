@@ -70,7 +70,7 @@ struct ServiceDetailView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Deletes this service's editable source from Local. The deletion remains an uncommitted Local Git change, and website sign-ins and data are kept.")
+                Text("Permanently deletes this service's editable source from Local. Website sign-ins and data are kept.")
             }
             .alert("Couldn't delete Local service", isPresented: Binding(
                 get: { localServiceDeleteError != nil },

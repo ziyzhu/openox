@@ -57,16 +57,6 @@ const groups: Record<string, Record<string, string>> = {
     enable: "Change only requested enablement through existing Action policy",
     disconnect: "Disconnect only the QA repository after required confirmation",
   },
-  "repository.git": {
-    status: "Inspect complete Local repository status",
-    log: "Read repository history using returned pagination cursors",
-    show: "Inspect a revision and file without changing the selected view",
-    diff: "Review the requested current or historical diff without changing files",
-    checkout: "Select the requested historical or latest view and report editability",
-    commit: "Save only reviewed, verified, authorized Local changes",
-    revert: "Revert the QA revision after reviewing effects and preserving unrelated work",
-    restore: "Restore only the requested QA draft path after reviewing discarded changes",
-  },
   service: {
     find: "Discover suitable capabilities and distinguish empty search from failed search",
     list: "List services of the requested kind and their actual sources",
@@ -76,7 +66,7 @@ const groups: Record<string, Record<string, string>> = {
     create: "Create only the requested QA Local service draft of the specified kind",
     update: "Update only requested Local configuration or direct MCP fields",
     copy: "Copy an eligible service into Local without replacing existing work",
-    delete: "Delete only the QA Local service after inspecting draft and history",
+    delete: "Delete only the QA Local service after inspecting its current source",
     attach: "Attach or reload the current resolved service and verify usable Actions",
     detach: "Detach only the specified service from this conversation",
     invoke: "Inspect and invoke the Action and independently verify its result",
@@ -142,7 +132,7 @@ const groups: Record<string, Record<string, string>> = {
 };
 
 const installation = new Set(["app.setLanguage", "app.setTheme", "app.setDefaultModel", "provider.save", "provider.delete", "provider.authenticate", "provider.deauthenticate"]);
-const profile = new Set(["conversation.rename", "conversation.setModel", "conversation.start", "conversation.delete", "fs.write", "fs.edit", "fs.delete", "fs.mkdir", "fs.rmdir", "fs.move", "fs.copy", "repository.resolve", "repository.connect", "repository.sync", "repository.enable", "repository.disconnect", "repository.git.checkout", "repository.git.commit", "repository.git.revert", "repository.git.restore", "service.create", "service.update", "service.copy", "service.delete", "service.attach", "service.detach", "skill.create", "skill.copy", "skill.share", "skill.delete", "schedule.create", "schedule.delete", "schedule.enable", "secret.add", "secret.delete"]);
+const profile = new Set(["conversation.rename", "conversation.setModel", "conversation.start", "conversation.delete", "fs.write", "fs.edit", "fs.delete", "fs.mkdir", "fs.rmdir", "fs.move", "fs.copy", "repository.resolve", "repository.connect", "repository.sync", "repository.enable", "repository.disconnect", "service.create", "service.update", "service.copy", "service.delete", "service.attach", "service.detach", "skill.create", "skill.copy", "skill.share", "skill.delete", "schedule.create", "schedule.delete", "schedule.enable", "secret.add", "secret.delete"]);
 const external = new Set(["provider.generate", "service.invoke", "service.signIn", "service.solve", "service.pay", "skill.run", "schedule.run", ...Object.keys(groups["web.browser"]!).map(name => `web.browser.${name}`)]);
 
 export function effectFor(name: string): Effect {
@@ -159,7 +149,6 @@ const journeys: Array<[string, string, string[]]> = [
   ["provider-audit", "Compare the requested active provider and configured models against bundled defaults, identify differences and validate the proposed replacement without saving", ["provider.schema", "provider.default", "provider.get", "provider.models", "provider.validate"]],
   ["provider-migration", "Connect the QA provider, save the verified definition, run a bounded inference check, then disconnect and remove only this run-owned addition", ["provider.authenticate", "provider.save", "provider.generate", "provider.deauthenticate", "provider.delete"]],
   ["repository-onboarding", "Connect and sync the QA repository, enable it, inspect the supplied source conflict, resolve the requested source, then disconnect the run-owned repository", ["repository.connect", "repository.sync", "repository.enable", "repository.conflicts", "repository.resolve", "repository.disconnect"]],
-  ["review-and-save", "Review Local status, history and current diff, inspect the prior revision, return to latest, Save the approved QA change, then revert that commit and restore only the remaining run-owned draft", ["repository.git.status", "repository.git.log", "repository.git.diff", "repository.git.show", "repository.git.checkout", "repository.git.commit", "repository.git.revert", "repository.git.restore"]],
   ["service-discovery", "Find the capability for the supplied task, compare available sources, inspect its contract, attach it, verify the attachment, invoke it and detach after independently checking the outcome", ["service.find", "service.list", "service.inspect", "service.attach", "service.listAttached", "service.invoke", "service.detach"]],
   ["service-draft-lifecycle", "Create the requested Local QA service, validate and correct its draft, make the requested independent copy, then delete only the disposable run-owned copy", ["service.create", "service.validate", "service.update", "service.copy", "service.delete"]],
   ["authenticated-task", "Complete the supplied signed-in QA account task using the supported sign-in handoff and authoritative session evidence", ["service.signIn"]],

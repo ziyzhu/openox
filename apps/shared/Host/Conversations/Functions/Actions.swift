@@ -63,14 +63,6 @@ nonisolated enum Actions {
     static let repositorySync = "ox.repository.sync"
     static let repositoryEnable = "ox.repository.enable"
     static let repositoryDisconnect = "ox.repository.disconnect"
-    static let repositoryGitStatus = "ox.repository.git.status"
-    static let repositoryGitLog = "ox.repository.git.log"
-    static let repositoryGitShow = "ox.repository.git.show"
-    static let repositoryGitDiff = "ox.repository.git.diff"
-    static let repositoryGitCheckout = "ox.repository.git.checkout"
-    static let repositoryGitCommit = "ox.repository.git.commit"
-    static let repositoryGitRevert = "ox.repository.git.revert"
-    static let repositoryGitRestore = "ox.repository.git.restore"
     static let serviceAttach = "ox.service.attach"
     static let serviceSignIn = "ox.service.signIn"
     static let serviceSolve = "ox.service.solve"
@@ -108,9 +100,7 @@ nonisolated enum Actions {
         serviceFind, serviceList, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryEnable, repositoryDisconnect,
         repositoryConflicts, repositoryResolve,
-        repositoryGitStatus, repositoryGitLog,
-        repositoryGitShow, repositoryGitDiff, repositoryGitCheckout, repositoryGitCommit, repositoryGitRevert,
-        repositoryGitRestore, serviceAttach, serviceSignIn, serviceSolve, servicePayment, serviceDetach,
+        serviceAttach, serviceSignIn, serviceSolve, servicePayment, serviceDetach,
         skillCreate, skillCopy, skillDelete, skillShare,
         scheduleCreate, scheduleList, scheduleDelete, scheduleEnable, scheduleRun,
         memoryRead, memoryWrite, memoryReplaceText,
@@ -180,13 +170,6 @@ nonisolated enum Actions {
         case repositorySync: L10n.string("Sync")
         case repositoryEnable: L10n.string("Repositories")
         case repositoryDisconnect: L10n.string("Remove Repository")
-        case repositoryGitStatus, repositoryGitDiff: L10n.string("Check repository changes")
-        case repositoryGitLog: L10n.string("Read repository history")
-        case repositoryGitShow: L10n.string("Read a saved repository version")
-        case repositoryGitCheckout: L10n.string("View a saved repository version")
-        case repositoryGitCommit: L10n.string("Save Local repository")
-        case repositoryGitRevert: L10n.string("Undo a saved Local version")
-        case repositoryGitRestore: L10n.string("Discard Local changes")
         case serviceAttach: L10n.string("Attach a service")
         case serviceSignIn: L10n.string("Service sign-in")
         case serviceSolve: L10n.string("Service verification")

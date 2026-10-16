@@ -18,9 +18,9 @@ Both paths use the same Ox authoring workflow. Built-in services usually evolve 
 Read the `ios-simulator` and `ox-cli` skills for simulator operation and conversation control. Use the user-selected simulator and its assigned Host endpoint; follow the repository's simulator setup and data-preservation rules.
 
 1. Establish the requested service outcome and whether delivery is Local or built-in. A request to add or update a built-in service authorizes preparing its promotion after live verification; a Local-only request does not authorize publication.
-2. Build, install, and launch the app as needed. Drive a real Ox conversation through `skills/evolve/SKILL.md` for discovery, exploration, action design, implementation, repair, and live verification. Follow its current planning, authentication, attachment, mutation, and Save boundaries.
+2. Build, install, and launch the app as needed. Drive a real Ox conversation through `skills/evolve/SKILL.md` for discovery, exploration, action design, implementation, repair, and live verification. Follow its current planning, authentication, attachment, and mutation boundaries.
 3. Observe the user-visible flow with `idb` and inspect conversation history and structured logs with `ox`. Look for unclear prompts, repeated failures, missing capabilities, unnecessary confirmations, poor recovery, and gaps in diagnostics or verification.
-4. Notify developers of actionable findings as they emerge. Fix supported harness issues within the task's scope, rebuild as needed, and exercise the affected flow through Ox again. Return service defects and compiler diagnostics to Ox for repair and a newly verified saved revision.
+4. Notify developers of actionable findings as they emerge. Fix supported harness issues within the task's scope, rebuild as needed, and exercise the affected flow through Ox again. Return service defects and compiler diagnostics to Ox for repair and newly verified source.
 5. Follow Choose a favicon in Ox’s `skills/evolve/references/web-service.md` for every new service. Inspect screenshots of one actual small avatar in both themes and keep evidence outside the repository. Return failed candidates to Ox for repair; report unavailable visual verification as incomplete. Built-in promotion additionally follows `references/promotion.md`.
 6. Verify the requested outcome through actual service actions, including applicable authentication and handoff boundaries. Browser success alone does not verify a handler. Preserve evidence outside the repository and disclose unexecuted or partially verified actions.
 
@@ -36,8 +36,8 @@ Use the current session as the notification destination unless the user specifie
 
 ## Deliver the service
 
-For Local delivery, finish the built-in `evolve` verification and Save workflow, then report the capability delivered, checks performed, limitations, and authoring-loop findings or fixes.
+For Local delivery, finish the built-in `evolve` verification workflow, then report the capability delivered, checks performed, limitations, and authoring-loop findings or fixes.
 
-For requested built-in web-service delivery, read [references/promotion.md](references/promotion.md) after Ox has produced a verified, saved Local revision. Follow its export, live verification, icon, bundle, and release checks. The exact saved Local implementation is the behavioral source of truth; promotion packages it without creating a second implementation.
+For requested built-in web-service delivery, read [references/promotion.md](references/promotion.md) after Ox has produced verified Local source. Follow its export, live verification, icon, bundle, and release checks. The exact verified Local implementation is the behavioral source of truth; promotion packages it without creating a second implementation.
 
 Do not commit repository changes unless the user requests it. Report service delivery and developer findings separately so a working service does not hide remaining loop issues.

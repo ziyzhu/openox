@@ -17,7 +17,7 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | `bun run build:host-schema` | Regenerate Host RPC JSON/Swift artifacts. |
 | `bun run build:repository-schema` | Regenerate repository JSON/Swift artifacts. |
 | `bun run build:provider-schema` | Regenerate provider definitions schema. |
-| `bun run build:services` | Rebuild bundled services, Local Git seed, and model-action resources. |
+| `bun run build:services` | Rebuild bundled services and model-action resources. |
 | `bun run generate:ios` / `bun run generate:macos` | Generate Xcode projects from each app's `project.yml`; include generated iOS changes for Xcode Cloud. |
 | `bun run build:macos` | Generate the native host-only project with XcodeGen and build for macOS 26+. |
 | `bun run build:agent` | Rebuild native bundles, the portable prompt renderer, default SOUL, package-owned bundled skills, and TS-owned `ModelGuidance.generated.swift`. |
@@ -38,7 +38,7 @@ follow the `providers` skill rather than a second catalog-management workflow.
 `apps/shared/Resources/OxServices.bundle/` is the single built-in repository source.
 Both native targets compile `apps/shared` and their own platform sources; neither compiles the other app. `typecheck` enforces this boundary and rejects OS conditionals in native Swift sources. Keep shared/platform Swift filenames distinct: localization extraction writes their `.stringsdata` outputs into the same target directory.
 `build:services` validates it, refreshes its content hash without rewriting service
-files, and creates a deterministic Local Git seed and model-action resources.
+files, and generates model-action resources.
 Package builds copy this source.
 It is a build operation, not live service verification. Bundled installers register handlers through `window.ox.install`; the Host runtime owns dispatch and error logging. Do not replace `window.ox` or retain a second dispatcher.
 Native targets default to MainActor with approachable concurrency. Use worker actors or `@concurrent` async helpers for CPU work and synchronous I/O; `nonisolated async` and inherited `Task` closures alone do not establish an off-main boundary. Publish observable state on MainActor after validating the captured scope or revision.

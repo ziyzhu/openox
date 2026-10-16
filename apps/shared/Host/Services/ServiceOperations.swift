@@ -352,13 +352,6 @@ final class ServiceOperations {
         }
     }
 
-    func repositoryGitStatus(repository: String, purpose: String) async throws -> JSONValue? {
-        let repository = try repositoryID(repository, function: "status")
-        return try await tracked(Actions.repositoryGitStatus, .object(["repository": .string(repository)]), purpose: purpose) {
-            try Self.encodeToJSON(try await self.serviceManager.repositoryGitStatus(repositoryID: repository))
-        }
-    }
-
     func repositoryConflicts(service: String?, purpose: String) async throws -> JSONValue? {
         let args: JSONValue = .object(service.map { ["service": .string($0)] } ?? [:])
         return try await tracked(Actions.repositoryConflicts, args, purpose: purpose) {
@@ -498,135 +491,6 @@ final class ServiceOperations {
                 "skillCount": .int(synced.skills.count),
                 "synced": .bool(true),
             ])
-        }
-    }
-
-    func repositoryGitLog(
-        repository: String,
-        limit: Int,
-        cursor: String?,
-        purpose: String
-    ) async throws -> JSONValue? {
-        let repository = try repositoryID(repository, function: "log")
-        guard (1...100).contains(limit) else {
-            throw RuntimeError.bridge("ox.repository.git.log: limit must be between 1 and 100")
-        }
-        var fields: [String: JSONValue] = [
-            "repository": .string(repository),
-            "limit": .int(limit),
-        ]
-        if let cursor { fields["cursor"] = .string(cursor) }
-        return try await tracked(Actions.repositoryGitLog, .object(fields), purpose: purpose) {
-            try Self.encodeToJSON(try await self.serviceManager.repositoryGitLog(
-                repositoryID: repository,
-                limit: limit,
-                cursor: cursor
-            ))
-        }
-    }
-
-    func repositoryGitShow(
-        repository: String,
-        commitHash: String,
-        path: String?,
-        purpose: String
-    ) async throws -> JSONValue? {
-        let repository = try repositoryID(repository, function: "show")
-        var fields: [String: JSONValue] = [
-            "repository": .string(repository),
-            "commitHash": .string(commitHash),
-        ]
-        if let path { fields["path"] = .string(path) }
-        return try await tracked(Actions.repositoryGitShow, .object(fields), purpose: purpose) {
-            try Self.encodeToJSON(try await self.serviceManager.repositoryGitShow(
-                repositoryID: repository,
-                commitHash: commitHash,
-                path: path
-            ))
-        }
-    }
-
-    func repositoryGitDiff(
-        repository: String,
-        commitHash: String?,
-        baseCommitHash: String?,
-        path: String?,
-        purpose: String
-    ) async throws -> JSONValue? {
-        let repository = try repositoryID(repository, function: "diff")
-        guard commitHash != nil || baseCommitHash == nil else {
-            throw RuntimeError.bridge("ox.repository.git.diff: commitHash is required when baseCommitHash is provided")
-        }
-        var fields: [String: JSONValue] = ["repository": .string(repository)]
-        if let commitHash { fields["commitHash"] = .string(commitHash) }
-        if let baseCommitHash { fields["baseCommitHash"] = .string(baseCommitHash) }
-        if let path { fields["path"] = .string(path) }
-        return try await tracked(Actions.repositoryGitDiff, .object(fields), purpose: purpose) {
-            try Self.encodeToJSON(try await self.serviceManager.repositoryGitDiff(
-                repositoryID: repository,
-                commitHash: commitHash,
-                baseCommitHash: baseCommitHash,
-                path: path
-            ))
-        }
-    }
-
-    func repositoryGitCheckout(repository: String, commitHash: String, purpose: String) async throws -> JSONValue? {
-        let repository = try repositoryID(repository, function: "checkout")
-        let args: JSONValue = .object([
-            "repository": .string(repository),
-            "commitHash": .string(commitHash),
-        ])
-        return try await tracked(Actions.repositoryGitCheckout, args, purpose: purpose) {
-            return try Self.encodeToJSON(try await self.serviceManager.checkoutRepository(
-                repositoryID: repository,
-                commitHash: commitHash,
-                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
-            ))
-        }
-    }
-
-    func repositoryGitCommit(message: String, purpose: String) async throws -> JSONValue? {
-        let message = try serviceCommitMessage(message, function: "commit")
-        let args: JSONValue = .object(["message": .string(message)])
-        return try await tracked(Actions.repositoryGitCommit, args, purpose: purpose) {
-            return try Self.encodeToJSON(try await self.serviceManager.commitLocalRepository(
-                message: message,
-                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
-            ))
-        }
-    }
-
-    func repositoryGitRevert(commitHash: String, message: String, purpose: String) async throws -> JSONValue? {
-        let message = try serviceCommitMessage(message, function: "revert")
-        let args: JSONValue = .object([
-            "commitHash": .string(commitHash),
-            "message": .string(message),
-        ])
-        return try await tracked(Actions.repositoryGitRevert, args, purpose: purpose) {
-            return try Self.encodeToJSON(try await self.serviceManager.revertLocalRepository(
-                commitHash: commitHash,
-                message: message,
-                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
-            ))
-        }
-    }
-
-    func repositoryGitRestore(path: String?, purpose: String) async throws -> JSONValue? {
-        let path = try path.map(serviceRestorePath)
-        let status = try await serviceManager.repositoryGitStatus(repositoryID: Repository.localID)
-        var fields: [String: JSONValue] = [
-            "staged": .array(status.staged.map(JSONValue.string)),
-            "unstaged": .array(status.unstaged.map(JSONValue.string)),
-            "untracked": .array(status.untracked.map(JSONValue.string)),
-        ]
-        if let path { fields["path"] = .string(path) }
-        let args: JSONValue = .object(fields)
-        return try await tracked(Actions.repositoryGitRestore, args, purpose: purpose) {
-            return try Self.encodeToJSON(try await self.serviceManager.restoreLocalRepository(
-                path: path,
-                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
-            ))
         }
     }
 
@@ -801,31 +665,6 @@ final class ServiceOperations {
             }
             return result
         }
-    }
-
-    private func repositoryID(_ value: String, function: String) throws -> String {
-        let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard clean == Repository.localID else {
-            throw RuntimeError.bridge("ox.repository.git.\(function): repository must be 'local'")
-        }
-        return clean
-    }
-
-    private func serviceRestorePath(_ value: String) throws -> String {
-        let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        let path = clean.hasPrefix("services/") ? String(clean.dropFirst("services/".count)) : clean
-        guard !path.isEmpty else {
-            throw RuntimeError.bridge("ox.repository.git.restore: path cannot be empty")
-        }
-        return path
-    }
-
-    private func serviceCommitMessage(_ value: String, function: String) throws -> String {
-        let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !clean.isEmpty, clean.count <= 500 else {
-            throw RuntimeError.bridge("ox.repository.git.\(function): message must contain 1-500 characters")
-        }
-        return clean
     }
 
     private func serviceSnapshot(_ service: Service) throws -> JSONValue {
