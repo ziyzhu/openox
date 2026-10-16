@@ -41,6 +41,8 @@ final class ProviderRegistry {
     private var catalog: ProviderCatalog
     private var catalogAvailable = true
     private var discovered: [String: DiscoveredModels]
+    private var modelCatalog: ProviderModelCatalog?
+    private var modelCatalogRefresh: Task<Void, Never>?
     private(set) var allClients: [any ProviderClient] = []
     private(set) var defaultModel: ModelSelection?
 
@@ -48,6 +50,7 @@ final class ProviderRegistry {
         bundled = Self.bundledDefinitions()
         discovered = UserDefaults.standard.data(forKey: Self.discoveredModelsKey)
             .flatMap { try? JSONDecoder().decode([String: DiscoveredModels].self, from: $0) } ?? [:]
+        modelCatalog = ProviderModelCatalog.load()
         do {
             if let data = UserDefaults.standard.data(forKey: Self.catalogKey) {
                 catalog = try JSONDecoder().decode(ProviderCatalog.self, from: data)
@@ -97,7 +100,8 @@ final class ProviderRegistry {
               let discovery = entry.discovery else {
             throw RuntimeError.bridge("Model discovery is unavailable for this provider")
         }
-        let models = try await discovery.models(for: entry.definition)
+        await refreshModelCatalogIfStale()
+        let models = try await discovery.models(for: entry.definition, known: modelCatalog?.models(for: discovery.catalog) ?? [:])
         discovered[id] = DiscoveredModels(fetchedAt: Date(), models: models)
         UserDefaults.standard.set(try JSONEncoder().encode(discovered), forKey: Self.discoveredModelsKey)
         rebuildClients()
@@ -110,6 +114,26 @@ final class ProviderRegistry {
               discovered[id].map({ Date().timeIntervalSince($0.fetchedAt) > Self.discoveryInterval }) ?? true else { return }
         do { try await refreshModels(id: id) }
         catch { Log.agent.warning("ProviderRegistry.discover provider=\(id) error=\(error.localizedDescription)") }
+    }
+
+    private func refreshModelCatalogIfStale() async {
+        if let modelCatalogRefresh { return await modelCatalogRefresh.value }
+        let names = Set(bundled.compactMap { $0.discovery?.catalog })
+        guard modelCatalog?.isStale(for: names) ?? true else { return }
+        let cached = modelCatalog
+        let refresh = Task {
+            do {
+                let next = try await ProviderModelCatalog.fetch(names, revalidating: cached)
+                modelCatalog = next
+                try next.save()
+                Log.agent.info("ProviderRegistry.modelCatalog catalogs=\(next.catalogs.count) models=\(next.catalogs.values.reduce(0) { $0 + $1.count })")
+            } catch {
+                Log.agent.warning("ProviderRegistry.modelCatalog error=\(error.localizedDescription)")
+            }
+        }
+        modelCatalogRefresh = refresh
+        await refresh.value
+        modelCatalogRefresh = nil
     }
 
     func refreshStaleModels() async {

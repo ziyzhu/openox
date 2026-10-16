@@ -23,7 +23,7 @@ nonisolated struct ProviderModelDiscovery: Codable, Equatable, Sendable {
     var catalog: String?
     var rules: [Rule]?
 
-    func models(for definition: ProviderDefinition) async throws -> [ProviderDefinition.Model] {
+    func models(for definition: ProviderDefinition, known: [String: ProviderModel]) async throws -> [ProviderDefinition.Model] {
         let (data, response) = try await URLSession.shared.data(for: try await request(for: definition))
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
         guard (200..<300).contains(status) else {
@@ -33,7 +33,6 @@ nonisolated struct ProviderModelDiscovery: Codable, Equatable, Sendable {
               let entries = body[format.listKey] as? [[String: Any]] else {
             throw RuntimeError.bridge("The provider returned a malformed model list")
         }
-        let known = ProviderModelCatalog.models(for: catalog)
         return entries.compactMap { model($0, known: known) }
     }
 
@@ -143,18 +142,80 @@ nonisolated struct ProviderModelDiscovery: Codable, Equatable, Sendable {
     }
 }
 
-nonisolated enum ProviderModelCatalog {
-    private static let snapshot: [String: [ProviderModel]] = {
-        guard let url = Bundle.main.url(forResource: "provider-catalog", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let snapshot = try? JSONDecoder().decode([String: [ProviderModel]].self, from: data) else {
-            Log.agent.error("ProviderModelCatalog snapshot unavailable")
-            return [:]
-        }
-        return snapshot
-    }()
+nonisolated struct ProviderModelCatalog: Codable, Sendable {
+    private static let source = URL(string: "https://models.dev/catalog.json")!
+    private static let refreshInterval: TimeInterval = 24 * 60 * 60
 
-    static func models(for catalog: String?) -> [String: ProviderModel] {
-        Dictionary((catalog.flatMap { snapshot[$0] } ?? []).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    var etag: String?
+    var fetchedAt: Date
+    var catalogs: [String: [ProviderModel]]
+
+    static func load() -> ProviderModelCatalog? {
+        try? JSONDecoder().decode(ProviderModelCatalog.self, from: Data(contentsOf: AppStoragePaths.providerModelCatalog))
+    }
+
+    func save() throws {
+        try FileManager.default.createDirectory(at: AppStoragePaths.caches, withIntermediateDirectories: true)
+        try JSONEncoder().encode(self).write(to: AppStoragePaths.providerModelCatalog, options: .atomic)
+    }
+
+    func covers(_ names: Set<String>) -> Bool {
+        names.isSubset(of: Set(catalogs.keys))
+    }
+
+    func isStale(for names: Set<String>) -> Bool {
+        !covers(names) || Date().timeIntervalSince(fetchedAt) > Self.refreshInterval
+    }
+
+    func models(for name: String?) -> [String: ProviderModel] {
+        Dictionary((name.flatMap { catalogs[$0] } ?? []).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    static func fetch(_ names: Set<String>, revalidating cached: ProviderModelCatalog?) async throws -> ProviderModelCatalog {
+        var request = URLRequest(url: source, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 60)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let cached, cached.covers(names), let etag = cached.etag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let http = response as? HTTPURLResponse
+        let status = http?.statusCode ?? -1
+        Log.network.info("ProviderModelCatalog.fetch status=\(status) bytes=\(data.count)")
+        if status == 304, var cached {
+            cached.fetchedAt = Date()
+            return cached
+        }
+        guard (200..<300).contains(status) else { throw RuntimeError.bridge("The model catalog returned HTTP \(status)") }
+        guard let providers = (try JSONSerialization.jsonObject(with: data) as? [String: Any])?["providers"] as? [String: Any] else {
+            throw RuntimeError.bridge("The model catalog is malformed")
+        }
+        let catalogs = Dictionary(uniqueKeysWithValues: names.map { name in
+            let models = (providers[name] as? [String: Any])?["models"] as? [String: Any] ?? [:]
+            return (name, models.compactMap { model(id: $0.key, $0.value as? [String: Any]) }.sorted { $0.id < $1.id })
+        })
+        return ProviderModelCatalog(etag: http?.value(forHTTPHeaderField: "ETag"), fetchedAt: Date(), catalogs: catalogs)
+    }
+
+    private static func model(id: String, _ entry: [String: Any]?) -> ProviderModel? {
+        guard let entry, entry["tool_call"] as? Bool == true, (entry["status"] as? String).map({ $0 == "active" }) ?? true else { return nil }
+        let modalities = entry["modalities"] as? [String: Any]
+        let input = Set((modalities?["input"] as? [String] ?? []).compactMap(ProviderModelModality.init(rawValue:)))
+        let output = Set((modalities?["output"] as? [String] ?? []).compactMap(ProviderModelModality.init(rawValue:)))
+        let limit = entry["limit"] as? [String: Any]
+        guard input.contains(.text), output.contains(.text),
+              let context = limit?["context"] as? Int, context > 0,
+              let maxOutput = limit?["output"] as? Int, maxOutput > 0 else { return nil }
+        let efforts = (entry["reasoning_options"] as? [[String: Any]] ?? [])
+            .filter { $0["type"] as? String == "effort" }
+            .flatMap { $0["values"] as? [Any] ?? [] }
+            .compactMap { $0 as? String }
+        return ProviderModel(
+            id: id,
+            displayName: (entry["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? id,
+            maxTokens: min(maxOutput, context),
+            maxContext: context,
+            supportsTools: true,
+            reasoning: entry["reasoning"] as? Bool ?? false,
+            reasoningEfforts: efforts,
+            modalities: ProviderModelModalities(input: input, output: output)
+        )
     }
 }

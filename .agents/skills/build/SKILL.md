@@ -1,6 +1,6 @@
 ---
 name: build
-description: Build bundled OpenOx services, regenerate protocol/provider schemas, refresh selected provider models, and run repository static checks and TypeScript validation. Use for generated-artifact maintenance or build/check failures; verification belongs to test and publication to release.
+description: Build bundled OpenOx services, regenerate protocol/provider schemas, and run repository static checks and TypeScript validation. Use for generated-artifact maintenance or build/check failures; verification belongs to test and publication to release.
 ---
 
 # Build
@@ -21,7 +21,6 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | `bun run generate:ios` / `bun run generate:macos` | Generate Xcode projects from each app's `project.yml`; include generated iOS changes for Xcode Cloud. |
 | `bun run build:macos` | Generate the native host-only project with XcodeGen and build for macOS 26+. |
 | `bun run build:agent` | Rebuild native bundles, the portable prompt renderer, default SOUL, package-owned bundled skills, and TS-owned `ModelGuidance.generated.swift`. |
-| `bun run update:llms` | Snapshot models.dev capabilities for the catalogs `providers.json` references; requires network access. |
 
 `typecheck` validates public/private-content boundaries, iOS Client-Host layering,
 protocol schema consistency, unsafe absolute-path slicing, bundled skill packages and links, translations, provider models,

@@ -21,6 +21,7 @@ nonisolated enum AppStoragePaths {
     static let deviceFolderGrants = applicationSupport.appendingPathComponent("device-folder-grants.json", isDirectory: false)
     static let scheduledSkills = applicationSupport.appendingPathComponent("scheduled-skills.json", isDirectory: false)
     static let serviceSearchVectors = caches.appendingPathComponent("ServiceSearchVectors.plist", isDirectory: false)
+    static let providerModelCatalog = caches.appendingPathComponent("ProviderModelCatalog.json", isDirectory: false)
 
     static func externalProfiles(in support: URL) -> URL {
         support.appendingPathComponent("external-profiles.json", isDirectory: false)

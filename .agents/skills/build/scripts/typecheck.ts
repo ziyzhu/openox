@@ -4,13 +4,13 @@ import { check as hostPlatforms } from "./host-platform-boundary-check.ts";
 import { check as hostSchema } from "./host-rpc-contract.ts";
 import { check as repositoryContract } from "./repository-contract.ts";
 import { check as localizations } from "./localization-check.ts";
-import { check as providerModels } from "./provider-models.ts";
+import { check as providers } from "./providers.ts";
 import { check as providerSchema } from "./provider-definitions.ts";
 import { check as publicBoundary } from "./public-boundary-check.ts";
 import { check as filesystemPaths } from "./filesystem-path-check.ts";
 import { check as skills } from "./skills-check.ts";
 
-for (const check of [publicBoundary, hostPlatforms, hostContract, hostSchema, repositoryContract, filesystemPaths, skills, localizations, providerModels, providerSchema]) {
+for (const check of [publicBoundary, hostPlatforms, hostContract, hostSchema, repositoryContract, filesystemPaths, skills, localizations, providers, providerSchema]) {
   await runCheck(check);
 }
 
