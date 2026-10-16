@@ -175,7 +175,6 @@ struct CustomLLMProviderEditor: View {
 
     private var providerFields: some View {
         SettingsSection(
-            "Provider",
             footer: "Addresses without a path use /v1. On a physical iPhone, use the server computer's local hostname or IP address, not localhost.",
             layout: .group
         ) {

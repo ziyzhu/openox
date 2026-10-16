@@ -68,7 +68,6 @@ struct ActionSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 SettingsSection(
-                    "Default",
                     footer: "By default, built-in Ox Actions are allowed except deletion. Services and devices use their declared defaults. Ask, Allow, or Block overrides that behavior for all Actions. More specific choices take priority.",
                     layout: .group
                 ) {
@@ -82,7 +81,7 @@ struct ActionSettingsView: View {
                     .settingsRowPadding()
                 }
 
-                SettingsSection("Actions", layout: .group) {
+                SettingsSection(layout: .group) {
                     VStack(spacing: 0) {
                         NavigationLink {
                             BuiltInActionSettingsView()
@@ -207,7 +206,7 @@ struct BuiltInActionSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
-                SettingsSection("Default for Ox Actions") {
+                SettingsSection {
                     ActionPolicyPicker(
                         title: "All Built-in Actions",
                         selection: serviceManager.sourcePolicy(for: "ox"),
@@ -217,7 +216,7 @@ struct BuiltInActionSettingsView: View {
                     )
                 }
 
-                SettingsSection("Categories", layout: .group) {
+                SettingsSection(layout: .group) {
                     VStack(spacing: 0) {
                         ForEach(Array(BuiltInActionGroup.allCases.enumerated()), id: \.element) { index, group in
                             if index > 0 { Divider().settingsContentInset() }
@@ -247,7 +246,7 @@ private struct BuiltInActionGroupSettingsView: View {
 
     var body: some View {
         ScrollView {
-            SettingsSection("Actions", layout: .group) {
+            SettingsSection(layout: .group) {
                 VStack(spacing: 0) {
                     ForEach(Array(group.actions.enumerated()), id: \.element) { index, action in
                         if index > 0 { Divider().settingsContentInset() }
@@ -295,7 +294,7 @@ struct ServiceActionSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
-                SettingsSection("Default for This Service") {
+                SettingsSection {
                     ActionPolicyPicker(
                         title: "All Service Actions",
                         selection: serviceManager.sourcePolicy(for: source),
@@ -305,7 +304,7 @@ struct ServiceActionSettingsView: View {
                     )
                 }
 
-                SettingsSection("Actions", layout: .group) {
+                SettingsSection(layout: .group) {
                     VStack(spacing: 0) {
                         serviceActionRow(
                             title: String(localized: "Attach to a conversation"),

@@ -63,11 +63,6 @@ struct RepositoriesView: View {
 
     private var repositoriesSection: some View {
         VStack(alignment: .leading, spacing: SettingsLayout.headerSpacing) {
-            Text("Repositories")
-                .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .settingsSectionHeaderInset()
-
             if let message = errorMessage {
                 SettingsErrorMessage(message: message, systemImage: "exclamationmark.circle.fill")
                     .accessibilityIdentifier(A11yID.Settings.repositoryStatus)
@@ -265,7 +260,6 @@ private struct AddRepositoryView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                     SettingsSection(
-                        "Git Repository",
                         footer: "The repository must be public, use HTTPS, and contain repository.json at its root."
                     ) {
                         TextField("https://github.com/example/services.git", text: $draft)
@@ -361,11 +355,6 @@ struct RepositoryDetailView: View {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 if let repository {
                     VStack(alignment: .leading, spacing: SettingsLayout.headerSpacing) {
-                        Text("Repository")
-                            .font(Theme.Fonts.labelMd)
-                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                            .settingsSectionHeaderInset()
-
                         if let message = errorMessage {
                             SettingsErrorMessage(message: message, systemImage: "exclamationmark.circle.fill")
                         }
@@ -516,7 +505,7 @@ struct RepositoryDetailView: View {
     }
 
     private var removalSection: some View {
-        SettingsSection("Manage", layout: .row) {
+        SettingsSection(layout: .row) {
             Button(role: .destructive) {
                 confirmingRemoval = true
             } label: {
@@ -535,7 +524,7 @@ struct RepositoryDetailView: View {
     }
 
     private var localExportSection: some View {
-        SettingsSection("Manage", layout: .row) {
+        SettingsSection(layout: .row) {
             Button {
                 prepareLocalExport()
             } label: {

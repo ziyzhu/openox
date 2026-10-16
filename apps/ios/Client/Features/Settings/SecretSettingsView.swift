@@ -106,7 +106,7 @@ private struct SecretEntryDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 if entry != nil {
-                    SettingsSection("Fields", layout: .group) {
+                    SettingsSection(layout: .group) {
                         VStack(spacing: 0) {
                             if let fields {
                                 ForEach(Array(fields.enumerated()), id: \.element.id) { index, field in
@@ -255,7 +255,7 @@ private struct SecretEntryEditorView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
-                    SettingsSection("Entry", layout: .group) {
+                    SettingsSection(layout: .group) {
                         VStack(spacing: 0) {
                             if entry == nil {
                                 TextField("Key", text: $key)

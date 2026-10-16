@@ -167,7 +167,6 @@ struct SettingsSheet: View {
                     }
 
                     SettingsSection(
-                        "Models",
                         footer: "Used for new conversations. Existing conversations keep their model.",
                         layout: .group
                     ) {
@@ -194,44 +193,48 @@ struct SettingsSheet: View {
 
                     HostSettingsSection()
 
-                    SettingsSection("Language") {
-                        Menu {
-                            Picker(selection: languageBinding) {
-                                ForEach(AppLocale.Language.allCases, id: \.self) { language in
-                                    Text(language.displayName).tag(language)
-                                }
-                            } label: {
-                                EmptyView()
-                            }
-                        } label: {
-                            SettingsValueRow(
-                                value: Text(verbatim: appLocale.language.displayName),
-                                indicator: "chevron.up.chevron.down"
-                            )
-                        }
-                        .accessibilityIdentifier(A11yID.Settings.language)
-                    }
-
-                    SettingsSection("Theme") {
-                        Menu {
-                            Picker(selection: themeBinding) {
-                                ForEach(AppTheme.allCases) { theme in
-                                    Text(theme.displayName).tag(theme)
-                                }
-                            } label: {
-                                EmptyView()
-                            }
-                        } label: {
-                            SettingsValueRow(
-                                value: Text(theme.theme.displayName),
-                                indicator: "chevron.up.chevron.down"
-                            )
-                        }
-                        .accessibilityIdentifier(A11yID.Settings.theme)
-                    }
-
-                    SettingsSection("App", layout: .group) {
+                    SettingsSection(layout: .group) {
                         VStack(spacing: 0) {
+                            Menu {
+                                Picker(selection: languageBinding) {
+                                    ForEach(AppLocale.Language.allCases, id: \.self) { language in
+                                        Text(language.displayName).tag(language)
+                                    }
+                                } label: {
+                                    EmptyView()
+                                }
+                            } label: {
+                                SettingsDisclosureRow(
+                                    title: "Language",
+                                    value: Text(verbatim: appLocale.language.displayName),
+                                    indicator: "chevron.up.chevron.down"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier(A11yID.Settings.language)
+
+                            Divider().settingsContentInset()
+
+                            Menu {
+                                Picker(selection: themeBinding) {
+                                    ForEach(AppTheme.allCases) { theme in
+                                        Text(theme.displayName).tag(theme)
+                                    }
+                                } label: {
+                                    EmptyView()
+                                }
+                            } label: {
+                                SettingsDisclosureRow(
+                                    title: "Theme",
+                                    value: Text(theme.theme.displayName),
+                                    indicator: "chevron.up.chevron.down"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier(A11yID.Settings.theme)
+
+                            Divider().settingsContentInset()
+
                             NavigationLink {
                                 NotificationSetupView()
                             } label: {
@@ -239,19 +242,19 @@ struct SettingsSheet: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier(A11yID.Settings.notifications)
+                        }
+                    }
 
-                            Divider().settingsContentInset()
-
+                    SettingsSection(layout: .group) {
+                        VStack(spacing: 0) {
                             Button { showOnboarding = true } label: {
                                 SettingsDisclosureRow(title: "Take the tour", value: Text(""))
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier(A11yID.Settings.howItWorks)
-                        }
-                    }
 
-                    SettingsSection("Community", layout: .group) {
-                        VStack(spacing: 0) {
+                            Divider().settingsContentInset()
+
                             Link(destination: OxLinks.discord) {
                                 SettingsDisclosureRow(
                                     title: "Discord",
@@ -345,7 +348,7 @@ struct SettingsSheet: View {
     }
 
     private var capabilitiesSettingsSection: some View {
-        SettingsSection("Capabilities", layout: .group) {
+        SettingsSection(layout: .group) {
             VStack(spacing: 0) {
                 NavigationLink {
                     ActionSettingsView()
@@ -640,27 +643,31 @@ struct ModelPickerContent: View {
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .settingsContentInset()
                     }
-                    if !isAuthenticating {
-                        selectionSection("Region") { regionMenu }
-                            .id("model-configuration-top")
-                    }
-                    selectionSection("Provider") {
+                    selectionGroup {
+                        if !isAuthenticating {
+                            regionMenu
+                            Divider().settingsContentInset()
+                        }
                         if case .authentication(let session) = mode {
-                            selectionRow(session.client.displayName, indicator: nil)
+                            selectionRow("Provider", session.client.displayName, indicator: nil)
                         } else {
                             providerMenu
                         }
                     }
+                    .id("model-configuration-top")
                     if providerSelection == .custom && !isAuthenticating {
                         customConnectionSection
                         customAuthenticationSection
-                        selectionSection("Model") { customModelControl }
+                        selectionGroup { customModelControl }
                     } else if let selectedClient {
                         authenticationSection(selectedClient)
                         if !isAuthenticating, isAuthenticated {
-                            selectionSection("Model") { modelMenu }
-                            if !reasoningEfforts.isEmpty {
-                                selectionSection("Thinking level") { reasoningEffortMenu }
+                            selectionGroup {
+                                modelMenu
+                                if !reasoningEfforts.isEmpty {
+                                    Divider().settingsContentInset()
+                                    reasoningEffortMenu
+                                }
                             }
                         }
                     }
@@ -700,7 +707,7 @@ struct ModelPickerContent: View {
                 }
             }
         } label: {
-            selectionRow(selectedRegion.displayName)
+            selectionRow("Region", selectedRegion.displayName)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Region")
@@ -710,7 +717,7 @@ struct ModelPickerContent: View {
 
     private var providerMenu: some View {
         Button { choosingProvider = true } label: {
-            selectionRow(providerSelection == .custom
+            selectionRow("Provider", providerSelection == .custom
                 ? "Custom provider"
                 : selectedClient?.displayName ?? "Choose a provider",
                 indicator: "chevron.right")
@@ -782,7 +789,7 @@ struct ModelPickerContent: View {
                 Text(verbatim: providerModelsError ?? "")
             }
         } label: {
-            selectionRow(selectedModel?.displayName ?? "No models available", indicator: "chevron.right")
+            selectionRow("Model", selectedModel?.displayName ?? "No models available", indicator: "chevron.right")
         }
         .buttonStyle(.plain)
         .disabled(selectedClient?.models.isEmpty != false && selectedClient?.canLoadModels != true)
@@ -812,7 +819,7 @@ struct ModelPickerContent: View {
                 )
             )
         } label: {
-            selectionRow(reasoningEffortName(selectedReasoningEffort), indicator: "chevron.right")
+            selectionRow("Thinking level", reasoningEffortName(selectedReasoningEffort), indicator: "chevron.right")
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Thinking level")
@@ -822,13 +829,6 @@ struct ModelPickerContent: View {
 
     private var customConnectionSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("Connection")
-                .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .settingsSectionHeaderInset()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture { dismissKeyboard() }
             VStack(spacing: 0) {
                 TextField("Provider name", text: $customName)
                     .textInputAutocapitalization(.words)
@@ -917,6 +917,7 @@ struct ModelPickerContent: View {
                 )
             } label: {
                 selectionRow(
+                    "Model",
                     customModels.first { $0.id == customModelID }?.displayName ?? "Choose a model",
                     indicator: "chevron.right"
                 )
@@ -933,38 +934,17 @@ struct ModelPickerContent: View {
         CustomLLMProviderDiscovery.normalizedBaseURL(customURL) != nil && !customModelsLoading
     }
 
-    private func selectionSection<Content: View>(
-        _ title: LocalizedStringKey,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text(title)
-                .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .settingsSectionHeaderInset()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture { dismissKeyboard() }
-            content()
-                .settingsSurface(singleRow: true)
-        }
+    private func selectionGroup<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(spacing: 0) { content() }
+            .settingsSurface()
     }
 
-    private func selectionRow(_ value: String, indicator: String? = "chevron.up.chevron.down") -> some View {
-        HStack(spacing: Theme.Spacing.md) {
-            Text(verbatim: value)
-                .font(Theme.Fonts.bodyMd)
-                .foregroundStyle(Theme.Colors.onSurface)
-                .lineLimit(1)
-            Spacer(minLength: 0)
-            if let indicator {
-                Image(systemName: indicator)
-                    .font(Theme.Icons.xs)
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
-            }
-        }
-        .settingsRowPadding()
-        .contentShape(Rectangle())
+    private func selectionRow(
+        _ title: LocalizedStringKey,
+        _ value: String,
+        indicator: String? = "chevron.up.chevron.down"
+    ) -> some View {
+        SettingsDisclosureRow(title: title, value: Text(verbatim: value), indicator: indicator)
     }
 
     private func authenticationSection(_ client: any ProviderClient) -> some View {
@@ -1362,21 +1342,23 @@ private struct ProfileCreationSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: SettingsLayout.sectionSpacing) {
-                    SettingsSection("Name", layout: .row) {
-                        TextField("Profile name", text: $name)
-                            .settingsRowPadding()
-                            .accessibilityIdentifier("settings.profileCreate.name")
-                    }
-                    SettingsSection("Location", layout: .row) {
-                        Button { choosingLocation = true } label: {
-                            SettingsDisclosureRow(title: "Save in", value: Text(verbatim: parent?.lastPathComponent ?? String(localized: "On this device")))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("settings.profileCreate.location")
-                        if parent != nil {
-                            Button("Use On This Device") { parent = nil }
+                    SettingsSection(layout: .group) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            TextField("Profile name", text: $name)
                                 .settingsRowPadding()
-                                .accessibilityIdentifier("settings.profileCreate.local")
+                                .accessibilityIdentifier("settings.profileCreate.name")
+                            Divider().settingsContentInset()
+                            Button { choosingLocation = true } label: {
+                                SettingsDisclosureRow(title: "Save in", value: Text(verbatim: parent?.lastPathComponent ?? String(localized: "On this device")))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("settings.profileCreate.location")
+                            if parent != nil {
+                                Divider().settingsContentInset()
+                                Button("Use On This Device") { parent = nil }
+                                    .settingsRowPadding()
+                                    .accessibilityIdentifier("settings.profileCreate.local")
+                            }
                         }
                     }
                 }

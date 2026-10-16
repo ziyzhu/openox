@@ -49,13 +49,13 @@ struct SettingsSection<Content: View>: View {
         case group
     }
 
-    let header: LocalizedStringKey
+    let header: LocalizedStringKey?
     let footer: LocalizedStringKey?
     let layout: Layout
     let content: Content
 
     init(
-        _ header: LocalizedStringKey,
+        _ header: LocalizedStringKey? = nil,
         footer: LocalizedStringKey? = nil,
         layout: Layout = .paddedRow,
         @ViewBuilder content: () -> Content
@@ -68,10 +68,12 @@ struct SettingsSection<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsLayout.headerSpacing) {
-            Text(header)
-                .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .settingsSectionHeaderInset()
+            if let header {
+                Text(header)
+                    .font(Theme.Fonts.labelMd)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .settingsSectionHeaderInset()
+            }
 
             content
                 .settingsRowPadding(layout == .paddedRow)

@@ -75,10 +75,9 @@ struct ProfileSettingsView: View {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 if let profile {
                     if profile.version == ProfileSchema.current {
-                        manageSection(for: profile)
-                        storageSection
                         ProfileContentsView(profile: profile, initialSkillDraft: initialSkillDraft)
                             .id(profile.url.path)
+                        detailsSection(for: profile)
                         exportSection(for: profile)
                         deleteSection(for: profile)
                     } else {
@@ -232,25 +231,22 @@ struct ProfileSettingsView: View {
         .contentShape(Rectangle())
     }
 
-    private var storageSection: some View {
-        SettingsSection("Location", layout: .row) {
-            if let profile {
+    private func detailsSection(for profile: Profile) -> some View {
+        SettingsSection(layout: .group) {
+            VStack(spacing: 0) {
+                nameRow(for: profile)
+                Divider().settingsContentInset()
                 Button { showingFiles = true } label: {
-                    HStack {
-                        Text(verbatim: "\(profile.url.deletingLastPathComponent().lastPathComponent) / \(profile.name)")
-                            .font(Theme.Fonts.caption)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(Theme.Icons.xs)
-                    }
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .settingsRowPadding()
-                    .contentShape(Rectangle())
+                    SettingsDisclosureRow(
+                        title: "Location",
+                        value: Text(verbatim: "\(profile.url.deletingLastPathComponent().lastPathComponent) / \(profile.name)")
+                    )
                 }
                 .buttonStyle(.plain)
                 .disabled(storage.isBusy)
                 .accessibilityIdentifier(A11yID.Settings.profileDetail)
                 .accessibilityHint("Show in Files")
+                Divider().settingsContentInset()
                 Button { choosingMoveLocation = true } label: {
                     SettingsDisclosureRow(title: "Move Profile…", value: Text(""))
                 }
@@ -261,14 +257,8 @@ struct ProfileSettingsView: View {
         }
     }
 
-    private func manageSection(for profile: Profile) -> some View {
-        SettingsSection("Manage", layout: .row) {
-            nameRow(for: profile)
-        }
-    }
-
     private func exportSection(for profile: Profile) -> some View {
-        SettingsSection("Backup", footer: "Export to iCloud Drive or another location outside Ox to keep a copy after deleting the app. Credentials and device permissions aren't included.", layout: .row) {
+        SettingsSection(footer: "Export to iCloud Drive or another location outside Ox to keep a copy after deleting the app. Credentials and device permissions aren't included.", layout: .row) {
             Button {
                 Task {
                     do {
@@ -333,7 +323,7 @@ private struct ProfileContentsView: View {
     }
 
     var body: some View {
-        SettingsSection("Profile", layout: .group) {
+        SettingsSection(layout: .group) {
             VStack(spacing: 0) {
                 NavigationLink {
                     ProfileFilesPage(scope: scope)

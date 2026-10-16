@@ -71,7 +71,7 @@ open /tmp/ox-macos-build/Build/Products/Debug/OxHost.app --args --allow-connecti
 
 1. Connect your terminal device and Host to the same [Tailscale](https://tailscale.com/) tailnet.
 2. Allow connections on the Host:
-   - **iPhone:** Enable Settings → Host → Allow connections and keep Ox open.
+   - **iPhone:** Turn on Settings → Host and keep Ox open.
    - **Mac:** Keep the Host running; the launch command above enables connections.
 3. Discover available Hosts and check your connection:
 
@@ -79,20 +79,6 @@ open /tmp/ox-macos-build/Build/Products/Debug/OxHost.app --args --allow-connecti
 ox host list
 ox --host ws://<host-tailnet-address>:9876 host describe
 ```
-
-Manage Profiles owned by the selected Host:
-
-```sh
-ox --host <ws-url> profile list
-ox --host <ws-url> profile create --name CourtServices
-ox --host <ws-url> profile select <profile-id>
-ox --host <ws-url> --profile <profile-id> profile update --memory-file ./MEMORY.md
-ox --host <ws-url> profile rename <profile-id> --name Courts
-```
-
-Stop running conversations before selecting or updating Profiles. Updates use the existing local Profile storage and migration gates; inspect state after an I/O failure before retrying. `ox --profile <directory>` without `--host` retains read-only disk inspection.
-
-Use `ox --help` for commands and connection options.
 
 ## Architecture
 
