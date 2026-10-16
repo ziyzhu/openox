@@ -212,30 +212,37 @@ struct RepositoriesView: View {
         let selectedName = conflict.candidates.first {
             $0.repositoryID == conflict.selectedRepositoryID
         }?.repositoryName ?? "Choose"
-        return Picker(
-            "Repository",
-            selection: Binding(
-                get: { conflict.selectedRepositoryID },
-                set: { repositoryID in
-                    guard let candidate = conflict.candidates.first(where: {
-                        $0.repositoryID == repositoryID
-                    }) else { return }
-                    resolve(conflict, with: candidate)
+        return Menu {
+            Picker(
+                "Repository",
+                selection: Binding(
+                    get: { conflict.selectedRepositoryID },
+                    set: { repositoryID in
+                        guard let candidate = conflict.candidates.first(where: {
+                            $0.repositoryID == repositoryID
+                        }) else { return }
+                        resolve(conflict, with: candidate)
+                    }
+                )
+            ) {
+                if conflict.selectedRepositoryID == nil {
+                    Text("Choose").tag(String?.none)
                 }
-            )
-        ) {
-            if conflict.selectedRepositoryID == nil {
-                Text("Choose").tag(String?.none)
+                ForEach(conflict.candidates) { candidate in
+                    Text(verbatim: candidate.repositoryName)
+                        .tag(Optional(candidate.repositoryID))
+                        .accessibilityIdentifier(A11yID.Settings.conflictCandidate(conflict.id, candidate.repositoryID))
+                }
             }
-            ForEach(conflict.candidates) { candidate in
-                Text(verbatim: candidate.repositoryName)
-                    .tag(Optional(candidate.repositoryID))
-                .accessibilityIdentifier(A11yID.Settings.conflictCandidate(conflict.id, candidate.repositoryID))
+        } label: {
+            HStack(spacing: Theme.Spacing.xs) {
+                Text(verbatim: selectedName)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(Theme.Icons.xs)
             }
+            .font(Theme.Fonts.bodySm)
+            .foregroundStyle(Theme.Colors.conversationSecondary)
         }
-        .pickerStyle(.menu)
-        .labelsHidden()
-        .tint(Theme.Colors.onSurface)
         .disabled(isBusy)
         .accessibilityLabel(Text(verbatim: conflict.serviceID))
         .accessibilityValue(Text(verbatim: selectedName))
