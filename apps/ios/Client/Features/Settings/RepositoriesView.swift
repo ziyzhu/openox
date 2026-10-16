@@ -38,6 +38,9 @@ struct RepositoriesView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 repositoriesSection
+                if let local = manager.repositories.first(where: { $0.id == Repository.localID }) {
+                    SettingsSection(layout: .group) { repositoryRow(local) }
+                }
                 if !manager.repositoryConflicts.isEmpty { conflictsSection }
             }
             .settingsPagePadding()
@@ -67,6 +70,10 @@ struct RepositoriesView: View {
         }
     }
 
+    private var selectableRepositories: [Repository.Descriptor] {
+        manager.repositories.filter { $0.id != Repository.localID }
+    }
+
     private var repositoriesSection: some View {
         VStack(alignment: .leading, spacing: SettingsLayout.headerSpacing) {
             if let message = errorMessage {
@@ -75,7 +82,7 @@ struct RepositoriesView: View {
             }
 
             VStack(spacing: 0) {
-                ForEach(Array(manager.repositories.enumerated()), id: \.element.id) { index, repository in
+                ForEach(Array(selectableRepositories.enumerated()), id: \.element.id) { index, repository in
                     if index > 0 { Divider().settingsContentInset() }
                     repositoryRow(repository)
                 }
@@ -101,9 +108,7 @@ struct RepositoriesView: View {
 
     private func repositoryRow(_ repository: Repository.Descriptor) -> some View {
         HStack(spacing: 0) {
-            if repository.id == Repository.localID {
-                Color.clear.frame(width: 44, height: 44)
-            } else {
+            if repository.id != Repository.localID {
                 enablementToggle(repository)
             }
 
