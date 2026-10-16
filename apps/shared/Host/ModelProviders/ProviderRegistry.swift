@@ -266,7 +266,10 @@ final class ProviderRegistry {
         try ProviderClientFactory.validateAdapter(definition)
         _ = try ProviderClientFactory.make(definition, presentation: presentation(for: definition))
         var stored = definition
-        if let found = discovered[definition.id]?.models { stored.models.removeAll { found.contains($0) } }
+        if let found = discovered[definition.id]?.models {
+            let pinned = Set(bundled.first { $0.definition.id == definition.id }?.definition.models.map(\.id) ?? [])
+            stored.models.removeAll { found.contains($0) && !pinned.contains($0.id) }
+        }
         var next = catalog
         if let index = next.providers.firstIndex(where: { $0.id == definition.id }) {
             next.providers[index] = stored
