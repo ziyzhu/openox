@@ -661,13 +661,7 @@ struct ConversationComposer: View, Equatable {
     }
 
     private func artifactSystemImage(_ artifact: FileItem) -> String {
-        switch artifact.kind {
-        case .image: "photo"
-        case .pdf: "doc.richtext"
-        case .text: "doc.text"
-        case .html: "sparkles.rectangle.stack"
-        case .file: "doc"
-        }
+        artifact.kind == .html ? "sparkles.rectangle.stack" : FileCardFormat(file: artifact).symbol
     }
 
     private var composerTopStrip: some View {
