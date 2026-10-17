@@ -53,6 +53,7 @@
 
 ## Commit Rules
 
+1. Do not include `Co-Authored-By` trailers in commit messages.
 1. Use the commit message template below with a short imperative subject. Describe the changes and testing performed; include related issues, pull requests, or commits, or write `None` when there are no related references. State when testing was not run and why.
 1. Committing does not require iOS version checks, App Store Connect queries, version bumps, or version tags in commit messages.
 
