@@ -90,13 +90,13 @@ This minimal binding example uses an illustrative 50 calories per cookie, not nu
 
 ## Write and revise the file
 
-Write one self-contained UTF-8 HTML fragment to a short lowercase `<name>.html` path in the conversation's working directory with `ox.fs.write`. Start with `<meta name="viewport" content="width=device-width, initial-scale=1">` and `<meta name="color-scheme" content="light dark">` so the browser uses phone-width layout and an appearance-aware page background. Put markup, `<style>`, and `<script>` in that file; omit `<!doctype>`, `<html>`, `<head>`, and `<body>`. Keep it below 200 KB. File creation and presentation are separate operations. Report the final Profile-relative path after writing.
+Write one self-contained UTF-8 HTML fragment to a short lowercase `<name>.html` path in the conversation's working directory with `ox.fs.write`. Start with `<meta name="viewport" content="width=device-width, initial-scale=1">` and `<meta name="color-scheme" content="light dark">` so the browser uses phone-width layout and an appearance-aware page background. Put markup, `<style>`, and `<script>` in that file; omit `<!doctype>`, `<html>`, `<head>`, and `<body>`. Keep it below 200 KB. Writing does not show the file. Show it by putting `![Short title](<name>.html)` on its own line in your reply; the conversation renders the live page there.
 
 HTML pages run under a restrictive content policy. Do not use browser network requests, remote subresources, external libraries, `<form>` submission, frames, file input, workers, object embeds, sensors, geolocation, camera, or microphone. Keep markup and scripts inline. Native `button`, `input`, and `select` controls may update local state or invoke Host services through the injected `ox.service` SDK.
 
 Give the fragment one unique root ID. Scope CSS and DOM queries to that root. Put the script after its markup, verify every queried element exists, and make the primary interaction update both the interface and its accessible state. Do not depend on browser storage or ambient globals.
 
-Read an existing HTML file before revising it, following `ox.fs.read` continuation offsets until complete. Edit or overwrite the same file when revising it. Messages refer to its current contents at that path; they do not retain historical bytes. Moving or renaming the file leaves old message references deleted, so present the file again at its new path. Use `ox.fs.copy` only when the user wants an independent file.
+Read an existing HTML file before revising it, following `ox.fs.read` continuation offsets until complete. Edit or overwrite the same file when revising it. Messages refer to its current contents at that path; they do not retain historical bytes. Moving or renaming the file leaves old message references deleted, so embed the file again at its new path. Use `ox.fs.copy` only when the user wants an independent file.
 
 ## Use Host services
 

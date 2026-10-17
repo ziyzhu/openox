@@ -124,11 +124,6 @@ const groups: Record<string, Record<string, string>> = {
     readCapturedEvent: "Inspect the selected exchange without exposing reusable secrets",
     stopCapture: "Stop capture and discard records when requested",
   },
-  widget: {
-    shoveler: "Present bounded cards with accurate labels and file targets",
-    image: "Present the QA image and verify inline rendering and viewer behavior",
-    video: "Present the QA video and verify visible playback",
-  },
 };
 
 const installation = new Set(["app.setLanguage", "app.setTheme", "app.setDefaultModel", "provider.save", "provider.delete", "provider.authenticate", "provider.deauthenticate"]);
@@ -158,12 +153,11 @@ const journeys: Array<[string, string, string[]]> = [
   ["schedule-lifecycle", "Schedule the supplied QA skill, inspect its fire time, disable and re-enable it, run it once and inspect the child outcome, then delete the run-owned schedule", ["schedule.create", "schedule.enable", "schedule.run", "schedule.delete"]],
   ["secret-lifecycle", "Inspect credential metadata, connect the QA service through native secret entry and remove only the run-owned credential after verifying the task", ["secret.list", "secret.add", "secret.delete"]],
   ["clarify-and-complete", "Resolve the supplied ambiguous request with a decisive choice, report progress during actual work and offer useful follow-up intents after completion", ["user.choose", "user.reportProgress", "user.follow"]],
-  ["image-research", "Read the supplied QA image, research the identified subject and verify the relevant public source before answering with grounded links", ["vision.analyze", "web.search", "web.fetch"]],
+  ["image-research", "Read the supplied QA image, research the identified subject and verify the relevant public source before answering with grounded links and one embedded public image whose direct image URL loads", ["vision.analyze", "web.search", "web.fetch"]],
   ["browser-navigation", "Investigate the QA site's navigation problem: inspect page state and history, exercise back and forward, stop the pending load, reload and verify the final page before presenting it", ["web.browser.navigate", "web.browser.getPageInfo", "web.browser.getNavigationHistory", "web.browser.goBack", "web.browser.goForward", "web.browser.stopLoading", "web.browser.reload", "web.browser.showPage"]],
   ["browser-form", "Complete the supplied QA form through bounded page interaction, wait for the resulting navigation, isolate the human-only step and export the verified confirmation as PDF", ["web.browser.executeScript", "web.browser.waitForNavigation", "web.browser.waitForUserInteraction", "web.browser.exportPdf"]],
   ["browser-diagnostics", "Diagnose the supplied QA request failure with narrow redacted capture: mark the reproduction, inspect relevant events and exchanges, then discard capture records", ["web.browser.startCapture", "web.browser.markCapture", "web.browser.listCapturedEvents", "web.browser.readCapturedEvent", "web.browser.stopCapture"]],
   ["browser-instrumentation", "Diagnose the QA document-start timing issue with scoped instrumentation, verify it on a fresh document and clear injected scripts afterward", ["web.browser.injectScript", "web.browser.clearScripts"]],
-  ["media-review", "Present the supplied QA media collection as useful cards, inspect the image and play the video, checking returned presentation status without claiming unobserved rendering", ["widget.shoveler", "widget.image", "widget.video"]],
 ];
 
 const focused: Array<[string, string, Variant]> = [

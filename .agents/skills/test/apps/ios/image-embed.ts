@@ -8,34 +8,26 @@ import { iosTarget } from "../../../setup/scripts/ios.ts";
 import { waitForHost } from "./host.ts";
 
 const qa = qaCommand({
-  usage: "bun .agents/skills/test/apps/ios/image-widget.ts --device ox-N --conversation <saved-Mock-QA-conversation-seeded-with-0> --app /absolute/Ox.app [--bundle id] [--output /tmp/directory]\nUses the assigned loopback Host. Retains run-owned QA files and conversation for visual review; never changes approval policies or credentials.",
+  usage: "bun .agents/skills/test/apps/ios/image-embed.ts --device ox-N --conversation <saved-Mock-QA-conversation-seeded-with-0> --app /absolute/Ox.app [--bundle id] [--output /tmp/directory]\nUses the assigned loopback Host. Retains run-owned QA files and conversation for visual review; never changes approval policies or credentials.",
   options: { chat: { type: "string" }, app: { type: "string" }, bundle: { type: "string" }, output: { type: "string" } },
 });
 if (!qa.values.chat || !qa.values.app) throw new Error("Pass a seeded saved QA conversation and the freshly built app");
 const localConfig = await readFile(join(ROOT, "apps/ios/Local.xcconfig"), "utf8").catch(() => "");
 const bundle = qa.values.bundle ?? Bun.env.OX_BUNDLE_ID
   ?? /^OX_BUNDLE_IDENTIFIER\s*=\s*([^\s/]+)/m.exec(localConfig)?.[1] ?? "ai.openox.local";
-const directory = resolve(qa.values.output ?? `/tmp/ox-image-widget-${Date.now()}`);
+const directory = resolve(qa.values.output ?? `/tmp/ox-image-embed-${Date.now()}`);
 assert(directory !== ROOT && !directory.startsWith(ROOT + "/"));
 const target = ["ox", "--host", qa.debugEndpoint, "--chat", qa.values.chat];
 const imageURL = "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=960&h=640&fit=crop";
-const prefix = `qa-image-${crypto.randomUUID().slice(0, 8)}`;
 const checks: string[] = [];
 async function json(args: string[]) {
   return JSON.parse((await run(args, { capture: true })).stdout);
-}
-async function call(name: string, args: Record<string, unknown>) {
-  return (await json([...target, "vm", "call", name, "--args", JSON.stringify({ purpose: "Verify image widget", ...args }), "--json"])).value;
 }
 async function inspect() {
   return json([...target, "conversation", "inspect", "--json"]);
 }
 async function present(image: string) {
-  await json([...target, "conversation", "send", `execute\nawait ox.widget.image({ purpose: "Verify image widget", image: ${JSON.stringify(image)} });`, "--json"]);
-}
-function images(state: Awaited<ReturnType<typeof inspect>>) {
-  return state.blocks.flatMap((block: { kind: { items?: { image?: { source: { type: string; artifact?: string; url?: string } } }[] } }) =>
-    block.kind.items?.flatMap(item => item.image ? [item.image.source] : []) ?? []);
+  await json([...target, "conversation", "send", `reply\n![QA image](${image})`, "--json"]);
 }
 const ios = iosTarget(qa.device);
 async function bottom() {
@@ -59,10 +51,8 @@ try {
   assert.equal(initial.model.id, "mock");
   assert.equal(initial.messages[0]?.user?.content[0]?.text?.text, "0");
   assert.equal(initial.messages.filter((message: { type: string }) => message.type === "user").length, 1);
-  assert.equal(images(initial).length, 0);
   const schema = await json([...target, "vm", "functions", "--json"]);
-  assert.deepEqual(new Set(schema["ox.widget.image"].inputSchema.required), new Set(["image", "purpose"]));
-  assert(!Object.keys(schema).some(name => name.startsWith("ox.artifact.")));
+  assert(!Object.keys(schema).some(name => name.startsWith("ox.artifact.") || name.startsWith("ox.widget.")));
   const retired = await json([...target, "vm", "eval", "--script", "return typeof ox.artifact", "--json"]);
   assert.equal(retired.value, "undefined");
   await present(imageURL);
@@ -73,41 +63,17 @@ try {
   await screenshot("remote-zoom");
   await ios.tap({ id: "chat.message.image.close" });
   checks.push("remote HTTPS image renders inline and opens the zoomable viewer");
-  for (const image of ["http://example.com/a.png", "https://user:password@example.com/a.png", "data:image/png;base64,AA==", `${prefix}-missing.png`]) {
-    await assert.rejects(() => call("ox.widget.image", { image }), /HTTPS URL|does not exist|missing|not found/i);
-  }
-  const text = await call("ox.fs.write", { path: `${prefix}.txt`, content: "Not an image" });
-  assert(text);
-  await assert.rejects(() => call("ox.widget.image", { image: text.path }), /not an image/);
-  checks.push("HTTP, embedded credentials, data URLs, missing files and non-image files are rejected");
-  const profile = await call("ox.app.profile", {});
-  assert(profile?.name && !profile.name.includes("/") && ![".", ".."].includes(profile.name));
-  const response = await fetch(imageURL);
-  assert(response.ok);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  assert(bytes.length > 0 && bytes.length < 10 * 1024 * 1024);
-  const imagePath = `/${prefix}.jpg`;
-  await writeFile(await ios.containerPath(bundle, `Documents/Profiles/${profile.name}/${prefix}.jpg`), bytes);
-  const renamed = await call("ox.fs.move", { from: imagePath, to: `${prefix}-renamed.jpg` });
-  await assert.rejects(() => call("ox.fs.read", { path: imagePath }));
-  await present(renamed.path);
   const before = await inspect();
-  assert.equal(images(before).length, 2);
-  assert.deepEqual(images(before)[0], { type: "remote", url: imageURL });
-  assert.equal(images(before)[1].type, "artifact");
   assert(!before.messages.some((message: unknown) => JSON.stringify(message).includes('"type":"attachment"')));
-  await bottom();
-  await screenshot("local-inline");
-  checks.push("local image files display at their moved paths without attaching pixels to model context");
   await ios.launch(bundle, resolve(qa.values.app), { OX_HOST_LOOPBACK: "1", OX_DEBUG_ENDPOINT: qa.debugEndpoint });
   await waitForHost(qa.debugEndpoint,
     () => json(["ox", "--host", qa.debugEndpoint, "host", "describe", "--timeout", "1000", "--json"]), 10_000);
   await json([...target, "conversation", "open", "--json"]);
-  assert.deepEqual(images(await inspect()), images(before));
   await bottom();
+  await ios.wait({ id: "chat.message.image.open" }, { timeout: 30_000, stable: 300 });
   await screenshot("reopened");
-  checks.push("remote and renamed local image widgets survive process relaunch");
-  await present("https://openox.ai/qa-image-widget-missing.png");
+  checks.push("remote image embeds survive process relaunch");
+  await present("https://openox.ai/qa-image-embed-missing.png");
   await bottom();
   await ios.wait({ id: "chat.message.image.retry" }, { timeout: 30_000, stable: 300 });
   const failures = await json(["ox", "--host", qa.debugEndpoint, "host", "logs", "--grep", "ImageWidgetView.load failed", "--json"]);
@@ -117,8 +83,8 @@ try {
   assert(retried.length > failures.length, "Retry must issue another image load");
   await screenshot("failure-retry");
   checks.push("remote failure displays a retry control");
-  await writeFile(join(directory, "report.json"), JSON.stringify({ device: qa.device, chat: qa.values.chat, checks, retainedFiles: [text.path, renamed.path] }, null, 2) + "\n");
+  await writeFile(join(directory, "report.json"), JSON.stringify({ device: qa.device, chat: qa.values.chat, checks }, null, 2) + "\n");
 } finally {
   release();
 }
-console.log(`PASS image widget E2E (${checks.length} checks); evidence: ${directory}`);
+console.log(`PASS image embed E2E (${checks.length} checks); evidence: ${directory}`);

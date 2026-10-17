@@ -36,9 +36,9 @@ reload requires the Host-based suite.
 Checks live VM error contracts. Requires an idle QA conversation and a fresh installed
 build; does not change files, settings, policies, or conversation selection.
 
-## Image widget
+## Image embed
 
-Checks image display, viewer interaction, and reopen. Requires a saved Mock conversation
+Checks remote Markdown image display, viewer interaction, retry, and reopen. Requires a saved Mock conversation
 seeded with `0` and the assigned loopback Host. Use the prepared saved ID from
 `conversation inspect`. Retains fixtures and the conversation for human review;
 remove them through the UI afterward.

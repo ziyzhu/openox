@@ -144,6 +144,8 @@ struct FileZoomPreviewScreen: View {
     @State private var snapshot: FilePreviewSnapshot?
     @State private var previewURL: URL?
     @State private var loadState = LoadState.loading
+    @State private var closesWithQuickLook = false
+    @Environment(\.dismiss) private var dismiss
 
     init(artifact: FileItem, chrome: Chrome, scope: ProfileScope? = StorageRoot.currentScope) {
         self.artifact = artifact
@@ -175,6 +177,13 @@ struct FileZoomPreviewScreen: View {
             await loadFile()
         }
         .quickLookPreview($previewURL)
+        .onChange(of: previewURL) { previous, current in
+            guard previous != nil, current == nil, closesWithQuickLook else { return }
+            switch chrome {
+            case .immersive(let onDismiss): onDismiss()
+            case .navigation: dismiss()
+            }
+        }
     }
 
     @ViewBuilder
@@ -199,20 +208,29 @@ struct FileZoomPreviewScreen: View {
                 unavailable
             }
         case .text, .file:
-            if let snapshot, loadState == .ready, QLPreviewController.canPreview(snapshot.url as NSURL) {
-                Button {
-                    previewURL = snapshot.url
-                } label: {
-                    Label("Open file", systemImage: "doc")
-                }
-                .buttonStyle(.bordered)
-                .accessibilityLabel(artifact.userFacingName)
+            if let snapshot, loadState == .ready {
+                openFileButton(snapshot)
             } else if loadState == .loading {
                 loading
             } else {
                 unavailable
             }
         case .html:
+            unavailable
+        }
+    }
+
+    @ViewBuilder
+    private func openFileButton(_ snapshot: FilePreviewSnapshot) -> some View {
+        if QLPreviewController.canPreview(snapshot.url as NSURL) {
+            Button {
+                previewURL = snapshot.url
+            } label: {
+                Label("Open file", systemImage: "doc")
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel(artifact.userFacingName)
+        } else {
             unavailable
         }
     }
@@ -228,6 +246,16 @@ struct FileZoomPreviewScreen: View {
             systemImage: "questionmark.folder",
             description: Text(artifact.userFacingName)
         )
+    }
+
+    private func loadSnapshot() async throws {
+        let loaded = try await source.snapshot()
+        try Task.checkCancellation()
+        snapshot = loaded
+        loadState = .ready
+        guard QLPreviewController.canPreview(loaded.url as NSURL) else { return }
+        closesWithQuickLook = true
+        previewURL = loaded.url
     }
 
     private func loadFile() async {
@@ -251,10 +279,7 @@ struct FileZoomPreviewScreen: View {
                 pdfDocument = loaded
                 loadState = loaded == nil ? .unavailable : .ready
             case .text, .file:
-                let loaded = try await source.snapshot()
-                snapshot = loaded
-                loadState = .ready
-                if QLPreviewController.canPreview(loaded.url as NSURL) { previewURL = loaded.url }
+                try await loadSnapshot()
             case .html:
                 loadState = .unavailable
             }

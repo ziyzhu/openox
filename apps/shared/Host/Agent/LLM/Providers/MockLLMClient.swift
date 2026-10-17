@@ -103,6 +103,9 @@ public struct MockLLMClient: ProviderClient {
                     }
                     return (scenario, turn)
                 }
+                if intent.hasPrefix("reply\n") {
+                    return (Scenario(name: "reply", steps: [.say(String(intent.dropFirst("reply\n".count))), .stop(.stop)]), turn)
+                }
                 if let scenario = scenarios[intent.lowercased()] { return (scenario, turn) }
                 if intent.hasPrefix("[system]") { continue }
                 return (fallback, turn)
@@ -300,8 +303,8 @@ extension Scenario {
             Entry("58", "files — write, edit, rename, and display", .fileWorkflow),
             Entry("69", "solve — human-verification handoff", .botControl),
             Entry("74", "progress — report, continue thinking, then answer", .progressReport),
-            Entry("75", "shoveler — display non-interactive cards", .shoveler),
-            Entry("76", "video — display inline file video", .video),
+            Entry("75", "embeds — file and remote image", .embeds),
+            Entry("76", "video — embed inline file video", .video),
             Entry("77", "payment — user-controlled checkout", .payment),
         ]),
         ("Context & diagnostics", [
@@ -640,34 +643,18 @@ extension Scenario {
         ]
     }
 
-    static let shoveler = Scenario(name: "shoveler") { ctx in
+    static let embeds = Scenario(name: "embeds") { ctx in
         if ctx.turn == 0 {
             return [execute("""
-            await ox.fs.write({ path: "artifacts/weekend-guide.txt", content: "Ocean Beach\\n\\nA windy, open shoreline on San Francisco's west side.", purpose: "Create weekend guide" });
-            await ox.widget.shoveler({
-              cards: [
-                { description: "Ocean Beach — windy and open", badge: "Nearby", artifact: "weekend-guide.txt" },
-                { title: "Cliffside trail" },
-                { title: "Presidio", description: "Forest paths winding through the quietest corners of the park", badge: "Forest" }
-              ],
-              purpose: "Show quiet places"
-            });
+            await ox.fs.write({ path: "weekend-guide.md", content: "# Ocean Beach\\n\\nA windy, open shoreline on San Francisco's west side.", purpose: "Create weekend guide" });
             """)]
         }
-        return [.say("Three quiet places, ready to browse."), .stop(.stop)]
+        return [.say("Two quiet places, ready to browse.\n\n![Weekend guide](weekend-guide.md)\n\n![Valley lake](https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=960&h=640&fit=crop)"), .stop(.stop)]
     }
 
-    static let video = Scenario(name: "video") { ctx in
-        if ctx.turn == 0 {
-            return [execute("""
-            await ox.widget.video({
-              video: "widget-video.mp4",
-              purpose: "Show video"
-            });
-            """)]
-        }
-        return [.say("The video is ready to play."), .stop(.stop)]
-    }
+    static let video = Scenario(name: "video", steps: [
+        .say("The video is ready to play.\n\n![Video](widget-video.mp4)"), .stop(.stop),
+    ])
 
     static let binaryChoiceFlow = Scenario(name: "binary-choice") { ctx in
         guard let result = ctx.resultText("execute") else {

@@ -15,6 +15,7 @@ struct StreamingMarkdownText: View {
         let snapshot = buffer.snapshot
         let hasInteractiveCode = snapshot.blocks.contains { block in
             if case .code(let language, _) = block { return DiffDocument.supports(language) }
+            if case .embed = block { return true }
             return false
         }
         VStack(alignment: .leading, spacing: 0) {
@@ -274,7 +275,7 @@ nonisolated private enum StreamingMarkdownTail {
         var lines = source.components(separatedBy: "\n")
         while let last = lines.last {
             let trimmed = last.trimmingCharacters(in: .whitespaces)
-            if isAmbiguousLineStart(trimmed) {
+            if isAmbiguousLineStart(trimmed) || (trimmed.hasPrefix("![") && !trimmed.hasSuffix(")")) {
                 lines.removeLast()
             } else if trimmed.hasPrefix("|"), !endsInConfirmedTable(lines) {
                 lines.removeLast()
@@ -509,6 +510,8 @@ private struct MarkdownBlockView: View {
             .defaultScrollAnchor(nil, for: .sizeChanges)
         case .rule:
             Divider()
+        case let .embed(alt, path):
+            MarkdownEmbedView(alt: alt, path: path)
         }
     }
 
@@ -772,6 +775,7 @@ nonisolated enum MarkdownBlock: Equatable, Sendable {
     case quote(String)
     case table(header: [String], rows: [[String]])
     case rule
+    case embed(alt: String, path: String)
 
     var logShape: String {
         switch self {
@@ -782,6 +786,7 @@ nonisolated enum MarkdownBlock: Equatable, Sendable {
         case .quote(let text): return "quote(chars:\(text.count))"
         case .table(let header, let rows): return "table(columns:\(header.count),rows:\(rows.count))"
         case .rule: return "rule"
+        case .embed: return "embed"
         }
     }
 
@@ -808,6 +813,10 @@ nonisolated enum MarkdownBlock: Equatable, Sendable {
                 if i < lines.count { i += 1 }
                 out.append(.code(language: language, body: body.joined(separator: "\n")))
                 continue
+            }
+
+            if let embed = embed(trimmed) {
+                out.append(embed); i += 1; continue
             }
 
             if trimmed == "---" || trimmed == "***" || trimmed == "___" {
@@ -874,6 +883,17 @@ nonisolated enum MarkdownBlock: Equatable, Sendable {
             out.append(.paragraph(para.joined(separator: " ")))
         }
         return out
+    }
+
+    static func embed(_ line: String) -> MarkdownBlock? {
+        guard let match = line.wholeMatch(of: /!\[([^\]]*)\]\(<?([^)>]+)>?\)/) else { return nil }
+        let path = String(match.2).trimmingCharacters(in: .whitespaces)
+        if path.contains(":") {
+            guard let url = URLComponents(string: path), url.scheme == "https", url.host?.isEmpty == false,
+                  url.user == nil, url.password == nil else { return nil }
+            return .embed(alt: String(match.1), path: path)
+        }
+        return .embed(alt: String(match.1), path: path.removingPercentEncoding ?? path)
     }
 
     private static func isTableStart(at i: Int, in lines: [String]) -> Bool {

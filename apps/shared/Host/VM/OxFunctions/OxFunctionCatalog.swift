@@ -15,7 +15,6 @@ nonisolated enum OxFunctionCatalog {
         ("skill", ModelGuidance.text("namespace.skill")),
         ("schedule", ModelGuidance.text("namespace.schedule")),
         ("vision", ModelGuidance.text("namespace.vision")),
-        ("widget", ModelGuidance.text("namespace.widget")),
     ]
 
     static let all: [OxFunction] = [
@@ -32,7 +31,6 @@ nonisolated enum OxFunctionCatalog {
         OxSkills.function,
         OxSchedules.function,
         OxVision.function,
-        OxWidgets.function,
     ]
 
     private static let catalogEntries: [(String, JSONValue)] =

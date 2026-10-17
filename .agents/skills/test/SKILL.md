@@ -36,7 +36,7 @@ Feature runners live in `apps/ios/`. Read the relevant section, then run
 | `service-icons.ts` | [Native icon loading](references/ios-runners.md#service-icons) |
 | `durable-conversation.ts --models` | [Queued model selection](references/ios-runners.md#model-selection) |
 | `ox-errors.ts` | [Structured VM errors](references/ios-runners.md#structured-errors) |
-| `image-widget.ts` | [Image display and viewer](references/ios-runners.md#image-widget) |
+| `image-embed.ts` | [Image display and viewer](references/ios-runners.md#image-embed) |
 | `profile-files.ts` | [Profile filesystem](references/ios-runners.md#profile-files) |
 
 ## Run and report

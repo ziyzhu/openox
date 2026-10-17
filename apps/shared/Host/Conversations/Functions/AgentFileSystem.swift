@@ -45,7 +45,11 @@ extension Conversation {
             JSONValue.object(["path": .string(root), "access": .string(["history", "tmp"].contains(root) ? "readOnly" : "readWrite")])
         } + [JSONValue.object(["path": .string("chats"), "access": .string("readOnly")]),
              JSONValue.object(["path": .string(""), "access": .string("readOnly")])]
-        return try await tracked(action, .object(args), purpose: purpose) {
+        var recorded = args
+        if let base64 = recorded.removeValue(forKey: "base64")?.stringValue {
+            recorded["bytes"] = .int(base64.utf8.count / 4 * 3)
+        }
+        return try await tracked(action, .object(recorded), purpose: purpose) {
             if ["write", "edit", "delete", "mkdir", "rmdir", "move", "copy"].contains(name) {
                 for candidate in [path, args["to"]?.stringValue].compactMap({ $0 }) {
                     let root = candidate.split(separator: "/").first.map(String.init) ?? ""
@@ -57,11 +61,6 @@ extension Conversation {
                 profileID: route.profileID, operation: name,
                 arguments: .object(args.merging(["purpose": .string(purpose)]) { _, value in value }), mounts: mounts)
             Log.session.info("bridge.fs.operation name=\(name) path=\(path) profile=\(route.profileID)")
-            if ["write", "edit"].contains(name), let written = result.objectValue?["path"]?.stringValue,
-               written.hasPrefix("conversations/\(route.conversationID)/"), written.lowercased().hasSuffix(".html"),
-               let file = await durableFile(path: written) {
-                embedFile(file.artifact)
-            }
             return result
         }
     }

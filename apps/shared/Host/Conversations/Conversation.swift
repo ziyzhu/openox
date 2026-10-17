@@ -740,7 +740,7 @@ final class Conversation: Identifiable {
         let artifacts: [FileItem]
     }
 
-    private var artifactFilesRevision = 0
+    private(set) var artifactFilesRevision = 0
     @ObservationIgnored private var artifactRefreshTask: Task<Void, Never>?
     @ObservationIgnored private var referencedFilesCache: ReferencedFilesCache?
     var transcript: [Block] { document.projection }
@@ -1419,27 +1419,6 @@ final class Conversation: Identifiable {
         Log.session.info("Conversation.embedFile filename=\(artifact.fileName)")
     }
 
-    func embedShoveler(_ shoveler: Shoveler) {
-        let standalone = ensureExecutionContext()
-        document.apply(.embedShoveler(shoveler))
-        if standalone { finishStandaloneExecution() }
-        Log.session.info("Conversation.embedShoveler cards=\(shoveler.cards.count)")
-    }
-
-    func embedVideo(_ video: VideoWidget) {
-        let standalone = ensureExecutionContext()
-        document.apply(.embedVideo(video))
-        if standalone { finishStandaloneExecution() }
-        Log.session.info("Conversation.embedVideo source=\(video.source.artifact?.fileName ?? "remote")")
-    }
-
-    func embedImage(_ image: ImageWidget) {
-        let standalone = ensureExecutionContext()
-        document.apply(.embedImage(image))
-        if standalone { finishStandaloneExecution() }
-        Log.session.info("Conversation.embedImage source=\(image.source.artifact == nil ? "remote" : "artifact")")
-    }
-
     private func embedServiceInspector(_ link: ServiceInspectorLink) {
         let standalone = ensureExecutionContext()
         document.apply(.embedServiceInspector(link))
@@ -1682,34 +1661,6 @@ final class Conversation: Identifiable {
                 purpose: purpose
             )
             let value = try await body()
-            resolveInvocation(invocationID: invocationID, outcome: .succeeded(Self.outcomeValue(value)))
-            if standalone { finishStandaloneExecution() }
-            return value
-        } catch {
-            resolveInvocation(invocationID: invocationID, outcome: .failed(error.localizedDescription))
-            if standalone { finishStandaloneExecution(output: error.localizedDescription, isError: true) }
-            throw error
-        }
-    }
-
-    func trackedEffect<T, Effect>(
-        _ action: String,
-        _ args: JSONValue,
-        purpose: String,
-        apply: (Effect) -> Void,
-        _ body: () async throws -> (T, Effect)
-    ) async throws -> T {
-        let standalone = ensureExecutionContext()
-        let invocationID = appendInvocation(name: action, purpose: purpose, args: args)
-        do {
-            try await requireApproval(
-                action: action,
-                defaultPolicy: Actions.defaultPolicy(for: action),
-                args: args.toAny(),
-                purpose: purpose
-            )
-            let (value, effect) = try await body()
-            apply(effect)
             resolveInvocation(invocationID: invocationID, outcome: .succeeded(Self.outcomeValue(value)))
             if standalone { finishStandaloneExecution() }
             return value

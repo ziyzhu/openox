@@ -32,7 +32,7 @@ export async function invokeFilesystem(runtime: ProfileRuntime, capability: stri
       return result.text;
     },
     write: async (path, content, _context, expected) => {
-      if (typeof content !== "string") throw new FileError("not_supported", "Use explicit media publication for binary files", path);
+      if (typeof content !== "string") throw new FileError("not_supported", "Binary writes are limited to conversation and shared Profile folders", path);
       await call("write", path, { content, expected: expected ?? originals.get(path) });
     },
     remove: async path => { await call("delete", path); },

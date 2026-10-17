@@ -60,9 +60,6 @@ public protocol OxFunctionBridge: AnyObject {
     func reportProgress(message: String, purpose: String) async throws -> JSONValue?
     func followUser(intents: JSONValue, purpose: String) async throws -> JSONValue?
     func chooseUser(body: String, options: [String], purpose: String) async throws -> JSONValue?
-    func presentShoveler(value: JSONValue?, purpose: String) async throws -> JSONValue?
-    func presentVideo(value: JSONValue?, purpose: String) async throws -> JSONValue?
-    func presentImage(value: JSONValue?, purpose: String) async throws -> JSONValue?
 }
 
 extension OxFunctionBridge {

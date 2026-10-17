@@ -21,7 +21,7 @@ struct FileCardView: View {
         VStack(alignment: .leading, spacing: 0) {
             if format.hasPreview {
                 previewSurface
-                    .frame(height: 160)
+                    .frame(height: 160, alignment: .top)
                     .frame(maxWidth: .infinity)
                     .clipped()
                     .background(Theme.Colors.surfaceSunken)
@@ -158,7 +158,7 @@ private enum FileCardContent {
     case fallback
 }
 
-private enum FileCardFormat {
+enum FileCardFormat {
     case image, pdf, markdown, text, table, spreadsheet, html, audio, video, archive, file
 
     init(file: FileItem) {

@@ -2,20 +2,30 @@ import SwiftUI
 import WebKit
 import UIKit
 
+struct ConversationFileResolver {
+    let revision: Int
+    let resolve: (String) async -> FileItem?
+}
+
 extension EnvironmentValues {
     @Entry var conversationLinkHandler: ((URL) -> Void)? = nil
+    @Entry var conversationFileResolver: ConversationFileResolver? = nil
 }
 
 enum ConversationLinkDestination: Equatable {
     case web(URL)
     case artifact(String)
+    case file(String)
     case unsupported(URL)
 
     init(_ url: URL) {
         switch url.scheme?.lowercased() {
         case "http", "https":
             self = .web(url)
-        case "sandbox", nil:
+        case nil:
+            let path = url.relativeString.removingPercentEncoding ?? url.relativeString
+            self = path.isEmpty ? .unsupported(url) : .file(path)
+        case "sandbox":
             let filename = url.lastPathComponent.removingPercentEncoding ?? url.lastPathComponent
             self = filename.isEmpty ? .unsupported(url) : .artifact(filename)
         default:

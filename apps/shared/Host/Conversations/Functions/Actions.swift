@@ -104,8 +104,9 @@ nonisolated enum Actions {
         skillCreate, skillCopy, skillDelete, skillShare,
         scheduleCreate, scheduleList, scheduleDelete, scheduleEnable, scheduleRun,
         memoryRead, memoryWrite, memoryReplaceText,
-        widgetShoveler, widgetVideo, widgetImage, userChoose, userFollow, userReportProgress,
+        userChoose, userFollow, userReportProgress,
     ]
+    static let retired = [widgetShoveler, widgetVideo, widgetImage]
 
     static func defaultPolicy(for action: String) -> ActionPolicy {
         guard builtIn.contains(action) else { return .ask }

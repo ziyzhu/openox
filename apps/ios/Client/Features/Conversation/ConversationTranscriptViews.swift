@@ -1082,13 +1082,7 @@ private struct UserSkillBubble: View {
                     onOpenAttachment: onOpenAttachment
                 )
             } else {
-                Button { onOpenSkill(invocation.skill) } label: {
-                    SkillLibraryRow(skill: invocation.skill)
-                }
-                .buttonStyle(.plain)
-                .modifier(ConversationInteractiveRowSurface())
-                .accessibilityLabel("/\(invocation.skill.displayName), \(invocation.skill.description)")
-                .accessibilityIdentifier(A11yID.ConversationControls.Message.skill(invocation.skill.name))
+                SkillBubble(skill: invocation.skill, onOpen: onOpenSkill)
             }
 
             if invocation.skill.owner != .system && (!invocation.argument.isEmpty || !attachments.isEmpty) {
@@ -1102,6 +1096,26 @@ private struct UserSkillBubble: View {
                 .accessibilityIdentifier(A11yID.ConversationControls.Message.user)
             }
         }
+    }
+}
+
+private struct SkillBubble: View {
+    let skill: Skill
+    let onOpen: (Skill) -> Void
+
+    var body: some View {
+        Button { onOpen(skill) } label: {
+            Text(verbatim: "/\(skill.displayName)")
+                .font(Theme.Fonts.bodyMd)
+                .foregroundStyle(Theme.Colors.onSurface)
+                .padding(.horizontal, 14)
+                .padding(.vertical, Theme.Spacing.md)
+                .conversationCardOutline(cornerRadius: Theme.Radius.xl)
+                .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("/\(skill.displayName), \(skill.description)")
+        .accessibilityIdentifier(A11yID.ConversationControls.Message.skill(skill.name))
     }
 }
 
@@ -1367,14 +1381,8 @@ struct BlockView: View, Equatable {
                         }
                     case let .skill(skill):
                         if skill.owner != .system {
-                            Button { onOpenSkill(skill) } label: {
-                                SkillLibraryRow(skill: skill)
-                            }
-                            .buttonStyle(.plain)
-                            .modifier(ConversationInteractiveRowSurface())
-                            .padding(.horizontal, 4)
-                            .accessibilityLabel("/\(skill.displayName), \(skill.description)")
-                            .accessibilityIdentifier(A11yID.ConversationControls.Message.skill(skill.name))
+                            SkillBubble(skill: skill, onOpen: onOpenSkill)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
                         }
                     }
                 }

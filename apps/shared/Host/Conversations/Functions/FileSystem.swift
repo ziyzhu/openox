@@ -265,6 +265,37 @@ extension Conversation {
         }
     }
 
+    public func messageFile(path: String) async -> FileItem? {
+        guard !path.contains(":") else { return nil }
+        _ = try? await durablePreparation?.value
+        guard let route = durableRoute,
+              let validated = try? await route.session.runtime.command(.object(["action": .string("filesystemValidate"),
+                  "operation": .string("read"), "arguments": .object(["path": .string(path), "purpose": .string("Show file")]),
+                  "profileID": .string(route.profileID.uuidString), "conversationID": .int(route.conversationID)])),
+              let normalized = validated.objectValue?["path"]?.stringValue else { return nil }
+        return await durableFile(path: normalized)?.artifact
+    }
+
+    public func messageFiles() async -> [FileItem] {
+        var paths: [String] = []
+        for block in transcript.reversed() {
+            guard case .agentContent(let items) = block.kind else { continue }
+            for case .text(let text) in items {
+                paths += text.matches(of: /\]\(<?([^)>\s]+)>?\)/).compactMap { match in
+                    let path = String(match.1).removingPercentEncoding ?? String(match.1)
+                    return path.contains(":") || paths.contains(path) ? nil : path
+                }
+            }
+        }
+        var files: [FileItem] = []
+        for path in paths {
+            guard let file = await messageFile(path: path), file.exists,
+                  !files.contains(where: { $0.fileName == file.fileName }) else { continue }
+            files.append(file)
+        }
+        return files
+    }
+
     func durableFile(path: String) async -> (artifact: FileItem, record: JSONValue)? {
         guard let route = durableRoute,
               let result = try? await route.session.runtime.command(.object(["action": .string("fileStat"), "path": .string(path), "byPath": .bool(true)])),

@@ -896,7 +896,7 @@ nonisolated struct ConversationDocument: Sendable {
         generation: AgentGenerationID,
         steps: [Step]
     ) -> Materialization? {
-        guard Actions.builtIn.contains(invocation.name) else { return nil }
+        guard Actions.builtIn.contains(invocation.name) || Actions.retired.contains(invocation.name) else { return nil }
         let filename = invocation.args.objectValue?["filename"]?.stringValue
         let domain = invocation.args.objectValue?["domain"]?.stringValue
         for index in stepIndex..<steps.count where steps[index].generation == generation {

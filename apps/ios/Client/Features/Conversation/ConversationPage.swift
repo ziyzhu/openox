@@ -369,6 +369,7 @@ struct ConversationPage: View {
 
     @State private var copiedBlockId: UUID?
     @State private var toast: Toast?
+    @State private var messageFiles: [FileItem] = []
     @State private var choiceInputFocused = false
     @State private var showsDelayedActivity = false
 
@@ -565,6 +566,14 @@ struct ConversationPage: View {
                 browserPageMount.reconcile(page: browserPage, ownerIDs: servicePageOwnerIDs)
             }
             .toast($toast, accessibilityIdentifier: A11yID.ConversationControls.toast)
+            .environment(\.conversationFileResolver, ConversationFileResolver(revision: conversation.artifactFilesRevision) { [conversation] path in
+                await conversation.messageFile(path: path)
+            })
+            .task(id: MessageFilesKey(conversation: conversation.id, blocks: conversation.transcriptBlockCount,
+                                      isBusy: conversation.isBusy, files: conversation.artifactFilesRevision)) {
+                guard !conversation.isBusy else { return }
+                messageFiles = await conversation.messageFiles()
+            }
             .safeAreaBar(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     pageTopBar(blockCount: totalBlockCount)
@@ -1024,7 +1033,15 @@ struct ConversationPage: View {
     }
 
     private var conversationFiles: [FileItem] {
-        conversation.referencedFiles
+        var seen = Set<String>()
+        return (messageFiles + conversation.referencedFiles).filter { seen.insert($0.fileName.lowercased()).inserted }
+    }
+
+    private struct MessageFilesKey: Equatable {
+        let conversation: Conversation.ID
+        let blocks: Int
+        let isBusy: Bool
+        let files: Int
     }
 
     private var submissionAnchor: Conversation.SubmissionAnchor? {
@@ -2075,6 +2092,16 @@ struct ConversationPage: View {
             }
             Log.ui.info("ConversationPage.openLink disposition=artifact filename=\(artifact.fileName)")
             openAttachment(artifact)
+        case .file(let path):
+            Task {
+                guard let file = await conversation.messageFile(path: path), file.exists else {
+                    Log.ui.warning("ConversationPage.openLink disposition=removed-file path=\(path)")
+                    toast = Toast(message: String(localized: "This file was removed."))
+                    return
+                }
+                Log.ui.info("ConversationPage.openLink disposition=file filename=\(file.fileName)")
+                openAttachment(file)
+            }
         case .unsupported(let url):
             Log.ui.warning("ConversationPage.openLink disposition=unsupported url=\(LogPrivacy.url(url.absoluteString))")
         }

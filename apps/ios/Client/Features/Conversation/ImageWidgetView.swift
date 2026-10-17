@@ -27,10 +27,7 @@ struct ImageWidgetView: View {
 
     var body: some View {
         surface
-            .frame(maxWidth: .infinity)
-            .background(Theme.Colors.background)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-            .conversationCardOutline(cornerRadius: Theme.Radius.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .task(id: LoadRequest(image: image, retry: retry)) { await load() }
             .fullScreenCover(item: $preview) { preview in
                 FileScreen(onDismiss: { self.preview = nil }, dismissIdentifier: A11yID.ConversationControls.Message.imageClose) { _ in
@@ -44,15 +41,17 @@ struct ImageWidgetView: View {
         switch state {
         case .loading:
             CellularAutomatonLoader(size: 16, tint: Theme.Colors.onSurfaceMuted.dynamic)
+                .frame(maxWidth: .infinity)
                 .frame(height: 160)
+                .placeholderCard()
                 .accessibilityLabel("Loading image")
         case let .ready(loaded):
             Button { preview = Preview(image: loaded) } label: {
                 Image(uiImage: loaded)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxHeight: 320)
-                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                    .frame(maxWidth: 320 * loaded.size.width / max(loaded.size.height, 1))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Open image")
@@ -71,6 +70,7 @@ struct ImageWidgetView: View {
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .frame(maxWidth: .infinity)
                 .frame(height: 160)
+                .placeholderCard()
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier(A11yID.ConversationControls.Message.imageRetry)
@@ -105,5 +105,12 @@ struct ImageWidgetView: View {
             state = .failed
             Log.ui.error("ImageWidgetView.load failed source=\(image.source.artifact == nil ? "remote" : "artifact") error=\(LogPrivacy.text(error.localizedDescription))")
         }
+    }
+}
+
+private extension View {
+    func placeholderCard() -> some View {
+        background(Theme.Colors.background, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .conversationCardOutline(cornerRadius: Theme.Radius.md)
     }
 }

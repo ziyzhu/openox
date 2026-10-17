@@ -111,7 +111,7 @@ nonisolated public struct FileItem: Equatable, Sendable, Identifiable, Codable {
     }
     public var kind: Kind {
         if contentType.conforms(to: .html) { return .html }
-        if contentType.conforms(to: .image) { return .image }
+        if contentType.conforms(to: .image), !contentType.conforms(to: .svg) { return .image }
         if contentType.conforms(to: .pdf) { return .pdf }
         if contentType.conforms(to: .text) || contentType.conforms(to: .sourceCode)
             || contentType.conforms(to: .json) || contentType.conforms(to: .commaSeparatedText) { return .text }

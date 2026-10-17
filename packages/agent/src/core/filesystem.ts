@@ -8,11 +8,12 @@ import type { MountedExecutionEnv } from "./file-mounts";
 import { canonical } from "./file-paths";
 import { filesystemContract } from "./filesystem-contract";
 import { bundledSkills } from "./bundled-skills";
+import { decodeBase64 } from "./base64";
 
 const tools = { read: createReadTool(), write: createWriteTool(), edit: createEditTool() };
 export type FileOperation = "list" | "read" | "write" | "edit" | "delete" | "mkdir" | "rmdir" | "move" | "copy" | "glob" | "grep";
 export interface FileRequest {
-  path?: string; from?: string; to?: string; recursive?: boolean; purpose?: string; offset?: number; limit?: number; content?: string;
+  path?: string; from?: string; to?: string; recursive?: boolean; purpose?: string; offset?: number; limit?: number; content?: string; base64?: string;
   edits?: { oldText: string; newText: string }[]; pattern?: string;
   options?: { limit?: number; glob?: string; ignoreCase?: boolean; literal?: boolean; contextLines?: number };
 }
@@ -63,7 +64,8 @@ function validateMutation(operation: FileOperation, args: FileRequest, path: str
     if (!args.edits!.length || args.edits!.length > 128) throw new FileError("invalid", "Use 1-128 targeted replacements");
     if (args.edits!.some(edit => !edit.oldText)) throw new FileError("invalid", "Each oldText must be non-empty and match exactly once");
   }
-  if (operation === "write" && encoder.encode(args.content!).length > 200 * 1024) throw new FileError("invalid", "Text write exceeds 200 KiB", path);
+  if (operation === "write" && (args.content === undefined) === (args.base64 === undefined)) throw new FileError("invalid", "Pass exactly one of content or base64", path);
+  if (operation === "write" && args.content !== undefined && encoder.encode(args.content).length > 200 * 1024) throw new FileError("invalid", "Text write exceeds 200 KiB", path);
   if (immutableRoots.has(path.split("/").slice(0, 2).join("/"))) throw new FileError("permission_denied", "Bundled System skills are read-only; copy to a distinct name to customize", path);
 }
 export function resolveFileRequest(args: FileRequest, cwd: string): FileRequest {
@@ -275,6 +277,12 @@ export class AgentFileSystem {
       return { path, deleted: true };
     }
     if (operation === "glob" || operation === "grep") return this.search(env, operation, args, context);
+    if (operation === "write" && args.base64 !== undefined) {
+      let bytes: Uint8Array;
+      try { bytes = decodeBase64(args.base64); } catch { throw new FileError("invalid", "base64 must be standard padded Base64 of at most 32 MiB", path); }
+      getOrThrow(await env.writeFile(path, bytes, context));
+      return item(getOrThrow(await env.fileInfo(path, context)));
+    }
     let totalLines = 0;
     const toolEnv = toolEnvironment(env, args, value => { totalLines = value; });
     const result = await executeFileTool(operation, args, toolEnv, context);
