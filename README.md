@@ -128,16 +128,6 @@ flowchart TB
 
 *The Client and model remain replaceable around a Host that owns the Agent, Profile, VM, and service lifecycle.*
 
-The network Client–Host protocol is JSON-RPC 2.0 over WebSocket inside Tailscale.
-The [shared protocol package](packages/protocol) owns Client–Host RPC
-schemas and Host–Repository content contracts. It supplies portable JSON Schema,
-generated iOS RPC request models, and the supported repository version.
-The [services package](packages/services) supplies the official repository
-and filesystem skill readers.
-iOS RPC handlers live under `Host/RPC`, UI automation under `Client/Automation`,
-and production logging under `Diagnostics`. Simulator launch helpers and demo
-previews live under `Development`; these do not define a separate Host privilege tier.
-
 - **Ox Client** — An interface that connects to an Ox Host. A Client may be a mobile app, desktop app, web app, or command-line tool. The Host binds VM execution to the selected conversation, its permissions, attached services, and virtual filesystem view.
 - **Ox Host** — A process or device that opens an Ox Profile, runs the Ox VM, and supplies platform and service adapters. A Client can use an embedded Host or target a compatible Host elsewhere.
 - **Ox Agent** — The reasoning and tool-using process that pursues the user’s goals using the selected model, the state in an Ox Profile, and the capabilities exposed through the Ox VM.
