@@ -2068,6 +2068,7 @@ struct ConversationPage: View {
         case .artifact(let filename):
             guard let artifact = conversationFiles.first(where: {
                 $0.fileName.caseInsensitiveCompare(filename) == .orderedSame
+                    || $0.displayName.caseInsensitiveCompare(filename) == .orderedSame
             }) else {
                 Log.ui.warning("ConversationPage.openLink disposition=missing-artifact filename=\(filename)")
                 return

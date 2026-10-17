@@ -265,15 +265,18 @@ extension Conversation {
         }
     }
 
+    func durableFile(path: String) async -> (artifact: FileItem, record: JSONValue)? {
+        guard let route = durableRoute,
+              let result = try? await route.session.runtime.command(.object(["action": .string("fileStat"), "path": .string(path), "byPath": .bool(true)])),
+              let record = result.objectValue?["file"]?.objectValue, record["hidden"]?.boolValue != true,
+              let actual = record["path"]?.stringValue, let reference = record["reference"]?.stringValue else { return nil }
+        return (FileItem(fileName: reference, directory: route.artifactScope?.root ?? scope.root, relativePath: actual), .object(record))
+    }
+
     func fileSystemMedia(path: String) async throws -> FileSystemMedia {
-        if let route = durableRoute {
-            let result = try? await route.session.runtime.command(.object(["action": .string("fileStat"), "path": .string(path), "byPath": .bool(true)]))
-            if let record = result?.objectValue?["file"]?.objectValue, record["hidden"]?.boolValue != true,
-               let actual = record["path"]?.stringValue, let reference = record["reference"]?.stringValue {
-                let artifact = FileItem(fileName: reference, directory: route.artifactScope?.root ?? scope.root, relativePath: actual)
-                let data = try await route.session.runtime.readFile(.object(record))
-                return FileSystemMedia(artifact: artifact, data: data, reference: reference)
-            }
+        if let route = durableRoute, let file = await durableFile(path: path) {
+            let data = try await route.session.runtime.readFile(file.record)
+            return FileSystemMedia(artifact: file.artifact, data: data, reference: file.artifact.fileName)
         }
         let location = try await fileSystemLocation(path)
         try await authorizeFileAccess(location, operation: .read)

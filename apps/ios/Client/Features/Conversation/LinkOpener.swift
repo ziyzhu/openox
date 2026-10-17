@@ -15,7 +15,7 @@ enum ConversationLinkDestination: Equatable {
         switch url.scheme?.lowercased() {
         case "http", "https":
             self = .web(url)
-        case "sandbox":
+        case "sandbox", nil:
             let filename = url.lastPathComponent.removingPercentEncoding ?? url.lastPathComponent
             self = filename.isEmpty ? .unsupported(url) : .artifact(filename)
         default:

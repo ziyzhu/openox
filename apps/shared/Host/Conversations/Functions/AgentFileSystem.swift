@@ -57,6 +57,11 @@ extension Conversation {
                 profileID: route.profileID, operation: name,
                 arguments: .object(args.merging(["purpose": .string(purpose)]) { _, value in value }), mounts: mounts)
             Log.session.info("bridge.fs.operation name=\(name) path=\(path) profile=\(route.profileID)")
+            if ["write", "edit"].contains(name), let written = result.objectValue?["path"]?.stringValue,
+               written.hasPrefix("conversations/\(route.conversationID)/"), written.lowercased().hasSuffix(".html"),
+               let file = await durableFile(path: written) {
+                embedFile(file.artifact)
+            }
             return result
         }
     }
