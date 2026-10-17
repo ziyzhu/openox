@@ -1,19 +1,27 @@
 ---
 name: visualize
-description: "Create or revise HTML files for visual results, explorable explanations, simulations, interactive tools, and small apps. Keep ordinary answers, lists, and small tables in conversation."
+description: "Create Mermaid diagrams, SVG drawings, or HTML files for visual results, explorable explanations, simulations, interactive tools, and small apps. Keep ordinary answers, lists, and small tables in conversation."
 ---
 
 # Visualize
 
-Create an HTML file when the user wants a visual result, an interactive experience, or a small app. Choose the simplest composition that serves the task; explanations are one option, not a requirement. Keep ordinary answers, lists, and small tables in conversation. Ordinary Markdown and file operations use `ox.fs` directly.
+Create a visual when the user wants a visual result, an interactive experience, or a small app. Choose the lightest form that serves the task: a Mermaid diagram in your reply, an SVG drawing, or an HTML file. Explanations are one option, not a requirement. Keep ordinary answers, lists, and small tables in conversation. Ordinary Markdown and file operations use `ox.fs` directly.
 
 ## Choose the experience
 
-- Static visuals: use labeled HTML or inline SVG for diagrams, flows, hierarchies, timelines, and comparisons; use plots for data patterns and maps for spatial relationships. Do not add interaction without a purpose.
+- Diagrams: use a Mermaid diagram for flowcharts, sequences, states, classes, entity relationships, mind maps, timelines, Gantt charts, and pie charts. It needs no file.
+- Static drawings: write an SVG file for illustrations, icons, and fixed layouts that Mermaid cannot express.
+- Other static visuals: use labeled HTML with inline SVG for comparisons, plots of data patterns, and maps of spatial relationships. Do not add interaction without a purpose.
 - Explorable explanations: combine authored prose with an inspectable model. Make the default readable without interaction, then let the reader question assumptions and see the consequences change.
 - Simulations: show how a system behaves as inputs or time change. Use meaningful starting conditions, clear controls, and a way to pause or restore the baseline.
 - Tools and apps: help the user calculate, select, organize, configure, or perform a task. Provide a useful starting or empty state and a clear primary workflow; do not force the interface into a narrative or chart.
 - Combine forms when they serve the same goal. A trip-planning app can use a map, editable itinerary, and explicit service actions; not every screen needs an explanation or visualization.
+
+## Draw Mermaid diagrams and SVG files
+
+Put Mermaid source in a fenced code block tagged `mermaid` in your reply. When the reply finishes, the conversation replaces the block with a static diagram that follows the conversation's light or dark theme and lays out for phone width; tapping it opens a zoomable view. Use standard Mermaid syntax with short node labels. Do not add `%%{init}%%` theme directives, `classDef` colors, `click` callbacks, links, or images; they are ignored or break the Ox theme. Invalid source shows as a plain code block, so check bracket pairs, arrow syntax, and quoting before replying. Keep one idea per diagram and about 15 nodes at most; split larger structures.
+
+Write an SVG drawing as a self-contained UTF-8 file at a short lowercase `<name>.svg` path with `ox.fs.write`, then show it with `![Short title](<name>.svg)` on its own line. Give the root `<svg>` an `xmlns`, a `viewBox`, and a `<title>`. Use inline attributes or a `<style>` element, system fonts, and no scripts, event handlers, links, external references, or embedded fonts; the conversation renders SVG as a non-interactive image on a white background and never runs its scripts. Keep it below 1 MB. Use HTML instead when the visual needs controls, theme-aware colors, or live data.
 
 ## Compose the interface
 
@@ -88,7 +96,7 @@ This minimal binding example uses an illustrative 50 calories per cookie, not nu
 - Use Ox's 4, 8, 12, 16, 24, and 32 px spacing scale, 12 px input radii, 18 px grouped-content radii, capsule buttons, and touch targets at least 44 px in both dimensions.
 - Separate structure with spacing and tonal surfaces, not decorative borders or shadows. Reserve harvest gold for at most one primary action or active series per visible region; use `surface-sunken` for small recessed accents. Do not imitate the Host's navigation, composer, or approval controls inside the HTML page.
 
-## Write and revise the file
+## Write and revise the HTML file
 
 Write one self-contained UTF-8 HTML fragment to a short lowercase `<name>.html` path in the conversation's working directory with `ox.fs.write`. Start with `<meta name="viewport" content="width=device-width, initial-scale=1">` and `<meta name="color-scheme" content="light dark">` so the browser uses phone-width layout and an appearance-aware page background. Put markup, `<style>`, and `<script>` in that file; omit `<!doctype>`, `<html>`, `<head>`, and `<body>`. Keep it below 200 KB. Writing does not show the file. Show it by putting `![Short title](<name>.html)` on its own line in your reply; the conversation renders the live page there.
 
