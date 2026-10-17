@@ -136,7 +136,7 @@ export async function refreshBuiltinRepository(): Promise<RepositoryPackage> {
   try {
     const repository = await buildArtifacts(temporary);
     const manifest = join(BUILTIN_REPOSITORY_ROOT, "repository.json");
-    const contents = await readFile(join(temporary, "repository.json"), "utf8");
+    const contents = `${JSON.stringify({ ...repository, contentHash: undefined }, null, 2)}\n`;
     if (contents !== await readFile(manifest, "utf8")) await writeFile(manifest, contents);
     return repository;
   } finally {

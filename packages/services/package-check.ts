@@ -32,7 +32,7 @@ try {
     readFile(join(import.meta.dir, "dist", "repository", "repository.json"), "utf8"),
     readFile(resolve(import.meta.dir, "../../apps/shared/Resources/OxServices.bundle/repository.json"), "utf8"),
   ]);
-  if (packagedManifest !== bundledManifest) throw new Error("npm repository differs from apps/shared/Resources/OxServices.bundle");
+  if (`${JSON.stringify({ ...JSON.parse(packagedManifest), contentHash: undefined }, null, 2)}\n` !== bundledManifest) throw new Error("npm repository differs from apps/shared/Resources/OxServices.bundle");
 
   const packed = await run(["npm", "pack", "--ignore-scripts", "--json", "--pack-destination", packageDirectory], import.meta.dir);
   const reports = JSON.parse(packed) as PackReport[];

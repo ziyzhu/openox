@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import SwiftGitX
+import Synchronization
 
 actor Repository {
     struct Entry: Sendable {
@@ -437,7 +438,9 @@ actor Repository {
             switch repository.descriptor.provenance {
             case .local, .mounted, .remote:
                 version = try? Self.contentHash(at: repository.root, package: repository.package)
-            case .bundled, .development:
+            case .bundled:
+                version = try? Self.bundledContentHash(at: repository.root, package: repository.package)
+            case .development:
                 version = repository.package.contentHash
                     ?? (try? Self.contentHash(at: repository.root, package: repository.package))
             }
@@ -1183,6 +1186,17 @@ actor Repository {
         var data = try encoder.encode(package)
         data.append(0x0A)
         try data.write(to: root.appendingPathComponent("repository.json"), options: .atomic)
+    }
+
+    private static let bundledContentHashes = Mutex<[URL: String]>([:])
+
+    private static func bundledContentHash(at root: URL, package: Package) throws -> String {
+        if let hash = bundledContentHashes.withLock({ $0[root] }) { return hash }
+        let startedAt = ContinuousClock.now
+        let hash = try contentHash(at: root, package: package)
+        bundledContentHashes.withLock { $0[root] = hash }
+        Log.service.info("Repository.bundledContentHash services=\(package.services.count) skills=\(package.skills.count) ms=\(Int(startedAt.duration(to: .now) / .milliseconds(1)))")
+        return hash
     }
 
     private static func contentHash(at root: URL, package: Package) throws -> String {
