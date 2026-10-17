@@ -6,11 +6,12 @@ import { catalog } from "../../../../packages/agent/evals/stubs";
 import type { EvalCase, Report } from "./types.ts";
 
 export async function sourceFunctions(): Promise<string[]> {
-  const directory = join(ROOT, "apps/shared/Host/VM/OxFunctions");
   const names = new Set<string>();
-  for (const filename of await readdir(directory)) {
-    if (!/^Ox.*\.swift$/.test(filename) || ["OxFunctionCatalog.swift", "OxFunctionBridge.swift"].includes(filename)) continue;
-    const source = await readFile(join(directory, filename), "utf8");
+  for (const path of await readdir(join(ROOT, "apps/shared/Host"), { recursive: true })) {
+    const filename = path.split("/").at(-1)!;
+    if (!/^Ox.*\.swift$/.test(filename)) continue;
+    const source = await readFile(join(ROOT, "apps/shared/Host", path), "utf8");
+    if (!source.includes("OxFunction(")) continue;
     for (const match of source.matchAll(/"(ox\.[a-z]+(?:\.[A-Za-z]+)+)"/g)) names.add(match[1]!);
     if (filename === "OxFileSystem.swift") for (const match of source.matchAll(/__nativeFS\('([A-Za-z]+)'/g)) names.add(`ox.fs.${match[1]}`);
   }
