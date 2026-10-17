@@ -19,6 +19,7 @@ ox --help
 ox host list --help
 ```
 
+- `bun install` registers the `*.xcstrings` merge driver in the checkout's Git config; it merges string catalog entries by key and falls back to a normal text merge when the same key changed on both sides.
 - Use `bun run typecheck` as the first source check. Use `apps/cli/install.sh` for standalone installation and `bun run --cwd apps/cli package:check` for package checks.
 - Run `bun link` inside `apps/cli`, not `bun link @openox/cli` at the workspace root; the latter creates a dependency loop with the existing workspace.
 - If help still lists old top-level `discover`, `logs`, or `service` commands, check `command -v ox`. The current CLI groups those operations under `host`. Resolve stale installations with their original package manager or adjust PATH; do not overwrite an unrelated executable.

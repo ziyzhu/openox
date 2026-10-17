@@ -4,6 +4,7 @@
   "license": "Apache-2.0",
   "workspaces": ["apps/cli", "packages/protocol", "packages/services", "packages/agent"],
   "scripts": {
+    "postinstall": "[ ! -f .agents/skills/setup/scripts/git-merge-drivers.ts ] || bun .agents/skills/setup/scripts/git-merge-drivers.ts",
     "ci": "./.agents/skills/test/scripts/ci.sh",
     "ci:ios": "bun .agents/skills/test/apps/ios/smoke.ts",
     "test:e2e": "bun test ./.agents/skills/test",
