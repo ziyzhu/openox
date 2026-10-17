@@ -85,7 +85,7 @@ nonisolated enum Actions {
     static let widgetImage = "ox.widget.image"
     static let userChoose = "ox.user.choose"
     static let userFollow = "ox.user.follow"
-    static let userReportProgress = "ox.user.reportProgress"
+    static let userProgress = "ox.user.progress"
 
     static let builtIn = [
         conversationStart, conversationDelete, providerDefault, providerList, providerGet, providerModels, providerGenerate, providerValidate, providerSave, providerDelete,
@@ -104,7 +104,7 @@ nonisolated enum Actions {
         skillCreate, skillCopy, skillDelete, skillShare,
         scheduleCreate, scheduleList, scheduleDelete, scheduleEnable, scheduleRun,
         memoryRead, memoryWrite, memoryReplaceText,
-        userChoose, userFollow, userReportProgress,
+        userChoose, userFollow, userProgress,
     ]
     static let retired = [widgetShoveler, widgetVideo, widgetImage]
 
@@ -202,7 +202,7 @@ nonisolated enum Actions {
         case widgetImage: L10n.string("Display image")
         case userChoose: L10n.string("Ask a question")
         case userFollow: L10n.string("Suggest next steps")
-        case userReportProgress: L10n.string("Report progress")
+        case userProgress: L10n.string("Report progress")
         default: nil
         }
     }

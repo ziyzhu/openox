@@ -631,7 +631,7 @@ extension Scenario {
             return [
                 .think("Planning the first pass."),
                 execute("""
-                await ox.user.reportProgress({ message: "I found the first result. I’m checking the remaining details now.", purpose: "Share progress" });
+                await ox.user.progress({ message: "I found the first result. I’m checking the remaining details now.", purpose: "Share progress" });
                 console.log(await ox.fs.list({ path: "artifacts", purpose: "List files" }));
                 """),
             ]

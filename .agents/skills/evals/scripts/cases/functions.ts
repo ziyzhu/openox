@@ -96,7 +96,7 @@ const groups: Record<string, Record<string, string>> = {
   user: {
     choose: "Ask the decisive question and honor the selected or custom answer",
     follow: "Offer at most two relevant intents without delaying the completed task",
-    reportProgress: "Report useful progress without claiming premature completion",
+    progress: "Report useful progress without claiming premature completion",
   },
   vision: { analyze: "Read QA image text and classifications on-device acknowledging truncation and uncertainty" },
   web: {
@@ -152,7 +152,7 @@ const journeys: Array<[string, string, string[]]> = [
   ["skill-package-lifecycle", "Create the approved reusable QA helper, execute it with variable inputs, make an independent copy, share the accepted package into Local and delete only the disposable copy", ["skill.create", "skill.run", "skill.copy", "skill.share", "skill.delete"]],
   ["schedule-lifecycle", "Schedule the supplied QA skill, inspect its fire time, disable and re-enable it, run it once and inspect the child outcome, then delete the run-owned schedule", ["schedule.create", "schedule.enable", "schedule.run", "schedule.delete"]],
   ["secret-lifecycle", "Inspect credential metadata, connect the QA service through native secret entry and remove only the run-owned credential after verifying the task", ["secret.list", "secret.add", "secret.delete"]],
-  ["clarify-and-complete", "Resolve the supplied ambiguous request with a decisive choice, report progress during actual work and offer useful follow-up intents after completion", ["user.choose", "user.reportProgress", "user.follow"]],
+  ["clarify-and-complete", "Resolve the supplied ambiguous request with a decisive choice, report progress during actual work and offer useful follow-up intents after completion", ["user.choose", "user.progress", "user.follow"]],
   ["image-research", "Read the supplied QA image, research the identified subject and verify the relevant public source before answering with grounded links and one embedded public image whose direct image URL loads", ["vision.analyze", "web.search", "web.fetch"]],
   ["browser-navigation", "Investigate the QA site's navigation problem: inspect page state and history, exercise back and forward, stop the pending load, reload and verify the final page before presenting it", ["web.browser.navigate", "web.browser.getPageInfo", "web.browser.getNavigationHistory", "web.browser.goBack", "web.browser.goForward", "web.browser.stopLoading", "web.browser.reload", "web.browser.showPage"]],
   ["browser-form", "Complete the supplied QA form through bounded page interaction, wait for the resulting navigation, isolate the human-only step and export the verified confirmation as PDF", ["web.browser.executeScript", "web.browser.waitForNavigation", "web.browser.waitForUserInteraction", "web.browser.exportPdf"]],

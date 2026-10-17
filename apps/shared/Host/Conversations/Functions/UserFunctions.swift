@@ -35,9 +35,9 @@ extension Conversation {
     public func reportProgress(message: String, purpose: String) async throws -> JSONValue? {
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed.count <= 2_000 else {
-            throw RuntimeError.bridge("ox.user.reportProgress: message must contain 1-2000 characters")
+            throw RuntimeError.bridge("ox.user.progress: message must contain 1-2000 characters")
         }
-        return try await tracked(Actions.userReportProgress, .object(["message": .string(trimmed)]), purpose: purpose) {
+        return try await tracked(Actions.userProgress, .object(["message": .string(trimmed)]), purpose: purpose) {
             try appendReportedProgress(trimmed)
             Log.session.info("Conversation.reportProgress id=\(id) chars=\(trimmed.count)")
             return nil

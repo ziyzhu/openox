@@ -1491,7 +1491,7 @@ final class Conversation: Identifiable {
 
     func appendReportedProgress(_ message: String) throws {
         guard document.hasOpenExecution else {
-            throw RuntimeError.bridge("ox.user.reportProgress: no JavaScript execution is active")
+            throw RuntimeError.bridge("ox.user.progress: no JavaScript execution is active")
         }
         document.apply(.appendProgress(message))
         activeRun?.backgroundExecution?.advance()

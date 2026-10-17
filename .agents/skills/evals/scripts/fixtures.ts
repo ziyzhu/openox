@@ -124,7 +124,7 @@ function skillFixture(qaProfile: string, probe: boolean): CaseBinding {
       ...(probe ? [{ evidence: "probe", phase: "probe" as const, observation: "probe", path: ["answer"], operator: "equals" as const, expected: prefix.repeat(count) }] : []),
     ],
     actions: [{ name: "ox.skill.create", outcome: "succeeded", minimum: 1, maximum: 1, args: { name } }, { name: "ox.skill.delete", outcome: "succeeded", minimum: 0, maximum: 1, args: { name } }],
-    allowedActions: ["ox.fs.read", "ox.fs.list", "ox.fs.glob", "ox.fs.grep", "ox.skill.create", "ox.skill.delete", "ox.user.choose", "ox.user.reportProgress", "ox.tool.help"],
+    allowedActions: ["ox.fs.read", "ox.fs.list", "ox.fs.glob", "ox.fs.grep", "ox.skill.create", "ox.skill.delete", "ox.user.choose", "ox.user.progress", "ox.tool.help"],
     cleanup: `Delete only the run-owned Profile skill ${name}. Preserve all other state; report any blocked deletion without trying another method.`,
   };
 }

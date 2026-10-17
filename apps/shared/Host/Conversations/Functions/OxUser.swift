@@ -38,9 +38,9 @@ nonisolated enum OxUser {
                     ])
                 ),
                 (
-                    "ox.user.reportProgress",
+                    "ox.user.progress",
                     .object([
-                        "description": .string(ModelGuidance.text("ox.user.reportProgress")),
+                        "description": .string(ModelGuidance.text("ox.user.progress")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -92,7 +92,7 @@ nonisolated enum OxUser {
             let follow: @convention(block) (JSValue, String) -> JSValue = { intents, purpose in
                 env.call { try await $0.followUser(intents: jsValueToJSON(intents) ?? .null, purpose: purpose) }
             }
-            let reportProgress: @convention(block) (String, String) -> JSValue = { message, purpose in
+            let progress: @convention(block) (String, String) -> JSValue = { message, purpose in
                 env.call { try await $0.reportProgress(message: message, purpose: purpose) }
             }
             let choose: @convention(block) (String, JSValue, String) -> JSValue = { body, options, purpose in
@@ -100,13 +100,13 @@ nonisolated enum OxUser {
                 return env.call(suspendingTimeout: true) { try await $0.chooseUser(body: body, options: labels, purpose: purpose) }
             }
             context.setObject(follow as AnyObject, forKeyedSubscript: "__nativeUserFollow" as NSString)
-            context.setObject(reportProgress as AnyObject, forKeyedSubscript: "__nativeUserReportProgress" as NSString)
+            context.setObject(progress as AnyObject, forKeyedSubscript: "__nativeUserProgress" as NSString)
             context.setObject(choose as AnyObject, forKeyedSubscript: "__nativeUserChoose" as NSString)
         },
         jsFragment: """
           follow: (value) => { const options = __oxOptions(value, 'ox.user.follow'); return __nativeUserFollow(options.intents, String(options.purpose)); },
           choose: (value) => { const options = __oxOptions(value, 'ox.user.choose'); return __nativeUserChoose(String(options.body), options.options, String(options.purpose)); },
-          reportProgress: (value) => { const options = __oxOptions(value, 'ox.user.reportProgress'); return __nativeUserReportProgress(String(options.message), String(options.purpose)); }
+          progress: (value) => { const options = __oxOptions(value, 'ox.user.progress'); return __nativeUserProgress(String(options.message), String(options.purpose)); }
         """
     )
 }
