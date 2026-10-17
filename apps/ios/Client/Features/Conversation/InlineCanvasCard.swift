@@ -16,6 +16,29 @@ private final class InlineCanvasSession {
     let presentations: AppPresentationCoordinator
     let source: FilePreviewSource
     private(set) var phase: Phase = .loading
+    private(set) var contentHeight: CGFloat?
+
+    private static let contentHeightScript = """
+        const measure = () => {
+          const body = document.body;
+          if (!body) return 0;
+          const rect = body.getBoundingClientRect();
+          const bottom = parseFloat(getComputedStyle(body).marginBottom) || 0;
+          return Math.ceil(rect.top + window.scrollY + Math.max(rect.height, body.scrollHeight) + bottom);
+        };
+        const current = measure();
+        if (current !== known) return current;
+        return await new Promise((resolve) => {
+          const observer = new ResizeObserver(() => {
+            const next = measure();
+            if (next === known) return;
+            observer.disconnect();
+            resolve(next);
+          });
+          observer.observe(document.documentElement);
+          if (document.body) observer.observe(document.body);
+        });
+        """
 
     init(source: FilePreviewSource, serviceManager: ServiceManager) {
         let artifact = source.artifact
@@ -49,6 +72,19 @@ private final class InlineCanvasSession {
         } catch {
             phase = .failed(artifact.userFacingErrorDescription(error))
             Log.ui.error("InlineCanvas.failed filename=\(artifact.fileName) error=\(error.localizedDescription)")
+        }
+    }
+
+    func trackContentHeight() async {
+        while !Task.isCancelled {
+            guard let value = try? await page.callJavaScript(
+                Self.contentHeightScript,
+                arguments: ["known": Double(contentHeight ?? -1)],
+                in: nil,
+                contentWorld: .defaultClient
+            ) as? Double, !Task.isCancelled else { return }
+            contentHeight = CGFloat(value)
+            Log.ui.debug("InlineCanvas.contentHeight filename=\(source.artifact.fileName) height=\(Int(value))")
         }
     }
 
@@ -87,22 +123,11 @@ struct InlineCanvasCard: View {
                 )
                 .appPresentations(session.presentations)
             } else {
-                LivePageCard(
-                    service: nil,
-                    fallbackSystemImage: "square.on.square",
-                    title: artifact.userFacingName,
-                    subtitle: String(localized: "HTML"),
-                    mount: nil,
-                    inlinePageAnchorID: nil,
-                    isPresented: isPresented,
-                    placeholder: .progress(String(localized: "Loading HTML…")),
-                    activate: nil,
-                    expand: nil,
-                    cancel: nil,
-                    accessibilityIdentifier: A11yID.ConversationControls.Message.artifact(artifact.id),
-                    expandAccessibilityIdentifier: A11yID.ConversationControls.canvasExpand(artifact.id),
-                    cancelAccessibilityIdentifier: ""
-                )
+                VStack(alignment: .leading, spacing: 0) {
+                    InlineCanvasPlaceholder(message: String(localized: "Loading HTML…"), isFailure: false)
+                        .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(artifact.id))
+                    InlineCanvasFileLink(artifact: artifact, open: nil)
+                }
             }
         }
         .fullScreenCover(isPresented: $isPresented, onDismiss: restore) {
@@ -176,29 +201,26 @@ private struct InlineCanvasPageCard: View {
         canvas = session.canvas
     }
 
+    private static let maximumHeight: CGFloat = 720
+
+    private var mount: WebPageMount? {
+        guard session.isReady, pageMount.isInline(page: session.page, ownerID: rowID) else { return nil }
+        return WebPageMount(page: session.page, ownerID: rowID, coordinator: pageMount)
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            LivePageCard(
-                service: nil,
-                fallbackSystemImage: "square.on.square",
-                title: artifact.userFacingName,
-                subtitle: String(localized: "HTML"),
-                mount: session.isReady && pageMount.isInline(page: session.page, ownerID: rowID)
-                    ? WebPageMount(page: session.page, ownerID: rowID, coordinator: pageMount)
-                    : nil,
-                inlinePageAnchorID: nil,
-                isPresented: false,
-                placeholder: placeholder,
-                activate: nil,
-                expand: session.isReady ? expand : nil,
-                cancel: nil,
-                accessibilityIdentifier: A11yID.ConversationControls.Message.artifact(artifact.id),
-                expandAccessibilityIdentifier: A11yID.ConversationControls.canvasExpand(artifact.id),
-                cancelAccessibilityIdentifier: "",
-                webContentMode: .canvas,
-                expandAccessibilityLabel: String(localized: "Open HTML")
-            )
+        VStack(alignment: .leading, spacing: 0) {
+            content
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(artifact.id))
+            InlineCanvasFileLink(artifact: artifact, open: session.isReady ? expand : nil)
             CanvasInteractionView(canvas: canvas)
+        }
+        .animation(.spring(duration: 0.3, bounce: 0), value: session.contentHeight)
+        .task(id: mount != nil) {
+            guard mount != nil else { return }
+            await session.trackContentHeight()
         }
         .fullScreenCover(item: $canvas.browser) { browser in
             NavigationStack {
@@ -208,11 +230,65 @@ private struct InlineCanvasPageCard: View {
         }
     }
 
-    private var placeholder: LivePageCard.Placeholder {
-        switch session.phase {
-        case .loading, .ready: .progress(String(localized: "Loading HTML…"))
-        case .failed(let message): .unavailable(message)
+    @ViewBuilder
+    private var content: some View {
+        if let mount {
+            MountedWebPageView(mount: mount, mode: .canvas)
+                .frame(height: min(session.contentHeight ?? InlineCanvasPlaceholder.height, Self.maximumHeight))
+        } else if case .failed(let message) = session.phase {
+            InlineCanvasPlaceholder(message: message, isFailure: true)
+        } else {
+            InlineCanvasPlaceholder(message: String(localized: "Loading HTML…"), isFailure: false)
         }
+    }
+}
+
+private struct InlineCanvasFileLink: View {
+    let artifact: FileItem
+    let open: (() -> Void)?
+
+    var body: some View {
+        Button {
+            open?()
+        } label: {
+            Text(artifact.userFacingName)
+                .font(Theme.Fonts.bodyMd)
+                .foregroundStyle(Theme.Colors.onSurface)
+                .underline(pattern: .dot)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(minHeight: Theme.Size.minimumTouchTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(open == nil)
+        .accessibilityHint(String(localized: "Open HTML"))
+        .accessibilityIdentifier(A11yID.ConversationControls.canvasExpand(artifact.id))
+    }
+}
+
+private struct InlineCanvasPlaceholder: View {
+    static let height: CGFloat = 220
+
+    let message: String
+    let isFailure: Bool
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            if isFailure {
+                Image(systemName: "safari.fill")
+                    .font(.title2)
+            } else {
+                ProgressView()
+            }
+            Text(message)
+        }
+        .font(Theme.Fonts.bodySm)
+        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .frame(height: Self.height)
+        .padding(.horizontal, Theme.Spacing.xl)
     }
 }
 
