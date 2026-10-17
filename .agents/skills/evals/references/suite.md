@@ -69,7 +69,7 @@ backend provides working-file state. System skill files come from the actual bun
 packages. Missing fixture coverage remains an explicit limit.
 
 Run `bun run test:vm --device ox-N --host <ws-url>` on a fresh QA build to compare
-`vm functions` with `packages/agent/evals/contracts.json` and exercise the real VM.
+`vm functions` with the per-namespace `packages/agent/src/functions/*/contracts.json` files and exercise the real VM.
 Update that snapshot from the native catalog only for reviewed contract changes.
 The runner uses a new QA Profile, exercises temporary and saved conversations,
 restores the previous Profile, and retains evidence outside Git. It requires the

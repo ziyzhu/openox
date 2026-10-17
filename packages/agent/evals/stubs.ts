@@ -1,6 +1,6 @@
 import { Value } from "typebox/value";
 import type { TObject, TSchema } from "typebox";
-import contracts from "./contracts.json";
+import { contracts } from "../src/functions/contracts";
 import providerSchema from "../../../apps/shared/Host/ModelProviders/provider-definition.schema.json";
 
 export const catalog = structuredClone(contracts) as Record<string, { description: string; inputSchema: TSchema; outputSchema: TSchema }>;

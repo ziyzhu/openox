@@ -58,7 +58,7 @@ for (const generated of [result, promptResult]) for (const file of generated.out
   const forbidden = inputs.filter(path => /\/(env\/node|storage\/.*\/node|api\/(?!lazy\.js$).*|providers\/|node\/).*\.js$|\/tools\/bash\.js$/.test(path)
     || (name === "harness.js" && /\/(storage-diagnostics\.ts$|storage-check\.ts$|storage-benchmark\.ts$)/.test(path))
     || (name === "harness-storage.js" && /\/src\/(core\/|profile\/|adapters\/ios\/(agent|native-model)\.ts$)/.test(path))
-    || (name === "prompts.js" && !/^packages\/(protocol\/src\/skills\.ts|agent\/(skills\/[^?]+|src\/(adapters\/ios\/prompt-renderer|core\/(prompts|provider-prompts|tool-prompts|guidance-texts|bundled-skills|runtime-prompts|host-context|ox-prompts|prompt-renderer))\.ts))$/.test(path)));
+    || (name === "prompts.js" && !/^packages\/(protocol\/src\/skills\.ts|agent\/(skills\/[^?]+|src\/(adapters\/ios\/prompt-renderer|core\/(prompts|provider-prompts|tool-prompts|guidance-texts|bundled-skills|runtime-prompts|host-context|ox-prompts|prompt-renderer)|functions\/(guidance|[a-z]+\/guidance))\.ts))$/.test(path)));
   const external = output.imports.filter(item => item.external);
   if (forbidden.length || external.length || usesNodeRuntime(file.text)) {
     throw new Error(`Non-portable ${name}: ${JSON.stringify({ forbidden, external })}`);
