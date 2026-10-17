@@ -270,12 +270,6 @@ struct ConversationPage: View {
             case .idle, .animating: 1
             }
         }
-
-        func riseRequestID(frame: CGRect) -> UUID? {
-            guard case .positioned(let id, _, let top) = self,
-                  abs(frame.minY - top) < 1 else { return nil }
-            return id
-        }
     }
 
     let conversation: Conversation
@@ -305,8 +299,6 @@ struct ConversationPage: View {
     @State private var latestSubmissionID: UUID?
     @State private var sendHandoff = SendHandoff.idle
     @State private var composerInputFrame = CGRect.zero
-    @State private var submissionFrame = CGRect.null
-    @State private var transcriptTail: CGFloat = 0
     @State private var sendTranscriptTail: CGFloat = 0
 
     private var holdsTranscript: Bool {
@@ -1328,7 +1320,7 @@ struct ConversationPage: View {
                 measuresTail ? $0.frame(in: .global).maxY : nil
             } action: {
                 guard let bottom = $0 else { return }
-                transcriptTail = bottom
+                scroller.transcriptTail = bottom
             }
 
         if identified {
@@ -1601,17 +1593,19 @@ struct ConversationPage: View {
                 .opacity(sendHandoff.opacity)
                 .frame(minHeight: anchoredViewportHeight, alignment: .top)
                 .id(submissionID)
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
-                    guard latestSubmissionID == submissionID else { return }
-                    submissionFrame = $0
-                    if case .positioned(let id, _, let top) = sendHandoff,
-                       id == submissionID, abs($0.minY - top) >= 1 {
+                .onGeometryChange(for: CGFloat?.self) { geometry in
+                    guard case .positioned(let id, _, _) = sendHandoff,
+                          id == submissionID else { return nil }
+                    return geometry.frame(in: .global).minY
+                } action: { top in
+                    guard let top, latestSubmissionID == submissionID,
+                          case .positioned(let id, _, let anchorTop) = sendHandoff,
+                          id == submissionID else { return }
+                    if abs(top - anchorTop) < 1 {
+                        animateSendRise(submissionID)
+                    } else {
                         scroller.preserveTurn(submissionID)
                     }
-                }
-                .task(id: sendHandoff.riseRequestID(frame: submissionFrame)) {
-                    guard let id = sendHandoff.riseRequestID(frame: submissionFrame) else { return }
-                    animateSendRise(id)
                 }
                 .task(id: submissionID) {
                     await Task.yield()
@@ -1646,8 +1640,7 @@ struct ConversationPage: View {
 
     private func animateSendRise(_ submissionID: UUID) {
         guard case .positioned(let id, let offset, _) = sendHandoff,
-              id == submissionID,
-              sendHandoff.riseRequestID(frame: submissionFrame) == id else { return }
+              id == submissionID else { return }
         let anchorID = submissionID
         Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=animating submission=\(submissionID) anchor=\(anchorID) rise=\(Int(offset)) historyRise=\(Int(offset))")
         withAnimation(reduceMotion ? nil : .spring(duration: 0.45, bounce: 0), completionCriteria: .logicallyComplete) {
@@ -2003,14 +1996,13 @@ struct ConversationPage: View {
     }
 
     private func enqueue(_ message: ConversationComposerModel.Message, skillInvocation: UserSkillInvocation? = nil) {
-        sendTranscriptTail = transcriptTail
+        sendTranscriptTail = scroller.transcriptTail
         let receipt = conversation.enqueue(
             message.text,
             attachments: message.attachments,
             skillInvocation: skillInvocation
         )
         latestSubmissionID = receipt.id
-        submissionFrame = .null
         sendHandoff = .waitingForAnchor(submissionID: receipt.id, originY: composerInputFrame.minY)
         Log.ui.info("ConversationPage.send conversation=\(conversation.id) draft=\(message.id) submission=\(receipt.id) disposition=\(receipt.disposition.rawValue) chars=\(message.text.count) attachments=\(message.attachments.count)")
     }

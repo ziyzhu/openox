@@ -124,6 +124,7 @@ final class ConversationViewportController {
     var visibleBlockID: UUID? { position.viewID(type: UUID.self) }
 
     @ObservationIgnored private(set) var anchorContentHeight: CGFloat = 0
+    @ObservationIgnored var transcriptTail: CGFloat = 0
     @ObservationIgnored private var conversationID = ""
     @ObservationIgnored private var frame: Frame?
     @ObservationIgnored private var motion = Motion.stationary

@@ -49,3 +49,7 @@ footprint, not RSS, for memory comparisons; run profiling separately from latenc
 Pass the Simulator UDID to `xctrace --device` when attaching to its app process.
 For bimodal RPC timings, compare mean and tail latency as well as median; distinguish
 native enqueue timestamps from wire acknowledgement.
+
+For scroll-performance regressions, compare identical saved transcripts before and after
+a native Send. Count full conversation view evaluations as well as CPU time; geometry
+samples needed only by event handlers must not invalidate the transcript every frame.
