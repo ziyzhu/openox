@@ -101,7 +101,7 @@ flowchart TB
     model_adapter["<b>Model adapter</b><br>Provider-neutral agent loop"]
     profile["<b>Ox Profile</b><br>Identity · Memory · Skills<br>Files · Conversations"]
     vm["<b>Ox VM</b><br>Sandboxed JavaScript · ox.*<br>Skills · Virtual filesystem"]
-    local_repository["<b>Local Repository</b><br>Services · Skills<br>Editable Git + repository.json"]
+    local_repository["<b>Local Repository</b><br>Services · Skills<br>Editable files + repository.json"]
     catalog["<b>Catalog</b><br>Services · Skills<br>Resolved sources"]
   end
 
