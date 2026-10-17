@@ -75,7 +75,7 @@ nonisolated final class PerfMonitor: @unchecked Sendable {
     static let shared = PerfMonitor()
 
     private let sampleInterval: Duration = .seconds(2)
-    private let heartbeatInterval: TimeInterval = 60
+    private let heartbeatInterval: TimeInterval = 600
     private let cpuDeltaPercent = 10.0
     private let memDeltaMB = 50.0
 

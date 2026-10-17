@@ -25,7 +25,7 @@ nonisolated struct ConversationPackageDocument: Transferable, Sendable {
             let data = try await Task.detached(priority: .userInitiated) {
                 try ConversationPackageCodec.encode(document.state, files: files.data, fileNames: files.names)
             }.value
-            Log.ui.info("ConversationPackage.export chat=\(document.state.meta.id) turns=\(document.state.turns.count) bytes=\(data.count)")
+            Log.ui.info("ConversationPackage.export conversation=\(document.state.meta.id) turns=\(document.state.turns.count) bytes=\(data.count)")
             return data
         }
         .suggestedFileName { "\($0.fileName).conversation" }
@@ -604,7 +604,7 @@ final class ConversationImportCoordinator {
                 self.proposal = nil
                 isSaving = false
                 importedConversationID = conversation.id
-                Log.ui.info("ConversationImport.saved chat=\(conversation.id) title=\(proposal.header.title)")
+                Log.ui.info("ConversationImport.saved conversation=\(conversation.id) title=\(proposal.header.title)")
             } catch is CancellationError {
             } catch {
                 guard !Task.isCancelled else { return }

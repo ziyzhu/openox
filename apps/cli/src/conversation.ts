@@ -8,6 +8,7 @@ import {
   usageBreakdown,
   type ConversationSnapshot,
 } from "./host-snapshot.ts";
+import { logs } from "./logs.ts";
 import { C, fail, terminalText, type CliContext, type SubCommand } from "./lib.ts";
 
 type ConversationOptions = {
@@ -27,6 +28,7 @@ export const SUBS: Record<string, SubCommand> = {
   stop: { desc: "Stop the selected conversation's running turn", fn: stopConversation },
   inspect: { desc: "Inspect the selected conversation's prompt, tools, messages, and blocks", fn: inspectConversation },
   watch: { desc: "Watch the selected conversation for changes, reconnecting between snapshots", fn: watchConversation },
+  logs: { desc: "Read Host logs that mention the conversation (--conversation <id>; same flags as host logs)", fn: conversationLogs },
 };
 
 
@@ -121,6 +123,11 @@ async function stopConversation(args: string[], context: CliContext): Promise<vo
   const result = await requireHost("chats.stop", context, options.timeoutMs);
   if (options.json) console.log(JSON.stringify(result, null, 2));
   else console.log(result.wasRunning ? `stop requested ${result.chatId}` : `idle ${result.chatId}`);
+}
+
+async function conversationLogs(args: string[], context: CliContext): Promise<void> {
+  if (!context.conversation) fail("ox conversation logs requires --conversation <conversation-id>");
+  await logs(args, context);
 }
 
 async function inspectConversation(args: string[], context: CliContext): Promise<void> {

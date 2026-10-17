@@ -164,7 +164,6 @@ actor DurableAgentHost {
                          runtime: DurableRuntime, stream: @escaping @Sendable (JSONValue) -> Void) async throws -> JSONValue {
         switch method {
         case "agentEvents":
-            Log.agent.debug("PiDurable committed events conversation=\(conversationID) count=\(fields["events"]?.arrayValue?.count ?? 0)")
             for event in fields["events"]?.arrayValue ?? [] { try await receive(event, conversationID: conversationID) }
             return .null
         case "nativeModel":
@@ -224,7 +223,7 @@ actor DurableAgentHost {
                                                 messages: messages, tools: config.client.supportsTools(for: config.model) ? tools : [],
                                                 options: options)
             let media = inputs.footprint
-            Log.agent.info("PiDurable native model start conversation=\(conversationID) profile=\(binding.runtimeProfileID) provider=\(config.client.id) model=\(config.model.id) messages=\(messages.count) tools=\(tools.count) mediaFiles=\(media.files) mediaBytes=\(media.bytes)")
+            Log.agent.info("PiDurable native model start durable=\(conversationID) profile=\(binding.runtimeProfileID) provider=\(config.client.id) model=\(config.model.id) messages=\(messages.count) tools=\(tools.count) mediaFiles=\(media.files) mediaBytes=\(media.bytes)")
             for try await event in response {
                 try Task.checkCancellation()
                 switch event {
@@ -248,7 +247,7 @@ actor DurableAgentHost {
                 }
                 stream(DurableMessageCodec.event(event, provider: "ox-native:\(conversationID)"))
             }
-            Log.agent.info("PiDurable native model complete conversation=\(conversationID) profile=\(binding.runtimeProfileID) provider=\(config.client.id)")
+            Log.agent.info("PiDurable native model complete durable=\(conversationID) profile=\(binding.runtimeProfileID) provider=\(config.client.id)")
             return .null
         case "nativeTool":
             let binding = binding.toolHydration != nil || binding.context == nil || binding.modelAssistant == nil
@@ -290,7 +289,7 @@ actor DurableAgentHost {
                     content.append(try DurableMessageCodec.transientReference(attachment, receipt: receipt, profileID: profileID!))
                 }
             } catch {
-                Log.agent.error("PiDurable media publication failed conversation=\(conversationID) call=\(callID) error=\(error.localizedDescription)")
+                Log.agent.error("PiDurable media publication failed durable=\(conversationID) call=\(callID) error=\(error.localizedDescription)")
                 throw RuntimeError.bridge("Native tool completed but its media could not be committed: \(error.localizedDescription). Inspect before retrying")
             }
             var value: [String: JSONValue] = ["content": .array(content), "isError": .bool(message.isError),
@@ -341,7 +340,7 @@ actor DurableAgentHost {
               let conversation = owner.conversation else { throw RuntimeError.bridge("Recovered tool conversation is no longer available") }
         await conversation.presentDurableToolAssistant(generation.committedAssistant)
         let media = generation.inputs.footprint
-        Log.agent.info("PiDurable native tool generation restored conversation=\(conversationID) assistantEntry=\(assistantEntryID) mediaFiles=\(media.files) mediaBytes=\(media.bytes) presentation=committed")
+        Log.agent.info("PiDurable native tool generation restored durable=\(conversationID) assistantEntry=\(assistantEntryID) mediaFiles=\(media.files) mediaBytes=\(media.bytes) presentation=committed")
     }
 
     private func readToolGeneration(_ fields: [String: JSONValue], binding: Binding, runtime: DurableRuntime) async throws -> ToolGeneration {

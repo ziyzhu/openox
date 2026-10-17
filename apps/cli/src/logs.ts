@@ -15,6 +15,10 @@ const LEVELS = ["debug", "info", "warning", "error"];
 
 export async function logs(args: string[], context: CliContext): Promise<void> {
   const options = parseOptions(args);
+  if (context.conversation) {
+    if (options.grep) fail("--grep cannot be combined with conversation logs; filter the --json output instead");
+    options.grep = context.conversation;
+  }
   if (!options.follow) {
     const pages: LogRow[][] = [];
     const cursors = new Set<string>(options.cursor ? [options.cursor] : []);
@@ -37,7 +41,8 @@ export async function logs(args: string[], context: CliContext): Promise<void> {
       if (cursor) cursors.add(cursor);
     } while (!options.page && hasMore && (options.all || count < options.tail && Number.isFinite(options.tail)));
     const rows = limitedRows(pages.reverse().flat(), options.tail);
-    if (options.page && options.json) console.log(JSON.stringify({ logs: rows, nextCursor: nextCursor ?? null, hasMore }, null, 2));
+    if (options.summary) printSummary(rows, options.json);
+    else if (options.page && options.json) console.log(JSON.stringify({ logs: rows, nextCursor: nextCursor ?? null, hasMore }, null, 2));
     else {
       printRows(rows, options.json, false);
       if (options.page && nextCursor) process.stderr.write(`Next cursor: ${nextCursor}\n`);
@@ -115,6 +120,7 @@ function parseOptions(args: string[]): {
   cursor?: string;
   page: boolean;
   all: boolean;
+  summary: boolean;
   category: string;
   since: string;
 } {
@@ -129,6 +135,7 @@ function parseOptions(args: string[]): {
   let cursor: string | undefined;
   let page = false;
   let all = false;
+  let summary = false;
   let category = "";
   let since = "";
   for (let index = 0; index < args.length; index++) {
@@ -137,6 +144,7 @@ function parseOptions(args: string[]): {
     else if (argument === "--follow" || argument === "-f") follow = true;
     else if (argument === "--page") page = true;
     else if (argument === "--all") all = true;
+    else if (argument === "--summary") summary = true;
     else if (argument === "--limit") limit = pageLimit(args[++index]);
     else if (argument.startsWith("--limit=")) limit = pageLimit(argument.slice(8));
     else if (argument === "--cursor") cursor = requiredValue(args[++index], "--cursor");
@@ -156,7 +164,7 @@ function parseOptions(args: string[]): {
     else if (argument === "--interval") intervalMs = positiveNumber(args[++index], "--interval");
     else if (argument.startsWith("--interval=")) intervalMs = positiveNumber(argument.slice(11), "--interval");
     else if (argument === "-h" || argument === "--help") {
-      console.log(`Usage: ox [--host <url>] host logs [--level ${LEVELS.join("|")}] [--grep <substring>] [--category <name>] [--since <ISO-8601>] [--tail <count>] [--limit 1..2000] [--page | --cursor <token> | --all | --follow] [--json] [--timeout 30000] [--interval 1000]`);
+      console.log(`Usage: ox [--host <url>] host logs [--level ${LEVELS.join("|")}] [--grep <substring>] [--category <name>] [--since <ISO-8601>] [--tail <count>] [--limit 1..2000] [--page | --cursor <token> | --all | --follow] [--summary] [--json] [--timeout 30000] [--interval 1000]`);
       process.exit(0);
     } else fail(`unknown option: ${argument}`);
   }
@@ -164,8 +172,10 @@ function parseOptions(args: string[]): {
   if (cursor) page = true;
   if (page && (all || follow || Number.isFinite(tail))) fail("--page/--cursor cannot be combined with --all, --follow, or --tail");
   if (all && (follow || Number.isFinite(tail))) fail("--all cannot be combined with --follow or --tail");
+  if (summary && (page || follow)) fail("--summary cannot be combined with --page, --cursor, or --follow");
+  if (summary && !Number.isFinite(tail)) all = true;
   if (follow && !Number.isFinite(tail)) tail = 20;
-  return { timeoutMs, intervalMs, json, follow, level, grep, tail, limit, cursor, page, all, category, since };
+  return { timeoutMs, intervalMs, json, follow, level, grep, tail, limit, cursor, page, all, summary, category, since };
 }
 
 function filteredRows(value: unknown, level: string, grep: string, category: string, since: string): LogRow[] {
@@ -197,10 +207,35 @@ function printRows(rows: LogRow[], json: boolean, streaming: boolean): void {
     return;
   }
   for (const row of rows) {
-    const time = row.time.slice(11, 23).padEnd(12);
+    const time = row.time.padEnd(24);
     const level = row.level.toUpperCase().padEnd(7);
     const thread = row.thread ? `(${row.thread}) ` : "";
     console.log(`${time} ${level} ${row.category} ${thread}${row.location} ${row.message}`);
+  }
+}
+
+function printSummary(rows: LogRow[], json: boolean): void {
+  const groups = new Map<string, { event: string; level: string; category: string; count: number; first: string; last: string }>();
+  for (const row of rows) {
+    const event = row.message.replace(/^((conversation|submission|turn)=\S+ )+/, "").split(" ", 1)[0]!;
+    const key = `${row.level}\u0000${row.category}\u0000${event}`;
+    const group = groups.get(key);
+    if (group) {
+      group.count++;
+      group.last = row.time;
+    } else groups.set(key, { event, level: row.level, category: row.category, count: 1, first: row.time, last: row.time });
+  }
+  const events = [...groups.values()].sort((a, b) => LEVELS.indexOf(b.level) - LEVELS.indexOf(a.level) || b.count - a.count);
+  const levels = Object.fromEntries(LEVELS.map(level => [level, rows.filter(row => row.level === level).length]));
+  const summary = { rows: rows.length, first: rows[0]?.time ?? null, last: rows.at(-1)?.time ?? null, levels, events };
+  if (json) {
+    console.log(JSON.stringify(summary, null, 2));
+    return;
+  }
+  console.log(`${summary.rows} rows ${summary.first ?? "-"} .. ${summary.last ?? "-"}`);
+  console.log(LEVELS.toReversed().map(level => `${level}=${levels[level]}`).join(" "));
+  for (const group of events) {
+    console.log(`${String(group.count).padStart(6)} ${group.level.toUpperCase().padEnd(7)} ${group.category} ${group.event} last=${group.last}`);
   }
 }
 

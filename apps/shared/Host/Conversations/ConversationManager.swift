@@ -308,7 +308,7 @@ final class ConversationManager {
         )
         register(conversation, as: state.conversationID)
         setCurrent(conversation)
-        Log.session.info("ConversationManager.import chat=\(conversation.id) turns=\(state.turns.count)")
+        Log.session.info("ConversationManager.import conversation=\(conversation.id) turns=\(state.turns.count)")
         return conversation
     }
 
@@ -358,7 +358,7 @@ final class ConversationManager {
         let conversation = makeConversation(retention: previous.isTemporary ? .persisted : .temporary)
         register(conversation, as: ConversationID(conversation.id))
         setCurrent(conversation)
-        Log.session.info("ConversationManager.retention chat=\(conversation.id) temporary=\(conversation.isTemporary)")
+        Log.session.info("ConversationManager.retention conversation=\(conversation.id) temporary=\(conversation.isTemporary)")
     }
 
     private func startTemporaryConversation(continuing continuation: ConversationContinuation) {
@@ -388,7 +388,7 @@ final class ConversationManager {
             attachments: continuation.attachments,
             skillInvocation: continuation.skillInvocation
         )
-        Log.session.info("ConversationManager.temporary started chat=\(conversation.id) turns=\(continuation.turns.count)")
+        Log.session.info("ConversationManager.temporary started conversation=\(conversation.id) turns=\(continuation.turns.count)")
     }
 
     private func discardTemporary(_ id: ConversationID) {
@@ -397,7 +397,7 @@ final class ConversationManager {
         records[id] = nil
         accessOrdinals[id] = nil
         if currentId == id.rawValue { selection = .empty }
-        Log.session.info("ConversationManager.temporary discarded chat=\(id)")
+        Log.session.info("ConversationManager.temporary discarded conversation=\(id)")
     }
 
     func open(_ rawID: UUID) {
@@ -782,7 +782,7 @@ final class ConversationManager {
             scheduledSkillID: scheduledSkillID
         )
         attachPersistence(conversation)
-        Log.session.info("ConversationManager created chat=\(conversation.id) retention=\(String(describing: retention))")
+        Log.session.info("ConversationManager created conversation=\(conversation.id) retention=\(String(describing: retention))")
         return conversation
     }
 

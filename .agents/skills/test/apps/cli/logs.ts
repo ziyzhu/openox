@@ -2,10 +2,11 @@ import { strict as assert } from "node:assert";
 import { createHash } from "node:crypto";
 import { RPC_VERSION, validateParams, validateResult } from "../../../../../packages/protocol/src/index.ts";
 
+const conversationID = "1BDD56C9-A279-4B01-0000-0000000006CE";
 const rows = Array.from({ length: 2_807 }, (_, seq) => ({
   seq, time: "2026-10-04T00:00:00.000Z", level: seq % 7 === 0 ? "error" : "info",
   category: seq % 3 === 0 ? "Session" : "Perf", thread: "main", location: "[fixture:1]",
-  message: seq === 0 ? "oldest retained failure" : `record ${seq}`,
+  message: seq === 0 ? "oldest retained failure" : seq === 1 ? `conversation=${conversationID} Conversation.runOne start` : `record ${seq}`,
 }));
 let rpcV1WithoutPagination = false;
 let repeatingCursor = false;
@@ -56,7 +57,11 @@ const server = Bun.serve({
 });
 
 async function cli(host: string, ...args: string[]) {
-  const child = Bun.spawn([process.execPath, new URL("../../../../../apps/cli/src/ox.ts", import.meta.url).pathname, "--host", host, "host", "logs", ...args], { stdout: "pipe", stderr: "pipe" });
+  return ox(host, "host", "logs", ...args);
+}
+
+async function ox(host: string, ...args: string[]) {
+  const child = Bun.spawn([process.execPath, new URL("../../../../../apps/cli/src/ox.ts", import.meta.url).pathname, "--host", host, ...args], { stdout: "pipe", stderr: "pipe" });
   const timer = setTimeout(() => child.kill(), 15_000);
   try {
     const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
@@ -93,12 +98,23 @@ try {
   for (const args of [["--limit", "0"], ["--limit", "2001"], ["--limit", "1.5"], ["--all", "--follow"], ["--page", "--tail", "1"]]) {
     assert.equal((await cli(host, ...args)).code, 1, args.join(" "));
   }
+  const summary = await json(host, "--summary", "--limit", "500");
+  assert.equal(summary.rows, rows.length);
+  assert.equal(summary.levels.error, rows.filter(row => row.level === "error").length);
+  assert.equal(summary.events[0].level, "error", "summary lists errors first");
+  assert.ok(summary.events.some((event: any) => event.event === "Conversation.runOne"), "summary strips correlation keys from event names");
+  const scoped = await ox(host, "--conversation", conversationID, "conversation", "logs", "--json");
+  assert.equal(scoped.code, 0, scoped.stderr);
+  assert.deepEqual(JSON.parse(scoped.stdout).map((row: any) => row.seq), [1]);
+  assert.equal((await ox(host, "--conversation", conversationID, "conversation", "logs", "--grep", "x")).code, 1);
+  assert.equal((await ox(host, "conversation", "logs")).code, 1);
+  assert.equal((await cli(host, "--summary", "--follow")).code, 1);
   rpcV1WithoutPagination = true;
   assert.ok(Array.isArray(await json(host)), "ordinary reads remain compatible with old Hosts");
   assert.match((await cli(host, "--all")).stderr, /does not support log pagination/);
   rpcV1WithoutPagination = false;
   repeatingCursor = true;
   assert.match((await cli(host, "--all", "--limit", "1")).stderr, /invalid log pagination cursor/);
-  console.log("PASS CLI process E2E: older pages, appends, all/tail, sparse server filters, cursor errors, validation, old Hosts");
+  console.log("PASS CLI process E2E: older pages, appends, all/tail, sparse server filters, summary, conversation scope, cursor errors, validation, old Hosts");
 
 } finally { server.stop(true); }

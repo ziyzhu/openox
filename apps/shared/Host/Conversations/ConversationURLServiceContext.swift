@@ -51,7 +51,7 @@ enum ConversationURLServiceContext {
         case .assistant:
             return messages
         }
-        Log.session.debug("ConversationURLServiceContext.transform chat=\(conversationID) urls=\(relations.count) matches=\(matched)")
+        Log.session.debug("ConversationURLServiceContext.transform conversation=\(conversationID) urls=\(relations.count) matches=\(matched)")
         return transformed
     }
 

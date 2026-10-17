@@ -191,7 +191,7 @@ extension ProfileMigrator {
             scanned += 1
             guard fm.fileExists(atPath: transcriptURL.path) else {
                 unreadable += 1
-                Log.app.warning("StorageMigrator.redundantAgentContexts retained=missing-transcript chat=\(directory.lastPathComponent)")
+                Log.app.warning("StorageMigrator.redundantAgentContexts retained=missing-transcript conversation=\(directory.lastPathComponent)")
                 continue
             }
             let turns: [Turn]
@@ -200,7 +200,7 @@ extension ProfileMigrator {
                 turns = try lines.map { try decoder.decode(Turn.self, from: $0) }
             } catch {
                 unreadable += 1
-                Log.app.warning("StorageMigrator.redundantAgentContexts retained=unreadable chat=\(directory.lastPathComponent) error=\(error.localizedDescription)")
+                Log.app.warning("StorageMigrator.redundantAgentContexts retained=unreadable conversation=\(directory.lastPathComponent) error=\(error.localizedDescription)")
                 continue
             }
             if turns.requiresContextCheckpoint {

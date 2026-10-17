@@ -60,7 +60,6 @@ struct HoldToTalkArea: UIViewRepresentable {
             guard let window else { return }
             window.addGestureRecognizer(hold)
             window.addGestureRecognizer(tap)
-            Log.ui.info("HoldToTalk.gesture attached")
         }
 
         func detach() {

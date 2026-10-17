@@ -55,7 +55,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         guard registered else {
             completion.outcome = .failed
             onExpiration = nil
-            Log.session.error("ConversationBackground.register rejected chat=\(conversationID) run=\(runID.rawValue) task=\(identifier)")
+            Log.session.error("ConversationBackground.register rejected conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier)")
             return
         }
         let request = BGContinuedProcessingTaskRequest(
@@ -67,12 +67,16 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         do {
             submittedAt = Date()
             try BGTaskScheduler.shared.submit(request)
-            Log.session.info("ConversationBackground.submit chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) strategy=queue")
+            Log.session.info("ConversationBackground.submit conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) strategy=queue")
         } catch {
             completion.outcome = .failed
             onExpiration = nil
+            guard (error as? BGTaskScheduler.Error)?.code != .unavailable else {
+                Log.session.info("ConversationBackground.submit unavailable conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier)")
+                return
+            }
             let failure = error as NSError
-            Log.session.error("ConversationBackground.submit failed chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) domain=\(failure.domain) code=\(failure.code) error=\(failure.localizedDescription)")
+            Log.session.error("ConversationBackground.submit failed conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) domain=\(failure.domain) code=\(failure.code) error=\(failure.localizedDescription)")
         }
     }
 
@@ -90,7 +94,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         guard self.phase != phase || stepSubtitle != nil else { return }
         self.phase = phase
         stepSubtitle = nil
-        Log.session.info("ConversationBackground.phase chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) phase=\(phase.rawValue) presented=\(task != nil)")
+        Log.session.info("ConversationBackground.phase conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) phase=\(phase.rawValue) presented=\(task != nil)")
         guard completion.outcome == nil else { return }
         task?.updateTitle(phase.title, subtitle: subtitle)
     }
@@ -123,7 +127,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         } else {
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
         }
-        Log.session.info("ConversationBackground.finish chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) outcome=\(outcome.logLabel) success=\(outcome.succeeded)")
+        Log.session.info("ConversationBackground.finish conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) outcome=\(outcome.logLabel) success=\(outcome.succeeded)")
     }
 
     private func receive(_ rawTask: BGTask) {
@@ -157,7 +161,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
             }
         }
         let latencyMs = submittedAt.map { Int(Date().timeIntervalSince($0) * 1_000) } ?? -1
-        Log.session.info("ConversationBackground.start chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) latencyMs=\(latencyMs)")
+        Log.session.info("ConversationBackground.start conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) latencyMs=\(latencyMs)")
     }
 
     private func expire() {
@@ -167,7 +171,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         finish(.expired)
         expiration?()
         let elapsedMs = submittedAt.map { Int(Date().timeIntervalSince($0) * 1_000) } ?? -1
-        Log.session.warning("ConversationBackground.expire chat=\(conversationID) run=\(runID.rawValue) task=\(identifier) phase=\(interruptedPhase.rawValue) elapsedMs=\(elapsedMs) completedUnits=\(completedUnits)")
+        Log.session.warning("ConversationBackground.expire conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) phase=\(interruptedPhase.rawValue) elapsedMs=\(elapsedMs) completedUnits=\(completedUnits)")
     }
 
     private var subtitle: String { stepSubtitle ?? phase.subtitle }

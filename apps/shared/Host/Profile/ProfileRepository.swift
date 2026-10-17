@@ -103,7 +103,7 @@ actor ProfileRepository {
     func loadConversation(_ id: ConversationID, in scope: ProfileScope) async -> ConversationLoadResult? {
         guard deleted[scope]?.contains(id) != true else { return nil }
         do { return try await load(DurableProfileStore.shared.reference(for: id, in: scope), scope: scope) }
-        catch { Log.session.error("ProfileRepository.load chat=\(id) failed=\(error.localizedDescription)"); return nil }
+        catch { Log.session.error("ProfileRepository.load conversation=\(id) failed=\(error.localizedDescription)"); return nil }
     }
 
     private func load(_ reference: DurableConversationReference, scope: ProfileScope) async throws -> ConversationLoadResult {
@@ -169,7 +169,7 @@ actor ProfileRepository {
             }
             _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(command))
             return ConversationSaveReceipt(saveID: request.saveID, succeeded: true)
-        } catch { Log.session.error("ProfileRepository.save chat=\(request.conversationID) failed=\(error.localizedDescription)"); return ConversationSaveReceipt(saveID: request.saveID, succeeded: false) }
+        } catch { Log.session.error("ProfileRepository.save conversation=\(request.conversationID) failed=\(error.localizedDescription)"); return ConversationSaveReceipt(saveID: request.saveID, succeeded: false) }
     }
 
     func deleteConversation(_ id: ConversationID, in scope: ProfileScope) async throws {
@@ -233,7 +233,7 @@ actor ProfileRepository {
             return try await load(reference, scope: scope).state
         } catch {
             do { try await deleteConversation(reference.compatibilityID, in: scope) }
-            catch { Log.app.error("ProfileRepository.import cleanup failed chat=\(reference.conversationID) error=\(error.localizedDescription)") }
+            catch { Log.app.error("ProfileRepository.import cleanup failed conversation=\(reference.conversationID) error=\(error.localizedDescription)") }
             throw error
         }
     }

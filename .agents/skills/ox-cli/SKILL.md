@@ -25,6 +25,7 @@ or tab session IDs; a live service is addressed by its domain.
 
 - Use `ox host list` to find reachable simulator Hosts and online iOS Tailscale peers; use `--all` to include unavailable candidates.
 - Use `ox host logs`, `ox host providers`, and `ox host describe` for Host introspection.
+- To debug behavior from logs, start with `ox host logs --summary --since <time>`: it counts rows by level, category, and event (the first message token, such as `Conversation.runOne`), errors first, with each group's last time. Then scope with `ox --conversation <full-id> conversation logs`, which keeps rows mentioning that conversation id, and narrow with `--level warning`, `--category`, or `--json`. Times are UTC. Turn-scoped lines carry `conversation=`, `submission=`, and `turn=`; `durable=` is the Pi Durable integer id, not a conversation id. Conversation logs cannot also take `--grep`; filter their `--json` output.
 - For agent-loop diagnostics, filter logs by `AgentLatency.summary`, `AgentModel.end`, or `AgentCall.`. Correlate `conversation`, `submission`, and `turn`; `tools` counts model-tool executions, while `functions` counts nested `ox.*` invocations. For browser efficiency, compare `totalMs`, `modelRoundTrips` (excluding compaction), `browserCalls`, and `browserResultBytes` (successful serialized invocation results, not model-visible bytes). Browser call counts include failed and unfinished calls; result bytes do not. These metrics do not verify task completion. Token totals cover reported model usage, including compaction; check `usageComplete`, `missingUsage`, and `unfinishedCalls` before treating a summary as complete. All-zero provider usage is conservatively reported as unknown, not measured zero.
 - Use `ox conversation` to create, open, drive, respond to, stop, inspect, and watch conversations; `ox conversation send`
   runs the real conversation turn, including tools, services, and compaction.
@@ -52,6 +53,8 @@ ox host logs --level warning
 ox host logs --all --level warning --grep timeout
 ox host logs --page --limit 100 --json
 ox host logs --cursor '<nextCursor>' --limit 100 --json
+ox host logs --summary --since <ISO-8601>
+ox --conversation <conversation-id> conversation logs --summary
 ox vm inspect
 ox vm functions
 ox vm help ox.fs.read

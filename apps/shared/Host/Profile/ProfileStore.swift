@@ -46,7 +46,8 @@ final class ProfileStore {
         var profilesByID: [UUID: Profile] = [:]
         for profile in ProfileIO.registeredProfiles() + managedProfiles(in: local, location: .local) + managedProfiles(in: ProfileIO.publicProfiles, location: .local) + managedProfiles(in: cloud, location: .iCloud) {
             if let existing = profilesByID[profile.id] {
-                Log.app.warning("ProfileStore.duplicate id=\(profile.id) first=\(existing.location.rawValue) second=\(profile.location.rawValue)")
+                guard canonical(existing.url) != canonical(profile.url) else { continue }
+                Log.app.warning("ProfileStore.duplicate id=\(profile.id) first=\(existing.location.rawValue) second=\(profile.location.rawValue) firstFolder=\(existing.url.lastPathComponent) secondFolder=\(profile.url.lastPathComponent)")
             } else {
                 profilesByID[profile.id] = profile
             }

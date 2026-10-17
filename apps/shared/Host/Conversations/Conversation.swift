@@ -337,7 +337,7 @@ final class Conversation: Identifiable {
             let authenticationOutcome = await client.prepareAuthentication()
             guard !Task.isCancelled else { return }
             let authenticationMs = TurnLatencyTrace.milliseconds(authenticationStarted.duration(to: .now))
-            Log.perf.info("LLM.auth.prepare chat=\(self.id) client=\(client.id) model=\(model.id) outcome=\(authenticationOutcome.rawValue) durationMs=\(authenticationMs)")
+            Log.perf.info("LLM.auth.prepare conversation=\(self.id) client=\(client.id) model=\(model.id) outcome=\(authenticationOutcome.rawValue) durationMs=\(authenticationMs)")
             guard self.modelPreparationIntent else { return }
             let configuration = self.agentConfiguration(client: client, model: model)
             let prompt: RenderedConversationPrompt
@@ -345,7 +345,7 @@ final class Conversation: Identifiable {
                 prompt = try await self.renderPrompt(configuration: configuration)
                 try Task.checkCancellation()
             } catch {
-                if !Task.isCancelled { Log.agent.warning("LLM.prepare prompt unavailable chat=\(self.id) error=\(error.localizedDescription)") }
+                if !Task.isCancelled { Log.agent.warning("LLM.prepare prompt unavailable conversation=\(self.id) error=\(error.localizedDescription)") }
                 return
             }
             let systemPrompt = prompt.rendered
@@ -362,7 +362,7 @@ final class Conversation: Identifiable {
             )
             guard !Task.isCancelled else { return }
             let elapsed = Int(Date().timeIntervalSince(started) * 1_000)
-            Log.perf.info("LLM.prepare chat=\(self.id) client=\(client.id) model=\(model.id) outcome=\(outcome.rawValue) ms=\(elapsed) fingerprint=\(fingerprint)")
+            Log.perf.info("LLM.prepare conversation=\(self.id) client=\(client.id) model=\(model.id) outcome=\(outcome.rawValue) ms=\(elapsed) fingerprint=\(fingerprint)")
         }
     }
 
@@ -2330,7 +2330,7 @@ final class Conversation: Identifiable {
             } catch {
                 submissionPresentation = .completed
                 notice = .error(error.localizedDescription)
-                Log.session.error("Conversation.recovery failed chat=\(id) submission=\(submissionID) error=\(error.localizedDescription)")
+                Log.session.error("Conversation.recovery failed conversation=\(id) submission=\(submissionID) error=\(error.localizedDescription)")
             }
         }
         activeRun = Run(id: runID, task: task, phase: .thinking, activeSubmission: nil, backgroundExecutionExpired: false,
