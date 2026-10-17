@@ -102,7 +102,7 @@ export async function check(): Promise<string> {
     "apps/ios/Host/OxHostProtocol.swift",
     "apps/shared/Host/OxHostProtocolMessages.swift",
     "apps/shared/Host/RPC/HostRPCRequests.swift",
-    "apps/shared/Host/Profile/StorageRoot.swift",
+    "apps/shared/Host/Storage/StorageRoot.swift",
     "apps/shared/Host/Services/ServiceDebug.swift",
     "apps/shared/Host/Profile/ProfileRepositorySaveGate.swift",
     ...["ConversationCommands", "ServiceCommands", "BootstrapCommands"].map(name => `apps/shared/Host/RPC/${name}.swift`),
@@ -151,12 +151,12 @@ export async function check(): Promise<string> {
   }
 
   const migrationOwners = ["StorageMigrator", "ProfileMigrator", "ApplicationStorageMigrator", "CredentialMigrator", "RepositoryMigrator", "StorageMigrationSupport", "ConversationMigrator"];
-  const migrationFile = new RegExp(`^apps/shared/Host/(Profile/(StorageMigration|${migrationOwners.slice(1, -1).join("|")})|Conversations/ConversationMigrator)(\\+\\w+)?\\.swift$`);
+  const migrationFile = new RegExp(`^apps/shared/Host/Storage/(StorageMigration|${migrationOwners.slice(1).join("|")})(\\+\\w+)?\\.swift$`);
   const migrationFiles = allSwiftFiles.map(file => relative(ROOT, file)).filter(path => migrationFile.test(path));
   const migrationCallers: Record<string, Set<string>> = {
-    StorageMigrator: new Set(["apps/shared/Host/Profile/StorageMigration.swift", "apps/ios/Host/IOSHost.swift", "apps/shared/Host/HostRuntime.swift"]),
-    ProfileMigrator: new Set([...migrationFiles, "apps/shared/Host/Profile/ProfileRepository.swift", "apps/shared/Host/Profile/StorageRoot.swift", "apps/shared/Host/Durable/DurableProfileStore.swift", "apps/shared/Host/RPC/DebugDurableConversation.swift"]),
-    ApplicationStorageMigrator: new Set([...migrationFiles, "apps/shared/Host/Profile/ScheduledSkills.swift"]),
+    StorageMigrator: new Set(["apps/shared/Host/Storage/StorageMigration.swift", "apps/ios/Host/IOSHost.swift", "apps/shared/Host/HostRuntime.swift"]),
+    ProfileMigrator: new Set([...migrationFiles, "apps/shared/Host/Profile/ProfileRepository.swift", "apps/shared/Host/Storage/StorageRoot.swift", "apps/shared/Host/Durable/DurableProfileStore.swift", "apps/shared/Host/RPC/DebugDurableConversation.swift"]),
+    ApplicationStorageMigrator: new Set([...migrationFiles, "apps/shared/Host/Skills/ScheduledSkills.swift"]),
     CredentialMigrator: new Set(migrationFiles),
     RepositoryMigrator: new Set([...migrationFiles, "apps/shared/Host/Services/Repository/Repository.swift"]),
     StorageMigrationSupport: new Set(migrationFiles),
@@ -167,7 +167,7 @@ export async function check(): Promise<string> {
     for (const owner of migrationOwners) {
       const calls = [...source.matchAll(new RegExp(`\\b${owner}\\.([a-zA-Z0-9_]+)\\s*\\(`, "g"))];
       const readOnlySkillCompatibility = owner === "ProfileMigrator"
-        && path === "apps/shared/Host/Profile/VirtualFileSystem.swift"
+        && path === "apps/shared/Host/Files/VirtualFileSystem.swift"
         && calls.every(match => match[1] === "legacyWorkflowLocation");
       const lazyAttachmentCompatibility = owner === "ConversationMigrator"
         && path === "apps/shared/Host/Conversations/Conversation.swift"

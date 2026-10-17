@@ -100,26 +100,26 @@ Choice, approval, and secret-entry prompts are transient `Conversation` interact
 - UserDefaults import-memory starter count — owner: Client/Features/Conversation/ConversationComposer.swift
 - UserDefaults service state — owner: Services/ServiceManager.swift
 - UserDefaults model state — owner: Host/ModelProviders/ProviderRegistry.swift
-- Keychain credentials — owner: Host/Profile/Credentials.swift
+- Keychain credentials — owner: Host/Credentials/Credentials.swift
 - Retired read-aloud voice preference — retained in UserDefaults and ignored
-- App-group theme — current value owners: Theme.swift and ShareExtension; legacy migration owner: Host/Profile/ApplicationStorageMigrator.swift
-- Fixed app-storage paths and backup policy — owner: Host/Profile/AppStoragePaths.swift
-- Active and saved profiles — owners: Host/Profile/StorageRoot.swift and Host/Profile/ProfileStore.swift
+- App-group theme — current value owners: Theme.swift and ShareExtension; legacy migration owner: Host/Storage/ApplicationStorageMigrator.swift
+- Fixed app-storage paths and backup policy — owner: Host/Storage/AppStoragePaths.swift
+- Active and saved profiles — owners: Host/Storage/StorageRoot.swift and Host/Profile/ProfileStore.swift
 - Profile execution/history/documents — owner: Pi Durable; host-neutral open runtime: packages/agent/src/profile/runtime.ts (`ProfileRuntime`, formerly `OxAgentSession`; persisted formats unchanged); native Session/owner lifetime: Host/Durable/DurableProfileStore.swift; native conversation/presentation: Host/Conversations/Conversation.swift and ConversationManager.swift; application facade: Host/Profile/ProfileRepository.swift. Native type renames do not change persisted ConversationMeta, Turn, RPC, or compatibility-ID formats.
-- Compatibility startup/recovery ordering — owner: Host/Profile/StorageMigration.swift
-- Profile milestones, conversion, and publication recovery — owner: Host/Profile/ProfileMigrator.swift and its `ProfileMigrator+*.swift` extensions
-- App-wide preferences, catalogs, bookmarks, and schedules — owner: Host/Profile/ApplicationStorageMigrator.swift
-- Credential conversion — owner: Host/Profile/CredentialMigrator.swift
-- Repository compatibility — owner: Host/Profile/RepositoryMigrator.swift
-- Shared stateless conversion and verified-copy helpers — owner: Host/Profile/StorageMigrationSupport.swift
-- File metadata — owner: Host/Profile/FileItem.swift
+- Compatibility startup/recovery ordering — owner: Host/Storage/StorageMigration.swift
+- Profile milestones, conversion, and publication recovery — owner: Host/Storage/ProfileMigrator.swift and its `ProfileMigrator+*.swift` extensions
+- App-wide preferences, catalogs, bookmarks, and schedules — owner: Host/Storage/ApplicationStorageMigrator.swift
+- Credential conversion — owner: Host/Storage/CredentialMigrator.swift
+- Repository compatibility — owner: Host/Storage/RepositoryMigrator.swift
+- Shared stateless conversion and verified-copy helpers — owner: Host/Storage/StorageMigrationSupport.swift
+- File metadata — owner: Host/Files/FileItem.swift
 - Folder bookmarks — owner: Services/Native/DeviceFolderStore.swift; records include nullable profileId, with unassigned grants inaccessible until explicitly assigned. ApplicationStorageMigrator stamps predecessor records as unassigned while preserving bookmarks. ProfileMigrator filters retired ios:files attachments at the ProfileRepository metadata boundary; ordinary saves converge them. ApplicationStorageMigrator retires saved Files service references and expands Files source policies into filesystem Action overrides without widening approval. Older readers ignore Profile ownership, and older writes can lose ownership fields; downgrade is not ownership-compatible and requires approval. iOS uses minimal bookmarks, macOS uses security-scoped bookmarks through target-owned adapters. New grant IDs include UUIDs so revocation followed by mounting another folder cannot revive an old binding.
 - Mounted repository bindings — owner: Services/Repository/MountedRepositoryStore.swift; device-local, visible/executable only through a grant owned by the active Profile, no source copies or migration. Missing settings mean no connections; malformed or future versions are preserved and block binding mutations. Revoked grants leave unavailable bindings until explicitly disconnected. Older builds retain but do not discover these bindings; mounted-repository functionality is not downgrade-compatible.
 - Service repositories — owner: Services/Repository/Repository.swift
 - Service-search vector cache — owner: Services/Repository/ServiceSearchIndex.swift
 - App log file — owner: Diagnostics/LogFile.swift
 - Shared note inbox — owner: Host/Profile/SharedNoteInbox.swift and ShareExtension
-- Scheduled skill definitions and run state — owners: Host/Profile/ScheduledSkills.swift and Host/Conversations/ScheduledSkillScheduler.swift
+- Scheduled skill definitions and run state — owners: Host/Skills/ScheduledSkills.swift and Host/Conversations/ScheduledSkillScheduler.swift
 - Developer bootstrap credentials — owner: .agents/skills/setup/scripts/bootstrap.ts
 - Debug Simulator device templates — schema/launcher: .agents/skills/setup/scripts/template-schema.ts and template.ts; native startup importer: Development/DeviceTemplate.swift. Control files live under Library/Caches/DeviceTemplates, are excluded from normal startup without explicit launch opt-in, and never become Profiles. Loaded input is removed and private credentials are released after application. Result/previous-preference files are purgeable QA artifacts; evidence copies stay outside Git. Template-created Profiles use ordinary production storage and remain until explicitly removed.
 
