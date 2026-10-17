@@ -21,6 +21,9 @@ final class ConversationViewportController {
     private struct TailHold: Equatable {
         let floorTop: CGFloat
         let fromEnd: CGFloat
+        let slack: CGFloat
+
+        var pinsEnd: Bool { slack == 0 }
 
         func expectedTop(in frame: Frame) -> CGFloat {
             let endTop = max(0, frame.visualTop + frame.distanceFromEnd)
@@ -28,7 +31,7 @@ final class ConversationViewportController {
         }
 
         var label: String {
-            "floor=\(Int(floorTop)) fromEnd=\(Int(fromEnd))"
+            "floor=\(Int(floorTop)) fromEnd=\(Int(fromEnd)) slack=\(Int(slack))"
         }
     }
 
@@ -111,6 +114,7 @@ final class ConversationViewportController {
     }
 
     private static let jumpThreshold: CGFloat = 32
+    private static let keyboardAnimation = Animation.spring(duration: 0.26, bounce: 0)
 
     private(set) var showsJumpButton = false
     private(set) var sizeChangeAnchor: UnitPoint?
@@ -134,6 +138,7 @@ final class ConversationViewportController {
     @ObservationIgnored private var inputFocused = false
     @ObservationIgnored private var visibleTargetID: UUID?
     @ObservationIgnored private var pendingFrame: Frame?
+    @ObservationIgnored private var animatingCorrectionTop: CGFloat?
     @ObservationIgnored private var presentation = Presentation.reading {
         didSet { updateSizeChangeAnchor() }
     }
@@ -242,7 +247,8 @@ final class ConversationViewportController {
             viewportHold = if frame.jumpDistance - slack <= Self.jumpThreshold {
                 .tail(TailHold(
                     floorTop: frame.visualTop,
-                    fromEnd: slack
+                    fromEnd: slack + max(0, frame.distanceFromEnd),
+                    slack: slack
                 ))
             } else {
                 .reader(top: frame.visualTop)
@@ -311,7 +317,8 @@ final class ConversationViewportController {
         }
         if case .followingBottom = presentation, followBottom(new) { return }
         updateJumpButton(new)
-        applyViewportHold()
+        let keyboardMoved = old.map { abs($0.insetBottom - new.insetBottom) > 0.5 } ?? false
+        applyViewportHold(animation: keyboardMoved ? Self.keyboardAnimation : nil)
         if case .programmatic(.bottom) = motion, new.distanceFromEnd <= 1 {
             motion = .stationary
         } else if case .programmatic(.viewportClearance) = motion {
@@ -370,13 +377,20 @@ final class ConversationViewportController {
         layoutLogEnd = nil
     }
 
-    private func applyViewportHold() {
+    private func applyViewportHold(animation: Animation? = nil) {
         if case .sending = presentation { return }
         guard let frame, let viewportHold else { return }
         let top = viewportHold.expectedTop(in: frame)
-        guard abs(top - frame.visualTop) > 0.5 else { return }
+        guard abs(top - frame.visualTop) > 0.5 else {
+            animatingCorrectionTop = nil
+            return
+        }
+        if let animatingCorrectionTop, abs(animatingCorrectionTop - top) <= 0.5 { return }
+        animatingCorrectionTop = animation == nil ? nil : top
         move(to: .viewportClearance)
-        position.scrollTo(y: top)
+        withAnimation(animation) {
+            position.scrollTo(y: top)
+        }
         Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=viewportCorrection targetTop=\(Int(top)) hold=\(viewportHold.label) \(logSnapshot)")
     }
 
@@ -395,7 +409,7 @@ final class ConversationViewportController {
 
     private var pinsEnd: Bool {
         if case .followingBottom = presentation { return true }
-        if case .tail(let hold) = viewportHold { return hold.fromEnd == 0 }
+        if case .tail(let hold) = viewportHold { return hold.pinsEnd }
         return false
     }
 
