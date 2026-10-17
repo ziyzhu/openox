@@ -127,6 +127,7 @@ final class APIService {
             }
         }
         guard let destination = components.url else { throw APIServiceError.invalidRequest }
+        guard await WebFetchURLPolicy.allowsResolved(destination) else { throw APIServiceError.destinationDenied }
         var request = URLRequest(url: destination)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")

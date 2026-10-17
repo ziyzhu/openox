@@ -1012,6 +1012,7 @@ final class RemoteMCPService {
         transport: RemoteMCPTransport?,
         allowsAuthorization: Bool
     ) async throws -> Connection {
+        guard await WebFetchURLPolicy.allowsResolved(endpoint) else { throw RemoteMCPError.invalidEndpoint }
         var token: String?
         do {
             token = try await RemoteMCPOAuth.accessToken(endpoint: endpoint)

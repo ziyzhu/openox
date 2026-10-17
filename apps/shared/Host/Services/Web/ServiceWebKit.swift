@@ -31,12 +31,18 @@ extension Service {
         preferences: inout WebPage.NavigationPreferences,
         in session: ServiceWebPage
     ) async -> WKNavigationActionPolicy {
-        guard action.target?.isMainFrame != false else { return .allow }
         let url = action.request.url
-        guard url.map(BrowserNavigation.allowsServiceNavigation) == true else {
+        if action.target?.isMainFrame == false {
+            guard let frameURL = url, await BrowserNavigation.resolvesFrameNavigation(frameURL) else {
+                Log.webView.error("Service.navigation rejected-frame domain=\(domain) url=\(LogPrivacy.url(url?.absoluteString ?? "?"))")
+                return .cancel
+            }
+            return .allow
+        }
+        guard let pageURL = url, await BrowserNavigation.resolvesServiceNavigation(pageURL) else {
             let scheme = url?.scheme?.uppercased() ?? "unsupported"
             let failure = scheme == "HTTPS"
-                ? "Browser blocked navigation to a private-network or unsupported HTTPS destination"
+                ? "Browser blocked navigation to a private-network, unresolvable, or unsupported HTTPS destination"
                 : "Browser blocked navigation to an unsupported \(scheme) destination; Browser only loads public HTTPS destinations"
             if owns(session) {
                 session.navigationFailure = failure

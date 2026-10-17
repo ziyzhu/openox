@@ -57,6 +57,7 @@ nonisolated enum WebFetchError: LocalizedError, Sendable {
     case executionTooLarge
     case invalidResponse
     case tooManyRedirects
+    case privateAddress
     case invalidText
 
     var errorDescription: String? {
@@ -66,6 +67,7 @@ nonisolated enum WebFetchError: LocalizedError, Sendable {
         case .executionTooLarge: "ox.web.fetch: responses exceeded the 20 MiB execution limit"
         case .invalidResponse: "ox.web.fetch: server returned an invalid response"
         case .tooManyRedirects: "ox.web.fetch: response exceeded the five-redirect limit"
+        case .privateAddress: "ox.web.fetch: host did not resolve to only public addresses"
         case .invalidText: "HTTP response body is not valid text"
         }
     }
@@ -96,64 +98,132 @@ nonisolated enum WebAttachmentError: LocalizedError, Sendable {
 }
 
 nonisolated enum WebFetchURLPolicy {
+    private static let ipv4Mapped: [UInt8] = Array(repeating: 0, count: 10) + [0xff, 0xff]
+    private static let nat64: [UInt8] = [0x00, 0x64, 0xff, 0x9b] + Array(repeating: 0, count: 8)
+
     static func allows(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
-              url.user == nil, url.password == nil,
-              let host = url.host?.lowercased(), !host.isEmpty else { return false }
-        #if DEBUG && targetEnvironment(simulator)
-        if let endpoint = SimEnv.servicesEndpoint,
-           let endpointHost = endpoint.host?.lowercased(),
-           host == endpointHost || ([host, endpointHost].allSatisfy { $0 == "127.0.0.1" || $0 == "localhost" }),
-           url.port == endpoint.port { return true }
-        #endif
+              url.user == nil, url.password == nil else { return false }
+        if isServicesEndpoint(url) { return true }
         guard url.port == nil || url.port == 80 || url.port == 443 else { return false }
-        if host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local") || host.hasSuffix(".internal") { return false }
-        if let address = ipv4(host) { return isPublic(address) }
-        if let address = ipv6(host) { return isPublic(address) }
-        return true
+        return hasPublicHost(url)
     }
 
-    private static func ipv4(_ host: String) -> in_addr? {
-        var address = in_addr()
-        return inet_pton(AF_INET, host, &address) == 1 ? address : nil
+    static func allowsResolved(_ url: URL) async -> Bool {
+        guard allows(url) else { return false }
+        if isServicesEndpoint(url) { return true }
+        return await resolvesPublicHost(url)
     }
 
-    private static func ipv6(_ host: String) -> in6_addr? {
-        var address = in6_addr()
-        return inet_pton(AF_INET6, host, &address) == 1 ? address : nil
+    static func hasPublicHost(_ url: URL) -> Bool {
+        guard let host = host(of: url) else { return false }
+        if let address = address(host) { return isPublic(address) }
+        return host != "localhost" && ![".localhost", ".local", ".internal"].contains { host.hasSuffix($0) }
     }
 
-    private static func isPublic(_ address: in_addr) -> Bool {
-        let value = UInt32(bigEndian: address.s_addr)
-        let first = value >> 24
-        let second = (value >> 16) & 0xff
+    static func resolvesPublicHost(_ url: URL) async -> Bool {
+        guard hasPublicHost(url), let host = host(of: url) else { return false }
+        let addresses = await resolve(host)
+        return !addresses.isEmpty && addresses.allSatisfy(isPublic)
+    }
+
+    static func reachedPublicAddresses(_ metrics: URLSessionTaskMetrics) -> Bool {
+        metrics.transactionMetrics.allSatisfy { transaction in
+            guard transaction.resourceFetchType == .networkLoad, !transaction.isProxyConnection,
+                  transaction.request.url.map(isServicesEndpoint) != true else { return true }
+            return transaction.remoteAddress.flatMap(address).map(isPublic) == true
+        }
+    }
+
+    private static func host(of url: URL) -> String? {
+        var host = url.host?.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]")) ?? ""
+        while host.hasSuffix(".") { host.removeLast() }
+        return host.isEmpty ? nil : host
+    }
+
+    private static func isServicesEndpoint(_ url: URL) -> Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        guard let endpoint = SimEnv.servicesEndpoint, let requested = host(of: url),
+              let endpointHost = host(of: endpoint), url.port == endpoint.port else { return false }
+        return requested == endpointHost || [requested, endpointHost].allSatisfy { $0 == "127.0.0.1" || $0 == "localhost" }
+        #else
+        return false
+        #endif
+    }
+
+    private static func address(_ literal: String) -> [UInt8]? {
+        let literal = String(literal.prefix { $0 != "%" })
+        var ipv4 = in_addr()
+        if inet_aton(literal, &ipv4) == 1 { return ipv4Mapped + bytes(of: ipv4) }
+        var ipv6 = in6_addr()
+        return inet_pton(AF_INET6, literal, &ipv6) == 1 ? bytes(of: ipv6) : nil
+    }
+
+    private static func resolve(_ host: String) async -> [[UInt8]] {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                var hints = addrinfo()
+                hints.ai_family = AF_UNSPEC
+                hints.ai_socktype = SOCK_STREAM
+                var result: UnsafeMutablePointer<addrinfo>?
+                guard getaddrinfo(host, nil, &hints, &result) == 0, let first = result else {
+                    continuation.resume(returning: [])
+                    return
+                }
+                defer { freeaddrinfo(first) }
+                let addresses = sequence(first: first) { $0.pointee.ai_next }.compactMap { entry -> [UInt8]? in
+                    switch entry.pointee.ai_family {
+                    case AF_INET:
+                        entry.pointee.ai_addr.withMemoryRebound(to: sockaddr_in.self, capacity: 1) {
+                            ipv4Mapped + bytes(of: $0.pointee.sin_addr)
+                        }
+                    case AF_INET6:
+                        entry.pointee.ai_addr.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) {
+                            bytes(of: $0.pointee.sin6_addr)
+                        }
+                    default: nil
+                    }
+                }
+                continuation.resume(returning: addresses)
+            }
+        }
+    }
+
+    private static func bytes<Value>(of value: Value) -> [UInt8] {
+        withUnsafeBytes(of: value) { Array($0) }
+    }
+
+    private static func isPublic(_ bytes: [UInt8]) -> Bool {
+        let prefix = Array(bytes.prefix(12))
+        if prefix == ipv4Mapped || prefix == nat64 { return isPublicIPv4(Array(bytes.suffix(4))) }
+        if prefix.allSatisfy({ $0 == 0 }) { return false }
+        if bytes[0] == 0x20 && bytes[1] == 0x02 { return isPublicIPv4(Array(bytes[2..<6])) }
+        if bytes[0] == 0xff || bytes[0] & 0xfe == 0xfc { return false }
+        return !(bytes[0] == 0xfe && bytes[1] & 0x80 == 0x80)
+    }
+
+    private static func isPublicIPv4(_ bytes: [UInt8]) -> Bool {
+        let first = bytes[0]
+        let second = bytes[1]
         if first == 0 || first == 10 || first == 127 || first >= 224 { return false }
         if first == 100 && (64...127).contains(second) { return false }
         if first == 169 && second == 254 { return false }
         if first == 172 && (16...31).contains(second) { return false }
-        if first == 192 && second == 168 { return false }
+        if first == 192 && (second == 168 || second == 0 && bytes[2] == 0) { return false }
         if first == 198 && (second == 18 || second == 19) { return false }
-        return true
-    }
-
-    private static func isPublic(_ address: in6_addr) -> Bool {
-        var copy = address
-        let bytes = withUnsafeBytes(of: &copy) { Array($0) }
-        if bytes.allSatisfy({ $0 == 0 }) { return false }
-        if bytes.dropLast().allSatisfy({ $0 == 0 }) && bytes.last == 1 { return false }
-        if bytes[0] == 0xff || bytes[0] & 0xfe == 0xfc { return false }
-        if bytes[0] == 0xfe && bytes[1] & 0xc0 == 0x80 { return false }
-        if Array(bytes.prefix(12)) == Array(repeating: UInt8(0), count: 10) + [0xff, 0xff] {
-            var mapped = in_addr()
-            withUnsafeMutableBytes(of: &mapped) { $0.copyBytes(from: bytes.suffix(4)) }
-            return isPublic(mapped)
-        }
         return true
     }
 }
 
 nonisolated private final class WebFetchSessionDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     private let redirects = Mutex(0)
+    let reachedPublicAddresses: AsyncStream<Bool>
+    private let collected: AsyncStream<Bool>.Continuation
+
+    override init() {
+        (reachedPublicAddresses, collected) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
+        super.init()
+    }
 
     func urlSession(
         _ session: URLSession,
@@ -166,7 +236,13 @@ nonisolated private final class WebFetchSessionDelegate: NSObject, URLSessionTas
             count += 1
             return count <= 5
         }
-        completionHandler(allowed && request.url.map(WebFetchURLPolicy.allows) == true ? request : nil)
+        guard allowed, let url = request.url else { return completionHandler(nil) }
+        Task { completionHandler(await WebFetchURLPolicy.allowsResolved(url) ? request : nil) }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+        collected.yield(WebFetchURLPolicy.reachedPublicAddresses(metrics))
+        collected.finish()
     }
 
     func urlSession(
@@ -204,6 +280,7 @@ actor WebFetchClient {
     }
 
     private func performFetch(_ request: WebFetchRequest) async throws -> WebFetchResponse {
+        guard await WebFetchURLPolicy.allowsResolved(request.url) else { throw WebFetchError.privateAddress }
         let delegate = WebFetchSessionDelegate()
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieAcceptPolicy = .never
@@ -229,6 +306,9 @@ actor WebFetchClient {
         for try await byte in bytes {
             guard data.count < Self.maximumBytes else { throw WebFetchError.responseTooLarge }
             data.append(byte)
+        }
+        guard await delegate.reachedPublicAddresses.first(where: { _ in true }) == true else {
+            throw WebFetchError.privateAddress
         }
         var headers: [String: String] = [:]
         for (key, value) in response.allHeaderFields {

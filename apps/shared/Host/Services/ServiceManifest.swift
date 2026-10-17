@@ -90,7 +90,8 @@ nonisolated struct ServiceDefinition: Sendable {
               let baseURL = URL(string: rawBaseURL),
               baseURL.scheme == "http" || baseURL.scheme == "https",
               let host = baseURL.host?.lowercased(),
-              api ? APIServiceAuth.validEndpoint(baseURL) : Self.isServiceHost(host, domain: domain) else {
+              api ? APIServiceAuth.validEndpoint(baseURL) && WebFetchURLPolicy.allows(baseURL)
+                  : Self.isServiceHost(host, domain: domain) else {
             throw ValidationError.invalid("baseUrl")
         }
         let faviconURL = try Self.faviconURL(object["faviconUrl"]?.stringValue)
