@@ -83,6 +83,11 @@ struct StreamingMarkdownText: View {
             }
             if input.isStreaming { fadeKey = generation }
             latest = input
+            if snapshot.blocks.isEmpty, scheduled == nil, !input.isStreaming,
+               let blocks = MarkdownParser.shared.cached(input.source) {
+                snapshot = Snapshot(input: input, blocks: blocks, generation: generation, fadeKey: fadeKey)
+                return
+            }
             pending = (input, generation, fadeKey)
             scheduleIfNeeded()
         }
@@ -724,12 +729,16 @@ private actor MarkdownParser {
         init(_ blocks: [MarkdownBlock]) { self.blocks = blocks }
     }
 
-    private let cache: NSCache<NSString, Cached> = {
+    nonisolated(unsafe) private let cache: NSCache<NSString, Cached> = {
         let cache = NSCache<NSString, Cached>()
         cache.countLimit = 256
         cache.totalCostLimit = TextRenderCachePolicy.parsedLimit
         return cache
     }()
+
+    nonisolated func cached(_ source: String) -> [MarkdownBlock]? {
+        cache.object(forKey: TextRenderCachePolicy.key(source))?.blocks
+    }
 
     func parse(_ source: String) throws -> [MarkdownBlock] {
         try Task.checkCancellation()
