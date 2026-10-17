@@ -1461,6 +1461,7 @@ struct ConversationPage: View {
                 scroller.visibleTargetsChanged($0)
             }
             .defaultScrollAnchor(.bottom, for: .initialOffset)
+            .defaultScrollAnchor(scroller.sizeChangeAnchor, for: .sizeChanges)
             .scrollPosition($scroller.position, anchor: .top)
             .modifier(SidebarScrollLockModifier())
             .scrollEdgeEffectStyle(.soft, for: .top)

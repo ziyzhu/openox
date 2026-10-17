@@ -113,6 +113,7 @@ final class ConversationViewportController {
     private static let jumpThreshold: CGFloat = 32
 
     private(set) var showsJumpButton = false
+    private(set) var sizeChangeAnchor: UnitPoint?
     var position = ScrollPosition(edge: .bottom)
 
     var isUserScrolling: Bool {
@@ -126,11 +127,15 @@ final class ConversationViewportController {
     @ObservationIgnored private var conversationID = ""
     @ObservationIgnored private var frame: Frame?
     @ObservationIgnored private var motion = Motion.stationary
-    @ObservationIgnored private var viewportHold: ViewportHold?
+    @ObservationIgnored private var viewportHold: ViewportHold? {
+        didSet { updateSizeChangeAnchor() }
+    }
     @ObservationIgnored private var inputFocused = false
     @ObservationIgnored private var visibleTargetID: UUID?
     @ObservationIgnored private var pendingFrame: Frame?
-    @ObservationIgnored private var presentation = Presentation.reading
+    @ObservationIgnored private var presentation = Presentation.reading {
+        didSet { updateSizeChangeAnchor() }
+    }
     @ObservationIgnored private var layoutLogStart: Frame?
     @ObservationIgnored private var layoutLogEnd: Frame?
     @ObservationIgnored private var layoutLogTask: Task<Void, Never>?
@@ -375,6 +380,18 @@ final class ConversationViewportController {
             viewportHold = nil
         }
         motion = .programmatic(target)
+    }
+
+    private func updateSizeChangeAnchor() {
+        let anchor: UnitPoint? = pinsEnd ? .bottom : nil
+        guard anchor != sizeChangeAnchor else { return }
+        sizeChangeAnchor = anchor
+    }
+
+    private var pinsEnd: Bool {
+        if case .followingBottom = presentation { return true }
+        if case .tail(let hold) = viewportHold { return hold.fromEnd == 0 }
+        return false
     }
 
     private func updateJumpButton(_ frame: Frame) {
