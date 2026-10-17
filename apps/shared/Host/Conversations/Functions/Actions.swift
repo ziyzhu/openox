@@ -108,6 +108,13 @@ nonisolated enum Actions {
     ]
     static let retired = [widgetShoveler, widgetVideo, widgetImage]
 
+    static func browserSite(_ site: String) -> String { "\(BrowserFunctionCatalog.publicNamespace):\(site)" }
+
+    static func browserSite(of action: String) -> String? {
+        let prefix = browserSite("")
+        return action.hasPrefix(prefix) ? String(action.dropFirst(prefix.count)) : nil
+    }
+
     static func defaultPolicy(for action: String) -> ActionPolicy {
         guard builtIn.contains(action) else { return .ask }
         return action.hasSuffix(".delete") || action == fsRmdir || action == providerGenerate ? .ask : .allow
@@ -116,6 +123,9 @@ nonisolated enum Actions {
     static func label(for action: String) -> String? {
         if let browser = BrowserFunctionCatalog.action(named: action) {
             return "Browser: \(browser.label)"
+        }
+        if let site = browserSite(of: action) {
+            return "Browser: \(site)"
         }
         return switch action {
         case conversationStart: L10n.string("Start conversation")

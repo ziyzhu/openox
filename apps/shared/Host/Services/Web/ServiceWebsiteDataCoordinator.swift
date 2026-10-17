@@ -67,9 +67,13 @@ final class ServiceWebsiteDataCoordinator {
     }
 
     nonisolated static func site(for domain: String) -> String {
+        registrableSite(for: domain) ?? domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+    }
+
+    nonisolated static func registrableSite(for domain: String) -> String? {
         let normalized = domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
         guard !isIPAddress(normalized) else { return normalized }
-        return WebsitePublicSuffixList.bundled.effectiveTLDPlusOne(normalized) ?? normalized
+        return WebsitePublicSuffixList.bundled.effectiveTLDPlusOne(normalized)
     }
 
     func clear(domain: String, services: [Service]) async {

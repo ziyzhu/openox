@@ -690,6 +690,9 @@ final class Conversation: Identifiable {
                     presentation: .application
                 )
                 return answer == Self.abortedAnswer ? nil : answer
+            },
+            authorizeBrowserSite: { [unowned self] site, purpose in
+                try await requireApproval(action: Actions.browserSite(site), defaultPolicy: .ask, purpose: purpose)
             }
         )
     }

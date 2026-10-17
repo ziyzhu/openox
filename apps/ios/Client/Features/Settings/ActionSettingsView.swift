@@ -248,7 +248,7 @@ private struct BuiltInActionGroupSettingsView: View {
         ScrollView {
             SettingsSection(layout: .group) {
                 VStack(spacing: 0) {
-                    ForEach(Array(group.actions.enumerated()), id: \.element) { index, action in
+                    ForEach(Array(actions.enumerated()), id: \.element) { index, action in
                         if index > 0 { Divider().settingsContentInset() }
                         actionRow(action)
                     }
@@ -260,6 +260,11 @@ private struct BuiltInActionGroupSettingsView: View {
         .background(Theme.Colors.background)
         .navigationTitle(group.title)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var actions: [String] {
+        guard group == .web else { return group.actions }
+        return group.actions + serviceManager.actionPolicies.actions.keys.filter { Actions.browserSite(of: $0) != nil }.sorted()
     }
 
     private func actionRow(_ action: String) -> some View {

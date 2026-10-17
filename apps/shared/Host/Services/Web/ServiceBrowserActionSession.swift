@@ -23,8 +23,9 @@ final class ServiceBrowserActionSession {
             didReceive message: WKScriptMessage
         ) {
             let body = message.body
+            let host = message.frameInfo.securityOrigin.host
             Task { @MainActor [weak self] in
-                self?.session?.receiveCapture(body)
+                self?.session?.receiveCapture(body, host: host)
             }
         }
     }
@@ -152,27 +153,31 @@ final class ServiceBrowserActionSession {
         }
     }
 
-    func executeScript(_ script: String) async throws -> JSONValue {
+    func executeScript(_ script: String, authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
         let name = "ox.web.browser.executeScript"
         try await service.awaitAuthenticationAvailability(name: name)
         guard let action = await service.resolvedAction("executeScript", role: .dangerousBrowserControl) else {
             throw Service.EvalError.notActive
         }
         let page = try await page(for: action)
-        return try await service.executeBrowserJavaScript(script, action: action, in: page)
+        let approval = try await Self.authorize(page, authorizeSite)
+        return try await service.executeBrowserJavaScript(script, action: action, in: page) { page in
+            try Self.requireUnchanged(page, since: approval)
+        }
     }
 
-    func exportPDF() async throws -> ExportedPDF {
+    func exportPDF(authorizeSite: (String) async throws -> Void) async throws -> ExportedPDF {
         let name = "ox.web.browser.exportPdf"
         try await service.awaitAuthenticationAvailability(name: name)
         guard let action = await service.resolvedAction("exportPdf", role: .dangerousBrowserControl) else {
             throw Service.EvalError.notActive
         }
         let page = try await page(for: action)
+        let approval = try await Self.authorize(page, authorizeSite)
         return try await service.manager.actionScheduler.schedule(action, on: page, name: name) { page in
-            let generation = page.navigationGeneration
+            try Self.requireUnchanged(page, since: approval)
             let data = try await page.page.exported(as: .pdf())
-            guard generation == page.navigationGeneration else { throw Service.EvalError.contextInvalidated }
+            try Self.requireUnchanged(page, since: approval)
             let prepared = try PDFPreparer.prepareFile(data)
             let attachment = TransientAttachment(
                 kind: .pdf,
@@ -190,7 +195,7 @@ final class ServiceBrowserActionSession {
         }
     }
 
-    func injectScript(_ source: String, domains: [String]) async throws -> URL? {
+    func injectScript(_ source: String, domains: [String], authorizeSite: (String) async throws -> Void) async throws -> URL? {
         let normalized = domains
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
             .filter { !$0.isEmpty }
@@ -202,6 +207,13 @@ final class ServiceBrowserActionSession {
               source.utf8.count <= 100_000,
               injectedScripts.count < 20 else {
             throw Service.EvalError.js("invalid or excessive document-start script")
+        }
+        let sites = normalized.map(ServiceWebsiteDataCoordinator.registrableSite(for:))
+        guard sites.allSatisfy({ $0 != nil }) else {
+            throw Service.EvalError.js("document-start script domains must be registrable domains, their subdomains, or IP addresses")
+        }
+        for site in Set(sites.compactMap { $0 }).sorted() {
+            try await authorizeSite(site)
         }
         let page = try await inspectionPage()
         injectedScripts.append((domains: Array(Set(normalized)).sorted(), source: source))
@@ -320,8 +332,33 @@ final class ServiceBrowserActionSession {
         ])
     }
 
-    func readCapturedEvent(id: String) -> JSONValue? {
-        capturedEvents.first { $0.objectValue?["id"]?.stringValue == id }
+    func readCapturedEvent(id: String, authorizeSite: (String) async throws -> Void) async throws -> JSONValue? {
+        guard let event = capturedEvents.first(where: { $0.objectValue?["id"]?.stringValue == id }),
+              let fields = event.objectValue else { return nil }
+        let hasBody = [fields["requestBody"], fields["responseBody"]].contains { $0 != nil && $0 != .null }
+        if hasBody, let site = fields["site"]?.stringValue {
+            try await authorizeSite(site)
+        }
+        return event
+    }
+
+    private static func site(of page: Service.ServiceWebPage) -> String? {
+        page.page.url?.host(percentEncoded: false).flatMap { $0.isEmpty ? nil : ServiceWebsiteDataCoordinator.site(for: $0) }
+    }
+
+    private static func authorize(
+        _ page: Service.ServiceWebPage,
+        _ authorizeSite: (String) async throws -> Void
+    ) async throws -> (generation: Int, site: String?) {
+        let approval = (generation: page.navigationGeneration, site: site(of: page))
+        if let site = approval.site { try await authorizeSite(site) }
+        return approval
+    }
+
+    private static func requireUnchanged(_ page: Service.ServiceWebPage, since approval: (generation: Int, site: String?)) throws {
+        guard page.navigationGeneration == approval.generation, site(of: page) == approval.site else {
+            throw Service.EvalError.contextInvalidated
+        }
     }
 
     func prepareForUserInteraction() async throws {
@@ -404,7 +441,7 @@ final class ServiceBrowserActionSession {
         Log.webView.info("Service.browserSession event=scripts owner=\(id) capture=\(captureActive) injected=\(injectedScripts.count)")
     }
 
-    private func receiveCapture(_ body: Any) {
+    private func receiveCapture(_ body: Any, host: String) {
         guard captureActive else { return }
         guard let data = try? JSONSerialization.data(withJSONObject: body), data.count <= 100_000 else {
             captureDroppedCount += 1
@@ -414,6 +451,7 @@ final class ServiceBrowserActionSession {
         var fields = JSONValue.from(body).objectValue ?? [:]
         guard fields.removeValue(forKey: "captureID")?.stringValue == captureID else { return }
         fields["id"] = .string(UUID().uuidString)
+        fields["site"] = host.isEmpty ? .null : .string(ServiceWebsiteDataCoordinator.site(for: host))
         appendCapturedEvent(.object(fields))
     }
 

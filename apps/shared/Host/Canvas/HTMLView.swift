@@ -226,6 +226,9 @@ final class HTMLView {
                 },
                 choose: { [unowned self] prompt in
                     await waitForInteraction(.choice(UUID(), prompt.body, prompt.options))?.stringValue
+                },
+                authorizeBrowserSite: { _, _ in
+                    throw RuntimeError.bridge("Browser page access is available only to conversation agents.")
                 }
             ),
             authenticationRecovery: authenticationRecovery

@@ -171,7 +171,8 @@ extension Service {
     func executeBrowserJavaScript(
         _ script: String,
         action: Action,
-        in page: ServiceWebPage
+        in page: ServiceWebPage,
+        verify: @escaping @MainActor @Sendable (ServiceWebPage) throws -> Void
     ) async throws -> JSONValue {
         guard domain == "ios:browser" else { throw EvalError.notActive }
         let name = "ox.web.browser.executeScript"
@@ -181,6 +182,7 @@ extension Service {
         return try await manager.actionScheduler.schedule(action, on: page, name: name) { page in
             let startingNavigation = page.navigationGeneration
             guard self.owns(page) else { throw EvalError.contextInvalidated }
+            try verify(page)
             let host = page.page.url?.host ?? "blank"
             Log.service.info("Service.dangerousBrowser start id=\(invocation) domain=\(self.domain) session=\(page.logLabel) nav=\(startingNavigation)/\(page.finishedNavigationGeneration) host=\(host) bytes=\(script.utf8.count)")
             do {

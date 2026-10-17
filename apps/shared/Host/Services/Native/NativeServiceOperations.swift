@@ -17,6 +17,7 @@ final class NativeServiceOperations {
     let attachTransient: (TransientAttachment) throws -> Void
     let importFile: (TransientAttachment, String) async throws -> FileItem
     let choose: (Prompt) async throws -> String?
+    let authorizeBrowserSite: (String, String?) async throws -> Void
 
     init(
         id: UUID,
@@ -26,7 +27,8 @@ final class NativeServiceOperations {
         showBrowser: @escaping (Service, UUID) -> Void,
         attachTransient: @escaping (TransientAttachment) throws -> Void,
         importFile: @escaping (TransientAttachment, String) async throws -> FileItem,
-        choose: @escaping (Prompt) async throws -> String?
+        choose: @escaping (Prompt) async throws -> String?,
+        authorizeBrowserSite: @escaping (String, String?) async throws -> Void
     ) {
         self.id = id
         self.serviceManager = serviceManager
@@ -36,6 +38,7 @@ final class NativeServiceOperations {
         self.attachTransient = attachTransient
         self.importFile = importFile
         self.choose = choose
+        self.authorizeBrowserSite = authorizeBrowserSite
     }
 
     private func presentBrowser(_ service: Service) async throws {
@@ -59,6 +62,7 @@ final class NativeServiceOperations {
         let browser = service
         let serviceID = service.domain
         let fields = args.objectValue ?? [:]
+        let authorizeSite = { [authorizeBrowserSite] (site: String) in try await authorizeBrowserSite(site, purpose) }
         switch (serviceID, actionID) {
         case ("ios:browser", "navigate"):
             guard let rawURL = fields["url"]?.stringValue,
@@ -131,11 +135,11 @@ final class NativeServiceOperations {
             }
             return try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
-                .executeScript(script)
+                .executeScript(script, authorizeSite: authorizeSite)
         case ("ios:browser", "exportPdf"):
             let pdf = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
-                .exportPDF()
+                .exportPDF(authorizeSite: authorizeSite)
             let artifact: FileItem?
             if let filename = fields["filename"]?.stringValue {
                 artifact = try await importFile(pdf.attachment, filename)
@@ -171,7 +175,7 @@ final class NativeServiceOperations {
             }
             let landed = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
-                .injectScript(source, domains: domains)
+                .injectScript(source, domains: domains, authorizeSite: authorizeSite)
             return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
         case ("ios:browser", "clearScripts"):
             let landed = try await serviceManager.browserActionSessions
@@ -201,9 +205,9 @@ final class NativeServiceOperations {
             return serviceManager.browserActionSessions.session(for: browser, ownerID: id).listCapturedEvents()
         case ("ios:browser", "readCapturedEvent"):
             guard let eventID = fields["id"]?.stringValue,
-                  let event = serviceManager.browserActionSessions
+                  let event = try await serviceManager.browserActionSessions
                     .session(for: browser, ownerID: id)
-                    .readCapturedEvent(id: eventID) else {
+                    .readCapturedEvent(id: eventID, authorizeSite: authorizeSite) else {
                 throw RuntimeError.bridge("ox.web.browser.readCapturedEvent requires a valid captured event id.")
             }
             return event

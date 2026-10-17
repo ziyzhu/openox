@@ -36,6 +36,14 @@ reload requires the Host-based suite.
 Checks live VM error contracts. Requires an idle QA conversation and a fresh installed
 build; does not change files, settings, policies, or conversation selection.
 
+## Browser sites
+
+Checks per-site Browser approval for page scripts, PDF export, injected-script domains,
+and captured bodies. Requires a saved idle Mock conversation, public HTTPS, and
+`example.com`/`example.org` site policies at Ask. Prompts outside an agent run are
+cancelled, so the runner drives Mock `execute` turns and answers only Approve or Deny.
+Verify Always allow and its Settings → Permissions → Web & browser row manually.
+
 ## Image embed
 
 Checks remote Markdown image display, viewer interaction, retry, and reopen. Requires a saved Mock conversation
