@@ -3,7 +3,6 @@ import PDFKit
 import QuickLookThumbnailing
 import SwiftUI
 import UniformTypeIdentifiers
-import WebKit
 
 struct FileCardView: View {
     let file: FileItem
@@ -159,12 +158,13 @@ private enum FileCardContent {
 }
 
 enum FileCardFormat {
-    case image, pdf, markdown, text, table, spreadsheet, html, audio, video, archive, file
+    case image, svg, pdf, markdown, text, table, spreadsheet, html, audio, video, archive, file
 
     init(file: FileItem) {
         let type = UTType(file.typeIdentifier) ?? .data
         let suffix = file.fileURL.pathExtension.lowercased()
         if file.isMarkdown { self = .markdown }
+        else if file.isSVG { self = .svg }
         else if file.isVideo { self = .video }
         else if type.conforms(to: .audio) { self = .audio }
         else if ["csv", "tsv"].contains(suffix) { self = .table }
@@ -185,7 +185,7 @@ enum FileCardFormat {
 
     var symbol: String {
         switch self {
-        case .image: "photo"
+        case .image, .svg: "photo"
         case .pdf: "doc.richtext"
         case .markdown, .text: "doc.text"
         case .table, .spreadsheet: "tablecells"
@@ -228,7 +228,9 @@ private enum FileCardLoader {
             }
             return Result(content: .media(image), detail: detail)
         case .html:
-            return Result(content: .image(try await FileCardHTMLThumbnail.render(url: snapshot.url)))
+            return Result(content: .image(try await WebSnapshot.image(html: html(at: snapshot.url), size: CGSize(width: 480, height: 320))))
+        case .svg:
+            return Result(content: .image(try await WebSnapshot.image(svg: data(at: snapshot.url), width: 480)))
         default:
             let request = QLThumbnailGenerator.Request(fileAt: snapshot.url, size: CGSize(width: 480, height: 320), scale: 2, representationTypes: .thumbnail)
             let image = try await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).uiImage
@@ -273,77 +275,15 @@ private enum FileCardLoader {
     }
 }
 
-private final class FileCardHTMLThumbnail: NSObject, WKNavigationDelegate {
-    private let webView: WKWebView
-    private var continuation: CheckedContinuation<UIImage, any Error>?
-    private var timeout: Task<Void, Never>?
-
-    private override init() {
-        let configuration = WKWebViewConfiguration()
-        configuration.defaultWebpagePreferences.allowsContentJavaScript = false
-        configuration.websiteDataStore = .nonPersistent()
-        webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 480, height: 320), configuration: configuration)
-        super.init()
-        webView.navigationDelegate = self
-        webView.isUserInteractionEnabled = false
-    }
-
-    static func render(url: URL) async throws -> UIImage {
-        let renderer = FileCardHTMLThumbnail()
-        let source = try await FileCardLoader.html(at: url)
-        try Task.checkCancellation()
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                guard !Task.isCancelled else {
-                    continuation.resume(throwing: CancellationError())
-                    return
-                }
-                renderer.continuation = continuation
-                renderer.timeout = Task {
-                    do {
-                        try await Task.sleep(for: .seconds(5))
-                        renderer.finish(.failure(URLError(.timedOut)))
-                    } catch {}
-                }
-                renderer.webView.loadHTMLString("<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:\">" + source, baseURL: nil)
-            }
-        } onCancel: {
-            Task { @MainActor in renderer.finish(.failure(CancellationError())) }
-        }
-    }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        let configuration = WKSnapshotConfiguration()
-        configuration.rect = webView.bounds
-        webView.takeSnapshot(with: configuration) { [self] image, error in
-            if let image { finish(.success(image)) }
-            else { finish(.failure(error ?? CocoaError(.fileReadUnknown))) }
-        }
-    }
-
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) { finish(.failure(error)) }
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) { finish(.failure(error)) }
-    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { finish(.failure(CocoaError(.fileReadUnknown))) }
-
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
-        navigationAction.request.url?.absoluteString == "about:blank" ? .allow : .cancel
-    }
-
-    private func finish(_ result: Swift.Result<UIImage, any Error>) {
-        guard let continuation else { return }
-        self.continuation = nil
-        timeout?.cancel()
-        timeout = nil
-        webView.stopLoading()
-        continuation.resume(with: result)
-    }
-}
-
 private extension FileCardLoader {
     @concurrent static func html(at url: URL) async throws -> String {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         let bytes = try handle.read(upToCount: 512 * 1_024) ?? Data()
         return String(decoding: bytes, as: UTF8.self)
+    }
+
+    @concurrent static func data(at url: URL) async throws -> Data {
+        try Data(contentsOf: url, options: .mappedIfSafe)
     }
 }

@@ -190,15 +190,7 @@ struct FileZoomPreviewScreen: View {
     private var preview: some View {
         switch artifact.kind {
         case .image:
-            if let image, loadState == .ready {
-                ZoomableImageView(image: image)
-                    .accessibilityLabel(artifact.userFacingName)
-                    .accessibilityIdentifier("artifacts.preview.ready")
-            } else if loadState == .loading {
-                loading
-            } else {
-                unavailable
-            }
+            imagePreview
         case .pdf:
             if let pdfDocument, loadState == .ready {
                 ZoomablePDFView(document: pdfDocument, accessibilityLabel: artifact.userFacingName)
@@ -208,7 +200,9 @@ struct FileZoomPreviewScreen: View {
                 unavailable
             }
         case .text, .file:
-            if let snapshot, loadState == .ready {
+            if artifact.isSVG {
+                imagePreview
+            } else if let snapshot, loadState == .ready {
                 openFileButton(snapshot)
             } else if loadState == .loading {
                 loading
@@ -216,6 +210,19 @@ struct FileZoomPreviewScreen: View {
                 unavailable
             }
         case .html:
+            unavailable
+        }
+    }
+
+    @ViewBuilder
+    private var imagePreview: some View {
+        if let image, loadState == .ready {
+            ZoomableImageView(image: image)
+                .accessibilityLabel(artifact.userFacingName)
+                .accessibilityIdentifier("artifacts.preview.ready")
+        } else if loadState == .loading {
+            loading
+        } else {
             unavailable
         }
     }
@@ -258,6 +265,13 @@ struct FileZoomPreviewScreen: View {
         previewURL = loaded.url
     }
 
+    private func loadSVG() async throws {
+        let loaded = try await WebSnapshot.image(svg: source.read(), width: 800)
+        try Task.checkCancellation()
+        image = loaded
+        loadState = .ready
+    }
+
     private func loadFile() async {
         image = nil
         pdfDocument = nil
@@ -279,7 +293,7 @@ struct FileZoomPreviewScreen: View {
                 pdfDocument = loaded
                 loadState = loaded == nil ? .unavailable : .ready
             case .text, .file:
-                try await loadSnapshot()
+                if artifact.isSVG { try await loadSVG() } else { try await loadSnapshot() }
             case .html:
                 loadState = .unavailable
             }

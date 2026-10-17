@@ -470,12 +470,12 @@ private struct MarkdownBlockView: View {
                 isStreaming: isStreaming
             )
         case .code(let language, let body):
-            CodeBlockSurface(scrollsHorizontally: !DiffDocument.supports(language)) {
-                CodeBlockHeader(language: language, code: body, isStreaming: isStreaming) {
-                    CodeBlockCopyButton(code: body, accessibilityIdentifier: "\(accessibilityIdentifier).copy")
+            if language == "mermaid", !isStreaming {
+                MermaidDiagramView(source: body, maxWidth: availableWidth, accessibilityIdentifier: accessibilityIdentifier) {
+                    codeBlock(body, language: language)
                 }
-            } content: {
-                codeBody(body, language: language)
+            } else {
+                codeBlock(body, language: language)
             }
         case .quote(let text):
             prose(text, font: MarkdownText.bodyFont, color: subtleColor, lineSpacing: 2, fades: true)
@@ -523,6 +523,16 @@ private struct MarkdownBlockView: View {
                                         font: font, color: color.uiColor, lineSpacing: lineSpacing)
         } else {
             SelectableText(markdown: text, font: font, color: color.uiColor, lineSpacing: lineSpacing)
+        }
+    }
+
+    private func codeBlock(_ body: String, language: String?) -> some View {
+        CodeBlockSurface(scrollsHorizontally: !DiffDocument.supports(language)) {
+            CodeBlockHeader(language: language, code: body, isStreaming: isStreaming) {
+                CodeBlockCopyButton(code: body, accessibilityIdentifier: "\(accessibilityIdentifier).copy")
+            }
+        } content: {
+            codeBody(body, language: language)
         }
     }
 

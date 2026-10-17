@@ -42,7 +42,7 @@ struct MarkdownEmbedView: View {
             Color.clear.frame(height: 52)
         case .found(let file) where file.kind == .html:
             InlineCanvasCard(artifact: file, rowID: StableID.uuid("markdown.embed.\(path)"))
-        case .found(let file) where file.kind == .image:
+        case .found(let file) where file.kind == .image || file.isSVG:
             ImageWidgetView(image: ImageWidget(source: .artifact(file)))
         case .found(let file) where file.isVideo:
             VideoWidgetView(video: VideoWidget(source: .artifact(file)))

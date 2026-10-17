@@ -83,6 +83,7 @@ nonisolated public struct FileItem: Equatable, Sendable, Identifiable, Codable {
             || suffix == "markdown"
     }
     public var isVideo: Bool { contentType.conforms(to: .movie) }
+    public var isSVG: Bool { contentType.conforms(to: .svg) }
     public var usesDedicatedPreview: Bool { kind == .html || isMarkdown }
     public var usesZoomablePreview: Bool { !usesDedicatedPreview }
     public func fileName(forUserFacingName name: String) -> String { name }

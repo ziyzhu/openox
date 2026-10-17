@@ -298,6 +298,7 @@ extension Scenario {
         ]),
         ("Files & handoffs", [
             Entry("30", "chart — inline JavaScript", .htmlChart),
+            Entry("31", "diagrams — Mermaid block and SVG file", .diagrams),
             Entry("50", "signin — auth card → resume after sign-in", .signin),
             Entry("53", "recover — tool error, then fall back", .recover),
             Entry("58", "files — write, edit, rename, and display", .fileWorkflow),
@@ -650,6 +651,27 @@ extension Scenario {
             """)]
         }
         return [.say("Two quiet places, ready to browse.\n\n![Weekend guide](weekend-guide.md)\n\n![Valley lake](https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=960&h=640&fit=crop)"), .stop(.stop)]
+    }
+
+    static let diagrams = Scenario(name: "diagrams") { ctx in
+        if ctx.turn == 0 {
+            return [execute("""
+            await ox.fs.write({ path: "sunrise.svg", content: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120"><rect width="240" height="120" fill="#FFE8C2"/><circle cx="120" cy="96" r="40" fill="#FFA500"/><rect y="96" width="240" height="24" fill="#3B6EA5"/><script>document.body.innerHTML = "script ran"</script></svg>', purpose: "Create sunrise drawing" });
+            """)]
+        }
+        return [.say("""
+        Here is how a request flows, plus the drawing.
+
+        ```mermaid
+        flowchart LR
+          A[Composer] --> B{Host}
+          B -->|tools| C[VM]
+          B -->|reply| D[Transcript]
+          C --> B
+        ```
+
+        ![Sunrise](sunrise.svg)
+        """), .stop(.stop)]
     }
 
     static let video = Scenario(name: "video", steps: [

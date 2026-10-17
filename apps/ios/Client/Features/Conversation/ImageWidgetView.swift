@@ -91,11 +91,15 @@ struct ImageWidgetView: View {
                 guard response.ok, response.url.scheme == "https" else { throw ImagePreparationError.invalid }
                 data = response.data
             }
-            let loaded = try await Task.detached(priority: .userInitiated) {
-                let prepared = try ImagePreparer.prepare(data)
-                guard let image = UIImage(data: prepared.data) else { throw ImagePreparationError.invalid }
-                return image
-            }.value
+            let loaded = if image.source.artifact?.isSVG == true {
+                try await WebSnapshot.image(svg: data, width: 800)
+            } else {
+                try await Task.detached(priority: .userInitiated) {
+                    let prepared = try ImagePreparer.prepare(data)
+                    guard let image = UIImage(data: prepared.data) else { throw ImagePreparationError.invalid }
+                    return image
+                }.value
+            }
             try Task.checkCancellation()
             state = .ready(loaded)
             Log.ui.info("ImageWidgetView.load ready source=\(image.source.artifact == nil ? "remote" : "artifact") bytes=\(data.count)")

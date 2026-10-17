@@ -7525,6 +7525,17 @@
         }
       }
     },
+    "Open diagram" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开图表"
+          }
+        }
+      }
+    },
     "Open image" : {
       "extractionState" : "manual",
       "localizations" : {
