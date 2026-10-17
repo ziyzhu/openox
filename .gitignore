@@ -8,6 +8,7 @@ node_modules
 apps/ios/build
 apps/ios/DerivedData
 apps/shared/Resources/PiDurable.bundle/
+apps/shared/Host/Agent/ModelGuidance.generated.swift
 apps/ios/Local.xcconfig
 **/.build/
 **/.swiftpm/

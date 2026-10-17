@@ -1,7 +1,8 @@
 #!/bin/sh
 set -eu
 
-resources="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/Resources/PiDurable.bundle"
+shared="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+resources="$shared/Resources/PiDurable.bundle"
 
 for resource in harness.js harness-storage.js prompts.js default-soul.md manifest.json UPSTREAM_LICENSE.txt; do
   if [ ! -s "$resources/$resource" ]; then
@@ -9,3 +10,8 @@ for resource in harness.js harness-storage.js prompts.js default-soul.md manifes
     exit 1
   fi
 done
+
+if [ ! -s "$shared/Host/Agent/ModelGuidance.generated.swift" ]; then
+  echo "error: Missing Host/Agent/ModelGuidance.generated.swift. Run bun run build:agent before building Ox." >&2
+  exit 1
+fi
