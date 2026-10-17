@@ -107,7 +107,7 @@ Choice, approval, and secret-entry prompts are transient `Conversation` interact
 - Active and saved profiles — owners: Host/Profile/StorageRoot.swift and Host/Profile/ProfileStore.swift
 - Profile execution/history/documents — owner: Pi Durable; host-neutral open runtime: packages/agent/src/profile/runtime.ts (`ProfileRuntime`, formerly `OxAgentSession`; persisted formats unchanged); native Session/owner lifetime: Host/Durable/DurableProfileStore.swift; native conversation/presentation: Host/Conversations/Conversation.swift and ConversationManager.swift; application facade: Host/Profile/ProfileRepository.swift. Native type renames do not change persisted ConversationMeta, Turn, RPC, or compatibility-ID formats.
 - Compatibility startup/recovery ordering — owner: Host/Profile/StorageMigration.swift
-- Profile milestones, conversion, and publication recovery — owner: Host/Profile/ProfileMigrator.swift
+- Profile milestones, conversion, and publication recovery — owner: Host/Profile/ProfileMigrator.swift and its `ProfileMigrator+*.swift` extensions
 - App-wide preferences, catalogs, bookmarks, and schedules — owner: Host/Profile/ApplicationStorageMigrator.swift
 - Credential conversion — owner: Host/Profile/CredentialMigrator.swift
 - Repository compatibility — owner: Host/Profile/RepositoryMigrator.swift

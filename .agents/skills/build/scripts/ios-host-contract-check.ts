@@ -151,13 +151,10 @@ export async function check(): Promise<string> {
   }
 
   const migrationOwners = ["StorageMigrator", "ProfileMigrator", "ApplicationStorageMigrator", "CredentialMigrator", "RepositoryMigrator", "StorageMigrationSupport", "ConversationMigrator"];
-  const migrationFiles = [
-    ...["StorageMigration", ...migrationOwners.slice(1, -1)].map(name => `apps/shared/Host/Profile/${name}.swift`),
-    "apps/shared/Host/Conversations/ConversationMigrator.swift",
-    "apps/shared/Host/Conversations/ConversationMigrator+Durable.swift",
-  ];
+  const migrationFile = new RegExp(`^apps/shared/Host/(Profile/(StorageMigration|${migrationOwners.slice(1, -1).join("|")})|Conversations/ConversationMigrator)(\\+\\w+)?\\.swift$`);
+  const migrationFiles = allSwiftFiles.map(file => relative(ROOT, file)).filter(path => migrationFile.test(path));
   const migrationCallers: Record<string, Set<string>> = {
-    StorageMigrator: new Set([migrationFiles[0], "apps/ios/Host/IOSHost.swift", "apps/shared/Host/HostRuntime.swift"]),
+    StorageMigrator: new Set(["apps/shared/Host/Profile/StorageMigration.swift", "apps/ios/Host/IOSHost.swift", "apps/shared/Host/HostRuntime.swift"]),
     ProfileMigrator: new Set([...migrationFiles, "apps/shared/Host/Profile/ProfileRepository.swift", "apps/shared/Host/Profile/StorageRoot.swift", "apps/shared/Host/Durable/DurableProfileStore.swift", "apps/shared/Host/RPC/DebugDurableConversation.swift"]),
     ApplicationStorageMigrator: new Set([...migrationFiles, "apps/shared/Host/Profile/ScheduledSkills.swift"]),
     CredentialMigrator: new Set(migrationFiles),
