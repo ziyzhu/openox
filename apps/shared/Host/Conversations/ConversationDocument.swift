@@ -992,10 +992,13 @@ nonisolated struct ConversationDocument: Sendable {
             guard case .agent(_, _) = turns[entryStart - 1] else { break }
             entryStart -= 1
         }
-        let entryIndexes = Dictionary(uniqueKeysWithValues: turns.enumerated().map { ($0.element.id, $0.offset) })
-        let blockStart = projection.firstIndex { block in
-            sourceTurnIDs[RenderBlockID(block.id)].flatMap { entryIndexes[$0] }.map { $0 >= entryStart } ?? false
-        } ?? projection.count
+        let tailTurnIDs = Set(turns[entryStart...].map(\.id))
+        var blockStart = projection.endIndex
+        while blockStart > projection.startIndex,
+              let turnID = sourceTurnIDs[RenderBlockID(projection[blockStart - 1].id)],
+              tailTurnIDs.contains(turnID) {
+            blockStart -= 1
+        }
         let projected = ConversationProjection.renderWithSource(
             Array(turns[entryStart...]),
             turnOffset: entryStart,

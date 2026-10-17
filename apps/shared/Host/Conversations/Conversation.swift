@@ -2542,14 +2542,11 @@ final class Conversation: Identifiable {
         var turnSkills: [Skill] = []
         var skillConflicts: [String] = []
         do {
-            turnSkills = try await skillsMount.entries().map(\.skill)
+            let catalog = try await skillsMount.catalog()
+            turnSkills = skillsMount.entries(in: catalog).map(\.skill)
+            skillConflicts = catalog.conflicts.filter { $0.selectedSourceID == nil }.map(\.name)
         } catch {
             Log.session.warning("Conversation.runOne skills unavailable id=\(id) fallback=empty error=\(error.localizedDescription)")
-        }
-        do {
-            skillConflicts = try await skillsMount.catalog().conflicts.filter { $0.selectedSourceID == nil }.map(\.name)
-        } catch {
-            Log.session.warning("Conversation.runOne skill-conflicts unavailable id=\(id) fallback=empty error=\(error.localizedDescription)")
         }
         let turnState = ConversationPromptState.turn(
             skills: turnSkills,

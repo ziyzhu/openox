@@ -51,22 +51,20 @@ nonisolated enum DurableConversationProjection {
         let decoder = JSONDecoder()
         decoder.userInfo[.profileScope] = scope
         decoder.userInfo[.artifactDirectoryListing] = files
-        var order: [TurnID] = []
-        var latest: [TurnID: Turn] = [:]
-        for entry in entries {
+        var latest: [Turn] = []
+        var seen = Set<TurnID>()
+        for entry in entries.reversed() {
             guard let fields = entry.objectValue,
                   ["ox.native.turn", "ox.native.presentation"].contains(fields["kind"]?.stringValue ?? ""),
                   let value = fields["data"]?.objectValue?["turn"] else { continue }
             do {
                 let turn = try decoder.decode(Turn.self, from: Data(value.jsonString().utf8))
-                order.removeAll { $0 == turn.id }
-                order.append(turn.id)
-                latest[turn.id] = turn
+                if seen.insert(turn.id).inserted { latest.append(turn) }
             } catch {
                 Log.session.warning("PiDurable presentation annotation ignored entry=\(fields["id"]?.intValue ?? -1) error=\(error.localizedDescription)")
             }
         }
-        return order.compactMap { latest[$0] }
+        return latest.reversed()
     }
 
     private struct Builder {

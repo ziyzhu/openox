@@ -33,7 +33,10 @@ struct SkillsMount {
     }
 
     func entries() async throws -> [Entry] {
-        let catalog = try await catalog()
+        entries(in: try await catalog())
+    }
+
+    func entries(in catalog: SkillCatalog) -> [Entry] {
         var skills = Dictionary(uniqueKeysWithValues: catalog.skills.map { ($0.name, $0) })
         for (name, skill) in session.snapshots where !SkillFiles.reservedNames.contains(name) || skill.owner == .system { skills[name] = skill }
         return skills.values.sorted { $0.name < $1.name }.map { Entry(skill: $0) }
