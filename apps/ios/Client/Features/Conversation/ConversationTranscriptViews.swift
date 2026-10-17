@@ -1021,11 +1021,84 @@ struct FileControls {
     let onDelete: (FileItem) -> Void
 }
 
+struct SendFlight {
+    static let coordinateSpace = "sendFlight"
+    static let rise = Spring(duration: 0.33, bounce: 0)
+    static let departure = UnitCurve.bezier(
+        startControlPoint: UnitPoint(x: 0.25, y: 0.7),
+        endControlPoint: UnitPoint(x: 0.4, y: 1)
+    )
+    static let departureDuration: TimeInterval = 0.2
+
+    static func departed(after elapsed: TimeInterval) -> Double {
+        departure.value(at: min(1, elapsed / departureDuration))
+    }
+
+    struct Bubble: Equatable {
+        let text: String
+        let frame: CGRect
+    }
+
+    struct Path: Equatable {
+        let origin: CGPoint
+        let start: CGPoint
+        let end: CGPoint
+
+        static func resting(at point: CGPoint) -> Path {
+            Path(origin: point, start: point, end: point)
+        }
+
+        func position(elapsed: TimeInterval) -> CGPoint {
+            let rise = SendFlight.rise.value(target: 1.0, time: elapsed)
+            let remaining = 1 - SendFlight.departed(after: elapsed)
+            return CGPoint(
+                x: start.x + (end.x - start.x) * rise + (origin.x - start.x) * remaining,
+                y: start.y + (end.y - start.y) * rise + (origin.y - start.y) * remaining
+            )
+        }
+    }
+
+    let origin: CGPoint?
+    let report: (Bubble) -> Void
+}
+
+extension EnvironmentValues {
+    @Entry var sendFlight: SendFlight? = nil
+}
+
+struct SendFlightBubbleView: View, Animatable {
+    let bubble: SendFlight.Bubble
+    let path: SendFlight.Path
+    let page: CGPoint
+    var elapsed: TimeInterval
+
+    var animatableData: TimeInterval {
+        get { elapsed }
+        set { elapsed = newValue }
+    }
+
+    var body: some View {
+        let position = path.position(elapsed: elapsed)
+        Text(bubble.text)
+            .font(Theme.Fonts.bodyMd)
+            .foregroundStyle(Theme.Colors.onSurface)
+            .frame(width: bubble.frame.width - 2 * UserBubble.textInset.width, alignment: .leading)
+            .padding(.horizontal, UserBubble.textInset.width)
+            .padding(.vertical, UserBubble.textInset.height)
+            .background(Theme.Colors.bubble.opacity(SendFlight.departed(after: elapsed)), in: UserBubble.shape)
+            .offset(x: position.x - page.x, y: position.y - page.y)
+    }
+}
+
 struct UserBubble: View {
+    static let textInset = CGSize(width: 14, height: Theme.Spacing.md)
+    static let shape = RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
+
     let text: String
     let attachments: [FileItem]
     let sourcePrefix: String
     let onOpenAttachment: (FileItem, String) -> Void
+    @Environment(\.sendFlight) private var sendFlight
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 6) {
@@ -1048,9 +1121,15 @@ struct UserBubble: View {
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
                     // Body font metrics add vertical whitespace around glyphs, so 12 pt reads like 14 pt horizontally.
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, Theme.Spacing.md)
-                    .background(Theme.Colors.bubble, in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
+                    .padding(.horizontal, Self.textInset.width)
+                    .padding(.vertical, Self.textInset.height)
+                    .background(Theme.Colors.bubble, in: Self.shape)
+                    .onGeometryChange(for: CGRect.self) {
+                        $0.frame(in: .named(SendFlight.coordinateSpace))
+                    } action: {
+                        sendFlight?.report(SendFlight.Bubble(text: text, frame: $0))
+                    }
+                    .opacity(sendFlight == nil ? 1 : 0)
             }
         }
     }
@@ -1073,6 +1152,10 @@ private struct UserSkillBubble: View {
     let onOpenSkill: (Skill) -> Void
 
     var body: some View {
+        skillBubbles.environment(\.sendFlight, nil)
+    }
+
+    private var skillBubbles: some View {
         VStack(alignment: .trailing, spacing: 6) {
             if invocation.skill.owner == .system {
                 UserBubble(
@@ -1145,6 +1228,7 @@ struct QueuedBubble: View {
                         sourcePrefix: "queued:\(message.id.uuidString)",
                         onOpenAttachment: onOpenAttachment
                     )
+                    .environment(\.sendFlight, nil)
                     .opacity(0.55)
                 }
             }

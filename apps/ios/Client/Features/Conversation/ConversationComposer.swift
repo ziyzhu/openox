@@ -239,6 +239,7 @@ struct ConversationComposer: View, Equatable {
     let onSpeechBegin: (Bool) -> Void
     var serviceAuthSource = ServiceChip.AuthSource.live
     var serviceScrollProgress: CGFloat? = nil
+    var hidesPlaceholder = false
     var onInputFrameChange: (CGRect) -> Void = { _ in }
 
     private let textLineFragmentPadding: CGFloat = 5
@@ -251,6 +252,7 @@ struct ConversationComposer: View, Equatable {
     @State private var serviceScrollExtent: CGFloat = 0
     @State private var composerSelection = AttributedTextSelection()
     @State private var textViewReference = ComposerTextViewReference()
+    @State private var editorDraftID: UUID?
     @State private var hasShownImportMemory = false
     @State private var speechLayoutState: LayoutState?
     @AppStorage("chat.importMemoryIntentDisplays") private var importMemoryIntentDisplays = 0
@@ -277,6 +279,7 @@ struct ConversationComposer: View, Equatable {
             && lhs.composerButtonSize == rhs.composerButtonSize
             && lhs.serviceAuthSource == rhs.serviceAuthSource
             && lhs.serviceScrollProgress == rhs.serviceScrollProgress
+            && lhs.hidesPlaceholder == rhs.hidesPlaceholder
     }
 
     private var empty: Bool {
@@ -719,7 +722,7 @@ struct ConversationComposer: View, Equatable {
 
     private var composerRow: some View {
         ZStack(alignment: .leading) {
-            if inputText.isEmpty {
+            if inputText.isEmpty, !hidesPlaceholder {
                 Group {
                     if isEditingMessage {
                         Text("Edit message", comment: "Placeholder shown while editing a previously sent message.")
@@ -735,7 +738,14 @@ struct ConversationComposer: View, Equatable {
                     .accessibilityHidden(true)
             }
             TextEditor(text: attributedDraft, selection: $composerSelection)
-                .id(composer.draftID)
+                .id(editorDraftID)
+                .transition(.identity)
+                .onChange(of: composer.draftID) { _, draftID in
+                    if !isFieldFocused { editorDraftID = draftID }
+                }
+                .onChange(of: isFieldFocused) { _, focused in
+                    if !focused { editorDraftID = composer.draftID }
+                }
                 .textEditorStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .contentMargins(0, for: .scrollContent)
@@ -745,7 +755,9 @@ struct ConversationComposer: View, Equatable {
                 .focused(fieldFocused)
                 .allowsHitTesting(!speech.isPresented)
                 .accessibilityIdentifier(A11yID.ConversationControls.input)
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                .onGeometryChange(for: CGRect.self) {
+                    $0.frame(in: .global).offsetBy(dx: textLineFragmentPadding, dy: 0)
+                } action: {
                     onInputFrameChange($0)
                 }
                 .accessibilityValue(inputAccessibilityValue)

@@ -167,10 +167,14 @@ final class ConversationViewportController {
         resetLayoutLog()
     }
 
-    func beginSendHandoff(_ id: UUID) {
+    func holdForSend(_ id: UUID) {
         presentation = .sending(id)
         showsJumpButton = false
         viewportHold = nil
+    }
+
+    func beginSendHandoff(_ id: UUID) {
+        holdForSend(id)
         move(to: .turnTop(id))
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
