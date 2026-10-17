@@ -57,7 +57,7 @@ async function outsideRepository(path: string): Promise<string> {
   await mkdir(dirname(output), { recursive: true });
   const directory = await realpath(dirname(output));
   const fromRoot = relative(await realpath(root), directory);
-  if (!fromRoot || !fromRoot.startsWith("../") && !isAbsolute(fromRoot)) throw new Error("Keep QA fixtures and evidence outside the repository");
+  if (fromRoot !== ".." && !fromRoot.startsWith("../") && !isAbsolute(fromRoot)) throw new Error("Keep QA fixtures and evidence outside the repository");
   return resolve(directory, output.split("/").at(-1)!);
 }
 

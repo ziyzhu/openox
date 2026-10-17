@@ -107,7 +107,7 @@ export class ProfileRuntime {
   }
 
   private async decodeConversation(id: ConversationId) {
-    if ((await this.files.state()).deletedConversations.includes(id)) throw new Error("Conversation not found");
+    if (this.files.physical && (await this.files.state()).deletedConversations.includes(id)) throw new Error("Conversation not found");
     const conversation = await this.harness.conversation(id, context);
     if (!conversation) throw new Error("Conversation not found");
     const nativeEntries: EntryDraft[] = [];
