@@ -20,7 +20,14 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | `bun run build:services` | Rebuild bundled services and model-action resources. |
 | `bun run generate:ios` / `bun run generate:macos` | Generate Xcode projects from each app's `project.yml`; include generated iOS changes for Xcode Cloud. |
 | `bun run build:macos` | Generate the native host-only project with XcodeGen and build for macOS 26+. |
+| `bun run build:ios` | Build the iOS app for a generic Simulator without booting one. |
 | `bun run build:agent` | Rebuild native bundles, the portable prompt renderer, default SOUL, package-owned bundled skills, and TS-owned `ModelGuidance.generated.swift`. |
+
+Both native builds write the full xcodebuild log to the system temporary directory and print
+only `PASS` or the unique compiler errors with the log path; read the log only when the summary
+is not enough. Append xcodebuild arguments such as `-derivedDataPath <dir>` to either command.
+For changes confined to `apps/shared`, `build:macos` compiles the same shared sources without
+a Simulator; use it as the first compile check, then `build:ios` before iOS verification.
 
 `typecheck` validates public/private-content boundaries, iOS Client-Host layering,
 protocol schema consistency, unsafe absolute-path slicing, bundled skill packages and links, translations, provider models,
