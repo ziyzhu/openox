@@ -20,18 +20,24 @@ final class ConversationViewportController {
 
     private struct TailHold: Equatable {
         let floorTop: CGFloat
-        let fromEnd: CGFloat
         let slack: CGFloat
+        let restingInset: CGFloat
+        var lifted = false
 
         var pinsEnd: Bool { slack == 0 }
 
+        func rests(in frame: Frame) -> Bool {
+            frame.insetBottom <= restingInset + 0.5
+        }
+
         func expectedTop(in frame: Frame) -> CGFloat {
             let endTop = max(0, frame.visualTop + frame.distanceFromEnd)
-            return min(max(floorTop, endTop - fromEnd), endTop)
+            guard lifted else { return min(floorTop, endTop) }
+            return min(max(floorTop, endTop - slack), endTop)
         }
 
         var label: String {
-            "floor=\(Int(floorTop)) fromEnd=\(Int(fromEnd)) slack=\(Int(slack))"
+            "floor=\(Int(floorTop)) slack=\(Int(slack)) lifted=\(lifted)"
         }
     }
 
@@ -46,11 +52,17 @@ final class ConversationViewportController {
             }
         }
 
-        var floorTop: CGFloat {
+        func settles(in frame: Frame) -> Bool {
             switch self {
-            case .tail(let hold): hold.floorTop
-            case .reader(let top): top
+            case .tail(let hold): hold.rests(in: frame) && abs(frame.visualTop - hold.expectedTop(in: frame)) <= 1
+            case .reader(let top): abs(frame.visualTop - top) <= 1
             }
+        }
+
+        mutating func observe(_ frame: Frame) {
+            guard case .tail(var hold) = self, !hold.lifted, !hold.rests(in: frame) else { return }
+            hold.lifted = true
+            self = .tail(hold)
         }
 
         var label: String {
@@ -245,11 +257,7 @@ final class ConversationViewportController {
                 return
             }
             viewportHold = if frame.jumpDistance - slack <= Self.jumpThreshold {
-                .tail(TailHold(
-                    floorTop: frame.visualTop,
-                    fromEnd: slack + max(0, frame.distanceFromEnd),
-                    slack: slack
-                ))
+                .tail(TailHold(floorTop: frame.visualTop, slack: slack, restingInset: frame.insetBottom))
             } else {
                 .reader(top: frame.visualTop)
             }
@@ -318,6 +326,7 @@ final class ConversationViewportController {
         if case .followingBottom = presentation, followBottom(new) { return }
         updateJumpButton(new)
         let keyboardMoved = old.map { abs($0.insetBottom - new.insetBottom) > 0.5 } ?? false
+        viewportHold?.observe(new)
         applyViewportHold(animation: keyboardMoved ? Self.keyboardAnimation : nil)
         if case .programmatic(.bottom) = motion, new.distanceFromEnd <= 1 {
             motion = .stationary
@@ -325,8 +334,7 @@ final class ConversationViewportController {
             motion = .stationary
         }
         if !inputFocused,
-           let viewportHold,
-           abs(new.visualTop - viewportHold.floorTop) <= 1 {
+           viewportHold?.settles(in: new) == true {
             self.viewportHold = nil
         }
     }

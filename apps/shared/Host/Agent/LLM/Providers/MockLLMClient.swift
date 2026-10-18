@@ -285,6 +285,8 @@ extension Scenario {
             Entry("19", "background — stream after the reader scrolls away", .backgroundStream),
             Entry("21", "focusstream — stream while the composer is focused", .focusedStream),
             Entry("97", "characterstream — partial words near a line break", .characterStream),
+            Entry("98", "longprose — ~120 KB of headings, paragraphs, and lists", .longProse),
+            Entry("99", "longmixed — longprose with a code block every 10 sections", .longMixed),
         ]),
         ("Tool loops & interaction", [
             Entry("22", "parallel — two reads, synthesize", .parallelTools),
