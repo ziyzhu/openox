@@ -122,7 +122,7 @@ final class ServiceFlowSession {
             title: title,
             navigationTitle: navigationTitle,
             initialURL: initialURL,
-            configuration: service.manager.makeHandoffPageConfiguration(for: service.domain),
+            configuration: service.manager.makePageConfiguration(),
             completionProbe: completionProbe,
             navigationObserver: navigationObserver
         )

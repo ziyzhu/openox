@@ -57,7 +57,7 @@ final class ServiceManager {
     private(set) var monoRepositoryRevision: UInt64 = 0 {
         didSet { invalidateFavicons() }
     }
-    private(set) var faviconRevision: UInt64 = 0
+    var faviconRevision: UInt64 { monoRepositoryRevision }
     private let index = ServiceSearchIndex()
     @ObservationIgnored private var faviconData: [String: Data] = [:]
     @ObservationIgnored private let repository: Repository
@@ -65,8 +65,7 @@ final class ServiceManager {
     @ObservationIgnored private var monoRepositoryLocale: String?
     @ObservationIgnored private var monoRepositoryGeneration: UInt64 = 0
     @ObservationIgnored private var semanticState: SemanticState = .unavailable
-    @ObservationIgnored private var repositoryLoadActive = false
-    @ObservationIgnored private var repositoryLoadWaiters: [CheckedContinuation<Void, Never>] = []
+    @ObservationIgnored private var repositoryLoadWaiters: [CheckedContinuation<Void, Never>]?
     @ObservationIgnored private let nativeServices: any NativeServiceCatalog
     @ObservationIgnored private var memoryWarningObserver: NSObjectProtocol?
     @ObservationIgnored private var folderGrantObserver: NSObjectProtocol?
@@ -79,7 +78,7 @@ final class ServiceManager {
     private(set) var monoRepositoryState: MonoRepositoryState = .idle
     private(set) var monoRepositoryHash: String?
     private(set) var repositories: [Repository.Descriptor] = []
-    private(set) var repositorySkills: [Skill] = []
+    var repositorySkills: [Skill] { Skills.shared.repositorySkills }
     private(set) var repositoryConflicts: [Repository.Conflict] = []
 
     struct ServiceMatch: Identifiable {
@@ -116,15 +115,7 @@ final class ServiceManager {
     nonisolated static let actionPoliciesKey = "actionApprovalPolicies"
     nonisolated static let legacyAutoApproveActionsKey = "autoApproveActions"
     nonisolated static let legacyAutoApproveAllKey = "autoApproveAll"
-    func makeHandoffPageConfiguration(for _: String) -> WebPage.Configuration {
-        websiteData.makePageConfiguration()
-    }
-
-    func makeServicePageConfiguration(for _: String) -> WebPage.Configuration {
-        websiteData.makePageConfiguration()
-    }
-
-    func makeBrowserPageConfiguration(for _: String) -> WebPage.Configuration {
+    func makePageConfiguration() -> WebPage.Configuration {
         websiteData.makePageConfiguration()
     }
 
@@ -239,12 +230,6 @@ final class ServiceManager {
         if let memoryWarningObserver {
             NotificationCenter.default.removeObserver(memoryWarningObserver)
         }
-    }
-
-    // MARK: - Saved services
-
-    var savedServices: [Service] {
-        services.filter { savedDomains.contains($0.domain) }
     }
 
     func isSaved(_ service: Service) -> Bool { savedDomains.contains(service.domain) }
@@ -387,15 +372,13 @@ final class ServiceManager {
         actionPolicies.sources.removeValue(forKey: service.domain)
     }
 
-    // An attached service whose origin owns this URL, so a tapped link can open
-    // inside that service's credentialed page instead of a logged-out Safari.
     func attachedService(for url: URL) -> Service? {
-        let attachedDomains = attachedServiceDomainsByConversation.values.reduce(into: Set<String>()) { $0.formUnion($1) }
-        return relatedWebServices(for: url).first { attachedDomains.contains($0.domain) }
+        let domains = attachedDomains
+        return relatedWebServices(for: url).first { domains.contains($0.domain) }
     }
 
-    func isConversationAttached(_ conversationID: UUID) -> Bool {
-        attachedServiceDomainsByConversation[conversationID] != nil
+    private var attachedDomains: Set<String> {
+        attachedServiceDomainsByConversation.values.reduce(into: Set<String>()) { $0.formUnion($1) }
     }
 
     func isAttached(domain: String, to conversationID: UUID) -> Bool {
@@ -403,7 +386,7 @@ final class ServiceManager {
     }
 
     func setAttachedServices(_ attached: [Service], for conversationID: UUID) {
-        let previous = attachedServiceDomainsByConversation.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+        let previous = attachedDomains
         let retained = Set(attached.map(\.domain))
         attachedServiceDomainsByConversation[conversationID] = retained
         let detached = webConversations.values.filter { $0.owner == .conversation(conversationID) && !retained.contains($0.service.domain) }
@@ -414,14 +397,14 @@ final class ServiceManager {
     }
 
     func removeAttachedServices(for conversationID: UUID) {
-        let previous = attachedServiceDomainsByConversation.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+        let previous = attachedDomains
         attachedServiceDomainsByConversation.removeValue(forKey: conversationID)
         closeWebConversations(owner: .conversation(conversationID))
         updateMCPActivation(from: previous)
     }
 
     private func updateMCPActivation(from previous: Set<String>) {
-        let current = attachedServiceDomainsByConversation.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+        let current = attachedDomains
         for domain in current.subtracting(previous) {
             guard let service = service(domain: domain), let mcp = service.remoteMCPService else { continue }
             Task {
@@ -475,7 +458,6 @@ final class ServiceManager {
 
     private func invalidateFavicons() {
         faviconData.removeAll()
-        faviconRevision &+= 1
         Log.service.info("Service.icon invalidated revision=\(self.faviconRevision)")
     }
 
@@ -494,7 +476,6 @@ final class ServiceManager {
             self.monoRepository = monoRepository
             repositories = monoRepository.repositories
             repositoryConflicts = monoRepository.conflicts
-            repositorySkills = monoRepository.skills
             Skills.shared.setRepositorySkills(monoRepository.skills)
             let hasReadyRepository = monoRepository.repositories.contains { repository in
                 if case .ready = repository.state { return true }
@@ -529,27 +510,27 @@ final class ServiceManager {
     }
 
     private func acquireRepositoryLoad() async {
-        guard repositoryLoadActive else {
-            repositoryLoadActive = true
+        guard repositoryLoadWaiters != nil else {
+            repositoryLoadWaiters = []
             return
         }
         await withCheckedContinuation { continuation in
-            repositoryLoadWaiters.append(continuation)
-            Log.service.info("ServiceManager.loadRepositories queued waiters=\(repositoryLoadWaiters.count)")
+            repositoryLoadWaiters?.append(continuation)
+            Log.service.info("ServiceManager.loadRepositories queued waiters=\(repositoryLoadWaiters?.count ?? 0)")
         }
     }
 
     private func releaseRepositoryLoad() {
-        guard !repositoryLoadWaiters.isEmpty else {
-            repositoryLoadActive = false
+        guard repositoryLoadWaiters?.isEmpty == false else {
+            repositoryLoadWaiters = nil
             return
         }
-        repositoryLoadWaiters.removeFirst().resume()
+        repositoryLoadWaiters?.removeFirst().resume()
     }
 
     @discardableResult
     func setRepositoryEnabled(_ repositoryID: String, enabled: Bool, locale: String?) async throws -> Repository.Descriptor {
-        guard !repositoryLoadActive, repositoryState != .syncing else {
+        guard repositoryLoadWaiters == nil, repositoryState != .syncing else {
             throw Repository.Failure(message: "Repositories are updating; wait before changing enablement")
         }
         guard repositoryID != Repository.localID || enabled else {
@@ -738,7 +719,7 @@ final class ServiceManager {
         _ = await loadRepositories(locale: locale)
         if service(domain: domain) == nil {
             savedDomains.remove(domain)
-            let previous = attachedServiceDomainsByConversation.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+            let previous = attachedDomains
             for conversationID in Array(attachedServiceDomainsByConversation.keys) {
                 attachedServiceDomainsByConversation[conversationID]?.remove(domain)
             }
@@ -1022,11 +1003,8 @@ final class ServiceManager {
         return await Self.decodeMCPDefinitions(files, locale: locale)
     }
 
-    // MARK: - Fetch
-
     struct Fetched { let actions: String }
 
-    // Read the service's built artifacts from the working tree.
     func fetch(domain: String) async -> Fetched? {
         guard let definition = byDomain[domain]?.definition else { return nil }
         if definition.repositoryID == Repository.localID {

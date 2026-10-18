@@ -85,7 +85,7 @@ final class ServiceBrowserSession {
         initialURL = url
         if let serviceManager {
             page = WebPage(
-                configuration: serviceManager.makeBrowserPageConfiguration(for: domain),
+                configuration: serviceManager.makePageConfiguration(),
                 navigationDecider: NavigationDecider(router: router)
             )
         } else {
