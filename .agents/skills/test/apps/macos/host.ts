@@ -106,8 +106,6 @@ try {
   await ox("--chat", chat, "conversation", "stop");
   const cancelled = await pending;
   if (cancelled.code !== 1 || !cancelled.stderr.includes("send cancelled")) throw new Error("Chat cancellation failed");
-  const unsupported = await run(["bun", "apps/cli/src/ox.ts", "--host", endpoint, "--chat", chat, "vm", "call", "ox.app.theme", "--args", '{"purpose":"Verify headless behavior"}'], { capture: true, allowFailure: true });
-  if (!unsupported.code || !unsupported.stderr.includes("no client theme")) throw new Error("Client-only capability did not reject clearly");
   await stop();
   await start();
   await ox("--chat", chat, "conversation", "open");

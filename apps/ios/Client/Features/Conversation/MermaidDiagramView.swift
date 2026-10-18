@@ -7,20 +7,20 @@ struct MermaidDiagramView<Fallback: View>: View {
     let accessibilityIdentifier: String
     @ViewBuilder let fallback: () -> Fallback
 
-    @Environment(\.appTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     @State private var image: UIImage?
     @State private var zoomed = false
 
     private struct Request: Equatable {
         let source: String
         let width: Int
-        let theme: AppTheme
+        let colorScheme: ColorScheme
     }
 
     var body: some View {
         content
-            .task(id: Request(source: source, width: Int(maxWidth), theme: theme)) {
-                image = await MermaidDiagrams.image(source, maxWidth: maxWidth, theme: theme)
+            .task(id: Request(source: source, width: Int(maxWidth), colorScheme: colorScheme)) {
+                image = await MermaidDiagrams.image(source, maxWidth: maxWidth, colorScheme: colorScheme)
             }
             .fullScreenCover(isPresented: $zoomed) {
                 if let image {
@@ -53,13 +53,13 @@ struct MermaidDiagramView<Fallback: View>: View {
 private enum MermaidDiagrams {
     private static let cache = NSCache<NSString, UIImage>()
 
-    static func image(_ source: String, maxWidth: CGFloat, theme: AppTheme) async -> UIImage? {
+    static func image(_ source: String, maxWidth: CGFloat, colorScheme: ColorScheme) async -> UIImage? {
         guard maxWidth > 0 else { return nil }
-        let key = "\(theme)|\(Int(maxWidth))|\(source)" as NSString
+        let key = "\(colorScheme)|\(Int(maxWidth))|\(source)" as NSString
         if let cached = cache.object(forKey: key) { return cached }
         do {
             let diagram = try await MermaidRenderer.shared.render(source, maxWidth: maxWidth)
-            let image = try await WebSnapshot.image(svg: diagram.svg, width: diagram.width, style: style(for: theme))
+            let image = try await WebSnapshot.image(svg: diagram.svg, width: diagram.width, style: style(for: colorScheme))
             cache.setObject(image, forKey: key)
             Log.ui.info("MermaidDiagram.render ready type=\(diagram.type) width=\(Int(diagram.width)) chars=\(source.count)")
             return image
@@ -71,8 +71,8 @@ private enum MermaidDiagrams {
         }
     }
 
-    private static func style(for theme: AppTheme) -> String {
-        func hex(_ color: DynamicColor) -> String { String(format: "#%06X", color.hex(for: theme)) }
+    private static func style(for colorScheme: ColorScheme) -> String {
+        func hex(_ color: DynamicColor) -> String { String(format: "#%06X", color.hex(for: colorScheme)) }
         let background = hex(Theme.Colors.conversationSurface)
         return "html{background:\(background)}.pele{--pele-bg:\(background);--pele-fg:\(hex(Theme.Colors.onSurface));"
             + "--pele-muted:\(hex(Theme.Colors.onSurfaceMuted));--pele-line:\(hex(Theme.Colors.conversationSecondary));"

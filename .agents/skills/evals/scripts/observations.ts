@@ -7,7 +7,7 @@ export { at, actions } from "./references.ts";
 import type { Assertion, CaseBinding, Check, EvalResponse, EvalSnapshot, ObservedState, Reader } from "./types.ts";
 
 export const readers = new Set([
-  "ox.app.info", "ox.app.profile", "ox.app.profiles", "ox.app.notifications", "ox.app.language", "ox.app.theme", "ox.app.defaultModel", "ox.app.actionPolicies", "ox.app.logs",
+  "ox.app.info", "ox.app.profile", "ox.app.profiles", "ox.app.notifications", "ox.app.language", "ox.app.defaultModel", "ox.app.actionPolicies", "ox.app.logs",
   "ox.conversation.model", "ox.provider.default", "ox.provider.list", "ox.provider.get", "ox.provider.models", "ox.repository.list", "ox.repository.conflicts",
   "ox.service.list", "ox.service.find", "ox.service.inspect", "ox.service.listAttached",
   "ox.fs.read", "ox.fs.list", "ox.fs.glob", "ox.fs.grep", "ox.schedule.list", "ox.secret.list",

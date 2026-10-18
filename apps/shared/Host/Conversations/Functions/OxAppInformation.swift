@@ -61,16 +61,6 @@ nonisolated enum OxAppInformation {
                     ], required: ["selection", "locale"]),
                 ])
             ), (
-                "ox.app.theme",
-                .object([
-                    "description": .string(ModelGuidance.text("ox.app.theme")),
-                    "inputSchema": object([:]),
-                    "outputSchema": object([
-                        "selection": enumeration(["creatorPick", "light", "dark"]),
-                        "appearance": enumeration(["light", "dark"]),
-                    ], required: ["selection", "appearance"]),
-                ])
-            ), (
                 "ox.app.setLanguage",
                 .object([
                     "description": .string(ModelGuidance.text("ox.app.setLanguage")),
@@ -82,19 +72,6 @@ nonisolated enum OxAppInformation {
                         "locale": string,
                         "changed": boolean,
                     ], required: ["selection", "locale", "changed"]),
-                ])
-            ), (
-                "ox.app.setTheme",
-                .object([
-                    "description": .string(ModelGuidance.text("ox.app.setTheme")),
-                    "inputSchema": object([
-                        "selection": enumeration(["creatorPick", "light", "dark"]),
-                    ], required: ["selection"]),
-                    "outputSchema": object([
-                        "selection": enumeration(["creatorPick", "light", "dark"]),
-                        "appearance": enumeration(["light", "dark"]),
-                        "changed": boolean,
-                    ], required: ["selection", "appearance", "changed"]),
                 ])
             ), (
                 "ox.app.defaultModel",
@@ -217,14 +194,8 @@ nonisolated enum OxAppInformation {
             let language: @convention(block) (String) -> JSValue = { purpose in
                 env.call { try await $0.appLanguage(purpose: purpose) }
             }
-            let theme: @convention(block) (String) -> JSValue = { purpose in
-                env.call { try await $0.appTheme(purpose: purpose) }
-            }
             let setLanguage: @convention(block) (String, String) -> JSValue = { selection, purpose in
                 env.call { try await $0.setAppLanguage(selection: selection, purpose: purpose) }
-            }
-            let setTheme: @convention(block) (String, String) -> JSValue = { selection, purpose in
-                env.call { try await $0.setAppTheme(selection: selection, purpose: purpose) }
             }
             let defaultModel: @convention(block) (String) -> JSValue = { purpose in
                 env.call { try await $0.appDefaultModel(purpose: purpose) }
@@ -246,9 +217,7 @@ nonisolated enum OxAppInformation {
             context.setObject(profiles as AnyObject, forKeyedSubscript: "__nativeAppProfiles" as NSString)
             context.setObject(notifications as AnyObject, forKeyedSubscript: "__nativeAppNotifications" as NSString)
             context.setObject(language as AnyObject, forKeyedSubscript: "__nativeAppLanguage" as NSString)
-            context.setObject(theme as AnyObject, forKeyedSubscript: "__nativeAppTheme" as NSString)
             context.setObject(setLanguage as AnyObject, forKeyedSubscript: "__nativeAppSetLanguage" as NSString)
-            context.setObject(setTheme as AnyObject, forKeyedSubscript: "__nativeAppSetTheme" as NSString)
             context.setObject(defaultModel as AnyObject, forKeyedSubscript: "__nativeAppDefaultModel" as NSString)
             context.setObject(setDefaultModel as AnyObject, forKeyedSubscript: "__nativeAppSetDefaultModel" as NSString)
             context.setObject(actionPolicies as AnyObject, forKeyedSubscript: "__nativeAppActionPolicies" as NSString)
@@ -260,9 +229,7 @@ nonisolated enum OxAppInformation {
           profiles: (value) => { const options = __oxOptions(value, 'ox.app.profiles'); return __nativeAppProfiles(String(options.purpose)); },
           notifications: (value) => { const options = __oxOptions(value, 'ox.app.notifications'); return __nativeAppNotifications(String(options.purpose)); },
           language: (value) => { const options = __oxOptions(value, 'ox.app.language'); return __nativeAppLanguage(String(options.purpose)); },
-          theme: (value) => { const options = __oxOptions(value, 'ox.app.theme'); return __nativeAppTheme(String(options.purpose)); },
           setLanguage: (value) => { const options = __oxOptions(value, 'ox.app.setLanguage'); return __nativeAppSetLanguage(String(options.selection), String(options.purpose)); },
-          setTheme: (value) => { const options = __oxOptions(value, 'ox.app.setTheme'); return __nativeAppSetTheme(String(options.selection), String(options.purpose)); },
           defaultModel: (value) => { const options = __oxOptions(value, 'ox.app.defaultModel'); return __nativeAppDefaultModel(String(options.purpose)); },
           setDefaultModel: (value) => { const { purpose, ...options } = __oxOptions(value, 'ox.app.setDefaultModel'); return __nativeAppSetDefaultModel(options, String(purpose)); },
           actionPolicies: (value) => { const { purpose, ...options } = __oxOptions(value, 'ox.app.actionPolicies'); return __nativeAppActionPolicies(options, String(purpose)); },

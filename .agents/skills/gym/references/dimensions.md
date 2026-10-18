@@ -38,7 +38,7 @@ Separate how the user behaves from what the user wants. Persona traits influence
 Examples:
 
 - A cautious novice with low patience asks for a concise plan, rejects unnecessary permissions, and abandons after prolonged unexplained waiting.
-- An expert with deep exploration asks Ox to inspect its current model and theme without changing either, then follows up on one detail.
+- An expert with deep exploration asks Ox to inspect its current model and language without changing either, then follows up on one detail.
 - A familiar Chinese-speaking user requests a structured answer, backgrounds the app during streaming, and returns expecting coherent state.
 
 ## Sampling
@@ -47,7 +47,7 @@ Use a hybrid strategy:
 
 1. Include at least one core smoke experience.
 2. Cover eligible values individually before repeating them when the session budget permits.
-3. Maximize uncovered pairs across provider, persona, intent, language, theme, lifecycle, and conversation state.
+3. Maximize uncovered pairs across provider, persona, intent, language, appearance, lifecycle, and conversation state.
 4. Guarantee high-risk pairs relevant to the request.
 5. Use seeded randomness to break ties and explore higher-order combinations.
 6. Avoid exact duplicate assignments inside one campaign.

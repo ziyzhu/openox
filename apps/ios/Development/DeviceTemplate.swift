@@ -5,7 +5,6 @@ import Foundation
 enum DeviceTemplate {
     struct Request: Decodable {
         struct Settings: Decodable {
-            let theme: String?
             let language: String?
             let onboardingCompleted: Bool?
             let region: String?
@@ -13,12 +12,11 @@ enum DeviceTemplate {
             let allowHostConnections: Bool?
 
             private enum CodingKeys: String, CodingKey {
-                case theme, language, onboardingCompleted, region, defaultModel, allowHostConnections
+                case language, onboardingCompleted, region, defaultModel, allowHostConnections
             }
 
             init(from decoder: Decoder) throws {
                 let values = try decoder.container(keyedBy: CodingKeys.self)
-                theme = try values.decodeIfPresent(String.self, forKey: .theme)
                 language = try values.decodeIfPresent(String.self, forKey: .language)
                 onboardingCompleted = try values.decodeIfPresent(Bool.self, forKey: .onboardingCompleted)
                 region = try values.decodeIfPresent(String.self, forKey: .region)
@@ -125,10 +123,9 @@ enum DeviceTemplate {
             try FileManager.default.removeItem(at: input)
             guard let group = UserDefaults(suiteName: AppStoragePaths.appGroupIdentifier) else { throw RuntimeError.bridge("App-group preferences unavailable") }
             var appKeys = Array(decoded.userDefaults?.app?.set?.keys ?? Dictionary<String, JSONValue>().keys) + (decoded.userDefaults?.app?.remove ?? [])
-            var groupKeys = Array(decoded.userDefaults?.appGroup?.set?.keys ?? Dictionary<String, JSONValue>().keys) + (decoded.userDefaults?.appGroup?.remove ?? [])
+            let groupKeys = Array(decoded.userDefaults?.appGroup?.set?.keys ?? Dictionary<String, JSONValue>().keys) + (decoded.userDefaults?.appGroup?.remove ?? [])
             if decoded.selection != nil { appKeys.append("storage.activeProfile") }
             if let settings = decoded.settings {
-                if settings.theme != nil { groupKeys.append("app.theme") }
                 if settings.language != nil { appKeys.append("app.language") }
                 if settings.onboardingCompleted != nil { appKeys.append("app.hasCompletedOnboarding") }
                 if settings.region != nil { appKeys.append("app.region") }
@@ -141,7 +138,6 @@ enum DeviceTemplate {
             try applyDefaults(decoded.userDefaults?.app, to: .standard)
             try applyDefaults(decoded.userDefaults?.appGroup, to: group)
             if let settings = decoded.settings {
-                if let theme = settings.theme { group.set(theme, forKey: "app.theme") }
                 if let language = settings.language { UserDefaults.standard.set(language, forKey: "app.language") }
                 if let value = settings.onboardingCompleted { UserDefaults.standard.set(value, forKey: "app.hasCompletedOnboarding") }
                 if let region = settings.region, let value = LLMRegion(rawValue: region) { AppRegion.shared.setForTesting(value) }

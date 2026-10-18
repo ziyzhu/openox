@@ -34,7 +34,7 @@ type Repository = { id: string; enabled: boolean; state: string };
 type DefaultModel = { configured: boolean; provider: { id: string }; model: { id: string }; thinkingLevel: string | null; authentication: { status: string } };
 let chat: string | undefined;
 let previousConversation: string | undefined;
-let baseline: { language: Selection; theme: Selection; repository: Repository; defaultModel: DefaultModel } | undefined;
+let baseline: { language: Selection; repository: Repository; defaultModel: DefaultModel } | undefined;
 const results: unknown[] = [];
 
 async function ox(...args: string[]): Promise<any> {
@@ -90,13 +90,12 @@ try {
     const inspected = await ox("--chat", previousConversation, "vm", "inspect");
     assert.equal(inspected.value.session.temporary, false, "Preserve or close the temporary conversation before testing");
   }
-  for (const name of ["ox.app.setLanguage", "ox.app.setTheme", "ox.repository.enable", "ox.app.setDefaultModel", "ox.conversation.setModel", "ox.conversation.model", "ox.conversation.rename", "ox.repository.list"]) {
+  for (const name of ["ox.app.setLanguage", "ox.repository.enable", "ox.app.setDefaultModel", "ox.conversation.setModel", "ox.conversation.model", "ox.conversation.rename", "ox.repository.list"]) {
     const help = await ox("vm", "help", name);
     assert.equal(help.name, name);
   }
   await newConversation();
   const language = await call("ox.app.language");
-  const theme = await call("ox.app.theme");
   const aliases = await ox("--chat", chat!, "vm", "eval", "--script", `return [
     [ox.app.model, ox.conversation.model],
     [ox.app.setModel, ox.conversation.setModel],
@@ -112,11 +111,10 @@ try {
   assert.ok(repository && repository.state === "ready", "A prepared Bundled repository is required");
   const defaultModel = await call("ox.app.defaultModel") as DefaultModel;
   assert.ok(!defaultModel.configured || ["ready", "notRequired"].includes(defaultModel.authentication.status), "The original default must be available for restoration");
-  baseline = { language, theme, repository, defaultModel };
+  baseline = { language, repository, defaultModel };
   await writeFile(join(evidence, "baseline.json"), JSON.stringify(baseline, null, 2), { mode: 0o600 });
   for (const [reader, setter, choices] of [
     ["ox.app.language", "ox.app.setLanguage", ["system", "en", "zh-Hans"]],
-    ["ox.app.theme", "ox.app.setTheme", ["creatorPick", "light", "dark"]],
   ] as const) {
     for (const selection of choices) {
       const before = await call(reader);
@@ -180,7 +178,6 @@ try {
   await newConversation();
   assert.equal((await call("ox.app.defaultModel")).model.id, "mock-text-only");
   assert.equal((await call("ox.app.language")).selection, "zh-Hans");
-  assert.equal((await call("ox.app.theme")).selection, "dark");
   assert.equal((await call("ox.repository.list")).repositories.find((candidate: Repository) => candidate.id === repository.id).enabled, enabled);
   console.log("PASS settings contracts, supported selections, validation, no-op results, repository isolation, and relaunch persistence");
 } catch (error) {
@@ -191,7 +188,6 @@ try {
     if (!chat) await newConversation().catch(error => { console.error(`Cleanup chat unavailable: ${error}`); process.exitCode = 1; });
     for (const [name, args, reader, expected] of [
       ["ox.app.setLanguage", { selection: baseline.language.selection }, "ox.app.language", baseline.language.selection],
-      ["ox.app.setTheme", { selection: baseline.theme.selection }, "ox.app.theme", baseline.theme.selection],
       ["ox.app.setDefaultModel", { selection: baseline.defaultModel.configured ? { provider: baseline.defaultModel.provider.id, model: baseline.defaultModel.model.id, thinkingLevel: baseline.defaultModel.thinkingLevel } : null }, "ox.app.defaultModel", baseline.defaultModel.configured],
       ["ox.repository.enable", { repository: baseline.repository.id, enabled: baseline.repository.enabled }, "ox.repository.list", baseline.repository.enabled],
     ] as const) {

@@ -72,7 +72,7 @@ export function effects(test: EvalCase, binding: CaseBinding) {
 }
 
 export function fixtureTemplate(selected: EvalCase[], qaProfile: string) {
-  const simple = new Set(["ox.app.info", "ox.app.profile", "ox.app.profiles", "ox.app.notifications", "ox.app.language", "ox.app.theme", "ox.app.defaultModel", "ox.provider.default", "ox.provider.list", "ox.repository.list", "ox.schedule.list", "ox.secret.list"]);
+  const simple = new Set(["ox.app.info", "ox.app.profile", "ox.app.profiles", "ox.app.notifications", "ox.app.language", "ox.app.defaultModel", "ox.provider.default", "ox.provider.list", "ox.repository.list", "ox.schedule.list", "ox.secret.list"]);
   return { version: 1, qaProfile, cases: Object.fromEntries(selected.map(test => [test.id,
     ["manage-skills-create", "manage-skills-fresh-use"].includes(test.id) ? skillFixture(qaProfile, !!test.probe) :
     test.variant === "success" && test.function && simple.has(test.function) ? {
@@ -109,7 +109,6 @@ function skillFixture(qaProfile: string, probe: boolean): CaseBinding {
       providers: { kind: "vm", name: "ox.provider.list", args: {} },
       defaults: { kind: "vm", name: "ox.app.defaultModel", args: {} },
       language: { kind: "vm", name: "ox.app.language", args: {} },
-      theme: { kind: "vm", name: "ox.app.theme", args: {} },
       policies: { kind: "vm", name: "ox.app.actionPolicies", args: { limit: 100 } },
       inventory: { kind: "vm", name: "ox.fs.glob", args: { path: "skills", pattern: `${name}/**/*` } },
       package: { kind: "skill", name, phases: ["after"] },
@@ -119,7 +118,7 @@ function skillFixture(qaProfile: string, probe: boolean): CaseBinding {
       { evidence: "qa", phase: "before", observation: "inventory", path: ["paths"], operator: "equals", expected: [] },
       { evidence: "outcome", phase: "after", observation: "inventory", path: ["paths"], operator: "equals", expected: [`skills/${name}/SKILL.md`] },
       { evidence: "outcome", phase: "after", observation: "package", path: [], operator: "equals", expected: { name, description, instructions, services: [], resources: {} } },
-      ...["profile", "memory", "soul", "providers", "defaults", "language", "theme", "policies"].flatMap(observation => (["after", "cleanup"] as const).map(phase => ({ evidence: phase === "after" ? "preserved" : "cleanup", phase, observation, path: [], operator: "unchanged" as const }))),
+      ...["profile", "memory", "soul", "providers", "defaults", "language", "policies"].flatMap(observation => (["after", "cleanup"] as const).map(phase => ({ evidence: phase === "after" ? "preserved" : "cleanup", phase, observation, path: [], operator: "unchanged" as const }))),
       { evidence: "cleanup", phase: "cleanup", observation: "inventory", path: ["paths"], operator: "unchanged" },
       ...(probe ? [{ evidence: "probe", phase: "probe" as const, observation: "probe", path: ["answer"], operator: "equals" as const, expected: prefix.repeat(count) }] : []),
     ],

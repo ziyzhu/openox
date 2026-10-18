@@ -14,7 +14,6 @@ struct ContextMenuPreviewSurface<Content: View>: View {
             .padding(Theme.Spacing.lg)
             .frame(width: 300, alignment: .leading)
             .background(Theme.Colors.surface)
-            .themed()
     }
 }
 
@@ -92,7 +91,6 @@ struct FileContextMenuPreview: View {
         }
         .frame(width: 300)
         .background(Theme.Colors.surface)
-        .themed()
         .accessibilityElement(children: .combine)
         .task(id: artifact.fileURL) {
             let loaded = await loadPreview()

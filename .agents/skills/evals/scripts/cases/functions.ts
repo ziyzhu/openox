@@ -7,9 +7,7 @@ const groups: Record<string, Record<string, string>> = {
     profiles: "List available Profiles and identify which is active without switching",
     notifications: "Report current notification permission without requesting it",
     language: "Report the selected language and effective locale",
-    theme: "Report the selected theme and effective appearance",
     setLanguage: "Change the requested language and verify the effective selection",
-    setTheme: "Change the requested theme and verify the effective appearance",
     defaultModel: "Identify the configured new-conversation model and authentication status",
     setDefaultModel: "Set or clear the requested default without changing this conversation",
     actionPolicies: "Resolve the requested Action policy and inheritance without changing policies",
@@ -126,7 +124,7 @@ const groups: Record<string, Record<string, string>> = {
   },
 };
 
-const installation = new Set(["app.setLanguage", "app.setTheme", "app.setDefaultModel", "provider.save", "provider.delete", "provider.authenticate", "provider.deauthenticate"]);
+const installation = new Set(["app.setLanguage", "app.setDefaultModel", "provider.save", "provider.delete", "provider.authenticate", "provider.deauthenticate"]);
 const profile = new Set(["conversation.rename", "conversation.setModel", "conversation.start", "conversation.delete", "fs.write", "fs.edit", "fs.delete", "fs.mkdir", "fs.rmdir", "fs.move", "fs.copy", "repository.resolve", "repository.connect", "repository.sync", "repository.enable", "repository.disconnect", "service.create", "service.update", "service.copy", "service.delete", "service.attach", "service.detach", "skill.create", "skill.copy", "skill.share", "skill.delete", "schedule.create", "schedule.delete", "schedule.enable", "secret.add", "secret.delete"]);
 const external = new Set(["provider.generate", "service.invoke", "service.signIn", "service.solve", "service.pay", "skill.run", "schedule.run", ...Object.keys(groups["web.browser"]!).map(name => `web.browser.${name}`)]);
 
@@ -136,8 +134,8 @@ export function effectFor(name: string): Effect {
 }
 
 const journeys: Array<[string, string, string[]]> = [
-  ["installation-check", "Check this QA installation before troubleshooting: identify build, Profile options, permissions, appearance, default model and applicable policies, then diagnose the supplied issue from scoped logs", ["app.info", "app.profiles", "app.notifications", "app.language", "app.theme", "app.defaultModel", "app.actionPolicies", "app.logs"]],
-  ["personalize-installation", "Apply my requested language, appearance and new-conversation model preferences and verify the effective settings", ["app.setLanguage", "app.setTheme", "app.setDefaultModel"]],
+  ["installation-check", "Check this QA installation before troubleshooting: identify build, Profile options, permissions, language, default model and applicable policies, then diagnose the supplied issue from scoped logs", ["app.info", "app.profiles", "app.notifications", "app.language", "app.defaultModel", "app.actionPolicies", "app.logs"]],
+  ["personalize-installation", "Apply my requested language and new-conversation model preferences and verify the effective settings", ["app.setLanguage", "app.setDefaultModel"]],
   ["conversation-handoff", "Rename this task, switch to the requested model, inspect its capabilities and remove only the completed QA child conversation", ["conversation.rename", "conversation.setModel", "conversation.model", "conversation.delete"]],
   ["organize-project-files", "Find the supplied project notes, read them completely, create an edited working copy in a new folder, move it to its final location, attach and use its contents, then remove the disposable scratch files and folder", ["fs.list", "fs.glob", "fs.grep", "fs.read", "fs.mkdir", "fs.write", "fs.copy", "fs.edit", "fs.move", "fs.attach", "fs.delete", "fs.rmdir"]],
   ["large-result-investigation", "Answer the requested question from the supplied long diagnostic result by reading the relevant omitted portion from its temporary output file without reprinting it all", ["fs.read"]],

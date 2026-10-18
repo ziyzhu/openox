@@ -63,7 +63,6 @@ private struct OxApplicationView: View {
 
     var body: some View {
         appContent
-            .themed()
             .appPresentations(presentations)
             .environment(client.services)
             .environment(hostAccess)
@@ -90,7 +89,6 @@ private struct OxApplicationView: View {
             )) {
                 if let proposal = serviceImports.proposal {
                     ServiceImportView(proposal: proposal, coordinator: serviceImports)
-                        .themed()
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
                 }

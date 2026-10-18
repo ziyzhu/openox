@@ -148,26 +148,26 @@ This document describes the current native implementation and provides defaults 
 
 ## Colors
 
-Ox offers **Light** and **Dark** themes. The legacy `creatorPick` default resolves to Light.
+Ox follows the system **Light** or **Dark** appearance.
 
-| Token | Default (legacy Ox) | Light | Dark |
-| --- | --- | --- | --- |
-| `primary` | `#FFA500` | `#FFA500` | `#F5A030` |
-| `primary-pressed` | `#D87A0A` | `#D87A0A` | `#C77410` |
-| `surface` | `#FFFFFF` | `#FFFFFF` | `#1C1C1E` |
-| `surface-sunken` | `#F2F2F7` | `#F2F2F7` | `#2C2C2E` |
-| `chip-on-background` | `#F2F2F7` | `#F2F2F7` | `#2C2C2E` |
-| `conversation-surface` | `#FFFFFF` | `#FFFFFF` | `#0A0A0A` |
-| `bubble` | `#F3F3F3` | `#F3F3F3` | `#1C1C1E` |
-| `background` | `#F2F2F7` | `#F2F2F7` | `#0A0A0A` |
-| `on-surface` | `#000000` | `#000000` | `#ECECEC` |
-| `on-surface-muted` | `#8E8E93` | `#8E8E93` | `#9A9A9A` |
-| `on-primary` | `#FFFDF7` | `#FFFDF7` | `#FFFDF7` |
-| `error` | `#B8422E` | `#B8422E` | `#E25A45` |
+| Token | Light | Dark |
+| --- | --- | --- |
+| `primary` | `#FFA500` | `#F5A030` |
+| `primary-pressed` | `#D87A0A` | `#C77410` |
+| `surface` | `#FFFFFF` | `#1C1C1E` |
+| `surface-sunken` | `#F2F2F7` | `#2C2C2E` |
+| `chip-on-background` | `#F2F2F7` | `#2C2C2E` |
+| `conversation-surface` | `#FFFFFF` | `#0A0A0A` |
+| `bubble` | `#F3F3F3` | `#1C1C1E` |
+| `background` | `#F2F2F7` | `#0A0A0A` |
+| `on-surface` | `#000000` | `#ECECEC` |
+| `on-surface-muted` | `#8E8E93` | `#9A9A9A` |
+| `on-primary` | `#FFFDF7` | `#FFFDF7` |
+| `error` | `#B8422E` | `#E25A45` |
 
 Use `surface` for content and settings rows, `background` for grouped pages, and `conversation-surface` for the conversation canvas. `surface-sunken` supports small recessed accents; `bubble` is a separate message token. Chips on grouped pages use `chip-on-background`, which uses a neutral grey fill. Composer chips use glass instead of an opaque token fill.
 
-Harvest gold marks primary actions, active states, and confirmation. Keep its emphasis selective. Body text uses `on-surface`; metadata and supporting text use `on-surface-muted`. Resolve colors through the selected theme rather than assuming that content is always white or text is always black.
+Harvest gold marks primary actions, active states, and confirmation. Keep its emphasis selective. Body text uses `on-surface`; metadata and supporting text use `on-surface-muted`. Resolve colors through the current appearance rather than assuming that content is always white or text is always black.
 
 ## Typography
 

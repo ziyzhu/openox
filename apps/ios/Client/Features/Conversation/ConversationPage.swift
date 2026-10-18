@@ -280,7 +280,7 @@ struct ConversationPage: View {
     let onFileNavigationChange: (Bool) -> Void
     let onInitialTranscriptPresented: () -> Void
     @Environment(ServiceManager.self) private var serviceManager
-    @Environment(\.appTheme) private var appTheme
+    @Environment(\.colorScheme) private var colorScheme
     private var providerRegistry: ProviderRegistry { .shared }
     private var isModelConfigured: Bool { providerRegistry.defaultModel != nil }
 
@@ -1749,7 +1749,7 @@ struct ConversationPage: View {
 
     private var persistedEmptyState: some View {
         EmptyConversationMark()
-            .saturation(appTheme == .dark ? 0 : 0.25)
+            .saturation(colorScheme == .dark ? 0 : 0.25)
             .opacity(0.3)
             .frame(width: 40, height: 40)
             .padding(.horizontal, Theme.Spacing.xl)

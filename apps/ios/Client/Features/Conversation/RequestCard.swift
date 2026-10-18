@@ -199,7 +199,6 @@ struct PermissionRequestCard: View {
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
-            .themed()
         }
     }
 

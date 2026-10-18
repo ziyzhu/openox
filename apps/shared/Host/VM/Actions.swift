@@ -21,9 +21,7 @@ nonisolated enum Actions {
     static let appProfiles = "ox.app.profiles"
     static let appNotifications = "ox.app.notifications"
     static let appLanguage = "ox.app.language"
-    static let appTheme = "ox.app.theme"
     static let appSetLanguage = "ox.app.setLanguage"
-    static let appSetTheme = "ox.app.setTheme"
     static let appModel = "ox.app.model"
     static let appDefaultModel = "ox.app.defaultModel"
     static let appSetDefaultModel = "ox.app.setDefaultModel"
@@ -90,11 +88,10 @@ nonisolated enum Actions {
     static let builtIn = [
         conversationStart, conversationDelete, providerDefault, providerList, providerGet, providerModels, providerGenerate, providerValidate, providerSave, providerDelete,
         providerAuthenticate, providerDeauthenticate, secretList, secretAdd, secretDelete,
-        appInfo, appProfile, appProfiles, appNotifications, appLanguage, appTheme, appSetLanguage, appSetTheme,
+        appInfo, appProfile, appProfiles, appNotifications, appLanguage, appSetLanguage,
         appModel, appDefaultModel, appSetModel, appSetDefaultModel, appActionPolicies, appRepositories,
         appLogs, appRenameConversation,
         webSearch, webFetch,
-    ] + BrowserFunctionCatalog.actionNames + [
         fsList, fsRead, fsAttach, fsWrite, fsEdit, fsDelete, fsMkdir, fsRmdir, fsMove, fsCopy, fsGlob, fsGrep,
         visionAnalyze,
         serviceFind, serviceList, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
@@ -121,9 +118,6 @@ nonisolated enum Actions {
     }
 
     static func label(for action: String) -> String? {
-        if let browser = BrowserFunctionCatalog.action(named: action) {
-            return "Browser: \(browser.label)"
-        }
         if let site = browserSite(of: action) {
             return "Browser: \(site)"
         }
@@ -147,7 +141,6 @@ nonisolated enum Actions {
         case appProfile, appProfiles: L10n.string("Profiles")
         case appNotifications: L10n.string("Notifications")
         case appLanguage, appSetLanguage: L10n.string("Language")
-        case appTheme, appSetTheme: L10n.string("Theme")
         case appModel, appSetModel: L10n.string("Model")
         case appDefaultModel, appSetDefaultModel: L10n.string("Default model")
         case appActionPolicies: L10n.string("Actions")

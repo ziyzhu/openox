@@ -257,7 +257,7 @@ struct ConversationComposer: View, Equatable {
     @State private var speechLayoutState: LayoutState?
     @AppStorage("chat.importMemoryIntentDisplays") private var importMemoryIntentDisplays = 0
 
-    @Environment(\.appTheme) private var appTheme
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static func == (lhs: ConversationComposer, rhs: ConversationComposer) -> Bool {
@@ -390,9 +390,9 @@ struct ConversationComposer: View, Equatable {
     private var chipRowEdgeGradient: some View {
         LinearGradient(
             colors: [
-                Theme.Colors.conversationSurface.color(for: appTheme).opacity(0.8),
-                Theme.Colors.conversationSurface.color(for: appTheme).opacity(0.25),
-                Theme.Colors.conversationSurface.color(for: appTheme).opacity(0)
+                Theme.Colors.conversationSurface.color(for: colorScheme).opacity(0.8),
+                Theme.Colors.conversationSurface.color(for: colorScheme).opacity(0.25),
+                Theme.Colors.conversationSurface.color(for: colorScheme).opacity(0)
             ],
             startPoint: .leading,
             endPoint: .trailing
@@ -453,10 +453,10 @@ struct ConversationComposer: View, Equatable {
         .padding(.top, inputBarTopSpacing)
         .padding(.bottom, Theme.Spacing.sm)
         .background(alignment: .bottom) {
-            if appTheme.colorScheme == .light && isFieldFocused {
+            if colorScheme == .light && isFieldFocused {
                 LinearGradient(
                     colors: [
-                        Theme.Colors.conversationSurface.color(for: appTheme).opacity(0),
+                        Theme.Colors.conversationSurface.color(for: colorScheme).opacity(0),
                         Color(uiColor: .systemBackground)
                     ],
                     startPoint: .top,
@@ -497,7 +497,7 @@ struct ConversationComposer: View, Equatable {
             .background {
                 Color.clear
                     .glassEffect(.regular, in: composerShape)
-                    .id(appTheme)
+                    .id(colorScheme)
             }
         }
         .animation(

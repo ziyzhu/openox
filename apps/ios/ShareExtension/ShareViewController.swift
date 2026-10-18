@@ -69,7 +69,6 @@ private struct ShareView: View {
             }
             .padding(ShareTheme.outerInset)
         }
-        .preferredColorScheme(ShareTheme.colorScheme)
         .task { await load() }
     }
 
@@ -186,18 +185,6 @@ private extension View {
 }
 
 private enum ShareTheme {
-    private enum Selection: String {
-        case creatorPick
-        case light
-        case dark
-    }
-
-    private static var selection: Selection {
-        UserDefaults(suiteName: SharedItemWriter.appGroupIdentifier)?
-            .string(forKey: "app.theme")
-            .flatMap(Selection.init(rawValue:)) ?? .creatorPick
-    }
-
     static let spacingMedium: CGFloat = 12
     static let spacingLarge: CGFloat = 16
     static let outerInset: CGFloat = 24
@@ -206,21 +193,15 @@ private enum ShareTheme {
     static let body = Font.body
     static let caption = Font.caption
     static let label = Font.system(.subheadline, design: .rounded).weight(.semibold)
-    static var background: Color { color(brand: 0xF5F5F5, light: 0xF5F5F5, dark: 0x0A0A0A) }
-    static var onSurface: Color { color(brand: 0x000000, light: 0x000000, dark: 0xECECEC) }
-    static var onSurfaceMuted: Color { color(brand: 0x8E8E93, light: 0x8E8E93, dark: 0x9A9A9A) }
-    static var primary: Color { color(brand: 0xFFA500, light: 0xFFA500, dark: 0xF5A030) }
-    static var onPrimary: Color { Color(uiColor: UIColor(hex: 0x000000)) }
-    static var error: Color { color(brand: 0xB8422E, light: 0xB8422E, dark: 0xE25A45) }
-    static var colorScheme: ColorScheme { selection == .dark ? .dark : .light }
+    static let background = color(light: 0xF5F5F5, dark: 0x0A0A0A)
+    static let onSurface = color(light: 0x000000, dark: 0xECECEC)
+    static let onSurfaceMuted = color(light: 0x8E8E93, dark: 0x9A9A9A)
+    static let primary = color(light: 0xFFA500, dark: 0xF5A030)
+    static let onPrimary = Color(uiColor: UIColor(hex: 0x000000))
+    static let error = color(light: 0xB8422E, dark: 0xE25A45)
 
-    private static func color(brand: UInt32, light: UInt32, dark: UInt32) -> Color {
-        let hex = switch selection {
-        case .creatorPick: brand
-        case .light: light
-        case .dark: dark
-        }
-        return Color(uiColor: UIColor(hex: hex))
+    private static func color(light: UInt32, dark: UInt32) -> Color {
+        Color(uiColor: UIColor { traits in UIColor(hex: traits.userInterfaceStyle == .dark ? dark : light) })
     }
 }
 

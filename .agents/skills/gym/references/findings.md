@@ -7,7 +7,7 @@ Judge observable user experience, not whether a trajectory resembles an imagined
 Use several independent signals where possible:
 
 - Explicit success conditions and UI invariants.
-- Differential results across builds, providers, models, themes, languages, or devices.
+- Differential results across builds, providers, models, appearances, languages, or devices.
 - Structured warning and error logs.
 - Missing or anomalous latency milestones.
 - Accessibility, screenshot or photo, and short screen-recording inspection.

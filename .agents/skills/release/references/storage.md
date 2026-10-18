@@ -70,8 +70,6 @@ types remain authoritative in their `Codable` implementations.
 └── Documents/<ProfileName>/              predecessor Profiles; live Pi activation refused
 
 <configured app group>/
-├── Library/Preferences/
-│   └── app.theme                             canonical app and ShareExtension theme
 └── ShareImports/
     ├── Staging/<uuid>/<artifact>             incomplete extension write
     └── Pending/<uuid>/<artifact>             complete copy awaiting import
@@ -289,9 +287,8 @@ MCP definitions that they cannot update.
 
 ## Shared preferences
 
-The app-group `app.theme` value is the single theme source shared by the app and
-ShareExtension. On first launch after upgrading, the app copies a legacy standard
-UserDefaults value into the app group and removes the legacy value.
+The app and ShareExtension follow the system appearance. Current builds ignore the
+retired `app.theme` preference, so a downgraded build keeps its saved selection.
 
 Application migration converts the legacy `autoApproveActions` allow-list and
 `autoApproveAll` preference into `actionApprovalPolicies`. The versioned JSON value

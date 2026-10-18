@@ -18,8 +18,6 @@ struct SettingsSheet: View {
     private var appLocale: AppLocale { AppLocale.shared }
     private var storage: StorageRoot { .shared }
 
-    private var theme: ThemeManager { .shared }
-
     init(
         initialProfileID: UUID?,
         initialSkillDraft: SkillDraft?,
@@ -34,10 +32,6 @@ struct SettingsSheet: View {
 
     private var languageBinding: Binding<AppLocale.Language> {
         Binding(get: { appLocale.language }, set: { appLocale.language = $0 })
-    }
-
-    private var themeBinding: Binding<AppTheme> {
-        Binding(get: { theme.theme == .dark ? .dark : .light }, set: { theme.theme = $0 })
     }
 
     private var defaultModelValue: Text {
@@ -167,26 +161,6 @@ struct SettingsSheet: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier(A11yID.Settings.language)
-
-                            Divider().settingsContentInset()
-
-                            Menu {
-                                Picker(selection: themeBinding) {
-                                    ForEach(AppTheme.allCases) { theme in
-                                        Text(theme.displayName).tag(theme)
-                                    }
-                                } label: {
-                                    EmptyView()
-                                }
-                            } label: {
-                                SettingsDisclosureRow(
-                                    title: "Theme",
-                                    value: Text(theme.theme.displayName),
-                                    indicator: "chevron.up.chevron.down"
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier(A11yID.Settings.theme)
 
                             Divider().settingsContentInset()
 

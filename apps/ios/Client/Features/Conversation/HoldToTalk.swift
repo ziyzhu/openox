@@ -112,13 +112,13 @@ struct HoldToTalkArea: UIViewRepresentable {
 }
 
 struct HoldToTalkBackdrop: View {
-    @Environment(\.appTheme) private var appTheme
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack {
-            Theme.Colors.conversationSurface.color(for: appTheme).opacity(0.6)
+            Theme.Colors.conversationSurface.color(for: colorScheme).opacity(0.6)
             LinearGradient(
-                colors: [.clear, Theme.Colors.background.color(for: appTheme)],
+                colors: [.clear, Theme.Colors.background.color(for: colorScheme)],
                 startPoint: .center,
                 endPoint: .bottom
             )
@@ -131,12 +131,12 @@ struct HoldToTalkBackdrop: View {
 
 struct HoldToTalkCard: View {
     let speech: ConversationSpeechInput
-    @Environment(\.appTheme) private var appTheme
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private var accent: Color {
-        (speech.selection == .cancel ? Theme.Colors.error : Theme.Colors.primary).color(for: appTheme)
+        (speech.selection == .cancel ? Theme.Colors.error : Theme.Colors.primary).color(for: colorScheme)
     }
 
     private var instruction: LocalizedStringKey {
@@ -198,7 +198,7 @@ struct HoldToTalkCard: View {
                 .strokeBorder(Theme.Colors.onSurface.opacity(0.06), lineWidth: 1)
                 .allowsHitTesting(false)
         }
-        .shadow(color: .black.opacity(appTheme == .dark ? 0.2 : 0.06), radius: 24, y: 8)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.2 : 0.06), radius: 24, y: 8)
     }
 
     @ViewBuilder
@@ -233,16 +233,16 @@ struct HoldToTalkCard: View {
 
     private func target(_ action: ConversationSpeechInput.ReleaseAction, title: LocalizedStringKey, symbol: String) -> some View {
         let selected = speech.selection == action
-        let color = (action == .cancel ? Theme.Colors.error : Theme.Colors.primary).color(for: appTheme)
+        let color = (action == .cancel ? Theme.Colors.error : Theme.Colors.primary).color(for: colorScheme)
         return Button {
             if action == .cancel { speech.cancel(reason: "cancelButton") }
             else { speech.release(action: action) }
         } label: {
             Label(title, systemImage: symbol)
                 .font(Theme.Fonts.labelMd)
-                .foregroundStyle(selected ? color : Theme.Colors.onSurface.color(for: appTheme))
+                .foregroundStyle(selected ? color : Theme.Colors.onSurface.color(for: colorScheme))
                 .frame(maxWidth: .infinity, minHeight: 52)
-                .background(selected ? color.opacity(0.14) : Theme.Colors.surfaceSunken.color(for: appTheme), in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
+                .background(selected ? color.opacity(0.14) : Theme.Colors.surfaceSunken.color(for: colorScheme), in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
                 .overlay {
                     RoundedRectangle(cornerRadius: Theme.Radius.lg)
                         .strokeBorder(selected ? color.opacity(0.5) : .clear, lineWidth: 1.5)

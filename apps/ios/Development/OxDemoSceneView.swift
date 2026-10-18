@@ -25,7 +25,6 @@ struct OxDemoSceneView: View {
             .environment(\.localDomainArtwork, playback.artwork)
             .environment(\.locale, Locale(identifier: "en"))
             .environment(\.openURL, OpenURLAction { _ in .discarded })
-            .themed()
             .onChange(of: playback.focusComposer) { _, focused in composerFocused = focused }
             .onDisappear { playback.stop() }
             .task {

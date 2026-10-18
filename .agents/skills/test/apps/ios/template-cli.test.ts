@@ -72,7 +72,7 @@ test("template CLI does not expose internal materialization", async () => {
 
 const basic = {
   version: 1,
-  settings: { theme: "dark", defaultModel: { provider: "mock", model: "mock" } },
+  settings: { language: "en", defaultModel: { provider: "mock", model: "mock" } },
   userDefaults: { app: { set: { count: 3, enabled: true, bytes: { data: "YWJj" }, list: ["a", 2], nested: { dictionary: { value: "x" } }, date: { date: "2026-01-01T00:00:00Z" } }, remove: ["old"] } },
   profiles: [{ id: "qa", name: "QA", files: [{ path: "notes/file.txt", content: { fromFile: "file.txt" } }], chats: [{ id: "conversation", title: "Chat", messages: [{ role: "user", text: "Hello" }, { role: "assistant", text: "Hi", reasoning: "A greeting." }] }] }],
   selection: { profile: "qa", chat: "conversation" },
@@ -88,13 +88,13 @@ test("template CLI rejects unsupported state and broken references before simula
   const invalid = [
     { ...basic, version: 2 },
     { ...basic, logs: [] },
-    { ...basic, settings: { theme: "missing" } },
+    { ...basic, settings: { language: "missing" } },
     { ...basic, selection: { profile: "missing" } },
     { ...basic, profiles: [{ id: "qa", name: "../escape" }] },
     { ...basic, profiles: [{ id: "qa", name: "QA", files: [{ path: "../escape", content: { text: "x" } }] }] },
     { ...basic, profiles: [{ id: "qa", name: "QA", chats: [{ id: "conversation", title: "Chat", messages: [{ role: "user", text: "Hello", attachments: ["missing"] }] }] }] },
     { ...basic, userDefaults: { app: { set: { same: 1 }, remove: ["same"] } } },
-    { ...basic, userDefaults: { appGroup: { set: { "app.theme": "light" } } } },
+    { ...basic, userDefaults: { app: { set: { "app.language": "en" } } } },
     { ...basic, userDefaults: { app: { set: { date: { date: "2026-02-30T00:00:00Z" } } } } },
     { ...basic, userDefaults: { app: { set: { data: { data: "invalid base64" } } } } },
     { version: 1, storage: [{ domain: "caches", path: "snapshot", from: "linked.txt", provenance: { build: "1", storageVersion: "1" } }] },

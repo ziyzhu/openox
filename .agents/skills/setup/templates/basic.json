@@ -1,7 +1,6 @@
 {
   "version": 1,
   "settings": {
-    "theme": "dark",
     "language": "en",
     "onboardingCompleted": true,
     "defaultModel": {

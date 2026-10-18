@@ -119,7 +119,7 @@ is a runnable example. `--schema` prints JSON Schema directly from that contract
 inputs without a simulator. Omitted fields remain unchanged. Profiles get a
 run-owned name suffix; each application creates new Profiles rather than merging
 into existing data. Result manifests map template-local Profile/conversation IDs to actual
-IDs. Settings support the existing Ox themes, not an invented system theme.
+IDs.
 
 For manual Simulator preference edits, stop the app and target the current data
 container’s `Library/Preferences/<bundle-id>` path with `defaults`; a bare bundle

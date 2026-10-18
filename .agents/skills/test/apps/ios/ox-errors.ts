@@ -23,7 +23,7 @@ try {
   const source = `
     const failures = [];
     const calls = [
-      ['invalid_argument', () => ox.app.setTheme({ selection: 'invalid', purpose: 'Verify error contract' })],
+      ['invalid_argument', () => ox.app.setLanguage({ selection: 'invalid', purpose: 'Verify error contract' })],
       ['invalid_argument', () => ox.fs.read({ purpose: "Verify error contract", path: 17 })],
       ['not_found', () => ox.fs.read({ purpose: "Verify error contract", path: 'skills/qa-missing-structured-error/SKILL.md' })],
       ['not_found', () => ox.fs.read({ purpose: "Verify error contract", path: 'artifacts/qa-missing-structured-error.txt' })],
@@ -38,8 +38,8 @@ try {
         failures.push({ expected, error, serialized: JSON.parse(JSON.stringify(error)) });
       }
     }
-    const settled = await Promise.allSettled([Promise.resolve().then(() => ox.app.setTheme({ selection: 'invalid', purpose: 'Verify parallel failure' }))]);
-    return { failures, parallel: settled[0].reason, help: ox.app.setTheme.help(), aliases: ox.app.setModel === ox.conversation.setModel, theme: await ox.app.theme({ purpose: 'Verify successful call' }) };
+    const settled = await Promise.allSettled([Promise.resolve().then(() => ox.app.setLanguage({ selection: 'invalid', purpose: 'Verify parallel failure' }))]);
+    return { failures, parallel: settled[0].reason, help: ox.app.setLanguage.help(), aliases: ox.app.setModel === ox.conversation.setModel, language: await ox.app.language({ purpose: 'Verify successful call' }) };
   `;
   const result = await run([...cli, "vm", "eval", "--script", source, "--json"], { capture: true });
   await writeFile(join(evidence, "caught.json"), result.stdout);
@@ -55,13 +55,13 @@ try {
   assert.equal(output.value.parallel.code, "invalid_argument");
   assert.ok(output.value.help.includes("selection"));
   assert.equal(output.value.aliases, true);
-  assert.equal(typeof output.value.theme.selection, "string");
+  assert.equal(typeof output.value.language.selection, "string");
   assert.equal(output.logs.length, 6);
   for (const log of output.logs) {
     const fields = JSON.parse(log.message.split("\n")[0]);
     assert.ok(fields.code && fields.message && fields.recovery);
   }
-  const uncaught = await run([...cli, "vm", "eval", "--script", "await ox.app.setTheme({ selection: 'invalid', purpose: 'Verify uncaught error' });", "--json"], { capture: true, allowFailure: true });
+  const uncaught = await run([...cli, "vm", "eval", "--script", "await ox.app.setLanguage({ selection: 'invalid', purpose: 'Verify uncaught error' });", "--json"], { capture: true, allowFailure: true });
   await writeFile(join(evidence, "uncaught.json"), JSON.stringify(uncaught));
   assert.notEqual(uncaught.code, 0);
   assert.ok((uncaught.stdout + uncaught.stderr).includes('"code":"invalid_argument"'));

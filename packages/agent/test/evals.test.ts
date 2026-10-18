@@ -57,18 +57,18 @@ test("real execute loop preserves filesystem state, errors, contract validation 
 }, 20000);
 
 test("stub state transitions commit only after valid output and remain isolated across runs", async () => {
-  const stubs = { state: { theme: { selection: "light", appearance: "light" } }, functions: {
-    "ox.app.theme": [{result:{$state:"theme"}}],
-    "ox.app.setTheme": [{args:{selection:"dark"}, result:{selection:"dark",appearance:"dark",changed:true},set:{theme:{selection:"dark",appearance:"dark"}}}],
+  const stubs = { state: { language: { selection: "en", locale: "en" } }, functions: {
+    "ox.app.language": [{result:{$state:"language"}}],
+    "ox.app.setLanguage": [{args:{selection:"zh-Hans"}, result:{selection:"zh-Hans",locale:"zh-Hans",changed:true},set:{language:{selection:"zh-Hans",locale:"zh-Hans"}}}],
   } };
-  const runtime = await fixture(["await ox.app.setTheme({selection:'dark',purpose:'Set theme'}); console.log(await ox.app.theme({purpose:'Verify'}));"], stubs);
+  const runtime = await fixture(["await ox.app.setLanguage({selection:'zh-Hans',purpose:'Set language'}); console.log(await ox.app.language({purpose:'Verify'}));"], stubs);
   const other = await fixture([], stubs);
   try {
     const chat = await runtime.request<{chatId:string}>(["conversation","new"]);
-    await runtime.request(["conversation","send","Use dark theme"],chat.chatId);
-    expect(runtime.stubs.state.theme).toEqual({selection:"dark",appearance:"dark"});
-    expect(other.stubs.state.theme).toEqual({selection:"light",appearance:"light"});
-    expect(()=>runtime.stubs.call("ox.app.setTheme",{selection:"light",purpose:"Unsupported"})).toThrow("No prepared stub");
+    await runtime.request(["conversation","send","Use Chinese"],chat.chatId);
+    expect(runtime.stubs.state.language).toEqual({selection:"zh-Hans",locale:"zh-Hans"});
+    expect(other.stubs.state.language).toEqual({selection:"en",locale:"en"});
+    expect(()=>runtime.stubs.call("ox.app.setLanguage",{selection:"en",purpose:"Unsupported"})).toThrow("No prepared stub");
   } finally { await runtime.close(); await other.close(); }
 }, 20000);
 
@@ -80,7 +80,7 @@ test("execute exposes namespace and function help without process, network, or d
   expect(result).toContain("inputSchema");
   expect(result).toContain("EvalError");
   expect(calls).toEqual([]);
-  expect(Object.keys(catalog)).toHaveLength(100);
+  expect(Object.keys(catalog)).toHaveLength(98);
 });
 
 test("cancellation terminates runaway execute code without a Host or simulator", async () => {
@@ -114,11 +114,11 @@ test("fabricated completion cannot pass without actual tool receipts", async()=>
 });
 
 test("invalid stub output cannot mutate state and failed calls remain observable in the agent loop",async()=>{
-  const runtime=await fixture(["try {await ox.app.setTheme({selection:'dark',purpose:'Change theme'})} catch(e) {console.log(e.message)}"],{state:{theme:"light"},functions:{"ox.app.setTheme":[{result:{changed:"wrong-type"},set:{theme:"dark"}}]}});
+  const runtime=await fixture(["try {await ox.app.setLanguage({selection:'zh-Hans',purpose:'Change language'})} catch(e) {console.log(e.message)}"],{state:{language:"en"},functions:{"ox.app.setLanguage":[{result:{changed:"wrong-type"},set:{language:"zh-Hans"}}]}});
   try {
     const chat=await runtime.request<{chatId:string}>(["conversation","new"]);
-    await runtime.request(["conversation","send","Set dark theme"],chat.chatId);
-    expect(runtime.stubs.state.theme).toBe("light");
+    await runtime.request(["conversation","send","Set Chinese"],chat.chatId);
+    expect(runtime.stubs.state.language).toBe("en");
     const snapshot=await runtime.request<EvalSnapshot>(["conversation","inspect"],chat.chatId);
     expect(snapshot.blocks[0]!.kind.trace!.entries[0]!.invocation!.outcome.failed).toMatchObject({code:"operation_failed"});
   } finally {await runtime.close();}

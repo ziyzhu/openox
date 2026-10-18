@@ -34,7 +34,6 @@ const chat = object({
 export const DeviceTemplateSchema = object({
   version: Type.Literal(1),
   settings: Type.Optional(object({
-    theme: Type.Optional(Type.Union([Type.Literal("creatorPick"), Type.Literal("light"), Type.Literal("dark")])),
     language: Type.Optional(Type.Union([Type.Literal("system"), Type.Literal("en"), Type.Literal("zh-Hans")])),
     onboardingCompleted: Type.Optional(Type.Boolean()),
     region: Type.Optional(Type.Union([Type.Literal("global"), Type.Literal("china")])),
@@ -144,7 +143,7 @@ export function parseTemplate(value: unknown): DeviceTemplate {
     const profile = profiles.find(profile => profile.id === template.selection!.profile);
     if (!profile || template.selection.chat && !profile.chats?.some(chat => chat.id === template.selection!.chat)) throw new Error("Unknown selection reference");
   }
-  const settingsKeys = { theme: ["appGroup", "app.theme"], language: ["app", "app.language"], onboardingCompleted: ["app", "app.hasCompletedOnboarding"], region: ["app", "app.region"], defaultModel: ["app", "llm.defaultModel"], allowHostConnections: ["app", "host.allowConnections"] } as const;
+  const settingsKeys = { language: ["app", "app.language"], onboardingCompleted: ["app", "app.hasCompletedOnboarding"], region: ["app", "app.region"], defaultModel: ["app", "llm.defaultModel"], allowHostConnections: ["app", "host.allowConnections"] } as const;
   for (const domain of ["app", "appGroup"] as const) {
     const defaults = template.userDefaults?.[domain];
     const keys = [...Object.keys(defaults?.set ?? {}), ...defaults?.remove ?? []];

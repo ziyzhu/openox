@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import os
 
 enum Theme {
     enum Colors {
@@ -84,65 +83,20 @@ enum Theme {
     }
 }
 
-nonisolated enum AppTheme: String, CaseIterable, Identifiable {
-    case creatorPick
-    case light
-    case dark
-
-    static let allCases: [AppTheme] = [.light, .dark]
-
-    private static let currentLock = OSAllocatedUnfairLock(initialState: AppTheme.creatorPick)
-
-    static var current: AppTheme {
-        get { currentLock.withLock { $0 } }
-        set { currentLock.withLock { $0 = newValue } }
-    }
-
-    var id: String { rawValue }
-
-    var displayName: LocalizedStringKey {
-        switch self {
-        case .creatorPick, .light: "Light"
-        case .dark:  "Dark"
-        }
-    }
-
-    var colorScheme: ColorScheme {
-        switch self {
-        case .creatorPick, .light: .light
-        case .dark:          .dark
-        }
-    }
-}
-
-private struct AppThemeKey: EnvironmentKey {
-    static let defaultValue: AppTheme = .creatorPick
-}
-
-extension EnvironmentValues {
-    var appTheme: AppTheme {
-        get { self[AppThemeKey.self] }
-        set { self[AppThemeKey.self] = newValue }
-    }
-}
-
 struct DynamicColor: ShapeStyle {
     let light: UInt32
     let dark: UInt32
 
     func resolve(in environment: EnvironmentValues) -> Color {
-        color(for: environment.appTheme)
+        color(for: environment.colorScheme)
     }
 
-    func hex(for theme: AppTheme) -> UInt32 {
-        switch theme {
-        case .creatorPick, .light: light
-        case .dark: dark
-        }
+    func hex(for colorScheme: ColorScheme) -> UInt32 {
+        colorScheme == .dark ? dark : light
     }
 
-    func color(for theme: AppTheme) -> Color {
-        Color(uiColor: UIColor(hex: hex(for: theme)))
+    func color(for colorScheme: ColorScheme) -> Color {
+        Color(uiColor: UIColor(hex: hex(for: colorScheme)))
     }
 
     var dynamic: Color {
@@ -151,7 +105,7 @@ struct DynamicColor: ShapeStyle {
 
     var uiColor: UIColor {
         let palette = self
-        return UIColor { _ in UIColor(hex: palette.hex(for: AppTheme.current)) }
+        return UIColor { traits in UIColor(hex: traits.userInterfaceStyle == .dark ? palette.dark : palette.light) }
     }
 }
 

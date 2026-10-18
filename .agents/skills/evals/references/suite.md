@@ -36,16 +36,16 @@ Bindings optionally contain `stubs`:
 
 ```json
 {
-  "state": {"theme": {"selection": "light", "appearance": "light"}},
+  "state": {"language": {"selection": "en", "locale": "en"}},
   "files": {"notes.txt": "Existing content"},
   "denied": ["ox.secret.delete"],
   "functions": {
-    "ox.app.theme": [{"result": {"$state": "theme"}}],
-    "ox.app.setTheme": [{
-      "args": {"selection": "dark"},
-      "when": {"theme": {"selection": "light", "appearance": "light"}},
-      "result": {"selection": "dark", "appearance": "dark", "changed": true},
-      "set": {"theme": {"selection": "dark", "appearance": "dark"}}
+    "ox.app.language": [{"result": {"$state": "language"}}],
+    "ox.app.setLanguage": [{
+      "args": {"selection": "zh-Hans"},
+      "when": {"language": {"selection": "en", "locale": "en"}},
+      "result": {"selection": "zh-Hans", "locale": "zh-Hans", "changed": true},
+      "set": {"language": {"selection": "zh-Hans", "locale": "zh-Hans"}}
     }]
   }
 }

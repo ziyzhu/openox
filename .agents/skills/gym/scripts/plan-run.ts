@@ -98,9 +98,9 @@ const intents: Intent[] = [
     id: "read-only-app-inspection",
     mockIntent: "80",
     prompts: {
-      en: ["Tell me which model and appearance this conversation is using. Do not change anything."],
-      "zh-Hans": ["告诉我这个聊天正在使用哪个模型和外观设置，不要更改任何内容。"],
-      mixed: ["告诉我这个 conversation 使用的 model 和 appearance，不要修改。"],
+      en: ["Tell me which model and language this conversation is using. Do not change anything."],
+      "zh-Hans": ["告诉我这个聊天正在使用哪个模型和语言设置，不要更改任何内容。"],
+      mixed: ["告诉我这个 conversation 使用的 model 和 language，不要修改。"],
     },
     success: "Ox inspects its current state without changing it or requesting unnecessary access",
     responseShape: "readOnlyToolResult",
@@ -206,7 +206,7 @@ const dimensions = {
   trust: ["cautious", "balanced", "eager"],
   exploration: ["shallow", "moderate", "deep"],
   verbosity: ["concise", "balanced", "detailed"],
-  theme: ["creatorPick", "light", "dark"],
+  appearance: ["light", "dark"],
   promptLanguage: ["en", "zh-Hans", "mixed"],
   inputMethod: ["type", "paste"],
   accessibility: ["default", "largeText", "reducedMotion", "increasedContrast"],
@@ -216,7 +216,7 @@ const dimensions = {
 } as const;
 
 const reservedDimensions = new Set([
-  "theme",
+  "appearance",
   "appLanguage",
   "promptLanguage",
   "responseShape",
@@ -381,7 +381,7 @@ function assignment(
     },
     intent,
     environment: {
-      theme: pick(dimensions.theme, rng),
+      appearance: pick(dimensions.appearance, rng),
       appLanguage: pick(appLanguages, rng),
       promptLanguage: pick(dimensions.promptLanguage, rng),
       responseShape: intent.responseShape,
@@ -400,7 +400,7 @@ function coreAssignment(extraDimensions: Record<string, string[]>): Assignment {
     persona: { fluency: "familiar", patience: "medium", trust: "balanced", exploration: "moderate", verbosity: "balanced" },
     intent: intents[0]!,
     environment: {
-      theme: "creatorPick",
+      appearance: "light",
       appLanguage: "en",
       promptLanguage: "en",
       responseShape: intents[0]!.responseShape,

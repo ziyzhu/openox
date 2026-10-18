@@ -74,7 +74,6 @@ nonisolated enum A11yID {
         static let customProviderURL = "settings.customProviderURL"
         static let customProviderKey = "settings.customProviderKey"
         static let language = "settings.language"
-        static let theme = "settings.theme"
         static let hostEnabled = "settings.host.enabled"
         static let actions = "settings.actions"
         static let services = "settings.services"

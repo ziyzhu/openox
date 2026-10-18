@@ -35,7 +35,6 @@ nonisolated enum ApplicationStorageMigrator {
         migrateFilesPolicies()
         migrateFolderOwnership()
         migrateSavedServices()
-        migrateTheme()
         CredentialMigrator.removeLegacyRepositoryAuthorization()
         Log.app.info("StorageMigrator.application done")
     }
@@ -64,27 +63,6 @@ nonisolated enum ApplicationStorageMigrator {
         if removedFiles > 0 || clearedDefault {
             Log.app.info("StorageMigrator.retiredGemma removedFiles=\(removedFiles) clearedDefault=\(clearedDefault)")
         }
-    }
-
-    private static func migrateTheme(
-        defaults: UserDefaults = .standard,
-        sharedDefaults: UserDefaults? = UserDefaults(suiteName: AppStoragePaths.appGroupIdentifier)
-    ) {
-        let key = "app.theme"
-        guard let legacyValue = defaults.string(forKey: key) else { return }
-        guard let sharedDefaults else {
-            Log.app.error("StorageMigrator.theme app-group unavailable")
-            return
-        }
-        if sharedDefaults.string(forKey: key) == nil {
-            sharedDefaults.set(legacyValue, forKey: key)
-        }
-        let saved = sharedDefaults.synchronize()
-        if saved {
-            defaults.removeObject(forKey: key)
-            defaults.synchronize()
-        }
-        Log.app.info("StorageMigrator.theme migrated saved=\(saved)")
     }
 
     private static func migrateActionApprovalPolicies(defaults: UserDefaults = .standard) {
