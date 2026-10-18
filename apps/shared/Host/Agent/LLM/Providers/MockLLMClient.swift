@@ -670,6 +670,18 @@ extension Scenario {
           C --> B
         ```
 
+        ```mermaid
+        flowchart TB
+          U[You] <--> O["Ox<br/>Conversation and coordination"]
+          O <--> S["Ox services<br/>APIs, device actions"]
+          O <-->|Delegate and check| M
+          subgraph R[Remote machine or server]
+            M[MCP bridge] <--> P["Pi Durable<br/>Agent execution"]
+            P --> L[Model provider]
+            P <--> F["Remote tools<br/>Files, shell"]
+          end
+        ```
+
         ![Sunrise](sunrise.svg)
         """), .stop(.stop)]
     }

@@ -37,7 +37,8 @@ struct MermaidDiagramView<Fallback: View>: View {
             Button { zoomed = true } label: {
                 Image(uiImage: image)
                     .resizable()
-                    .frame(width: image.size.width, height: image.size.height)
+                    .scaledToFit()
+                    .frame(maxWidth: image.size.width)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Open diagram")
