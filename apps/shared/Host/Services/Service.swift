@@ -690,7 +690,7 @@ final class Service: NSObject, Identifiable {
         title = resolved.name
         summary = resolved.description
         if let mcp = remoteMCPService {
-            setAuth(mcp.requiresAuthorization ? (mcp.isAuthorized ? .authorized : .authorizationRequired) : .notRequired)
+            setAuth(mcp.auth)
         }
         setCapabilityState(.ready, reason: reason)
         manager.serviceCapabilitiesDidChange(self)

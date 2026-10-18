@@ -15,6 +15,7 @@ final class RemoteMCPService {
     private(set) var requiresAuthorization: Bool
     private(set) var isAuthorized: Bool
     var isActive: Bool { client != nil || activationTask != nil }
+    var auth: Service.Auth { requiresAuthorization ? (isAuthorized ? .authorized : .authorizationRequired) : .notRequired }
 
     let endpoint: URL
     let transport: RemoteMCPTransport?
@@ -56,9 +57,11 @@ final class RemoteMCPService {
         descriptor = connection.descriptor
         requiresAuthorization = connection.requiresAuthorization
         isAuthorized = connection.isAuthorized
-        let authorization = connection.requiresAuthorization
-            ? (connection.isAuthorized ? "authorized" : "required")
-            : "notRequired"
+        let authorization = switch auth {
+        case .authorized: "authorized"
+        case .authorizationRequired: "required"
+        default: "notRequired"
+        }
         Log.service.info("RemoteMCP.connect id=\(connection.descriptor.id) endpoint=\(LogPrivacy.url(endpoint.absoluteString)) tools=\(connection.descriptor.tools.count) icons=\(connection.descriptor.icons.count) authorization=\(authorization) active=false")
         return connection.descriptor
     }

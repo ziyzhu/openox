@@ -158,7 +158,6 @@ extension Scenario {
                 .say("Here's the chart you asked for:\n\n"),
                 .wait(.seconds(3)),
                 execute(htmlFile("revenue", revenueDocument)),
-                .stop(.toolUse)
             ]
         }
         return [.say("[Open Quarterly Revenue](sandbox:/mnt/data/mock-revenue.html)"), .stop(.stop)]

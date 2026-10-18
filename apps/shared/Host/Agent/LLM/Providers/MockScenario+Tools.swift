@@ -165,7 +165,7 @@ extension Scenario {
                     if !pending.isEmpty { return [.say("Compaction orphaned tool calls."), .stop(.stop)] }
                 case .assistant(let assistant):
                     if !pending.isEmpty { return [.say("Compaction separated tool calls and results."), .stop(.stop)] }
-                    pending = Set(assistant.content.compactMap { if case .toolCall(let call) = $0 { call.id } else { nil } })
+                    pending = Set(assistant.content.toolCalls.map(\.id))
                 case .toolResult(let result):
                     guard pending.remove(result.toolCallId) != nil else { return [.say("Compaction orphaned a tool result."), .stop(.stop)] }
                     if result.content.concatenatedText.hasPrefix("EARLY_STEP_") { return [.say("Compaction retained the early tool result."), .stop(.stop)] }
@@ -181,14 +181,12 @@ extension Scenario {
             return [
                 execute("console.log(\"SECOND_RECENT_STEP_\" + \"C\".repeat(50000));"),
                 .usage(input: 900_000, output: 32),
-                .stop(.toolUse),
             ]
         }
         if ctx.turn == 1 {
             return [
                 execute("console.log(\"RECENT_STEP_\" + \"B\".repeat(50000));"),
                 .usage(input: 900_000, output: 32),
-                .stop(.toolUse),
             ]
         }
         return [.say("The long ongoing turn was not compacted."), .stop(.stop)]

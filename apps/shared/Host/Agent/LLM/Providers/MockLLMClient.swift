@@ -98,7 +98,7 @@ public struct MockLLMClient: ProviderClient {
                     let source = String(intent.dropFirst("execute\n".count))
                     let scenario = Scenario(name: "execute") { context in
                         context.turn == 0
-                            ? [.tool(name: "execute", args: .object(["purpose": .string("Run Mock scenario"), "source": .string(source)])), .stop(.toolUse)]
+                            ? [Scenario.execute(source)]
                             : [.say("(mock) Execution finished."), .stop(.stop)]
                     }
                     return (scenario, turn)

@@ -71,7 +71,7 @@ extension Service {
         if let apiService { return try await apiService.authorization.checkAccess(previous: auth.observation) }
         if let mcp = remoteMCPService {
             _ = try await mcp.resolve(refresh: true)
-            return mcp.requiresAuthorization ? (mcp.isAuthorized ? .authorized : .authorizationRequired) : .notRequired
+            return mcp.auth
         }
         guard supportsWebAuthentication, let webService else { return .notRequired }
         return try await webService.checkAccess(service: self)

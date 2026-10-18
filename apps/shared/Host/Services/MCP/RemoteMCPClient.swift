@@ -81,7 +81,7 @@ nonisolated enum RemoteMCPError: LocalizedError, Sendable {
     }
 }
 
-nonisolated private final class RemoteMCPRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+nonisolated final class RemoteMCPRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func urlSession(
         _: URLSession,
         task _: URLSessionTask,
@@ -290,32 +290,27 @@ actor RemoteMCPClient {
         expectedID: Int? = nil,
         acceptsEmpty: Bool = false
     ) async throws -> JSONValue? {
-        if transport == .sse {
+        let selected = transport
+        switch selected {
+        case .sse:
             if legacyMessageEndpoint == nil { try await openLegacySSE() }
             return try await sendLegacy(payload, expectedID: expectedID)
-        }
-        if transport == .streamableHTTP {
-            return try await sendStreamableHTTP(
-                payload,
-                protocolVersion: protocolVersion,
-                expectedID: expectedID,
-                acceptsEmpty: acceptsEmpty
-            )
-        }
-        do {
-            let value = try await sendStreamableHTTP(
-                payload,
-                protocolVersion: protocolVersion,
-                expectedID: expectedID,
-                acceptsEmpty: acceptsEmpty
-            )
-            transport = RemoteMCPTransport.streamableHTTP
-            return value
-        } catch RemoteMCPError.http(let status) where [400, 404, 405].contains(status) {
-            Log.service.info("RemoteMCP.transport fallback=legacySSE endpoint=\(LogPrivacy.url(endpoint.absoluteString)) status=\(status)")
-            try await openLegacySSE()
-            transport = .sse
-            return try await sendLegacy(payload, expectedID: expectedID)
+        case .streamableHTTP, nil:
+            do {
+                let value = try await sendStreamableHTTP(
+                    payload,
+                    protocolVersion: protocolVersion,
+                    expectedID: expectedID,
+                    acceptsEmpty: acceptsEmpty
+                )
+                transport = .streamableHTTP
+                return value
+            } catch RemoteMCPError.http(let status) where selected == nil && [400, 404, 405].contains(status) {
+                Log.service.info("RemoteMCP.transport fallback=legacySSE endpoint=\(LogPrivacy.url(endpoint.absoluteString)) status=\(status)")
+                try await openLegacySSE()
+                transport = .sse
+                return try await sendLegacy(payload, expectedID: expectedID)
+            }
         }
     }
 
@@ -350,10 +345,7 @@ actor RemoteMCPClient {
                let fields = value.objectValue,
                fields["jsonrpc"]?.stringValue == "2.0",
                let error = fields["error"]?.objectValue {
-                throw RemoteMCPError.server(
-                    error["code"]?.intValue ?? -32_000,
-                    error["message"]?.stringValue ?? "Unknown error"
-                )
+                throw Self.serverError(error)
             }
             throw RemoteMCPError.http(response.statusCode)
         }
@@ -605,11 +597,13 @@ actor RemoteMCPClient {
         guard let fields = response?.objectValue, fields["id"]?.intValue == id else {
             throw RemoteMCPError.invalidResponse
         }
-        if let error = fields["error"]?.objectValue {
-            throw RemoteMCPError.server(error["code"]?.intValue ?? -32_000, error["message"]?.stringValue ?? "Unknown error")
-        }
+        if let error = fields["error"]?.objectValue { throw serverError(error) }
         guard let result = fields["result"] else { throw RemoteMCPError.invalidResponse }
         return result
+    }
+
+    private static func serverError(_ error: [String: JSONValue]) -> RemoteMCPError {
+        .server(error["code"]?.intValue ?? -32_000, error["message"]?.stringValue ?? "Unknown error")
     }
 
     private static func sseValues(_ data: Data) throws -> [JSONValue] {

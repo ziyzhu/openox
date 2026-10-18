@@ -12,9 +12,7 @@ extension Scenario {
             return [.say("URL service context leaked into the system prompt."), .stop(.stop)]
         }
         if let result = ctx.toolResults.last(where: { $0.toolName == "execute" }) {
-            let text = result.content.compactMap { block in
-                if case .text(let text) = block { text.text } else { nil }
-            }.joined()
+            let text = result.content.concatenatedText
             guard text.contains("<url-relations provenance=\"runtime-generated\">")
                     && text.contains(toolURL)
                     && text.contains("- www.google.com |")
@@ -88,7 +86,7 @@ extension Scenario {
                 const guide = await ox.fs.read({ path: "skills/manage-skills/SKILL.md", purpose: "Activate the bundled authoring skill" });
                 const references = await ox.fs.list({ path: "skills/manage-skills/references", purpose: "List skill references" });
                 console.log({ count: files.paths.length, guide: guide.text.includes("# Manage Skills"), references: references.items.length });
-                """), .stop(.toolUse)]
+                """)]
             }
             guard !result.isError, result.activatedSkills.contains(where: { $0.name == "manage-skills" }),
                   let text = ctx.resultText("execute"), let values = JSONValue.parse(jsonString: text)?.objectValue,
@@ -99,10 +97,7 @@ extension Scenario {
         }
         if activatesUserSkill {
             guard let result = ctx.toolResults.last else {
-                return [
-                    execute(#"console.log(await ox.fs.read({ path: "skills/grocery-planner/SKILL.md", purpose: "Activate grocery planning skill" }));"#),
-                    .stop(.toolUse),
-                ]
+                return [execute(#"console.log(await ox.fs.read({ path: "skills/grocery-planner/SKILL.md", purpose: "Activate grocery planning skill" }));"#)]
             }
             guard result.activatedSkills.contains(where: {
                 $0.path == "skills/grocery-planner/SKILL.md"
@@ -127,10 +122,7 @@ extension Scenario {
                 return [.say("Current memory replaced the frozen system-prompt snapshot."), .stop(.stop)]
             }
             if ctx.resultText("execute") == nil {
-                return [
-                    execute(#"console.log(await ox.fs.read({ path: "MEMORY.md", purpose: "Read current memory" }));"#),
-                    .stop(.toolUse),
-                ]
+                return [execute(#"console.log(await ox.fs.read({ path: "MEMORY.md", purpose: "Read current memory" }));"#)]
             }
             guard ctx.resultText("execute")?.contains("current-memory-must-be-injected") == true else {
                 return [.say("Current memory could not be read on demand."), .stop(.stop)]
@@ -138,10 +130,7 @@ extension Scenario {
             return [.say("Memory stayed frozen in the system prompt and current memory remained available on demand."), .stop(.stop)]
         }
         if ctx.resultText("execute") == nil {
-            return [
-                execute(#"console.log(await ox.fs.read({ path: "MEMORY.md", purpose: "Read memory" }));"#),
-                .stop(.toolUse),
-            ]
+            return [execute(#"console.log(await ox.fs.read({ path: "MEMORY.md", purpose: "Read memory" }));"#)]
         }
         guard ctx.resultText("execute")?.contains("transient-memory-must-not-be-injected") == true else {
             return [.say("Memory could not be read on demand."), .stop(.stop)]
