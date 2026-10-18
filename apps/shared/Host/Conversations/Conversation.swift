@@ -2,160 +2,12 @@ import Foundation
 import WebKit
 import Observation
 
-enum ConversationRetention: Equatable {
-    case persisted
-    case temporary
-}
-
-nonisolated struct FollowIntent: Equatable, Identifiable, Sendable {
-    let label: String
-    let message: String
-
-    static func parse(_ value: JSONValue) throws -> [Self] {
-        guard let entries = value.arrayValue, entries.count <= 2 else {
-            throw RuntimeError.bridge("ox.user.follow: provide at most 2 intents")
-        }
-        let intents = try entries.map { entry -> Self in
-            guard let fields = entry.objectValue,
-                  let kind = fields["kind"]?.stringValue else {
-                throw RuntimeError.bridge("ox.user.follow: each intent needs a kind")
-            }
-            switch kind {
-            case "send":
-                let label = fields["label"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                let message = fields["message"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                guard !label.isEmpty, label.count <= 80,
-                      !message.isEmpty, message.count <= 1_000 else {
-                    throw RuntimeError.bridge("ox.user.follow: send needs a short label and message")
-                }
-                return Self(label: label, message: message)
-            default: throw RuntimeError.bridge("ox.user.follow: unsupported intent kind")
-            }
-        }
-        guard Set(intents.map(\.id)).count == intents.count else {
-            throw RuntimeError.bridge("ox.user.follow: intents must be unique")
-        }
-        return intents
-    }
-
-    var id: String { "send:\(label.lowercased())" }
-}
-
-struct ConversationContinuation {
-    let meta: ConversationMeta
-    let turns: [Turn]
-    let intent: String
-    let attachments: [FileItem]
-    let skillInvocation: UserSkillInvocation?
-}
-
-nonisolated enum ConversationPromptPresentation: Equatable, Sendable {
-    case conversation
-    case application
-}
-
-nonisolated struct ConversationPendingPrompt: Equatable, Sendable {
-    let id: UUID
-    let prompt: String
-    let options: [String]
-    let presentation: ConversationPromptPresentation
-}
-
 @MainActor
 @Observable
 final class Conversation: Identifiable {
-    enum ExecutionLease {
-        case userInitiated
-        case externallyManaged
-    }
-
     private enum AgentHapticPhase {
         case waitingForDelta
         case deltaReceived
-    }
-
-    struct PendingServiceControl: Identifiable, Equatable {
-        struct Source: Equatable {
-            let blockID: UUID
-            let itemIndex: Int
-        }
-
-        let id: UUID
-        let control: ServiceControl
-        var source: Source?
-        var accessPreflight: UUID? = nil
-    }
-
-    struct PendingPrompt: Identifiable, Equatable {
-        struct AutoApproval: Equatable {
-            let action: String
-            let defaultPolicy: ActionPolicy
-            let approve: String
-            let alwaysApprove: String
-            let deny: String
-        }
-
-        let id: UUID
-        let kind: ConversationPromptKind
-        let prompt: String
-        let options: [String]
-        let presentation: ConversationPromptPresentation
-        let allowsCustomAnswer: Bool
-        let autoApproval: AutoApproval?
-        let secretEntry: SecretEntryRequest?
-        let permission: PermissionPresentation?
-    }
-
-    enum Interaction: Equatable {
-        case prompt(PendingPrompt)
-        case serviceControl(PendingServiceControl)
-    }
-
-    enum Activity: Equatable {
-        enum Idle: Equatable {
-            case read
-            case unread
-            case stopped
-        }
-
-        enum AwaitingAction: Equatable {
-            case approval
-            case reply
-            case signIn
-            case verification
-            case payment
-        }
-
-        enum Running: Equatable {
-            case thinking
-            case streaming
-            case awaiting(AwaitingAction)
-        }
-
-        case idle(Idle)
-        case running(Running)
-
-        var isThinking: Bool {
-            self == .running(.thinking)
-        }
-
-        var isAwaitingUser: Bool {
-            if case .running(.awaiting) = self { true } else { false }
-        }
-    }
-
-    enum Notice: Equatable {
-        case none
-        case error(String)
-
-        var errorMessage: String? {
-            if case .error(let message) = self { message } else { nil }
-        }
-    }
-
-    struct ThinkingActivity: Equatable {
-        let turnID: TurnID
-        let startedAt: Date
     }
 
     private enum InteractionWaiter {
@@ -488,22 +340,7 @@ final class Conversation: Identifiable {
         onPersistableChange?()
     }
 
-    var latestAgentConversationTitle: String? {
-        for turn in document.turns.reversed() {
-            guard case let .agent(agent, _) = turn else { continue }
-            for step in agent.steps.reversed() {
-                guard case let .execute(execution) = step.kind else { continue }
-                for effect in execution.effects.reversed() {
-                    guard case let .invocation(invocation) = effect,
-                          invocation.name == Actions.appRenameConversation,
-                          case let .succeeded(value) = invocation.outcome,
-                          value?.objectValue?["renamed"]?.boolValue == true else { continue }
-                    return value?.objectValue?["title"]?.stringValue
-                }
-            }
-        }
-        return nil
-    }
+    var latestAgentConversationTitle: String? { document.latestAgentRenamedTitle }
 
     private func resolveTarget(_ name: String, label: String) throws -> (service: Service, id: String) {
         let parts = name.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
@@ -842,35 +679,6 @@ final class Conversation: Identifiable {
             state = .consumed
         }
     }
-    struct QueuedMessage: Identifiable {
-        let id: UUID
-        let text: String
-        let attachments: [FileItem]
-        let skillInvocation: UserSkillInvocation?
-    }
-
-    struct SubmissionReceipt: Equatable {
-        enum Disposition: String {
-            case posted
-            case queued
-        }
-
-        let id: UUID
-        let disposition: Disposition
-    }
-
-    enum SubmissionAnchor: Equatable {
-        case queued(UUID)
-        case turn(blockID: UUID, submissionID: UUID?)
-
-        var id: UUID {
-            switch self {
-            case .queued(let id): id
-            case .turn(let blockID, _): blockID
-            }
-        }
-    }
-
     var queuedMessages: [QueuedMessage] {
         submissions.compactMap(\.queuedMessage)
     }
@@ -1219,24 +1027,15 @@ final class Conversation: Identifiable {
         )
     }
 
-    private var runningExecution: Execution? {
-        guard case let .agent(turn, _) = document.turns.last else { return nil }
-        for step in turn.steps.reversed() {
-            guard case let .execute(execution) = step.kind else { continue }
-            return execution.outcome == .running ? execution : nil
-        }
-        return nil
-    }
-
     func executionInvocations() -> [Invocation] {
-        runningExecution?.effects.compactMap {
+        document.runningExecution?.effects.compactMap {
             if case let .invocation(invocation) = $0 { return invocation }
             return nil
         } ?? []
     }
 
     func executionOmittedInvocations() -> Int {
-        runningExecution?.invocationTrace?.omittedCalls ?? 0
+        document.runningExecution?.invocationTrace?.omittedCalls ?? 0
     }
 
     func executionActivatedSkills() -> [ActivatedSkillContext] {
@@ -1789,16 +1588,6 @@ final class Conversation: Identifiable {
 
     // MARK: - Branch / retry
 
-    private func rerunCut(at blockId: UUID) -> (cutEntry: Int, text: String, attachments: [FileItem], skillInvocation: UserSkillInvocation?)? {
-        guard let target = document.blocksWithTurn().first(where: { $0.0.id == blockId })?.1 else { return nil }
-        for ei in stride(from: target, through: 0, by: -1) {
-            if case let .user(turn, _) = document.turns[ei] {
-                return (ei, turn.intent, turn.attachments, turn.skillInvocation)
-            }
-        }
-        return nil
-    }
-
     @discardableResult
     func retry(at blockId: UUID) -> SubmissionReceipt? {
         rerun(at: blockId, replacingText: nil)
@@ -1810,29 +1599,30 @@ final class Conversation: Identifiable {
     }
 
     private func rerun(at blockId: UUID, replacingText: String?) -> SubmissionReceipt? {
-        guard let cut = rerunCut(at: blockId) else {
+        guard let target = document.turnIndex(containingBlock: blockId),
+              let cut = document.lastUserTurn(through: target) else {
             Log.session.warning("Conversation.rerun no cut for block=\(blockId)")
             return nil
         }
-        let text = replacingText ?? cut.text
-        Log.session.info("Conversation.rerun id=\(id) at=\(blockId) cutEntry=\(cut.cutEntry) edited=\(replacingText != nil)")
+        let text = replacingText ?? cut.turn.intent
+        Log.session.info("Conversation.rerun id=\(id) at=\(blockId) cutEntry=\(cut.index) edited=\(replacingText != nil)")
         cancelAll()
         let snapshot = continuation(
-            before: cut.cutEntry,
-            intent: cut.text,
-            attachments: cut.attachments,
-            skillInvocation: cut.skillInvocation
+            before: cut.index,
+            intent: cut.turn.intent,
+            attachments: cut.turn.attachments,
+            skillInvocation: cut.turn.skillInvocation
         )
         guard let replacement = conversationManager?.replaceForRerun(from: self, snapshot: snapshot) else { return nil }
         return replacement.enqueue(
             text,
-            attachments: cut.attachments,
-            skillInvocation: replacingText == nil ? cut.skillInvocation : nil
+            attachments: cut.turn.attachments,
+            skillInvocation: replacingText == nil ? cut.turn.skillInvocation : nil
         )
     }
 
     func branchSnapshot(at blockId: UUID) -> ConversationContinuation? {
-        guard let target = document.blocksWithTurn().first(where: { $0.0.id == blockId })?.1 else { return nil }
+        guard let target = document.turnIndex(containingBlock: blockId) else { return nil }
         return continuation(
             before: target + 1,
             intent: "",
@@ -1843,10 +1633,7 @@ final class Conversation: Identifiable {
 
     func latestContinuation() -> ConversationContinuation? {
         if let activeSubmission = activeRun?.activeSubmission, case .user = activeSubmission.kind {
-            if let index = document.turns.lastIndex(where: { turn in
-                guard case let .user(user, _) = turn else { return false }
-                return user.submissionID == activeSubmission.id
-            }) {
+            if let index = document.lastUserTurnIndex(forSubmissionID: activeSubmission.id) {
                 return continuation(
                     before: index,
                     intent: activeSubmission.text,
@@ -1854,10 +1641,7 @@ final class Conversation: Identifiable {
                     skillInvocation: activeSubmission.skillInvocation
                 )
             }
-            let index = document.turns.lastIndex(where: { turn in
-                guard case let .agent(agent, _) = turn else { return false }
-                return agent.outcome == .running
-            }) ?? document.turns.endIndex
+            let index = document.runningAgentTurnIndex ?? document.turns.endIndex
             Log.session.warning("Conversation.continuation activeFallback id=\(id) submission=\(activeSubmission.id.rawValue) turns=\(index)")
             return continuation(
                 before: index,
@@ -1866,16 +1650,13 @@ final class Conversation: Identifiable {
                 skillInvocation: activeSubmission.skillInvocation
             )
         }
-        for index in document.turns.indices.reversed() {
-            guard case let .user(turn, _) = document.turns[index] else { continue }
-            return continuation(
-                before: index,
-                intent: turn.intent,
-                attachments: turn.attachments,
-                skillInvocation: turn.skillInvocation
-            )
-        }
-        return nil
+        guard let last = document.lastUserTurn(through: document.turns.count - 1) else { return nil }
+        return continuation(
+            before: last.index,
+            intent: last.turn.intent,
+            attachments: last.turn.attachments,
+            skillInvocation: last.turn.skillInvocation
+        )
     }
 
     private func continuation(
@@ -2642,27 +2423,13 @@ final class Conversation: Identifiable {
         } else if let error {
             outcome = .failed(Self.userFacingError(error, kind: failureKind))
         } else {
-            let response = responseText(for: submission.id)
+            let response = document.responseText(forSubmissionID: submission.id)
             outcome = response.isEmpty
                 ? .failed("Ox finished without a text response.")
                 : .completed(response)
         }
         continuation.resume(returning: outcome)
         Log.session.info("Conversation.submitAndWait resolved id=\(id) submission=\(submission.id.rawValue) outcome=\(outcome.logLabel)")
-    }
-
-    private func responseText(for submissionID: SubmissionID) -> String {
-        guard let userIndex = document.turns.firstIndex(where: { turn in
-            guard case let .user(user, _) = turn else { return false }
-            return user.submissionID == submissionID
-        }), document.turns.indices.contains(userIndex + 1),
-              case let .agent(turn, _) = document.turns[userIndex + 1] else { return "" }
-        return turn.steps.compactMap { step in
-            if case let .text(text) = step.kind { return text }
-            return nil
-        }
-        .joined(separator: "\n\n")
-        .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func outcome(for assistant: AssistantMessage, at: Date) -> TurnOutcome {

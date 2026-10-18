@@ -205,3 +205,182 @@ enum RuntimeError: LocalizedError {
         }
     }
 }
+
+enum ConversationRetention: Equatable {
+    case persisted
+    case temporary
+}
+
+nonisolated struct FollowIntent: Equatable, Identifiable, Sendable {
+    let label: String
+    let message: String
+
+    static func parse(_ value: JSONValue) throws -> [Self] {
+        guard let entries = value.arrayValue, entries.count <= 2 else {
+            throw RuntimeError.bridge("ox.user.follow: provide at most 2 intents")
+        }
+        let intents = try entries.map { entry -> Self in
+            guard let fields = entry.objectValue,
+                  let kind = fields["kind"]?.stringValue else {
+                throw RuntimeError.bridge("ox.user.follow: each intent needs a kind")
+            }
+            switch kind {
+            case "send":
+                let label = fields["label"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let message = fields["message"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                guard !label.isEmpty, label.count <= 80,
+                      !message.isEmpty, message.count <= 1_000 else {
+                    throw RuntimeError.bridge("ox.user.follow: send needs a short label and message")
+                }
+                return Self(label: label, message: message)
+            default: throw RuntimeError.bridge("ox.user.follow: unsupported intent kind")
+            }
+        }
+        guard Set(intents.map(\.id)).count == intents.count else {
+            throw RuntimeError.bridge("ox.user.follow: intents must be unique")
+        }
+        return intents
+    }
+
+    var id: String { "send:\(label.lowercased())" }
+}
+
+struct ConversationContinuation {
+    let meta: ConversationMeta
+    let turns: [Turn]
+    let intent: String
+    let attachments: [FileItem]
+    let skillInvocation: UserSkillInvocation?
+}
+
+nonisolated enum ConversationPromptPresentation: Equatable, Sendable {
+    case conversation
+    case application
+}
+
+nonisolated struct ConversationPendingPrompt: Equatable, Sendable {
+    let id: UUID
+    let prompt: String
+    let options: [String]
+    let presentation: ConversationPromptPresentation
+}
+
+extension Conversation {
+    enum ExecutionLease {
+        case userInitiated
+        case externallyManaged
+    }
+
+    struct PendingServiceControl: Identifiable, Equatable {
+        struct Source: Equatable {
+            let blockID: UUID
+            let itemIndex: Int
+        }
+
+        let id: UUID
+        let control: ServiceControl
+        var source: Source?
+        var accessPreflight: UUID? = nil
+    }
+
+    struct PendingPrompt: Identifiable, Equatable {
+        struct AutoApproval: Equatable {
+            let action: String
+            let defaultPolicy: ActionPolicy
+            let approve: String
+            let alwaysApprove: String
+            let deny: String
+        }
+
+        let id: UUID
+        let kind: ConversationPromptKind
+        let prompt: String
+        let options: [String]
+        let presentation: ConversationPromptPresentation
+        let allowsCustomAnswer: Bool
+        let autoApproval: AutoApproval?
+        let secretEntry: SecretEntryRequest?
+        let permission: PermissionPresentation?
+    }
+
+    enum Interaction: Equatable {
+        case prompt(PendingPrompt)
+        case serviceControl(PendingServiceControl)
+    }
+
+    enum Activity: Equatable {
+        enum Idle: Equatable {
+            case read
+            case unread
+            case stopped
+        }
+
+        enum AwaitingAction: Equatable {
+            case approval
+            case reply
+            case signIn
+            case verification
+            case payment
+        }
+
+        enum Running: Equatable {
+            case thinking
+            case streaming
+            case awaiting(AwaitingAction)
+        }
+
+        case idle(Idle)
+        case running(Running)
+
+        var isThinking: Bool {
+            self == .running(.thinking)
+        }
+
+        var isAwaitingUser: Bool {
+            if case .running(.awaiting) = self { true } else { false }
+        }
+    }
+
+    enum Notice: Equatable {
+        case none
+        case error(String)
+
+        var errorMessage: String? {
+            if case .error(let message) = self { message } else { nil }
+        }
+    }
+
+    struct ThinkingActivity: Equatable {
+        let turnID: TurnID
+        let startedAt: Date
+    }
+
+    struct QueuedMessage: Identifiable {
+        let id: UUID
+        let text: String
+        let attachments: [FileItem]
+        let skillInvocation: UserSkillInvocation?
+    }
+
+    struct SubmissionReceipt: Equatable {
+        enum Disposition: String {
+            case posted
+            case queued
+        }
+
+        let id: UUID
+        let disposition: Disposition
+    }
+
+    enum SubmissionAnchor: Equatable {
+        case queued(UUID)
+        case turn(blockID: UUID, submissionID: UUID?)
+
+        var id: UUID {
+            switch self {
+            case .queued(let id): id
+            case .turn(let blockID, _): blockID
+            }
+        }
+    }
+}
