@@ -170,7 +170,7 @@ export async function check(): Promise<string> {
         && path === "apps/shared/Host/Files/VirtualFileSystem.swift"
         && calls.every(match => match[1] === "legacyWorkflowLocation");
       const lazyAttachmentCompatibility = owner === "ConversationMigrator"
-        && path === "apps/shared/Host/Conversations/Conversation.swift"
+        && path === "apps/shared/Host/Conversations/ConversationServiceAttachments.swift"
         && calls.every(match => match[1] === "migratedServiceDomains");
       if (calls.length && !migrationCallers[owner].has(path) && !readOnlySkillCompatibility && !lazyAttachmentCompatibility) {
         failures.push(`${path}: persisted compatibility must enter through an approved ${owner} caller`);

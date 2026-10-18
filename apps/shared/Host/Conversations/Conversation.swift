@@ -167,8 +167,13 @@ final class Conversation: Identifiable {
         }
     }
 
-    private(set) var attachedServices: [Service] = []
-    @ObservationIgnored private var attachedServiceDomains: [String] = []
+    @ObservationIgnored private lazy var serviceAttachments = ConversationServiceAttachments(
+        conversation: self,
+        botControlSource: botControlSource,
+        cancelInteractions: { [unowned self] domains in interactions.cancelServiceInteractions(domains: domains) },
+        resumeAgent: { [unowned self] event, source in enqueueSystemEvent(event, source: source) }
+    )
+    var attachedServices: [Service] { serviceAttachments.services }
     @ObservationIgnored private lazy var interactions = ConversationInteractionGate(
         conversation: self,
         feedback: feedback,
@@ -303,30 +308,6 @@ final class Conversation: Identifiable {
 
     var latestAgentConversationTitle: String? { document.latestAgentRenamedTitle }
 
-    private func resolveTarget(_ name: String, label: String) throws -> (service: Service, id: String) {
-        let parts = name.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
-        if parts.count == 3, ["web", "api", "ios", "mcp"].contains(parts[0]) {
-            let service = attachedServices.first { candidate in
-                switch parts[0] {
-                case "web": candidate.isWebService && candidate.domain == parts[1]
-                case "api": candidate.isAPIService && candidate.domain == parts[1]
-                case "ios": candidate.isIOSService && candidate.domain == "ios:\(parts[1])"
-                case "mcp": candidate.isMCPService && candidate.domain == parts[1]
-                default: false
-                }
-            }
-            guard let service else {
-                throw OxFunctionError(code: "service_not_attached", message: "\(label): service '\(parts[0]):\(parts[1])' isn't attached to this conversation.", recovery: "Find the service with ox.service.find and attach its exact returned domain with ox.service.attach before invoking its actions.")
-            }
-            return (service, parts[2])
-        }
-        if attachedServices.count == 1, let only = attachedServices.first {
-            return (only, name)
-        }
-        throw RuntimeError.bridge("\(label): use 'web:<domain>:\(name)', 'ios:<app>:\(name)', or 'mcp:<server>:\(name)' — the conversation has \(attachedServices.count) services attached.")
-    }
-
-
     @ObservationIgnored let virtualMachine: VirtualMachine
 
     func runDebugSnippet(_ source: String) async throws -> VirtualMachineOutput {
@@ -397,7 +378,7 @@ final class Conversation: Identifiable {
                 }
                 return service
             },
-            resolveAction: { [unowned self] name in try resolveTarget(name, label: "ox.service.invoke") },
+            resolveAction: { [unowned self] name in try serviceAttachments.target(name, label: "ox.service.invoke") },
             attachedDomains: { [unowned self] in Set(attachedServices.map(\.domain)) },
             approve: { [unowned self] action, defaultPolicy, args, purpose, prompt in
                 try await requireApproval(
@@ -880,12 +861,8 @@ final class Conversation: Identifiable {
         isFavorite = meta.isFavorite
         document = restoredDocument ?? ConversationDocument.restoring(turns)
         let recovered = document.turns != turns
-        attachedServiceDomains = Self.uniqueServiceDomains(meta.attachedServiceDomains)
-        if attachedServiceDomains.count != meta.attachedServiceDomains.count {
-            Log.session.warning("Conversation.restore deduplicated-services id=\(meta.id) stored=\(meta.attachedServiceDomains.count) unique=\(attachedServiceDomains.count)")
-        }
         hasUnreadResponse = meta.hasUnreadResponse
-        resolveAttachedServices()
+        serviceAttachments.restore(meta.attachedServiceDomains)
         lastActivityAt = meta.lastActivity
         Log.session.info("Conversation restored id=\(meta.id) turns=\(turns.count) blocks=\(transcript.count) services=\(attachedServices.count) recovered=\(recovered) context=pending")
     }
@@ -899,7 +876,7 @@ final class Conversation: Identifiable {
             isFavorite: isFavorite,
             model: modelSelection,
             monoRepositoryHash: monoRepositoryHash,
-            attachedServiceDomains: attachedServiceDomains,
+            attachedServiceDomains: serviceAttachments.domains,
             preview: transcriptPreview,
             hasUnreadResponse: hasUnreadResponse,
             scheduledSkillID: scheduledSkillID,
@@ -917,7 +894,7 @@ final class Conversation: Identifiable {
 
     @discardableResult
     func syncToMonoRepository() async -> [String] {
-        resolveAttachedServices()
+        serviceAttachments.resolve()
         let manager = serviceManager
         guard let currentHash = manager.monoRepositoryHash, currentHash != monoRepositoryHash else { return [] }
         defer {
@@ -1363,7 +1340,7 @@ final class Conversation: Identifiable {
             isFavorite: false,
             model: modelSelection,
             monoRepositoryHash: monoRepositoryHash,
-            attachedServiceDomains: attachedServiceDomains,
+            attachedServiceDomains: serviceAttachments.domains,
             preview: nil
         )
         return ConversationContinuation(
@@ -1486,22 +1463,7 @@ final class Conversation: Identifiable {
         Log.session.info("Conversation.submitAndWait detached id=\(id) submission=\(submissionID.rawValue) busy=\(isBusy)")
     }
 
-    // A turn the host injects after an out-of-band event (e.g. the user signed in
-    // via a sign-in card). It carries no visible user bubble; the agent just sees
-    // the note plus a fresh turn-state (with the now-updated auth) and decides.
-    private enum SystemEventSource {
-        case serviceSignIn(String)
-        case botControl(String)
-
-        var logLabel: String {
-            switch self {
-            case .serviceSignIn(let domain): "serviceSignIn:\(domain)"
-            case .botControl(let domain): "botControl:\(domain)"
-            }
-        }
-    }
-
-    private func enqueueSystemEvent(_ event: JSONValue, source: SystemEventSource) {
+    private func enqueueSystemEvent(_ event: JSONValue, source: ConversationServiceAttachments.SystemEvent) {
         let note: String
         do {
             note = try ModelPromptRenderer.shared.render(.runtimeEvent, input: event)
@@ -1531,23 +1493,7 @@ final class Conversation: Identifiable {
         resumeAgent: Bool = true,
         using presenter: (any ServiceAuthPresenting)? = nil
     ) async -> JSONValue? {
-        guard let service = attachedService(domain: domain) else {
-            Log.session.error("Conversation.signInService no service domain=\(domain)")
-            return nil
-        }
-        Log.session.info("Conversation.signInService start id=\(id) domain=\(domain) auth=\(service.signInState.rawValue) resumeAgent=\(resumeAgent)")
-        let outcome = try? await service.requestAccess(using: presenter ?? presentations.serviceSignIn, source: .conversationCard)
-        let acknowledged = outcome == .acknowledged
-        let ok = acknowledged || service.signInState.isAuthenticated
-        let result = ok ? service.accessResult(acknowledged: acknowledged) : nil
-        Log.session.info("Conversation.signInService done id=\(id) domain=\(domain) ok=\(ok) auth=\(service.signInState.rawValue)")
-        if ok, resumeAgent {
-            enqueueSystemEvent(
-                .object(["type": .string("serviceSignIn"), "domain": .string(domain), "access": result ?? .null]),
-                source: .serviceSignIn(domain)
-            )
-        }
-        return result
+        await serviceAttachments.signIn(domain: domain, resumeAgent: resumeAgent, using: presenter)
     }
 
     func completeBotControl(
@@ -1556,46 +1502,11 @@ final class Conversation: Identifiable {
         resumeAgent: Bool = true,
         using presenter: (any ServiceHandoffPresenting)? = nil
     ) async -> Bool {
-        guard let service = attachedService(domain: domain) else {
-            Log.session.error("Conversation.completeBotControl no service domain=\(domain)")
-            return false
-        }
-        let source: ServiceActionScheduler.BotControlLease?
-        switch botControlSource.claim(service: service, args: args) {
-        case .none:
-            source = nil
-        case .mismatch:
-            Log.session.warning("Conversation.completeBotControl source-args-mismatch id=\(id) domain=\(domain)")
-            return false
-        case .matched(let lease):
-            source = lease
-        }
-        defer { source?.release(discardPage: true) }
-        let ok = await service.completeBotControl(
-            args: args,
-            using: presenter ?? presentations.serviceHandoff,
-            source: source
-        )
-        Log.session.info("Conversation.completeBotControl domain=\(domain) ok=\(ok)")
-        if ok, resumeAgent {
-            let data = try? JSONEncoder().encode(args)
-            let argsText = data.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-            enqueueSystemEvent(
-                .object(["type": .string("botControl"), "domain": .string(domain), "argsJSON": .string(argsText)]),
-                source: .botControl(domain)
-            )
-        }
-        return ok
+        await serviceAttachments.completeBotControl(domain: domain, args: args, resumeAgent: resumeAgent, using: presenter)
     }
 
     func completePayment(domain: String, args: JSONValue) async -> JSONValue? {
-        guard let service = attachedService(domain: domain) else {
-            Log.session.error("Conversation.completePayment no service domain=\(domain)")
-            return nil
-        }
-        let result = await service.completePayment(args: args, using: presentations.serviceHandoff)
-        Log.session.info("Conversation.completePayment domain=\(domain) completed=\(result != nil)")
-        return result
+        await serviceAttachments.completePayment(domain: domain, args: args)
     }
 
     func cancelQueued(_ blockId: UUID) {
@@ -1942,7 +1853,7 @@ final class Conversation: Identifiable {
         submission.latency.mark(.promptReady)
         let attachedLog = attached.isEmpty ? "none" : attached.map(\.domain).joined(separator: ",")
         Log.session.info("Conversation.runOne prompt id=\(id) attached=\(attachedLog) model=\(model.id) intentChars=\(submission.text.count) turnStateChars=\(turnState.jsonString().count) attachments=\(submission.attachments.count)")
-        for definition in allDefinitions() {
+        for definition in attachedServices.map(\.definition) {
             let actions = definition.actions
                 .map(\.id)
                 .joined(separator: ",")
@@ -2039,119 +1950,21 @@ final class Conversation: Identifiable {
     // MARK: - Manifest + actions
 
     func setAttachedServices(_ services: [Service]) {
-        let canonical = services.map { serviceManager.service(domain: $0.domain) ?? $0 }
-        let normalized = Self.uniqueServices(canonical)
-        if normalized.count != services.count {
-            Log.session.warning("Conversation.setAttachedServices deduplicated id=\(id) supplied=\(services.count) unique=\(normalized.count)")
-        }
-        let domains = normalized.map(\.domain)
-        guard domains != attachedServiceDomains else {
-            replaceAttachedServices(normalized)
-            return
-        }
-        attachedServiceDomains = domains
-        replaceAttachedServices(normalized)
-        onPersistableChange?()
+        serviceAttachments.set(services)
     }
 
     func attachedService(domain: String) -> Service? {
-        attachedServices.first { $0.domain == domain }
+        serviceAttachments.service(domain: domain)
     }
 
     @discardableResult
     func attachService(_ service: Service) -> Bool {
-        guard !attachedServices.contains(where: { $0.domain == service.domain }) else { return false }
-        setAttachedServices(attachedServices + [service])
-        return true
+        serviceAttachments.attach(service)
     }
 
     @discardableResult
     func attachServiceDomains(_ domains: [String]) -> Bool {
-        let monoRepositoryReady = serviceManager.monoRepositoryState == .ready
-        var known = Set(attachedServiceDomains)
-        var added: [String] = []
-        var unavailable: [String] = []
-        for domain in domains where known.insert(domain).inserted {
-            if serviceManager.service(domain: domain) != nil || !monoRepositoryReady {
-                added.append(domain)
-            } else {
-                unavailable.append(domain)
-            }
-        }
-        if !unavailable.isEmpty {
-            Log.session.warning("Conversation.attachServiceDomains id=\(id) unavailable=\(unavailable.joined(separator: ","))")
-        }
-        guard !added.isEmpty else {
-            resolveAttachedServices()
-            return false
-        }
-        attachedServiceDomains.append(contentsOf: added)
-        resolveAttachedServices()
-        let resolved = added.filter { serviceManager.service(domain: $0) != nil }
-        let deferred = added.filter { serviceManager.service(domain: $0) == nil }
-        Log.session.info("Conversation.attachServiceDomains id=\(id) resolved=\(resolved.joined(separator: ",")) deferred=\(deferred.joined(separator: ","))")
-        onPersistableChange?()
-        return true
-    }
-
-    private func resolveAttachedServices() {
-        let migratedDomains = ConversationMigrator.migratedServiceDomains(attachedServiceDomains, services: serviceManager)
-        if migratedDomains != attachedServiceDomains {
-            Log.session.info("Conversation.resolveAttachedServices migrated id=\(id) from=\(attachedServiceDomains.joined(separator: ",")) to=\(migratedDomains.joined(separator: ","))")
-            attachedServiceDomains = migratedDomains
-            onPersistableChange?()
-        }
-        let normalizedDomains = Self.uniqueServiceDomains(attachedServiceDomains)
-        if normalizedDomains.count != attachedServiceDomains.count {
-            Log.session.warning("Conversation.resolveAttachedServices deduplicated id=\(id) stored=\(attachedServiceDomains.count) unique=\(normalizedDomains.count)")
-            attachedServiceDomains = normalizedDomains
-        }
-        replaceAttachedServices(attachedServiceDomains.compactMap { serviceManager.service(domain: $0) })
-    }
-
-    private static func uniqueServiceDomains(_ domains: [String]) -> [String] {
-        var seen: Set<String> = []
-        return domains.filter { seen.insert($0).inserted }
-    }
-
-    private static func uniqueServices(_ services: [Service]) -> [Service] {
-        var normalized: [Service] = []
-        var indexByDomain: [String: Int] = [:]
-        for service in services {
-            if let index = indexByDomain[service.domain] {
-                normalized[index] = service
-            } else {
-                indexByDomain[service.domain] = normalized.count
-                normalized.append(service)
-            }
-        }
-        return normalized
-    }
-
-    private func replaceAttachedServices(_ services: [Service]) {
-        assert(Set(services.map(\.domain)).count == services.count)
-        assert(services.allSatisfy { serviceManager.service(domain: $0.domain) === $0 })
-        let unchanged = services.count == attachedServices.count
-            && zip(services, attachedServices).allSatisfy { pair in pair.0 === pair.1 }
-        guard !unchanged else { return }
-        let added = services.filter { candidate in
-            !attachedServices.contains { $0 === candidate }
-        }
-        let removed = attachedServices.filter { candidate in
-            !services.contains { $0 === candidate }
-        }
-        interactions.cancelServiceInteractions(domains: Set(removed.map(\.domain)))
-        attachedServices = services
-        Log.session.info("Conversation.setAttachedServices id=\(id) attached=\(services.map(\.domain).joined(separator: ",")) selected=\(isSelected)")
-        if isSelected {
-            serviceManager.setAttachedServices(services, for: id)
-            for service in added {
-                Task { await service.checkAccess(reason: .attach) }
-            }
-        }
-        for svc in services {
-            Task { _ = await svc.loadManifest() }
-        }
+        serviceAttachments.attach(domains: domains)
     }
 
     var monoRepositoryRevision: UInt64 { serviceManager.monoRepositoryRevision }
@@ -2159,8 +1972,6 @@ final class Conversation: Identifiable {
     var serviceBootstrapRevision: String {
         "\(id.uuidString):\(monoRepositoryRevision):\(attachedServices.map(\.domain).joined(separator: ","))"
     }
-
-    func allDefinitions() -> [ServiceDefinition] { attachedServices.map(\.definition) }
 
     // MARK: - Helpers
 
