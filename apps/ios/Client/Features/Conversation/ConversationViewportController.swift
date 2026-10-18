@@ -408,7 +408,10 @@ final class ConversationViewportController {
     }
 
     private var pinsEnd: Bool {
-        if case .followingBottom = presentation { return true }
+        switch presentation {
+        case .opening, .followingBottom: return true
+        case .sending, .followingTurn, .reading: break
+        }
         if case .tail(let hold) = viewportHold { return hold.pinsEnd }
         return false
     }
