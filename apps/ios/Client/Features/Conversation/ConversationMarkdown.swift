@@ -463,6 +463,7 @@ private struct MarkdownRenderBlockView: View {
                         }
                     }
                 }
+                .fixedSize(horizontal: false, vertical: true)
             }
             .defaultScrollAnchor(.leading)
             .excludesCompactPageSwitch()

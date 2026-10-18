@@ -29,7 +29,6 @@ struct FileCardView: View {
                     .frame(height: 160, alignment: .top)
                     .frame(maxWidth: .infinity)
                     .clipped()
-                    .background(Theme.Colors.surfaceSunken)
                     .accessibilityHidden(true)
             }
             Group {
@@ -42,7 +41,7 @@ struct FileCardView: View {
         }
         .frame(width: 240, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(Theme.Colors.background)
+        .background(Theme.Colors.surfaceSunken)
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .accessibilityElement(children: .combine)
         .task(id: file) {
