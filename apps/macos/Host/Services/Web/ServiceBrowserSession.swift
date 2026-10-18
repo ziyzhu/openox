@@ -71,7 +71,7 @@ final class ServiceBrowserSession {
         serviceTitle = service.title
         initialURL = url
         page = WebPage(
-            configuration: serviceManager.makeBrowserPageConfiguration(for: service.domain),
+            configuration: serviceManager.makePageConfiguration(),
             navigationDecider: NavigationDecider(router: router)
         )
         router.openPopup = { [weak self] request in self?.loadPopup(request) }
@@ -89,7 +89,7 @@ final class ServiceBrowserSession {
         initialURL = url
         if let serviceManager {
             page = WebPage(
-                configuration: serviceManager.makeBrowserPageConfiguration(for: serviceDomain),
+                configuration: serviceManager.makePageConfiguration(),
                 navigationDecider: NavigationDecider(router: router)
             )
         } else {

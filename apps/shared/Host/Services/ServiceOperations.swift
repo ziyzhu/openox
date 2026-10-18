@@ -335,7 +335,6 @@ final class ServiceOperations {
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
             )
             let replacement = self.serviceManager.service(domain: cleanDomain)
-            if replacement == nil, let currentService { serviceManager.setSaved(currentService, false) }
             serviceChanged(cleanDomain)
             var result: [String: JSONValue] = [
                 "domain": .string(cleanDomain),

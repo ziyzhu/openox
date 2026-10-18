@@ -704,7 +704,7 @@ final class Service: NSObject, Identifiable {
     }
 
     func makeServiceWebPage(actions: String) -> ServiceWebPage {
-        var config = manager.makeServicePageConfiguration(for: domain)
+        var config = manager.makePageConfiguration()
         let ucc = WKUserContentController()
         config.userContentController = ucc
         ucc.installBridgeHandlers(self)
