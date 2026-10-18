@@ -1,9 +1,12 @@
 # Portable verification
 
 CI installs with the frozen lockfile and runs build/static checks, controlled CLI/Host
-fixtures, offline runner safety checks, eval-definition validation, service generation,
-and package consumer checks. It clears live-target variables and disables `.env` loading.
-No simulator, credentials, model calls, or publication are required.
+fixtures, agent package tests, offline runner safety checks, eval-definition validation,
+service generation, and package consumer checks. It clears live-target variables and
+disables `.env` loading. No simulator, credentials, model calls, or publication are required.
+
+The GitHub CI workflow also compiles the iOS and macOS apps unsigned on a macOS runner.
+It catches Swift build breaks only; it does not launch or exercise either app.
 
 Standalone mode additionally needs platform installation tools such as curl and tar.
 It installs the current platform's CLI archive and exercises fixtures without Bun or

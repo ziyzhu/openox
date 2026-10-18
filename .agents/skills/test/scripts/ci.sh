@@ -42,6 +42,7 @@ fi
 command -v npm >/dev/null || { echo 'Missing prerequisite: npm' >&2; exit 1; }
 bun --no-env-file run typecheck
 bun --no-env-file test ./.agents/skills/test
+bun --no-env-file test packages/agent/test
 bun --no-env-file .agents/skills/test/apps/cli/logs.ts
 bun --no-env-file .agents/skills/evals/scripts/runner.ts --validate --suite all
 bun --no-env-file run build:services

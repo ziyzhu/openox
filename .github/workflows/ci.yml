@@ -26,3 +26,23 @@ jobs:
         with:
           bun-version: 1.3.13
       - run: bun run ci
+
+  apps:
+    runs-on: macos-26
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.3.13
+      - run: sudo xcode-select --switch /Applications/Xcode_26.2.app
+      - run: brew install xcodegen
+      - run: git config --global lfs.fetchexclude 'prebuilt/**'
+      - run: printf '%s\n' 'OX_DEVELOPMENT_TEAM =' 'OX_BUNDLE_IDENTIFIER = ai.openox.local' > apps/ios/Local.xcconfig
+      - run: bun --no-env-file install --frozen-lockfile
+      - run: bun --no-env-file run build:agent
+      - run: bun --no-env-file run build:ios CODE_SIGNING_ALLOWED=NO
+      - run: bun --no-env-file run build:macos CODE_SIGNING_ALLOWED=NO
