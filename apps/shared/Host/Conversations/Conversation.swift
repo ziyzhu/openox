@@ -5,11 +5,6 @@ import Observation
 @MainActor
 @Observable
 final class Conversation: Identifiable {
-    private enum AgentHapticPhase {
-        case waitingForDelta
-        case deltaReceived
-    }
-
     private(set) var id: UUID
     let createdAt: Date
     let scheduledSkillID: UUID?
@@ -220,8 +215,7 @@ final class Conversation: Identifiable {
             Task { _ = await service.loadManifest() }
         }
         Log.session.info("Conversation.selection id=\(id) selected=true busy=\(isBusy)")
-        outputDelivery.setVisibility(.visible)
-        if outputDelivery.needsFrames { startStreamLink() }
+        stream.setVisible(true)
         scheduleModelPreparation()
         if let browserURLToRestore,
            !isBusy,
@@ -260,9 +254,7 @@ final class Conversation: Identifiable {
             ?? browserURLToRestore
         modelPreparationTask?.cancel()
         modelPreparationTask = nil
-        outputDelivery.setVisibility(.hidden)
-        stopStreamLink()
-        finalizeBufferedTurnIfInactive()
+        stream.setVisible(false)
     }
 
     func release(cancelling: Bool = true) {
@@ -719,9 +711,6 @@ final class Conversation: Identifiable {
         return true
     }
     var hasPendingInteraction: Bool { interaction != nil }
-    @ObservationIgnored private var streamedText = ""
-    @ObservationIgnored private var streamedTextBlockIndex: Int?
-    @ObservationIgnored private var agentHapticPhase = AgentHapticPhase.waitingForDelta
     @ObservationIgnored private var finishingStartedAt: Date?
     @ObservationIgnored private var finishingWatchdog: Task<Void, Never>?
     @ObservationIgnored private var activeLatency: TurnLatencyTrace?
@@ -731,10 +720,22 @@ final class Conversation: Identifiable {
 
     private let execution: any ConversationExecution
     private let feedback: any ConversationFeedback
-    private let outputDelivery = OutputDelivery()
-    @ObservationIgnored private var streamingDeliveryContinuation: CheckedContinuation<Void, Never>?
-    @ObservationIgnored private var streamingTurnDelivered = true
-    @ObservationIgnored private lazy var streamFrameDriver = execution.frameDriver(handler: { [weak self] timestamp in self?.onStreamFrame(at: timestamp) })
+    @ObservationIgnored private lazy var stream = ConversationAssistantStream(
+        conversation: self,
+        execution: execution,
+        feedback: feedback,
+        showText: { [unowned self] text in
+            if isSelected { activeLatency?.mark(.firstTextVisible) }
+            growAgentText(text)
+        },
+        replaceText: { [unowned self] text in
+            if isSelected { activeLatency?.mark(.firstTextVisible) }
+            document.apply(.replaceGenerationText(text))
+        },
+        finishTurn: { [unowned self] assistant in
+            setRunPhase(assistant.stopReason == .toolUse ? .thinking : .finishing)
+        }
+    )
 
     static func userFacingError(_ raw: String, kind: LLMFailureKind?) -> String {
         if kind == .rateLimited {
@@ -793,12 +794,12 @@ final class Conversation: Identifiable {
             if !document.hasOpenAgentTurn { beginAgentTurn() }
         case .generationStarted(let model, _):
             setRunPhase(.thinking)
-            resetStreamedText()
+            stream.reset()
             document.apply(.beginGeneration(model: model, at: Date()))
             for compaction in pendingContextCompactions { document.apply(.appendContextCompaction(compaction)) }
             pendingContextCompactions = []
         case .messageStart(.assistant(let assistant)):
-            resetStreamedText()
+            stream.reset()
             if !document.hasOpenAgentTurn { document.apply(.beginAgentTurn(at: assistant.timestamp)) }
             if !document.hasOpenGeneration { document.apply(.beginGeneration(model: assistant.model, at: assistant.timestamp)) }
         case .messageUpdate(_, let event):
@@ -807,10 +808,13 @@ final class Conversation: Identifiable {
             appendReasoning(text)
         case .messageEnd(.assistant(let assistant)):
             document.apply(.setGenerationAssistant(assistant))
-            applyAssistantFinal(assistant)
-            endStreamingTurn(assistant)
+            stream.reconcile(assistant)
+            if !isTemporary, assistant.stopReason != .toolUse {
+                stageCompletionNotification(assistant: assistant)
+            }
+            stream.end(assistant)
         case .generationFinished(let assistant, _):
-            await waitForStreamingDelivery()
+            await stream.waitForDelivery()
             document.apply(.finishGeneration(Self.outcome(for: assistant, at: Date())))
             requestPersistence(.generationFinished)
             activeRun?.backgroundExecution?.advance()
@@ -967,7 +971,7 @@ final class Conversation: Identifiable {
     }
 
     func beginExecution(source: String) {
-        flushBufferedAgentText()
+        stream.flush()
         currentExecutionFiles = []
         currentExecutionTransientAttachments = []
         currentExecutionActivatedSkills = [:]
@@ -975,13 +979,6 @@ final class Conversation: Identifiable {
         currentExecutionFetchBytes = 0
         activeRun?.backgroundExecution?.updatePhase(.working)
         document.apply(.beginExecution(source: source))
-    }
-
-    private func flushBufferedAgentText() {
-        let text = outputDelivery.drainText()
-        guard !text.isEmpty else { return }
-        if isSelected { activeLatency?.mark(.firstTextVisible) }
-        growAgentText(text)
     }
 
     func executionAttachments() -> (artifacts: [FileItem], transient: [TransientAttachment]) {
@@ -1182,72 +1179,35 @@ final class Conversation: Identifiable {
         activeRun?.backgroundExecution?.advance()
     }
 
-    private func resetStreamedText() {
-        streamedText = ""
-        streamedTextBlockIndex = nil
-    }
-
     private func applyAssistantEvent(_ event: AssistantEvent) {
         switch event {
         case .textDelta(let index, let delta, _):
             guard !delta.isEmpty else { return }
-            registerAgentDelta()
+            stream.registerDelta()
             activeRun?.backgroundExecution?.advance()
             activeRun?.backgroundExecution?.updatePhase(.responding)
-            let chunk = streamedTextBlockIndex == nil || streamedTextBlockIndex == index ? delta : "\n" + delta
-            streamedTextBlockIndex = index
-            streamedText += chunk
-            bufferAssistantDelta(chunk)
+            stream.appendDelta(delta, block: index)
         case .thinkingDelta(_, let delta, _):
             guard !delta.isEmpty else { return }
-            registerAgentDelta()
+            stream.registerDelta()
             activeRun?.backgroundExecution?.advance()
         case .toolCallDelta:
-            registerAgentDelta()
+            stream.registerDelta()
             activeRun?.backgroundExecution?.advance()
-            flushBufferedAgentText()
+            stream.flush()
             setRunPhase(.thinking)
         case .start(let partial):
             if !partial.content.isEmpty {
-                registerAgentDelta()
+                stream.registerDelta()
                 activeRun?.backgroundExecution?.advance()
             }
             if partial.content.contains(where: { if case .text(let text) = $0 { return !text.text.isEmpty }; return false }) {
                 activeRun?.backgroundExecution?.updatePhase(.responding)
             }
-            applyAssistantFinal(partial)
+            stream.reconcile(partial)
         case .textEnd, .thinkingEnd, .toolCallEnd, .done, .failed:
             break
         }
-    }
-
-    private func registerAgentDelta() {
-        guard agentHapticPhase == .waitingForDelta else { return }
-        agentHapticPhase = .deltaReceived
-        if isSelected { feedback.receivedAgentDelta() }
-    }
-
-    private func applyAssistantFinal(_ assistant: AssistantMessage) {
-        let text = assistant.content.compactMap { block -> String? in
-            if case .text(let value) = block { return value.text }
-            return nil
-        }.joined(separator: "\n")
-        guard !text.hasPrefix(streamedText) else {
-            let delta = String(text.dropFirst(streamedText.count))
-            streamedText = text
-            bufferAssistantDelta(delta)
-            return
-        }
-        Log.session.warning("Conversation.stream reconciliation id=\(id) streamedChars=\(streamedText.count) finalChars=\(text.count)")
-        outputDelivery.discardText()
-        streamedText = text
-        if isSelected { activeLatency?.mark(.firstTextVisible) }
-        document.apply(.replaceGenerationText(text))
-    }
-
-    private func bufferAssistantDelta(_ delta: String) {
-        outputDelivery.append(delta)
-        startStreamLink()
     }
 
     func resolveInvocation(invocationID: UUID, outcome: Invocation.Outcome) {
@@ -1664,8 +1624,7 @@ final class Conversation: Identifiable {
         let runID = activeRun?.id
         activeRun?.task.cancel()
         Log.session.info("Conversation.cancelAll id=\(id) run=\(runID.map { String($0.rawValue.uuidString.prefix(8)) } ?? "idle")")
-        resetOutputDelivery()
-        stopStreamLink()
+        stream.cancel()
     }
 
     func stopCurrentTurn() {
@@ -1681,8 +1640,7 @@ final class Conversation: Identifiable {
         submissionPresentation = .cancelled
         activeRun?.task.cancel()
         interactions.cancelAll()
-        resetOutputDelivery()
-        stopStreamLink()
+        stream.cancel()
         if activeRun?.phase != .preparing { setRunPhase(.thinking) }
     }
 
@@ -1692,34 +1650,6 @@ final class Conversation: Identifiable {
         }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
         let body = preview.isEmpty ? L10n.string("Your conversation finished while you were away.", comment: "Notification body shown when a conversation turn completes while the app is backgrounded and there is no preview text.") : String(preview.prefix(140))
         activeRun?.completionNotification = CompletionNotification(title: title, body: body)
-    }
-
-    // MARK: - Streaming
-
-    private func startStreamLink() {
-        guard isSelected else { return }
-        if streamFrameDriver.start() { Log.session.debug("Conversation.streamLink start id=\(id)") }
-    }
-
-    private func stopStreamLink() {
-        if streamFrameDriver.stop() { Log.session.debug("Conversation.streamLink stop id=\(id)") }
-    }
-
-    private func onStreamFrame(at timestamp: CFTimeInterval) {
-        guard let checkpoint = outputDelivery.nextFrame(at: timestamp) else { return }
-        apply(checkpoint)
-    }
-
-    private func waitForStreamingDelivery() async {
-        guard !streamingTurnDelivered else { return }
-        await withCheckedContinuation { streamingDeliveryContinuation = $0 }
-    }
-
-    private func resetOutputDelivery() {
-        outputDelivery.reset()
-        streamingTurnDelivered = true
-        streamingDeliveryContinuation?.resume()
-        streamingDeliveryContinuation = nil
     }
 
     private func finishAgentTurnFromEvents(error: String?) {
@@ -1737,37 +1667,6 @@ final class Conversation: Identifiable {
         if document.hasOpenAgentTurn { document.apply(.finishAgentTurn(outcome)) }
     }
 
-    private func endStreamingTurn(_ assistant: AssistantMessage) {
-        if !isTemporary, assistant.stopReason != .toolUse {
-            stageCompletionNotification(assistant: assistant)
-        }
-        streamingTurnDelivered = false
-        outputDelivery.end(assistant)
-        if isSelected { startStreamLink() } else { finalizeBufferedTurnIfInactive() }
-    }
-
-    private func finalizeBufferedTurnIfInactive() {
-        guard let checkpoint = outputDelivery.hiddenCheckpoint() else { return }
-        Log.session.debug("Conversation.streamLink checkpoint id=\(id) chars=\(checkpoint.text.count)")
-        apply(checkpoint)
-    }
-
-    private func apply(_ checkpoint: OutputDelivery.Checkpoint) {
-        if !checkpoint.text.isEmpty {
-            if isSelected { activeLatency?.mark(.firstTextVisible) }
-            growAgentText(checkpoint.text)
-        }
-        if let completion = checkpoint.completion { finalizeTurnEnd(completion) }
-    }
-
-    private func finalizeTurnEnd(_ assistant: AssistantMessage) {
-        stopStreamLink()
-        setRunPhase(assistant.stopReason == .toolUse ? .thinking : .finishing)
-        streamingTurnDelivered = true
-        streamingDeliveryContinuation?.resume()
-        streamingDeliveryContinuation = nil
-    }
-
     // MARK: - Agent loop
 
     func presentDurableToolAssistant(_ assistant: AssistantMessage) {
@@ -1782,9 +1681,7 @@ final class Conversation: Identifiable {
             } else { document.apply(.beginGeneration(model: assistant.model, at: assistant.timestamp)) }
         }
         document.apply(.setGenerationAssistant(assistant))
-        outputDelivery.discardText()
-        streamedText = assistant.content.compactMap { if case .text(let text) = $0 { return text.text }; return nil }.joined(separator: "\n")
-        document.apply(.replaceGenerationText(streamedText))
+        document.apply(.replaceGenerationText(stream.present(assistant)))
     }
 
     func prepareDurableRecovery() async throws {
@@ -1989,7 +1886,7 @@ final class Conversation: Identifiable {
         submissionPresentation = .running
         submission.latency.mark(.runStarted)
         Log.session.info("Conversation.runOne start id=\(id) client=\(client.id) model=\(model.id)")
-        agentHapticPhase = .waitingForDelta
+        stream.armHaptic()
         if activeRun?.id == runID { activeRun?.activeSubmission = submission }
         var submissionResult: ConversationRunResult?
         defer {
