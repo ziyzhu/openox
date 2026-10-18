@@ -26,16 +26,10 @@ extension Repository {
         var digest = SHA256()
         let paths = package.services.map { $0.id.path } + package.skills.map { "skills/\($0)" }
         for path in paths.sorted() {
-            let serviceRoot = root.appendingPathComponent(path, isDirectory: true)
-            guard let enumerator = FileManager.default.enumerator(
-                at: serviceRoot,
-                includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
-                options: [.skipsHiddenFiles]
-            ) else { continue }
             var files: [(path: String, url: URL)] = []
-            while let url = enumerator.nextObject() as? URL {
-                let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-                if values.isSymbolicLink != true, values.isRegularFile == true { files.append((path + "/" + url.pathComponents.suffix(enumerator.level).joined(separator: "/"), url)) }
+            try forEachFile(in: root.appendingPathComponent(path, isDirectory: true)) { url, values, relative in
+                if values.isSymbolicLink != true, values.isRegularFile == true { files.append((path + "/" + relative, url)) }
+                return true
             }
             for file in files.sorted(by: { $0.path < $1.path }) {
                 digest.update(data: Data(file.path.utf8))
@@ -62,18 +56,28 @@ extension Repository {
         if [.web, .api].contains(service.id.kind) {
             try validateRegularFile(serviceRoot.appendingPathComponent("actions.js"), maximumSize: 1_000_000)
         }
-        let enumerator = FileManager.default.enumerator(
-            at: serviceRoot,
-            includingPropertiesForKeys: [.isSymbolicLinkKey, .isRegularFileKey, .fileSizeKey],
-            options: [.skipsHiddenFiles]
-        )
         var total = 0
-        while let url = enumerator?.nextObject() as? URL {
-            let values = try url.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey, .fileSizeKey])
+        try forEachFile(in: serviceRoot) { _, values, _ in
             guard values.isSymbolicLink != true else { throw Failure(message: "Symbolic links are not supported") }
             if values.isRegularFile == true { total += values.fileSize ?? 0 }
             guard total <= 4_000_000 else { throw Failure(message: "Service \(service.id.rawValue) is too large") }
+            return true
         }
+    }
+
+    @discardableResult
+    static func forEachFile(
+        in root: URL,
+        options: FileManager.DirectoryEnumerationOptions = [.skipsHiddenFiles],
+        _ visit: (_ url: URL, _ values: URLResourceValues, _ relativePath: String) throws -> Bool
+    ) throws -> Bool {
+        let keys: [URLResourceKey] = [.isSymbolicLinkKey, .isRegularFileKey, .fileSizeKey]
+        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: options) else { return false }
+        while let url = enumerator.nextObject() as? URL {
+            let values = try url.resourceValues(forKeys: Set(keys))
+            guard try visit(url, values, url.pathComponents.suffix(enumerator.level).joined(separator: "/")) else { break }
+        }
+        return true
     }
 
     static func validatePackageShape(_ data: Data) throws {

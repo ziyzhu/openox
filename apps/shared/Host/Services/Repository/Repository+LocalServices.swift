@@ -2,7 +2,7 @@ import Foundation
 
 extension Repository {
     func saveSkill(_ skill: Skill, replacing: String? = nil, createOnly: Bool = false) throws {
-        try prepareLocalMutation()
+        try materializeLocalRepository()
         guard !SkillFiles.reservedNames.contains(skill.name) else { throw SkillError.reserved(skill.name) }
         try SkillFiles.validate(skill)
         var package = try Self.loadPackage(at: localRoot, provenance: .local)
@@ -23,7 +23,7 @@ extension Repository {
     }
 
     func deleteSkill(name: String) throws {
-        try prepareLocalMutation()
+        try materializeLocalRepository()
         guard SkillFiles.isLocalName(name) else { throw SkillError.invalidName }
         var package = try Self.loadPackage(at: localRoot, provenance: .local)
         guard package.skills.contains(name) else { throw SkillError.missing(name) }
@@ -33,18 +33,14 @@ extension Repository {
         Log.service.info("Repository.skill delete name=\(name)")
     }
 
-    func createService(kind: ServiceKind, id: String) throws {
+    func createService(kind: ServiceKind, id domain: String) throws {
         guard [.web, .api].contains(kind) else {
             throw Failure(message: "Only Local web and API services can be created.")
         }
-        try createScriptService(kind: kind, domain: id)
-    }
-
-    private func createScriptService(kind: ServiceKind, domain: String) throws {
         guard Self.isServiceID(domain), kind == .api || domain.contains(".") else {
             throw Failure(message: "Use a lowercase website domain for the Local service.")
         }
-        try prepareLocalMutation()
+        try materializeLocalRepository()
         var package = try Self.loadPackage(at: localRoot, provenance: .local)
         guard !package.services.contains(where: { $0.id.runtimeID == domain }) else {
             throw Failure(message: "A Local service already exists for \(domain).")
@@ -88,7 +84,7 @@ extension Repository {
 
     func saveMCPService(_ manifest: MCPCatalogManifest, creating: Bool) throws {
         guard manifest.isValid else { throw Failure(message: "Invalid MCP manifest.") }
-        try prepareLocalMutation()
+        try materializeLocalRepository()
         var package = try Self.loadPackage(at: localRoot, provenance: .local)
         let service = Package.Service(id: try ServiceID(kind: .mcp, runtimeID: manifest.id))
         let serviceRoot = localRoot.appendingPathComponent(service.id.path, isDirectory: true)
@@ -116,7 +112,7 @@ extension Repository {
     }
 
     func copyServiceToLocal(id: String) throws {
-        try prepareLocalMutation()
+        try materializeLocalRepository()
         guard let source = activeSources[id] else { throw Failure(message: "Service not found") }
         guard source.provenance != .local else { return }
         guard source.kind != .iOS else { throw Failure(message: "Native iOS services cannot be copied to Local.") }
@@ -153,26 +149,21 @@ extension Repository {
         }
         let source = try localSource(kind: service.id.kind, id: id)
         try Self.validateService(service, root: localRoot)
-        guard let enumerator = FileManager.default.enumerator(
-            at: source.root,
-            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
-            options: [.skipsHiddenFiles]
-        ) else { throw Failure(message: "Local service source is unavailable.") }
         var files: [ZipArchiveCodec.File] = []
-        while let url = enumerator.nextObject() as? URL {
-            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        let available = try Self.forEachFile(in: source.root) { url, values, path in
             guard values.isSymbolicLink != true else { throw Failure(message: "Service source contains a symbolic link.") }
-            guard values.isRegularFile == true else { continue }
-            let path = url.pathComponents.suffix(enumerator.level).joined(separator: "/")
+            guard values.isRegularFile == true else { return true }
             files.append(.init(path: "services/\(service.id.path)/\(path)", data: try Data(contentsOf: url)))
+            return true
         }
+        guard available else { throw Failure(message: "Local service source is unavailable.") }
         let data = try ServicePackageCodec.encode(kind: service.id.kind, domain: id, files: files.sorted { $0.path < $1.path })
         Log.service.info("Repository.export id=\(service.id.rawValue) files=\(files.count) bytes=\(data.count)")
         return data
     }
 
     func importLocalService(_ payload: ServicePackagePayload, replacing: Bool) throws {
-        try prepareLocalMutation()
+        try materializeLocalRepository()
         let originalPackage = try Self.loadPackage(at: localRoot, provenance: .local)
         let service = Package.Service(id: try ServiceID(kind: payload.kind, runtimeID: payload.domain))
         let existing = originalPackage.services.first(where: { $0.id.runtimeID == payload.domain })
@@ -248,7 +239,7 @@ extension Repository {
     }
 
     func deleteLocalService(id: String) throws -> ServiceKind {
-        try prepareLocalMutation()
+        try materializeLocalRepository()
         let originalPackage = try Self.loadPackage(at: localRoot, provenance: .local)
         guard let index = originalPackage.services.firstIndex(where: { $0.id.runtimeID == id }) else {
             throw Failure(message: "No Local service exists for \(id).")

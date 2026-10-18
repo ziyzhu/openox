@@ -3,7 +3,7 @@ import SwiftGitX
 
 extension Repository {
     func setEnabled(repositoryID: String, enabled: Bool) throws {
-        if (try? mountedRepositories.records().contains(where: { $0.id == repositoryID })) == true {
+        if isMounted(repositoryID) {
             try mountedRepositories.setEnabled(repositoryID, enabled: enabled)
             return
         }
@@ -12,7 +12,7 @@ extension Repository {
             configuration.bundledEnabled = enabled
         } else if repositoryID == Self.localID {
             throw Failure(message: "The Local repository is always enabled.")
-        } else if repositoryID == "development", developmentRemote != nil {
+        } else if repositoryID == Self.developmentID, developmentRemote != nil {
             configuration.developmentEnabled = enabled
         } else if let index = configuration.repositories.firstIndex(where: { $0.id == repositoryID }) {
             configuration.repositories[index].isEnabled = enabled
@@ -69,9 +69,9 @@ extension Repository {
     }
 
     func update(repositoryID: String) async throws {
-        if (try? mountedRepositories.records().contains(where: { $0.id == repositoryID })) == true { return }
-        if repositoryID == "development", let developmentRemote {
-            Log.service.info("Repository.update origin=\(Self.redacted(developmentRemote)) id=development")
+        if isMounted(repositoryID) { return }
+        if repositoryID == Self.developmentID, let developmentRemote {
+            Log.service.info("Repository.update origin=\(Self.redacted(developmentRemote)) id=\(Self.developmentID)")
             try await syncDevelopmentRepository()
             return
         }
@@ -91,7 +91,7 @@ extension Repository {
     }
 
     func remove(repositoryID: String) throws {
-        if (try? mountedRepositories.records().contains(where: { $0.id == repositoryID })) == true {
+        if isMounted(repositoryID) {
             try mountedRepositories.disconnect(repositoryID)
             return
         }
@@ -119,10 +119,18 @@ extension Repository {
     }
 
     func requireMountedAccess(_ id: String) async throws {
-        guard let record = try mountedRepositories.records().first(where: { $0.id == id }), record.isEnabled else {
+        guard let record = try mountedRecord(id), record.isEnabled else {
             throw Failure(message: "Mounted repository is disconnected or disabled")
         }
         _ = try await DeviceFolderStore.shared.repositoryRoot(grantID: record.grantID, relativePath: record.relativePath, profileId: StorageRoot.shared.activeId)
+    }
+
+    func mountedRecord(_ id: String) throws -> MountedRepositoryStore.Record? {
+        try mountedRepositories.records().first { $0.id == id }
+    }
+
+    private func isMounted(_ id: String) -> Bool {
+        (try? mountedRecord(id)) != nil
     }
 
     func disconnectMountedRepository(_ id: String) throws {
@@ -136,7 +144,7 @@ extension Repository {
         let root = AppStoragePaths.developmentRepositorySnapshot
         let staging = root.deletingLastPathComponent().appendingPathComponent(".updating-development", isDirectory: true)
         do {
-            try await replaceSnapshot(from: developmentRemote, at: root, staging: staging, repositoryID: "development", provenance: .development)
+            try await replaceSnapshot(from: developmentRemote, at: root, staging: staging, repositoryID: Self.developmentID, provenance: .development)
         } catch {
             throw Failure(message: Self.errorMessage(error))
         }

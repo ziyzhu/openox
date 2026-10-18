@@ -77,11 +77,12 @@ actor Repository {
         let lastSyncedAt: Date?
         let isEnabled: Bool
         let provenance: Provenance
-        let serviceCount: Int
         let services: [ServiceReference]
         let state: State
         var skills: [String] = []
         var directoryName: String? = nil
+
+        var serviceCount: Int { services.count }
     }
 
     struct Conflict: Identifiable, Equatable, Sendable {
@@ -134,6 +135,10 @@ actor Repository {
         let contentHash: String?
         var services: [Service]
         var skills: [String] = []
+
+        static func empty(named name: String) -> Package {
+            Package(version: HostProtocols.repository.last!, name: name, contentHash: nil, services: [])
+        }
     }
 
     struct ServiceID: Codable, Hashable {
@@ -222,14 +227,6 @@ actor Repository {
         let descriptor: Descriptor
         let root: URL
         let package: Package
-        let contentRoot: URL
-
-        init(descriptor: Descriptor, root: URL, package: Package, contentRoot: URL? = nil) {
-            self.descriptor = descriptor
-            self.root = root
-            self.package = package
-            self.contentRoot = contentRoot ?? root
-        }
     }
 
     private struct Candidate {
@@ -246,6 +243,7 @@ actor Repository {
 
     static let bundledID = "bundled"
     static let localID = "local"
+    static let developmentID = "development"
 
     private let bundledRoot: URL?
     let developmentRemote: URL?
@@ -300,7 +298,7 @@ actor Repository {
         } else {
             let bundled = loadBundledRepository()
             let development = loadDevelopmentRepository()
-            let local = localPreparation?.failureMessage.map(failedLocal) ?? loadLocalRepository()
+            let local = loadLocalRepository()
             application = [bundled, development, local].compactMap { $0 } + configuration.repositories.map(loadInstalledRepository)
             applicationRepositories = application
             applicationSkills = [:]
@@ -320,8 +318,27 @@ actor Repository {
             descriptor.skills = loaded.package.skills
             return descriptor
         }
+        let skills = loadSkills(from: loaded)
+        let (selected, conflicts) = selectCandidates(from: loaded)
+        let manifests = activateManifests(selected)
+        let hash = Self.catalogHash(selected: selected, skills: skills)
+        Log.service.info("Repository.monoRepository repositories=\(descriptors.count) enabled=\(descriptors.count(where: \.isEnabled)) services=\(selected.count) conflicts=\(conflicts.count) hash=\(hash.prefix(12))")
+        let catalog = MonoRepository(
+            repositories: descriptors,
+            conflicts: conflicts,
+            webManifests: manifests.web,
+            iOSManifests: manifests.byKind[.iOS] ?? [],
+            mcpManifests: manifests.byKind[.mcp] ?? [],
+            hash: hash,
+            skills: skills
+        )
+        if mountedRecords.isEmpty { unmountedCatalog = catalog }
+        return catalog
+    }
+
+    private func loadSkills(from repositories: [LoadedRepository]) -> [Skill] {
         var skills: [Skill] = []
-        for loaded in loaded where loaded.descriptor.isEnabled {
+        for loaded in repositories where loaded.descriptor.isEnabled {
             let applicationOwned = loaded.descriptor.provenance != .mounted
             if applicationOwned, let cached = applicationSkills[loaded.descriptor.id] {
                 skills.append(contentsOf: cached)
@@ -330,7 +347,7 @@ actor Repository {
             var repositorySkills: [Skill] = []
             for name in loaded.package.skills {
                 do {
-                    var skill = try SkillFiles.load(directory: loaded.contentRoot.appendingPathComponent("skills/\(name)"))
+                    var skill = try SkillFiles.load(directory: loaded.root.appendingPathComponent("skills/\(name)"))
                     skill.source = .repository(id: loaded.descriptor.id, name: loaded.descriptor.name, writable: loaded.descriptor.provenance == .local)
                     repositorySkills.append(skill)
                 } catch {
@@ -340,13 +357,16 @@ actor Repository {
             skills.append(contentsOf: repositorySkills)
             if applicationOwned { applicationSkills[loaded.descriptor.id] = repositorySkills }
         }
+        return skills
+    }
+
+    private func selectCandidates(from repositories: [LoadedRepository]) -> (selected: [Candidate], conflicts: [Conflict]) {
         var candidates: [String: [Candidate]] = [:]
-        for repository in loaded where repository.descriptor.isEnabled {
+        for repository in repositories where repository.descriptor.isEnabled {
             for service in repository.package.services {
                 candidates[service.id.runtimeID, default: []].append(Candidate(repository: repository, service: service))
             }
         }
-
         var selected: [Candidate] = []
         var conflicts: [Conflict] = []
         for serviceID in candidates.keys.sorted() {
@@ -378,15 +398,17 @@ actor Repository {
                 selectedRepositoryID: chosen?.repository.descriptor.id
             ))
         }
+        return (selected, conflicts)
+    }
 
+    private func activateManifests(_ selected: [Candidate]) -> (web: [ManifestFile], byKind: [ServiceKind: [RepositoryManifestFile]]) {
         activeSources = [:]
         var web: [ManifestFile] = []
-        var iOS: [RepositoryManifestFile] = []
-        var mcp: [RepositoryManifestFile] = []
+        var byKind: [ServiceKind: [RepositoryManifestFile]] = [:]
         for candidate in selected {
             let repository = candidate.repository
             let service = candidate.service
-            let serviceRoot = repository.contentRoot.appendingPathComponent(service.id.path, isDirectory: true)
+            let serviceRoot = repository.root.appendingPathComponent(service.id.path, isDirectory: true)
             let source = ActiveSource(
                 kind: service.id.kind,
                 root: serviceRoot,
@@ -416,15 +438,8 @@ actor Repository {
                     domain: service.id.runtimeID,
                     data: data
                 ))
-            case .iOS:
-                iOS.append(RepositoryManifestFile(
-                    repositoryID: repository.descriptor.id,
-                    provenance: repository.descriptor.provenance,
-                    id: service.id.runtimeID,
-                    data: data
-                ))
-            case .mcp:
-                mcp.append(RepositoryManifestFile(
+            case .iOS, .mcp:
+                byKind[service.id.kind, default: []].append(RepositoryManifestFile(
                     repositoryID: repository.descriptor.id,
                     provenance: repository.descriptor.provenance,
                     id: service.id.runtimeID,
@@ -432,34 +447,26 @@ actor Repository {
                 ))
             }
         }
+        return (web, byKind)
+    }
+
+    private static func catalogHash(selected: [Candidate], skills: [Skill]) -> String {
         let input = selected.map {
             let repository = $0.repository
             let version: String?
             switch repository.descriptor.provenance {
             case .local, .mounted, .remote:
-                version = try? Self.contentHash(at: repository.root, package: repository.package)
+                version = try? contentHash(at: repository.root, package: repository.package)
             case .bundled:
-                version = try? Self.bundledContentHash(at: repository.root, package: repository.package)
+                version = try? bundledContentHash(at: repository.root, package: repository.package)
             case .development:
                 version = repository.package.contentHash
-                    ?? (try? Self.contentHash(at: repository.root, package: repository.package))
+                    ?? (try? contentHash(at: repository.root, package: repository.package))
             }
             return "\($0.service.id.rawValue):\(repository.descriptor.id):\(version ?? "unknown")"
         }.sorted().joined(separator: "\n")
         let skillInput = skills.map { "\($0.id):\(SkillFiles.serialize($0)):\(($0.resources ?? [:]).sorted { $0.key < $1.key }.map { $0.key + $0.value }.joined())" }.sorted().joined(separator: "\n")
-        let hash = SHA256.hash(data: Data((input + skillInput).utf8)).map { String(format: "%02x", $0) }.joined()
-        Log.service.info("Repository.monoRepository repositories=\(descriptors.count) enabled=\(descriptors.count(where: \.isEnabled)) services=\(selected.count) conflicts=\(conflicts.count) hash=\(hash.prefix(12))")
-        let catalog = MonoRepository(
-            repositories: descriptors,
-            conflicts: conflicts,
-            webManifests: web,
-            iOSManifests: iOS,
-            mcpManifests: mcp,
-            hash: hash,
-            skills: skills
-        )
-        if mountedRecords.isEmpty { unmountedCatalog = catalog }
-        return catalog
+        return SHA256.hash(data: Data((input + skillInput).utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     func exportLocalRepository() throws -> URL {
@@ -479,15 +486,11 @@ actor Repository {
         return destination
     }
 
-    func prepareLocalMutation() throws {
-        try materializeLocalRepository()
-    }
-
     var localRoot: URL {
         repositoryDirectory(Self.localID)
     }
 
-    private func materializeLocalRepository() throws {
+    func materializeLocalRepository() throws {
         if let message = localPreparation?.failureMessage { throw Failure(message: message) }
         let packageURL = Self.repositoryManifestURL(at: localRoot)
         if !FileManager.default.fileExists(atPath: packageURL.path) {
@@ -495,10 +498,7 @@ actor Repository {
                 throw Failure(message: "Local is missing repository.json. Your files have been kept unchanged.")
             }
             try FileManager.default.createDirectory(at: localRoot, withIntermediateDirectories: true)
-            try Self.writePackage(
-                Package(version: HostProtocols.repository.last!, name: "Local", contentHash: nil, services: []),
-                at: localRoot
-            )
+            try Self.writePackage(.empty(named: "Local"), at: localRoot)
             Log.service.info("Repository.local materialized")
         }
         try RepositoryMigrator.migrateLegacyLocalServiceManifests(at: localRoot)
@@ -514,205 +514,95 @@ actor Repository {
     }
 
     private func loadLocalRepository() -> LoadedRepository {
-        do {
-            let package = try Self.loadPackage(at: localRoot, provenance: .local)
-            return LoadedRepository(
-                descriptor: Descriptor(
-                    id: Self.localID,
-                    name: package.name,
-                    origin: nil,
-                    lastSyncedAt: nil,
-                    isEnabled: true,
-                    provenance: .local,
-                    serviceCount: package.services.count,
-                    services: Self.serviceReferences(in: package),
-                    state: .ready
-                ),
-                root: localRoot,
-                package: package,
-                contentRoot: try RepositoryMigrator.prepareRepository(at: localRoot)
-            )
-        } catch {
-            return LoadedRepository(
-                descriptor: Descriptor(
-                    id: Self.localID,
-                    name: "Local",
-                    origin: nil,
-                    lastSyncedAt: nil,
-                    isEnabled: true,
-                    provenance: .local,
-                    serviceCount: 0,
-                    services: [],
-                    state: .failed(Self.errorMessage(error))
-                ),
-                root: localRoot,
-                package: Package(version: HostProtocols.repository.last!, name: "Local", contentHash: nil, services: [])
-            )
+        let package = Result { () throws -> Package in
+            if let message = localPreparation?.failureMessage { throw Failure(message: message) }
+            return try Self.loadPackage(at: localRoot, provenance: .local)
         }
-    }
-
-    private func failedLocal(_ message: String) -> LoadedRepository {
-        LoadedRepository(
-            descriptor: Descriptor(
-                id: Self.localID,
-                name: "Local",
-                origin: nil,
-                lastSyncedAt: nil,
-                isEnabled: true,
-                provenance: .local,
-                serviceCount: 0,
-                services: [],
-                state: .failed(message)
-            ),
-            root: localRoot,
-            package: Package(version: HostProtocols.repository.last!, name: "Local", contentHash: nil, services: [])
-        )
+        return loaded(package, id: Self.localID, fallbackName: "Local", provenance: .local, isEnabled: true, root: localRoot)
     }
 
     private func loadBundledRepository() -> LoadedRepository {
-        guard let bundledRoot else {
-            return failedBundled("OxServices.bundle is missing")
+        let package = Result { () throws -> Package in
+            guard let bundledRoot else { throw Failure(message: "OxServices.bundle is missing") }
+            return try Self.loadPackage(at: bundledRoot, provenance: .bundled)
         }
-        do {
-            let package = try Self.loadPackage(at: bundledRoot, provenance: .bundled)
-            return LoadedRepository(
-                descriptor: Descriptor(
-                    id: Self.bundledID,
-                    name: package.name,
-                    origin: nil,
-                    lastSyncedAt: nil,
-                    isEnabled: configuration.bundledEnabled,
-                    provenance: .bundled,
-                    serviceCount: package.services.count,
-                    services: Self.serviceReferences(in: package),
-                    state: .ready
-                ),
-                root: bundledRoot,
-                package: package
-            )
-        } catch {
-            return failedBundled(Self.errorMessage(error))
-        }
-    }
-
-    private func failedBundled(_ message: String) -> LoadedRepository {
-        LoadedRepository(
-            descriptor: Descriptor(
-                id: Self.bundledID,
-                name: "Built-in",
-                origin: nil,
-                lastSyncedAt: nil,
-                isEnabled: configuration.bundledEnabled,
-                provenance: .bundled,
-                serviceCount: 0,
-                services: [],
-                state: .failed(message)
-            ),
-            root: bundledRoot ?? Bundle.main.bundleURL,
-            package: Package(version: HostProtocols.repository.last!, name: "Built-in", contentHash: nil, services: [])
+        return loaded(
+            package, id: Self.bundledID, fallbackName: "Built-in", provenance: .bundled,
+            isEnabled: configuration.bundledEnabled, root: bundledRoot ?? Bundle.main.bundleURL
         )
     }
 
     private func loadDevelopmentRepository() -> LoadedRepository? {
         guard let developmentRemote else { return nil }
         let root = AppStoragePaths.developmentRepositorySnapshot
-        do {
-            let package = try Self.loadPackage(at: root, provenance: .development)
-            return LoadedRepository(
-                descriptor: Descriptor(
-                    id: "development",
-                    name: package.name,
-                    origin: developmentRemote,
-                    lastSyncedAt: Self.snapshotDate(at: root),
-                    isEnabled: configuration.developmentEnabled,
-                    provenance: .development,
-                    serviceCount: package.services.count,
-                    services: Self.serviceReferences(in: package),
-                    state: .ready
-                ),
-                root: root,
-                package: package
-            )
-        } catch {
-            return LoadedRepository(
-                descriptor: Descriptor(
-                    id: "development",
-                    name: "Development Server",
-                    origin: developmentRemote,
-                    lastSyncedAt: Self.snapshotDate(at: root),
-                    isEnabled: configuration.developmentEnabled,
-                    provenance: .development,
-                    serviceCount: 0,
-                    services: [],
-                    state: .failed(error.localizedDescription)
-                ),
-                root: root,
-                package: Package(version: HostProtocols.repository.last!, name: "Development Server", contentHash: nil, services: [])
-            )
-        }
+        return loaded(
+            Result { try Self.loadPackage(at: root, provenance: .development) },
+            id: Self.developmentID, fallbackName: "Development Server", provenance: .development,
+            isEnabled: configuration.developmentEnabled, root: root,
+            origin: developmentRemote, lastSyncedAt: Self.snapshotDate(at: root)
+        )
     }
 
     private func loadMountedRepository(_ record: MountedRepositoryStore.Record, profileId: UUID?) async -> LoadedRepository {
+        var root = repositoriesRoot
+        let package: Result<Package, any Error>
         do {
-            let root = try await DeviceFolderStore.shared.repositoryRoot(grantID: record.grantID, relativePath: record.relativePath, profileId: profileId)
-            let package = try Self.loadPackage(at: root, provenance: .mounted)
-            return LoadedRepository(
-                descriptor: Descriptor(
-                    id: record.id, name: package.name, origin: nil,
-                    lastSyncedAt: nil, isEnabled: record.isEnabled, provenance: .mounted,
-                    serviceCount: package.services.count, services: Self.serviceReferences(in: package), state: .ready
-                ), root: root, package: package
-            )
+            let mountedRoot = try await DeviceFolderStore.shared.repositoryRoot(grantID: record.grantID, relativePath: record.relativePath, profileId: profileId)
+            package = .success(try Self.loadPackage(at: mountedRoot, provenance: .mounted))
+            root = mountedRoot
         } catch {
             Log.service.error("Repository.mounted unavailable id=\(record.id) grant=\(record.grantID) error=\(error.localizedDescription)")
-            return LoadedRepository(
-                descriptor: Descriptor(
-                    id: record.id, name: "files/\(record.grantID)", origin: nil,
-                    lastSyncedAt: nil, isEnabled: record.isEnabled, provenance: .mounted,
-                    serviceCount: 0, services: [], state: .failed(error.localizedDescription)
-                ), root: repositoriesRoot, package: Package(version: HostProtocols.repository.last!, name: "Files", contentHash: nil, services: [])
-            )
+            package = .failure(error)
         }
+        return loaded(package, id: record.id, fallbackName: "files/\(record.grantID)", provenance: .mounted, isEnabled: record.isEnabled, root: root)
     }
 
     private func loadInstalledRepository(_ stored: InstalledRepository) -> LoadedRepository {
         let root = repositoryDirectory(stored.id)
-        do {
-            let package = try Self.loadPackage(at: root, provenance: .remote)
-            return LoadedRepository(
-                descriptor: Descriptor(
-                    id: stored.id,
-                    name: package.name,
-                    origin: stored.origin,
-                    lastSyncedAt: Self.snapshotDate(at: root),
-                    isEnabled: stored.isEnabled,
-                    provenance: .remote,
-                    serviceCount: package.services.count,
-                    services: Self.serviceReferences(in: package),
-                    state: .ready,
-                    directoryName: stored.directoryName
-                ),
-                root: root,
-                package: package
-            )
-        } catch {
-            return LoadedRepository(
-                descriptor: Descriptor(
-                    id: stored.id,
-                    name: stored.origin.host ?? "Repository",
-                    origin: stored.origin,
-                    lastSyncedAt: Self.snapshotDate(at: root),
-                    isEnabled: stored.isEnabled,
-                    provenance: .remote,
-                    serviceCount: 0,
-                    services: [],
-                    state: .failed(error.localizedDescription),
-                    directoryName: stored.directoryName
-                ),
-                root: root,
-                package: Package(version: HostProtocols.repository.last!, name: "Invalid", contentHash: nil, services: [])
-            )
+        return loaded(
+            Result { try Self.loadPackage(at: root, provenance: .remote) },
+            id: stored.id, fallbackName: stored.origin.host ?? "Repository", provenance: .remote,
+            isEnabled: stored.isEnabled, root: root, origin: stored.origin,
+            lastSyncedAt: Self.snapshotDate(at: root), directoryName: stored.directoryName
+        )
+    }
+
+    private func loaded(
+        _ package: Result<Package, any Error>,
+        id: String,
+        fallbackName: String,
+        provenance: Descriptor.Provenance,
+        isEnabled: Bool,
+        root: URL,
+        origin: URL? = nil,
+        lastSyncedAt: Date? = nil,
+        directoryName: String? = nil
+    ) -> LoadedRepository {
+        let loadedPackage: Package
+        let state: Descriptor.State
+        switch package {
+        case .success(let package):
+            loadedPackage = package
+            state = .ready
+        case .failure(let error):
+            loadedPackage = .empty(named: fallbackName)
+            state = .failed(Self.errorMessage(error))
         }
+        return LoadedRepository(
+            descriptor: Descriptor(
+                id: id,
+                name: loadedPackage.name,
+                origin: origin,
+                lastSyncedAt: lastSyncedAt,
+                isEnabled: isEnabled,
+                provenance: provenance,
+                services: Self.serviceReferences(in: loadedPackage),
+                state: state,
+                directoryName: directoryName
+            ),
+            root: root,
+            package: loadedPackage
+        )
     }
 
     static func loadPackage(at root: URL, provenance: Descriptor.Provenance) throws -> Package {

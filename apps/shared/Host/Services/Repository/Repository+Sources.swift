@@ -5,7 +5,7 @@ extension Repository {
         guard let source = activeSources[domain] else { return nil }
         if source.provenance == .mounted {
             do {
-                guard let record = try mountedRepositories.records().first(where: { $0.id == source.repositoryID }) else { return nil }
+                guard let record = try mountedRecord(source.repositoryID) else { return nil }
                 return try await DeviceFolderStore.shared.coordinate(
                     grantID: record.grantID,
                     relativePath: record.relativePath + [source.kind.rawValue, domain, "actions.js"],
@@ -21,8 +21,7 @@ extension Repository {
     }
 
     func listSource(kind: ServiceKind, id: String, path: [String]) async throws -> [Entry] {
-        let source = try activeSource(kind: kind, id: id)
-        if source.provenance == .mounted { try await requireMountedAccess(source.repositoryID) }
+        let source = try await readableSource(kind: kind, id: id)
         if !source.provenance.exposesFullSource {
             guard path.isEmpty else { throw Failure(message: "Full service source is available only for Bundled and Local services.") }
             let manifest = Self.serviceManifestURL(at: source.root)
@@ -54,15 +53,13 @@ extension Repository {
     }
 
     func sourceIsDirectory(kind: ServiceKind, id: String, path: [String]) async throws -> Bool {
-        let source = try activeSource(kind: kind, id: id)
-        if source.provenance == .mounted { try await requireMountedAccess(source.repositoryID) }
+        let source = try await readableSource(kind: kind, id: id)
         guard source.provenance.exposesFullSource || path.isEmpty else { return false }
         return try sourceURL(source, path: path).resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true
     }
 
     func readSource(kind: ServiceKind, id: String, path: [String]) async throws -> Data {
-        let source = try activeSource(kind: kind, id: id)
-        if source.provenance == .mounted { try await requireMountedAccess(source.repositoryID) }
+        let source = try await readableSource(kind: kind, id: id)
         guard source.provenance.exposesFullSource || path == ["service.json"] else {
             throw Failure(message: "Full service source is available only for Bundled and Local services.")
         }
@@ -142,25 +139,18 @@ extension Repository {
     }
 
     func sourcePaths(kind: ServiceKind, id: String) async throws -> [String] {
-        let source = try activeSource(kind: kind, id: id)
-        if source.provenance == .mounted { try await requireMountedAccess(source.repositoryID) }
+        let source = try await readableSource(kind: kind, id: id)
         if !source.provenance.exposesFullSource { return ["services/\(kind.rawValue)/\(id)/service.json"] }
-        guard let enumerator = FileManager.default.enumerator(
-            at: source.root,
-            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else { return [] }
         var paths: [String] = []
-        while let url = enumerator.nextObject() as? URL {
-            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-            guard values.isSymbolicLink != true, values.isRegularFile == true else { continue }
-            var relative = url.pathComponents.suffix(enumerator.level).joined(separator: "/")
+        try Self.forEachFile(in: source.root, options: [.skipsHiddenFiles, .skipsPackageDescendants]) { _, values, path in
+            guard values.isSymbolicLink != true, values.isRegularFile == true else { return true }
+            var relative = path
             if relative == "manifest.json" {
-                if FileManager.default.fileExists(atPath: source.root.appendingPathComponent("service.json").path) { continue }
+                if FileManager.default.fileExists(atPath: source.root.appendingPathComponent("service.json").path) { return true }
                 relative = "service.json"
             }
             paths.append("services/\(kind.rawValue)/\(id)/\(relative)")
-            if paths.count >= VirtualFileSystem.maximumSearchFiles { break }
+            return paths.count < VirtualFileSystem.maximumSearchFiles
         }
         return paths.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
@@ -171,12 +161,18 @@ extension Repository {
         return source
     }
 
+    private func readableSource(kind: ServiceKind, id: String) async throws -> ActiveSource {
+        let source = try activeSource(kind: kind, id: id)
+        if source.provenance == .mounted { try await requireMountedAccess(source.repositoryID) }
+        return source
+    }
+
     private func editableSource(kind: ServiceKind, id: String) throws -> ActiveSource {
         let source = try activeSource(kind: kind, id: id)
         guard source.provenance == .local else {
             throw Failure(message: "Only Local services are editable. Copy this service to Local before editing it.")
         }
-        try prepareLocalMutation()
+        try materializeLocalRepository()
         return source
     }
 
