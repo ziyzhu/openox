@@ -569,8 +569,9 @@ struct PermissionActionButtons: View {
         RequestActionButton(
             title: option,
             isPrimary: isPrimary,
-            secondaryFill: colorScheme == .light ? Theme.Colors.surface : Theme.Colors.surfaceSunken,
-            secondaryBorder: Theme.Colors.onSurface.dynamic.opacity(0.25),
+            secondaryFill: colorScheme == .light
+                ? AnyShapeStyle(Theme.Colors.primary.opacity(0.12))
+                : AnyShapeStyle(Theme.Colors.surfaceSunken),
             cornerRadius: Theme.Radius.full,
             action: { onSelect(option) }
         )
@@ -582,8 +583,7 @@ private struct RequestActionButton: View {
     let title: String
     let isPrimary: Bool
     var primaryFill = Theme.Colors.primary
-    var secondaryFill = Theme.Colors.surfaceSunken
-    var secondaryBorder = Color.clear
+    var secondaryFill = AnyShapeStyle(Theme.Colors.surfaceSunken)
     var cornerRadius = Theme.Radius.md
     let action: () -> Void
 
@@ -605,14 +605,9 @@ private struct RequestActionButton: View {
         .frame(maxWidth: .infinity, minHeight: 44)
         .padding(.horizontal, Theme.Spacing.sm)
         .background(
-            isPrimary ? AnyShapeStyle(primaryFill) : AnyShapeStyle(secondaryFill),
+            isPrimary ? AnyShapeStyle(primaryFill) : secondaryFill,
             in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(isPrimary ? Color.clear : secondaryBorder, lineWidth: 1)
-                .allowsHitTesting(false)
-        }
     }
 }
 

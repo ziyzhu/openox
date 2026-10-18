@@ -2139,12 +2139,12 @@
         }
       }
     },
-    "Browser can read and act on this site, including signed-in data, and make it available to the current model. Always allow applies only to this site." : {
+    "Browser can read and act on this site, including signed-in data, and share it with the model. Approve trusts it for this conversation." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "浏览器可以读取此网站并在其上操作，包括已登录数据，并将其提供给当前模型。“始终允许”仅适用于此网站。"
+            "value" : "浏览器可以读取此网站并在其上操作，包括已登录数据，并将其提供给模型。“批准”在此对话中信任此网站。"
           }
         }
       }

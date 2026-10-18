@@ -44,6 +44,7 @@ final class ServiceBrowserActionSession {
     private var captureSink: CaptureSink?
     private var capturedEvents: [JSONValue] = []
     private var injectedScripts: [(domains: [String], source: String)] = []
+    private var trustedSites: Set<String> = []
     private var captureActive = false
     private var captureID: String?
     private var captureIncludesBodies = false
@@ -160,7 +161,7 @@ final class ServiceBrowserActionSession {
             throw Service.EvalError.notActive
         }
         let page = try await page(for: action)
-        let approval = try await Self.authorize(page, authorizeSite)
+        let approval = try await authorize(page, authorizeSite)
         return try await service.executeBrowserJavaScript(script, action: action, in: page) { page in
             try Self.requireUnchanged(page, since: approval)
         }
@@ -173,7 +174,7 @@ final class ServiceBrowserActionSession {
             throw Service.EvalError.notActive
         }
         let page = try await page(for: action)
-        let approval = try await Self.authorize(page, authorizeSite)
+        let approval = try await authorize(page, authorizeSite)
         return try await service.manager.actionScheduler.schedule(action, on: page, name: name) { page in
             try Self.requireUnchanged(page, since: approval)
             let data = try await page.page.exported(as: .pdf())
@@ -213,7 +214,7 @@ final class ServiceBrowserActionSession {
             throw Service.EvalError.js("document-start script domains must be registrable domains, their subdomains, or IP addresses")
         }
         for site in Set(sites.compactMap { $0 }).sorted() {
-            try await authorizeSite(site)
+            try await trust(site, authorizeSite)
         }
         let page = try await inspectionPage()
         injectedScripts.append((domains: Array(Set(normalized)).sorted(), source: source))
@@ -337,7 +338,7 @@ final class ServiceBrowserActionSession {
               let fields = event.objectValue else { return nil }
         let hasBody = [fields["requestBody"], fields["responseBody"]].contains { $0 != nil && $0 != .null }
         if hasBody, let site = fields["site"]?.stringValue {
-            try await authorizeSite(site)
+            try await trust(site, authorizeSite)
         }
         return event
     }
@@ -346,13 +347,21 @@ final class ServiceBrowserActionSession {
         page.page.url?.host(percentEncoded: false).flatMap { $0.isEmpty ? nil : ServiceWebsiteDataCoordinator.site(for: $0) }
     }
 
-    private static func authorize(
+    private func authorize(
         _ page: Service.ServiceWebPage,
         _ authorizeSite: (String) async throws -> Void
     ) async throws -> (generation: Int, site: String?) {
-        let approval = (generation: page.navigationGeneration, site: site(of: page))
-        if let site = approval.site { try await authorizeSite(site) }
+        let approval = (generation: page.navigationGeneration, site: Self.site(of: page))
+        if let site = approval.site { try await trust(site, authorizeSite) }
         return approval
+    }
+
+    private func trust(_ site: String, _ authorizeSite: (String) async throws -> Void) async throws {
+        let blocked = service.manager.actionPolicy(for: Actions.browserSite(site), default: .ask) == .block
+        guard blocked || !trustedSites.contains(site) else { return }
+        try await authorizeSite(site)
+        trustedSites.insert(site)
+        Log.webView.info("Service.browserSession event=trust owner=\(id) site=\(site)")
     }
 
     private static func requireUnchanged(_ page: Service.ServiceWebPage, since approval: (generation: Int, site: String?)) throws {
