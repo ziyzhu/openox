@@ -265,3 +265,87 @@ extension ConversationBlock {
         }
     }
 }
+
+struct ConversationTranscriptProjectionSnapshot {
+    let key: ConversationTranscriptProjectionKey
+    let totalBlockCount: Int
+    let sourceRange: Range<Int>
+    let sourceBlockIDs: [UUID]
+    let blocks: [ConversationBlock]
+    let latestCanvasBlockIDs: [URL: UUID]
+
+    init(key: ConversationTranscriptProjectionKey, conversation: Conversation) {
+        self.key = key
+        let sourceWindow = conversation.blocksWithTurnID(in: key.requestedSourceRange)
+        let projectedBlocks = ConversationBlock.project(
+            sourceWindow.blocks,
+            thinkingActivity: key.thinkingActivity,
+            isBusy: key.isBusy,
+            interaction: key.interaction
+        )
+        let requestedOffset = key.requestedSourceRange.lowerBound - sourceWindow.range.lowerBound
+        let requestedSourceIDs = sourceWindow.blocks.dropFirst(requestedOffset).map(\.block.id)
+        let blocks: [ConversationBlock]
+        if requestedOffset > 0 {
+            let requestedSourceIDSet = Set(requestedSourceIDs)
+            blocks = projectedBlocks.filter {
+                requestedSourceIDSet.contains($0.sourceBlockID) || $0.isActiveInteraction
+            }
+        } else {
+            blocks = projectedBlocks
+        }
+        totalBlockCount = key.totalBlockCount
+        sourceRange = key.requestedSourceRange
+        sourceBlockIDs = requestedSourceIDs
+        self.blocks = blocks
+        latestCanvasBlockIDs = ConversationBlock.latestCanvasBlockIDs(in: sourceWindow.blocks.map(\.block))
+    }
+}
+
+struct ConversationTranscriptProjectionKey: Equatable {
+    let conversationID: UUID
+    let transcriptRevision: UInt64
+    let totalBlockCount: Int
+    let requestedSourceRange: Range<Int>
+    let thinkingActivity: Conversation.ThinkingActivity?
+    let isBusy: Bool
+    let interaction: Conversation.Interaction?
+}
+
+final class ConversationTranscriptProjectionCache {
+    private var snapshot: ConversationTranscriptProjectionSnapshot?
+
+    func snapshot(for key: ConversationTranscriptProjectionKey, conversation: Conversation) -> ConversationTranscriptProjectionSnapshot {
+        if let snapshot, snapshot.key == key { return snapshot }
+        let resolved = ConversationTranscriptProjectionSnapshot(key: key, conversation: conversation)
+        snapshot = resolved
+        return resolved
+    }
+}
+
+struct ConversationTranscriptProjection<Content: View>: View {
+    let conversation: Conversation
+    let transcriptWindow: TranscriptWindow
+    let interaction: Conversation.Interaction?
+    let content: (ConversationTranscriptProjectionSnapshot) -> Content
+
+    @State private var cache = ConversationTranscriptProjectionCache()
+
+    var body: some View {
+        content(cache.snapshot(for: projectionKey, conversation: conversation))
+    }
+
+    private var projectionKey: ConversationTranscriptProjectionKey {
+        let totalBlockCount = conversation.transcriptBlockCount
+        let requestedSourceRange = transcriptWindow.resolvedRange(total: totalBlockCount)
+        return ConversationTranscriptProjectionKey(
+            conversationID: conversation.id,
+            transcriptRevision: conversation.transcriptRevision,
+            totalBlockCount: totalBlockCount,
+            requestedSourceRange: requestedSourceRange,
+            thinkingActivity: conversation.thinkingActivity,
+            isBusy: conversation.isBusy,
+            interaction: interaction
+        )
+    }
+}
