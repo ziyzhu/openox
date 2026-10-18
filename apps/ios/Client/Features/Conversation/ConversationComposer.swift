@@ -934,7 +934,7 @@ struct ConversationComposer: View, Equatable {
         } label: {
             Image(systemName: systemName)
                 .font(.system(.subheadline, weight: .bold))
-                .foregroundStyle(Theme.Colors.conversationControlLabel)
+                .foregroundStyle(Theme.Colors.onPrimary)
                 .frame(width: composerButtonSize, height: composerButtonSize)
                 .background(fill, in: Circle())
                 .padding(.leading, 4)

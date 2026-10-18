@@ -15,7 +15,6 @@ enum Theme {
         static let conversationCodeBorder = DynamicColor(light: 0xE6E6E6, dark: 0x0A0A0A)
         static let conversationInlineCode = DynamicColor(light: 0x909090, dark: 0x9A9A9A)
         static let conversationControl = DynamicColor(light: 0x000000, dark: 0xF5A030)
-        static let conversationControlLabel = DynamicColor(light: 0xFFFFFF, dark: 0x000000)
         static let bubble          = DynamicColor(light: 0xF3F3F3, dark: 0x1C1C1E)
         static let background      = DynamicColor(light: 0xF2F2F7, dark: 0x0A0A0A)
         static let onSurface       = DynamicColor(light: 0x000000, dark: 0xECECEC)
