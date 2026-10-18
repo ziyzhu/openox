@@ -474,11 +474,11 @@ struct RootView: View {
             }
         }
 
-        var sidebarContentState: ConversationSidebar.ContentState {
-            switch self {
-            case .idle, .openingStorage, .loadingProfile: .loading
-            case .failed: .unavailable
-            case .ready: .ready
+        func sidebarContentState(listing: ConversationManager.SummaryListing) -> ConversationSidebar.ContentState {
+            switch (self, listing) {
+            case (.failed, _): .unavailable
+            case (.ready, _), (_, .partial), (_, .complete): .ready
+            case (.idle, .pending), (.openingStorage, .pending), (.loadingProfile, .pending): .loading
             }
         }
     }
@@ -763,7 +763,8 @@ struct RootView: View {
 
     private func makeSidebarPanel(summaries: [ConversationMeta], currentId: UUID?) -> ConversationSidebar {
         ConversationSidebar(
-            contentState: startup.sidebarContentState,
+            contentState: startup.sidebarContentState(listing: conversations.summaryListing),
+            actionsEnabled: startup == .ready,
             summaries: summaries,
             activities: conversations.activities,
             currentId: currentId,
@@ -1234,6 +1235,7 @@ extension ConversationSidebar: Equatable {
     static func == (lhs: ConversationSidebar, rhs: ConversationSidebar) -> Bool {
         lhs.summaries == rhs.summaries
             && lhs.contentState == rhs.contentState
+            && lhs.actionsEnabled == rhs.actionsEnabled
             && lhs.activities == rhs.activities
             && lhs.currentId == rhs.currentId
             && lhs.showsCloseButton == rhs.showsCloseButton

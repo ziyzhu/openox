@@ -157,6 +157,15 @@ nonisolated struct ConversationDocument: Sendable {
         return nil
     }
 
+    var lastMessageAt: Date? {
+        turns.reversed().lazy.compactMap { turn -> Date? in
+            switch turn {
+            case let .user(turn, _): turn.at
+            case let .agent(turn, _): turn.generations.last?.at
+            }
+        }.first
+    }
+
     var currentAgentTurnAt: Date {
         guard case let .agent(turn, _) = turns.last else { return Date() }
         return turn.at

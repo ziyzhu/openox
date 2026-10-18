@@ -2,7 +2,8 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { JsonValue } from "@earendil-works/chord";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { AgentDoc, type ConversationId, type Cursor, type EntryDraft, type EntryRecord, type JsonObject, type Tx } from "@earendil-works/pi-durable";
-import { ConversationFavorite, ConversationPresentation, ConversationReadState, type ConversationReference, type ConversationListCursor, type ConversationHistoryCursor } from "./conversations";
+import { ConversationFavorite, ConversationPresentation, ConversationReadState, type ConversationReference } from "./conversations";
+import type { ConversationIndexCursor } from "./conversation-index";
 import { ConversationApplicationMetadata } from "./install";
 import type { ProfileRuntime } from "./runtime";
 import { ProfileFileState } from "./file-store";
@@ -70,31 +71,28 @@ export class ApplicationPresentation {
   constructor(runtime: ProfileRuntime) {
     this.runtime = runtime;
   }
-  private async hasTranscript(reference: ConversationReference) {
-    const conversation = await this.runtime.harness.conversation(this.runtime.conversations.id(reference), context);
-    if (!conversation) throw new Error("Conversation not found");
-    let cursor: Cursor | undefined;
-    do {
-      const page = await conversation.entries({}, 20, cursor, context);
-      if (page.items.some(entry => entry.kind === "ox.native.transcript" && entry.data && typeof entry.data === "object" && !Array.isArray(entry.data)
-        && entry.data.source && typeof entry.data.source === "object" && !Array.isArray(entry.data.source) && Number(entry.data.source.size) > 0
-        || entry.kind !== "pi.reset" && entry.kind !== "pi.compaction"
-        && entry.model?.some(message => message.role === "user" || message.role === "assistant"))) return true;
-      cursor = page.next;
-    } while (cursor);
-    return false;
-  }
-  async list(limit = 100, cursor?: ConversationListCursor) {
-    const page = await this.runtime.conversations.list(limit, cursor);
-    const items = await Promise.all(page.items.map(async state => {
-      const [metadata, hasTranscript] = await Promise.all([
-        this.runtime.harness.snapshot(ConversationApplicationMetadata, state.reference.conversationID, context),
-        this.hasTranscript(state.reference),
-      ]);
-      return { reference: state.reference, presentation: state.presentation, favorite: state.favorite, unread: state.unread,
-        agent: { model: state.agent?.model, thinkingLevel: state.agent?.thinkingLevel }, metadata: metadata?.fields ?? {}, hasTranscript };
+  async list(limit = 100, cursor?: ConversationIndexCursor) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("Page size must be between 1 and 100");
+    const { index, conversations, harness } = this.runtime;
+    const page = await index.page(limit, cursor);
+    const items = await Promise.all(page.rows.map(async row => {
+      const id = row.id as ConversationId;
+      try {
+        const [state, metadata] = await Promise.all([
+          conversations.metadata(conversations.reference(id)),
+          harness.snapshot(ConversationApplicationMetadata, id, context),
+        ]);
+        const lastMessageAt = await index.checkedAt(id, row, metadata?.fields);
+        if (state.favorite !== row.pinned) index.refresh(id);
+        if (lastMessageAt === undefined) return [];
+        return [{ reference: state.reference, presentation: state.presentation, favorite: state.favorite, unread: state.unread,
+          agent: { model: state.agent?.model, thinkingLevel: state.agent?.thinkingLevel }, metadata: metadata?.fields ?? {}, lastMessageAt }];
+      } catch {
+        index.refresh(id);
+        return [];
+      }
     }));
-    return { items, next: page.next };
+    return { items: items.flat(), next: page.next };
   }
   private async agentChange(tx: Tx, id: ConversationId, change: ApplicationAgentChange, requireIdle: boolean) {
     const state = await tx.doc(AgentDoc, id);

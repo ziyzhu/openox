@@ -10,6 +10,7 @@ import { profileMounts } from "./filesystem";
 import { mountedFileSystem, type FileMount, type TextFileMount } from "../core/file-mounts";
 import { bundledSkills } from "../core/bundled-skills";
 import { OxConversations, type ConversationReference } from "./conversations";
+import { ConversationIndexer } from "./conversation-index";
 import { profileTools } from "./tools";
 import { AgentFileSystem } from "../core/filesystem";
 import { type ProfileFileBackend, type ProfileFileRecord } from "./file-store";
@@ -45,6 +46,7 @@ export class ProfileRuntime {
   readonly files: ProfileFiles;
   readonly filesystem = new AgentFileSystem();
   readonly conversations: OxConversations;
+  readonly index: ConversationIndexer;
   readonly env: ReturnType<typeof mountedFileSystem>;
   get skillPackages() {
     this.ready();
@@ -71,6 +73,7 @@ export class ProfileRuntime {
     this.files = new ProfileFiles(harness, options.database, options.profileID, options.createBlobID, options.artifacts,
       options.fileStorage?.kind === "prepare" ? "prepare" : options.fileStorage ? "physical" : "legacy", options.fileStorage?.backend, options.fileStorage?.publicFiles);
     this.conversations = new OxConversations(options.profileID, harness, () => this.ready(), reference => this.prepareConversation(reference));
+    this.index = new ConversationIndexer(harness, options.profileID, error => options.onReport?.(error));
     const mounts = profileMounts(this.files, this.conversations);
     this.env = mountedFileSystem(options.profileID, [...mounts, ...options.mounts ?? []]);
   }
@@ -283,6 +286,7 @@ export class ProfileRuntime {
       await Promise.allSettled(this.preparingConversations.values());
       await this.files.flush();
       await Promise.allSettled(this.attaching.values());
+      await this.index.close();
       await this.harness.close(context);
       await this.env.cleanup(context);
       await this.files.close();

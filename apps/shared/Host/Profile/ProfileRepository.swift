@@ -82,22 +82,32 @@ actor ProfileRepository {
         }
     }
 
-    func conversationSummaries(in scope: ProfileScope) async -> [ConversationMeta] {
+    func conversationSummaries(in scope: ProfileScope, onFirstPage: (@MainActor @Sendable ([ConversationMeta]) -> Void)? = nil) async -> [ConversationMeta] {
         do {
             var result: [ConversationMeta] = []
             var cursor: JSONValue = .null
             repeat {
-                let page = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationList"), "limit": .int(20), "listCursor": cursor]))
-                for item in page.objectValue?["items"]?.arrayValue ?? [] {
-                    guard let fields = item.objectValue, fields["hasTranscript"]?.boolValue == true,
-                          let value = fields["reference"] else { continue }
-                    let reference = try decodeReference(value, scope: scope)
-                    result.append(try decodeMeta(fields, reference: reference, scope: scope))
+                let page = try await conversationSummaryPage(in: scope, limit: result.isEmpty ? 20 : 100, after: cursor)
+                if result.isEmpty, page.next != .null, let onFirstPage {
+                    let summaries = page.summaries
+                    Task { @MainActor in onFirstPage(summaries) }
                 }
-                cursor = page.objectValue?["next"] ?? .null
+                result += page.summaries
+                cursor = page.next
             } while cursor != .null
             return result
         } catch { Log.session.error("ProfileRepository.list failed=\(error.localizedDescription)"); return [] }
+    }
+
+    private func conversationSummaryPage(in scope: ProfileScope, limit: Int, after cursor: JSONValue) async throws -> (summaries: [ConversationMeta], next: JSONValue) {
+        let page = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationList"), "limit": .int(limit), "listCursor": cursor]))
+        let summaries = try (page.objectValue?["items"]?.arrayValue ?? []).compactMap { item -> ConversationMeta? in
+            guard let fields = item.objectValue, let value = fields["reference"] else { return nil }
+            var meta = try decodeMeta(fields, reference: try decodeReference(value, scope: scope), scope: scope)
+            meta.lastMessageAt = fields["lastMessageAt"]?.doubleValue.map { Date(timeIntervalSince1970: $0 / 1_000) }
+            return meta
+        }
+        return (summaries, page.objectValue?["next"] ?? .null)
     }
 
     func loadConversation(_ id: ConversationID, in scope: ProfileScope) async -> ConversationLoadResult? {

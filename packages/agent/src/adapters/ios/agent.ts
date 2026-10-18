@@ -5,7 +5,7 @@ import { getCurrentSystemPrompt, getCurrentTools } from "@earendil-works/pi-ai/u
 import type { Model, Tool, Api, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { AgentDoc, defineExtension, defineTool, section, type EntryDraft, type UserInput, type ToolExecutionResult, type ToolExecutionMode } from "@earendil-works/pi-durable";
 import { openProfileRuntime, type ProfileRuntime, type ConversationReference, type ConversationHistoryCursor,
-  type ConversationListCursor, type PresentationChange, installOxProfile, type NormalizedProfileDraft,
+  type ConversationListCursor, type ConversationIndexCursor, type PresentationChange, installOxProfile, type NormalizedProfileDraft,
   ApplicationPresentation, type ApplicationPresentationChange, LegacyProfileFile, ProfileFile, ProfileIndex, canonical, type TextFileMount,
   ConversationApplicationMetadata, ConversationPresentation, type FilePayloadStore, type FileRecord } from "../../index";
 import type { CompactionCheckpoint, ConversationId, EntryId, GenerationCheckpoint, HarnessInspection, SubmissionId, TaskId, ToolExecutionApi, ToolTaskInput } from "@earendil-works/pi-durable";
@@ -42,7 +42,8 @@ type Command = CommandScope & (
   | ({ action: "applicationSave" } & ApplicationPresentationChange)
   | { action: "conversationPopulate"; entries: EntryDraft[] }
   | { action: "conversationFork"; entryID: EntryId; title?: string }
-  | { action: "applicationList" | "conversationList"; limit?: number; listCursor?: ConversationListCursor | null }
+  | { action: "applicationList"; limit?: number; listCursor?: ConversationIndexCursor | null }
+  | { action: "conversationList"; limit?: number; listCursor?: ConversationListCursor | null }
   | { action: "conversationHistory"; limit?: number; historyCursor?: ConversationHistoryCursor | null }
   | { action: "conversationPresent"; presentation?: PresentationChange | null }
   | { action: "conversationRead"; lastReadEntryID?: EntryId | null }

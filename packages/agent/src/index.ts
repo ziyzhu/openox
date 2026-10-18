@@ -13,6 +13,7 @@ export { guidanceText } from "./core/guidance-texts";
 export { bundledSkills, type BundledSkill } from "./core/bundled-skills";
 export { OxConversations, ConversationPresentation, ConversationFavorite, ConversationReadState,
   type ConversationReference, type ConversationListCursor, type ConversationHistoryCursor, type PresentationChange } from "./profile/conversations";
+export { ConversationIndex, type ConversationIndexCursor } from "./profile/conversation-index";
 export type { FilePayloadStore } from "./profile/file-payloads";
 export type { FileRecord } from "./profile/file-record";
 export { ProfileFileState, type ProfileFileBackend, type ProfileFileRecord } from "./profile/file-store";

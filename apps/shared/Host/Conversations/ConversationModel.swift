@@ -213,6 +213,7 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
     var preview: String?
     var hasUnreadResponse: Bool
     var scheduledSkillID: UUID?
+    var lastMessageAt: Date?
 
     init(
         schemaVersion: Int = ConversationFormat.currentSchemaVersion,
@@ -226,7 +227,8 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         attachedServiceDomains: [String],
         preview: String?,
         hasUnreadResponse: Bool = false,
-        scheduledSkillID: UUID? = nil
+        scheduledSkillID: UUID? = nil,
+        lastMessageAt: Date? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.id = id
@@ -240,6 +242,7 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         self.preview = preview
         self.hasUnreadResponse = hasUnreadResponse
         self.scheduledSkillID = scheduledSkillID
+        self.lastMessageAt = lastMessageAt
     }
 
     var displayTitle: String {
@@ -248,7 +251,7 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         return "New conversation"
     }
 
-    var activityDate: Date { lastActivity ?? createdAt }
+    var activityDate: Date { lastMessageAt ?? lastActivity ?? createdAt }
     var modelID: String? { model?.modelID }
 
     private enum CodingKeys: String, CodingKey {
@@ -280,6 +283,7 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         preview = try values.decodeIfPresent(String.self, forKey: .preview)
         hasUnreadResponse = try values.decodeIfPresent(Bool.self, forKey: .hasUnreadResponse) ?? false
         scheduledSkillID = try values.decodeIfPresent(UUID.self, forKey: .scheduledSkillID)
+        lastMessageAt = nil
     }
 }
 

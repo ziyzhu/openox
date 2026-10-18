@@ -1126,7 +1126,8 @@ final class Conversation: Identifiable {
             attachedServiceDomains: attachedServiceDomains,
             preview: transcriptPreview,
             hasUnreadResponse: hasUnreadResponse,
-            scheduledSkillID: scheduledSkillID
+            scheduledSkillID: scheduledSkillID,
+            lastMessageAt: document.lastMessageAt
         )
     }
 

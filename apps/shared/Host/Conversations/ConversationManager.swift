@@ -79,8 +79,16 @@ final class ConversationManager {
         case active(Conversation)
     }
 
+    enum SummaryListing: Equatable {
+        case pending
+        case partial
+        case complete
+    }
+
     private var records: [ConversationID: Record] = [:]
     private var selection: Selection = .empty
+    private(set) var summaryListing = SummaryListing.pending
+    @ObservationIgnored private var firstPageRevisions: [ConversationID: UInt64] = [:]
     @ObservationIgnored private var accessOrdinals: [ConversationID: UInt64] = [:]
     @ObservationIgnored private var hydrationOrdinal: UInt64 = 0
     @ObservationIgnored private var hydrationGeneration: UInt64 = 0
@@ -189,14 +197,16 @@ final class ConversationManager {
         let locallyAuthoritative = Set(records.compactMap { id, record in
             record.persistence.preservesLocalRecordDuringReload ? id : nil
         })
-        let summaries = await scopedRepository.conversationSummaries(in: scope)
+        let summaries = await scopedRepository.conversationSummaries(in: scope) { [weak self] page in
+            self?.publishFirstSummaries(page, in: scope)
+        }
         guard repositoryScope == scope else { return }
         var loaded = Dictionary(uniqueKeysWithValues: summaries.map { meta in
             (ConversationID(meta.id), Record(meta: meta))
         })
         var preserved = 0
         for (id, record) in records {
-            let changedWhileLoading = revisions[id] != record.metadataRevision
+            let changedWhileLoading = (revisions[id] ?? firstPageRevisions[id]) != record.metadataRevision
             if record.hydration.conversation != nil
                 || record.persistence.preservesLocalRecordDuringReload
                 || locallyAuthoritative.contains(id)
@@ -206,11 +216,24 @@ final class ConversationManager {
             }
         }
         records = loaded
+        firstPageRevisions = [:]
+        summaryListing = .complete
         accessOrdinals = accessOrdinals.filter { loaded[$0.key] != nil }
         do { try await recoverConversations(in: scope) }
         catch { Log.session.error("ConversationManager.recovery blocked error=\(error.localizedDescription)") }
         Log.session.info("ConversationManager.loadSummaries count=\(summaries.count) preserved=\(preserved) generation=\(scope.generation)")
         if case .deferred(let id, _) = selection { open(id.rawValue) }
+    }
+
+    private func publishFirstSummaries(_ page: [ConversationMeta], in scope: ProfileScope) {
+        guard repositoryScope == scope, summaryListing == .pending else { return }
+        for meta in page where records[ConversationID(meta.id)] == nil {
+            let record = Record(meta: meta)
+            records[ConversationID(meta.id)] = record
+            firstPageRevisions[ConversationID(meta.id)] = record.metadataRevision
+        }
+        summaryListing = .partial
+        Log.session.info("ConversationManager.loadSummaries listing=partial count=\(page.count) generation=\(scope.generation)")
     }
 
     private func recoverConversations(in scope: ProfileScope) async throws {
@@ -730,6 +753,8 @@ final class ConversationManager {
         hydrationTasks.values.forEach { $0.task.cancel() }
         hydrationTasks.removeAll()
         records.removeAll()
+        firstPageRevisions = [:]
+        summaryListing = .pending
         accessOrdinals.removeAll()
         selection = .empty
         ensureRepositoryScope()

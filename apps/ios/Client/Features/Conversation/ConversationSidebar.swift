@@ -8,6 +8,7 @@ struct ConversationSidebar: View {
     }
 
     let contentState: ContentState
+    let actionsEnabled: Bool
     let summaries: [ConversationMeta]
     let activities: [UUID: Conversation.Activity]
     let currentId: UUID?
@@ -94,7 +95,7 @@ struct ConversationSidebar: View {
         }
         .accessibilityLabel(A11yLabel.newConversation)
         .accessibilityIdentifier(A11yID.Sidebar.newConversation)
-        .disabled(contentState != .ready)
+        .disabled(!actionsEnabled)
     }
 
     private var settingsButton: some View {
@@ -107,7 +108,7 @@ struct ConversationSidebar: View {
         }
         .accessibilityLabel(A11yLabel.settings)
         .accessibilityIdentifier(A11yID.Sidebar.settings)
-        .disabled(contentState != .ready)
+        .disabled(!actionsEnabled)
     }
 
     private var header: some View {
