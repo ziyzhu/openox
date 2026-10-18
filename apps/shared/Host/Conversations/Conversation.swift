@@ -581,55 +581,15 @@ final class Conversation: Identifiable {
 
     static let abortedAnswer = "The user stopped before answering."
 
-    private struct Submission {
-        enum Kind: Equatable {
-            case user
-            case system(resume: TurnID?)
-        }
+    private typealias Submission = ConversationSubmissionQueue.Submission
 
-        enum State {
-            case queued
-            case posted
-            case consumed
-            case cancelled
-        }
-
-        let id: SubmissionID
-        let kind: Kind
-        let text: String
-        let attachments: [FileItem]
-        let skillInvocation: UserSkillInvocation?
-        let latency: TurnLatencyTrace
-        var state: State
-
-        var needsPosting: Bool {
-            guard case .user = kind else { return false }
-            return state == .queued
-        }
-
-        var queuedMessage: QueuedMessage? {
-            guard needsPosting else { return nil }
-            return QueuedMessage(id: id.rawValue, text: text, attachments: attachments, skillInvocation: skillInvocation)
-        }
-
-        mutating func post() {
-            guard needsPosting else { return }
-            state = .posted
-        }
-
-        mutating func consume() {
-            state = .consumed
-        }
-    }
-    var queuedMessages: [QueuedMessage] {
-        submissions.compactMap(\.queuedMessage)
-    }
+    var queuedMessages: [QueuedMessage] { submissions.queuedMessages }
 
     func anchor(forSubmissionID submissionID: UUID) -> SubmissionAnchor? {
         if let blockID = document.firstBlockID(forSubmissionID: submissionID) {
             return .turn(blockID: blockID, submissionID: submissionID)
         }
-        if submissions.contains(where: { $0.id.rawValue == submissionID && $0.needsPosting }) {
+        if submissions.queued(submissionID) != nil {
             return .queued(submissionID)
         }
         return nil
@@ -677,7 +637,10 @@ final class Conversation: Identifiable {
     }
 
     private var activeRun: Run?
-    private var submissions: [Submission] = []
+    @ObservationIgnored private lazy var submissions = ConversationSubmissionQueue(
+        conversation: self,
+        responseText: { [unowned self] submissionID in document.responseText(forSubmissionID: submissionID) }
+    )
     var isBusy: Bool { activeRun != nil }
 
     func waitForRun() async {
@@ -696,7 +659,6 @@ final class Conversation: Identifiable {
     @ObservationIgnored private var finishingWatchdog: Task<Void, Never>?
     @ObservationIgnored private var activeLatency: TurnLatencyTrace?
     @ObservationIgnored private var submissionPresentation = SubmissionPresentation.completed
-    @ObservationIgnored private var submissionWaiters: [SubmissionID: CheckedContinuation<ConversationSubmissionOutcome, Never>] = [:]
     @ObservationIgnored private let executionLease: ExecutionLease
 
     private let execution: any ConversationExecution
@@ -1380,7 +1342,7 @@ final class Conversation: Identifiable {
                     continuation.resume(returning: .cancelled)
                     return
                 }
-                submissionWaiters[submissionID] = continuation
+                submissions.wait(for: submissionID, continuation)
                 enqueue(
                     intent,
                     attachments: attachments,
@@ -1390,7 +1352,7 @@ final class Conversation: Identifiable {
             }
         } onCancel: {
             Task { @MainActor [weak self] in
-                self?.cancelAwaitedSubmission(submissionID)
+                self?.submissions.detach(submissionID)
             }
         }
     }
@@ -1457,12 +1419,6 @@ final class Conversation: Identifiable {
         return receipt
     }
 
-    private func cancelAwaitedSubmission(_ submissionID: SubmissionID) {
-        guard let continuation = submissionWaiters.removeValue(forKey: submissionID) else { return }
-        continuation.resume(returning: .cancelled)
-        Log.session.info("Conversation.submitAndWait detached id=\(id) submission=\(submissionID.rawValue) busy=\(isBusy)")
-    }
-
     private func enqueueSystemEvent(_ event: JSONValue, source: ConversationServiceAttachments.SystemEvent) {
         let note: String
         do {
@@ -1510,9 +1466,9 @@ final class Conversation: Identifiable {
     }
 
     func cancelQueued(_ blockId: UUID) {
-        guard let submission = submissions.first(where: { $0.id.rawValue == blockId && $0.needsPosting }) else { return }
+        guard let submission = submissions.queued(blockId) else { return }
         Log.session.info("Conversation.cancelQueued id=\(id) block=\(blockId) queueDepth=\(submissions.count)")
-        submissions.removeAll { $0.id.rawValue == blockId && $0.needsPosting }
+        submissions.remove(submission.id)
         if activeRun?.activeSubmission?.id == submission.id {
             activeRun?.task.cancel()
         }
@@ -1522,13 +1478,10 @@ final class Conversation: Identifiable {
     func cancelAll() {
         cancelModelSelectionChange()
         botControlSource.release()
-        let cancelled = drainSubmissions()
-        for submission in cancelled {
+        for submission in submissions.drain() {
             submission.latency.finish(outcome: "cancelledQueued", client: client.id, model: model.id)
         }
-        let waiters = submissionWaiters.values
-        submissionWaiters.removeAll()
-        for continuation in waiters { continuation.resume(returning: .cancelled) }
+        submissions.cancelWaiters()
         notice = .none
         submissionPresentation = .cancelled
         interactions.cancelAll()
@@ -1630,22 +1583,20 @@ final class Conversation: Identifiable {
     }
 
     private func startWorker() {
-        guard !isBusy, !submissions.isEmpty else { return }
+        guard !isBusy, let submission = submissions.next else { return }
         let runID = RunID()
         let queueDepth = submissions.count
-        let submission = submissions[0]
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
             defer { finishWorker(runID) }
             await waitUntilProfilePrepared(runID: runID)
             if Task.isCancelled {
-                submissions.removeAll { $0.id == submission.id }
+                submissions.remove(submission.id)
                 submission.latency.finish(outcome: "cancelled", client: client.id, model: model.id)
                 return
             }
-            guard let index = submissions.firstIndex(where: { $0.id == submission.id }) else { return }
+            guard var submission = submissions.take(submission.id) else { return }
             setRunPhase(.thinking)
-            var submission = submissions.remove(at: index)
             if submission.needsPosting {
                 let at = Date()
                 document.apply(.appendUser(
@@ -1787,12 +1738,6 @@ final class Conversation: Identifiable {
         Log.session.warning("Conversation.backgroundLeaseExpired id=\(id) run=\(runID.rawValue)")
     }
 
-    private func drainSubmissions() -> [Submission] {
-        let drained = submissions
-        submissions.removeAll()
-        return drained
-    }
-
     private func runOne(_ submission: Submission, runID: RunID) async {
         submissionPresentation = .running
         submission.latency.mark(.runStarted)
@@ -1815,7 +1760,7 @@ final class Conversation: Identifiable {
             Log.session.error("Conversation Profile documents unavailable id=\(id) error=\(message)")
             if !cancelled { notice = .error(message) }
             submission.latency.finish(outcome: cancelled ? "cancelled" : "rejected", client: client.id, model: model.id)
-            resolveAwaitedSubmission(submission, error: message, failureKind: nil, cancelled: cancelled)
+            submissions.resolve(submission, error: message, failureKind: nil, cancelled: cancelled)
             return
         }
         await Skills.shared.waitUntilCurrent()
@@ -1888,7 +1833,7 @@ final class Conversation: Identifiable {
             Log.session.error("Conversation.runOne rejected id=\(id) error=\(message)")
             if !cancelled { notice = .error(message) }
             submission.latency.finish(outcome: cancelled ? "cancelled" : "rejected", client: client.id, model: model.id)
-            resolveAwaitedSubmission(submission, error: message, failureKind: nil, cancelled: cancelled)
+            submissions.resolve(submission, error: message, failureKind: nil, cancelled: cancelled)
             return
         }
         submissionResult = result
@@ -1910,35 +1855,13 @@ final class Conversation: Identifiable {
             "completed"
         }
         submission.latency.finish(outcome: outcomeName, client: client.id, model: model.id)
-        resolveAwaitedSubmission(
+        submissions.resolve(
             submission,
             error: err,
             failureKind: failureKind,
             cancelled: Task.isCancelled || err == "aborted"
         )
         Log.session.info("Conversation.runOne end id=\(id) outcome=\(outcomeName)")
-    }
-
-    private func resolveAwaitedSubmission(
-        _ submission: Submission,
-        error: String?,
-        failureKind: LLMFailureKind?,
-        cancelled: Bool
-    ) {
-        guard let continuation = submissionWaiters.removeValue(forKey: submission.id) else { return }
-        let outcome: ConversationSubmissionOutcome
-        if cancelled {
-            outcome = .cancelled
-        } else if let error {
-            outcome = .failed(Self.userFacingError(error, kind: failureKind))
-        } else {
-            let response = document.responseText(forSubmissionID: submission.id)
-            outcome = response.isEmpty
-                ? .failed("Ox finished without a text response.")
-                : .completed(response)
-        }
-        continuation.resume(returning: outcome)
-        Log.session.info("Conversation.submitAndWait resolved id=\(id) submission=\(submission.id.rawValue) outcome=\(outcome.logLabel)")
     }
 
     private static func outcome(for assistant: AssistantMessage, at: Date) -> TurnOutcome {
