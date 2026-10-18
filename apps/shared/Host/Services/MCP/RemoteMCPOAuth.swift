@@ -117,18 +117,6 @@ nonisolated private struct RemoteMCPHTTPResponse: Sendable {
     let response: HTTPURLResponse
 }
 
-nonisolated private final class RemoteMCPOAuthRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
-    func urlSession(
-        _: URLSession,
-        task _: URLSessionTask,
-        willPerformHTTPRedirection _: HTTPURLResponse,
-        newRequest _: URLRequest,
-        completionHandler: @escaping (URLRequest?) -> Void
-    ) {
-        completionHandler(nil)
-    }
-}
-
 @MainActor
 enum RemoteMCPOAuth {
     private static let redirectURI = "http://localhost:49213/oauth/callback"
@@ -432,7 +420,7 @@ enum RemoteMCPOAuth {
         configuration.timeoutIntervalForResource = 60
         configuration.httpCookieStorage = nil
         configuration.urlCredentialStorage = nil
-        let session = URLSession(configuration: configuration, delegate: RemoteMCPOAuthRedirectDelegate(), delegateQueue: nil)
+        let session = URLSession(configuration: configuration, delegate: RemoteMCPRedirectDelegate(), delegateQueue: nil)
         defer { session.finishTasksAndInvalidate() }
         let (bytes, rawResponse) = try await session.bytes(for: request)
         guard let response = rawResponse as? HTTPURLResponse else { throw RemoteMCPError.oauth("The OAuth server returned an invalid response.") }
