@@ -1087,12 +1087,10 @@ private struct PendingAttachmentChip: View {
     let pending: ConversationComposerModel.PendingAttachment
     let onRemove: () -> Void
 
-    private var userFacingName: String { FileItem.userFacingName(forFileName: pending.displayName) }
-
     var body: some View {
         ComposerAttachmentChip(
-            name: userFacingName,
-            accessibilityLabel: "Attaching \(userFacingName)",
+            name: pending.displayName,
+            accessibilityLabel: "Attaching \(pending.displayName)",
             accessibilityIdentifier: A11yID.ConversationControls.composerAttachment(pending.displayName),
             onRemove: onRemove
         ) {

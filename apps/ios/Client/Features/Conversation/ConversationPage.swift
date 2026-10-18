@@ -1776,7 +1776,7 @@ struct ConversationPage: View {
                 Log.ui.info("ConversationPage.renameFile conversation=\(conversation.id) from=\(artifact.fileName) to=\(renamed.fileName)")
             } catch {
                 Log.ui.error("ConversationPage.renameFile conversation=\(conversation.id) from=\(artifact.fileName) error=\(error.localizedDescription)")
-                artifactMutation = .renameFailed(artifact.userFacingErrorDescription(error))
+                artifactMutation = .renameFailed(error.localizedDescription)
             }
         }
     }
@@ -1789,7 +1789,7 @@ struct ConversationPage: View {
                 Log.ui.info("ConversationPage.deleteFile conversation=\(conversation.id) file=\(artifact.fileName)")
             } catch {
                 Log.ui.error("ConversationPage.deleteFile conversation=\(conversation.id) file=\(artifact.fileName) error=\(error.localizedDescription)")
-                artifactMutation = .deleteFailed(artifact.userFacingErrorDescription(error))
+                artifactMutation = .deleteFailed(error.localizedDescription)
             }
         }
     }

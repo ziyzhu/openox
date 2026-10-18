@@ -451,7 +451,7 @@ nonisolated enum WebAttachmentFactory {
 
     private static func validatePDF(_ data: Data) throws {
         do {
-            _ = try PDFPreparer.prepare(data)
+            _ = try PDFPreparer.prepareFile(data)
         } catch {
             throw WebAttachmentError.invalidPDF
         }

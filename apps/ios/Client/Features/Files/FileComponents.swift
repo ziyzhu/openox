@@ -176,7 +176,7 @@ private struct FileMutationAlerts: ViewModifier {
                 Button("Rename") {
                     guard case .renaming(let artifact, let draft) = mutation else { return }
                     mutation = nil
-                    onRename(artifact, artifact.fileName(forUserFacingName: draft))
+                    onRename(artifact, draft)
                 }
                 .disabled(!canSubmitRename)
                 .accessibilityIdentifier(A11yID.Files.renameSubmit)
