@@ -18,9 +18,10 @@ struct StreamingMarkdownText: View {
             if case .embed = block { return true }
             return false
         }
+        let blocks = MarkdownRenderBlock.group(snapshot.blocks)
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(snapshot.blocks.enumerated()), id: \.offset) { index, block in
-                MarkdownBlockView(
+            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
+                MarkdownRenderBlockView(
                     block: block,
                     textColor: Theme.Colors.onSurface,
                     subtleColor: Theme.Colors.conversationSecondary,
@@ -31,8 +32,8 @@ struct StreamingMarkdownText: View {
                 )
                 .id(snapshot.generation)
                 .padding(.top, MarkdownText.spacing(
-                    before: block,
-                    after: index == 0 ? nil : snapshot.blocks[index - 1]
+                    before: block.first,
+                    after: index == 0 ? nil : blocks[index - 1].last
                 ))
             }
         }
@@ -319,6 +320,11 @@ struct MarkdownText: View {
         }
     }
 
+    static func headingInset(_ block: MarkdownBlock) -> CGFloat {
+        guard case .heading(let level, _) = block else { return 0 }
+        return level <= 2 ? 4 : 2
+    }
+
     let source: String
     let textColor: DynamicColor
     let subtleColor: DynamicColor
@@ -377,49 +383,45 @@ struct MarkdownText: View {
 }
 
 nonisolated private enum MarkdownRenderBlock: Equatable, Sendable {
-    case paragraphs([String])
+    case prose([MarkdownBlock])
     case block(MarkdownBlock)
     case embeds([MarkdownBlock])
 
     var first: MarkdownBlock {
         switch self {
-        case .paragraphs(let sources): .paragraph(sources.first ?? "")
+        case .prose(let blocks), .embeds(let blocks): blocks.first ?? .paragraph("")
         case .block(let block): block
-        case .embeds(let blocks): blocks.first ?? .paragraph("")
         }
     }
 
     var last: MarkdownBlock {
         switch self {
-        case .paragraphs(let sources): .paragraph(sources.last ?? "")
+        case .prose(let blocks), .embeds(let blocks): blocks.last ?? .paragraph("")
         case .block(let block): block
-        case .embeds(let blocks): blocks.last ?? .paragraph("")
         }
     }
 
     static func group(_ blocks: [MarkdownBlock]) -> [MarkdownRenderBlock] {
         var grouped: [MarkdownRenderBlock] = []
         for block in blocks {
-            if case .embed = block {
+            switch block {
+            case .paragraph, .heading, .lists:
+                if case .prose(let prose) = grouped.last {
+                    grouped[grouped.count - 1] = .prose(prose + [block])
+                } else {
+                    grouped.append(.prose([block]))
+                }
+            case .embed:
                 switch grouped.last {
                 case .embeds(let embeds):
                     grouped[grouped.count - 1] = .embeds(embeds + [block])
-                    continue
                 case .block(.embed(let alt, let path)):
                     grouped[grouped.count - 1] = .embeds([.embed(alt: alt, path: path), block])
-                    continue
                 default:
-                    break
+                    grouped.append(.block(block))
                 }
-            }
-            guard case .paragraph(let text) = block else {
+            case .code, .quote, .table, .rule:
                 grouped.append(.block(block))
-                continue
-            }
-            if case .paragraphs(let sources) = grouped.last {
-                grouped[grouped.count - 1] = .paragraphs(sources + [text])
-            } else {
-                grouped.append(.paragraphs([text]))
             }
         }
         return grouped
@@ -432,27 +434,14 @@ private struct MarkdownRenderBlockView: View {
     let subtleColor: DynamicColor
     let availableWidth: CGFloat
     let accessibilityIdentifier: String
+    var fadeKey: Int? = nil
+    var isStreaming = false
 
     var body: some View {
         switch block {
-        case .paragraphs(let sources):
-            SelectableText(
-                SelectableText.attributedMarkdownParagraphs(
-                    sources,
-                    font: MarkdownText.bodyFont,
-                    color: textColor.uiColor,
-                    lineSpacing: 1,
-                    paragraphSpacing: ConversationTranscriptMetrics.blockSpacing
-                )
-            )
-        case .block(let block):
-            MarkdownBlockView(
-                block: block,
-                textColor: textColor,
-                subtleColor: subtleColor,
-                availableWidth: availableWidth,
-                accessibilityIdentifier: accessibilityIdentifier
-            )
+        case .prose(let blocks):
+            prose(SelectableText.attributedMarkdownProse(blocks, color: textColor.uiColor, isStreaming: isStreaming))
+                .padding(.top, SelectableText.proseTopInset(block.first))
         case .embeds(let blocks):
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: Theme.Spacing.md) {
@@ -468,6 +457,25 @@ private struct MarkdownRenderBlockView: View {
             .defaultScrollAnchor(.leading)
             .excludesCompactPageSwitch()
             .accessibilityIdentifier("\(accessibilityIdentifier).embeds")
+        case .block(let block):
+            MarkdownBlockView(
+                block: block,
+                textColor: textColor,
+                subtleColor: subtleColor,
+                availableWidth: availableWidth,
+                accessibilityIdentifier: accessibilityIdentifier,
+                fadeKey: fadeKey,
+                isStreaming: isStreaming
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func prose(_ attributed: NSAttributedString) -> some View {
+        if let fadeKey {
+            StreamingFadeSelectableText(attributed: attributed, resetKey: fadeKey)
+        } else {
+            SelectableText(attributed)
         }
     }
 }
@@ -483,22 +491,15 @@ private struct MarkdownBlockView: View {
 
     private static let tableCellMinWidth: CGFloat = 88
     private static let tableCellMaxWidth: CGFloat = 220
+    private static let tableCellFont = UIFont.preferredFont(forTextStyle: .subheadline)
+    private static let tableHeaderFont = UIFontMetrics(forTextStyle: .subheadline)
+        .scaledFont(for: .systemFont(ofSize: tableCellFont.pointSize, weight: .semibold))
 
     var body: some View {
         switch block {
-        case .paragraph(let text):
-            prose(text, font: MarkdownText.bodyFont, color: textColor, lineSpacing: 1, fades: true)
-        case .heading(let level, let text):
-            prose(text, font: SelectableText.headingFont(level: level), color: textColor, lineSpacing: 2, fades: true)
-                .padding(.top, level <= 2 ? 4 : 2)
-        case .lists(let lists):
-            MarkdownListsView(
-                lists: lists,
-                textColor: textColor,
-                subtleColor: subtleColor,
-                fadeKey: fadeKey,
-                isStreaming: isStreaming
-            )
+        case .paragraph, .heading, .lists:
+            SelectableText(SelectableText.attributedMarkdownProse([block], color: textColor.uiColor))
+                .padding(.top, SelectableText.proseTopInset(block))
         case .code(let language, let body):
             if language == "mermaid", !isStreaming {
                 MermaidDiagramView(source: body, maxWidth: availableWidth, accessibilityIdentifier: accessibilityIdentifier) {
@@ -508,7 +509,7 @@ private struct MarkdownBlockView: View {
                 codeBlock(body, language: language)
             }
         case .quote(let text):
-            prose(text, font: MarkdownText.bodyFont, color: subtleColor, lineSpacing: 2, fades: true)
+            quote(text)
                 .padding(.leading, 11)
                 .overlay(alignment: .leading) {
                     Rectangle()
@@ -519,7 +520,7 @@ private struct MarkdownBlockView: View {
             let columns = max(header.count, rows.map(\.count).max() ?? 1)
             let cellWidth = Self.tableCellWidth(forColumns: columns, in: availableWidth)
             ScrollView(.horizontal, showsIndicators: true) {
-                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Theme.Spacing.md, verticalSpacing: Theme.Spacing.sm) {
+                Grid(alignment: .topLeading, horizontalSpacing: Theme.Spacing.md, verticalSpacing: Theme.Spacing.sm) {
                     GridRow {
                         ForEach(Array(header.enumerated()), id: \.offset) { _, col in
                             tableCell(col, width: cellWidth, header: true)
@@ -546,13 +547,12 @@ private struct MarkdownBlockView: View {
     }
 
     @ViewBuilder
-    private func prose(_ text: String, font: UIFont, color: DynamicColor,
-                       lineSpacing: CGFloat, fades: Bool) -> some View {
-        if let fadeKey, fades {
+    private func quote(_ text: String) -> some View {
+        if let fadeKey {
             StreamingFadeSelectableText(markdown: isStreaming ? StreamingMarkdownText.balanced(text) : text, resetKey: fadeKey,
-                                        font: font, color: color.uiColor, lineSpacing: lineSpacing)
+                                        font: MarkdownText.bodyFont, color: subtleColor.uiColor, lineSpacing: 2)
         } else {
-            SelectableText(markdown: text, font: font, color: color.uiColor, lineSpacing: lineSpacing)
+            SelectableText(markdown: text, font: MarkdownText.bodyFont, color: subtleColor.uiColor, lineSpacing: 2)
         }
     }
 
@@ -579,9 +579,7 @@ private struct MarkdownBlockView: View {
     }
 
     private func tableCell(_ text: String, width: CGFloat, header: Bool = false) -> some View {
-        inline(text)
-            .font(header ? Theme.Fonts.bodySm.weight(.semibold) : Theme.Fonts.bodySm)
-            .foregroundStyle(textColor)
+        SelectableText(markdown: text, font: header ? Self.tableHeaderFont : Self.tableCellFont, color: textColor.uiColor)
             .frame(width: width, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -590,139 +588,6 @@ private struct MarkdownBlockView: View {
         guard available > 0, columns > 0 else { return tableCellMaxWidth }
         let fit = (available - Theme.Spacing.md * CGFloat(columns - 1)) / CGFloat(columns)
         return min(tableCellMaxWidth, max(tableCellMinWidth, fit))
-    }
-
-    private func inline(_ source: String) -> Text {
-        if var attributed = SelectableText.inlineMarkdown(source) {
-            let links = attributed.runs.compactMap { $0.link == nil ? nil : $0.range }
-            let code = attributed.runs.compactMap {
-                $0.inlinePresentationIntent?.contains(.code) == true ? $0.range : nil
-            }
-            attributed.removeInlinePresentationIntent(.emphasized)
-            for range in links {
-                attributed[range].foregroundColor = textColor.dynamic
-                attributed[range].underlineStyle = Text.LineStyle(pattern: .dot)
-            }
-            for range in code {
-                attributed[range].foregroundColor = Theme.Colors.conversationInlineCode.dynamic
-                if let intent = attributed[range].inlinePresentationIntent {
-                    let remaining = intent.subtracting(.code)
-                    attributed[range].inlinePresentationIntent = remaining.isEmpty ? nil : remaining
-                }
-            }
-            return Text(attributed)
-        }
-        return Text(source)
-    }
-}
-
-extension AttributedString {
-    mutating func removeInlinePresentationIntent(_ removed: InlinePresentationIntent) {
-        let intents = runs.compactMap { run in
-            run.inlinePresentationIntent.map { (run.range, $0) }
-        }
-        for (range, intent) in intents where intent.contains(removed) {
-            let remaining = intent.subtracting(removed)
-            self[range].inlinePresentationIntent = remaining.isEmpty ? nil : remaining
-        }
-    }
-}
-
-private struct MarkdownListsView: View {
-    let lists: [MarkdownList]
-    let textColor: DynamicColor
-    let subtleColor: DynamicColor
-    let fadeKey: Int?
-    let isStreaming: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            ForEach(Array(lists.enumerated()), id: \.offset) { index, list in
-                MarkdownListView(
-                    list: list,
-                    textColor: textColor,
-                    subtleColor: subtleColor,
-                    fadeKey: fadeKey,
-                    isStreaming: isStreaming
-                )
-            }
-        }
-    }
-}
-
-private struct MarkdownListView: View {
-    let list: MarkdownList
-    let textColor: DynamicColor
-    let subtleColor: DynamicColor
-    let fadeKey: Int?
-    let isStreaming: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            ForEach(Array(list.items.enumerated()), id: \.offset) { index, item in
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
-                        Text(marker(for: index))
-                            .font(.system(size: markerPointSize))
-                            .monospacedDigit()
-                            .foregroundStyle(textColor)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .frame(width: markerColumnWidth, alignment: .trailing)
-                        prose(item.text)
-                    }
-                    if !item.children.isEmpty {
-                        MarkdownListsView(
-                            lists: item.children,
-                            textColor: textColor,
-                            subtleColor: subtleColor,
-                            fadeKey: fadeKey,
-                            isStreaming: isStreaming
-                        )
-                        .padding(.leading, Theme.Spacing.lg)
-                    }
-                }
-            }
-        }
-    }
-
-    private var markerPointSize: CGFloat {
-        switch list.kind {
-        case .bullets: MarkdownText.bodyFont.pointSize * 1.35
-        case .ordered: MarkdownText.bodyFont.pointSize
-        }
-    }
-
-    private var markerColumnWidth: CGFloat {
-        let widestMarker = list.kind == .ordered ? "99." : "•"
-        let font = UIFont.monospacedDigitSystemFont(ofSize: markerPointSize, weight: .regular)
-        return ceil((widestMarker as NSString).size(withAttributes: [.font: font]).width)
-    }
-
-    private func marker(for index: Int) -> String {
-        switch list.kind {
-        case .bullets: "•"
-        case .ordered: "\(index + 1)."
-        }
-    }
-
-    @ViewBuilder
-    private func prose(_ text: String) -> some View {
-        if let fadeKey {
-            StreamingFadeSelectableText(
-                markdown: isStreaming ? StreamingMarkdownText.balanced(text) : text,
-                resetKey: fadeKey,
-                font: MarkdownText.bodyFont,
-                color: textColor.uiColor,
-                lineSpacing: 2
-            )
-        } else {
-            SelectableText(
-                markdown: text,
-                font: MarkdownText.bodyFont,
-                color: textColor.uiColor,
-                lineSpacing: 2
-            )
-        }
     }
 }
 

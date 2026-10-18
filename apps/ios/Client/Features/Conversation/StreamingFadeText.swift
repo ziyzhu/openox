@@ -121,10 +121,12 @@ struct StreamingFadeSelectableText: View {
     private enum Content {
         case markdown(String)
         case code(String, language: String?)
+        case attributed(NSAttributedString)
 
         var source: String {
             switch self {
             case .markdown(let source), .code(let source, _): source
+            case .attributed(let value): value.string
             }
         }
 
@@ -139,6 +141,8 @@ struct StreamingFadeSelectableText: View {
                 SelectableText.attributedMarkdown(source, font: font, color: color, lineSpacing: lineSpacing)
             case .code(let source, let language):
                 SyntaxHighlighter.selectable(source, language: language, font: font)
+            case .attributed(let value):
+                value
             }
         }
     }
@@ -173,6 +177,13 @@ struct StreamingFadeSelectableText: View {
         self.lineSpacing = lineSpacing
     }
 
+    init(attributed: NSAttributedString, resetKey: Int = 0) {
+        content = .attributed(attributed)
+        self.resetKey = resetKey
+        font = MarkdownText.bodyFont
+        color = .label
+    }
+
     init(code: String, language: String?, resetKey: Int = 0) {
         content = .code(code, language: language)
         self.resetKey = resetKey
@@ -187,7 +198,12 @@ struct StreamingFadeSelectableText: View {
     var body: some View {
         let source = content.source
         let streamsPlain = content.streamsPlain
-        let plain = streamsPlain || classifier.isPlain(source, reset: resetKey)
+        let plain = switch content {
+        case .code: true
+        case .markdown: classifier.isPlain(source, reset: resetKey)
+        case .attributed: false
+        }
+        let fadeColor: UIColor? = if case .attributed = content { nil } else { color }
         let rendered = plain ? nil : content.attributed(font: font, color: color, lineSpacing: lineSpacing)
         let length = streamsPlain ? source.utf16.count : (plain ? classifier.length : rendered?.length ?? 0)
         TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: fadeDeadline == nil)) { _ in
@@ -206,7 +222,7 @@ struct StreamingFadeSelectableText: View {
                     streamingAttributed: rendered,
                     resetKey: resetKey,
                     fade: .init(
-                        color: color,
+                        color: fadeColor,
                         arrivals: tracker.arrivals,
                         now: now
                     )

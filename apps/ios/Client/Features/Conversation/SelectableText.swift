@@ -23,6 +23,25 @@ private final class SelectableTextView: UITextView {
         resignFirstResponder()
         Log.ui.info("SelectableText.dismissSelection chars=\(range.length)")
     }
+
+    override func copy(_ sender: Any?) {
+        let selection = attributedText.attributedSubstring(from: selectedRange)
+        let whole = NSRange(location: 0, length: selection.length)
+        let copied = NSMutableString(string: selection.string)
+        var markers = 0
+        selection.enumerateAttribute(.markdownListMarker, in: whole, options: .reverse) { value, range, _ in
+            guard let marker = value as? String else { return }
+            copied.replaceCharacters(in: range, with: marker)
+            markers += 1
+        }
+        guard markers > 0 else { return super.copy(sender) }
+        UIPasteboard.general.string = copied as String
+        Log.ui.info("SelectableText.copy chars=\(copied.length) listMarkers=\(markers)")
+    }
+}
+
+extension NSAttributedString.Key {
+    static let markdownListMarker = NSAttributedString.Key("ai.oxcraft.markdownListMarker")
 }
 
 private struct SelectableTextSelectionDismissModifier: ViewModifier {
@@ -378,6 +397,7 @@ struct SelectableText: UIViewRepresentable {
 
         func textView(_ textView: UITextView, primaryActionFor textItem: UITextItem,
                       defaultAction: UIAction) -> UIAction? {
+            if case .textAttachment = textItem.content { return nil }
             guard case let .link(url) = textItem.content else { return defaultAction }
             return UIAction { [weak self] _ in
                 self?.open(url)
@@ -395,6 +415,7 @@ struct SelectableText: UIViewRepresentable {
 
         func textView(_ textView: UITextView, menuConfigurationFor textItem: UITextItem,
                       defaultMenu: UIMenu) -> UITextItem.MenuConfiguration? {
+            if case .textAttachment = textItem.content { return nil }
             guard case let .link(url) = textItem.content else {
                 return UITextItem.MenuConfiguration(menu: defaultMenu)
             }
@@ -496,41 +517,175 @@ struct SelectableText: UIViewRepresentable {
         parsedMarkdown(source).attributed
     }
 
-    static func attributedMarkdownParagraphs(
-        _ sources: [String],
-        font: UIFont,
-        color: UIColor,
-        lineSpacing: CGFloat,
-        paragraphSpacing: CGFloat
-    ) -> NSAttributedString {
-        let style = "\(styleKey(font: font, color: color, lineSpacing: lineSpacing))|\(paragraphSpacing)"
-        let sourceKey = sources.map { "\($0.utf8.count):\($0)" }.joined(separator: "|")
-        let key = TextRenderCachePolicy.key("\(style)|\(sourceKey)")
-        if let hit = paragraphCache.object(forKey: key) { return hit }
+    static func attributedMarkdownProse(_ blocks: [MarkdownBlock], color: UIColor, isStreaming: Bool = false)
+        -> NSAttributedString {
+        let key = TextRenderCachePolicy.key("\(colorKey(color))|\(String(describing: blocks))")
+        if !isStreaming, let hit = proseCache.object(forKey: key) { return hit }
         let result = NSMutableAttributedString()
-        for (index, source) in sources.enumerated() {
-            let paragraph = NSMutableAttributedString(
-                attributedString: renderMarkdown(source, font: font, color: color, lineSpacing: lineSpacing)
-            )
-            if index < sources.count - 1 {
-                paragraph.append(NSAttributedString(string: "\n"))
-            }
-            let style = NSMutableParagraphStyle()
-            style.lineSpacing = lineSpacing
-            style.lineBreakStrategy = []
-            style.paragraphSpacing = index < sources.count - 1 ? max(0, paragraphSpacing - lineSpacing) : 0
-            paragraph.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: paragraph.length))
-            result.append(paragraph)
+        var previous: MarkdownBlock?
+        for block in blocks {
+            let gap = previous.map { MarkdownText.spacing(before: block, after: $0) + MarkdownText.headingInset(block) } ?? 0
+            appendProse(block, gap: gap, color: color, isStreaming: isStreaming, to: result)
+            previous = block
         }
         let rendered = NSAttributedString(attributedString: result)
         let cost = TextRenderCachePolicy.attributedCost(utf16Count: rendered.length)
-        if cost <= paragraphCache.totalCostLimit {
-            paragraphCache.setObject(rendered, forKey: key, cost: cost)
+        if !isStreaming, cost <= proseCache.totalCostLimit {
+            proseCache.setObject(rendered, forKey: key, cost: cost)
         }
         return rendered
     }
 
-    private static let paragraphCache: NSCache<NSString, NSAttributedString> = {
+    private static func appendProse(
+        _ block: MarkdownBlock,
+        gap: CGFloat,
+        color: UIColor,
+        isStreaming: Bool,
+        to result: NSMutableAttributedString
+    ) {
+        let text = { (source: String) in isStreaming ? StreamingMarkdownText.balanced(source) : source }
+        switch block {
+        case .paragraph(let source):
+            let rendered = renderMarkdown(text(source), font: MarkdownText.bodyFont, color: color, lineSpacing: 1)
+            appendParagraph(rendered, gap: gap, to: result) { $0.lineSpacing = 1 }
+        case .heading(let level, let source):
+            let rendered = renderMarkdown(text(source), font: headingFont(level: level), color: color, lineSpacing: 2)
+            appendParagraph(rendered, gap: gap, to: result) { $0.lineSpacing = 2 }
+        case .lists(let lists):
+            appendLists(lists, depth: 0, gap: gap, color: color, text: text, to: result)
+        case .code, .quote, .table, .rule, .embed:
+            break
+        }
+    }
+
+    private static func appendLists(
+        _ lists: [MarkdownList],
+        depth: Int,
+        gap: CGFloat,
+        color: UIColor,
+        text: (String) -> String,
+        to result: NSMutableAttributedString
+    ) {
+        let itemSpacing: CGFloat = 3
+        var gap = gap
+        for list in lists {
+            let indent = CGFloat(depth) * Theme.Spacing.lg
+            let markerWidth = listMarkerWidth(list.kind)
+            let markerOverhang = listMarkerOverhang(list.kind)
+            for (index, item) in list.items.enumerated() {
+                let line = NSMutableAttributedString(attributedString: listMarker(list.kind, index: index, depth: depth, color: color))
+                line.append(renderMarkdown(text(item.text), font: MarkdownText.bodyFont, color: color, lineSpacing: 2))
+                appendParagraph(line, gap: gap + markerOverhang, to: result) { style in
+                    style.lineSpacing = 2
+                    style.firstLineHeadIndent = indent
+                    style.headIndent = indent + markerWidth + Theme.Spacing.sm
+                    style.tabStops = [
+                        NSTextTab(textAlignment: .right, location: indent + markerWidth),
+                        NSTextTab(textAlignment: .left, location: indent + markerWidth + Theme.Spacing.sm),
+                    ]
+                }
+                gap = itemSpacing
+                appendLists(item.children, depth: depth + 1, gap: itemSpacing, color: color, text: text, to: result)
+            }
+        }
+    }
+
+    private static func appendParagraph(
+        _ paragraph: NSAttributedString,
+        gap: CGFloat,
+        to result: NSMutableAttributedString,
+        configure: (NSMutableParagraphStyle) -> Void
+    ) {
+        let style = NSMutableParagraphStyle()
+        style.lineBreakStrategy = []
+        configure(style)
+        if result.length > 0 {
+            let previous = result.attribute(.paragraphStyle, at: result.length - 1, effectiveRange: nil) as? NSParagraphStyle
+            style.paragraphSpacingBefore = max(0, gap - style.lineSpacing)
+            result.append(NSAttributedString(string: "\n", attributes: [
+                .font: MarkdownText.bodyFont,
+                .paragraphStyle: previous ?? style,
+            ]))
+        }
+        let styled = NSMutableAttributedString(attributedString: paragraph)
+        styled.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: styled.length))
+        result.append(styled)
+    }
+
+    private static let bulletFont = UIFont.monospacedDigitSystemFont(
+        ofSize: MarkdownText.bodyFont.pointSize * 1.35, weight: .regular
+    )
+    private static let orderedMarkerFont = UIFont.monospacedDigitSystemFont(
+        ofSize: MarkdownText.bodyFont.pointSize, weight: .regular
+    )
+
+    static func proseTopInset(_ block: MarkdownBlock) -> CGFloat {
+        guard case .lists(let lists) = block else { return MarkdownText.headingInset(block) }
+        return lists.first.map { listMarkerOverhang($0.kind) } ?? 0
+    }
+
+    private static func listMarkerOverhang(_ kind: MarkdownListKind) -> CGFloat {
+        kind == .bullets ? bulletFont.ascender - MarkdownText.bodyFont.ascender : 0
+    }
+
+    private static func listMarkerWidth(_ kind: MarkdownListKind) -> CGFloat {
+        let (marker, font) = kind == .ordered ? ("99.", orderedMarkerFont) : ("•", bulletFont)
+        return ceil((marker as NSString).size(withAttributes: [.font: font]).width)
+    }
+
+    private static var bullets: [String: NSTextAttachment] = [:]
+
+    private static func bullet(color: UIColor) -> NSTextAttachment {
+        let styles: [UIUserInterfaceStyle] = [.light, .dark]
+        let key = styles.map { colorKey(color.resolvedColor(with: UITraitCollection(userInterfaceStyle: $0))) }.joined(separator: "|")
+        if let cached = bullets[key] { return cached }
+        let inkTop = CTLineGetImageBounds(
+            CTLineCreateWithAttributedString(NSAttributedString(string: "•", attributes: [.font: bulletFont])), nil
+        ).maxY
+        let size = CGSize(width: ("•" as NSString).size(withAttributes: [.font: bulletFont]).width, height: ceil(inkTop))
+        let asset = UIImageAsset()
+        for style in styles {
+            let traits = UITraitCollection(userInterfaceStyle: style)
+            let glyph = NSAttributedString(string: "•", attributes: [
+                .font: bulletFont,
+                .foregroundColor: color.resolvedColor(with: traits),
+            ])
+            let format = UIGraphicsImageRendererFormat(for: traits)
+            let image = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+                glyph.draw(at: CGPoint(x: 0, y: size.height - bulletFont.ascender))
+            }
+            asset.register(image, with: traits)
+        }
+        let attachment = NSTextAttachment(image: asset.image(with: UITraitCollection.current))
+        attachment.bounds = CGRect(origin: .zero, size: size)
+        bullets[key] = attachment
+        return attachment
+    }
+
+    private static func listMarker(_ kind: MarkdownListKind, index: Int, depth: Int, color: UIColor) -> NSAttributedString {
+        let copied = String(repeating: "  ", count: depth) + (kind == .ordered ? "\(index + 1). " : "• ")
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: MarkdownText.bodyFont,
+            .foregroundColor: color,
+            .markdownListMarker: copied,
+        ]
+        let marker = NSMutableAttributedString(string: "\t", attributes: attributes)
+        switch kind {
+        case .bullets:
+            let bullet = NSMutableAttributedString(attachment: bullet(color: color))
+            bullet.addAttributes(attributes, range: NSRange(location: 0, length: bullet.length))
+            marker.append(bullet)
+        case .ordered:
+            marker.append(NSAttributedString(
+                string: "\(index + 1).",
+                attributes: attributes.merging([.font: orderedMarkerFont]) { $1 }
+            ))
+        }
+        marker.append(NSAttributedString(string: "\t", attributes: attributes))
+        return marker
+    }
+
+    private static let proseCache: NSCache<NSString, NSAttributedString> = {
         let cache = NSCache<NSString, NSAttributedString>()
         cache.countLimit = 256
         cache.totalCostLimit = TextRenderCachePolicy.attributedLimit
