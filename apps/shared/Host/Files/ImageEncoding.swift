@@ -73,17 +73,6 @@ nonisolated enum ImagePreparer: ImageEncoding {
         return try encode(image, lossless: lossless)
     }
 
-    static func preparePreservingResolution(_ data: Data) throws -> PreparedImage {
-        let inspection = try inspect(data)
-        if inspection.type.conforms(to: .png) {
-            return PreparedImage(data: data, mimeType: "image/png", fileExtension: "png")
-        }
-        if inspection.type.conforms(to: .jpeg) {
-            return PreparedImage(data: data, mimeType: "image/jpeg", fileExtension: "jpg")
-        }
-        throw ImagePreparationError.invalid
-    }
-
     static func hasAlpha(_ image: CGImage) -> Bool {
         switch image.alphaInfo {
         case .alphaOnly, .first, .last, .premultipliedFirst, .premultipliedLast: true

@@ -131,7 +131,7 @@ struct MarkdownFileView: View {
             Log.ui.info("MarkdownFileView.load filename=\(artifact.fileName) bytes=\(document.byteCount)")
         } catch {
             guard !Task.isCancelled else { return }
-            phase = .failed(artifact.userFacingErrorDescription(error))
+            phase = .failed(error.localizedDescription)
             Log.ui.error("MarkdownFileView.load filename=\(artifact.fileName) error=\(error.localizedDescription)")
         }
     }
@@ -171,7 +171,7 @@ struct MarkdownFileView: View {
             } catch {
                 guard !Task.isCancelled else { return }
                 isSaving = false
-                saveError = artifact.userFacingErrorDescription(error)
+                saveError = error.localizedDescription
                 Log.ui.error("MarkdownFileView.save filename=\(artifact.fileName) error=\(error.localizedDescription)")
             }
         }

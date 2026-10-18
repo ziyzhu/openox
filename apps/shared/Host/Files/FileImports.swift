@@ -60,35 +60,12 @@ nonisolated public enum FileImporter {
         return try await write(draft, in: scope, conversation: conversation)
     }
 
-    static func importPreparedImageDataAsync(
-        _ data: Data,
-        suggestedName: String,
-        in scope: ProfileScope
-    ) async throws -> FileItem {
-        let draft = try await Task.detached(priority: .userInitiated) {
-            try preparedImageDataDraft(data, suggestedName: suggestedName)
-        }.value
-        return try await write(draft, in: scope)
-    }
-
     private static func imageDataDraft(_ data: Data, suggestedName: String?) throws -> Draft {
         do {
             let prepared = try ImagePreparer.prepare(data)
             return Draft(data: prepared.data, fileName: prepared.filename(from: suggestedName))
         } catch ImagePreparationError.encode {
             throw FileError.imageEncodeFailed
-        } catch {
-            throw FileError.imageDecodeFailed
-        }
-    }
-
-    private static func preparedImageDataDraft(_ data: Data, suggestedName: String?) throws -> Draft {
-        guard data.count <= FileLimits.fileBytes else {
-            throw FileError.fileTooLarge(bytes: data.count, limit: FileLimits.fileBytes)
-        }
-        do {
-            let prepared = try ImagePreparer.preparePreservingResolution(data)
-            return Draft(data: prepared.data, fileName: prepared.filename(from: suggestedName))
         } catch {
             throw FileError.imageDecodeFailed
         }

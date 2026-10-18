@@ -112,7 +112,7 @@ struct HTMLFileView: View {
             Log.ui.info("HTMLFileView.load filename=\(artifact.fileName) bytes=\(document.byteCount)")
         } catch {
             guard !Task.isCancelled else { return }
-            phase = .failed(artifact.userFacingErrorDescription(error))
+            phase = .failed(error.localizedDescription)
             Log.ui.error("HTMLFileView.load filename=\(artifact.fileName) error=\(error.localizedDescription)")
         }
     }

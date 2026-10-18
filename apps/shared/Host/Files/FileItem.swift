@@ -84,8 +84,6 @@ nonisolated public struct FileItem: Equatable, Sendable, Identifiable, Codable {
     public var isVideo: Bool { contentType.conforms(to: .movie) }
     public var isSVG: Bool { contentType.conforms(to: .svg) }
     public var usesDedicatedPreview: Bool { kind == .html || isMarkdown }
-    public var usesZoomablePreview: Bool { !usesDedicatedPreview }
-    public func fileName(forUserFacingName name: String) -> String { name }
     func updatingAvailability(_ availability: Availability) -> FileItem {
         FileItem(
             fileName: fileName,
@@ -96,18 +94,6 @@ nonisolated public struct FileItem: Equatable, Sendable, Identifiable, Codable {
             createdAt: listedCreatedAt,
             modifiedAt: listedModifiedAt
         )
-    }
-    public static func userFacingName(forFileName fileName: String) -> String { fileName }
-    public func userFacingErrorDescription(_ error: Error) -> String {
-        guard let artifactError = error as? FileError else { return error.localizedDescription }
-        let presentedError = switch artifactError {
-        case .unsupportedType(let value): FileError.unsupportedType(Self.userFacingName(forFileName: value))
-        case .invalidFilename(let value): FileError.invalidFilename(Self.userFacingName(forFileName: value))
-        case .filenameExists(let value): FileError.filenameExists(Self.userFacingName(forFileName: value))
-        case .missing(let value): FileError.missing(Self.userFacingName(forFileName: value))
-        default: artifactError
-        }
-        return presentedError.localizedDescription
     }
     public var kind: Kind {
         if contentType.conforms(to: .html) { return .html }
@@ -176,28 +162,6 @@ nonisolated public struct FileItem: Equatable, Sendable, Identifiable, Codable {
 nonisolated struct MarkdownFileDocument: Equatable, Sendable {
     let source: String
     let byteCount: Int
-
-    static func read(_ artifact: FileItem) throws -> Self {
-        guard artifact.isMarkdown else { throw FileError.unsupportedType(artifact.fileName) }
-        guard artifact.exists else { throw FileError.missing(artifact.fileName) }
-        let data = try Data(contentsOf: artifact.fileURL)
-        guard data.count <= FileLimits.textBytes else {
-            throw FileError.textTooLarge(bytes: data.count, limit: FileLimits.textBytes)
-        }
-        guard let source = String(data: data, encoding: .utf8) else { throw FileError.textNotUTF8 }
-        return Self(source: source, byteCount: data.count)
-    }
-
-    static func write(_ source: String, to artifact: FileItem) throws -> Self {
-        guard artifact.isMarkdown else { throw FileError.unsupportedType(artifact.fileName) }
-        guard artifact.exists else { throw FileError.missing(artifact.fileName) }
-        let data = Data(source.utf8)
-        guard data.count <= FileLimits.textBytes else {
-            throw FileError.textTooLarge(bytes: data.count, limit: FileLimits.textBytes)
-        }
-        try data.write(to: artifact.fileURL, options: .atomic)
-        return Self(source: source, byteCount: data.count)
-    }
 }
 
 nonisolated public enum FileError: LocalizedError {
@@ -215,7 +179,6 @@ nonisolated public enum FileError: LocalizedError {
     case fileTooLarge(bytes: Int, limit: Int)
     case imageDecodeFailed
     case imageEncodeFailed
-    case downloadTimedOut(String)
 
     public var errorDescription: String? {
         switch self {
@@ -233,7 +196,6 @@ nonisolated public enum FileError: LocalizedError {
         case .fileTooLarge(let bytes, let limit): return String(format: L10n.string("File too large (%lld bytes; limit %lld).", comment: ""), bytes, limit)
         case .imageDecodeFailed: return L10n.string("Couldn't decode the image.", comment: "")
         case .imageEncodeFailed: return L10n.string("Couldn't encode the image.", comment: "")
-        case .downloadTimedOut(let name): return String(format: L10n.string("Timed out downloading %@ from iCloud.", comment: ""), name)
         }
     }
 }

@@ -70,7 +70,7 @@ private final class InlineCanvasSession {
         } catch is CancellationError {
             page.stopLoading()
         } catch {
-            phase = .failed(artifact.userFacingErrorDescription(error))
+            phase = .failed(error.localizedDescription)
             Log.ui.error("InlineCanvas.failed filename=\(artifact.fileName) error=\(error.localizedDescription)")
         }
     }

@@ -116,18 +116,6 @@ extension ProfileRepository {
         try await requiredFileRecord(named: name, in: scope).artifact(in: scope)
     }
 
-    func savedFileNames(in scope: ProfileScope) async throws -> Set<String> {
-        Set(try await profileFiles(prefix: "", in: scope).filter(\.saved).compactMap(\.reference))
-    }
-
-    func setFileSaved(_ saved: Bool, named name: String, in scope: ProfileScope) async throws {
-        let record = try await requiredFileRecord(named: name, in: scope)
-        _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
-            "action": .string("fileSaved"), "path": .string(record.reference ?? record.path), "saved": .bool(saved),
-        ]))
-        Log.app.info("ProfileRepository.artifact profile=\(scope.profileID?.uuidString ?? "temporary") saved=\(saved) file=\(name)")
-    }
-
     func importFile(data: Data, suggestedName: String, in scope: ProfileScope, conversation: DurableConversationReference? = nil) async throws -> FileItem {
         if let conversation {
             guard conversation.profileID == scope.profileID else { throw CocoaError(.fileReadNoPermission) }
@@ -147,16 +135,7 @@ extension ProfileRepository {
             throw FileError.fileTooLarge(bytes: data.count, limit: FileLimits.fileBytes)
         }
         let artifact = FileItem(fileName: name, directory: scope.root.appendingPathComponent("artifacts", isDirectory: true))
-        let text: String?
-        if artifact.kind == .text || artifact.kind == .html {
-            guard data.count <= FileLimits.textBytes else {
-                throw FileError.textTooLarge(bytes: data.count, limit: FileLimits.textBytes)
-            }
-            guard let decoded = String(data: data, encoding: .utf8) else { throw FileError.textNotUTF8 }
-            text = decoded
-        } else {
-            text = nil
-        }
+        let text = artifact.kind == .text || artifact.kind == .html ? try artifactText(data) : nil
         let path: String
         if let conversation {
             guard conversation.profileID == scope.profileID else { throw CocoaError(.fileReadNoPermission) }
@@ -174,21 +153,6 @@ extension ProfileRepository {
         let published = try await self.artifact(named: path, in: scope)
         Log.app.info("ProfileRepository.artifact publish profile=\(scope.profileID?.uuidString ?? "temporary") file=\(name) bytes=\(data.count) binary=\(text == nil)")
         return published
-    }
-
-    func replaceFileText(named name: String, oldText: String, newText: String, in scope: ProfileScope) async throws -> FileItem {
-        let record = try await requiredFileRecord(named: name, in: scope)
-        let source = try artifactText(try await readFileBytes(record, in: scope))
-        let updated: String
-        if oldText.isEmpty {
-            updated = source + newText
-        } else {
-            let matches = ExactTextReplacement.count(oldText, in: source)
-            guard matches > 0 else { throw FileError.textNotFound }
-            guard matches == 1 else { throw FileError.textAmbiguous(matches: matches) }
-            updated = ExactTextReplacement.replace(oldText, with: newText, in: source)
-        }
-        return try await publishFileVersion(updated, of: record, in: scope)
     }
 
     func readMarkdownFile(named name: String, in scope: ProfileScope) async throws -> MarkdownFileDocument {
