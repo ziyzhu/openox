@@ -2,208 +2,9 @@ import Foundation
 import WebKit
 import Observation
 
-enum ConversationRetention: Equatable {
-    case persisted
-    case temporary
-}
-
-nonisolated struct FollowIntent: Equatable, Identifiable, Sendable {
-    let label: String
-    let message: String
-
-    static func parse(_ value: JSONValue) throws -> [Self] {
-        guard let entries = value.arrayValue, entries.count <= 2 else {
-            throw RuntimeError.bridge("ox.user.follow: provide at most 2 intents")
-        }
-        let intents = try entries.map { entry -> Self in
-            guard let fields = entry.objectValue,
-                  let kind = fields["kind"]?.stringValue else {
-                throw RuntimeError.bridge("ox.user.follow: each intent needs a kind")
-            }
-            switch kind {
-            case "send":
-                let label = fields["label"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                let message = fields["message"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                guard !label.isEmpty, label.count <= 80,
-                      !message.isEmpty, message.count <= 1_000 else {
-                    throw RuntimeError.bridge("ox.user.follow: send needs a short label and message")
-                }
-                return Self(label: label, message: message)
-            default: throw RuntimeError.bridge("ox.user.follow: unsupported intent kind")
-            }
-        }
-        guard Set(intents.map(\.id)).count == intents.count else {
-            throw RuntimeError.bridge("ox.user.follow: intents must be unique")
-        }
-        return intents
-    }
-
-    var id: String { "send:\(label.lowercased())" }
-}
-
-struct ConversationContinuation {
-    let meta: ConversationMeta
-    let turns: [Turn]
-    let intent: String
-    let attachments: [FileItem]
-    let skillInvocation: UserSkillInvocation?
-}
-
-nonisolated enum ConversationPromptPresentation: Equatable, Sendable {
-    case conversation
-    case application
-}
-
-nonisolated struct ConversationPendingPrompt: Equatable, Sendable {
-    let id: UUID
-    let prompt: String
-    let options: [String]
-    let presentation: ConversationPromptPresentation
-}
-
 @MainActor
 @Observable
 final class Conversation: Identifiable {
-    enum ExecutionLease {
-        case userInitiated
-        case externallyManaged
-    }
-
-    private enum AgentHapticPhase {
-        case waitingForDelta
-        case deltaReceived
-    }
-
-    struct PendingServiceControl: Identifiable, Equatable {
-        struct Source: Equatable {
-            let blockID: UUID
-            let itemIndex: Int
-        }
-
-        let id: UUID
-        let control: ServiceControl
-        var source: Source?
-        var accessPreflight: UUID? = nil
-    }
-
-    struct PendingPrompt: Identifiable, Equatable {
-        struct AutoApproval: Equatable {
-            let action: String
-            let defaultPolicy: ActionPolicy
-            let approve: String
-            let alwaysApprove: String
-            let deny: String
-        }
-
-        let id: UUID
-        let kind: ConversationPromptKind
-        let prompt: String
-        let options: [String]
-        let presentation: ConversationPromptPresentation
-        let allowsCustomAnswer: Bool
-        let autoApproval: AutoApproval?
-        let secretEntry: SecretEntryRequest?
-        let permission: PermissionPresentation?
-    }
-
-    enum Interaction: Equatable {
-        case prompt(PendingPrompt)
-        case serviceControl(PendingServiceControl)
-    }
-
-    enum Activity: Equatable {
-        enum Idle: Equatable {
-            case read
-            case unread
-            case stopped
-        }
-
-        enum AwaitingAction: Equatable {
-            case approval
-            case reply
-            case signIn
-            case verification
-            case payment
-        }
-
-        enum Running: Equatable {
-            case thinking
-            case streaming
-            case awaiting(AwaitingAction)
-        }
-
-        case idle(Idle)
-        case running(Running)
-
-        var isThinking: Bool {
-            self == .running(.thinking)
-        }
-
-        var isAwaitingUser: Bool {
-            if case .running(.awaiting) = self { true } else { false }
-        }
-    }
-
-    enum Notice: Equatable {
-        case none
-        case error(String)
-
-        var errorMessage: String? {
-            if case .error(let message) = self { message } else { nil }
-        }
-    }
-
-    struct ThinkingActivity: Equatable {
-        let turnID: TurnID
-        let startedAt: Date
-    }
-
-    private enum InteractionWaiter {
-        case prompt(PendingPrompt, CheckedContinuation<PromptResult, Never>)
-        case serviceControl(PendingServiceControl, CheckedContinuation<JSONValue?, Never>)
-
-        var interaction: Interaction {
-            switch self {
-            case .prompt(let prompt, _): .prompt(prompt)
-            case .serviceControl(let control, _): .serviceControl(control)
-            }
-        }
-
-        var id: UUID {
-            switch self {
-            case .prompt(let prompt, _): prompt.id
-            case .serviceControl(let control, _): control.id
-            }
-        }
-
-        var backgroundPhase: ConversationBackgroundPhase {
-            switch interaction {
-            case .prompt(let prompt) where prompt.kind == .permission: .permissionNeeded
-            case .prompt: .inputNeeded
-            case .serviceControl(let control):
-                switch control.control {
-                case .signIn: .signInNeeded
-                case .botControl: .verificationNeeded
-                case .payment: .paymentNeeded
-                }
-            }
-        }
-
-        var serviceDomain: String? {
-            guard case .serviceControl(let control, _) = self else { return nil }
-            return control.control.domain
-        }
-
-        func cancel() {
-            switch self {
-            case .prompt(let prompt, let continuation):
-                prompt.secretEntry?.cancel()
-                continuation.resume(returning: .cancelled)
-            case .serviceControl(_, let continuation): continuation.resume(returning: nil)
-            }
-        }
-    }
-
     private(set) var id: UUID
     let createdAt: Date
     let scheduledSkillID: UUID?
@@ -366,11 +167,31 @@ final class Conversation: Identifiable {
         }
     }
 
-    private(set) var attachedServices: [Service] = []
-    @ObservationIgnored private var attachedServiceDomains: [String] = []
-    @ObservationIgnored private var interactionWaiter: InteractionWaiter?
-    @ObservationIgnored private var interactionQueue: [InteractionWaiter] = []
-    @ObservationIgnored private var attentionNotificationID: String?
+    @ObservationIgnored private lazy var serviceAttachments = ConversationServiceAttachments(
+        conversation: self,
+        botControlSource: botControlSource,
+        cancelInteractions: { [unowned self] domains in interactions.cancelServiceInteractions(domains: domains) },
+        resumeAgent: { [unowned self] event, source in enqueueSystemEvent(event, source: source) }
+    )
+    var attachedServices: [Service] { serviceAttachments.services }
+    @ObservationIgnored private lazy var interactions = ConversationInteractionGate(
+        conversation: self,
+        feedback: feedback,
+        present: { [unowned self] interaction, phase in
+            replaceRunPhase(.awaiting(interaction))
+            activeRun?.backgroundExecution?.finish(.awaitingInput(phase))
+            activeRun?.backgroundExecution = nil
+        },
+        settle: { [unowned self] in
+            replaceRunPhase(.thinking)
+            startBackgroundExecution()
+        },
+        dismiss: { [unowned self] in
+            if interaction != nil { replaceRunPhase(.thinking) }
+        },
+        permissionNeeded: { [unowned self] in activeRun?.backgroundExecution?.updatePhase(.permissionNeeded) },
+        answered: { [unowned self] in markActivity() }
+    )
 
     var interaction: Interaction? {
         guard let run = activeRun,
@@ -399,8 +220,7 @@ final class Conversation: Identifiable {
             Task { _ = await service.loadManifest() }
         }
         Log.session.info("Conversation.selection id=\(id) selected=true busy=\(isBusy)")
-        outputDelivery.setVisibility(.visible)
-        if outputDelivery.needsFrames { startStreamLink() }
+        stream.setVisible(true)
         scheduleModelPreparation()
         if let browserURLToRestore,
            !isBusy,
@@ -439,9 +259,7 @@ final class Conversation: Identifiable {
             ?? browserURLToRestore
         modelPreparationTask?.cancel()
         modelPreparationTask = nil
-        outputDelivery.setVisibility(.hidden)
-        stopStreamLink()
-        finalizeBufferedTurnIfInactive()
+        stream.setVisible(false)
     }
 
     func release(cancelling: Bool = true) {
@@ -488,46 +306,7 @@ final class Conversation: Identifiable {
         onPersistableChange?()
     }
 
-    var latestAgentConversationTitle: String? {
-        for turn in document.turns.reversed() {
-            guard case let .agent(agent, _) = turn else { continue }
-            for step in agent.steps.reversed() {
-                guard case let .execute(execution) = step.kind else { continue }
-                for effect in execution.effects.reversed() {
-                    guard case let .invocation(invocation) = effect,
-                          invocation.name == Actions.appRenameConversation,
-                          case let .succeeded(value) = invocation.outcome,
-                          value?.objectValue?["renamed"]?.boolValue == true else { continue }
-                    return value?.objectValue?["title"]?.stringValue
-                }
-            }
-        }
-        return nil
-    }
-
-    private func resolveTarget(_ name: String, label: String) throws -> (service: Service, id: String) {
-        let parts = name.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
-        if parts.count == 3, ["web", "api", "ios", "mcp"].contains(parts[0]) {
-            let service = attachedServices.first { candidate in
-                switch parts[0] {
-                case "web": candidate.isWebService && candidate.domain == parts[1]
-                case "api": candidate.isAPIService && candidate.domain == parts[1]
-                case "ios": candidate.isIOSService && candidate.domain == "ios:\(parts[1])"
-                case "mcp": candidate.isMCPService && candidate.domain == parts[1]
-                default: false
-                }
-            }
-            guard let service else {
-                throw OxFunctionError(code: "service_not_attached", message: "\(label): service '\(parts[0]):\(parts[1])' isn't attached to this conversation.", recovery: "Find the service with ox.service.find and attach its exact returned domain with ox.service.attach before invoking its actions.")
-            }
-            return (service, parts[2])
-        }
-        if attachedServices.count == 1, let only = attachedServices.first {
-            return (only, name)
-        }
-        throw RuntimeError.bridge("\(label): use 'web:<domain>:\(name)', 'ios:<app>:\(name)', or 'mcp:<server>:\(name)' — the conversation has \(attachedServices.count) services attached.")
-    }
-
+    var latestAgentConversationTitle: String? { document.latestAgentRenamedTitle }
 
     @ObservationIgnored let virtualMachine: VirtualMachine
 
@@ -599,7 +378,7 @@ final class Conversation: Identifiable {
                 }
                 return service
             },
-            resolveAction: { [unowned self] name in try resolveTarget(name, label: "ox.service.invoke") },
+            resolveAction: { [unowned self] name in try serviceAttachments.target(name, label: "ox.service.invoke") },
             attachedDomains: { [unowned self] in Set(attachedServices.map(\.domain)) },
             approve: { [unowned self] action, defaultPolicy, args, purpose, prompt in
                 try await requireApproval(
@@ -612,7 +391,7 @@ final class Conversation: Identifiable {
             },
             presentControl: { [unowned self] control, _ in
                 let pending = embedServiceControl(control)
-                return await waitForServiceControl(pending)
+                return await interactions.waitForServiceControl(pending)
             },
             receiveFiles: { [unowned self] in try await importRemoteMCPFiles($0) },
             serviceChanged: { [unowned self] domain in
@@ -713,8 +492,6 @@ final class Conversation: Identifiable {
         try await invokeIOSService(serviceID, actionID: actionID, args: args, purpose: purpose)
     }
 
-    // MARK: - Transcript (folded in from ConversationManager)
-
     private var document = ConversationDocument() {
         didSet {
             transcriptRevision &+= 1
@@ -802,84 +579,15 @@ final class Conversation: Identifiable {
 
     static let abortedAnswer = "The user stopped before answering."
 
-    private struct Submission {
-        enum Kind: Equatable {
-            case user
-            case system(resume: TurnID?)
-        }
+    private typealias Submission = ConversationSubmissionQueue.Submission
 
-        enum State {
-            case queued
-            case posted
-            case consumed
-            case cancelled
-        }
-
-        let id: SubmissionID
-        let kind: Kind
-        let text: String
-        let attachments: [FileItem]
-        let skillInvocation: UserSkillInvocation?
-        let latency: TurnLatencyTrace
-        var state: State
-
-        var needsPosting: Bool {
-            guard case .user = kind else { return false }
-            return state == .queued
-        }
-
-        var queuedMessage: QueuedMessage? {
-            guard needsPosting else { return nil }
-            return QueuedMessage(id: id.rawValue, text: text, attachments: attachments, skillInvocation: skillInvocation)
-        }
-
-        mutating func post() {
-            guard needsPosting else { return }
-            state = .posted
-        }
-
-        mutating func consume() {
-            state = .consumed
-        }
-    }
-    struct QueuedMessage: Identifiable {
-        let id: UUID
-        let text: String
-        let attachments: [FileItem]
-        let skillInvocation: UserSkillInvocation?
-    }
-
-    struct SubmissionReceipt: Equatable {
-        enum Disposition: String {
-            case posted
-            case queued
-        }
-
-        let id: UUID
-        let disposition: Disposition
-    }
-
-    enum SubmissionAnchor: Equatable {
-        case queued(UUID)
-        case turn(blockID: UUID, submissionID: UUID?)
-
-        var id: UUID {
-            switch self {
-            case .queued(let id): id
-            case .turn(let blockID, _): blockID
-            }
-        }
-    }
-
-    var queuedMessages: [QueuedMessage] {
-        submissions.compactMap(\.queuedMessage)
-    }
+    var queuedMessages: [QueuedMessage] { submissions.queuedMessages }
 
     func anchor(forSubmissionID submissionID: UUID) -> SubmissionAnchor? {
         if let blockID = document.firstBlockID(forSubmissionID: submissionID) {
             return .turn(blockID: blockID, submissionID: submissionID)
         }
-        if submissions.contains(where: { $0.id.rawValue == submissionID && $0.needsPosting }) {
+        if submissions.queued(submissionID) != nil {
             return .queued(submissionID)
         }
         return nil
@@ -926,13 +634,11 @@ final class Conversation: Identifiable {
         let body: String
     }
 
-    private enum PromptResult {
-        case answered(String)
-        case cancelled
-    }
-
     private var activeRun: Run?
-    private var submissions: [Submission] = []
+    @ObservationIgnored private lazy var submissions = ConversationSubmissionQueue(
+        conversation: self,
+        responseText: { [unowned self] submissionID in document.responseText(forSubmissionID: submissionID) }
+    )
     var isBusy: Bool { activeRun != nil }
 
     func waitForRun() async {
@@ -947,22 +653,30 @@ final class Conversation: Identifiable {
         return true
     }
     var hasPendingInteraction: Bool { interaction != nil }
-    @ObservationIgnored private var streamedText = ""
-    @ObservationIgnored private var streamedTextBlockIndex: Int?
-    @ObservationIgnored private var agentHapticPhase = AgentHapticPhase.waitingForDelta
     @ObservationIgnored private var finishingStartedAt: Date?
     @ObservationIgnored private var finishingWatchdog: Task<Void, Never>?
     @ObservationIgnored private var activeLatency: TurnLatencyTrace?
     @ObservationIgnored private var submissionPresentation = SubmissionPresentation.completed
-    @ObservationIgnored private var submissionWaiters: [SubmissionID: CheckedContinuation<ConversationSubmissionOutcome, Never>] = [:]
     @ObservationIgnored private let executionLease: ExecutionLease
 
     private let execution: any ConversationExecution
     private let feedback: any ConversationFeedback
-    private let outputDelivery = OutputDelivery()
-    @ObservationIgnored private var streamingDeliveryContinuation: CheckedContinuation<Void, Never>?
-    @ObservationIgnored private var streamingTurnDelivered = true
-    @ObservationIgnored private lazy var streamFrameDriver = execution.frameDriver(handler: { [weak self] timestamp in self?.onStreamFrame(at: timestamp) })
+    @ObservationIgnored private lazy var stream = ConversationAssistantStream(
+        conversation: self,
+        execution: execution,
+        feedback: feedback,
+        showText: { [unowned self] text in
+            if isSelected { activeLatency?.mark(.firstTextVisible) }
+            growAgentText(text)
+        },
+        replaceText: { [unowned self] text in
+            if isSelected { activeLatency?.mark(.firstTextVisible) }
+            document.apply(.replaceGenerationText(text))
+        },
+        finishTurn: { [unowned self] assistant in
+            setRunPhase(assistant.stopReason == .toolUse ? .thinking : .finishing)
+        }
+    )
 
     static func userFacingError(_ raw: String, kind: LLMFailureKind?) -> String {
         if kind == .rateLimited {
@@ -1021,12 +735,12 @@ final class Conversation: Identifiable {
             if !document.hasOpenAgentTurn { beginAgentTurn() }
         case .generationStarted(let model, _):
             setRunPhase(.thinking)
-            resetStreamedText()
+            stream.reset()
             document.apply(.beginGeneration(model: model, at: Date()))
             for compaction in pendingContextCompactions { document.apply(.appendContextCompaction(compaction)) }
             pendingContextCompactions = []
         case .messageStart(.assistant(let assistant)):
-            resetStreamedText()
+            stream.reset()
             if !document.hasOpenAgentTurn { document.apply(.beginAgentTurn(at: assistant.timestamp)) }
             if !document.hasOpenGeneration { document.apply(.beginGeneration(model: assistant.model, at: assistant.timestamp)) }
         case .messageUpdate(_, let event):
@@ -1035,10 +749,13 @@ final class Conversation: Identifiable {
             appendReasoning(text)
         case .messageEnd(.assistant(let assistant)):
             document.apply(.setGenerationAssistant(assistant))
-            applyAssistantFinal(assistant)
-            endStreamingTurn(assistant)
+            stream.reconcile(assistant)
+            if !isTemporary, assistant.stopReason != .toolUse {
+                stageCompletionNotification(assistant: assistant)
+            }
+            stream.end(assistant)
         case .generationFinished(let assistant, _):
-            await waitForStreamingDelivery()
+            await stream.waitForDelivery()
             document.apply(.finishGeneration(Self.outcome(for: assistant, at: Date())))
             requestPersistence(.generationFinished)
             activeRun?.backgroundExecution?.advance()
@@ -1104,12 +821,8 @@ final class Conversation: Identifiable {
         isFavorite = meta.isFavorite
         document = restoredDocument ?? ConversationDocument.restoring(turns)
         let recovered = document.turns != turns
-        attachedServiceDomains = Self.uniqueServiceDomains(meta.attachedServiceDomains)
-        if attachedServiceDomains.count != meta.attachedServiceDomains.count {
-            Log.session.warning("Conversation.restore deduplicated-services id=\(meta.id) stored=\(meta.attachedServiceDomains.count) unique=\(attachedServiceDomains.count)")
-        }
         hasUnreadResponse = meta.hasUnreadResponse
-        resolveAttachedServices()
+        serviceAttachments.restore(meta.attachedServiceDomains)
         lastActivityAt = meta.lastActivity
         Log.session.info("Conversation restored id=\(meta.id) turns=\(turns.count) blocks=\(transcript.count) services=\(attachedServices.count) recovered=\(recovered) context=pending")
     }
@@ -1123,7 +836,7 @@ final class Conversation: Identifiable {
             isFavorite: isFavorite,
             model: modelSelection,
             monoRepositoryHash: monoRepositoryHash,
-            attachedServiceDomains: attachedServiceDomains,
+            attachedServiceDomains: serviceAttachments.domains,
             preview: transcriptPreview,
             hasUnreadResponse: hasUnreadResponse,
             scheduledSkillID: scheduledSkillID,
@@ -1141,7 +854,7 @@ final class Conversation: Identifiable {
 
     @discardableResult
     func syncToMonoRepository() async -> [String] {
-        resolveAttachedServices()
+        serviceAttachments.resolve()
         let manager = serviceManager
         guard let currentHash = manager.monoRepositoryHash, currentHash != monoRepositoryHash else { return [] }
         defer {
@@ -1158,8 +871,6 @@ final class Conversation: Identifiable {
         Log.session.info("Conversation.syncToMonoRepository id=\(id) \(previousHash.prefix(7))->\(currentHash.prefix(7)) reloaded=\(servicesToReload.map(\.domain).joined(separator: ","))")
         return servicesToReload.map(\.title)
     }
-
-    // MARK: - Transcript mutation (was ConversationManager)
 
     private func markActivity(_ date: Date = Date(), persist: Bool = true) {
         lastActivityAt = date
@@ -1195,7 +906,7 @@ final class Conversation: Identifiable {
     }
 
     func beginExecution(source: String) {
-        flushBufferedAgentText()
+        stream.flush()
         currentExecutionFiles = []
         currentExecutionTransientAttachments = []
         currentExecutionActivatedSkills = [:]
@@ -1205,13 +916,6 @@ final class Conversation: Identifiable {
         document.apply(.beginExecution(source: source))
     }
 
-    private func flushBufferedAgentText() {
-        let text = outputDelivery.drainText()
-        guard !text.isEmpty else { return }
-        if isSelected { activeLatency?.mark(.firstTextVisible) }
-        growAgentText(text)
-    }
-
     func executionAttachments() -> (artifacts: [FileItem], transient: [TransientAttachment]) {
         (
             currentExecutionFiles,
@@ -1219,24 +923,15 @@ final class Conversation: Identifiable {
         )
     }
 
-    private var runningExecution: Execution? {
-        guard case let .agent(turn, _) = document.turns.last else { return nil }
-        for step in turn.steps.reversed() {
-            guard case let .execute(execution) = step.kind else { continue }
-            return execution.outcome == .running ? execution : nil
-        }
-        return nil
-    }
-
     func executionInvocations() -> [Invocation] {
-        runningExecution?.effects.compactMap {
+        document.runningExecution?.effects.compactMap {
             if case let .invocation(invocation) = $0 { return invocation }
             return nil
         } ?? []
     }
 
     func executionOmittedInvocations() -> Int {
-        runningExecution?.invocationTrace?.omittedCalls ?? 0
+        document.runningExecution?.invocationTrace?.omittedCalls ?? 0
     }
 
     func executionActivatedSkills() -> [ActivatedSkillContext] {
@@ -1283,135 +978,11 @@ final class Conversation: Identifiable {
     }
 
     func resolveServiceControl(id controlID: UUID, result: JSONValue?) {
-        guard case .serviceControl(let control, let continuation) = interactionWaiter else {
-            Log.session.warning("Conversation.resolveServiceControl ignored id=\(controlID) reason=no-active-service-control")
-            return
-        }
-        guard control.id == controlID else {
-            Log.session.warning("Conversation.resolveServiceControl ignored id=\(controlID) active=\(control.id) reason=id-mismatch")
-            return
-        }
-        interactionWaiter = nil
-        advanceInteraction()
-        continuation.resume(returning: result)
-        Log.session.info("Conversation.resolveServiceControl id=\(controlID) succeeded=\(result != nil)")
-    }
-
-    func waitForServiceControl(_ control: PendingServiceControl) async -> JSONValue? {
-        await withCheckedContinuation { continuation in
-            guard isBusy else {
-                continuation.resume(returning: nil)
-                return
-            }
-            enqueueInteraction(.serviceControl(control, continuation))
-        }
-    }
-
-    private func enqueueInteraction(_ waiter: InteractionWaiter) {
-        guard interactionWaiter == nil else {
-            interactionQueue.append(waiter)
-            Log.session.info("Conversation.interaction queued id=\(waiter.id) depth=\(interactionQueue.count)")
-            return
-        }
-        activateInteraction(waiter)
-    }
-
-    private func activateInteraction(_ waiter: InteractionWaiter) {
-        interactionWaiter = waiter
-        replaceRunPhase(.awaiting(waiter.interaction))
-        activeRun?.backgroundExecution?.finish(.awaitingInput(waiter.backgroundPhase))
-        activeRun?.backgroundExecution = nil
-        Log.session.info("Conversation.interaction active id=\(waiter.id) queued=\(interactionQueue.count)")
-        observeActionPolicy()
-        notifyPendingInteraction()
+        interactions.resolveServiceControl(id: controlID, result: result)
     }
 
     func notifyPendingInteraction() {
-        guard let waiter = interactionWaiter,
-              attentionNotificationID == nil,
-              feedback.isBackground else { return }
-        deliverAttentionNotification(interactionID: waiter.id, phase: waiter.backgroundPhase)
-    }
-
-    private func observeActionPolicy() {
-        guard case .prompt(let prompt, _) = interactionWaiter,
-              let approval = prompt.autoApproval else { return }
-        let policy = withObservationTracking {
-            serviceManager.actionPolicy(for: approval.action, default: approval.defaultPolicy)
-        } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self, self.interactionWaiter?.id == prompt.id else { return }
-                self.observeActionPolicy()
-            }
-        }
-        switch policy {
-        case .allow:
-            Log.session.info("Conversation.interaction policyResolved id=\(prompt.id) action=\(approval.action) policy=allow")
-            resolvePrompt(blockId: prompt.id, answer: approval.approve)
-        case .block:
-            Log.session.info("Conversation.interaction policyResolved id=\(prompt.id) action=\(approval.action) policy=block")
-            resolvePrompt(blockId: prompt.id, answer: approval.deny)
-        case .ask:
-            break
-        }
-    }
-
-    private func advanceInteraction() {
-        clearAttentionNotification()
-        while !interactionQueue.isEmpty {
-            let waiter = interactionQueue.removeFirst()
-            if case .prompt(let prompt, let continuation) = waiter,
-               let approval = prompt.autoApproval {
-                switch serviceManager.actionPolicy(for: approval.action, default: approval.defaultPolicy) {
-                case .allow:
-                    Log.session.info("Conversation.interaction policyResolved id=\(prompt.id) action=\(approval.action) policy=allow")
-                    continuation.resume(returning: .answered(approval.approve))
-                    continue
-                case .block:
-                    Log.session.info("Conversation.interaction policyResolved id=\(prompt.id) action=\(approval.action) policy=block")
-                    continuation.resume(returning: .answered(approval.deny))
-                    continue
-                case .ask:
-                    break
-                }
-            }
-            activateInteraction(waiter)
-            return
-        }
-        replaceRunPhase(.thinking)
-        startBackgroundExecution()
-    }
-
-    private func cancelInteractions() {
-        clearAttentionNotification()
-        var waiters = interactionQueue
-        if let interactionWaiter { waiters.insert(interactionWaiter, at: 0) }
-        interactionWaiter = nil
-        interactionQueue.removeAll()
-        if interaction != nil { replaceRunPhase(.thinking) }
-        for waiter in waiters { waiter.cancel() }
-        if !waiters.isEmpty {
-            Log.session.info("Conversation.interaction canceled count=\(waiters.count)")
-        }
-    }
-
-    private func cancelServiceInteractions(domains: Set<String>) {
-        guard !domains.isEmpty else { return }
-        var cancelled: [InteractionWaiter] = []
-        let removedActive = interactionWaiter?.serviceDomain.map(domains.contains) == true
-        if removedActive, let interactionWaiter {
-            cancelled.append(interactionWaiter)
-            self.interactionWaiter = nil
-        }
-        interactionQueue.removeAll { waiter in
-            guard waiter.serviceDomain.map(domains.contains) == true else { return false }
-            cancelled.append(waiter)
-            return true
-        }
-        for waiter in cancelled { waiter.cancel() }
-        guard !cancelled.isEmpty else { return }
-        Log.session.info("Conversation.serviceInteractions canceled domains=\(domains.sorted().joined(separator: ",")) count=\(cancelled.count)")
-        if removedActive { advanceInteraction() }
+        interactions.notifyPending()
     }
 
     func embedFile(_ artifact: FileItem) {
@@ -1505,54 +1076,20 @@ final class Conversation: Identifiable {
         kind: ConversationPromptKind = .choice,
         allowsCustomAnswer: Bool = false,
         presentation: ConversationPromptPresentation = .conversation,
-        autoApproval: PendingPrompt.AutoApproval? = nil,
-        secretEntry: SecretEntryRequest? = nil,
-        permission: PermissionPresentation? = nil
+        secretEntry: SecretEntryRequest? = nil
     ) async -> String {
-        defer { secretEntry?.cancel() }
-        let blockId = UUID()
-        let pending = PendingPrompt(
-            id: blockId,
-            kind: kind,
+        await interactions.awaitPrompt(
             prompt: prompt,
             options: options,
-            presentation: presentation,
+            kind: kind,
             allowsCustomAnswer: allowsCustomAnswer,
-            autoApproval: autoApproval,
-            secretEntry: secretEntry,
-            permission: permission
+            presentation: presentation,
+            secretEntry: secretEntry
         )
-        Log.session.info("Conversation.awaitPrompt id=\(id) kind=\(kind.rawValue) presentation=\(String(describing: presentation)) options=\(options.count)")
-        let result = await waitForPrompt(pending)
-        markActivity()
-        switch result {
-        case .answered(let answer): return answer
-        case .cancelled: return Self.abortedAnswer
-        }
     }
 
     func resolvePrompt(blockId: UUID, answer: String) {
-        guard case .prompt(let prompt, let continuation) = interactionWaiter,
-              prompt.id == blockId else { return }
-        if let approval = prompt.autoApproval,
-           answer == approval.alwaysApprove {
-            serviceManager.setActionPolicy(.allow, for: approval.action)
-        }
-        prompt.secretEntry?.cancel()
-        interactionWaiter = nil
-        advanceInteraction()
-        continuation.resume(returning: .answered(answer))
-    }
-
-    private func waitForPrompt(_ prompt: PendingPrompt) async -> PromptResult {
-        await withCheckedContinuation { continuation in
-            if !isBusy {
-                Log.session.error("Conversation prompt outside run id=\(id) block=\(prompt.id)")
-                continuation.resume(returning: .cancelled)
-            } else {
-                enqueueInteraction(.prompt(prompt, continuation))
-            }
-        }
+        interactions.resolvePrompt(blockId: blockId, answer: answer)
     }
 
     @discardableResult
@@ -1577,72 +1114,35 @@ final class Conversation: Identifiable {
         activeRun?.backgroundExecution?.advance()
     }
 
-    private func resetStreamedText() {
-        streamedText = ""
-        streamedTextBlockIndex = nil
-    }
-
     private func applyAssistantEvent(_ event: AssistantEvent) {
         switch event {
         case .textDelta(let index, let delta, _):
             guard !delta.isEmpty else { return }
-            registerAgentDelta()
+            stream.registerDelta()
             activeRun?.backgroundExecution?.advance()
             activeRun?.backgroundExecution?.updatePhase(.responding)
-            let chunk = streamedTextBlockIndex == nil || streamedTextBlockIndex == index ? delta : "\n" + delta
-            streamedTextBlockIndex = index
-            streamedText += chunk
-            bufferAssistantDelta(chunk)
+            stream.appendDelta(delta, block: index)
         case .thinkingDelta(_, let delta, _):
             guard !delta.isEmpty else { return }
-            registerAgentDelta()
+            stream.registerDelta()
             activeRun?.backgroundExecution?.advance()
         case .toolCallDelta:
-            registerAgentDelta()
+            stream.registerDelta()
             activeRun?.backgroundExecution?.advance()
-            flushBufferedAgentText()
+            stream.flush()
             setRunPhase(.thinking)
         case .start(let partial):
             if !partial.content.isEmpty {
-                registerAgentDelta()
+                stream.registerDelta()
                 activeRun?.backgroundExecution?.advance()
             }
             if partial.content.contains(where: { if case .text(let text) = $0 { return !text.text.isEmpty }; return false }) {
                 activeRun?.backgroundExecution?.updatePhase(.responding)
             }
-            applyAssistantFinal(partial)
+            stream.reconcile(partial)
         case .textEnd, .thinkingEnd, .toolCallEnd, .done, .failed:
             break
         }
-    }
-
-    private func registerAgentDelta() {
-        guard agentHapticPhase == .waitingForDelta else { return }
-        agentHapticPhase = .deltaReceived
-        if isSelected { feedback.receivedAgentDelta() }
-    }
-
-    private func applyAssistantFinal(_ assistant: AssistantMessage) {
-        let text = assistant.content.compactMap { block -> String? in
-            if case .text(let value) = block { return value.text }
-            return nil
-        }.joined(separator: "\n")
-        guard !text.hasPrefix(streamedText) else {
-            let delta = String(text.dropFirst(streamedText.count))
-            streamedText = text
-            bufferAssistantDelta(delta)
-            return
-        }
-        Log.session.warning("Conversation.stream reconciliation id=\(id) streamedChars=\(streamedText.count) finalChars=\(text.count)")
-        outputDelivery.discardText()
-        streamedText = text
-        if isSelected { activeLatency?.mark(.firstTextVisible) }
-        document.apply(.replaceGenerationText(text))
-    }
-
-    private func bufferAssistantDelta(_ delta: String) {
-        outputDelivery.append(delta)
-        startStreamLink()
     }
 
     func resolveInvocation(invocationID: UUID, outcome: Invocation.Outcome) {
@@ -1681,32 +1181,11 @@ final class Conversation: Identifiable {
         return .from(value)
     }
 
-    // MARK: - Approval gate
-
     static func attachApproveKey(_ domain: String) -> String { "ox.service.attach:\(domain)" }
 
     func gateServiceAttach(_ service: Service) async throws {
-        let title = "\(service.title) - \(L10n.string( "Attach"))"
-        let message = if service.isIOSService {
-            L10n.string("Its actions and permitted device data become available to this conversation.")
-        } else if service.isMCPService {
-            L10n.string("Its remote Actions can receive arguments from this conversation and return data to Ox.")
-        } else {
-            L10n.string("Its actions and your signed-in data become available to this conversation.")
-        }
-        switch await requestApproval(
-            action: Self.attachApproveKey(service.domain),
-            defaultPolicy: Actions.defaultPolicy(for: Actions.serviceAttach),
-            prompt: "\(title)\n\(message)"
-        ) {
-        case .approved: return
-        case .denied: throw OxFunctionError(code: "permission_denied", message: "ox.service.attach: the user declined to attach \(service.title).", recovery: "Stop. Do not request this attachment again unless the user asks.")
-        case .blocked: throw OxFunctionError(code: "permission_denied", message: "ox.service.attach: the user blocked this Action in Settings.", recovery: "Do not bypass the policy. Ask the user to change it in Settings only if they want to allow this action.")
-        case .stopped: throw OxFunctionError(code: "cancelled", message: "ox.service.attach: the user stopped before attaching \(service.title).", recovery: "Stop. Do not reopen the attachment request unless the user asks.")
-        }
+        try await interactions.gateServiceAttach(service)
     }
-
-    private typealias ApprovalOutcome = ActionApproval.Outcome
 
     func requireApproval(
         action: String,
@@ -1716,18 +1195,7 @@ final class Conversation: Identifiable {
         prompt: String? = nil
     ) async throws {
         try await requireWritableFileAction(action, args: args)
-        switch await requestApproval(
-            action: action,
-            defaultPolicy: defaultPolicy,
-            args: args,
-            purpose: purpose,
-            prompt: prompt
-        ) {
-        case .approved: return
-        case .denied: throw OxFunctionError(code: "permission_denied", message: "\(action): the user declined.", recovery: "Stop. Do not repeat the action unless the user asks.")
-        case .blocked: throw OxFunctionError(code: "permission_denied", message: "\(action): the user blocked this Action in Settings.", recovery: "Do not bypass the policy. Ask the user to change it in Settings only if they want to allow this action.")
-        case .stopped: throw OxFunctionError(code: "cancelled", message: "\(action): the user stopped before answering.", recovery: "Stop. Do not reopen the request unless the user asks.")
-        }
+        try await interactions.requireApproval(action: action, defaultPolicy: defaultPolicy, args: args, purpose: purpose, prompt: prompt)
     }
 
     func requireProfileMutation(_ action: String) throws {
@@ -1738,65 +1206,7 @@ final class Conversation: Identifiable {
     }
 
     func confirmScheduledSkillChange(action: String, prompt: String) async throws {
-        activeRun?.backgroundExecution?.updatePhase(.permissionNeeded)
-        let cancel = L10n.string("Cancel")
-        let permission = PermissionPresentation(title: "Ox - \(action)", purpose: prompt)
-        let answer = await awaitPrompt(
-            prompt: permission.prompt,
-            options: [action, cancel],
-            kind: .permission,
-            presentation: .application,
-            autoApproval: nil,
-            permission: permission
-        )
-        guard answer == action else {
-            throw RuntimeError.bridge("The scheduled skill change was cancelled.")
-        }
-    }
-
-    private func requestApproval(
-        action: String,
-        defaultPolicy: ActionPolicy,
-        args: Any? = nil,
-        purpose: String? = nil,
-        prompt: String? = nil
-    ) async -> ApprovalOutcome {
-        await ActionApproval(serviceManager: serviceManager, ownerID: id, resolveService: { self.attachedService(domain: $0) }).request(
-            action: action,
-            defaultPolicy: defaultPolicy,
-            args: args,
-            purpose: purpose,
-            prompt: prompt
-        ) { request in
-            activeRun?.backgroundExecution?.updatePhase(.permissionNeeded)
-            let answer = await awaitPrompt(
-                prompt: request.prompt,
-                options: request.options,
-                kind: .permission,
-                presentation: .application,
-                autoApproval: PendingPrompt.AutoApproval(
-                    action: request.action,
-                    defaultPolicy: defaultPolicy,
-                    approve: request.approve,
-                    alwaysApprove: request.alwaysApprove,
-                    deny: request.deny
-                ),
-                permission: request.presentation
-            )
-            return answer == Self.abortedAnswer ? nil : answer
-        }
-    }
-
-    // MARK: - Branch / retry
-
-    private func rerunCut(at blockId: UUID) -> (cutEntry: Int, text: String, attachments: [FileItem], skillInvocation: UserSkillInvocation?)? {
-        guard let target = document.blocksWithTurn().first(where: { $0.0.id == blockId })?.1 else { return nil }
-        for ei in stride(from: target, through: 0, by: -1) {
-            if case let .user(turn, _) = document.turns[ei] {
-                return (ei, turn.intent, turn.attachments, turn.skillInvocation)
-            }
-        }
-        return nil
+        try await interactions.confirmScheduledSkillChange(action: action, prompt: prompt)
     }
 
     @discardableResult
@@ -1810,29 +1220,30 @@ final class Conversation: Identifiable {
     }
 
     private func rerun(at blockId: UUID, replacingText: String?) -> SubmissionReceipt? {
-        guard let cut = rerunCut(at: blockId) else {
+        guard let target = document.turnIndex(containingBlock: blockId),
+              let cut = document.lastUserTurn(through: target) else {
             Log.session.warning("Conversation.rerun no cut for block=\(blockId)")
             return nil
         }
-        let text = replacingText ?? cut.text
-        Log.session.info("Conversation.rerun id=\(id) at=\(blockId) cutEntry=\(cut.cutEntry) edited=\(replacingText != nil)")
+        let text = replacingText ?? cut.turn.intent
+        Log.session.info("Conversation.rerun id=\(id) at=\(blockId) cutEntry=\(cut.index) edited=\(replacingText != nil)")
         cancelAll()
         let snapshot = continuation(
-            before: cut.cutEntry,
-            intent: cut.text,
-            attachments: cut.attachments,
-            skillInvocation: cut.skillInvocation
+            before: cut.index,
+            intent: cut.turn.intent,
+            attachments: cut.turn.attachments,
+            skillInvocation: cut.turn.skillInvocation
         )
         guard let replacement = conversationManager?.replaceForRerun(from: self, snapshot: snapshot) else { return nil }
         return replacement.enqueue(
             text,
-            attachments: cut.attachments,
-            skillInvocation: replacingText == nil ? cut.skillInvocation : nil
+            attachments: cut.turn.attachments,
+            skillInvocation: replacingText == nil ? cut.turn.skillInvocation : nil
         )
     }
 
     func branchSnapshot(at blockId: UUID) -> ConversationContinuation? {
-        guard let target = document.blocksWithTurn().first(where: { $0.0.id == blockId })?.1 else { return nil }
+        guard let target = document.turnIndex(containingBlock: blockId) else { return nil }
         return continuation(
             before: target + 1,
             intent: "",
@@ -1843,10 +1254,7 @@ final class Conversation: Identifiable {
 
     func latestContinuation() -> ConversationContinuation? {
         if let activeSubmission = activeRun?.activeSubmission, case .user = activeSubmission.kind {
-            if let index = document.turns.lastIndex(where: { turn in
-                guard case let .user(user, _) = turn else { return false }
-                return user.submissionID == activeSubmission.id
-            }) {
+            if let index = document.lastUserTurnIndex(forSubmissionID: activeSubmission.id) {
                 return continuation(
                     before: index,
                     intent: activeSubmission.text,
@@ -1854,10 +1262,7 @@ final class Conversation: Identifiable {
                     skillInvocation: activeSubmission.skillInvocation
                 )
             }
-            let index = document.turns.lastIndex(where: { turn in
-                guard case let .agent(agent, _) = turn else { return false }
-                return agent.outcome == .running
-            }) ?? document.turns.endIndex
+            let index = document.runningAgentTurnIndex ?? document.turns.endIndex
             Log.session.warning("Conversation.continuation activeFallback id=\(id) submission=\(activeSubmission.id.rawValue) turns=\(index)")
             return continuation(
                 before: index,
@@ -1866,16 +1271,13 @@ final class Conversation: Identifiable {
                 skillInvocation: activeSubmission.skillInvocation
             )
         }
-        for index in document.turns.indices.reversed() {
-            guard case let .user(turn, _) = document.turns[index] else { continue }
-            return continuation(
-                before: index,
-                intent: turn.intent,
-                attachments: turn.attachments,
-                skillInvocation: turn.skillInvocation
-            )
-        }
-        return nil
+        guard let last = document.lastUserTurn(through: document.turns.count - 1) else { return nil }
+        return continuation(
+            before: last.index,
+            intent: last.turn.intent,
+            attachments: last.turn.attachments,
+            skillInvocation: last.turn.skillInvocation
+        )
     }
 
     private func continuation(
@@ -1892,7 +1294,7 @@ final class Conversation: Identifiable {
             isFavorite: false,
             model: modelSelection,
             monoRepositoryHash: monoRepositoryHash,
-            attachedServiceDomains: attachedServiceDomains,
+            attachedServiceDomains: serviceAttachments.domains,
             preview: nil
         )
         return ConversationContinuation(
@@ -1903,8 +1305,6 @@ final class Conversation: Identifiable {
             skillInvocation: skillInvocation
         )
     }
-
-    // MARK: - Intent queue
 
     @discardableResult
     func enqueue(
@@ -1932,7 +1332,7 @@ final class Conversation: Identifiable {
                     continuation.resume(returning: .cancelled)
                     return
                 }
-                submissionWaiters[submissionID] = continuation
+                submissions.wait(for: submissionID, continuation)
                 enqueue(
                     intent,
                     attachments: attachments,
@@ -1942,7 +1342,7 @@ final class Conversation: Identifiable {
             }
         } onCancel: {
             Task { @MainActor [weak self] in
-                self?.cancelAwaitedSubmission(submissionID)
+                self?.submissions.detach(submissionID)
             }
         }
     }
@@ -2009,28 +1409,7 @@ final class Conversation: Identifiable {
         return receipt
     }
 
-    private func cancelAwaitedSubmission(_ submissionID: SubmissionID) {
-        guard let continuation = submissionWaiters.removeValue(forKey: submissionID) else { return }
-        continuation.resume(returning: .cancelled)
-        Log.session.info("Conversation.submitAndWait detached id=\(id) submission=\(submissionID.rawValue) busy=\(isBusy)")
-    }
-
-    // A turn the host injects after an out-of-band event (e.g. the user signed in
-    // via a sign-in card). It carries no visible user bubble; the agent just sees
-    // the note plus a fresh turn-state (with the now-updated auth) and decides.
-    private enum SystemEventSource {
-        case serviceSignIn(String)
-        case botControl(String)
-
-        var logLabel: String {
-            switch self {
-            case .serviceSignIn(let domain): "serviceSignIn:\(domain)"
-            case .botControl(let domain): "botControl:\(domain)"
-            }
-        }
-    }
-
-    private func enqueueSystemEvent(_ event: JSONValue, source: SystemEventSource) {
+    private func enqueueSystemEvent(_ event: JSONValue, source: ConversationServiceAttachments.SystemEvent) {
         let note: String
         do {
             note = try ModelPromptRenderer.shared.render(.runtimeEvent, input: event)
@@ -2060,23 +1439,7 @@ final class Conversation: Identifiable {
         resumeAgent: Bool = true,
         using presenter: (any ServiceAuthPresenting)? = nil
     ) async -> JSONValue? {
-        guard let service = attachedService(domain: domain) else {
-            Log.session.error("Conversation.signInService no service domain=\(domain)")
-            return nil
-        }
-        Log.session.info("Conversation.signInService start id=\(id) domain=\(domain) auth=\(service.signInState.rawValue) resumeAgent=\(resumeAgent)")
-        let outcome = try? await service.requestAccess(using: presenter ?? presentations.serviceSignIn, source: .conversationCard)
-        let acknowledged = outcome == .acknowledged
-        let ok = acknowledged || service.signInState.isAuthenticated
-        let result = ok ? service.accessResult(acknowledged: acknowledged) : nil
-        Log.session.info("Conversation.signInService done id=\(id) domain=\(domain) ok=\(ok) auth=\(service.signInState.rawValue)")
-        if ok, resumeAgent {
-            enqueueSystemEvent(
-                .object(["type": .string("serviceSignIn"), "domain": .string(domain), "access": result ?? .null]),
-                source: .serviceSignIn(domain)
-            )
-        }
-        return result
+        await serviceAttachments.signIn(domain: domain, resumeAgent: resumeAgent, using: presenter)
     }
 
     func completeBotControl(
@@ -2085,52 +1448,17 @@ final class Conversation: Identifiable {
         resumeAgent: Bool = true,
         using presenter: (any ServiceHandoffPresenting)? = nil
     ) async -> Bool {
-        guard let service = attachedService(domain: domain) else {
-            Log.session.error("Conversation.completeBotControl no service domain=\(domain)")
-            return false
-        }
-        let source: ServiceActionScheduler.BotControlLease?
-        switch botControlSource.claim(service: service, args: args) {
-        case .none:
-            source = nil
-        case .mismatch:
-            Log.session.warning("Conversation.completeBotControl source-args-mismatch id=\(id) domain=\(domain)")
-            return false
-        case .matched(let lease):
-            source = lease
-        }
-        defer { source?.release(discardPage: true) }
-        let ok = await service.completeBotControl(
-            args: args,
-            using: presenter ?? presentations.serviceHandoff,
-            source: source
-        )
-        Log.session.info("Conversation.completeBotControl domain=\(domain) ok=\(ok)")
-        if ok, resumeAgent {
-            let data = try? JSONEncoder().encode(args)
-            let argsText = data.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-            enqueueSystemEvent(
-                .object(["type": .string("botControl"), "domain": .string(domain), "argsJSON": .string(argsText)]),
-                source: .botControl(domain)
-            )
-        }
-        return ok
+        await serviceAttachments.completeBotControl(domain: domain, args: args, resumeAgent: resumeAgent, using: presenter)
     }
 
     func completePayment(domain: String, args: JSONValue) async -> JSONValue? {
-        guard let service = attachedService(domain: domain) else {
-            Log.session.error("Conversation.completePayment no service domain=\(domain)")
-            return nil
-        }
-        let result = await service.completePayment(args: args, using: presentations.serviceHandoff)
-        Log.session.info("Conversation.completePayment domain=\(domain) completed=\(result != nil)")
-        return result
+        await serviceAttachments.completePayment(domain: domain, args: args)
     }
 
     func cancelQueued(_ blockId: UUID) {
-        guard let submission = submissions.first(where: { $0.id.rawValue == blockId && $0.needsPosting }) else { return }
+        guard let submission = submissions.queued(blockId) else { return }
         Log.session.info("Conversation.cancelQueued id=\(id) block=\(blockId) queueDepth=\(submissions.count)")
-        submissions.removeAll { $0.id.rawValue == blockId && $0.needsPosting }
+        submissions.remove(submission.id)
         if activeRun?.activeSubmission?.id == submission.id {
             activeRun?.task.cancel()
         }
@@ -2140,21 +1468,17 @@ final class Conversation: Identifiable {
     func cancelAll() {
         cancelModelSelectionChange()
         botControlSource.release()
-        let cancelled = drainSubmissions()
-        for submission in cancelled {
+        for submission in submissions.drain() {
             submission.latency.finish(outcome: "cancelledQueued", client: client.id, model: model.id)
         }
-        let waiters = submissionWaiters.values
-        submissionWaiters.removeAll()
-        for continuation in waiters { continuation.resume(returning: .cancelled) }
+        submissions.cancelWaiters()
         notice = .none
         submissionPresentation = .cancelled
-        cancelInteractions()
+        interactions.cancelAll()
         let runID = activeRun?.id
         activeRun?.task.cancel()
         Log.session.info("Conversation.cancelAll id=\(id) run=\(runID.map { String($0.rawValue.uuidString.prefix(8)) } ?? "idle")")
-        resetOutputDelivery()
-        stopStreamLink()
+        stream.cancel()
     }
 
     func stopCurrentTurn() {
@@ -2169,9 +1493,8 @@ final class Conversation: Identifiable {
         notice = .none
         submissionPresentation = .cancelled
         activeRun?.task.cancel()
-        cancelInteractions()
-        resetOutputDelivery()
-        stopStreamLink()
+        interactions.cancelAll()
+        stream.cancel()
         if activeRun?.phase != .preparing { setRunPhase(.thinking) }
     }
 
@@ -2181,63 +1504,6 @@ final class Conversation: Identifiable {
         }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
         let body = preview.isEmpty ? L10n.string("Your conversation finished while you were away.", comment: "Notification body shown when a conversation turn completes while the app is backgrounded and there is no preview text.") : String(preview.prefix(140))
         activeRun?.completionNotification = CompletionNotification(title: title, body: body)
-    }
-
-    private func deliverAttentionNotification(interactionID: UUID, phase: ConversationBackgroundPhase) {
-        let identifier = "conversation.attention.\(id.uuidString).\(interactionID.uuidString)"
-        attentionNotificationID = identifier
-        let notificationTitle = title
-        Task {
-            do {
-                let delivered = try await feedback.notifyAttention(
-                    identifier: identifier,
-                    title: notificationTitle,
-                    body: phase.subtitle,
-                    isCurrent: { [weak self] in
-                        self?.interactionWaiter?.id == interactionID
-                            && self?.feedback.isBackground == true
-                    }
-                )
-                Log.session.info("Conversation.attentionNotify id=\(interactionID) phase=\(phase.rawValue) delivered=\(delivered)")
-            } catch {
-                Log.session.error("Conversation.attentionNotify failed id=\(interactionID) error=\(error.localizedDescription)")
-            }
-        }
-    }
-
-    private func clearAttentionNotification() {
-        guard let identifier = attentionNotificationID else { return }
-        attentionNotificationID = nil
-        feedback.dismissAttention(identifier: identifier)
-        Log.session.info("Conversation.attentionNotify cleared id=\(identifier)")
-    }
-
-    // MARK: - Streaming
-
-    private func startStreamLink() {
-        guard isSelected else { return }
-        if streamFrameDriver.start() { Log.session.debug("Conversation.streamLink start id=\(id)") }
-    }
-
-    private func stopStreamLink() {
-        if streamFrameDriver.stop() { Log.session.debug("Conversation.streamLink stop id=\(id)") }
-    }
-
-    private func onStreamFrame(at timestamp: CFTimeInterval) {
-        guard let checkpoint = outputDelivery.nextFrame(at: timestamp) else { return }
-        apply(checkpoint)
-    }
-
-    private func waitForStreamingDelivery() async {
-        guard !streamingTurnDelivered else { return }
-        await withCheckedContinuation { streamingDeliveryContinuation = $0 }
-    }
-
-    private func resetOutputDelivery() {
-        outputDelivery.reset()
-        streamingTurnDelivered = true
-        streamingDeliveryContinuation?.resume()
-        streamingDeliveryContinuation = nil
     }
 
     private func finishAgentTurnFromEvents(error: String?) {
@@ -2255,39 +1521,6 @@ final class Conversation: Identifiable {
         if document.hasOpenAgentTurn { document.apply(.finishAgentTurn(outcome)) }
     }
 
-    private func endStreamingTurn(_ assistant: AssistantMessage) {
-        if !isTemporary, assistant.stopReason != .toolUse {
-            stageCompletionNotification(assistant: assistant)
-        }
-        streamingTurnDelivered = false
-        outputDelivery.end(assistant)
-        if isSelected { startStreamLink() } else { finalizeBufferedTurnIfInactive() }
-    }
-
-    private func finalizeBufferedTurnIfInactive() {
-        guard let checkpoint = outputDelivery.hiddenCheckpoint() else { return }
-        Log.session.debug("Conversation.streamLink checkpoint id=\(id) chars=\(checkpoint.text.count)")
-        apply(checkpoint)
-    }
-
-    private func apply(_ checkpoint: OutputDelivery.Checkpoint) {
-        if !checkpoint.text.isEmpty {
-            if isSelected { activeLatency?.mark(.firstTextVisible) }
-            growAgentText(checkpoint.text)
-        }
-        if let completion = checkpoint.completion { finalizeTurnEnd(completion) }
-    }
-
-    private func finalizeTurnEnd(_ assistant: AssistantMessage) {
-        stopStreamLink()
-        setRunPhase(assistant.stopReason == .toolUse ? .thinking : .finishing)
-        streamingTurnDelivered = true
-        streamingDeliveryContinuation?.resume()
-        streamingDeliveryContinuation = nil
-    }
-
-    // MARK: - Agent loop
-
     func presentDurableToolAssistant(_ assistant: AssistantMessage) {
         if !document.hasOpenAgentTurn {
             if case .agent(_, let id) = document.turns.last { document.apply(.resumeAgentTurn(id: id)) }
@@ -2300,9 +1533,7 @@ final class Conversation: Identifiable {
             } else { document.apply(.beginGeneration(model: assistant.model, at: assistant.timestamp)) }
         }
         document.apply(.setGenerationAssistant(assistant))
-        outputDelivery.discardText()
-        streamedText = assistant.content.compactMap { if case .text(let text) = $0 { return text.text }; return nil }.joined(separator: "\n")
-        document.apply(.replaceGenerationText(streamedText))
+        document.apply(.replaceGenerationText(stream.present(assistant)))
     }
 
     func prepareDurableRecovery() async throws {
@@ -2340,22 +1571,20 @@ final class Conversation: Identifiable {
     }
 
     private func startWorker() {
-        guard !isBusy, !submissions.isEmpty else { return }
+        guard !isBusy, let submission = submissions.next else { return }
         let runID = RunID()
         let queueDepth = submissions.count
-        let submission = submissions[0]
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
             defer { finishWorker(runID) }
             await waitUntilProfilePrepared(runID: runID)
             if Task.isCancelled {
-                submissions.removeAll { $0.id == submission.id }
+                submissions.remove(submission.id)
                 submission.latency.finish(outcome: "cancelled", client: client.id, model: model.id)
                 return
             }
-            guard let index = submissions.firstIndex(where: { $0.id == submission.id }) else { return }
+            guard var submission = submissions.take(submission.id) else { return }
             setRunPhase(.thinking)
-            var submission = submissions.remove(at: index)
             if submission.needsPosting {
                 let at = Date()
                 document.apply(.appendUser(
@@ -2419,7 +1648,7 @@ final class Conversation: Identifiable {
         settleModelSelectionChange(runID: runID, succeeded: conversationSucceeded && !run.task.isCancelled)
         let completionNotification = conversationSucceeded ? run.completionNotification : nil
         run.backgroundExecution?.finish(backgroundOutcome)
-        clearAttentionNotification()
+        interactions.clearAttentionNotification()
         finishFinishingDiagnostics(next: "idle")
         activeRun = nil
         if hasUnreadResult, !isTranscriptVisible {
@@ -2497,17 +1726,11 @@ final class Conversation: Identifiable {
         Log.session.warning("Conversation.backgroundLeaseExpired id=\(id) run=\(runID.rawValue)")
     }
 
-    private func drainSubmissions() -> [Submission] {
-        let drained = submissions
-        submissions.removeAll()
-        return drained
-    }
-
     private func runOne(_ submission: Submission, runID: RunID) async {
         submissionPresentation = .running
         submission.latency.mark(.runStarted)
         Log.session.info("Conversation.runOne start id=\(id) client=\(client.id) model=\(model.id)")
-        agentHapticPhase = .waitingForDelta
+        stream.armHaptic()
         if activeRun?.id == runID { activeRun?.activeSubmission = submission }
         var submissionResult: ConversationRunResult?
         defer {
@@ -2525,7 +1748,7 @@ final class Conversation: Identifiable {
             Log.session.error("Conversation Profile documents unavailable id=\(id) error=\(message)")
             if !cancelled { notice = .error(message) }
             submission.latency.finish(outcome: cancelled ? "cancelled" : "rejected", client: client.id, model: model.id)
-            resolveAwaitedSubmission(submission, error: message, failureKind: nil, cancelled: cancelled)
+            submissions.resolve(submission, error: message, failureKind: nil, cancelled: cancelled)
             return
         }
         await Skills.shared.waitUntilCurrent()
@@ -2563,7 +1786,7 @@ final class Conversation: Identifiable {
         submission.latency.mark(.promptReady)
         let attachedLog = attached.isEmpty ? "none" : attached.map(\.domain).joined(separator: ",")
         Log.session.info("Conversation.runOne prompt id=\(id) attached=\(attachedLog) model=\(model.id) intentChars=\(submission.text.count) turnStateChars=\(turnState.jsonString().count) attachments=\(submission.attachments.count)")
-        for definition in allDefinitions() {
+        for definition in attachedServices.map(\.definition) {
             let actions = definition.actions
                 .map(\.id)
                 .joined(separator: ",")
@@ -2598,7 +1821,7 @@ final class Conversation: Identifiable {
             Log.session.error("Conversation.runOne rejected id=\(id) error=\(message)")
             if !cancelled { notice = .error(message) }
             submission.latency.finish(outcome: cancelled ? "cancelled" : "rejected", client: client.id, model: model.id)
-            resolveAwaitedSubmission(submission, error: message, failureKind: nil, cancelled: cancelled)
+            submissions.resolve(submission, error: message, failureKind: nil, cancelled: cancelled)
             return
         }
         submissionResult = result
@@ -2620,7 +1843,7 @@ final class Conversation: Identifiable {
             "completed"
         }
         submission.latency.finish(outcome: outcomeName, client: client.id, model: model.id)
-        resolveAwaitedSubmission(
+        submissions.resolve(
             submission,
             error: err,
             failureKind: failureKind,
@@ -2629,164 +1852,28 @@ final class Conversation: Identifiable {
         Log.session.info("Conversation.runOne end id=\(id) outcome=\(outcomeName)")
     }
 
-    private func resolveAwaitedSubmission(
-        _ submission: Submission,
-        error: String?,
-        failureKind: LLMFailureKind?,
-        cancelled: Bool
-    ) {
-        guard let continuation = submissionWaiters.removeValue(forKey: submission.id) else { return }
-        let outcome: ConversationSubmissionOutcome
-        if cancelled {
-            outcome = .cancelled
-        } else if let error {
-            outcome = .failed(Self.userFacingError(error, kind: failureKind))
-        } else {
-            let response = responseText(for: submission.id)
-            outcome = response.isEmpty
-                ? .failed("Ox finished without a text response.")
-                : .completed(response)
-        }
-        continuation.resume(returning: outcome)
-        Log.session.info("Conversation.submitAndWait resolved id=\(id) submission=\(submission.id.rawValue) outcome=\(outcome.logLabel)")
-    }
-
-    private func responseText(for submissionID: SubmissionID) -> String {
-        guard let userIndex = document.turns.firstIndex(where: { turn in
-            guard case let .user(user, _) = turn else { return false }
-            return user.submissionID == submissionID
-        }), document.turns.indices.contains(userIndex + 1),
-              case let .agent(turn, _) = document.turns[userIndex + 1] else { return "" }
-        return turn.steps.compactMap { step in
-            if case let .text(text) = step.kind { return text }
-            return nil
-        }
-        .joined(separator: "\n\n")
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private static func outcome(for assistant: AssistantMessage, at: Date) -> TurnOutcome {
         if assistant.stopReason == .aborted { return .cancelled(at: at) }
         if let error = assistant.errorMessage { return .failed(at: at, message: error) }
         return .completed(at: at)
     }
 
-    // MARK: - Manifest + actions
-
     func setAttachedServices(_ services: [Service]) {
-        let canonical = services.map { serviceManager.service(domain: $0.domain) ?? $0 }
-        let normalized = Self.uniqueServices(canonical)
-        if normalized.count != services.count {
-            Log.session.warning("Conversation.setAttachedServices deduplicated id=\(id) supplied=\(services.count) unique=\(normalized.count)")
-        }
-        let domains = normalized.map(\.domain)
-        guard domains != attachedServiceDomains else {
-            replaceAttachedServices(normalized)
-            return
-        }
-        attachedServiceDomains = domains
-        replaceAttachedServices(normalized)
-        onPersistableChange?()
+        serviceAttachments.set(services)
     }
 
     func attachedService(domain: String) -> Service? {
-        attachedServices.first { $0.domain == domain }
+        serviceAttachments.service(domain: domain)
     }
 
     @discardableResult
     func attachService(_ service: Service) -> Bool {
-        guard !attachedServices.contains(where: { $0.domain == service.domain }) else { return false }
-        setAttachedServices(attachedServices + [service])
-        return true
+        serviceAttachments.attach(service)
     }
 
     @discardableResult
     func attachServiceDomains(_ domains: [String]) -> Bool {
-        let monoRepositoryReady = serviceManager.monoRepositoryState == .ready
-        var known = Set(attachedServiceDomains)
-        var added: [String] = []
-        var unavailable: [String] = []
-        for domain in domains where known.insert(domain).inserted {
-            if serviceManager.service(domain: domain) != nil || !monoRepositoryReady {
-                added.append(domain)
-            } else {
-                unavailable.append(domain)
-            }
-        }
-        if !unavailable.isEmpty {
-            Log.session.warning("Conversation.attachServiceDomains id=\(id) unavailable=\(unavailable.joined(separator: ","))")
-        }
-        guard !added.isEmpty else {
-            resolveAttachedServices()
-            return false
-        }
-        attachedServiceDomains.append(contentsOf: added)
-        resolveAttachedServices()
-        let resolved = added.filter { serviceManager.service(domain: $0) != nil }
-        let deferred = added.filter { serviceManager.service(domain: $0) == nil }
-        Log.session.info("Conversation.attachServiceDomains id=\(id) resolved=\(resolved.joined(separator: ",")) deferred=\(deferred.joined(separator: ","))")
-        onPersistableChange?()
-        return true
-    }
-
-    private func resolveAttachedServices() {
-        let migratedDomains = ConversationMigrator.migratedServiceDomains(attachedServiceDomains, services: serviceManager)
-        if migratedDomains != attachedServiceDomains {
-            Log.session.info("Conversation.resolveAttachedServices migrated id=\(id) from=\(attachedServiceDomains.joined(separator: ",")) to=\(migratedDomains.joined(separator: ","))")
-            attachedServiceDomains = migratedDomains
-            onPersistableChange?()
-        }
-        let normalizedDomains = Self.uniqueServiceDomains(attachedServiceDomains)
-        if normalizedDomains.count != attachedServiceDomains.count {
-            Log.session.warning("Conversation.resolveAttachedServices deduplicated id=\(id) stored=\(attachedServiceDomains.count) unique=\(normalizedDomains.count)")
-            attachedServiceDomains = normalizedDomains
-        }
-        replaceAttachedServices(attachedServiceDomains.compactMap { serviceManager.service(domain: $0) })
-    }
-
-    private static func uniqueServiceDomains(_ domains: [String]) -> [String] {
-        var seen: Set<String> = []
-        return domains.filter { seen.insert($0).inserted }
-    }
-
-    private static func uniqueServices(_ services: [Service]) -> [Service] {
-        var normalized: [Service] = []
-        var indexByDomain: [String: Int] = [:]
-        for service in services {
-            if let index = indexByDomain[service.domain] {
-                normalized[index] = service
-            } else {
-                indexByDomain[service.domain] = normalized.count
-                normalized.append(service)
-            }
-        }
-        return normalized
-    }
-
-    private func replaceAttachedServices(_ services: [Service]) {
-        assert(Set(services.map(\.domain)).count == services.count)
-        assert(services.allSatisfy { serviceManager.service(domain: $0.domain) === $0 })
-        let unchanged = services.count == attachedServices.count
-            && zip(services, attachedServices).allSatisfy { pair in pair.0 === pair.1 }
-        guard !unchanged else { return }
-        let added = services.filter { candidate in
-            !attachedServices.contains { $0 === candidate }
-        }
-        let removed = attachedServices.filter { candidate in
-            !services.contains { $0 === candidate }
-        }
-        cancelServiceInteractions(domains: Set(removed.map(\.domain)))
-        attachedServices = services
-        Log.session.info("Conversation.setAttachedServices id=\(id) attached=\(services.map(\.domain).joined(separator: ",")) selected=\(isSelected)")
-        if isSelected {
-            serviceManager.setAttachedServices(services, for: id)
-            for service in added {
-                Task { await service.checkAccess(reason: .attach) }
-            }
-        }
-        for svc in services {
-            Task { _ = await svc.loadManifest() }
-        }
+        serviceAttachments.attach(domains: domains)
     }
 
     var monoRepositoryRevision: UInt64 { serviceManager.monoRepositoryRevision }
@@ -2794,10 +1881,6 @@ final class Conversation: Identifiable {
     var serviceBootstrapRevision: String {
         "\(id.uuidString):\(monoRepositoryRevision):\(attachedServices.map(\.domain).joined(separator: ","))"
     }
-
-    func allDefinitions() -> [ServiceDefinition] { attachedServices.map(\.definition) }
-
-    // MARK: - Helpers
 
     var systemPromptMemory: String {
         memorySnapshot ?? UserMemory.shared.text
@@ -2839,8 +1922,6 @@ final class Conversation: Identifiable {
             }
         )
     }
-
-
 }
 
 extension Conversation: PrivateDataHost {

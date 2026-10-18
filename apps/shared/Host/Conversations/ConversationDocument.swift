@@ -211,6 +211,71 @@ nonisolated struct ConversationDocument: Sendable {
             .last?.id
     }
 
+    func turnIndex(containingBlock blockID: UUID) -> Int? {
+        blocksWithTurn().first { $0.0.id == blockID }?.1
+    }
+
+    func lastUserTurn(through index: Int) -> (index: Int, turn: UserTurn)? {
+        for candidate in stride(from: index, through: 0, by: -1) {
+            if case let .user(turn, _) = turns[candidate] { return (candidate, turn) }
+        }
+        return nil
+    }
+
+    func lastUserTurnIndex(forSubmissionID submissionID: SubmissionID) -> Int? {
+        turns.lastIndex { turn in
+            guard case let .user(user, _) = turn else { return false }
+            return user.submissionID == submissionID
+        }
+    }
+
+    var runningAgentTurnIndex: Int? {
+        turns.lastIndex { turn in
+            guard case let .agent(agent, _) = turn else { return false }
+            return agent.outcome == .running
+        }
+    }
+
+    var runningExecution: Execution? {
+        guard case let .agent(turn, _) = turns.last else { return nil }
+        for step in turn.steps.reversed() {
+            guard case let .execute(execution) = step.kind else { continue }
+            return execution.outcome == .running ? execution : nil
+        }
+        return nil
+    }
+
+    func responseText(forSubmissionID submissionID: SubmissionID) -> String {
+        guard let userIndex = turns.firstIndex(where: { turn in
+            guard case let .user(user, _) = turn else { return false }
+            return user.submissionID == submissionID
+        }), turns.indices.contains(userIndex + 1),
+              case let .agent(turn, _) = turns[userIndex + 1] else { return "" }
+        return turn.steps.compactMap { step in
+            if case let .text(text) = step.kind { return text }
+            return nil
+        }
+        .joined(separator: "\n\n")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var latestAgentRenamedTitle: String? {
+        for turn in turns.reversed() {
+            guard case let .agent(agent, _) = turn else { continue }
+            for step in agent.steps.reversed() {
+                guard case let .execute(execution) = step.kind else { continue }
+                for effect in execution.effects.reversed() {
+                    guard case let .invocation(invocation) = effect,
+                          invocation.name == Actions.appRenameConversation,
+                          case let .succeeded(value) = invocation.outcome,
+                          value?.objectValue?["renamed"]?.boolValue == true else { continue }
+                    return value?.objectValue?["title"]?.stringValue
+                }
+            }
+        }
+        return nil
+    }
+
     func blocksWithTurnID(in requestedRange: Range<Int>) -> (range: Range<Int>, blocks: [(block: Block, turnID: TurnID)]) {
         let upperBound = min(max(0, requestedRange.upperBound), projection.count)
         var lowerBound = min(max(0, requestedRange.lowerBound), upperBound)
