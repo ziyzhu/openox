@@ -344,6 +344,8 @@ final class ServiceManager {
                 clearMCPApprovals(replacing)
             }
             resolvedServices = ResolvedServices(services.filter { $0.domain != id } + [service])
+            monoRepositoryRevision &+= 1
+            reindexMonoRepository()
             _ = await loadRepositories(locale: monoRepositoryLocale)
         }
         Log.service.info("RemoteMCP.save id=\(service.domain) updated=\(replacing != nil) reused=\(existing != nil)")
