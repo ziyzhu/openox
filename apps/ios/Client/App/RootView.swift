@@ -477,7 +477,7 @@ struct RootView: View {
         func sidebarContentState(listing: ConversationManager.SummaryListing) -> ConversationSidebar.ContentState {
             switch (self, listing) {
             case (.failed, _): .unavailable
-            case (.ready, _), (_, .partial), (_, .complete): .ready
+            case (.ready, _), (_, .partial), (_, .paging), (_, .complete): .ready
             case (.idle, .pending), (.openingStorage, .pending), (.loadingProfile, .pending): .loading
             }
         }
@@ -766,10 +766,13 @@ struct RootView: View {
             contentState: startup.sidebarContentState(listing: conversations.summaryListing),
             actionsEnabled: startup == .ready,
             summaries: summaries,
+            canLoadMore: showSidebar && conversations.summaryListing.hasMore,
             activities: conversations.activities,
             currentId: currentId,
             showsCloseButton: !isSplitLayout,
             onClose: { setSidebar(false) },
+            onLoadMore: { await conversations.loadMoreSummaries() },
+            onSearch: { await conversations.loadAllSummaries() },
             onNewConversation: {
                 sidebarAction("newChat") {
                     let conversation = conversations.startNewConversation()
@@ -1234,6 +1237,7 @@ struct RootView: View {
 extension ConversationSidebar: Equatable {
     static func == (lhs: ConversationSidebar, rhs: ConversationSidebar) -> Bool {
         lhs.summaries == rhs.summaries
+            && lhs.canLoadMore == rhs.canLoadMore
             && lhs.contentState == rhs.contentState
             && lhs.actionsEnabled == rhs.actionsEnabled
             && lhs.activities == rhs.activities

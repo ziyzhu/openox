@@ -23,7 +23,7 @@ extension Conversation {
         guard let targetID = UUID(uuidString: id), let manager = conversationManager else {
             throw RuntimeError.bridge("ox.conversation.delete: a valid conversation ID and active Profile are required.")
         }
-        let target = try manager.deletionTarget(targetID, requestedBy: self)
+        let target = try await manager.deletionTarget(targetID, requestedBy: self)
         let args: JSONValue = .object([
             "id": .string(targetID.uuidString),
             "title": .string(target.displayTitle),
@@ -31,7 +31,7 @@ extension Conversation {
         ])
         return try await tracked(Actions.conversationDelete, args, purpose: purpose) {
             try Task.checkCancellation()
-            _ = try manager.deletionTarget(targetID, requestedBy: self)
+            _ = try await manager.deletionTarget(targetID, requestedBy: self)
             guard let deletion = manager.delete(targetID) else {
                 throw RuntimeError.bridge("ox.conversation.delete: the conversation is no longer available.")
             }

@@ -73,26 +73,36 @@ export class ApplicationPresentation {
   }
   async list(limit = 100, cursor?: ConversationIndexCursor) {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("Page size must be between 1 and 100");
-    const { index, conversations, harness } = this.runtime;
+    const { index } = this.runtime;
     const page = await index.page(limit, cursor);
     const items = await Promise.all(page.rows.map(async row => {
       const id = row.id as ConversationId;
       try {
-        const [state, metadata] = await Promise.all([
-          conversations.metadata(conversations.reference(id)),
-          harness.snapshot(ConversationApplicationMetadata, id, context),
-        ]);
-        const lastMessageAt = await index.checkedAt(id, row, metadata?.fields);
-        if (state.favorite !== row.pinned) index.refresh(id);
-        if (lastMessageAt === undefined) return [];
-        return [{ reference: state.reference, presentation: state.presentation, favorite: state.favorite, unread: state.unread,
-          agent: { model: state.agent?.model, thinkingLevel: state.agent?.thinkingLevel }, metadata: metadata?.fields ?? {}, lastMessageAt }];
+        const { item, favorite } = await this.summary(id, fields => index.checkedAt(id, row, fields));
+        if (favorite !== row.pinned) index.refresh(id);
+        return item ? [item] : [];
       } catch {
         index.refresh(id);
         return [];
       }
     }));
     return { items: items.flat(), next: page.next };
+  }
+  async find(reference: ConversationReference) {
+    const id = this.runtime.conversations.id(reference);
+    const { item, visible } = await this.summary(id, fields => this.runtime.index.lastMessageAt(id, fields));
+    return { item: visible ? item ?? null : null };
+  }
+  private async summary(id: ConversationId, lastMessageAt: (fields: JsonObject | undefined) => Promise<number | undefined>) {
+    const { conversations, harness } = this.runtime;
+    const [state, metadata] = await Promise.all([
+      conversations.metadata(conversations.reference(id)),
+      harness.snapshot(ConversationApplicationMetadata, id, context),
+    ]);
+    const at = await lastMessageAt(metadata?.fields);
+    const item = at === undefined ? undefined : { reference: state.reference, presentation: state.presentation, favorite: state.favorite, unread: state.unread,
+      agent: { model: state.agent?.model, thinkingLevel: state.agent?.thinkingLevel }, metadata: metadata?.fields ?? {}, lastMessageAt: at };
+    return { item, favorite: state.favorite, visible: state.presentation?.visible === true };
   }
   private async agentChange(tx: Tx, id: ConversationId, change: ApplicationAgentChange, requireIdle: boolean) {
     const state = await tx.doc(AgentDoc, id);

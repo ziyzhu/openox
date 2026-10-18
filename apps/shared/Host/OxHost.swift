@@ -16,7 +16,7 @@ protocol OxHost: AnyObject {
     var conversations: ConversationManager { get }
     var services: ServiceManager { get }
 
-    func listConversations() -> [HostConversationSummary]
+    func listConversations() async -> [HostConversationSummary]
     func prepareStorage() async throws
     func prepare() async throws
 }

@@ -79,16 +79,23 @@ final class ConversationManager {
         case active(Conversation)
     }
 
-    enum SummaryListing: Equatable {
+    enum SummaryListing {
         case pending
-        case partial
+        case partial(next: JSONValue)
+        case paging(Task<Bool, Never>)
         case complete
+
+        var hasMore: Bool {
+            switch self {
+            case .partial, .paging: true
+            case .pending, .complete: false
+            }
+        }
     }
 
     private var records: [ConversationID: Record] = [:]
     private var selection: Selection = .empty
     private(set) var summaryListing = SummaryListing.pending
-    @ObservationIgnored private var firstPageRevisions: [ConversationID: UInt64] = [:]
     @ObservationIgnored private var accessOrdinals: [ConversationID: UInt64] = [:]
     @ObservationIgnored private var hydrationOrdinal: UInt64 = 0
     @ObservationIgnored private var hydrationGeneration: UInt64 = 0
@@ -106,6 +113,8 @@ final class ConversationManager {
     @ObservationIgnored private let debugRepositorySaveGate: ProfileRepositorySaveGate
     private static let saveDebounceNs: UInt64 = 1_000_000_000
     private static let maxHydratedConversations = 5
+    private static let firstSummaryPageSize = 20
+    private static let summaryPageSize = 50
 
     init(
         repository: ProfileRepository,
@@ -192,48 +201,99 @@ final class ConversationManager {
     func loadSummariesNow() async {
         ensureRepositoryScope()
         let scope = repositoryScope
-        let scopedRepository = repository
-        let revisions = records.mapValues(\.metadataRevision)
-        let locallyAuthoritative = Set(records.compactMap { id, record in
-            record.persistence.preservesLocalRecordDuringReload ? id : nil
-        })
-        let summaries = await scopedRepository.conversationSummaries(in: scope) { [weak self] page in
-            self?.publishFirstSummaries(page, in: scope)
+        let startedAt = Date()
+        let baseline = reloadBaseline
+        do {
+            let page = try await repository.conversationSummaryPage(in: scope, limit: Self.firstSummaryPageSize, after: .null)
+            guard repositoryScope == scope else { return }
+            let added = merge(page.summaries, since: baseline)
+            if case .pending = summaryListing { summaryListing = page.next == .null ? .complete : .partial(next: page.next) }
+            Log.session.info("ConversationManager.loadSummaries count=\(page.summaries.count) added=\(added) more=\(summaryListing.hasMore) durationMs=\(Self.elapsedMs(since: startedAt)) generation=\(scope.generation)")
+        } catch {
+            guard repositoryScope == scope else { return }
+            if case .pending = summaryListing { summaryListing = .complete }
+            Log.session.error("ConversationManager.loadSummaries failed error=\(error.localizedDescription)")
         }
-        guard repositoryScope == scope else { return }
-        var loaded = Dictionary(uniqueKeysWithValues: summaries.map { meta in
-            (ConversationID(meta.id), Record(meta: meta))
-        })
-        var preserved = 0
-        for (id, record) in records {
-            let changedWhileLoading = (revisions[id] ?? firstPageRevisions[id]) != record.metadataRevision
-            if record.hydration.conversation != nil
-                || record.persistence.preservesLocalRecordDuringReload
-                || locallyAuthoritative.contains(id)
-                || changedWhileLoading {
-                loaded[id] = record
-                preserved += 1
-            }
-        }
-        records = loaded
-        firstPageRevisions = [:]
-        summaryListing = .complete
-        accessOrdinals = accessOrdinals.filter { loaded[$0.key] != nil }
         do { try await recoverConversations(in: scope) }
         catch { Log.session.error("ConversationManager.recovery blocked error=\(error.localizedDescription)") }
-        Log.session.info("ConversationManager.loadSummaries count=\(summaries.count) preserved=\(preserved) generation=\(scope.generation)")
         if case .deferred(let id, _) = selection { open(id.rawValue) }
     }
 
-    private func publishFirstSummaries(_ page: [ConversationMeta], in scope: ProfileScope) {
-        guard repositoryScope == scope, summaryListing == .pending else { return }
-        for meta in page where records[ConversationID(meta.id)] == nil {
-            let record = Record(meta: meta)
-            records[ConversationID(meta.id)] = record
-            firstPageRevisions[ConversationID(meta.id)] = record.metadataRevision
+    @discardableResult
+    func loadMoreSummaries() async -> Bool {
+        switch summaryListing {
+        case .pending, .complete:
+            return false
+        case .paging(let task):
+            return await task.value
+        case .partial(let next):
+            let scope = repositoryScope
+            let task = Task { [weak self] in await self?.loadSummaryPages(after: next, in: scope) ?? false }
+            summaryListing = .paging(task)
+            return await task.value
         }
-        summaryListing = .partial
-        Log.session.info("ConversationManager.loadSummaries listing=partial count=\(page.count) generation=\(scope.generation)")
+    }
+
+    func loadAllSummaries() async {
+        if case .pending = summaryListing { await loadSummariesNow() }
+        while summaryListing.hasMore, await loadMoreSummaries() {}
+    }
+
+    private func loadSummaryPages(after cursor: JSONValue, in scope: ProfileScope) async -> Bool {
+        let startedAt = Date()
+        var cursor = cursor
+        var added = 0
+        do {
+            repeat {
+                let baseline = reloadBaseline
+                let page = try await repository.conversationSummaryPage(in: scope, limit: Self.summaryPageSize, after: cursor)
+                guard repositoryScope == scope else { return false }
+                added += merge(page.summaries, since: baseline)
+                cursor = page.next
+            } while added == 0 && cursor != .null
+        } catch {
+            guard repositoryScope == scope else { return false }
+            summaryListing = .partial(next: cursor)
+            Log.session.error("ConversationManager.page failed error=\(error.localizedDescription)")
+            return false
+        }
+        summaryListing = cursor == .null ? .complete : .partial(next: cursor)
+        Log.session.info("ConversationManager.page added=\(added) more=\(summaryListing.hasMore) durationMs=\(Self.elapsedMs(since: startedAt)) generation=\(scope.generation)")
+        return true
+    }
+
+    private var reloadBaseline: [ConversationID: UInt64?] {
+        records.mapValues { $0.persistence.preservesLocalRecordDuringReload ? nil : $0.metadataRevision }
+    }
+
+    private func merge(_ page: [ConversationMeta], since baseline: [ConversationID: UInt64?]) -> Int {
+        var added = 0
+        for meta in page {
+            let id = ConversationID(meta.id)
+            guard var record = records[id] else {
+                records[id] = Record(meta: meta)
+                added += 1
+                continue
+            }
+            guard record.hydration.conversation == nil, !record.persistence.preservesLocalRecordDuringReload,
+                  let revision = baseline[id] ?? nil, revision == record.metadataRevision else { continue }
+            record.hydration = record.hydration.replacingMeta(meta)
+            records[id] = record
+        }
+        return added
+    }
+
+    private func locate(_ id: ConversationID) async -> Bool {
+        let scope = repositoryScope
+        let meta = await repository.conversationSummary(id, in: scope)
+        Log.session.info("ConversationManager.locate id=\(id) found=\(meta != nil)")
+        guard let meta, repositoryScope == scope else { return false }
+        if records[id] == nil { records[id] = Record(meta: meta) }
+        return true
+    }
+
+    private static func elapsedMs(since start: Date) -> Int {
+        Int(Date().timeIntervalSince(start) * 1_000)
     }
 
     private func recoverConversations(in scope: ProfileScope) async throws {
@@ -430,7 +490,7 @@ final class ConversationManager {
             setCurrent(conversation)
             return
         }
-        guard records[id] != nil else {
+        if case .pending = summaryListing, records[id] == nil {
             selection = .deferred(id, previous: current)
             Log.session.info("ConversationManager.open deferred id=\(id)")
             return
@@ -459,7 +519,7 @@ final class ConversationManager {
         let scope = repositoryScope
         let storageScope = storage.scope
         let id = canonicalID(rawID)
-        guard contains(rawID), let conversation = await hydrate(id),
+        guard let conversation = await hydrate(id),
               scope == repositoryScope, storageScope == storage.scope, contains(rawID) else {
             throw RuntimeError.bridge("conversation unavailable: \(rawID)")
         }
@@ -471,6 +531,10 @@ final class ConversationManager {
     private func hydrate(_ id: ConversationID) async -> Conversation? {
         if let conversation = records[id]?.hydration.conversation { return conversation }
         if let pending = hydrationTasks[id] { return await pending.task.value }
+        if records[id] == nil {
+            guard await locate(id) else { return nil }
+            return await hydrate(id)
+        }
         guard var record = records[id], contains(id.rawValue) else { return nil }
         hydrationGeneration &+= 1
         let generation = HydrationGeneration(rawValue: hydrationGeneration)
@@ -698,13 +762,13 @@ final class ConversationManager {
         return deletion
     }
 
-    func deletionTarget(_ id: UUID, requestedBy conversation: Conversation) throws -> ConversationMeta {
+    func deletionTarget(_ id: UUID, requestedBy conversation: Conversation) async throws -> ConversationMeta {
+        let unavailable = RuntimeError.bridge("ox.conversation.delete: choose another existing conversation in the active Profile.")
         guard conversation.scope == repositoryScope, conversation.scope.profileID == storage.scope.profileID,
               conversation.scope.root == storage.scope.root, conversation.scope.location == storage.scope.location,
-              id != conversation.id,
-              let meta = summaries.first(where: { $0.id == id }) else {
-            throw RuntimeError.bridge("ox.conversation.delete: choose another existing conversation in the active Profile.")
-        }
+              id != conversation.id else { throw unavailable }
+        if records[ConversationID(id)] == nil, !(await locate(ConversationID(id))) { throw unavailable }
+        guard conversation.scope == repositoryScope, let meta = summaries.first(where: { $0.id == id }) else { throw unavailable }
         return meta
     }
 
@@ -753,7 +817,6 @@ final class ConversationManager {
         hydrationTasks.values.forEach { $0.task.cancel() }
         hydrationTasks.removeAll()
         records.removeAll()
-        firstPageRevisions = [:]
         summaryListing = .pending
         accessOrdinals.removeAll()
         selection = .empty

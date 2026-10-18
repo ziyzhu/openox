@@ -87,8 +87,9 @@ final class HostRuntime: OxHost {
         Log.app.info("HostRuntime Profile changed id=\(StorageRoot.shared.activeId?.uuidString ?? "none") durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1_000))")
     }
 
-    func listConversations() -> [HostConversationSummary] {
-        conversations.orderedSummaries.map { summary in
+    func listConversations() async -> [HostConversationSummary] {
+        await conversations.loadAllSummaries()
+        return conversations.orderedSummaries.map { summary in
             HostConversationSummary(
                 id: summary.id,
                 title: summary.displayTitle,

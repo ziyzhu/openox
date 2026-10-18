@@ -10,10 +10,13 @@ struct ConversationSidebar: View {
     let contentState: ContentState
     let actionsEnabled: Bool
     let summaries: [ConversationMeta]
+    let canLoadMore: Bool
     let activities: [UUID: Conversation.Activity]
     let currentId: UUID?
     let showsCloseButton: Bool
     let onClose: () -> Void
+    let onLoadMore: () async -> Void
+    let onSearch: () async -> Void
     let onNewConversation: () -> Void
     let onOpen: (ConversationMeta) -> Void
     let onDelete: (ConversationMeta) -> Void
@@ -58,6 +61,10 @@ struct ConversationSidebar: View {
             accessibilityIdentifier: A11yID.Sidebar.search
         )
         .onChange(of: searchQuery) { _, _ in visibleCount = pageSize }
+        .task(id: searchPresented) {
+            guard searchPresented else { return }
+            await onSearch()
+        }
         .alert(A11yLabel.renameConversation, isPresented: Binding(
             get: { renaming != nil },
             set: { if !$0 { renaming = nil } }
@@ -162,7 +169,7 @@ struct ConversationSidebar: View {
         let ordered = sorted.filter(\.isFavorite) + sorted.filter { !$0.isFavorite }
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                if contentState == .ready, ordered.isEmpty {
+                if contentState == .ready, ordered.isEmpty, !canLoadMore {
                     Text(LocalizedStringKey(query.isEmpty ? "Empty" : "No conversations found"))
                         .font(Theme.Fonts.bodyMd)
                         .foregroundStyle(Theme.Colors.conversationSecondary)
@@ -170,7 +177,7 @@ struct ConversationSidebar: View {
                         .padding(.vertical, 11)
                 } else if contentState == .ready {
                     ForEach(ordered.prefix(visibleCount)) { row($0) }
-                    if ordered.count > visibleCount {
+                    if ordered.count > visibleCount || canLoadMore {
                         CellularAutomatonLoader.small
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, Theme.Spacing.md)
@@ -178,9 +185,13 @@ struct ConversationSidebar: View {
                             .task {
                                 await Task.yield()
                                 guard !Task.isCancelled else { return }
-                                visibleCount = min(visibleCount + pageSize, ordered.count)
+                                if ordered.count > visibleCount {
+                                    visibleCount = min(visibleCount + pageSize, ordered.count)
+                                } else {
+                                    await onLoadMore()
+                                }
                             }
-                            .id("\(query):\(visibleCount)")
+                            .id("\(query):\(visibleCount):\(ordered.count)")
                     }
                 }
                 Color.clear.frame(height: Theme.Spacing.md)

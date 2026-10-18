@@ -60,7 +60,7 @@ type Command = CommandScope & (
   | { action: "fileAdopt"; artifact: FileRecord & { binary: boolean; saved: boolean } }
   | { action: "fileSaved"; path: string; saved: boolean }
   | { action: "fileMove"; path: string; prefix: string }
-  | { action: "filesPrepare" | "publicFilesInventory" | "applicationLoad" | "applicationDelete" | "conversationMetadata" | "conversationContext"
+  | { action: "filesPrepare" | "publicFilesInventory" | "applicationLoad" | "applicationSummary" | "applicationDelete" | "conversationMetadata" | "conversationContext"
       | "profileExportCheck" | "observe" | "recoveryPlan" | "resume" | "abort" | "inspect" | "fileMounts" | "skillPackages" | "close" }
 );
 interface OpenedSession {
@@ -201,6 +201,7 @@ export class IOSAgentAdapter {
       case "conversationFork": return this.fork(required(), args.entryID, args.title);
       case "applicationLoad": return application.load(required());
       case "applicationList": return application.list(args.limit, args.listCursor ?? undefined);
+      case "applicationSummary": return application.find(required());
       case "applicationSave": await application.save(required(), args); return {};
       case "applicationDelete": await application.delete(required()); return {};
       case "conversationList": return session.conversations.list(args.limit, args.listCursor ?? undefined);

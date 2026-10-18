@@ -7,9 +7,11 @@ extension OxHostProtocol {
         host: any OxHost,
         reply: OxHostRPC.Reply
     ) {
-        let conversations = conversationRows(host.listConversations())
-        Log.agent.debug("OxHostRPC.chats.list id=\(reply.id) count=\(conversations.count)")
-        reply.success(ListConversationsResult(conversations: conversations))
+        Task { @MainActor in
+            let conversations = conversationRows(await host.listConversations())
+            Log.agent.debug("OxHostRPC.chats.list id=\(reply.id) count=\(conversations.count)")
+            reply.success(ListConversationsResult(conversations: conversations))
+        }
     }
 
     @MainActor

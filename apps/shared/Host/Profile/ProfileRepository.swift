@@ -82,16 +82,12 @@ actor ProfileRepository {
         }
     }
 
-    func conversationSummaries(in scope: ProfileScope, onFirstPage: (@MainActor @Sendable ([ConversationMeta]) -> Void)? = nil) async -> [ConversationMeta] {
+    func conversationSummaries(in scope: ProfileScope) async -> [ConversationMeta] {
         do {
             var result: [ConversationMeta] = []
             var cursor: JSONValue = .null
             repeat {
-                let page = try await conversationSummaryPage(in: scope, limit: result.isEmpty ? 20 : 100, after: cursor)
-                if result.isEmpty, page.next != .null, let onFirstPage {
-                    let summaries = page.summaries
-                    Task { @MainActor in onFirstPage(summaries) }
-                }
+                let page = try await conversationSummaryPage(in: scope, limit: 100, after: cursor)
                 result += page.summaries
                 cursor = page.next
             } while cursor != .null
@@ -99,15 +95,27 @@ actor ProfileRepository {
         } catch { Log.session.error("ProfileRepository.list failed=\(error.localizedDescription)"); return [] }
     }
 
-    private func conversationSummaryPage(in scope: ProfileScope, limit: Int, after cursor: JSONValue) async throws -> (summaries: [ConversationMeta], next: JSONValue) {
+    func conversationSummaryPage(in scope: ProfileScope, limit: Int, after cursor: JSONValue) async throws -> (summaries: [ConversationMeta], next: JSONValue) {
         let page = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationList"), "limit": .int(limit), "listCursor": cursor]))
-        let summaries = try (page.objectValue?["items"]?.arrayValue ?? []).compactMap { item -> ConversationMeta? in
-            guard let fields = item.objectValue, let value = fields["reference"] else { return nil }
-            var meta = try decodeMeta(fields, reference: try decodeReference(value, scope: scope), scope: scope)
-            meta.lastMessageAt = fields["lastMessageAt"]?.doubleValue.map { Date(timeIntervalSince1970: $0 / 1_000) }
-            return meta
-        }
+        let summaries = try (page.objectValue?["items"]?.arrayValue ?? []).compactMap { try summary($0, in: scope) }
+            .filter { deleted[scope]?.contains(ConversationID($0.id)) != true }
         return (summaries, page.objectValue?["next"] ?? .null)
+    }
+
+    func conversationSummary(_ id: ConversationID, in scope: ProfileScope) async -> ConversationMeta? {
+        guard deleted[scope]?.contains(id) != true else { return nil }
+        do {
+            let reference = try DurableProfileStore.shared.reference(for: id, in: scope)
+            let found = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationSummary"), "reference": reference.value]))
+            return try found.objectValue?["item"].flatMap { try summary($0, in: scope) }
+        } catch { Log.session.error("ProfileRepository.summary conversation=\(id) failed=\(error.localizedDescription)"); return nil }
+    }
+
+    private func summary(_ item: JSONValue, in scope: ProfileScope) throws -> ConversationMeta? {
+        guard let fields = item.objectValue, let value = fields["reference"] else { return nil }
+        var meta = try decodeMeta(fields, reference: try decodeReference(value, scope: scope), scope: scope)
+        meta.lastMessageAt = fields["lastMessageAt"]?.doubleValue.map { Date(timeIntervalSince1970: $0 / 1_000) }
+        return meta
     }
 
     func loadConversation(_ id: ConversationID, in scope: ProfileScope) async -> ConversationLoadResult? {

@@ -53,7 +53,7 @@ struct EmbeddedHostConversationReader: HostConversationReading {
 
     func listConversations() async throws -> [HostConversationSummary] {
         try await host.prepare()
-        return host.listConversations()
+        return await host.listConversations()
     }
 
     func readConversation(_ id: UUID) async throws -> HostConversationState {
