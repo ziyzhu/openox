@@ -279,7 +279,6 @@ nonisolated enum BrowserFunctionCatalog {
         ),
     ]
 
-    static let actionNames = actions.map(\.name)
     static let serviceDefinition: ServiceDefinition = {
         let manifest: JSONValue = .object([
             "domain": .string(internalDomain),

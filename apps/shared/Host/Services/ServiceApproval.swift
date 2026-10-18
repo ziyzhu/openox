@@ -71,7 +71,10 @@ struct ActionApproval {
         choose: (Request) async -> String?
     ) async -> Outcome {
         guard !Task.isCancelled else { return .stopped }
-        switch serviceManager.actionPolicy(for: action, default: defaultPolicy) {
+        let policy = BrowserFunctionCatalog.action(named: action) == nil
+            ? serviceManager.actionPolicy(for: action, default: defaultPolicy)
+            : .allow
+        switch policy {
         case .allow:
             Log.service.info("ActionApproval.allow action=\(action) caller=\(ownerID)")
             return .approved
@@ -83,29 +86,12 @@ struct ActionApproval {
         }
         let display = approvalLabel(for: action)
         let overridePresentation = override.map(PermissionPresentation.init(prompt:))
-        var title = overridePresentation?.title ?? display
+        let title = overridePresentation?.title ?? display
         var disclosure = overridePresentation?.message
         if override == nil, action == Actions.appLogs {
             disclosure = L10n.string("Logs may include private data from other conversations and Profiles and become available to the current model. Always allow applies to all app logs.")
         } else if override == nil, Actions.browserSite(of: action) != nil {
             disclosure = L10n.string("Browser can read and act on this site, including signed-in data, and share it with the model. Approve trusts it for this conversation.")
-        } else if override == nil, action == "ox.web.browser.exportPdf" {
-            let page = serviceManager.browserActionSessions.existingSession(for: ownerID)?.webPage
-            let destination = page?.url?.host(percentEncoded: false) ?? L10n.string("Current page")
-            let savesFile = (args as? [String: Any])?["filename"] is String
-            title = "\(display) - \(destination)"
-            disclosure = savesFile
-                ? L10n.string("The exported PDF may include signed-in or sensitive information beyond the visible area, is saved to the current Profile as a file, and becomes available to the current model. Always allow applies to every page Browser visits.")
-                : L10n.string("The exported PDF may include signed-in or sensitive information beyond the visible area and becomes available to the current model. Always allow applies to every page Browser visits.")
-        } else if override == nil, [
-            "ox.web.browser.executeScript",
-            "ox.web.browser.injectScript",
-            "ox.web.browser.startCapture",
-        ].contains(action) {
-            let page = serviceManager.browserActionSessions.existingSession(for: ownerID)?.webPage
-            let destination = page?.url?.host(percentEncoded: false) ?? L10n.string("Current page")
-            title = "\(display) - \(destination)"
-            disclosure = L10n.string("Dangerous mode gives the agent full control of this website, including signed-in data and network access. Always allow applies to every page Web visits.")
         }
         if let callerName {
             disclosure = [disclosure, callerName].compactMap { $0 }.joined(separator: "\n")
