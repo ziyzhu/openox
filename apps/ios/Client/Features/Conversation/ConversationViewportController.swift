@@ -244,11 +244,12 @@ final class ConversationViewportController {
                 Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=focus source=\(source) focused=true hold=none \(logSnapshot)")
                 return
             }
+            let consumableSlack = max(0, slack - ConversationViewportLayout.responseComposerSpacing)
             viewportHold = if frame.jumpDistance - slack <= Self.jumpThreshold {
                 .tail(TailHold(
                     floorTop: frame.visualTop,
-                    fromEnd: slack + max(0, frame.distanceFromEnd),
-                    slack: slack
+                    fromEnd: consumableSlack + max(0, frame.distanceFromEnd),
+                    slack: consumableSlack
                 ))
             } else {
                 .reader(top: frame.visualTop)
