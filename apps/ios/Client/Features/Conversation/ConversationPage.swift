@@ -5,83 +5,6 @@ import WebKit
 import PhotosUI
 import QuickLook
 import UniformTypeIdentifiers
-import Observation
-
-@MainActor
-@Observable
-private final class ConversationBotControlPresenter: ServiceHandoffPresenting {
-    private(set) var session: ServiceHandoffSession?
-    let pageMount = WebPageMountCoordinator()
-
-    func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
-        guard self.session == nil else {
-            Log.ui.warning("ConversationBotControlPresenter rejected domain=\(session.serviceDomain) reason=occupied")
-            session.presentationFailed()
-            return .failed
-        }
-        self.session = session
-        pageMount.reconcile(page: session.page, ownerIDs: [session.id])
-        Log.ui.info("ConversationBotControlPresenter present domain=\(session.serviceDomain)")
-        let outcome = await session.run()
-        if self.session === session {
-            pageMount.clear()
-            self.session = nil
-        }
-        Log.ui.info("ConversationBotControlPresenter finish domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
-        return outcome
-    }
-}
-
-@MainActor
-@Observable
-private final class ConversationServiceAuthPresenter: ServiceAuthPresenting {
-    private(set) var session: ServiceAuthSession?
-    let pageMount = WebPageMountCoordinator()
-
-    func present(session: ServiceAuthSession) async -> ServiceAuthSession.Outcome {
-        if let outcome = await session.preflight(for: .seconds(1)) {
-            Log.ui.info("ConversationServiceAuthPresenter preflight domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
-            return outcome
-        }
-        guard self.session == nil else {
-            Log.ui.warning("ConversationServiceAuthPresenter rejected domain=\(session.serviceDomain) reason=occupied")
-            session.presentationFailed()
-            return .failed
-        }
-        self.session = session
-        pageMount.reconcile(page: session.page, ownerIDs: [session.id])
-        Log.ui.info("ConversationServiceAuthPresenter present domain=\(session.serviceDomain)")
-        let outcome = await session.run()
-        if self.session === session {
-            pageMount.clear()
-            self.session = nil
-        }
-        Log.ui.info("ConversationServiceAuthPresenter finish domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
-        return outcome
-    }
-}
-
-private struct InlineServicePageHost: View {
-    let anchor: Anchor<CGRect>
-    let mount: WebPageMount
-
-    var body: some View {
-        GeometryReader { geometry in
-            let frame = geometry[anchor]
-            MountedWebPageView(mount: mount)
-                .frame(width: frame.width, height: frame.height)
-                .clipShape(
-                    UnevenRoundedRectangle(
-                        bottomLeadingRadius: Theme.Radius.lg,
-                        bottomTrailingRadius: Theme.Radius.lg,
-                        style: .continuous
-                    )
-                )
-                .position(x: frame.midX, y: frame.midY)
-        }
-        .clipped()
-    }
-}
 
 private struct SidebarScrollLockModifier: ViewModifier {
     @Environment(\.sidebarInteraction) private var sidebarInteraction
@@ -91,165 +14,10 @@ private struct SidebarScrollLockModifier: ViewModifier {
     }
 }
 
-private struct EmptyConversationMark: View {
-    private let strongCells: Set<Int> = [0, 3, 4, 5, 6, 7, 9, 10, 13, 14]
-
-    var body: some View {
-        VStack(spacing: 2) {
-            ForEach(0..<4, id: \.self) { row in
-                HStack(spacing: 2) {
-                    ForEach(0..<4, id: \.self) { column in
-                        RoundedRectangle(cornerRadius: 2, style: .continuous)
-                            .fill(color(at: row * 4 + column))
-                            .frame(width: 8, height: 8)
-                    }
-                }
-            }
-        }
-    }
-
-    private func color(at index: Int) -> Color {
-        strongCells.contains(index)
-            ? Theme.Colors.primary.dynamic
-            : .clear
-    }
-}
-
-private struct ScrollToBottomButton: View {
-    let composerButtonSize: CGFloat
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "arrow.down")
-                .font(.system(.subheadline, weight: .medium))
-                .foregroundStyle(Theme.Colors.onSurface)
-                .frame(width: composerButtonSize, height: composerButtonSize)
-        }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Circle())
-        .minimumTouchTarget()
-        .accessibilityLabel(A11yLabel.scrollToBottom)
-        .accessibilityIdentifier(A11yID.ConversationControls.scrollToBottom)
-    }
-}
-
-private struct ScrollToBottomControl: View {
-    let composer: ConversationComposerModel
-    let composerFocused: Bool
-    let isEditingMessage: Bool
-    let hasFiles: Bool
-    let hasAttachedServices: Bool
-    let floatsTopStrip: Bool
-    let composerButtonSize: CGFloat
-    let action: () -> Void
-
-    var body: some View {
-        ScrollToBottomButton(composerButtonSize: composerButtonSize, action: action)
-            .offset(y: offset)
-    }
-
-    private var offset: CGFloat {
-        let touchTargetInset = max(0, (Theme.Size.minimumTouchTarget - composerButtonSize) / 2)
-        let isResting = !composerFocused && composer.isEmpty && !isEditingMessage
-        let showsTopStrip = isEditingMessage || hasFiles || hasAttachedServices
-        let firstSurfaceTop = ConversationComposer.firstSurfaceTopOffset(
-            isResting: isResting,
-            showsTopStrip: showsTopStrip,
-            floatsTopStrip: floatsTopStrip
-        )
-        return firstSurfaceTop - ConversationComposer.surfaceSpacing - composerButtonSize - touchTargetInset
-    }
-}
-
-private struct ConversationTranscriptProjectionSnapshot {
-    let key: ConversationTranscriptProjectionKey
-    let totalBlockCount: Int
-    let sourceRange: Range<Int>
-    let sourceBlockIDs: [UUID]
-    let blocks: [ConversationBlock]
-    let latestCanvasBlockIDs: [URL: UUID]
-
-    init(key: ConversationTranscriptProjectionKey, conversation: Conversation) {
-        self.key = key
-        let sourceWindow = conversation.blocksWithTurnID(in: key.requestedSourceRange)
-        let projectedBlocks = ConversationBlock.project(
-            sourceWindow.blocks,
-            thinkingActivity: key.thinkingActivity,
-            isBusy: key.isBusy,
-            interaction: key.interaction
-        )
-        let requestedOffset = key.requestedSourceRange.lowerBound - sourceWindow.range.lowerBound
-        let requestedSourceIDs = sourceWindow.blocks.dropFirst(requestedOffset).map(\.block.id)
-        let blocks: [ConversationBlock]
-        if requestedOffset > 0 {
-            let requestedSourceIDSet = Set(requestedSourceIDs)
-            blocks = projectedBlocks.filter {
-                requestedSourceIDSet.contains($0.sourceBlockID) || $0.isActiveInteraction
-            }
-        } else {
-            blocks = projectedBlocks
-        }
-        totalBlockCount = key.totalBlockCount
-        sourceRange = key.requestedSourceRange
-        sourceBlockIDs = requestedSourceIDs
-        self.blocks = blocks
-        latestCanvasBlockIDs = ConversationBlock.latestCanvasBlockIDs(in: sourceWindow.blocks.map(\.block))
-    }
-}
-
-private struct ConversationTranscriptProjectionKey: Equatable {
-    let conversationID: UUID
-    let transcriptRevision: UInt64
-    let totalBlockCount: Int
-    let requestedSourceRange: Range<Int>
-    let thinkingActivity: Conversation.ThinkingActivity?
-    let isBusy: Bool
-    let interaction: Conversation.Interaction?
-}
-
 private struct DelayedActivityKey: Equatable {
     let conversationID: UUID
     let activity: Conversation.Activity
     let transcriptRevision: UInt64
-}
-
-private final class ConversationTranscriptProjectionCache {
-    private var snapshot: ConversationTranscriptProjectionSnapshot?
-
-    func snapshot(for key: ConversationTranscriptProjectionKey, conversation: Conversation) -> ConversationTranscriptProjectionSnapshot {
-        if let snapshot, snapshot.key == key { return snapshot }
-        let resolved = ConversationTranscriptProjectionSnapshot(key: key, conversation: conversation)
-        snapshot = resolved
-        return resolved
-    }
-}
-
-private struct ConversationTranscriptProjection<Content: View>: View {
-    let conversation: Conversation
-    let transcriptWindow: TranscriptWindow
-    let interaction: Conversation.Interaction?
-    let content: (ConversationTranscriptProjectionSnapshot) -> Content
-
-    @State private var cache = ConversationTranscriptProjectionCache()
-
-    var body: some View {
-        content(cache.snapshot(for: projectionKey, conversation: conversation))
-    }
-
-    private var projectionKey: ConversationTranscriptProjectionKey {
-        let totalBlockCount = conversation.transcriptBlockCount
-        let requestedSourceRange = transcriptWindow.resolvedRange(total: totalBlockCount)
-        return ConversationTranscriptProjectionKey(
-            conversationID: conversation.id,
-            transcriptRevision: conversation.transcriptRevision,
-            totalBlockCount: totalBlockCount,
-            requestedSourceRange: requestedSourceRange,
-            thinkingActivity: conversation.thinkingActivity,
-            isBusy: conversation.isBusy,
-            interaction: interaction
-        )
-    }
 }
 
 struct ConversationPage: View {
@@ -280,7 +48,6 @@ struct ConversationPage: View {
     let onFileNavigationChange: (Bool) -> Void
     let onInitialTranscriptPresented: () -> Void
     @Environment(ServiceManager.self) private var serviceManager
-    @Environment(\.colorScheme) private var colorScheme
     private var providerRegistry: ProviderRegistry { .shared }
     private var isModelConfigured: Bool { providerRegistry.defaultModel != nil }
 
@@ -568,7 +335,7 @@ struct ConversationPage: View {
                 VStack(spacing: 0) {
                     pageTopBar(blockCount: totalBlockCount)
                     if modelAccessNeedsAttention {
-                        modelAccessNotice
+                        ConversationModelAccessNotice { modalPresentation = .modelPicker }
                     }
                 }
             }
@@ -1101,108 +868,22 @@ struct ConversationPage: View {
                 }
             }
         case .serviceControl(let control, let interactionID):
-            serviceControlBlock(control, interactionID: interactionID)
+            ConversationServiceControlBlock(
+                control: control,
+                interactionID: interactionID,
+                conversation: conversation,
+                botControlPresenter: botControlPresenter,
+                serviceAuthPresenter: serviceAuthPresenter,
+                isBotControlPresentedInSheet: expandedBotControlSessionID != nil,
+                isServiceAuthPresentedInSheet: expandedServiceAuthSessionID != nil,
+                expandBotControl: expandBotControl,
+                expandServiceAuth: expandServiceAuth,
+                prepareServiceControl: prepareServiceControl
+            )
                 .padding(.horizontal, 4)
         case .userText, .userSkill, .agentContent, .thinking, .contextCompaction:
             transcriptContentBlock(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
         }
-    }
-
-    @ViewBuilder
-    private func promptCard(_ pending: Conversation.PendingPrompt) -> some View {
-        if let request = pending.secretEntry {
-            SecretEntryRequestCard(request: request, onSaved: {
-                conversation.resolvePrompt(blockId: pending.id, answer: "Saved")
-            }, onCancel: {
-                conversation.resolvePrompt(blockId: pending.id, answer: "Cancelled")
-            })
-            .id(request.id)
-        } else {
-            switch pending.kind {
-            case .permission:
-                if let request = PermissionRequest(
-                    id: pending.id,
-                    prompt: pending.prompt,
-                    options: pending.options,
-                    presentation: pending.permission
-                ) {
-                    PermissionRequestCard(request: request) { option in
-                        conversation.resolvePrompt(blockId: pending.id, answer: option)
-                    }
-                } else if sendHandoff == .idle {
-                    ActivityBubble()
-                }
-            case .choice:
-                AgentChoiceRequestCard(
-                    request: AgentChoiceRequest(
-                        id: pending.id,
-                        prompt: pending.prompt,
-                        options: pending.options,
-                        allowsCustomAnswer: pending.allowsCustomAnswer
-                    ),
-                    composerButtonSize: composerButtonSize,
-                    onCustomFocusChange: { choiceInputFocused = $0 }
-                ) { option in
-                    conversation.resolvePrompt(blockId: pending.id, answer: option)
-                }
-            }
-        }
-    }
-
-    private func serviceControlBlock(_ control: ServiceControl, interactionID: UUID?) -> some View {
-        Group {
-            if case .botControl = control, interactionID != nil {
-                InlineBotControlView(
-                    control: control,
-                    session: botControlPresenter.session,
-                    pageMount: botControlPresenter.pageMount,
-                    isPresentedInSheet: isBotControlPresentedInSheet,
-                    expand: expandBotControl,
-                    cancel: { $0.cancel() }
-                )
-            } else if case .signIn = control, interactionID != nil {
-                InlineServiceAuthView(
-                    control: control,
-                    session: serviceAuthPresenter.session,
-                    pageMount: serviceAuthPresenter.pageMount,
-                    isPresentedInSheet: expandedServiceAuthSessionID != nil,
-                    expand: expandServiceAuth,
-                    cancel: {
-                        if let session = serviceAuthPresenter.session {
-                            session.cancel()
-                        } else if let interactionID {
-                            conversation.resolveServiceControl(id: interactionID, result: nil)
-                        }
-                    }
-                )
-            } else {
-                ServiceControlView(
-                    control: control,
-                    isActive: interactionID != nil,
-                    reflectsAuthentication: false,
-                    signIn: { domain in
-                        guard prepareServiceControl(control) else { return false }
-                        return await conversation.signInService(domain: domain, resumeAgent: false) != nil
-                    },
-                    completeBotControl: { domain, args in
-                        guard prepareServiceControl(control) else { return false }
-                        return await conversation.completeBotControl(domain: domain, args: args, resumeAgent: false)
-                    },
-                    completePayment: { domain, args in
-                        guard prepareServiceControl(control) else { return nil }
-                        return await conversation.completePayment(domain: domain, args: args)
-                    },
-                    onResolved: { result in
-                        guard let interactionID else { return }
-                        conversation.resolveServiceControl(id: interactionID, result: result)
-                    }
-                )
-            }
-        }
-    }
-
-    private var isBotControlPresentedInSheet: Bool {
-        expandedBotControlSessionID != nil
     }
 
     private func expandBotControl(_ session: ServiceHandoffSession) {
@@ -1404,30 +1085,13 @@ struct ConversationPage: View {
                 )
             }
             .overlayPreferenceValue(LivePageCardAnchorKey.self) { anchors in
-                if let page = browserPage,
-                   let ownerID = browserPageMount.inlineOwnerID(for: page),
-                   let anchor = anchors[ownerID] {
-                    InlineServicePageHost(
-                        anchor: anchor,
-                        mount: WebPageMount(page: page, ownerID: ownerID, coordinator: browserPageMount)
-                    )
-                }
-                if let session = serviceAuthPresenter.session,
-                   let ownerID = serviceAuthPresenter.pageMount.inlineOwnerID(for: session.page),
-                   let anchor = anchors[ownerID] {
-                    InlineServicePageHost(
-                        anchor: anchor,
-                        mount: WebPageMount(page: session.page, ownerID: ownerID, coordinator: serviceAuthPresenter.pageMount)
-                    )
-                }
-                if let session = botControlPresenter.session,
-                   let ownerID = botControlPresenter.pageMount.inlineOwnerID(for: session.page),
-                   let anchor = anchors[ownerID] {
-                    InlineServicePageHost(
-                        anchor: anchor,
-                        mount: WebPageMount(page: session.page, ownerID: ownerID, coordinator: botControlPresenter.pageMount)
-                    )
-                }
+                ConversationInlineServicePages(
+                    anchors: anchors,
+                    browserPage: browserPage,
+                    browserPageMount: browserPageMount,
+                    serviceAuthPresenter: serviceAuthPresenter,
+                    botControlPresenter: botControlPresenter
+                )
             }
             .contentMargins(.bottom, dockClearance, for: .scrollContent)
             .onScrollGeometryChange(for: ConversationViewportController.Frame?.self) { geo in
@@ -1533,7 +1197,12 @@ struct ConversationPage: View {
         let historyTail = sendTranscriptTail
         return VStack(spacing: 0) {
             if conversation.canChangeRetention {
-                emptyConversationState
+                ConversationEmptyState(
+                    isModelConfigured: isModelConfigured,
+                    isTemporary: conversation.isTemporary,
+                    contentFloorHeight: viewportLayout.contentFloorHeight,
+                    onChooseModel: { modalPresentation = .modelPicker }
+                )
             }
             earlierWindowBoundary(blocks: blocks)
             let anchorIndex = renderedBlocks.firstIndex { $0.id == anchoredTurnID }
@@ -1720,62 +1389,6 @@ struct ConversationPage: View {
         if anyInputFocused { prepareComposerSubmission() }
     }
 
-    @ViewBuilder
-    private var emptyConversationState: some View {
-        if !isModelConfigured {
-            modelSetupState
-        } else if conversation.isTemporary {
-            temporaryEmptyState
-        } else {
-            persistedEmptyState
-        }
-    }
-
-    private var modelSetupState: some View {
-        VStack(spacing: Theme.Spacing.lg) {
-            Text("Choose a default model to start a conversation.")
-                .font(Theme.Fonts.headline)
-                .foregroundStyle(Theme.Colors.onSurface)
-                .multilineTextAlignment(.center)
-            Button("Choose default model") { modalPresentation = .modelPicker }
-                .font(Theme.Fonts.labelMd)
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.Colors.primary)
-                .accessibilityIdentifier(A11yID.ConversationControls.modelSetup)
-        }
-        .padding(.horizontal, Theme.Spacing.xl)
-        .frame(maxWidth: .infinity, minHeight: viewportLayout.contentFloorHeight, alignment: .center)
-    }
-
-    private var persistedEmptyState: some View {
-        EmptyConversationMark()
-            .saturation(colorScheme == .dark ? 0 : 0.25)
-            .opacity(0.3)
-            .frame(width: 40, height: 40)
-            .padding(.horizontal, Theme.Spacing.xl)
-            .frame(maxWidth: .infinity, minHeight: viewportLayout.contentFloorHeight, alignment: .center)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("New conversation")
-            .accessibilityIdentifier(A11yID.ConversationControls.persistedEmpty)
-    }
-
-    private var temporaryEmptyState: some View {
-        VStack(spacing: Theme.Spacing.md) {
-            Text("Temporary conversation")
-                .font(Theme.Fonts.headline)
-                .foregroundStyle(Theme.Colors.onSurface)
-            Text("This conversation won’t be saved by Ox or synced with iCloud. Temporary mode changes Ox’s storage only; your selected model’s data policy still applies.")
-                .font(Theme.Fonts.bodyMd)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 340)
-        }
-        .padding(.horizontal, Theme.Spacing.xl)
-        .frame(maxWidth: .infinity, minHeight: viewportLayout.contentFloorHeight, alignment: .center)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier(A11yID.ConversationControls.temporaryEmpty)
-    }
-
     private func earlierWindowBoundary(blocks: [ConversationBlock]) -> some View {
         ZStack {
             if transcriptWindow.isLoadingEarlier {
@@ -1893,7 +1506,13 @@ struct ConversationPage: View {
         _ pending: Conversation.PendingPrompt,
         totalBlockCount: Int
     ) -> some View {
-        promptCard(pending)
+        ConversationPromptCard(
+            pending: pending,
+            conversation: conversation,
+            showsLoader: sendHandoff == .idle,
+            composerButtonSize: composerButtonSize,
+            onCustomFocusChange: { choiceInputFocused = $0 }
+        )
             .id(pending.id)
             .background(
                 Theme.Colors.conversationSurface,
@@ -1919,33 +1538,6 @@ struct ConversationPage: View {
             .onDisappear {
                 Log.ui.info("ConversationUX.promptDock conversation=\(conversation.id) prompt=\(pending.id) phase=dismissed")
             }
-    }
-
-    private var modelAccessNotice: some View {
-        Button { modalPresentation = .modelPicker } label: {
-            HStack(spacing: Theme.Spacing.sm) {
-                Image(systemName: "exclamationmark.circle")
-                    .foregroundStyle(Theme.Colors.primary)
-                Text(verbatim: modelAccessNoticeTitle)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
-            }
-            .font(Theme.Fonts.bodySm)
-            .foregroundStyle(Theme.Colors.onSurface)
-            .alertGlassPill(in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
-        }
-        .buttonStyle(.plain)
-        .minimumTouchTarget()
-        .accessibilityIdentifier(A11yID.ConversationControls.modelAccessNotice)
-        .padding(.horizontal, Theme.Spacing.md)
-        .padding(.bottom, Theme.Spacing.sm)
-        .frame(maxWidth: Theme.ContainerWidth.readable)
-        .frame(maxWidth: .infinity)
-    }
-
-    private var modelAccessNoticeTitle: String {
-        L10n.string("Choose a model")
     }
 
     private func ensureModelAccess() -> Bool {

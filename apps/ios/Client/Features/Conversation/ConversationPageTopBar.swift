@@ -68,3 +68,30 @@ struct ConversationPageTopBar: View {
         }
     }
 }
+
+struct ConversationModelAccessNotice: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "exclamationmark.circle")
+                    .foregroundStyle(Theme.Colors.primary)
+                Text(verbatim: L10n.string("Choose a model"))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
+            }
+            .font(Theme.Fonts.bodySm)
+            .foregroundStyle(Theme.Colors.onSurface)
+            .alertGlassPill(in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
+        }
+        .buttonStyle(.plain)
+        .minimumTouchTarget()
+        .accessibilityIdentifier(A11yID.ConversationControls.modelAccessNotice)
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.bottom, Theme.Spacing.sm)
+        .frame(maxWidth: Theme.ContainerWidth.readable)
+        .frame(maxWidth: .infinity)
+    }
+}
