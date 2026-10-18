@@ -5,7 +5,13 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct FileCardView: View {
+    enum Footer {
+        case details
+        case name
+    }
+
     let file: FileItem
+    var footer = Footer.details
     var title: String?
     var description: String?
     var badge: String?
@@ -26,34 +32,12 @@ struct FileCardView: View {
                     .background(Theme.Colors.surfaceSunken)
                     .accessibilityHidden(true)
             }
-            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                if let badge {
-                    Text(badge)
-                        .font(Theme.Fonts.captionMd)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                }
-                Label(title ?? file.userFacingName, systemImage: format.symbol)
-                    .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                    .lineLimit(2)
-                if title != nil, title != file.userFacingName {
-                    Text(file.userFacingName)
-                        .font(Theme.Fonts.caption)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                        .lineLimit(1)
-                }
-                Text(metadata)
-                    .font(Theme.Fonts.caption)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .lineLimit(2)
-                if let description {
-                    Text(description)
-                        .font(Theme.Fonts.bodySm)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                        .lineLimit(3)
+            Group {
+                switch footer {
+                case .details: details
+                case .name: name
                 }
             }
-            .padding(Theme.Spacing.md)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(width: 240, alignment: .leading)
@@ -80,6 +64,47 @@ struct FileCardView: View {
                 Log.ui.error("FileCardView.load file=\(file.fileName) error=\(error.localizedDescription)")
             }
         }
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            if let badge {
+                Text(badge)
+                    .font(Theme.Fonts.captionMd)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            }
+            Label(title ?? file.userFacingName, systemImage: format.symbol)
+                .font(Theme.Fonts.bodyMd)
+                .foregroundStyle(Theme.Colors.onSurface)
+                .lineLimit(2)
+            if title != nil, title != file.userFacingName {
+                Text(file.userFacingName)
+                    .font(Theme.Fonts.caption)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .lineLimit(1)
+            }
+            Text(metadata)
+                .font(Theme.Fonts.caption)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .lineLimit(2)
+            if let description {
+                Text(description)
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .lineLimit(3)
+            }
+        }
+        .padding(Theme.Spacing.md)
+    }
+
+    private var name: some View {
+        Text(file.userFacingName)
+            .font(Theme.Fonts.caption)
+            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.sm)
     }
 
     private var metadata: String {

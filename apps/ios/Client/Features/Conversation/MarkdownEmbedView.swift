@@ -48,32 +48,30 @@ struct MarkdownEmbedView: View {
             VideoWidgetView(video: VideoWidget(source: .artifact(file)))
         case .found(let file):
             Button { open() } label: {
-                fileLine(file, removed: false)
+                FileCardView(file: file, footer: .name)
             }
             .buttonStyle(.plain)
             .accessibilityHint(String(format: L10n.string("Opens %@"), file.userFacingName))
             .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(file.id))
         case .removed:
-            fileLine(FileItem(fileName: removedName, directory: URL(fileURLWithPath: "/")), removed: true)
+            removedLine
                 .accessibilityLabel(String(format: L10n.string("%@, deleted file"), removedName))
                 .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(removedName))
         }
     }
 
-    private func fileLine(_ file: FileItem, removed: Bool) -> some View {
+    private var removedLine: some View {
         Label {
-            Text(file.userFacingName)
-                .underline(!removed, pattern: .dot)
-                .strikethrough(removed)
+            Text(removedName)
+                .strikethrough()
         } icon: {
-            Image(systemName: FileCardFormat(file: file).symbol)
+            Image(systemName: FileCardFormat(file: FileItem(fileName: removedName, directory: URL(fileURLWithPath: "/"))).symbol)
         }
         .font(Theme.Fonts.bodyMd)
-        .foregroundStyle(removed ? Theme.Colors.conversationSecondary : Theme.Colors.onSurface)
+        .foregroundStyle(Theme.Colors.conversationSecondary)
         .lineLimit(1)
         .truncationMode(.middle)
         .frame(minHeight: Theme.Size.minimumTouchTarget)
-        .contentShape(Rectangle())
     }
 
     private var removedName: String {

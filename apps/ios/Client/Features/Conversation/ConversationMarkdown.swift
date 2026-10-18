@@ -379,11 +379,13 @@ struct MarkdownText: View {
 nonisolated private enum MarkdownRenderBlock: Equatable, Sendable {
     case paragraphs([String])
     case block(MarkdownBlock)
+    case embeds([MarkdownBlock])
 
     var first: MarkdownBlock {
         switch self {
         case .paragraphs(let sources): .paragraph(sources.first ?? "")
         case .block(let block): block
+        case .embeds(let blocks): blocks.first ?? .paragraph("")
         }
     }
 
@@ -391,12 +393,25 @@ nonisolated private enum MarkdownRenderBlock: Equatable, Sendable {
         switch self {
         case .paragraphs(let sources): .paragraph(sources.last ?? "")
         case .block(let block): block
+        case .embeds(let blocks): blocks.last ?? .paragraph("")
         }
     }
 
     static func group(_ blocks: [MarkdownBlock]) -> [MarkdownRenderBlock] {
         var grouped: [MarkdownRenderBlock] = []
         for block in blocks {
+            if case .embed = block {
+                switch grouped.last {
+                case .embeds(let embeds):
+                    grouped[grouped.count - 1] = .embeds(embeds + [block])
+                    continue
+                case .block(.embed(let alt, let path)):
+                    grouped[grouped.count - 1] = .embeds([.embed(alt: alt, path: path), block])
+                    continue
+                default:
+                    break
+                }
+            }
             guard case .paragraph(let text) = block else {
                 grouped.append(.block(block))
                 continue
@@ -438,6 +453,20 @@ private struct MarkdownRenderBlockView: View {
                 availableWidth: availableWidth,
                 accessibilityIdentifier: accessibilityIdentifier
             )
+        case .embeds(let blocks):
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: Theme.Spacing.md) {
+                    ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                        if case let .embed(alt, path) = block {
+                            MarkdownEmbedView(alt: alt, path: path)
+                                .frame(width: 240)
+                        }
+                    }
+                }
+            }
+            .defaultScrollAnchor(.leading)
+            .excludesCompactPageSwitch()
+            .accessibilityIdentifier("\(accessibilityIdentifier).embeds")
         }
     }
 }

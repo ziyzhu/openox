@@ -648,9 +648,10 @@ extension Scenario {
         if ctx.turn == 0 {
             return [execute("""
             await ox.fs.write({ path: "weekend-guide.md", content: "# Ocean Beach\\n\\nA windy, open shoreline on San Francisco's west side.", purpose: "Create weekend guide" });
+            await ox.fs.write({ path: "trail-times.csv", content: "Trail,Miles,Hours\\nLands End,3.4,1.5\\nMount Sutro,1.2,0.5", purpose: "Create trail times" });
             """)]
         }
-        return [.say("Two quiet places, ready to browse.\n\n![Weekend guide](weekend-guide.md)\n\n![Valley lake](https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=960&h=640&fit=crop)"), .stop(.stop)]
+        return [.say("Two quiet places, ready to browse.\n\n![Weekend guide](weekend-guide.md)\n\n![Trail times](trail-times.csv)\n\n![Valley lake](https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=960&h=640&fit=crop)"), .stop(.stop)]
     }
 
     static let diagrams = Scenario(name: "diagrams") { ctx in
