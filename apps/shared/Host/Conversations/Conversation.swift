@@ -10,52 +10,6 @@ final class Conversation: Identifiable {
         case deltaReceived
     }
 
-    private enum InteractionWaiter {
-        case prompt(PendingPrompt, CheckedContinuation<PromptResult, Never>)
-        case serviceControl(PendingServiceControl, CheckedContinuation<JSONValue?, Never>)
-
-        var interaction: Interaction {
-            switch self {
-            case .prompt(let prompt, _): .prompt(prompt)
-            case .serviceControl(let control, _): .serviceControl(control)
-            }
-        }
-
-        var id: UUID {
-            switch self {
-            case .prompt(let prompt, _): prompt.id
-            case .serviceControl(let control, _): control.id
-            }
-        }
-
-        var backgroundPhase: ConversationBackgroundPhase {
-            switch interaction {
-            case .prompt(let prompt) where prompt.kind == .permission: .permissionNeeded
-            case .prompt: .inputNeeded
-            case .serviceControl(let control):
-                switch control.control {
-                case .signIn: .signInNeeded
-                case .botControl: .verificationNeeded
-                case .payment: .paymentNeeded
-                }
-            }
-        }
-
-        var serviceDomain: String? {
-            guard case .serviceControl(let control, _) = self else { return nil }
-            return control.control.domain
-        }
-
-        func cancel() {
-            switch self {
-            case .prompt(let prompt, let continuation):
-                prompt.secretEntry?.cancel()
-                continuation.resume(returning: .cancelled)
-            case .serviceControl(_, let continuation): continuation.resume(returning: nil)
-            }
-        }
-    }
-
     private(set) var id: UUID
     let createdAt: Date
     let scheduledSkillID: UUID?
@@ -220,9 +174,24 @@ final class Conversation: Identifiable {
 
     private(set) var attachedServices: [Service] = []
     @ObservationIgnored private var attachedServiceDomains: [String] = []
-    @ObservationIgnored private var interactionWaiter: InteractionWaiter?
-    @ObservationIgnored private var interactionQueue: [InteractionWaiter] = []
-    @ObservationIgnored private var attentionNotificationID: String?
+    @ObservationIgnored private lazy var interactions = ConversationInteractionGate(
+        conversation: self,
+        feedback: feedback,
+        present: { [unowned self] interaction, phase in
+            replaceRunPhase(.awaiting(interaction))
+            activeRun?.backgroundExecution?.finish(.awaitingInput(phase))
+            activeRun?.backgroundExecution = nil
+        },
+        settle: { [unowned self] in
+            replaceRunPhase(.thinking)
+            startBackgroundExecution()
+        },
+        dismiss: { [unowned self] in
+            if interaction != nil { replaceRunPhase(.thinking) }
+        },
+        permissionNeeded: { [unowned self] in activeRun?.backgroundExecution?.updatePhase(.permissionNeeded) },
+        answered: { [unowned self] in markActivity() }
+    )
 
     var interaction: Interaction? {
         guard let run = activeRun,
@@ -449,7 +418,7 @@ final class Conversation: Identifiable {
             },
             presentControl: { [unowned self] control, _ in
                 let pending = embedServiceControl(control)
-                return await waitForServiceControl(pending)
+                return await interactions.waitForServiceControl(pending)
             },
             receiveFiles: { [unowned self] in try await importRemoteMCPFiles($0) },
             serviceChanged: { [unowned self] domain in
@@ -732,11 +701,6 @@ final class Conversation: Identifiable {
     private struct CompletionNotification {
         let title: String
         let body: String
-    }
-
-    private enum PromptResult {
-        case answered(String)
-        case cancelled
     }
 
     private var activeRun: Run?
@@ -1082,135 +1046,11 @@ final class Conversation: Identifiable {
     }
 
     func resolveServiceControl(id controlID: UUID, result: JSONValue?) {
-        guard case .serviceControl(let control, let continuation) = interactionWaiter else {
-            Log.session.warning("Conversation.resolveServiceControl ignored id=\(controlID) reason=no-active-service-control")
-            return
-        }
-        guard control.id == controlID else {
-            Log.session.warning("Conversation.resolveServiceControl ignored id=\(controlID) active=\(control.id) reason=id-mismatch")
-            return
-        }
-        interactionWaiter = nil
-        advanceInteraction()
-        continuation.resume(returning: result)
-        Log.session.info("Conversation.resolveServiceControl id=\(controlID) succeeded=\(result != nil)")
-    }
-
-    func waitForServiceControl(_ control: PendingServiceControl) async -> JSONValue? {
-        await withCheckedContinuation { continuation in
-            guard isBusy else {
-                continuation.resume(returning: nil)
-                return
-            }
-            enqueueInteraction(.serviceControl(control, continuation))
-        }
-    }
-
-    private func enqueueInteraction(_ waiter: InteractionWaiter) {
-        guard interactionWaiter == nil else {
-            interactionQueue.append(waiter)
-            Log.session.info("Conversation.interaction queued id=\(waiter.id) depth=\(interactionQueue.count)")
-            return
-        }
-        activateInteraction(waiter)
-    }
-
-    private func activateInteraction(_ waiter: InteractionWaiter) {
-        interactionWaiter = waiter
-        replaceRunPhase(.awaiting(waiter.interaction))
-        activeRun?.backgroundExecution?.finish(.awaitingInput(waiter.backgroundPhase))
-        activeRun?.backgroundExecution = nil
-        Log.session.info("Conversation.interaction active id=\(waiter.id) queued=\(interactionQueue.count)")
-        observeActionPolicy()
-        notifyPendingInteraction()
+        interactions.resolveServiceControl(id: controlID, result: result)
     }
 
     func notifyPendingInteraction() {
-        guard let waiter = interactionWaiter,
-              attentionNotificationID == nil,
-              feedback.isBackground else { return }
-        deliverAttentionNotification(interactionID: waiter.id, phase: waiter.backgroundPhase)
-    }
-
-    private func observeActionPolicy() {
-        guard case .prompt(let prompt, _) = interactionWaiter,
-              let approval = prompt.autoApproval else { return }
-        let policy = withObservationTracking {
-            serviceManager.actionPolicy(for: approval.action, default: approval.defaultPolicy)
-        } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self, self.interactionWaiter?.id == prompt.id else { return }
-                self.observeActionPolicy()
-            }
-        }
-        switch policy {
-        case .allow:
-            Log.session.info("Conversation.interaction policyResolved id=\(prompt.id) action=\(approval.action) policy=allow")
-            resolvePrompt(blockId: prompt.id, answer: approval.approve)
-        case .block:
-            Log.session.info("Conversation.interaction policyResolved id=\(prompt.id) action=\(approval.action) policy=block")
-            resolvePrompt(blockId: prompt.id, answer: approval.deny)
-        case .ask:
-            break
-        }
-    }
-
-    private func advanceInteraction() {
-        clearAttentionNotification()
-        while !interactionQueue.isEmpty {
-            let waiter = interactionQueue.removeFirst()
-            if case .prompt(let prompt, let continuation) = waiter,
-               let approval = prompt.autoApproval {
-                switch serviceManager.actionPolicy(for: approval.action, default: approval.defaultPolicy) {
-                case .allow:
-                    Log.session.info("Conversation.interaction policyResolved id=\(prompt.id) action=\(approval.action) policy=allow")
-                    continuation.resume(returning: .answered(approval.approve))
-                    continue
-                case .block:
-                    Log.session.info("Conversation.interaction policyResolved id=\(prompt.id) action=\(approval.action) policy=block")
-                    continuation.resume(returning: .answered(approval.deny))
-                    continue
-                case .ask:
-                    break
-                }
-            }
-            activateInteraction(waiter)
-            return
-        }
-        replaceRunPhase(.thinking)
-        startBackgroundExecution()
-    }
-
-    private func cancelInteractions() {
-        clearAttentionNotification()
-        var waiters = interactionQueue
-        if let interactionWaiter { waiters.insert(interactionWaiter, at: 0) }
-        interactionWaiter = nil
-        interactionQueue.removeAll()
-        if interaction != nil { replaceRunPhase(.thinking) }
-        for waiter in waiters { waiter.cancel() }
-        if !waiters.isEmpty {
-            Log.session.info("Conversation.interaction canceled count=\(waiters.count)")
-        }
-    }
-
-    private func cancelServiceInteractions(domains: Set<String>) {
-        guard !domains.isEmpty else { return }
-        var cancelled: [InteractionWaiter] = []
-        let removedActive = interactionWaiter?.serviceDomain.map(domains.contains) == true
-        if removedActive, let interactionWaiter {
-            cancelled.append(interactionWaiter)
-            self.interactionWaiter = nil
-        }
-        interactionQueue.removeAll { waiter in
-            guard waiter.serviceDomain.map(domains.contains) == true else { return false }
-            cancelled.append(waiter)
-            return true
-        }
-        for waiter in cancelled { waiter.cancel() }
-        guard !cancelled.isEmpty else { return }
-        Log.session.info("Conversation.serviceInteractions canceled domains=\(domains.sorted().joined(separator: ",")) count=\(cancelled.count)")
-        if removedActive { advanceInteraction() }
+        interactions.notifyPending()
     }
 
     func embedFile(_ artifact: FileItem) {
@@ -1304,54 +1144,20 @@ final class Conversation: Identifiable {
         kind: ConversationPromptKind = .choice,
         allowsCustomAnswer: Bool = false,
         presentation: ConversationPromptPresentation = .conversation,
-        autoApproval: PendingPrompt.AutoApproval? = nil,
-        secretEntry: SecretEntryRequest? = nil,
-        permission: PermissionPresentation? = nil
+        secretEntry: SecretEntryRequest? = nil
     ) async -> String {
-        defer { secretEntry?.cancel() }
-        let blockId = UUID()
-        let pending = PendingPrompt(
-            id: blockId,
-            kind: kind,
+        await interactions.awaitPrompt(
             prompt: prompt,
             options: options,
-            presentation: presentation,
+            kind: kind,
             allowsCustomAnswer: allowsCustomAnswer,
-            autoApproval: autoApproval,
-            secretEntry: secretEntry,
-            permission: permission
+            presentation: presentation,
+            secretEntry: secretEntry
         )
-        Log.session.info("Conversation.awaitPrompt id=\(id) kind=\(kind.rawValue) presentation=\(String(describing: presentation)) options=\(options.count)")
-        let result = await waitForPrompt(pending)
-        markActivity()
-        switch result {
-        case .answered(let answer): return answer
-        case .cancelled: return Self.abortedAnswer
-        }
     }
 
     func resolvePrompt(blockId: UUID, answer: String) {
-        guard case .prompt(let prompt, let continuation) = interactionWaiter,
-              prompt.id == blockId else { return }
-        if let approval = prompt.autoApproval,
-           answer == approval.alwaysApprove {
-            serviceManager.setActionPolicy(.allow, for: approval.action)
-        }
-        prompt.secretEntry?.cancel()
-        interactionWaiter = nil
-        advanceInteraction()
-        continuation.resume(returning: .answered(answer))
-    }
-
-    private func waitForPrompt(_ prompt: PendingPrompt) async -> PromptResult {
-        await withCheckedContinuation { continuation in
-            if !isBusy {
-                Log.session.error("Conversation prompt outside run id=\(id) block=\(prompt.id)")
-                continuation.resume(returning: .cancelled)
-            } else {
-                enqueueInteraction(.prompt(prompt, continuation))
-            }
-        }
+        interactions.resolvePrompt(blockId: blockId, answer: answer)
     }
 
     @discardableResult
@@ -1485,27 +1291,8 @@ final class Conversation: Identifiable {
     static func attachApproveKey(_ domain: String) -> String { "ox.service.attach:\(domain)" }
 
     func gateServiceAttach(_ service: Service) async throws {
-        let title = "\(service.title) - \(L10n.string( "Attach"))"
-        let message = if service.isIOSService {
-            L10n.string("Its actions and permitted device data become available to this conversation.")
-        } else if service.isMCPService {
-            L10n.string("Its remote Actions can receive arguments from this conversation and return data to Ox.")
-        } else {
-            L10n.string("Its actions and your signed-in data become available to this conversation.")
-        }
-        switch await requestApproval(
-            action: Self.attachApproveKey(service.domain),
-            defaultPolicy: Actions.defaultPolicy(for: Actions.serviceAttach),
-            prompt: "\(title)\n\(message)"
-        ) {
-        case .approved: return
-        case .denied: throw OxFunctionError(code: "permission_denied", message: "ox.service.attach: the user declined to attach \(service.title).", recovery: "Stop. Do not request this attachment again unless the user asks.")
-        case .blocked: throw OxFunctionError(code: "permission_denied", message: "ox.service.attach: the user blocked this Action in Settings.", recovery: "Do not bypass the policy. Ask the user to change it in Settings only if they want to allow this action.")
-        case .stopped: throw OxFunctionError(code: "cancelled", message: "ox.service.attach: the user stopped before attaching \(service.title).", recovery: "Stop. Do not reopen the attachment request unless the user asks.")
-        }
+        try await interactions.gateServiceAttach(service)
     }
-
-    private typealias ApprovalOutcome = ActionApproval.Outcome
 
     func requireApproval(
         action: String,
@@ -1515,18 +1302,7 @@ final class Conversation: Identifiable {
         prompt: String? = nil
     ) async throws {
         try await requireWritableFileAction(action, args: args)
-        switch await requestApproval(
-            action: action,
-            defaultPolicy: defaultPolicy,
-            args: args,
-            purpose: purpose,
-            prompt: prompt
-        ) {
-        case .approved: return
-        case .denied: throw OxFunctionError(code: "permission_denied", message: "\(action): the user declined.", recovery: "Stop. Do not repeat the action unless the user asks.")
-        case .blocked: throw OxFunctionError(code: "permission_denied", message: "\(action): the user blocked this Action in Settings.", recovery: "Do not bypass the policy. Ask the user to change it in Settings only if they want to allow this action.")
-        case .stopped: throw OxFunctionError(code: "cancelled", message: "\(action): the user stopped before answering.", recovery: "Stop. Do not reopen the request unless the user asks.")
-        }
+        try await interactions.requireApproval(action: action, defaultPolicy: defaultPolicy, args: args, purpose: purpose, prompt: prompt)
     }
 
     func requireProfileMutation(_ action: String) throws {
@@ -1537,53 +1313,7 @@ final class Conversation: Identifiable {
     }
 
     func confirmScheduledSkillChange(action: String, prompt: String) async throws {
-        activeRun?.backgroundExecution?.updatePhase(.permissionNeeded)
-        let cancel = L10n.string("Cancel")
-        let permission = PermissionPresentation(title: "Ox - \(action)", purpose: prompt)
-        let answer = await awaitPrompt(
-            prompt: permission.prompt,
-            options: [action, cancel],
-            kind: .permission,
-            presentation: .application,
-            autoApproval: nil,
-            permission: permission
-        )
-        guard answer == action else {
-            throw RuntimeError.bridge("The scheduled skill change was cancelled.")
-        }
-    }
-
-    private func requestApproval(
-        action: String,
-        defaultPolicy: ActionPolicy,
-        args: Any? = nil,
-        purpose: String? = nil,
-        prompt: String? = nil
-    ) async -> ApprovalOutcome {
-        await ActionApproval(serviceManager: serviceManager, ownerID: id, resolveService: { self.attachedService(domain: $0) }).request(
-            action: action,
-            defaultPolicy: defaultPolicy,
-            args: args,
-            purpose: purpose,
-            prompt: prompt
-        ) { request in
-            activeRun?.backgroundExecution?.updatePhase(.permissionNeeded)
-            let answer = await awaitPrompt(
-                prompt: request.prompt,
-                options: request.options,
-                kind: .permission,
-                presentation: .application,
-                autoApproval: PendingPrompt.AutoApproval(
-                    action: request.action,
-                    defaultPolicy: defaultPolicy,
-                    approve: request.approve,
-                    alwaysApprove: request.alwaysApprove,
-                    deny: request.deny
-                ),
-                permission: request.presentation
-            )
-            return answer == Self.abortedAnswer ? nil : answer
-        }
+        try await interactions.confirmScheduledSkillChange(action: action, prompt: prompt)
     }
 
     // MARK: - Branch / retry
@@ -1930,7 +1660,7 @@ final class Conversation: Identifiable {
         for continuation in waiters { continuation.resume(returning: .cancelled) }
         notice = .none
         submissionPresentation = .cancelled
-        cancelInteractions()
+        interactions.cancelAll()
         let runID = activeRun?.id
         activeRun?.task.cancel()
         Log.session.info("Conversation.cancelAll id=\(id) run=\(runID.map { String($0.rawValue.uuidString.prefix(8)) } ?? "idle")")
@@ -1950,7 +1680,7 @@ final class Conversation: Identifiable {
         notice = .none
         submissionPresentation = .cancelled
         activeRun?.task.cancel()
-        cancelInteractions()
+        interactions.cancelAll()
         resetOutputDelivery()
         stopStreamLink()
         if activeRun?.phase != .preparing { setRunPhase(.thinking) }
@@ -1962,35 +1692,6 @@ final class Conversation: Identifiable {
         }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
         let body = preview.isEmpty ? L10n.string("Your conversation finished while you were away.", comment: "Notification body shown when a conversation turn completes while the app is backgrounded and there is no preview text.") : String(preview.prefix(140))
         activeRun?.completionNotification = CompletionNotification(title: title, body: body)
-    }
-
-    private func deliverAttentionNotification(interactionID: UUID, phase: ConversationBackgroundPhase) {
-        let identifier = "conversation.attention.\(id.uuidString).\(interactionID.uuidString)"
-        attentionNotificationID = identifier
-        let notificationTitle = title
-        Task {
-            do {
-                let delivered = try await feedback.notifyAttention(
-                    identifier: identifier,
-                    title: notificationTitle,
-                    body: phase.subtitle,
-                    isCurrent: { [weak self] in
-                        self?.interactionWaiter?.id == interactionID
-                            && self?.feedback.isBackground == true
-                    }
-                )
-                Log.session.info("Conversation.attentionNotify id=\(interactionID) phase=\(phase.rawValue) delivered=\(delivered)")
-            } catch {
-                Log.session.error("Conversation.attentionNotify failed id=\(interactionID) error=\(error.localizedDescription)")
-            }
-        }
-    }
-
-    private func clearAttentionNotification() {
-        guard let identifier = attentionNotificationID else { return }
-        attentionNotificationID = nil
-        feedback.dismissAttention(identifier: identifier)
-        Log.session.info("Conversation.attentionNotify cleared id=\(identifier)")
     }
 
     // MARK: - Streaming
@@ -2200,7 +1901,7 @@ final class Conversation: Identifiable {
         settleModelSelectionChange(runID: runID, succeeded: conversationSucceeded && !run.task.isCancelled)
         let completionNotification = conversationSucceeded ? run.completionNotification : nil
         run.backgroundExecution?.finish(backgroundOutcome)
-        clearAttentionNotification()
+        interactions.clearAttentionNotification()
         finishFinishingDiagnostics(next: "idle")
         activeRun = nil
         if hasUnreadResult, !isTranscriptVisible {
@@ -2542,7 +2243,7 @@ final class Conversation: Identifiable {
         let removed = attachedServices.filter { candidate in
             !services.contains { $0 === candidate }
         }
-        cancelServiceInteractions(domains: Set(removed.map(\.domain)))
+        interactions.cancelServiceInteractions(domains: Set(removed.map(\.domain)))
         attachedServices = services
         Log.session.info("Conversation.setAttachedServices id=\(id) attached=\(services.map(\.domain).joined(separator: ",")) selected=\(isSelected)")
         if isSelected {
