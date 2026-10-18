@@ -6,7 +6,7 @@ struct TranscriptWindow: Equatable {
         case pending(UUID)
     }
 
-    static let batchSize = 16
+    static let batchSize = 8
 
     private(set) var range = 0..<0
     private var earlierBoundaryVisible = false
