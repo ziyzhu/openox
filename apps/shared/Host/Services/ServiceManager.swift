@@ -1,5 +1,4 @@
 import Foundation
-import JavaScriptCore
 import WebKit
 import Observation
 
@@ -273,18 +272,6 @@ final class ServiceManager {
         actionPolicies.policy(for: action, default: actionDefault)
     }
 
-    func defaultPolicy(for action: String) -> ActionPolicy {
-        if action.hasPrefix("\(Actions.serviceAttach):") { return Actions.defaultPolicy(for: Actions.serviceAttach) }
-        if Actions.builtIn.contains(action) { return Actions.defaultPolicy(for: action) }
-        for service in services {
-            guard let serviceAction = service.definition.exposedActions.first(where: {
-                service.definition.qualifiedActionName($0.id) == action
-            }) else { continue }
-            return serviceAction.requireApproval ? .ask : .allow
-        }
-        return .ask
-    }
-
     func explicitActionPolicy(for action: String) -> ActionPolicy? { actionPolicies.actions[action] }
 
     func setActionPolicy(_ policy: ActionPolicy?, for action: String) {
@@ -312,13 +299,6 @@ final class ServiceManager {
         let service = Service(definition: BrowserFunctionCatalog.serviceDefinition, manager: self)
         intrinsicBrowserService = service
         return service
-    }
-
-    func inspectionService(domain: String) -> Service? {
-        if domain == BrowserFunctionCatalog.publicNamespace || domain == BrowserFunctionCatalog.internalDomain {
-            return browserService
-        }
-        return service(domain: domain)
     }
 
     func connectRemoteMCP(
@@ -414,28 +394,6 @@ final class ServiceManager {
         return relatedWebServices(for: url).first { attachedDomains.contains($0.domain) }
     }
 
-    func relatedWebServices(for url: URL) -> [Service] {
-        guard let rawHost = url.host?.lowercased() else { return [] }
-        let host = rawHost.trimmingCharacters(in: CharacterSet(charactersIn: "."))
-        return services
-            .filter { service in
-                guard service.webService != nil else { return false }
-                let domain = service.domain.lowercased()
-                return host == domain || host.hasSuffix("." + domain)
-            }
-            .sorted { lhs, rhs in
-                let lhsDomain = lhs.domain.lowercased()
-                let rhsDomain = rhs.domain.lowercased()
-                let lhsExact = lhsDomain == host
-                let rhsExact = rhsDomain == host
-                if lhsExact != rhsExact { return lhsExact }
-                let lhsLabels = lhsDomain.split(separator: ".").count
-                let rhsLabels = rhsDomain.split(separator: ".").count
-                if lhsLabels != rhsLabels { return lhsLabels > rhsLabels }
-                return lhsDomain < rhsDomain
-            }
-    }
-
     func isConversationAttached(_ conversationID: UUID) -> Bool {
         attachedServiceDomainsByConversation[conversationID] != nil
     }
@@ -524,47 +482,6 @@ final class ServiceManager {
     @discardableResult
     func refreshServices(locale: String?, reuseApplicationRepositories: Bool = false) async -> [String] {
         await loadRepositories(locale: locale, reuseApplicationRepositories: reuseApplicationRepositories)
-    }
-
-    func prepareServices(domains: [String], locale: String?) async throws -> [Service] {
-        try Task.checkCancellation()
-        await refreshServices(locale: locale)
-        try Task.checkCancellation()
-        if case .failed(let message) = repositoryState {
-            throw RuntimeError.bridge("Service catalog could not be loaded: \(message)")
-        }
-        let resolved = try requireServices(domains: domains)
-        let required = resolved.map(\.domain)
-        let unavailable = await withTaskGroup(of: String?.self, returning: [String].self) { group in
-            for service in resolved {
-                group.addTask { await service.loadManifest() == nil ? service.domain : nil }
-            }
-            var unavailable: [String] = []
-            for await domain in group {
-                if let domain { unavailable.append(domain) }
-            }
-            return unavailable.sorted()
-        }
-        try Task.checkCancellation()
-        guard unavailable.isEmpty else {
-            throw RuntimeError.bridge("Required service capabilities could not be loaded: \(unavailable.joined(separator: ", "))")
-        }
-        Log.service.info("ServiceManager.prepareServices ready domains=\(required.joined(separator: ","))")
-        return resolved
-    }
-
-    @discardableResult
-    func requireServices(domains: [String]) throws -> [Service] {
-        guard monoRepositoryState == .ready else {
-            throw RuntimeError.bridge("Service catalog is not ready.")
-        }
-        var seen = Set<String>()
-        let required = domains.filter { seen.insert($0).inserted }
-        let missing = required.filter { service(domain: $0) == nil }
-        guard missing.isEmpty else {
-            throw RuntimeError.bridge("Required service is not installed or enabled: \(missing.joined(separator: ", ")). Install or enable its repository in Settings > Repositories.")
-        }
-        return required.compactMap { service(domain: $0) }
     }
 
     private func loadRepositories(locale: String?, reuseApplicationRepositories: Bool = false) async -> [String] {
@@ -806,7 +723,7 @@ final class ServiceManager {
         guard let kind = ServicesMount.Kind(rawValue: payload.kind.rawValue) else {
             throw ServicePackageError.invalidPackage
         }
-        try await validateServiceSource(kind: kind, domain: payload.domain) { path in
+        try await Self.validateServiceSource(kind: kind, domain: payload.domain) { path in
             try payload.read(path.joined(separator: "/"))
         }
         try await repository.importLocalService(payload, replacing: replacing)
@@ -872,100 +789,8 @@ final class ServiceManager {
 
     private func validateLocalService(kind: ServicesMount.Kind, domain: String) async throws {
         try await repository.validateLocalSource(kind: kind.repositoryKind, id: domain)
-        try await validateServiceSource(kind: kind, domain: domain) { path in
+        try await Self.validateServiceSource(kind: kind, domain: domain) { path in
             try await self.repository.readLocalSource(kind: kind.repositoryKind, id: domain, path: path)
-        }
-    }
-
-    private func validateServiceSource(
-        kind: ServicesMount.Kind,
-        domain: String,
-        read: ([String]) async throws -> Data
-    ) async throws {
-        switch kind {
-        case .web, .api:
-            let manifestData = try await read(["service.json"])
-            let raw = try JSONDecoder().decode(JSONValue.self, from: manifestData)
-            let definition = try ServiceDefinition(manifest: raw, repositoryID: Repository.localID, provenance: .local)
-            guard definition.domain == domain, definition.isAPI == (kind == .api) else {
-                throw Repository.Failure(message: "manifest identity does not match its directory")
-            }
-            let actionsData = try await read(["actions.js"])
-            guard let source = String(data: actionsData, encoding: .utf8) else {
-                throw Repository.Failure(message: "actions.js is not UTF-8")
-            }
-            let context = JSContext()!
-            var syntaxError: String?
-            context.exceptionHandler = { _, exception in syntaxError = exception?.toString() }
-            let encoded = try JSONEncoder().encode(source)
-            context.evaluateScript("new Function(\(String(decoding: encoded, as: UTF8.self)))")
-            if let syntaxError {
-                throw Repository.Failure(message: "actions.js syntax: \(syntaxError)")
-            }
-            syntaxError = nil
-            context.evaluateScript(#"""
-            globalThis.window = globalThis;
-            window.ox = {
-              __installations: 0,
-              __registered: [],
-              install(installer, ...extra) {
-                this.__installations++;
-                if (this.__installations > 1) throw new Error("service installer may run only once");
-                if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer");
-                const names = this.__registered;
-                const action = (name, definition) => {
-                  if (typeof name !== "string" || !name) throw new Error("action name must be a non-empty string");
-                  if (names.includes(name)) throw new Error(`duplicate action: ${name}`);
-                  if (typeof definition?.invoke !== "function") throw new Error(`action ${name} has no invoke function`);
-                  names.push(name);
-                };
-                const unavailable = () => { throw new Error("not callable during registration validation"); };
-                const api = new Proxy(
-                  Object.freeze(\#(kind == .api ? "true" : "false") ? { action, request: unavailable } : { action }),
-                  {
-                    get(target, name) {
-                      if (name in target) return target[name];
-                      throw new Error(`service installer does not provide ${String(name)}`);
-                    },
-                  }
-                );
-                const result = installer(api);
-                if (result && typeof result.then === "function") throw new Error("service installer must be synchronous");
-              },
-            };
-            """#)
-            context.evaluateScript(source)
-            if let syntaxError {
-                throw Repository.Failure(message: "actions.js registration: \(syntaxError)")
-            }
-            guard let result = context.evaluateScript(
-                "JSON.stringify({ installations: window.ox.__installations, actions: window.ox.__registered })"
-            )?.toString(),
-                  let resultData = result.data(using: .utf8),
-                  let registration = try JSONSerialization.jsonObject(with: resultData) as? [String: Any],
-                  registration["installations"] as? Int == 1,
-                  let registered = registration["actions"] as? [String] else {
-                throw Repository.Failure(message: "actions.js must install exactly once")
-            }
-            let declared = Set(definition.actions.map(\.id))
-            let implemented = Set(registered)
-            let missing = declared.subtracting(implemented).sorted()
-            let extra = implemented.subtracting(declared).sorted()
-            guard missing.isEmpty, extra.isEmpty else {
-                let details = [
-                    missing.isEmpty ? nil : "missing implementations: \(missing.joined(separator: ", "))",
-                    extra.isEmpty ? nil : "undeclared implementations: \(extra.joined(separator: ", "))",
-                ].compactMap { $0 }.joined(separator: "; ")
-                throw Repository.Failure(message: "actions.js registration mismatch; \(details)")
-            }
-        case .mcp:
-            let data = try await read(["service.json"])
-            let manifest = try JSONDecoder().decode(MCPCatalogManifest.self, from: data)
-            guard manifest.id == domain, manifest.isValid else {
-                throw Repository.Failure(message: "invalid MCP manifest")
-            }
-        case .iOS:
-            throw Repository.Failure(message: "Native iOS services cannot be edited in Local.")
         }
     }
 
@@ -1179,43 +1004,12 @@ final class ServiceManager {
         Log.service.info("ServiceManager.semantic finish generation=\(generation) installed=\(installed)")
     }
 
-    nonisolated struct Listing: Sendable {
-        let definition: ServiceDefinition
-        var domain: String { definition.domain }
-    }
-
     func listServices(locale: String?) async -> [Listing]? {
         guard let files = monoRepository?.webManifests else { return nil }
         let out = await Task.detached(priority: .userInitiated) {
             Self.decodeListings(files, locale: locale)
         }.value
         Log.service.info("ServiceManager.listServices count=\(out.count)")
-        return out
-    }
-
-    nonisolated private static func decodeListings(
-        _ files: [Repository.ManifestFile],
-        locale: String?
-    ) -> [Listing] {
-        let out: [Listing] = files.compactMap { file in
-            guard let raw = try? JSONDecoder().decode(JSONValue.self, from: file.data) else { return nil }
-            let manifest = Manifest.localized(raw, locale: locale)
-            do {
-                let definition = try ServiceDefinition(
-                    manifest: manifest,
-                    repositoryID: file.repositoryID,
-                    provenance: file.provenance
-                )
-                guard definition.domain == file.domain else {
-                    Log.service.error("ServiceManager.listServices domain mismatch directory=\(file.domain) manifest=\(definition.domain)")
-                    return nil
-                }
-                return Listing(definition: definition)
-            } catch {
-                Log.service.error("ServiceManager.listServices invalid domain=\(file.domain) error=\(error.localizedDescription)")
-                return nil
-            }
-        }
         return out
     }
 
@@ -1226,31 +1020,6 @@ final class ServiceManager {
     private func listMCPServiceDefinitions(locale: String?) async -> [ServiceDefinition] {
         guard let files = monoRepository?.mcpManifests else { return [] }
         return await Self.decodeMCPDefinitions(files, locale: locale)
-    }
-
-    @concurrent
-    nonisolated private static func decodeMCPDefinitions(
-        _ files: [Repository.RepositoryManifestFile], locale: String?
-    ) async -> [ServiceDefinition] {
-        let definitions = files.compactMap { file -> ServiceDefinition? in
-            guard let manifest = try? JSONDecoder().decode(MCPCatalogManifest.self, from: file.data),
-                  manifest.id == file.id,
-                  manifest.isValid else {
-                Log.service.error("ServiceManager.listMCPServices invalid id=\(file.id)")
-                return nil
-            }
-            do {
-                return try ServiceDefinition(
-                    mcp: manifest.localized(locale),
-                    repositoryID: file.repositoryID
-                )
-            } catch {
-                Log.service.error("ServiceManager.listMCPServices invalid id=\(file.id) error=\(error.localizedDescription)")
-                return nil
-            }
-        }
-        Log.service.info("ServiceManager.listMCPServices count=\(definitions.count)")
-        return definitions
     }
 
     // MARK: - Fetch
