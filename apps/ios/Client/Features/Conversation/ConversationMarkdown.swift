@@ -491,9 +491,6 @@ private struct MarkdownBlockView: View {
 
     private static let tableCellMinWidth: CGFloat = 88
     private static let tableCellMaxWidth: CGFloat = 220
-    private static let tableCellFont = UIFont.preferredFont(forTextStyle: .subheadline)
-    private static let tableHeaderFont = UIFontMetrics(forTextStyle: .subheadline)
-        .scaledFont(for: .systemFont(ofSize: tableCellFont.pointSize, weight: .semibold))
 
     var body: some View {
         switch block {
@@ -520,7 +517,7 @@ private struct MarkdownBlockView: View {
             let columns = max(header.count, rows.map(\.count).max() ?? 1)
             let cellWidth = Self.tableCellWidth(forColumns: columns, in: availableWidth)
             ScrollView(.horizontal, showsIndicators: true) {
-                Grid(alignment: .topLeading, horizontalSpacing: Theme.Spacing.md, verticalSpacing: Theme.Spacing.sm) {
+                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Theme.Spacing.md, verticalSpacing: Theme.Spacing.sm) {
                     GridRow {
                         ForEach(Array(header.enumerated()), id: \.offset) { _, col in
                             tableCell(col, width: cellWidth, header: true)
@@ -579,7 +576,9 @@ private struct MarkdownBlockView: View {
     }
 
     private func tableCell(_ text: String, width: CGFloat, header: Bool = false) -> some View {
-        SelectableText(markdown: text, font: header ? Self.tableHeaderFont : Self.tableCellFont, color: textColor.uiColor)
+        inline(text)
+            .font(header ? Theme.Fonts.bodySm.weight(.semibold) : Theme.Fonts.bodySm)
+            .foregroundStyle(textColor)
             .frame(width: width, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -588,6 +587,41 @@ private struct MarkdownBlockView: View {
         guard available > 0, columns > 0 else { return tableCellMaxWidth }
         let fit = (available - Theme.Spacing.md * CGFloat(columns - 1)) / CGFloat(columns)
         return min(tableCellMaxWidth, max(tableCellMinWidth, fit))
+    }
+
+    private func inline(_ source: String) -> Text {
+        if var attributed = SelectableText.inlineMarkdown(source) {
+            let links = attributed.runs.compactMap { $0.link == nil ? nil : $0.range }
+            let code = attributed.runs.compactMap {
+                $0.inlinePresentationIntent?.contains(.code) == true ? $0.range : nil
+            }
+            attributed.removeInlinePresentationIntent(.emphasized)
+            for range in links {
+                attributed[range].foregroundColor = textColor.dynamic
+                attributed[range].underlineStyle = Text.LineStyle(pattern: .dot)
+            }
+            for range in code {
+                attributed[range].foregroundColor = Theme.Colors.conversationInlineCode.dynamic
+                if let intent = attributed[range].inlinePresentationIntent {
+                    let remaining = intent.subtracting(.code)
+                    attributed[range].inlinePresentationIntent = remaining.isEmpty ? nil : remaining
+                }
+            }
+            return Text(attributed)
+        }
+        return Text(source)
+    }
+}
+
+extension AttributedString {
+    mutating func removeInlinePresentationIntent(_ removed: InlinePresentationIntent) {
+        let intents = runs.compactMap { run in
+            run.inlinePresentationIntent.map { (run.range, $0) }
+        }
+        for (range, intent) in intents where intent.contains(removed) {
+            let remaining = intent.subtracting(removed)
+            self[range].inlinePresentationIntent = remaining.isEmpty ? nil : remaining
+        }
     }
 }
 
