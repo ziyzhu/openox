@@ -176,8 +176,9 @@ struct ConversationSidebar: View {
                         .padding(.horizontal, edgeInset)
                         .padding(.vertical, 11)
                 } else if contentState == .ready {
+                    if !query.isEmpty, canLoadMore { searchLoadingRow }
                     ForEach(ordered.prefix(visibleCount)) { row($0) }
-                    if ordered.count > visibleCount || canLoadMore {
+                    if ordered.count > visibleCount || (canLoadMore && query.isEmpty) {
                         CellularAutomatonLoader.small
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, Theme.Spacing.md)
@@ -206,6 +207,19 @@ struct ConversationSidebar: View {
                     .accessibilityLabel("Loading your conversations…")
             }
         }
+    }
+
+    private var searchLoadingRow: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            CellularAutomatonLoader.small
+                .frame(width: 20, height: 20)
+            Text("Loading your conversations…")
+                .font(Theme.Fonts.captionSm)
+                .foregroundStyle(Theme.Colors.conversationSecondary)
+        }
+        .padding(.horizontal, edgeInset)
+        .padding(.vertical, Theme.Spacing.sm)
+        .accessibilityElement(children: .combine)
     }
 
     private func row(_ meta: ConversationMeta) -> some View {
