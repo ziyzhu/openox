@@ -70,15 +70,9 @@ nonisolated enum A11yID {
         static let soulSave = "settings.soulSave"
         static let soulCopy = "settings.soulCopy"
         static let defaultModel = "settings.defaultModel"
-        static let customProviders = "settings.customProviders"
-        static let customProviderAdd = "settings.customProviderAdd"
         static let customProviderName = "settings.customProviderName"
         static let customProviderURL = "settings.customProviderURL"
         static let customProviderKey = "settings.customProviderKey"
-        static let customProviderSave = "settings.customProviderSave"
-        static let customProviderDelete = "settings.customProviderDelete"
-        static func customProvider(_ id: String) -> String { "settings.customProvider.\(id)" }
-        static func customProviderModel(_ id: String) -> String { "settings.customProviderModel.\(id)" }
         static let language = "settings.language"
         static let theme = "settings.theme"
         static let hostEnabled = "settings.host.enabled"
