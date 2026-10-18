@@ -1065,17 +1065,12 @@ struct ConversationPage: View {
         sourceBlockIDs: [UUID],
         dockClearance: CGFloat
     ) -> some View {
-        let anchoredViewportHeight = max(
-            0,
-            max(viewportLayout.anchorFloor, viewportLayout.contentFloorHeight)
-        )
-        return GeometryReader { outer in
+        GeometryReader { outer in
             ScrollView {
                 transcriptRows(
                     blocks: blocks,
                     renderedBlocks: blocks,
                     latestCanvasBlockIDs: latestCanvasBlockIDs,
-                    anchoredViewportHeight: anchoredViewportHeight,
                     scrollToTurn: { id in
                         await anchorBecameReady(
                             id,
@@ -1190,7 +1185,6 @@ struct ConversationPage: View {
         blocks: [ConversationBlock],
         renderedBlocks: [ConversationBlock],
         latestCanvasBlockIDs: [URL: UUID],
-        anchoredViewportHeight: CGFloat,
         scrollToTurn: @escaping (TurnID) async -> Void
     ) -> some View {
         let holdsHistory = holdsTranscript
@@ -1200,7 +1194,7 @@ struct ConversationPage: View {
                 ConversationEmptyState(
                     isModelConfigured: isModelConfigured,
                     isTemporary: conversation.isTemporary,
-                    contentFloorHeight: viewportLayout.contentFloorHeight,
+                    layout: viewportLayout,
                     onChooseModel: { modalPresentation = .modelPicker }
                 )
             }
@@ -1257,7 +1251,7 @@ struct ConversationPage: View {
                 .coordinateSpace(.named(SendFlight.coordinateSpace))
                 .offset(y: sendRiseOffset)
                 .opacity(sendRiseOpacity)
-                .frame(minHeight: anchoredViewportHeight, alignment: .top)
+                .modifier(ViewportFloorFrame(layout: viewportLayout, includesAnchorFloor: true))
                 .id(submissionID)
                 .onGeometryChange(for: CGRect?.self) { geometry in
                     guard case .waitingForAnchor(let id, _) = sendHandoff, id == submissionID else { return nil }
@@ -1293,7 +1287,8 @@ struct ConversationPage: View {
         .padding(.top, 6)
         .frame(maxWidth: .infinity)
         .frame(maxWidth: Theme.ContainerWidth.readable)
-        .frame(maxWidth: .infinity, minHeight: viewportLayout.contentFloorHeight, alignment: .top)
+        .frame(maxWidth: .infinity)
+        .modifier(ViewportFloorFrame(layout: viewportLayout))
         .contentShape(Rectangle())
         .background(KeyboardDismissPadding(padding: viewportLayout.composerHeight))
     }

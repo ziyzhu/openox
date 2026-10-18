@@ -27,7 +27,7 @@ private struct EmptyConversationMark: View {
 struct ConversationEmptyState: View {
     let isModelConfigured: Bool
     let isTemporary: Bool
-    let contentFloorHeight: CGFloat
+    let layout: ConversationViewportLayout
     let onChooseModel: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
@@ -55,7 +55,7 @@ struct ConversationEmptyState: View {
                 .accessibilityIdentifier(A11yID.ConversationControls.modelSetup)
         }
         .padding(.horizontal, Theme.Spacing.xl)
-        .frame(maxWidth: .infinity, minHeight: contentFloorHeight, alignment: .center)
+        .frame(maxWidth: .infinity, minHeight: layout.contentFloorHeight, alignment: .center)
     }
 
     private var persistedEmptyState: some View {
@@ -64,7 +64,7 @@ struct ConversationEmptyState: View {
             .opacity(0.3)
             .frame(width: 40, height: 40)
             .padding(.horizontal, Theme.Spacing.xl)
-            .frame(maxWidth: .infinity, minHeight: contentFloorHeight, alignment: .center)
+            .frame(maxWidth: .infinity, minHeight: layout.contentFloorHeight, alignment: .center)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("New conversation")
             .accessibilityIdentifier(A11yID.ConversationControls.persistedEmpty)
@@ -82,7 +82,7 @@ struct ConversationEmptyState: View {
                 .frame(maxWidth: 340)
         }
         .padding(.horizontal, Theme.Spacing.xl)
-        .frame(maxWidth: .infinity, minHeight: contentFloorHeight, alignment: .center)
+        .frame(maxWidth: .infinity, minHeight: layout.contentFloorHeight, alignment: .center)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(A11yID.ConversationControls.temporaryEmpty)
     }

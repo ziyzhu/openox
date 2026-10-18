@@ -582,11 +582,12 @@ struct RootView: View {
     }
 
     private var rootLayout: some View {
-        GeometryReader { geo in
+        let workspace = conversationLayer
+        return GeometryReader { geo in
             if isSplitLayout {
                 splitLayout(width: geo.size.width)
             } else {
-                compactLayout(geo: geo)
+                compactLayout(geo: geo, workspace: workspace)
             }
         }
         .background(Theme.Colors.surface, ignoresSafeAreaEdges: .all)
@@ -699,7 +700,7 @@ struct RootView: View {
         autoCloseSidebar()
     }
 
-    private func compactLayout(geo: GeometryProxy) -> some View {
+    private func compactLayout(geo: GeometryProxy, workspace: some View) -> some View {
         CompactPageLayout(
             page: $compactPage,
             size: geo.size,
@@ -711,7 +712,7 @@ struct RootView: View {
                 dismissKeyboard(via: "sidebarDrag")
             },
             sidebar: compactSidebarPanel,
-            workspace: conversationLayer
+            workspace: workspace
         )
     }
 
