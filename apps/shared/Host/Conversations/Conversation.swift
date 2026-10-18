@@ -492,8 +492,6 @@ final class Conversation: Identifiable {
         try await invokeIOSService(serviceID, actionID: actionID, args: args, purpose: purpose)
     }
 
-    // MARK: - Transcript (folded in from ConversationManager)
-
     private var document = ConversationDocument() {
         didSet {
             transcriptRevision &+= 1
@@ -874,8 +872,6 @@ final class Conversation: Identifiable {
         return servicesToReload.map(\.title)
     }
 
-    // MARK: - Transcript mutation (was ConversationManager)
-
     private func markActivity(_ date: Date = Date(), persist: Bool = true) {
         lastActivityAt = date
         if persist { onPersistableChange?() }
@@ -1185,8 +1181,6 @@ final class Conversation: Identifiable {
         return .from(value)
     }
 
-    // MARK: - Approval gate
-
     static func attachApproveKey(_ domain: String) -> String { "ox.service.attach:\(domain)" }
 
     func gateServiceAttach(_ service: Service) async throws {
@@ -1214,8 +1208,6 @@ final class Conversation: Identifiable {
     func confirmScheduledSkillChange(action: String, prompt: String) async throws {
         try await interactions.confirmScheduledSkillChange(action: action, prompt: prompt)
     }
-
-    // MARK: - Branch / retry
 
     @discardableResult
     func retry(at blockId: UUID) -> SubmissionReceipt? {
@@ -1313,8 +1305,6 @@ final class Conversation: Identifiable {
             skillInvocation: skillInvocation
         )
     }
-
-    // MARK: - Intent queue
 
     @discardableResult
     func enqueue(
@@ -1530,8 +1520,6 @@ final class Conversation: Identifiable {
         if document.hasOpenGeneration { document.apply(.finishGeneration(outcome)) }
         if document.hasOpenAgentTurn { document.apply(.finishAgentTurn(outcome)) }
     }
-
-    // MARK: - Agent loop
 
     func presentDurableToolAssistant(_ assistant: AssistantMessage) {
         if !document.hasOpenAgentTurn {
@@ -1870,8 +1858,6 @@ final class Conversation: Identifiable {
         return .completed(at: at)
     }
 
-    // MARK: - Manifest + actions
-
     func setAttachedServices(_ services: [Service]) {
         serviceAttachments.set(services)
     }
@@ -1895,8 +1881,6 @@ final class Conversation: Identifiable {
     var serviceBootstrapRevision: String {
         "\(id.uuidString):\(monoRepositoryRevision):\(attachedServices.map(\.domain).joined(separator: ","))"
     }
-
-    // MARK: - Helpers
 
     var systemPromptMemory: String {
         memorySnapshot ?? UserMemory.shared.text
@@ -1938,8 +1922,6 @@ final class Conversation: Identifiable {
             }
         )
     }
-
-
 }
 
 extension Conversation: PrivateDataHost {
