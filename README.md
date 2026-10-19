@@ -84,47 +84,7 @@ ox --host ws://<host-tailnet-address>:9876 host describe
 
 An Ox separates the interface, runtime, model, persistent state, and capabilities into seven components.
 
-```mermaid
----
-config:
-  flowchart:
-    wrappingWidth: 400
----
-flowchart TB
-  client["<b>Ox Client</b><br>Mobile · Desktop · Web · CLI"]
-  model["<b>Ox Model Provider</b><br>Any model · Any provider"]
-  remote_repositories["<b>Remote Repositories</b><br>Public Git + repository.json"]
-
-  subgraph host["Ox Host"]
-    host_api["<b>Ox Host API</b><br>Conversations · Services · Lifecycle"]
-    agent["<b>Ox Agent</b><br>Reasoning · Tool use"]
-    model_adapter["<b>Model adapter</b><br>Provider-neutral agent loop"]
-    profile["<b>Ox Profile</b><br>Identity · Memory · Skills<br>Files · Conversations"]
-    vm["<b>Ox VM</b><br>Sandboxed JavaScript · ox.*<br>Skills · Virtual filesystem"]
-    local_repository["<b>Local Repository</b><br>Services · Skills<br>Editable files + repository.json"]
-    catalog["<b>Catalog</b><br>Services · Skills<br>Resolved sources"]
-  end
-
-  subgraph interfaces["Service interfaces"]
-    device["<b>Device-native interface</b><br>Device Service"]
-    web["<b>Web page</b><br>Web Service"]
-    mcp["<b>MCP server</b><br>MCP Service"]
-  end
-
-  client <-- "in-process or remote" --> host_api
-  host_api <--> agent
-  agent <-- "provider-neutral" --> model_adapter
-  model_adapter <-- "provider API" --> model
-  agent -- "writes and executes code" --> vm
-  profile <-- "reads and writes files" --> vm
-  vm -- "creates or revises<br>via ox.fs" --> local_repository
-  vm <-- "invokes actions<br>reads skills" --> catalog
-  local_repository -- "validates and reloads" --> catalog
-  remote_repositories -- "installs" --> catalog
-  catalog --> device
-  catalog --> web
-  catalog --> mcp
-```
+![OpenOx architecture showing the Client, Host, Agent, model provider, Profile, VM, repositories, catalog, and service interfaces](docs/architecture.svg)
 
 *The Client and model remain replaceable around a Host that owns the Agent, Profile, VM, and service lifecycle.*
 

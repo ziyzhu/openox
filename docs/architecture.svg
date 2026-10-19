@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 866 1374" width="866" height="1374" fill="#1f1f1f" font-family="-apple-system, BlinkMacSystemFont, Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" role="img" aria-labelledby="title description">
+  <title id="title">OpenOx architecture</title>
+  <desc id="description">The Client connects to the Host API and Agent. The Agent uses a provider-neutral model adapter and a sandboxed VM. The VM reads and writes Profile files, creates services and skills in the Local Repository, and uses a catalog of local and remote sources to reach device, web, and MCP service interfaces.</desc>
+  <rect width="866" height="1374" fill="#fff"/>
+  <g fill="#e6e6e6" fill-opacity="0.5" stroke="#8a8a8a">
+    <rect x="265.08" y="1214" width="592.9" height="152" rx="4"/>
+    <rect x="59.66" y="177" width="704.97" height="964" rx="4"/>
+  </g>
+  <text fill="#6e6e6e" x="102.83" y="202.6" text-anchor="middle">Ox Host</text>
+  <g fill="none" stroke="#1f1f1f" stroke-linecap="round">
+    <path d="M395.92,111L395.92,114.38C395.92,117.1 245.21,121.78 245.21,124.5L245.21,230"/>
+    <path d="M395.92,104L399.28,112L392.56,112Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M245.21,237L241.85,229L248.57,229Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M245.21,340L245.21,386"/>
+    <path d="M245.21,333L248.57,341L241.85,341Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M245.21,393L241.85,385L248.57,385Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M196.92,472L196.92,567"/>
+    <path d="M196.92,465L200.28,473L193.56,473Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M196.92,574L193.56,566L200.28,566Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M196.92,653L196.92,1186.5C196.92,1194.19 116.54,1194.19 116.54,1201.88L116.54,1207"/>
+    <path d="M196.92,646L200.28,654L193.56,654Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M116.54,1214L113.18,1206L119.9,1206Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M285.59,465L285.59,478C285.59,487.75 431.44,487.75 431.44,497.5L431.44,543"/>
+    <path d="M431.44,550L428.08,542L434.8,542Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M610.19,484L610.19,522.5C610.19,530.19 541.28,530.19 541.28,537.88L541.28,543"/>
+    <path d="M610.19,477L613.55,485L606.83,485Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M541.28,550L537.92,542L544.64,542Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M434.58,670L434.58,678.97C434.58,684.73 379.53,684.73 379.53,690.5L379.53,757"/>
+    <path d="M379.53,764L376.17,756L382.89,756Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M541.28,677L541.28,683C541.28,723.5 603.93,723.5 603.93,764L603.93,950"/>
+    <path d="M541.28,670L544.64,678L537.92,678Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M603.93,957L600.57,949L607.29,949Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M379.53,884L379.53,929.5C379.53,934.36 574.15,940.02 574.15,944.88L574.15,950"/>
+    <path d="M574.15,957L570.79,949L577.51,949Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M656.98,104C656.98,114.25 744.63,114.25 744.63,124.5L744.63,884C744.63,914 633.7,914 633.7,944L633.7,950"/>
+    <path d="M633.7,957L630.34,949L637.06,949Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M550.39,1053C550.39,1070.36 508.94,1081 441.31,1081C373.68,1081 332.23,1096.2 332.23,1121L332.23,1141C332.23,1177.5 393.6,1177.5 393.6,1214L393.6,1267"/>
+    <path d="M393.6,1274L390.24,1266L396.96,1266Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M566.39,1053L566.39,1081C566.39,1101 542.64,1101 542.64,1121L542.64,1141C542.64,1177.5 605.61,1177.5 605.61,1214L605.61,1267"/>
+    <path d="M605.61,1274L602.25,1266L608.97,1266Z" fill="#1f1f1f" stroke="none"/>
+    <path d="M619.93,1053L619.93,1141C619.93,1177.5 773.54,1177.5 773.54,1214L773.54,1267"/>
+    <path d="M773.54,1274L770.18,1266L776.9,1266Z" fill="#1f1f1f" stroke="none"/>
+  </g>
+  <text fill="#6e6e6e" stroke="#f3f3f3" stroke-width="5" stroke-linejoin="round" paint-order="stroke" x="344.4" y="1239.6" text-anchor="middle">Service interfaces</text>
+  <g font-size="14" text-anchor="middle">
+    <rect x="173.43" y="126.5" width="143.56" height="21" rx="3" fill="#fff"/>
+    <text x="245.21" y="141.9">in-process or remote</text>
+    <rect x="140.76" y="499.5" width="112.32" height="21" rx="3" fill="#fff"/>
+    <text x="196.92" y="514.9">provider-neutral</text>
+    <rect x="153.5" y="1163.5" width="86.85" height="21" rx="3" fill="#fff"/>
+    <text x="196.92" y="1178.9">provider API</text>
+    <rect x="345.26" y="499.5" width="172.38" height="21" rx="3" fill="#fff"/>
+    <text x="431.44" y="514.9">writes and executes code</text>
+    <rect x="537.63" y="499.5" width="145.11" height="21" rx="3" fill="#fff"/>
+    <text x="610.19" y="514.9">reads and writes files</text>
+    <rect x="318.31" y="692.5" width="122.45" height="42" rx="3" fill="#fff"/>
+    <text x="379.53" y="707.9">creates or revises</text>
+    <text x="379.53" y="728.9">via ox.fs</text>
+    <rect x="550.32" y="803" width="107.22" height="42" rx="3" fill="#fff"/>
+    <text x="603.93" y="818.4">invokes actions</text>
+    <text x="603.93" y="839.4">reads skills</text>
+    <rect x="307.3" y="906.5" width="144.47" height="21" rx="3" fill="#fff"/>
+    <text x="379.53" y="921.9">validates and reloads</text>
+    <rect x="718.18" y="126.5" width="52.91" height="21" rx="3" fill="#fff"/>
+    <text x="744.63" y="141.9">installs</text>
+  </g>
+  <g text-anchor="middle">
+    <g id="client" transform="translate(395.92,56)">
+      <rect x="-106.03" y="-48" width="212.07" height="96" rx="4" fill="#f3f3f3" stroke="#8a8a8a"/>
+      <text x="0" y="-18.4" font-weight="bold">Ox Client</text>
+      <text x="0" y="5.6">Mobile · Desktop · Web ·</text>
+      <text x="0" y="29.6">CLI</text>
+    </g>
+    <g id="model" transform="translate(116.54,1250)">
+      <rect x="-108.54" y="-36" width="217.08" height="72" rx="4" fill="#f3f3f3" stroke="#8a8a8a"/>
+      <text x="0" y="-6.4" font-weight="bold">Ox Model Provider</text>
+      <text x="0" y="17.6">Any model · Any provider</text>
+    </g>
+    <g id="remote_repositories" transform="translate(656.98,68)">
+      <rect x="-115.03" y="-36" width="230.06" height="72" rx="4" fill="#f3f3f3" stroke="#8a8a8a"/>
+      <text x="0" y="-6.4" font-weight="bold">Remote Repositories</text>
+      <text x="0" y="17.6">Public Git + repository.json</text>
+    </g>
+    <g id="host_api" transform="translate(245.21,285)">
+      <rect x="-111.49" y="-48" width="222.98" height="96" rx="4" fill="#f3f3f3" stroke="#8a8a8a"/>
+      <text x="0" y="-18.4" font-weight="bold">Ox Host API</text>
+      <text x="0" y="5.6">Conversations · Services ·</text>
+      <text x="0" y="29.6">Lifecycle</text>
+    </g>
+    <g id="agent" transform="translate(245.21,429)">
+      <rect x="-92.39" y="-36" width="184.77" height="72" rx="4" fill="#f3f3f3" stroke="#8a8a8a"/>
+      <text x="0" y="-6.4" font-weight="bold">Ox Agent</text>
+      <text x="0" y="17.6">Reasoning · Tool use</text>
+    </g>
+    <g id="model_adapter" transform="translate(196.92,610)">
+      <rect x="-117.26" y="-36" width="234.52" height="72" rx="4" fill="#f3f3f3" stroke="#8a8a8a"/>
+      <text x="0" y="-6.4" font-weight="bold">Model adapter</text>
+      <text x="0" y="17.6">Provider-neutral agent loop</text>
+    </g>
+    <g id="profile" transform="translate(610.19,429)">
+      <rect x="-106.44" y="-48" width="212.89" height="96" rx="4" fill="#f3f3f3" stroke="#8a8a8a"/>
+      <text x="0" y="-18.4" font-weight="bold">Ox Profile</text>
+      <text x="0" y="5.6">Identity · Memory · Skills</text>
+      <text x="0" y="29.6">Files · Conversations</text>
+    </g>
+    <g id="vm" transform="translate(487.93,610)">
+      <rect x="-105.35" y="-60" width="210.7" height="120" rx="4" fill="#f3f3f3" stroke="#8a8a8a"/>
+      <text x="0" y="-30.4" font-weight="bold">Ox VM</text>
+      <text x="0" y="-6.4">Sandboxed JavaScript ·</text>
+      <text x="0" y="17.6">ox.*</text>
+      <text x="0" y="41.6">Skills · Virtual filesystem</text>
+    </g>
+    <g id="local_repository" transform="translate(379.53,824)">
+      <rect x="-82.61" y="-60" width="165.22" height="120" rx="4" fill="#f3f3f3" stroke="#8a8a8a"/>
+      <text x="0" y="-30.4" font-weight="bold">Local Repository</text>
+      <text x="0" y="-6.4">Services · Skills</text>
+      <text x="0" y="17.6">Editable files +</text>
+      <text x="0" y="41.6">repository.json</text>
+    </g>
+    <g id="catalog" transform="translate(603.93,1005)">
+      <rect x="-81.78" y="-48" width="163.55" height="96" rx="4" fill="#f3f3f3" stroke="#8a8a8a"/>
+      <text x="0" y="-18.4" font-weight="bold">Catalog</text>
+      <text x="0" y="5.6">Services · Skills</text>
+      <text x="0" y="29.6">Resolved sources</text>
+    </g>
+    <g id="device" transform="translate(393.6,1310)">
+      <rect x="-108.53" y="-36" width="217.05" height="72" rx="4" fill="#f3f3f3" stroke="#8a8a8a"/>
+      <text x="0" y="-6.4" font-weight="bold">Device-native interface</text>
+      <text x="0" y="17.6">Device Service</text>
+    </g>
+    <g id="web" transform="translate(605.61,1310)">
+      <rect x="-63.48" y="-36" width="126.96" height="72" rx="4" fill="#f3f3f3" stroke="#8a8a8a"/>
+      <text x="0" y="-6.4" font-weight="bold">Web page</text>
+      <text x="0" y="17.6">Web Service</text>
+    </g>
+    <g id="mcp" transform="translate(773.54,1310)">
+      <rect x="-64.44" y="-36" width="128.89" height="72" rx="4" fill="#f3f3f3" stroke="#8a8a8a"/>
+      <text x="0" y="-6.4" font-weight="bold">MCP server</text>
+      <text x="0" y="17.6">MCP Service</text>
+    </g>
+  </g>
+</svg>
