@@ -93,13 +93,14 @@ struct SelectableText: UIViewRepresentable {
         case attributed(StreamingAttributed)
     }
 
-    // Fading recolors ranges in place on the text view's storage: color-only
-    // attribute edits redraw without relayout, so fade ticks never invalidate
-    // layout or size. Replacing attributedText per tick would relayout at 30fps.
     struct Fade {
         let color: UIColor?
         let arrivals: [StreamingFadeText.Arrival]
         let now: CFTimeInterval
+
+        var live: ArraySlice<StreamingFadeText.Arrival> {
+            arrivals.drop { now - $0.timestamp >= Theme.Animation.streamFade }
+        }
     }
 
     init(_ attributed: NSAttributedString, fade: Fade? = nil) {
@@ -195,58 +196,7 @@ struct SelectableText: UIViewRepresentable {
             }
         }
         guard let fade else { return }
-        context.coordinator.fadedStart = applyFade(
-            fade,
-            to: view.textStorage,
-            previousStart: context.coordinator.fadedStart
-        )
-    }
-
-    private func applyFade(
-        _ fade: Fade,
-        to storage: NSTextStorage,
-        previousStart: Int?
-    ) -> Int? {
-        let length = fade.color == nil
-            ? min(storage.length, attributed.length)
-            : storage.length
-        guard length > 0 else { return nil }
-        var firstLive = 0
-        while firstLive < fade.arrivals.count,
-              fade.now - fade.arrivals[firstLive].timestamp >= Theme.Animation.streamFade {
-            firstLive += 1
-        }
-        let live = fade.arrivals[firstLive...]
-        let liveStart = live.first.map { min($0.startIndex, length) }
-        let dirtyStart = min(previousStart ?? length, liveStart ?? length)
-        guard dirtyStart < length else { return liveStart }
-        storage.beginEditing()
-        let dirtyRange = NSRange(location: dirtyStart, length: length - dirtyStart)
-        if let color = fade.color {
-            storage.addAttribute(.foregroundColor, value: color, range: dirtyRange)
-        } else {
-            applyColors(from: attributed, to: storage, range: dirtyRange)
-        }
-        for index in live.indices {
-            let arrival = live[index]
-            let next = live.index(after: index)
-            let end = min(next < live.endIndex ? live[next].startIndex : length, length)
-            let start = min(arrival.startIndex, length)
-            guard end > start else { continue }
-            let opacity = CGFloat(StreamingFadeText.opacity(
-                at: fade.now,
-                since: arrival.timestamp,
-                duration: Theme.Animation.streamFade
-            ))
-            let range = NSRange(location: start, length: end - start)
-            if let color = fade.color {
-                storage.addAttribute(.foregroundColor, value: color.withAlphaComponent(opacity), range: range)
-            } else {
-                applyColors(from: attributed, to: storage, range: range, alpha: opacity)
-            }
-        }
-        storage.endEditing()
-        return liveStart
+        context.coordinator.applyFade(fade, colors: fade.color == nil ? attributed : nil, in: view)
     }
 
     private var linkTextAttributes: [NSAttributedString.Key: Any] {
@@ -257,22 +207,6 @@ struct SelectableText: UIViewRepresentable {
             .foregroundColor: color,
             .underlineStyle: NSUnderlineStyle([.single, .patternDot]).rawValue,
         ]
-    }
-
-    private func applyColors(
-        from source: NSAttributedString,
-        to storage: NSTextStorage,
-        range: NSRange,
-        alpha: CGFloat? = nil
-    ) {
-        source.enumerateAttribute(.foregroundColor, in: range) { value, colorRange, _ in
-            let color = value as? UIColor ?? .label
-            storage.addAttribute(
-                .foregroundColor,
-                value: alpha.map { color.withAlphaComponent($0) } ?? color,
-                range: colorRange
-            )
-        }
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
@@ -306,7 +240,10 @@ struct SelectableText: UIViewRepresentable {
         var lastSet: NSAttributedString?
         var sizes: [SizeKey: CGSize] = [:]
         private let serviceManager: ServiceManager
-        var fadedStart: Int?
+        private var fadedStart: Int?
+        private var fade: Fade?
+        private var fadeColors: NSAttributedString?
+        private var fadeLength = 0
         private var streaming = StreamingState.none
         var conversationLinkHandler: ((URL) -> Void)?
 
@@ -329,7 +266,59 @@ struct SelectableText: UIViewRepresentable {
         func textReplaced(_ attributed: NSAttributedString) {
             lastSet = attributed
             fadedStart = nil
+            fade = nil
             sizes.removeAll()
+        }
+
+        func applyFade(_ next: Fade, colors: NSAttributedString?, in view: UITextView) {
+            guard let manager = view.textLayoutManager else { return }
+            let storageLength = view.textStorage.length
+            let length = colors.map { min(storageLength, $0.length) } ?? storageLength
+            let liveStart = next.live.first.map { min($0.startIndex, length) }
+            let dirtyStart = min(fadedStart ?? length, liveStart ?? length)
+            fade = next
+            fadeColors = colors
+            fadeLength = length
+            fadedStart = liveStart
+            if manager.renderingAttributesValidator == nil {
+                manager.renderingAttributesValidator = { [weak self] manager, fragment in
+                    self?.renderFade(in: fragment.rangeInElement, manager: manager)
+                }
+            }
+            guard dirtyStart < length, let dirty = manager.textRange(dirtyStart..<length) else { return }
+            manager.removeRenderingAttribute(.foregroundColor, for: dirty)
+            renderFade(in: dirty, manager: manager)
+            guard let top = manager.textLayoutFragment(for: dirty.location)?.layoutFragmentFrame.minY else { return }
+            view.setNeedsDisplayOfSubviews(below: top, in: view)
+        }
+
+        private func renderFade(in bounds: NSTextRange, manager: NSTextLayoutManager) {
+            guard let fade, let content = manager.textContentManager else { return }
+            let origin = content.documentRange.location
+            let lower = content.offset(from: origin, to: bounds.location)
+            let upper = min(content.offset(from: origin, to: bounds.endLocation), fadeLength)
+            let live = fade.live
+            for index in live.indices {
+                let next = live.index(after: index)
+                let start = max(lower, live[index].startIndex)
+                let end = min(next < live.endIndex ? live[next].startIndex : upper, upper)
+                guard end > start else { continue }
+                let opacity = CGFloat(StreamingFadeText.opacity(
+                    at: fade.now,
+                    since: live[index].timestamp,
+                    duration: Theme.Animation.streamFade
+                ))
+                if let color = fade.color {
+                    guard let range = manager.textRange(start..<end) else { continue }
+                    manager.addRenderingAttribute(.foregroundColor, value: color.withAlphaComponent(opacity), for: range)
+                } else {
+                    fadeColors?.enumerateAttribute(.foregroundColor, in: NSRange(start..<end)) { value, run, _ in
+                        guard let range = manager.textRange(run.lowerBound..<run.upperBound) else { return }
+                        let color = value as? UIColor ?? .label
+                        manager.addRenderingAttribute(.foregroundColor, value: color.withAlphaComponent(opacity), for: range)
+                    }
+                }
+            }
         }
 
         fileprivate func updateStreamingPlain(_ stream: StreamingPlain, in view: UITextView) {
@@ -746,6 +735,27 @@ struct SelectableText: UIViewRepresentable {
             parsedMarkdownCache.setObject(parsed, forKey: key, cost: cost)
         }
         return parsed
+    }
+}
+
+private extension NSTextLayoutManager {
+    func textRange(_ range: Range<Int>) -> NSTextRange? {
+        guard let content = textContentManager,
+              let start = content.location(documentRange.location, offsetBy: range.lowerBound),
+              let end = content.location(start, offsetBy: range.count) else { return nil }
+        return NSTextRange(location: start, end: end)
+    }
+}
+
+private extension UIView {
+    func setNeedsDisplayOfSubviews(below top: CGFloat, in root: UIView) {
+        for subview in subviews where subview.convert(subview.bounds, to: root).maxY > top {
+            if subview.subviews.isEmpty {
+                subview.setNeedsDisplay()
+            } else {
+                subview.setNeedsDisplayOfSubviews(below: top, in: root)
+            }
+        }
     }
 }
 
