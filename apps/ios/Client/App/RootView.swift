@@ -459,12 +459,13 @@ struct RootView: View {
         case whenAvailable
         case updateBuild
         case locateFolder
+        case missingFolder
 
         var title: LocalizedStringKey {
             switch self {
             case .manual, .whenAvailable: "Ox Couldn’t Open Your Data"
             case .updateBuild: "Update Ox to Continue"
-            case .locateFolder: "Profile Folder Not Found"
+            case .locateFolder, .missingFolder: "Profile Folder Not Found"
             }
         }
     }
@@ -1180,8 +1181,10 @@ struct RootView: View {
                 let recovery: StartupRecovery
                 if case .unsupportedProfileVersion? = error as? StorageMigrationError {
                     recovery = .updateBuild
-                } else if StorageRoot.shared.unavailableActiveID != nil {
+                } else if case .externalProfileUnavailable? = error as? StorageMigrationError {
                     recovery = .locateFolder
+                } else if case .activeProfileUnavailable? = error as? StorageMigrationError {
+                    recovery = .missingFolder
                 } else if keychainError.domain == NSOSStatusErrorDomain && keychainError.code == Int(errSecMissingEntitlement) {
                     recovery = .updateBuild
                 } else if keychainError.domain == NSOSStatusErrorDomain

@@ -2,6 +2,7 @@ import Foundation
 
 nonisolated enum StorageMigrationError: LocalizedError {
     case activeProfileUnavailable
+    case externalProfileUnavailable(String?)
     case collision(String)
     case invalidAttachment(String)
     case invalidApplicationStorage(String)
@@ -14,7 +15,9 @@ nonisolated enum StorageMigrationError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .activeProfileUnavailable: "This Profile’s folder couldn’t be found. Locate it to reconnect."
+        case .activeProfileUnavailable: "Ox can’t find this Profile’s folder. If it’s in iCloud Drive, make sure iCloud is on, then try again."
+        case .externalProfileUnavailable(let name?): "Ox can’t reach the folder for “\(name)”. If it moved, locate it to reconnect."
+        case .externalProfileUnavailable(nil): "Ox can’t reach this Profile’s folder. If it moved, locate it to reconnect."
         case .collision(let path): "Migration destination conflicts with existing data: \(path)"
         case .invalidAttachment(let path): "Legacy attachment metadata is invalid: \(path)"
         case .invalidApplicationStorage(let component): "Stored \(component) data is not compatible with this version of Ox."

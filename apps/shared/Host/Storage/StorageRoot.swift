@@ -94,7 +94,10 @@ final class StorageRoot {
     func resolve() async throws {
         cloudDocs = await ProfileRepository.cloudDocuments()
         loadSavedProfiles()
-        if unavailableActiveID != nil { throw StorageMigrationError.activeProfileUnavailable }
+        if let id = unavailableActiveID {
+            guard let record = unavailableProfiles.first(where: { $0.id == id }) else { throw StorageMigrationError.activeProfileUnavailable }
+            throw StorageMigrationError.externalProfileUnavailable(record.name)
+        }
         if profiles.isEmpty, let seeded = await seedDefaultProfile() { profiles = [seeded] }
         guard let chosen = profiles.first(where: { $0.id == storedActiveId }) ?? profiles.first else {
             throw StorageMigrationError.activeProfileUnavailable
