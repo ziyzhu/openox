@@ -13,7 +13,7 @@ colors:
   background: "#F2F2F7"
   on-surface: "#000000"
   on-surface-muted: "#8E8E93"
-  on-primary: "#FFFDF7"
+  on-primary: "#FFFFFF"
   error: "#B8422E"
 typography:
   display:
@@ -142,9 +142,9 @@ Ox is a provider-neutral personal assistant for iOS. Its primary surface is a st
 
 The brand is steady, capable, and warm. **Ox feels grounded and strong without becoming heavy or stern** — a dependable working companion with an easy, informal voice. Ox uses neutral surfaces and text with a bright orange accent in Light and Dark.
 
-The voice is curious and direct. Native screens and agent-created artifacts should prefer **a few large, legible elements over dense layouts**. When in doubt: bigger type, more breathing room, fewer chrome lines.
+The voice is curious and direct. Native screens and agent-created files should prefer **a few large, legible elements over dense layouts**. When in doubt: bigger type, more breathing room, fewer chrome lines.
 
-This document describes the current native implementation and provides defaults for HTML artifacts. Shared native tokens live in [Theme.swift](apps/ios/Client/UI/Theme.swift); individual components own their layout and state variants. The frontmatter uses the default Ox palette. Its `px` dimensions are CSS equivalents for artifacts; native layout uses points and semantic fonts that support Dynamic Type. Generic card, list-row, and input tokens are artifact defaults, not universal native component styles. Primary and secondary button tokens describe the shared chip buttons; native exceptions are listed below.
+This document describes the current native implementation and provides defaults for HTML files. Shared native tokens live in [Theme.swift](apps/ios/Client/UI/Theme.swift); individual components own their layout and state variants. The frontmatter uses the default Ox palette. Its `px` dimensions are CSS equivalents for HTML files; native layout uses points and semantic fonts that support Dynamic Type. Generic card, list-row, and input tokens are HTML defaults, not universal native component styles. Primary and secondary button tokens describe the shared chip buttons; native exceptions are listed below.
 
 ## Colors
 
@@ -162,12 +162,18 @@ Ox follows the system **Light** or **Dark** appearance.
 | `background` | `#F2F2F7` | `#0A0A0A` |
 | `on-surface` | `#000000` | `#ECECEC` |
 | `on-surface-muted` | `#8E8E93` | `#9A9A9A` |
-| `on-primary` | `#FFFDF7` | `#FFFDF7` |
+| `on-primary` | `#FFFFFF` | `#FFFFFF` |
 | `error` | `#B8422E` | `#E25A45` |
+| `composer-send` | `#FF9500` | `#FF9500` |
+| `conversation-secondary` | `#666666` | `#9A9A9A` |
+| `conversation-code-surface` | `#F8F8F8` | `#0A0A0A` |
+| `conversation-code-border` | `#E6E6E6` | `#0A0A0A` |
+| `conversation-inline-code` | `#909090` | `#9A9A9A` |
+| `conversation-control` | `#000000` | `#F5A030` |
 
 Use `surface` for content and settings rows, `background` for grouped pages, and `conversation-surface` for the conversation canvas. `surface-sunken` supports small recessed accents; `bubble` is a separate message token. Chips on grouped pages use `chip-on-background`, which uses a neutral grey fill. Composer chips use glass instead of an opaque token fill.
 
-Harvest gold marks primary actions, active states, and confirmation. Keep its emphasis selective. Body text uses `on-surface`; metadata and supporting text use `on-surface-muted`. Resolve colors through the current appearance rather than assuming that content is always white or text is always black.
+Harvest gold marks primary actions, active states, and confirmation. Keep its emphasis selective. Body text uses `on-surface`; metadata and supporting text use `on-surface-muted` or the darker Light-mode `conversation-secondary`, which also appears in settings values. Composer send and stop controls use the distinct `composer-send` orange in both appearances. Resolve colors through the current appearance rather than assuming that content is always white or text is always black.
 
 ## Typography
 
@@ -186,16 +192,16 @@ The type system uses **SF Pro Rounded for display and label roles**, SF Pro for 
 | `label-md` | `.subheadline` | Rounded, semibold |
 | `mono-sm` | `.caption` | Monospaced |
 
-The frontmatter gives nominal artifact sizes; native text scales with the user's text-size setting. The `mono-sm` artifact default maps to a monospaced system caption; native views configure monospacing directly. Prefer a small number of type roles per visible region. See Apple's [SwiftUI Font documentation](https://developer.apple.com/documentation/swiftui/font) for the native font model.
+The frontmatter gives nominal HTML sizes; native text scales with the user's text-size setting. The `mono-sm` HTML default maps to a monospaced system caption; native views configure monospacing directly. Prefer a small number of type roles per visible region. See Apple's [SwiftUI Font documentation](https://developer.apple.com/documentation/swiftui/font) for the native font model.
 
 ## Layout
 
-Ox centers the active conversation and uses a sidebar for conversations, artifacts, skills, services, and settings. The sidebar is a full-screen peer page in compact environments and may remain visible beside the conversation on regular-width iPad. On compact layouts, a rightward swipe from the workspace opens the sidebar and a leftward swipe returns to the workspace; both pages also keep visible navigation controls. The compact sidebar bottom bar keeps conversation search, settings, and new conversation within reach, while regular layouts let native search follow the platform toolbar placement. The layout system is deliberately minimal:
+Ox centers the active conversation and uses a sidebar for conversation history, search, settings, and new conversation. Files, Skills, and Memory are reached through Profile settings; Services is reached through Settings or the composer attachment menu. The sidebar is a full-screen peer page in compact environments and may remain visible beside the conversation on regular-width iPad. On compact layouts, a rightward swipe from the workspace opens the sidebar and a leftward swipe returns to the workspace; both pages also keep visible navigation controls. The compact sidebar bottom bar keeps conversation search, settings, and new conversation within reach, while regular layouts let native search follow the platform toolbar placement. The layout system is deliberately minimal:
 
-- **One reading column.** The shared readable-width limit is 700pt. Keep equal outer-edge padding; 16pt is the general phone margin, with component-specific insets. Full-screen artifacts own their internal responsive layout.
+- **One reading column.** The shared readable-width limit is 700pt. Keep equal outer-edge padding; 16pt is the general phone margin, with component-specific insets. Full-screen HTML files own their internal responsive layout.
 - **Shared spacing scale.** Prefer `xs` (4), `sm` (8), `md` (12), `lg` (16), `xl` (24), and `xxl` (32). Native components also use optical and content-specific spacing: transcript blocks use 20pt, and settings rows use 20pt horizontal and 14pt vertical padding. Set stack spacing explicitly for the component.
 - **Generous touch targets.** Target at least 44pt in both dimensions for custom buttons. Shared chip buttons keep a 32pt visual height inside a minimum 44pt target.
-- **The composer lives at the bottom.** It is narrower and centered while empty and unfocused, then expands when active. Its resting width is 84% of the container; horizontal outer padding is 8pt at rest and 12pt when active. Attached services and artifacts sit in a strip above it.
+- **The composer lives at the bottom.** It is narrower and centered while empty and unfocused, then expands when active. Its resting width is 84% of the container; horizontal outer padding is 8pt at rest and 12pt when active. Attached services, the Files menu, and editing status sit in a strip above it. Follow-up suggestions and the import-memory shortcut appear inside the composer glass above the text field.
 - **Requests belong to the conversation.** Permission, choice, secret-entry, and service-control surfaces appear as transcript blocks. Active sign-in and verification use live-page cards with inline web content when available and controls to expand or cancel. Resolved service controls remain as compact inactive history; authentication and verification do not use a separate transient dock above the composer.
 
 Settings pages use 20pt horizontal and 16pt vertical padding, with 32pt between sections and 8pt between a section header and its content.
@@ -204,7 +210,7 @@ Settings pages use 20pt horizontal and 16pt vertical padding, with 32pt between 
 
 Ox combines **tonal content surfaces with Liquid Glass controls and overlays**. Grouped pages place `surface` content on `background`; the conversation canvas uses `conversation-surface`. Navigation controls, the composer, composer chips, compact service controls, and toasts use regular glass, with interactive glass on applicable controls. Permission, choice, and secret-entry cards use outlines on the conversation canvas rather than glass; live-page cards use an opaque `surface` fill. Glass is a material, so its appearance depends on the content behind it. See Apple's [Applying Liquid Glass to custom views](https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views).
 
-Prefer tone and spacing for ordinary content separation. Native settings groups and structured content can use dividers. Request cards, interactive artifact and skill rows, inline video, and live-page cards use a 1pt `on-surface-muted` outline at 18% opacity. Live-page cards also separate their header from web content with a divider. The hold-to-talk overlay uses a subtle 1pt border and soft shadow; its selected actions also use an outline. These are component-specific treatments, not defaults for every card or input.
+Prefer tone and spacing for ordinary content separation. Native settings groups and structured content can use dividers. Request cards, interactive file and skill rows, inline video, and live-page cards use a 1pt `on-surface-muted` outline at 18% opacity. Live-page cards also separate their header from web content with a divider. The hold-to-talk overlay uses a subtle 1pt border and soft shadow; its selected actions also use an outline. These are component-specific treatments, not defaults for every card or input.
 
 ## Shapes
 
@@ -220,22 +226,22 @@ The shape language is **soft, broad, and continuous**. Strength comes from stabl
 
 ## Components
 
-These descriptions capture native behavior. Interactive artifacts can reuse the palette, typography, and generic frontmatter defaults while keeping their own responsive layout.
+These descriptions capture native behavior. Interactive HTML files can reuse the palette, typography, and generic frontmatter defaults while keeping their own responsive layout.
 
 - **Button (primary):** Shared chip buttons use `primary` fill, `on-primary` text, label typography, capsule shape, and 12pt horizontal padding. Onboarding uses a full-width capsule with a minimum 44pt height. Request actions use their own capsule sizing.
 - **Button (secondary):** Shared unfilled chip buttons use `chip-on-background` fill and `on-surface` text. Settings action labels use a capsule with `primary` at 14% opacity and primary-colored text. Composer controls may use interactive glass.
-- **Link:** Inline `primary` color on body type. Used when the agent is surfacing a navigable item from the page (a story title, an author, a comment thread).
-- **List row:** Native lists use role-specific layouts. Interactive artifact and skill rows in conversation use an 18pt outline with 16pt horizontal and 12pt vertical padding. For lists inside HTML artifacts, start with `surface`, `body-md`, and 12px padding; settings use the explicit native metrics below.
+- **Link:** Native conversation links inherit the surrounding text color and use a dotted underline. Inline HTML filenames use `on-surface` body text with the same underline treatment. The frontmatter's primary-colored link is an HTML default, not the native conversation style.
+- **List row:** Native lists use role-specific layouts. Interactive file and skill rows in conversation use an 18pt outline with 16pt horizontal and 12pt vertical padding. For lists inside HTML files, start with `surface`, `body-md`, and 12px padding; settings use the explicit native metrics below.
 - **Settings surface:** Opaque `surface` fill, body row typography, capsules for standalone rows and fields, and `rounded.xl` groups for multi-row content. Row padding is 20pt horizontal and 14pt vertical. Section headers, supporting copy, and dividers use the same 20pt horizontal inset.
-- **Card / Shoveler:** The generic artifact card uses `surface`, `rounded.lg`, and 16px padding. Native Shoveler cards use `background`, `rounded.md`, and 12pt text-content padding. They scroll horizontally with 12pt spacing and widths from 160–280pt; a card can open one referenced artifact.
-- **Input:** Use the containing native component's shape and material: settings fields use settings surfaces and conversation entry uses the glass composer. The generic artifact input uses `surface`, a 12px radius, and 12px padding. Keep keyboard focus visible and preserve native editing behavior.
-- **Composer:** Regular glass with a 24pt continuous radius, attachment control, text entry, and send, stop, or attachment-loading states. The strip above it exposes attached services, artifacts, and applicable prompt shortcuts.
+- **Card / Shoveler:** The generic HTML card uses `surface`, `rounded.lg`, and 16px padding. Native Shoveler cards use `background`, `rounded.md`, and 12pt text-content padding. They scroll horizontally with 12pt spacing and widths from 160–280pt; a card can open one referenced file.
+- **Input:** Use the containing native component's shape and material: settings fields use settings surfaces and conversation entry uses the glass composer. The generic HTML input uses `surface`, a 12px radius, and 12px padding. Keep keyboard focus visible and preserve native editing behavior.
+- **Composer:** Regular glass with a 24pt continuous radius, attachment control, text entry, and send, stop, or attachment-loading states. Send and stop buttons use `composer-send` fill with `on-primary` icons. The strip above it exposes attached services, the Files menu, and editing status. Applicable follow-up suggestions and the import-memory shortcut sit inside the glass above the text field; draft attachment chips also sit inside the composer.
 - **Service chip:** A 32pt capsule with service identity and optional authentication status. Composer chips use interactive glass; the shared chip defaults to `surface-sunken` elsewhere. Signed-in or authorized services show a muted filled check; signed-out, unknown, or unavailable states show a hollow circle. Checking and signing in show a cellular-automaton loader. No icon appears when sign-in is not required. A tap opens service details. The current chip has no long-press menu; variants without auth status can expose a trailing remove button.
 - **Request card:** Permission and agent-choice cards use an 18pt outline and 16pt padding without a glass background. Permission cards identify the source and action, show purpose or disclosure when supplied, and can open an arguments sheet. Choice cards offer options and, when allowed, a custom-answer field. Resolved cards preserve the answer; only pending requests remain interactive. See [RequestCard.swift](apps/ios/Client/Features/Conversation/RequestCard.swift).
 - **Secret entry:** An outlined request card with a display name, editable secret fields, inline errors, and Cancel / Save actions. Saving disables editing and shows progress. Secret values stay out of the model context.
 - **Service control:** Active sign-in and human verification use live-page cards, showing the service page inline when available with expand and cancel controls. Payment, inactive history, and canvas service controls use the compact 18pt rounded glass surface with 12pt padding, service identity, and a short instruction. Only pending interactions are actionable. Compact controls can show verification or payment completion checkmarks; sign-in hides its action on success. See [ServiceControlView.swift](apps/ios/Client/Features/Services/ServiceControlView.swift).
 - **Live-page card:** An outlined 18pt `surface` container with an identity header, divider, and square web-content area. Loading, unavailable, and invitation placeholders use a 220pt content height. Header actions use 44pt circular interactive glass controls. Browser previews share this surface and can expand into the native page inspector. See [LivePageCard.swift](apps/ios/Client/Features/Services/LivePageCard.swift).
-- **Interactive artifact:** The latest HTML canvas in the transcript runs inline in a live-page card; other artifacts use rows that open dedicated screens. Expanding the inline canvas moves the same live page into a full-screen navigation presentation with Done and Share controls, then restores it on dismissal. HTML canvases opened from the library use a navigation title and Share action, not close-only chrome. Canvas approvals and service interactions appear beneath the content when needed. The artifact owns its internal visual language, but should default to one phone-width column, native body type, generous targets, and warm accents. See [InlineCanvasCard.swift](apps/ios/Client/Features/Conversation/InlineCanvasCard.swift).
+- **Interactive HTML file:** The latest transcript occurrence of each HTML file URL runs inline, so multiple distinct files can have live previews. Earlier occurrences and other files use rows that open dedicated screens. Inline canvases size to their content up to 720pt and clip to an 18pt radius, with a dotted-underlined filename below; they do not use the live-page card's identity header, divider, outline, or square content area. Loading and failure placeholders are 220pt tall. Expanding the inline canvas moves the same live page into a full-screen navigation presentation with Done and Share controls, then restores it on dismissal. HTML canvases opened from Files use a navigation title and Share action, not close-only chrome. Canvas approvals and service interactions appear beneath the content when needed. The HTML file owns its internal visual language, but should default to one phone-width column, native body type, generous targets, and warm accents. See [InlineCanvasCard.swift](apps/ios/Client/Features/Conversation/InlineCanvasCard.swift).
 - **Video:** An inline 4:3 player with a 12pt radius and outline. A thumbnail and play control precede native playback controls; unavailable content shows an inline failure state. Playback stops when the view disappears.
 - **Activity / thinking:** A compact cellular-automaton loader represents “Plowing…”; live reasoning or action labels shimmer. Recorded traces open a medium or large sheet, and completed activity can expose source chips. The shared loader uses a static pattern under Reduce Motion; live-page placeholders use the native progress indicator.
 - **Toast:** Regular glass, `on-surface` label text, and 14pt horizontal / 10pt vertical padding. Info uses a capsule and primary-colored check icon; errors use a 24pt rounded rectangle and error-colored warning icon. Info dismisses automatically after 1.8 seconds by default; errors stay until dismissed. Toasts can include an Open Settings action.
@@ -244,18 +250,18 @@ Pressed treatments vary by component: onboarding uses `primary-pressed`, shared 
 
 ## Motion
 
-Movement uses duration-based springs with little or no bounce. Shared `Theme.Animation` tokens use `.smooth(duration:)`; the composer expands with `.spring(duration: 0.28, bounce: 0)`, and compact sidebar settling uses a 0.25-second smooth spring. Tune duration to the interaction rather than adding decorative overshoot. See Apple's [Animate with springs](https://developer.apple.com/videos/play/wwdc2023/10158/).
+Movement uses duration-based springs with little or no bounce. Shared `Theme.Animation` tokens use `.smooth(duration:)`; the composer's resting/active layout transition uses the 0.2-second standard token. Hold-to-talk presentation uses `.spring(duration: 0.28, bounce: 0)`, inline canvas content-height changes use a 0.3-second zero-bounce spring, and compact sidebar settling uses a 0.25-second smooth spring. Tune duration to the interaction rather than adding decorative overshoot. See Apple's [Animate with springs](https://developer.apple.com/videos/play/wwdc2023/10158/).
 
 Use `.logicallyComplete` for user-facing handoffs, including permission submission and gesture settling; a spring can be perceptually complete before its tail ends. Do not replace completion callbacks with fixed delays. See Apple's [AnimationCompletionCriteria.logicallyComplete](https://developer.apple.com/documentation/swiftui/animationcompletioncriteria/logicallycomplete).
 
-Respect Reduce Motion and Reduce Transparency. The compact sidebar substitutes crossfades for page travel and disables blur when either setting requires it; the composer disables its expansion animation under Reduce Motion. Preserve state changes and completion behavior even when movement is removed.
+Respect Reduce Motion and Reduce Transparency. The compact sidebar substitutes crossfades for page travel under Reduce Motion and disables blur when either setting requires it. Hold-to-talk presentation disables its spring under Reduce Motion. The current composer resting/active layout transition and inline canvas content-height animation do not have explicit Reduce Motion guards. Preserve state changes and completion behavior even when movement is removed.
 
 ## Do's and Don'ts
 
 - **Do** use theme tokens: neutral surfaces and text with bright orange accents in Light and Dark, and a distinct conversation canvas.
 - **Do** give primary emphasis a clear purpose. Avoid making adjacent controls compete for attention.
 - **Do** prefer larger type and fewer items. The agent has license to drop content the user didn't ask for.
-- **Do** use `on-surface` for text and `on-surface-muted` for metadata and disabled states.
+- **Do** use `on-surface` for text and the component's `on-surface-muted` or `conversation-secondary` token for supporting text; use `on-surface-muted` for disabled states.
 - **Do** use tonal fills for content and glass for the native controls and overlays described here.
 - **Don't** add decorative borders or shadows to every surface. Preserve purposeful transcript outlines, dividers, and the hold-to-talk treatments.
 - **Do** choose shapes by component role and keep matching components consistent.
