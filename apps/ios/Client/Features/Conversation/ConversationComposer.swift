@@ -255,7 +255,7 @@ struct ConversationComposer: View, Equatable {
     @State private var editorDraftID: UUID?
     @State private var hasShownImportMemory = false
     @State private var speechLayoutState: LayoutState?
-    @AppStorage("chat.importMemoryIntentDisplays") private var importMemoryIntentDisplays = 0
+    @AppStorage("conversation.importMemoryIntentDisplays") private var importMemoryIntentDisplays = 0
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

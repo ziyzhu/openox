@@ -2,6 +2,11 @@ import Foundation
 
 nonisolated enum ConversationMigrator {
     private static let legacyConversationSchemaVersion = 6
+    static let legacyRenameAction = "ox.app.renameChat"
+
+    static func isRenameAction(_ name: String) -> Bool {
+        name == Actions.appRenameConversation || name == legacyRenameAction
+    }
 
     @MainActor
     static func migratedServiceDomains(_ domains: [String], services: ServiceManager) -> [String] {

@@ -11,7 +11,7 @@
   "userDefaults": {
     "app": {
       "set": {
-        "chat.importMemoryIntentDisplays": 3
+        "conversation.importMemoryIntentDisplays": 3
       }
     }
   },

@@ -20,6 +20,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── app.language                     UI and agent language override
 │   │   ├── host.allowConnections             app-wide Host access toggle; absent means off
 │   │   ├── conversation.importMemoryIntentDisplays   app-wide count of starter intent displays, capped at three
+│   │   ├── chat.importMemoryIntentDisplays  legacy display count, copied once when the current key is absent and retained
 │   │   ├── speech.voice.identifier          legacy read-aloud voice preference, ignored and retained
 │   │   ├── storage.activeProfile            active profile UUID
 │   │   ├── chatgpt.installationId           retained predecessor Codex installation ID, ignored
@@ -207,7 +208,7 @@ The Profile document kinds checkpoint every 32 ordinary changes.
 latest projections. Title/visibility fork current; favorite/read fork initial.
 Qualified `(profileID,conversationID)` references and bound cursors route full
 fork-aware scrollback separately from active model context. Read-only virtual
-`conversations/<Pi-ID>/metadata` and `history` are generated from Pi, never disk transcripts. The native UUID projection uses `conversations/<uuid>/conversation.json` and `turns.jsonl`. Old `chats/` virtual paths and `ox.chat` calls remain compatibility aliases for user-authored code. `StorageMigrator` rewrites stored `ox.chat.start` and `ox.chat.delete` approval keys to `ox.conversation.start` and `ox.conversation.delete` before policy consumers initialize; existing destination policies win collisions, and subsequent launches are no-ops. Predecessor disk paths, document kinds, and UUID binding keys are unchanged.
+`conversations/<Pi-ID>/metadata` and `history` are generated from Pi, never disk transcripts. The native UUID projection uses `conversations/<uuid>/conversation.json` and `turns.jsonl`. Old `chats/` virtual paths and `ox.chat` calls remain compatibility aliases for user-authored code. `StorageMigrator` rewrites stored `ox.chat.start`, `ox.chat.delete`, and `ox.app.renameChat` approval keys to `ox.conversation.start`, `ox.conversation.delete`, and `ox.app.renameConversation` before policy consumers initialize; conversation history keeps recorded `ox.app.renameChat` invocations, which still count as agent renames, and an older build ignores the renamed key, so its rename Action falls back to Automatic; existing destination policies win collisions, and subsequent launches are no-ops. Predecessor disk paths, document kinds, and UUID binding keys are unchanged.
 Physical image results use `oxAttachment`/`oxProfileID`, not image Base64 in history.
 Temporary native routing still retains explicit `ox.chat` UUID compatibility.
 Portable Profiles activate Pi after the storage gate at their selected folder. No simultaneous cross-device editing or raw active-database export is supported. Native UI testing uses direct simulator interaction; Host RPC still requires authorized VPN ingress without loopback exceptions.
@@ -635,6 +636,9 @@ recurrence, time zone, next occurrence, enabled state, and bounded last-run outc
 with its result conversation UUID. The file is prepared and validated by `StorageMigrator` when schedules load;
 unknown versions and malformed or duplicate records disable scheduling and edits,
 retain the file, and defer to automatic recovery without blocking ordinary conversations.
+Preparation renames each record's legacy `lastChatID` to `lastConversationID` without
+changing the document version. Older builds ignore the new key, so after a downgrade
+schedules keep running but lose their last-run conversation link until they run again.
 It follows Application Support's normal device-backup policy and never syncs through
 the Profile, preventing one iCloud Profile from executing on several devices.
 

@@ -138,11 +138,6 @@ nonisolated struct ScheduledSkill: Codable, Equatable, Identifiable, Sendable {
     var lastOutcome: ScheduledSkillRunOutcome?
     var lastConversationID: UUID?
 
-    private enum CodingKeys: String, CodingKey {
-        case id, profileID, skill, argument, recurrence, nextFireAt, isEnabled, createdAt, lastRunAt, lastOutcome
-        case lastConversationID = "lastChatID"
-    }
-
     var expandedIntent: String {
         UserSkillInvocation(skill: skill, argument: argument).expandedIntent
     }

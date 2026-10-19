@@ -29,7 +29,7 @@ nonisolated enum Actions {
     static let appActionPolicies = "ox.app.actionPolicies"
     static let appRepositories = "ox.app.repositories"
     static let appLogs = "ox.app.logs"
-    static let appRenameConversation = "ox.app.renameChat"
+    static let appRenameConversation = "ox.app.renameConversation"
     static let webSearch = "ox.web.search"
     static let webFetch = "ox.web.fetch"
     static let fsList = "ox.fs.list"

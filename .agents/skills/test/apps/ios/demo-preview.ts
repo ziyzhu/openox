@@ -64,7 +64,7 @@ try {
   app ??= await ios.build(join(directory, "DerivedData"), join(directory, "build.log"));
   const before = await snapshot("before");
   check(before.documents !== null, "installed profile snapshot available");
-  const defaultsBefore = await ios.defaults(bundle, "chat.importMemoryIntentDisplays");
+  const defaultsBefore = await ios.defaults(bundle, "conversation.importMemoryIntentDisplays");
   let tree = await scene("connect");
   check(tree.some(element => element.AXLabel === "Connect anything, Ox works across AI assistants, apps, and websites to get things done for you."), "verbatim copy in native onboarding row");
   tree = await scene("memory");
@@ -196,7 +196,7 @@ try {
   await scene("connect");
   const after = await snapshot("after");
   check(JSON.stringify(before) === JSON.stringify(after), "profile and Local repository contents unchanged");
-  const defaultsAfter = await ios.defaults(bundle, "chat.importMemoryIntentDisplays");
+  const defaultsAfter = await ios.defaults(bundle, "conversation.importMemoryIntentDisplays");
   check(defaultsBefore.code === defaultsAfter.code && defaultsBefore.stdout === defaultsAfter.stdout, "composer suggestion preference unchanged");
   console.log(JSON.stringify({ passed: true, checks, diagnostics: directory }, null, 2));
 } catch (error) {

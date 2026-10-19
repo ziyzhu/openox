@@ -162,17 +162,17 @@ export async function check(): Promise<string> {
     StorageMigrationSupport: new Set(migrationFiles),
     ConversationMigrator: new Set([...migrationFiles, "apps/shared/Host/Durable/DurableFileStore.swift"]),
   };
+  const readOnlyCompatibility: Record<string, string> = {
+    "ProfileMigrator apps/shared/Host/Files/VirtualFileSystem.swift": "legacyWorkflowLocation",
+    "ConversationMigrator apps/shared/Host/Conversations/ConversationServiceAttachments.swift": "migratedServiceDomains",
+    "ConversationMigrator apps/shared/Host/Conversations/ConversationDocument.swift": "isRenameAction",
+  };
   for (const [index, source] of allSource.entries()) {
     const path = relative(ROOT, allSwiftFiles[index]);
     for (const owner of migrationOwners) {
       const calls = [...source.matchAll(new RegExp(`\\b${owner}\\.([a-zA-Z0-9_]+)\\s*\\(`, "g"))];
-      const readOnlySkillCompatibility = owner === "ProfileMigrator"
-        && path === "apps/shared/Host/Files/VirtualFileSystem.swift"
-        && calls.every(match => match[1] === "legacyWorkflowLocation");
-      const lazyAttachmentCompatibility = owner === "ConversationMigrator"
-        && path === "apps/shared/Host/Conversations/ConversationServiceAttachments.swift"
-        && calls.every(match => match[1] === "migratedServiceDomains");
-      if (calls.length && !migrationCallers[owner].has(path) && !readOnlySkillCompatibility && !lazyAttachmentCompatibility) {
+      const readOnly = calls.every(match => readOnlyCompatibility[`${owner} ${path}`] === match[1]);
+      if (calls.length && !migrationCallers[owner].has(path) && !readOnly) {
         failures.push(`${path}: persisted compatibility must enter through an approved ${owner} caller`);
       }
     }

@@ -102,7 +102,7 @@ try {
     [ox.app.renameConversation, ox.conversation.rename],
     [ox.app.repositories, ox.repository.list],
   ].every(([previous, current]) => previous === current && previous.help() === current.help())
-    && !["model", "setModel", "renameChat", "repositories"].some(name => Object.keys(ox.app).includes(name));`);
+    && !["model", "setModel", "renameConversation", "repositories"].some(name => Object.keys(ox.app).includes(name));`);
   assert.equal(aliases.value, true, "Old helpers must remain hidden aliases with current validation and help");
   const repositories = await call("ox.repository.list");
   const local = repositories.repositories.find((candidate: Repository) => candidate.id === "local");

@@ -266,7 +266,7 @@ nonisolated struct ConversationDocument: Sendable {
                 guard case let .execute(execution) = step.kind else { continue }
                 for effect in execution.effects.reversed() {
                     guard case let .invocation(invocation) = effect,
-                          invocation.name == Actions.appRenameConversation,
+                          ConversationMigrator.isRenameAction(invocation.name),
                           case let .succeeded(value) = invocation.outcome,
                           value?.objectValue?["renamed"]?.boolValue == true else { continue }
                     return value?.objectValue?["title"]?.stringValue

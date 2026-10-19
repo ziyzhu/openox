@@ -35,6 +35,7 @@ nonisolated enum ApplicationStorageMigrator {
         migrateFilesPolicies()
         migrateFolderOwnership()
         migrateSavedServices()
+        migrateImportMemoryIntentDisplays()
         CredentialMigrator.removeLegacyRepositoryAuthorization()
         Log.app.info("StorageMigrator.application done")
     }
@@ -187,10 +188,19 @@ nonisolated enum ApplicationStorageMigrator {
         Log.app.info("StorageMigrator.savedServices retiredBrowser=\(stored.count - retained.count)")
     }
 
+    private static func migrateImportMemoryIntentDisplays(defaults: UserDefaults = .standard) {
+        let key = "conversation.importMemoryIntentDisplays"
+        guard defaults.object(forKey: key) == nil,
+              let displays = defaults.object(forKey: "chat.importMemoryIntentDisplays") as? Int else { return }
+        defaults.set(displays, forKey: key)
+        Log.app.info("StorageMigrator.importMemoryIntentDisplays migrated displays=\(displays) legacyRetained=true")
+    }
+
     private static func canonicalApprovalAction(_ action: String) -> String {
         switch action {
         case "ox.chat.start": return "ox.conversation.start"
         case "ox.chat.delete": return "ox.conversation.delete"
+        case ConversationMigrator.legacyRenameAction: return Actions.appRenameConversation
         default: break
         }
         let renamed = action.replacingOccurrences(of: "ox.service.repository.", with: "ox.repository.")
@@ -453,6 +463,7 @@ nonisolated enum ApplicationStorageMigrator {
     static func prepareScheduledSkills(at file: URL) throws -> [ScheduledSkill] {
         guard FileManager.default.fileExists(atPath: file.path) else { return [] }
         try migrateScheduledSkillPackages(at: file)
+        try migrateScheduledSkillConversationKey(at: file)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let document = try decoder.decode(ScheduledSkillsDocument.self, from: Data(contentsOf: file))
@@ -472,12 +483,35 @@ nonisolated enum ApplicationStorageMigrator {
         }
         document["version"] = 2
         document["schedules"] = schedules
+        try writeScheduledSkills(document, to: file)
+        Log.app.info("StorageMigrator.scheduledSkills from=1 to=2 count=\(schedules.count)")
+    }
+
+    private static func migrateScheduledSkillConversationKey(at file: URL) throws {
+        let legacyKey = "lastChatID"
+        guard var document = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any],
+              document["version"] as? Int == ScheduledSkillsDocument.currentVersion,
+              var schedules = document["schedules"] as? [[String: Any]],
+              schedules.contains(where: { $0[legacyKey] != nil }) else { return }
+        var renamed = 0
+        for index in schedules.indices {
+            guard let conversationID = schedules[index].removeValue(forKey: legacyKey) else { continue }
+            if schedules[index]["lastConversationID"] == nil {
+                schedules[index]["lastConversationID"] = conversationID
+                renamed += 1
+            }
+        }
+        document["schedules"] = schedules
+        try writeScheduledSkills(document, to: file)
+        Log.app.info("StorageMigrator.scheduledSkills conversationKey renamed=\(renamed) count=\(schedules.count)")
+    }
+
+    private static func writeScheduledSkills(_ document: [String: Any], to file: URL) throws {
         let data = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         _ = try decoder.decode(ScheduledSkillsDocument.self, from: data).validated()
         try data.write(to: file, options: .atomic)
-        Log.app.info("StorageMigrator.scheduledSkills from=1 to=2 count=\(schedules.count)")
     }
 
     nonisolated private static func removeLegacyFile(_ url: URL, directory: URL) throws {
