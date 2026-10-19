@@ -78,7 +78,7 @@ private struct OxApplicationView: View {
                 }
                 switch url.pathExtension.lowercased() {
                 case "skill": skillImports.receive(url)
-                case "chat": conversationImports.receive(url)
+                case "conversation", "chat": conversationImports.receive(url)
                 case "service": serviceImports.receive(url)
                 default: Log.ui.info("DocumentImport.ignored source=\(url.lastPathComponent)")
                 }

@@ -135,6 +135,7 @@
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
+					<string>conversation</string>
 					<string>chat</string>
 				</array>
 				<key>public.mime-type</key>
@@ -195,6 +196,7 @@
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
+					<string>conversation</string>
 					<string>chat</string>
 				</array>
 				<key>public.mime-type</key>

@@ -570,7 +570,7 @@ final class ConversationImportCoordinator {
         operation = Task {
             do {
                 let proposal = try await Task.detached(priority: .userInitiated) {
-                    guard url.pathExtension.lowercased() == "chat" else { throw ConversationPackageError.invalidArchive }
+                    guard ["conversation", "chat"].contains(url.pathExtension.lowercased()) else { throw ConversationPackageError.invalidArchive }
                     let scoped = url.startAccessingSecurityScopedResource()
                     defer { if scoped { url.stopAccessingSecurityScopedResource() } }
                     if let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
