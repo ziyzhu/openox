@@ -24,7 +24,8 @@ const maximumEntries = 10_000;
 const mutations = new Set(["write", "edit", "delete", "mkdir", "rmdir", "move", "copy"]);
 const immutableRoots = new Set(bundledSkills.map(skill => `skills/${skill.name}`));
 const encoder = new TextEncoder();
-const item = (info: FileInfo) => ({ path: canonical(info.path), name: info.name, type: info.kind, size: info.kind === "directory" ? null : info.size });
+const item = (info: FileInfo & { cloud?: string | null }) => ({ path: canonical(info.path), name: info.name, type: info.kind,
+  size: info.kind === "directory" ? null : info.size, mtimeMs: info.mtimeMs || null, cloud: info.cloud ?? null });
 const limit = (value: number | undefined, fallback: number, maximum: number) => {
   if (value !== undefined && (!Number.isSafeInteger(value) || value < 1 || value > maximum)) throw new FileError("invalid", "Invalid filesystem limit");
   return value ?? fallback;

@@ -41,7 +41,8 @@ extension Conversation {
                     return .object(["error": .object(["code": .string("not_found"), "message": .string("File not found")])])
                 }
                 value = .object(["path": .string(path), "name": fields["name"] ?? .string(path),
-                    "kind": fields["type"] ?? .string("file"), "size": fields["size"] ?? .int(0), "mtimeMs": .int(0)])
+                    "kind": fields["type"] ?? .string("file"), "size": fields["size"] ?? .int(0),
+                    "mtimeMs": fields["mtimeMs"] ?? .int(0), "cloud": fields["cloud"] ?? .null])
             }
         case "list":
             let listing = try await listFileBackend(path: path)
@@ -49,7 +50,8 @@ extension Conversation {
             value = .array(listing.map { item in
                 let fields = item.objectValue ?? [:]
                 return .object(["path": fields["path"] ?? .null, "name": fields["name"] ?? .null,
-                    "kind": fields["type"] ?? .null, "size": fields["size"] == .null ? .int(0) : fields["size"] ?? .int(0), "mtimeMs": .int(0)])
+                    "kind": fields["type"] ?? .null, "size": fields["size"] == .null ? .int(0) : fields["size"] ?? .int(0),
+                    "mtimeMs": fields["mtimeMs"] ?? .int(0), "cloud": fields["cloud"] ?? .null])
             })
         case "read":
             value = try await readFileBackend(path: path)
@@ -498,17 +500,31 @@ extension Conversation {
 
     private func listDeviceFiles(_ location: VirtualFileSystem.Location) async throws -> [JSONValue] {
         try await withDeviceFile(location, mode: .read) { directory in
+            let keys: Set<URLResourceKey> = [
+                .isDirectoryKey, .isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey, .contentModificationDateKey,
+                .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey, .ubiquitousItemIsDownloadingKey,
+                .ubiquitousItemIsUploadingKey, .ubiquitousItemHasUnresolvedConflictsKey,
+                .ubiquitousItemDownloadingErrorKey, .ubiquitousItemUploadingErrorKey,
+            ]
             let urls = try FileManager.default.contentsOfDirectory(
                 at: directory,
-                includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .fileSizeKey, .isHiddenKey, .isSymbolicLinkKey],
+                includingPropertiesForKeys: Array(keys),
                 options: [.skipsHiddenFiles]
             )
             return try urls.compactMap { url in
-                let values = try url.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey])
+                let values = try url.resourceValues(forKeys: keys)
                 guard values.isSymbolicLink != true else { return nil }
                 let path = location.path + "/" + url.lastPathComponent
                 if values.isDirectory == true { return self.fileSystemItem(path: path, type: "directory", size: nil) }
-                if values.isRegularFile == true { return self.fileSystemItem(path: path, type: "file", size: values.fileSize) }
+                if values.isRegularFile == true {
+                    return self.fileSystemItem(
+                        path: path,
+                        type: "file",
+                        size: values.fileSize,
+                        modified: values.contentModificationDate,
+                        cloud: Self.cloudStatus(values)
+                    )
+                }
                 return nil
             }
         }
@@ -689,13 +705,34 @@ extension Conversation {
         }
     }
 
-    nonisolated private func fileSystemItem(path: String, type: String, size: Int?) -> JSONValue {
+    nonisolated private func fileSystemItem(
+        path: String,
+        type: String,
+        size: Int?,
+        modified: Date? = nil,
+        cloud: String? = nil
+    ) -> JSONValue {
         .object([
             "path": .string(path),
             "name": .string(path.split(separator: "/").last.map(String.init) ?? path),
             "type": .string(type),
             "size": size.map(JSONValue.int) ?? .null,
+            "mtimeMs": .int(modified.map { Int($0.timeIntervalSince1970 * 1000) } ?? 0),
+            "cloud": cloud.map(JSONValue.string) ?? .null,
         ])
+    }
+
+    nonisolated private static func cloudStatus(_ values: URLResourceValues) -> String? {
+        guard values.isUbiquitousItem == true else { return nil }
+        if values.ubiquitousItemDownloadingError != nil || values.ubiquitousItemUploadingError != nil { return "error" }
+        if values.ubiquitousItemHasUnresolvedConflicts == true { return "conflict" }
+        if values.ubiquitousItemIsDownloading == true { return "downloading" }
+        if values.ubiquitousItemIsUploading == true { return "uploading" }
+        switch values.ubiquitousItemDownloadingStatus {
+        case .current: return "current"
+        case .downloaded: return "outdated"
+        default: return "cloudOnly"
+        }
     }
 
     private func fileSystemReadJSON(path: String, result: FileLibrary.Read) -> JSONValue {

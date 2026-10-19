@@ -9,8 +9,12 @@ const array = (items: unknown) => ({ type: "array", items });
 const path = string("Virtual filesystem path, relative or absolute.");
 const purpose = { ...string("Short (<10 words) description shown to the user as the step label."), minLength: 1, maxLength: 80 };
 const input = (properties: Record<string, unknown>, required: string[] = []) => object({ purpose, ...properties }, ["purpose", ...required]);
-const itemProperties = { path, name: string("Final component."), type: { type: "string", enum: ["file", "directory"] }, size: { type: ["integer", "null"] } };
-const item = object(itemProperties, ["path", "name", "type", "size"]);
+const itemProperties = { path, name: string("Final component."), type: { type: "string", enum: ["file", "directory"] }, size: { type: ["integer", "null"] },
+  mtimeMs: { type: ["integer", "null"], description: "Last modification time in Unix milliseconds, or null when unknown." },
+  cloud: { type: ["string", "null"], enum: ["current", "outdated", "cloudOnly", "downloading", "uploading", "conflict", "error", null],
+    description: "iCloud sync state for a file in a selected iCloud folder, or null for other files." } };
+const itemRequired = ["path", "name", "type", "size", "mtimeMs", "cloud"];
+const item = object(itemProperties, itemRequired);
 const nullableString = { type: ["string", "null"] };
 const tools = { read: createReadTool(), write: createWriteTool(), edit: createEditTool() };
 export const filesystemInputs = Object.fromEntries(Object.entries(tools).map(([name, tool]) => [name, {
@@ -28,7 +32,7 @@ const schemas = {
     required: ["purpose", "path"] }, outputSchema: item },
   edit: { inputSchema: filesystemInputs.edit,
     outputSchema: object({ ...itemProperties, diff: string("Changed lines."), patch: string("Unified patch."), firstChangedLine: integer("First changed line.", 1, Number.MAX_SAFE_INTEGER) },
-      ["path", "name", "type", "size", "diff", "patch"]) },
+      [...itemRequired, "diff", "patch"]) },
   delete: { inputSchema: input({ path }, ["path"]), outputSchema: object({ path, deleted: boolean("Deleted.") }, ["path", "deleted"]) },
   mkdir: { inputSchema: input({ path, recursive: boolean("Create missing parents; accept an existing directory.") }, ["path"]), outputSchema: item },
   rmdir: { inputSchema: input({ path, recursive: boolean("Explicitly delete the directory and its contents.") }, ["path"]), outputSchema: object({ path, deleted: boolean("Deleted.") }, ["path", "deleted"]) },
