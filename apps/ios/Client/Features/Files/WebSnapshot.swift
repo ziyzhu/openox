@@ -10,7 +10,16 @@ final class WebSnapshot: NSObject, WKNavigationDelegate {
     static let maximumSVGBytes = 4 * 1_024 * 1_024
     private static let maximumSVGAspect: CGFloat = 2
     private static let policy = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:\">"
-    private static let svgMeasurement = "(() => { const r = document.querySelector('svg')?.getBoundingClientRect(); return r ? [r.width, r.height] : [] })()"
+    private static let svgMeasurement = """
+    (() => {
+        const r = document.querySelector('svg')?.getBoundingClientRect();
+        if (!r || r.width <= 0 || r.height <= 0) return [];
+        const scale = Math.min(1, window.innerHeight / r.height);
+        document.body.style.transformOrigin = '0 0';
+        document.body.style.transform = `scale(${scale})`;
+        return [r.width * scale, r.height * scale];
+    })()
+    """
 
     private let webView: WKWebView
     private let size: Size
@@ -75,7 +84,7 @@ final class WebSnapshot: NSObject, WKNavigationDelegate {
                     finish(.failure(error ?? CocoaError(.fileReadCorruptFile)))
                     return
                 }
-                let rect = CGRect(x: 0, y: 0, width: measured[0], height: min(measured[1], webView.bounds.height))
+                let rect = CGRect(x: 0, y: 0, width: measured[0], height: measured[1])
                 snapshot(rect: rect, width: min(width, width * Self.maximumSVGAspect * rect.width / rect.height))
             }
         }

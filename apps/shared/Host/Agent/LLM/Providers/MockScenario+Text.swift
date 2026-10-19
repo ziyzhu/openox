@@ -187,6 +187,45 @@ extension Scenario {
         .stop(.length)
     ])
 
+    static let longProse = Scenario(name: "longprose", steps: [
+        .say(longMarkdown(sections: 120, codeEvery: nil)),
+        .stop(.stop)
+    ]).pacing(betweenDeltas: .milliseconds(2))
+
+    static let longMixed = Scenario(name: "longmixed", steps: [
+        .say(longMarkdown(sections: 120, codeEvery: 10)),
+        .stop(.stop)
+    ]).pacing(betweenDeltas: .milliseconds(2))
+
+    private static func longMarkdown(sections: Int, codeEvery: Int?) -> String {
+        (1...sections).map { index in
+            let code = codeEvery.map { index.isMultiple(of: $0) } == true
+                ? "```swift\nlet section = \(index)\nprint(\"section \\(section) settled\")\n```\n\n"
+                : ""
+            return """
+            ## Section \(index): streaming layout
+
+            Section \(index) opens with **bold claims**, *quiet asides*, `inline code`, and a \
+            [reference link](https://example.com/\(index)) so every inline style appears. The paragraph runs long \
+            enough to wrap several times on a phone and keeps the text system busy measuring lines.
+
+            - First point for section \(index) with **emphasis** and enough words to wrap onto a second line
+            - Second point that mentions `value\(index)` inline
+              - Nested detail one under the second point
+              - Nested detail two with *italic* text
+            - Third point closing the list
+
+            1. Ordered step one for section \(index)
+            2. Ordered step two with a longer explanation that wraps across lines on narrow screens
+            3. Ordered step three
+
+            \(code)A closing paragraph for section \(index) ties the points together before the next heading.
+
+
+            """
+        }.joined()
+    }
+
     static let empty = Scenario(name: "empty", steps: [
         .stop(.stop)
     ])

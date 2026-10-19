@@ -85,6 +85,13 @@ enum Theme {
 struct DynamicColor: ShapeStyle {
     let light: UInt32
     let dark: UInt32
+    let uiColor: UIColor
+
+    init(light: UInt32, dark: UInt32) {
+        self.light = light
+        self.dark = dark
+        uiColor = UIColor { traits in UIColor(hex: traits.userInterfaceStyle == .dark ? dark : light) }
+    }
 
     func resolve(in environment: EnvironmentValues) -> Color {
         color(for: environment.colorScheme)
@@ -100,11 +107,6 @@ struct DynamicColor: ShapeStyle {
 
     var dynamic: Color {
         Color(uiColor: uiColor)
-    }
-
-    var uiColor: UIColor {
-        let palette = self
-        return UIColor { traits in UIColor(hex: traits.userInterfaceStyle == .dark ? palette.dark : palette.light) }
     }
 }
 

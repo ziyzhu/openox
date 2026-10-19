@@ -61,46 +61,67 @@ extension View {
     }
 }
 
-struct FileScreen<Content: View>: View {
+struct FileScreen<Content: View, Actions: View>: View {
     let onDismiss: () -> Void
     let dismissIdentifier: String
     let content: (EdgeInsets) -> Content
+    let actions: () -> Actions
 
     @ScaledMetric(relativeTo: .title3) private var iconButtonSize: CGFloat = 44
 
     init(
         onDismiss: @escaping () -> Void,
         dismissIdentifier: String,
-        @ViewBuilder content: @escaping (EdgeInsets) -> Content
+        @ViewBuilder content: @escaping (EdgeInsets) -> Content,
+        @ViewBuilder actions: @escaping () -> Actions
     ) {
         self.onDismiss = onDismiss
         self.dismissIdentifier = dismissIdentifier
         self.content = content
+        self.actions = actions
     }
 
     var body: some View {
         GeometryReader { geometry in
-            ZStack(alignment: .topTrailing) {
+            ZStack(alignment: .top) {
                 Rectangle().fill(Theme.Colors.conversationSurface)
                 content(geometry.safeAreaInsets)
                     .padding(geometry.safeAreaInsets)
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .font(.system(.title3, weight: .semibold))
-                        .foregroundStyle(Theme.Colors.onSurface)
-                        .frame(width: iconButtonSize, height: iconButtonSize)
-                        .contentShape(Circle())
+                HStack(spacing: Theme.Spacing.sm) {
+                    closeButton
+                    Spacer()
+                    actions()
                 }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: Circle())
-                .accessibilityLabel("Close file")
-                .accessibilityIdentifier(dismissIdentifier)
                 .padding(.top, geometry.safeAreaInsets.top + Theme.Spacing.sm)
-                .padding(.trailing, Theme.Spacing.md)
+                .padding(.horizontal, Theme.Spacing.md)
             }
             .ignoresSafeArea()
         }
         .statusBarHidden(true)
+    }
+
+    private var closeButton: some View {
+        Button(action: onDismiss) {
+            Image(systemName: "xmark")
+                .font(.system(.title3, weight: .semibold))
+                .foregroundStyle(Theme.Colors.onSurface)
+                .frame(width: iconButtonSize, height: iconButtonSize)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Circle())
+        .accessibilityLabel("Close file")
+        .accessibilityIdentifier(dismissIdentifier)
+    }
+}
+
+extension FileScreen where Actions == EmptyView {
+    init(
+        onDismiss: @escaping () -> Void,
+        dismissIdentifier: String,
+        @ViewBuilder content: @escaping (EdgeInsets) -> Content
+    ) {
+        self.init(onDismiss: onDismiss, dismissIdentifier: dismissIdentifier, content: content) { EmptyView() }
     }
 }
 
