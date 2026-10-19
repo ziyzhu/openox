@@ -6977,12 +6977,42 @@
         }
       }
     },
-    "Ox couldn’t update your data" : {
+    "Ox Couldn’t Open Your Data" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 无法更新你的数据"
+            "value" : "Ox 无法打开你的数据"
+          }
+        }
+      }
+    },
+    "Profile Folder Not Found" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到配置档案文件夹"
+          }
+        }
+      }
+    },
+    "Switch Profile" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换配置档案"
+          }
+        }
+      }
+    },
+    "Update Ox to Continue" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新 Ox 以继续"
           }
         }
       }

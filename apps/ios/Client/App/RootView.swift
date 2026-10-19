@@ -458,6 +458,15 @@ struct RootView: View {
         case manual
         case whenAvailable
         case updateBuild
+        case locateFolder
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .manual, .whenAvailable: "Ox Couldn’t Open Your Data"
+            case .updateBuild: "Update Ox to Continue"
+            case .locateFolder: "Profile Folder Not Found"
+            }
+        }
     }
 
     private enum Startup: Equatable {
@@ -888,7 +897,7 @@ struct RootView: View {
             Image(systemName: "exclamationmark.triangle")
                 .font(.title.weight(.medium))
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
-            Text("Ox couldn’t update your data")
+            Text(recovery.title)
                 .font(Theme.Fonts.headline)
             Text(message)
                 .font(Theme.Fonts.bodySm)
@@ -900,13 +909,28 @@ struct RootView: View {
                         .buttonStyle(.bordered)
                         .tint(Theme.Colors.primary)
                 }
-                if StorageRoot.shared.unavailableActiveID != nil {
+                if recovery == .locateFolder {
                     Button("Locate Folder…") { locatingMissingProfile = true }
                         .buttonStyle(.borderedProminent)
                         .accessibilityIdentifier("startup.locateProfile")
                 }
             }
             .font(Theme.Fonts.labelMd)
+            if !storage.otherProfiles.isEmpty {
+                Menu {
+                    ForEach(storage.otherProfiles) { profile in
+                        Button(profile.name) { switchStartupProfile(to: profile) }
+                            .accessibilityIdentifier("startup.switchProfile.\(profile.id)")
+                    }
+                } label: {
+                    Text("Switch Profile")
+                        .font(Theme.Fonts.labelMd)
+                        .padding(.horizontal, Theme.Spacing.md)
+                        .minimumTouchTarget()
+                }
+                .tint(Theme.Colors.primary)
+                .accessibilityIdentifier("startup.switchProfile")
+            }
         }
         .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -921,6 +945,16 @@ struct RootView: View {
         .alert("Couldn't locate Profile", isPresented: Binding(get: { profileLocationError != nil }, set: { if !$0 { profileLocationError = nil } })) {
             Button("OK", role: .cancel) { profileLocationError = nil }
         } message: { Text(profileLocationError ?? "") }
+    }
+
+    private func switchStartupProfile(to profile: Profile) {
+        Log.app.info("RootView.startup switchProfile id=\(profile.id)")
+        do {
+            try storage.prefer(profile)
+            bootstrap()
+        } catch {
+            startup = .failed(message: error.localizedDescription, recovery: .manual)
+        }
     }
 
     private func autoCloseSidebar() {
@@ -1144,7 +1178,11 @@ struct RootView: View {
             } catch {
                 let keychainError = error as NSError
                 let recovery: StartupRecovery
-                if keychainError.domain == NSOSStatusErrorDomain && keychainError.code == Int(errSecMissingEntitlement) {
+                if case .unsupportedProfileVersion? = error as? StorageMigrationError {
+                    recovery = .updateBuild
+                } else if StorageRoot.shared.unavailableActiveID != nil {
+                    recovery = .locateFolder
+                } else if keychainError.domain == NSOSStatusErrorDomain && keychainError.code == Int(errSecMissingEntitlement) {
                     recovery = .updateBuild
                 } else if keychainError.domain == NSOSStatusErrorDomain
                     && [Int(errSecInteractionNotAllowed), Int(errSecNotAvailable)].contains(keychainError.code) {

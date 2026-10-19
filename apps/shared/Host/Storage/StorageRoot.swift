@@ -47,6 +47,14 @@ final class StorageRoot {
         UserDefaults.standard.string(forKey: Self.activeKey).flatMap(UUID.init(uuidString:))
     }
 
+    var otherProfiles: [Profile] {
+        profiles.filter { $0.id != storedActiveId }
+    }
+
+    func prefer(_ profile: Profile) throws {
+        try storeActiveProfile(profile.id)
+    }
+
     private func storeActiveProfile(_ id: UUID) throws {
         let defaults = UserDefaults.standard
         let previous = defaults.object(forKey: Self.activeKey)

@@ -23,8 +23,8 @@ nonisolated enum StorageMigrationError: LocalizedError {
         case .missingConfig: "The Profile configuration could not be read."
         case .profileMigrationFailed(let name): "The Profile “\(name)” could not be updated safely."
         case .recoveryRequired(let message): message
-        case .unsupportedProfileVersion(let name, let version):
-            "The Profile “\(name)” uses data format “\(version)”, which this version of Ox does not support. Install the Ox version that last opened it or a newer one."
+        case .unsupportedProfileVersion(let name, _):
+            "The Profile “\(name)” was saved by a newer version of Ox. Update Ox to open it."
         }
     }
 }
