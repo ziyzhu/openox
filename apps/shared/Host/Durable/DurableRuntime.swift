@@ -60,7 +60,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
         guard data.count <= 1024 * 1024 else { throw failure("Read-only mount snapshot exceeds size limit") }
         let snapshot = try JSONDecoder().decode(ReadOnlyFiles.Snapshot.self, from: data)
         return try ReadOnlyFiles(snapshot: snapshot, scope: scope.uuidString,
-                                 reservedPaths: VirtualFileSystem.hostRoots + ["files", "skill-selections.json", "chats"])
+                                 reservedPaths: VirtualFileSystem.hostRoots + ["files", "skill-selections.json"])
     }
 
     func skillPackages(scope: UUID) async throws -> BundledSkillPackages {

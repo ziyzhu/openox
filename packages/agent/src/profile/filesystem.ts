@@ -40,11 +40,10 @@ export function profileMounts(files: ProfileFiles, conversations: OxConversation
     copy: async (from, to) => { writable(to); await files.copy(from, to); },
   };
   const paths = files.physical ? ["MEMORY.md", "SOUL.md", "skill-selections.json", "skills", ""]
-    : ["MEMORY.md", "SOUL.md", "skill-selections.json", "artifacts", "skills", "conversations", "chats"];
+    : ["MEMORY.md", "SOUL.md", "skill-selections.json", "artifacts", "skills", "conversations"];
   return paths.map(path => ({
-    path, access: path === "conversations" || path === "chats" ? "readOnly" : "readWrite",
-    source: { kind: "backend", backend, path: path === "chats" ? "conversations" : path },
-    visibility: path === "chats" ? "unlisted" : "listed",
+    path, access: path === "conversations" ? "readOnly" : "readWrite",
+    source: { kind: "backend", backend, path },
   }));
 }
 
@@ -60,26 +59,22 @@ export function profileEnv(files: ProfileFiles, conversations?: OxConversations,
     try { return await content.list(path); }
     catch (error) { if (error instanceof FileError && error.code === "not_found") return []; throw error; }
   }
-  function projectionPath(path: string) {
-    const name = canonical(path);
-    return name === "chats" ? "conversations" : name.startsWith("chats/") ? "conversations/" + name.slice(6) : name;
-  }
   function writable(path: string) {
-    if (isConversation(projectionPath(path))) throw new FileError("permission_denied", "Conversation projections are read-only", path);
+    if (isConversation(canonical(path))) throw new FileError("permission_denied", "Conversation projections are read-only", path);
   }
   async function conversation(path: string) {
-    const match = /^conversations\/(0|[1-9][0-9]*)(?:\/(metadata|history|conversation\.json|turns\.jsonl))?$/.exec(projectionPath(path));
+    const match = /^conversations\/(0|[1-9][0-9]*)(?:\/(metadata|history|conversation\.json|turns\.jsonl))?$/.exec(canonical(path));
     if (!conversations || !match || !Number.isSafeInteger(Number(match[1]))) throw new FileError("not_found", "Conversation projection not found", path);
     const reference = conversations.reference(Number(match[1]) as ConversationId);
     let metadata;
     try { metadata = await conversations.metadata(reference); }
     catch (error) { if (error instanceof Error && error.message === "Conversation not found") throw new FileError("not_found", error.message, path); throw error; }
     if (!metadata.presentation?.visible) throw new FileError("not_found", "Conversation projection not found", path);
-    if (files.physical && match[2] && (await content.record(projectionPath(path), false))) throw new FileError("invalid", "A retained working file conflicts with this virtual conversation record; storage preparation is required", path);
+    if (files.physical && match[2] && (await content.record(canonical(path), false))) throw new FileError("invalid", "A retained working file conflicts with this virtual conversation record; storage preparation is required", path);
     return { reference, metadata, file: match[2] };
   }
   async function info(path: string): Promise<FileInfo> {
-    const name = projectionPath(path);
+    const name = canonical(path);
     if (isConversation(name)) {
       if (name === "conversations" && conversations) return { name, path: "/conversations", kind: "directory", size: 0, mtimeMs: 0 };
       const projection = await conversation(name);
@@ -95,7 +90,7 @@ export function profileEnv(files: ProfileFiles, conversations?: OxConversations,
     throw new FileError("not_found", "File not found", path);
   }
   async function text(path: string) {
-    if (isConversation(projectionPath(path))) {
+    if (isConversation(canonical(path))) {
       const projection = await conversation(path);
       if (!projection.file) throw new FileError("is_directory", "Cannot read a conversation directory", path);
       if (projection.file === "turns.jsonl") {
@@ -132,12 +127,12 @@ export function profileEnv(files: ProfileFiles, conversations?: OxConversations,
       try { await info(path); return true; } catch (error) { if (error instanceof FileError && error.code === "not_found") return false; throw error; }
     }),
     readTextFile: async path => result(() => text(path)),
-    readBinaryFile: async path => result(async () => { const value = isConversation(projectionPath(path)) ? await text(path) : await files.read(path); return typeof value === "string" ? new TextEncoder().encode(value) : value; }),
+    readBinaryFile: async path => result(async () => { const value = isConversation(canonical(path)) ? await text(path) : await files.read(path); return typeof value === "string" ? new TextEncoder().encode(value) : value; }),
     openBinaryReader: async (path, options) => result(async () => {
       const metadata = await info(path);
       if (metadata.kind === "directory") throw new FileError("is_directory", "Cannot read a directory", path);
       if (metadata.kind === "symlink" && options?.noFollow) throw new FileError("invalid", "Cannot open a symbolic link", path);
-      return snapshotBinaryReader(metadata, isConversation(projectionPath(path)) ? await text(path) : await content.read(path));
+      return snapshotBinaryReader(metadata, isConversation(canonical(path)) ? await text(path) : await content.read(path));
     }),
     openDirReader: unsupported, watch: unsupported,
     readTextLines: async (path, options) => result(async () => (await text(path)).split("\n").slice(0, options?.maxLines)),
@@ -152,7 +147,7 @@ export function profileEnv(files: ProfileFiles, conversations?: OxConversations,
     }),
     listDir: async path => result(async () => {
       if ((await info(path)).kind !== "directory") throw new FileError("not_directory", "Not a directory", path);
-      const name = projectionPath(path); const prefix = name ? name + "/" : "";
+      const name = canonical(path); const prefix = name ? name + "/" : "";
       if (isConversation(name)) {
         if (name !== "conversations") {
           if (!includeConversationRecords) return workingEntries(name);

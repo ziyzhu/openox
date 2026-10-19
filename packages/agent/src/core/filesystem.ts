@@ -70,14 +70,13 @@ function validateMutation(operation: FileOperation, args: FileRequest, path: str
   if (immutableRoots.has(path.split("/").slice(0, 2).join("/"))) throw new FileError("permission_denied", "Bundled System skills are read-only; copy to a distinct name to customize", path);
 }
 export function resolveFileRequest(args: FileRequest, cwd: string): FileRequest {
-  const roots = new Set(["MEMORY.md", "SOUL.md", "skills", "services", "files", "artifacts", "conversations", "history", "chats", "tmp"]);
+  const roots = new Set(["MEMORY.md", "SOUL.md", "skills", "services", "files", "artifacts", "conversations", "history", "tmp"]);
   const resolve = (path: string) => {
     if (path.startsWith("/") || roots.has(path.split("/")[0]!)) {
       const parts = canonical(path).split("/");
       const uuid = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(parts[1] ?? "");
-      if (parts[0] === "chats" || parts[0] === "history" || (parts[0] === "conversations" && uuid)) {
+      if (parts[0] === "history" || (parts[0] === "conversations" && uuid)) {
         parts[0] = uuid ? "history" : "conversations";
-        if (parts[2] === "chat.json") parts[2] = "conversation.json";
         if (parts[2] === "messages.jsonl") parts[2] = "turns.jsonl";
         if (parts[2] === "metadata") parts[2] = "conversation.json";
         if (parts[2] === "history") parts[2] = "turns.jsonl";

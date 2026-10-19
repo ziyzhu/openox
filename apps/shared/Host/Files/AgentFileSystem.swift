@@ -43,8 +43,7 @@ extension Conversation {
         roots.append("files")
         let mounts = roots.map { root in
             JSONValue.object(["path": .string(root), "access": .string(["history", "tmp"].contains(root) ? "readOnly" : "readWrite")])
-        } + [JSONValue.object(["path": .string("chats"), "access": .string("readOnly")]),
-             JSONValue.object(["path": .string(""), "access": .string("readOnly")])]
+        } + [JSONValue.object(["path": .string(""), "access": .string("readOnly")])]
         var recorded = args
         if let base64 = recorded.removeValue(forKey: "base64")?.stringValue {
             recorded["bytes"] = .int(base64.utf8.count / 4 * 3)

@@ -119,10 +119,6 @@ nonisolated public struct VirtualFileSystem: Sendable {
               !path.contains("\\") else { throw Error.invalidPath(rawPath) }
         var parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         if parts.first == "history" { parts[0] = "conversations" }
-        if parts.first == "chats" {
-            parts[0] = "conversations"
-            if parts.count == 3, parts[2] == "chat.json" { parts[2] = "conversation.json" }
-        }
         guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
             throw Error.invalidPath(rawPath)
         }

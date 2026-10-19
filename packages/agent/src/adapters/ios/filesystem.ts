@@ -37,8 +37,8 @@ export async function invokeFilesystem(runtime: ProfileRuntime, capability: stri
     },
     remove: async path => { await call("delete", path); },
   };
-  const inputs: FileMount[] = mounts.filter(mount => mount.path !== "" && (!runtime.files.physical || !["artifacts", "conversations"].includes(mount.path))).map(mount => ({ ...mount, visibility: ["chats", "history"].includes(mount.path) ? "unlisted" : "listed",
-    source: { kind: "backend", backend, path: mount.path === "chats" ? "history" : mount.path } }));
+  const inputs: FileMount[] = mounts.filter(mount => mount.path !== "" && (!runtime.files.physical || !["artifacts", "conversations"].includes(mount.path))).map(mount => ({ ...mount, visibility: mount.path === "history" ? "unlisted" : "listed",
+    source: { kind: "backend", backend, path: mount.path } }));
   if (runtime.files.physical) {
     const search = operation === "glob" || operation === "grep";
     const base = canonical(args.path ?? "");
