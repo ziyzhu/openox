@@ -191,22 +191,34 @@ nonisolated enum OpenAIResponsesWebSocketBody {
         var comparableCurrent = current
         comparableCurrent.removeValue(forKey: "input")
         comparableCurrent.removeValue(forKey: "previous_response_id")
-        previous.removeValue(forKey: "input")
+        let previousInput = previous.removeValue(forKey: "input") as? [Any] ?? []
         previous.removeValue(forKey: "previous_response_id")
         guard equal(comparableCurrent, previous) else { return nil }
 
-        let previousInput = (try? JSONSerialization.jsonObject(with: continuation.requestBody) as? [String: Any])?["input"] as? [Any] ?? []
-        let baseline = previousInput + responseOutput
         let currentInput = current["input"] as? [Any] ?? []
-        guard currentInput.count >= baseline.count else { return nil }
-        for index in baseline.indices where !equal(currentInput[index], baseline[index]) { return nil }
-        return Array(currentInput.dropFirst(baseline.count))
+        let baselineCount = previousInput.count + responseOutput.count
+        guard currentInput.count >= baselineCount else { return nil }
+        for (index, item) in previousInput.enumerated() where !equal(currentInput[index], item) { return nil }
+        for (offset, item) in responseOutput.enumerated()
+        where !replays(currentInput[previousInput.count + offset], item) { return nil }
+        return Array(currentInput.dropFirst(baselineCount))
+    }
+
+    private static func replays(_ replayed: Any, _ original: Any) -> Bool {
+        switch (replayed, original) {
+        case (let replayed as [String: Any], let original as [String: Any]):
+            return replayed.allSatisfy { key, value in original[key].map { replays(value, $0) } ?? false }
+        case (let replayed as [Any], let original as [Any]):
+            return replayed.count == original.count && zip(replayed, original).allSatisfy(replays)
+        default:
+            return equal(replayed, original)
+        }
     }
 
     private static func equal(_ lhs: Any, _ rhs: Any) -> Bool {
         guard JSONSerialization.isValidJSONObject([lhs]), JSONSerialization.isValidJSONObject([rhs]),
-              let left = try? JSONSerialization.data(withJSONObject: lhs, options: [.sortedKeys]),
-              let right = try? JSONSerialization.data(withJSONObject: rhs, options: [.sortedKeys])
+              let left = try? JSONSerialization.data(withJSONObject: [lhs], options: [.sortedKeys]),
+              let right = try? JSONSerialization.data(withJSONObject: [rhs], options: [.sortedKeys])
         else { return false }
         return left == right
     }

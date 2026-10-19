@@ -94,7 +94,7 @@ nonisolated public indirect enum JSONValue: Codable, Equatable, Sendable {
 
     public func jsonString(fallback: String = "{}") -> String {
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.withoutEscapingSlashes]
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         guard let data = try? encoder.encode(self), let string = String(data: data, encoding: .utf8) else {
             return fallback
         }
