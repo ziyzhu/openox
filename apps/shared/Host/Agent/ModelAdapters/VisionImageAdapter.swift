@@ -12,13 +12,12 @@ nonisolated struct VisionImageAdapter: ModelAdapter {
         var transformed: [Message] = []
         transformed.reserveCapacity(messages.count)
         for message in messages {
-            guard let message = await transform(message) else { return .failed }
-            transformed.append(message)
+            transformed.append(await transform(message))
         }
         return .transformed(transformed)
     }
 
-    private func transform(_ message: Message) async -> Message? {
+    private func transform(_ message: Message) async -> Message {
         switch message {
         case .user(var user):
             var content: [ContentBlock] = []
@@ -31,7 +30,9 @@ nonisolated struct VisionImageAdapter: ModelAdapter {
                 guard let data = try? ProviderFileInputs.read(artifact),
                       let analysis = await analysis(data: data, filename: artifact.fileName, mimeType: artifact.mimeType) else {
                     Log.agent.error("VisionImageAdapter couldn't analyze artifact=\(artifact.fileName)")
-                    return nil
+                    content.append(.text(TextContent(FileReferenceAdapter.recovery(kind: .image, source: FilePromptReference.text(for: artifact)))))
+                    transformed = true
+                    continue
                 }
                 content.append(.text(TextContent("\(FilePromptReference.text(for: artifact))\n\n\(analysis)")))
                 transformed = true
@@ -51,7 +52,9 @@ nonisolated struct VisionImageAdapter: ModelAdapter {
                 guard let data = try? ProviderFileInputs.read(artifact),
                       let analysis = await analysis(data: data, filename: artifact.fileName, mimeType: artifact.mimeType) else {
                     Log.agent.error("VisionImageAdapter couldn't analyze tool artifact=\(artifact.fileName)")
-                    return nil
+                    content.append(.text(TextContent(FileReferenceAdapter.recovery(kind: .image, source: FilePromptReference.text(for: artifact)))))
+                    transformed = true
+                    continue
                 }
                 content.append(.text(TextContent("\n\n\(FilePromptReference.text(for: artifact))\n\n\(analysis)")))
                 transformed = true
@@ -70,7 +73,9 @@ nonisolated struct VisionImageAdapter: ModelAdapter {
                     mimeType: attachment.mimeType
                 ) else {
                     Log.agent.error("VisionImageAdapter couldn't analyze transient=\(attachment.displayName)")
-                    return nil
+                    transientAnalyses.append(FileReferenceAdapter.recovery(kind: .image, source: FileReferenceAdapter.source(for: attachment)))
+                    transformed = true
+                    continue
                 }
                 transientAnalyses.append(analysis)
                 transformed = true

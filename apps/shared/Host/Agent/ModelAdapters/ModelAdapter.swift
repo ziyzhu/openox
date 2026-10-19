@@ -12,9 +12,8 @@ nonisolated protocol ModelAdapter: Sendable {
 }
 
 nonisolated enum ModelAdapterPipeline {
-    static func transform(messages: [Message], model: ProviderModel, loadsFilesLazily: Bool) async -> [Message] {
-        var adapters: [any ModelAdapter] = [ToolExchangeAdapter()]
-        if loadsFilesLazily { adapters.append(FileReferenceAdapter()) }
+    static func transform(messages: [Message], model: ProviderModel, loadsFilesLazily: Bool, wireProtocol: LLMWireProtocol? = nil) async -> [Message] {
+        var adapters: [any ModelAdapter] = [ToolExchangeAdapter(), FileReferenceAdapter(loadsFilesLazily: loadsFilesLazily, wireProtocol: wireProtocol)]
         adapters.append(VisionImageAdapter())
         var transformed = messages
         for adapter in adapters {

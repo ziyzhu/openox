@@ -42,6 +42,7 @@ struct ConversationPage: View {
     let onToggleTemporary: () -> Void
     let onDeleteConversation: () -> Void
     let onBranch: (UUID) -> Void
+    let onOpenConversation: (UUID) -> Void
     let onRenameFile: (FileItem, String) async throws -> FileItem
     let onDeleteFile: (FileItem) async throws -> Void
     let onExploreServices: () -> Void
@@ -867,6 +868,23 @@ struct ConversationPage: View {
                         .transition(.opacity)
                 }
             }
+        case .startedConversation(let id, let title):
+            Button { onOpenConversation(id) } label: {
+                HStack(spacing: Theme.Spacing.md) {
+                    Image(systemName: "bubble.left.and.bubble.right")
+                    Text(title)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "chevron.right")
+                }
+                .font(Theme.Fonts.bodyMd)
+                .foregroundStyle(Theme.Colors.onSurface)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .modifier(ConversationInteractiveRowSurface())
+            .accessibilityIdentifier("conversation.message.startedConversation.\(id.uuidString)")
+            .padding(.horizontal, 4)
         case .serviceControl(let control, let interactionID):
             ConversationServiceControlBlock(
                 control: control,
@@ -980,7 +998,7 @@ struct ConversationPage: View {
             kind = .userText(text, attachments: attachments)
         case .userSkill(let invocation, let attachments):
             kind = .userSkill(invocation, attachments: attachments)
-        case .agentContent, .thinking, .contextCompaction, .serviceControl, .responseFooter:
+        case .agentContent, .startedConversation, .thinking, .contextCompaction, .serviceControl, .responseFooter:
             return nil
         }
         return Block(id: block.sourceBlockID, createdAt: block.createdAt, kind: kind)

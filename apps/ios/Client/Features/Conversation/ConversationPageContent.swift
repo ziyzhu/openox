@@ -12,6 +12,7 @@ struct ConversationBlock: Identifiable, Equatable {
         case userText(String, attachments: [FileItem])
         case userSkill(UserSkillInvocation, attachments: [FileItem])
         case agentContent(ContentItem)
+        case startedConversation(UUID, title: String)
         case thinking(ThinkingTrace)
         case contextCompaction(ContextCompaction)
         case serviceControl(ServiceControl, interactionID: UUID?)
@@ -29,7 +30,7 @@ struct ConversationBlock: Identifiable, Equatable {
     var isUserInitiated: Bool {
         switch kind {
         case .userText, .userSkill: true
-        case .agentContent, .thinking, .contextCompaction, .serviceControl, .responseFooter: false
+        case .agentContent, .startedConversation, .thinking, .contextCompaction, .serviceControl, .responseFooter: false
         }
     }
 
@@ -103,6 +104,24 @@ extension ConversationBlock {
                     kind: .thinking(trace),
                     spacingBefore: ConversationTranscriptMetrics.blockSpacing
                 ))
+                for invocation in trace.invocations {
+                    guard invocation.name == Actions.conversationStart,
+                          case .succeeded(let result?) = invocation.outcome,
+                          let rawID = result.objectValue?["id"]?.stringValue,
+                          let conversationID = UUID(uuidString: rawID) else { continue }
+                    let title = invocation.args.objectValue?["title"]?.stringValue?
+                        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    projectedTurns[turnIndex].blocks.append(ConversationBlock(
+                        id: StableID.uuid("conversation.started.\(invocation.id)"),
+                        sourceBlockID: block.id,
+                        createdAt: block.createdAt,
+                        kind: .startedConversation(
+                            conversationID,
+                            title: title.isEmpty ? L10n.string("New conversation") : title
+                        ),
+                        spacingBefore: ConversationTranscriptMetrics.blockSpacing
+                    ))
+                }
                 continue
             }
             guard case .agentContent(let items) = block.kind else {

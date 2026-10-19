@@ -66,7 +66,7 @@ private struct ConversationFileRow: View {
     }
 }
 
-private struct ConversationInteractiveRowSurface: ViewModifier {
+struct ConversationInteractiveRowSurface: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
         content
@@ -1303,7 +1303,7 @@ struct BlockView: View, Equatable {
             .padding(.horizontal, 4)
         case .contextCompaction:
             contextCompactionDivider
-        case .serviceControl, .responseFooter:
+        case .startedConversation, .serviceControl, .responseFooter:
             EmptyView()
         }
     }

@@ -1917,7 +1917,8 @@ final class Conversation: Identifiable {
                 return await ModelAdapterPipeline.transform(
                     messages: messages,
                     model: request.model,
-                    loadsFilesLazily: client.supportsTools(for: request.model)
+                    loadsFilesLazily: client.supportsTools(for: request.model),
+                    wireProtocol: client.wireProtocol(for: request.model)
                 )
             }
         )

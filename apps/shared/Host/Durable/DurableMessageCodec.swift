@@ -126,7 +126,9 @@ nonisolated enum DurableMessageCodec {
             let artifact = FileItem(fileName: name, directory: (artifactScope ?? scope).root,
                 relativePath: current.objectValue?["path"]?.stringValue ?? "artifacts/\(name)", size: data.count)
             _ = try inputs.snapshot(artifact, data: data)
-            result.transientAttachments.append(try WebAttachmentFactory.make(data: data, filename: artifact.displayName, mimeType: artifact.mimeType))
+            let prepared = try WebAttachmentFactory.make(data: data, filename: artifact.displayName, mimeType: artifact.mimeType)
+            result.transientAttachments.append(TransientAttachment(kind: prepared.kind, mimeType: prepared.mimeType,
+                displayName: prepared.displayName, data: prepared.data, reference: artifact.fileName))
         }
         return .toolResult(result)
     }

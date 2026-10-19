@@ -843,6 +843,10 @@ struct RootView: View {
                          onToggleTemporary: { conversations.toggleTemporaryConversation() },
                          onDeleteConversation: { conversations.delete(conversation.id) },
                          onBranch: { blockId in conversations.branch(from: conversation, atBlock: blockId) },
+                         onOpenConversation: { id in
+                             guard conversations.contains(id) else { return }
+                             openConversation(id)
+                         },
                          onRenameFile: { artifact, newFilename in
                              try await conversations.renameFile(artifact, to: newFilename)
                          },
