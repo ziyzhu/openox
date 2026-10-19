@@ -894,16 +894,19 @@ struct RootView: View {
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .multilineTextAlignment(.center)
-            if StorageRoot.shared.unavailableActiveID != nil {
-                Button("Locate Folder…") { locatingMissingProfile = true }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityIdentifier("startup.locateProfile")
+            HStack(spacing: Theme.Spacing.sm) {
+                if recovery != .updateBuild {
+                    Button("Try Again") { bootstrap() }
+                        .buttonStyle(.bordered)
+                        .tint(Theme.Colors.primary)
+                }
+                if StorageRoot.shared.unavailableActiveID != nil {
+                    Button("Locate Folder…") { locatingMissingProfile = true }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("startup.locateProfile")
+                }
             }
-            if recovery != .updateBuild {
-                Button("Try Again") { bootstrap() }
-                    .font(Theme.Fonts.labelMd)
-                    .buttonStyle(.borderedProminent)
-            }
+            .font(Theme.Fonts.labelMd)
         }
         .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
