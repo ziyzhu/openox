@@ -197,6 +197,11 @@ extension Scenario {
         .stop(.stop)
     ]).pacing(betweenDeltas: .milliseconds(2))
 
+    static let burstStream = Scenario(name: "burststream", steps: [
+        .say(longMarkdown(sections: 8, codeEvery: 4)),
+        .stop(.stop)
+    ]).pacing(betweenDeltas: .milliseconds(150)).bursts(of: 8)
+
     private static func longMarkdown(sections: Int, codeEvery: Int?) -> String {
         (1...sections).map { index in
             let code = codeEvery.map { index.isMultiple(of: $0) } == true

@@ -15,6 +15,8 @@ struct StreamingFadeText: View {
     }
 
     struct Tracker {
+        static let frameInterval = 1.0 / 30.0
+        private static let maximumLag = 0.25
         private(set) var arrivals: [Arrival] = []
         private var renderedLength = 0
         private var reset = Int.min
@@ -24,7 +26,7 @@ struct StreamingFadeText: View {
             _ length: Int,
             reset nextReset: Int,
             at now: CFTimeInterval,
-            characterStarts: [Int]? = nil
+            snap: (Int) -> Int = { $0 }
         ) -> CFTimeInterval? {
             if reset != nextReset {
                 reset = nextReset
@@ -33,18 +35,17 @@ struct StreamingFadeText: View {
                 lastUpdateTimestamp = nil
             }
             if length > renderedLength {
-                let starts = characterStarts.map {
-                    let fresh = $0.filter { $0 >= renderedLength && $0 < length }
-                    return fresh.isEmpty ? [renderedLength] : fresh
-                } ?? Array(renderedLength..<length)
-                let frameDuration = lastUpdateTimestamp.map {
-                    min(1.0 / 15.0, max(1.0 / 120.0, now - $0))
-                } ?? 1.0 / 30.0
-                let interval = frameDuration / Double(max(1, starts.count))
-                for (offset, startIndex) in starts.enumerated() {
+                let cadence = lastUpdateTimestamp.map {
+                    min(Self.maximumLag, max(Self.frameInterval, now - $0))
+                } ?? Self.frameInterval
+                let cursor = max(now, arrivals.last?.timestamp ?? now)
+                let window = max(Self.frameInterval, min(cadence, now + Self.maximumLag - cursor))
+                let units = length - renderedLength
+                let slices = min(units, Int((window / Self.frameInterval).rounded(.up)))
+                for slice in 0..<slices {
                     arrivals.append(Arrival(
-                        startIndex: startIndex,
-                        timestamp: now - frameDuration + interval * Double(offset + 1)
+                        startIndex: slice == 0 ? renderedLength : max(renderedLength, snap(renderedLength + slice * units / slices)),
+                        timestamp: cursor + window * Double(slice + 1) / Double(slices)
                     ))
                 }
                 lastUpdateTimestamp = now
@@ -75,7 +76,7 @@ struct StreamingFadeText: View {
     @State private var settleTask: Task<Void, Never>?
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: fadeDeadline == nil)) { _ in
+        TimelineView(.animation(minimumInterval: Tracker.frameInterval, paused: fadeDeadline == nil)) { _ in
             Text(text)
                 .font(font)
                 .lineSpacing(lineSpacing)
@@ -206,7 +207,8 @@ struct StreamingFadeSelectableText: View {
         let fadeColor: UIColor? = if case .attributed = content { nil } else { color }
         let rendered = plain ? nil : content.attributed(font: font, color: color, lineSpacing: lineSpacing)
         let length = streamsPlain ? source.utf16.count : (plain ? classifier.length : rendered?.length ?? 0)
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: fadeDeadline == nil)) { _ in
+        let revealed = (rendered?.string ?? source) as NSString
+        TimelineView(.animation(minimumInterval: StreamingFadeText.Tracker.frameInterval, paused: fadeDeadline == nil)) { _ in
             let now = CACurrentMediaTime()
             if plain {
                 SelectableText(
@@ -230,11 +232,7 @@ struct StreamingFadeSelectableText: View {
             }
         }
         .onChange(of: Marker(reset: resetKey, length: length), initial: true) { _, marker in
-            absorb(
-                marker.length,
-                reset: marker.reset,
-                characterStarts: plain && !streamsPlain ? classifier.freshCharacterStarts : []
-            )
+            absorb(marker.length, reset: marker.reset) { revealed.rangeOfComposedCharacterSequence(at: $0).location }
         }
         .onDisappear { settleTask?.cancel() }
     }
@@ -245,10 +243,8 @@ struct StreamingFadeSelectableText: View {
         private var reset = Int.min
         private var plain = true
         private(set) var length = 0
-        private(set) var freshCharacterStarts: [Int] = []
 
         func isPlain(_ source: String, reset nextReset: Int) -> Bool {
-            freshCharacterStarts.removeAll(keepingCapacity: true)
             let total = source.utf8.count
             let needsReset = reset != nextReset
                 || (plain && (total < consumedUTF8 || !source.hasPrefix(previousSource)))
@@ -264,7 +260,6 @@ struct StreamingFadeSelectableText: View {
             consumedUTF8 = total
             var remainsPlain = true
             for character in delta {
-                freshCharacterStarts.append(length)
                 length += String(character).utf16.count
                 if "*_`[\\<>".contains(character) { remainsPlain = false }
             }
@@ -273,14 +268,9 @@ struct StreamingFadeSelectableText: View {
         }
     }
 
-    private func absorb(_ length: Int, reset: Int, characterStarts: [Int]) {
+    private func absorb(_ length: Int, reset: Int, snap: (Int) -> Int) {
         let now = CACurrentMediaTime()
-        let deadline = tracker.absorb(
-            length,
-            reset: reset,
-            at: now,
-            characterStarts: characterStarts
-        )
+        let deadline = tracker.absorb(length, reset: reset, at: now, snap: snap)
         settleTask?.cancel()
         guard let deadline else {
             fadeDeadline = nil

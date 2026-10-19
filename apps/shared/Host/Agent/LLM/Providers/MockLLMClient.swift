@@ -11,6 +11,7 @@ public struct MockLLMClient: ProviderClient {
         public var beforeToolCall: Duration = .milliseconds(80)
         public var beforeDone: Duration = .milliseconds(40)
         public var streamCharacters = false
+        public var wordsPerDelta = 1
         public init() {}
     }
 
@@ -247,6 +248,14 @@ public struct Scenario: Sendable {
         return scenario
     }
 
+    func bursts(of words: Int) -> Scenario {
+        var scenario = self
+        var clock = scenario.clock ?? MockLLMClient.Clock()
+        clock.wordsPerDelta = words
+        scenario.clock = clock
+        return scenario
+    }
+
     func characterStreaming() -> Scenario {
         var scenario = self
         var clock = scenario.clock ?? MockLLMClient.Clock()
@@ -284,6 +293,7 @@ extension Scenario {
             Entry("18", "selectcode — selectable code while streaming", .selectableCodeStream),
             Entry("19", "background — stream after the reader scrolls away", .backgroundStream),
             Entry("21", "focusstream — stream while the composer is focused", .focusedStream),
+            Entry("96", "burststream — 8-word deltas every 150 ms", .burstStream),
             Entry("97", "characterstream — partial words near a line break", .characterStream),
             Entry("98", "longprose — ~120 KB of headings, paragraphs, and lists", .longProse),
             Entry("99", "longmixed — longprose with a code block every 10 sections", .longMixed),
@@ -465,7 +475,7 @@ nonisolated private final class Replayer: @unchecked Sendable {
         clock: MockLLMClient.Clock,
         continuation: AsyncThrowingStream<AssistantEvent, Error>.Continuation
     ) async {
-        for chunk in clock.streamCharacters ? s.map(String.init) : s.tokenizedForStreaming() {
+        for chunk in clock.streamCharacters ? s.map(String.init) : s.tokenizedForStreaming(wordsPerDelta: clock.wordsPerDelta) {
             if Task.isCancelled { return }
             switch partial.content[idx] {
             case .text(var t):
@@ -488,14 +498,19 @@ nonisolated private final class Replayer: @unchecked Sendable {
 }
 
 nonisolated private extension String {
-    func tokenizedForStreaming() -> [String] {
+    func tokenizedForStreaming(wordsPerDelta: Int) -> [String] {
         var out: [String] = []
         var buf = ""
+        var words = 0
         for ch in self {
             buf.append(ch)
             if ch.isWhitespace {
-                out.append(buf)
-                buf = ""
+                words += 1
+                if words >= wordsPerDelta {
+                    out.append(buf)
+                    buf = ""
+                    words = 0
+                }
             }
         }
         if !buf.isEmpty { out.append(buf) }
