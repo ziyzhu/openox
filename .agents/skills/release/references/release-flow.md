@@ -18,10 +18,10 @@ bun .agents/skills/release/scripts/ios-inspect.ts --since <verified-released-com
 
 ## Stage
 
-1. Record the exact version/build, What's New text, and intended remote changes for the handoff. Preserve promotional text, descriptions, URLs, screenshots, and previews unless a separate change was requested. Check the documented promotional text against live state; report drift rather than silently overwriting it.
+1. Record the exact version/build, What's New text, approved English promotional text, and intended remote changes for the handoff. Set missing or differing English promotional text to the operator-approved copy in SKILL.md as part of release preparation. Preserve non-English promotional text, descriptions, URLs, screenshots, and previews unless a separate change was requested.
 2. Run available dry runs, apply only the intended fields, and attach the exact processed build without an additional approval prompt. Stop at preparation if no processed build or signed IPA from the requested release is available.
 3. If media changes are requested, use the demo workflow, current Apple specifications, and synthetic content. Keep assets outside Git, inspect existing remote media, and validate and visually review replacements before applying the requested changes.
-4. Wait for build/media processing and run the strongest available readiness validation. Read back What's New for every configured locale, require nonempty text for app updates, compare changed notes with the intended text, and verify the selected build. Confirm unrelated fields and locales are unchanged. A successful write alone does not establish readiness. Report blockers and warnings; do not change privacy, pricing, agreements, or other account state beyond the requested scope.
+4. Wait for build/media processing and run the strongest available readiness validation. Read back What's New for every configured locale, require nonempty text for app updates, compare changed notes with the intended text, require exact approved promotional text in every configured English locale, and verify the selected build. Confirm unrelated fields and locales are unchanged. A successful write alone does not establish readiness. Report blockers and warnings; do not change privacy, pricing, agreements, or other account state beyond the requested scope.
 
 ## Manual submission and release
 

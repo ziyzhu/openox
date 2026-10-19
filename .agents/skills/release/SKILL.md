@@ -8,7 +8,8 @@ description: Prepare and verify OpenOx iOS App Store, npm, and standalone CLI re
 Run from the selected OpenOx checkout on `main` and follow its `AGENTS.md`.
 Choose the storage compatibility, App Store, or package workflow below. A requested
 App Store release authorizes preparation, build/upload, release-note translation,
-and staging within the requested scope without additional approval prompts.
+application of the approved English promotional text, and staging within the
+requested scope without additional approval prompts.
 App Review submission and final release are manual. Package publication requires
 explicit user authorization. Never publish as a verification step or invoke this
 skill's publisher from ordinary CI.
@@ -46,8 +47,12 @@ Current English promotional text, supplied by the operator:
 
 > A self-evolving agent that runs on your phone
 
-Preserve it unless a change is explicitly requested. This is intended copy, not
-live verification. Do not automatically translate it or use it as release notes.
+Require this exact text in every configured English locale of the intended
+version. During release preparation, set it when missing or different, then read
+it back; reporting drift alone is insufficient. A release request authorizes
+applying this approved copy, not inventing replacement copy. Preserve non-English
+promotional text unless a change is requested. Do not automatically translate the
+tagline or use it as release notes.
 For app updates, require saved, nonempty **What's New in This Version** text in
 every configured locale, including `zh-Hans`; English text alone is insufficient.
 Review translations before staging and verify all locales afterward. Preserve

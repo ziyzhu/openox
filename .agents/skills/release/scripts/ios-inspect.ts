@@ -162,7 +162,7 @@ try {
           blockers.push(`What's New is empty for ${locale}.`);
         }
         if (locale.startsWith("en") && localization.attributes.promotionalText !== "A self-evolving agent that runs on your phone") {
-          warnings.push(`Promotional text differs from intended copy in ${locale}; preserve live text until a change is approved.`);
+          blockers.push(`Promotional text differs from approved copy in ${locale}; apply the approved English text during release preparation and verify readback.`);
         }
         media[locale] = {
           screenshots: await asc(["screenshots", "list", "--version-localization", localization.id]),
