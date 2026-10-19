@@ -136,7 +136,7 @@ test("file-backed host integrates actual Pi SQLite commits, physical files, hist
       replay: "unsafe", execute: async ({ path }) => {
         const bytes = await runtime.files.read(path);
         if (!(bytes instanceof Uint8Array)) throw new Error("Attachment requires verified binary bytes");
-        return { content: [Object.assign({ type: "text" as const, text: `[Attachment: ${path}]` },
+        return { output: [Object.assign({ type: "text" as const, text: `[Attachment: ${path}]` },
           { oxAttachment: path.slice("artifacts/".length), oxProfileID: runtime.files.identity })] };
       },
     })] }));

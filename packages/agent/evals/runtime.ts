@@ -56,7 +56,7 @@ export class EvalRuntime {
       runtime.extension = defineExtension({ name: "eval-ox", sections: [section("ox", input => runtime.prompts.get(String(input.conversationId))!.rendered, { tag: false })], tools: [defineTool({ name: "execute", description, parameters, replay: "unsafe",
         execute: async ({ source }, api, context) => {
           const text = await execute(source, (name, args) => runtime.call(String(api.conversationId), name, args, true), context.abortSignal);
-          return { content: [{ type: "text", text }] };
+          return { output: [{ type: "text", text }] };
         },
       })] });
       runtime.session.registry.install(runtime.extension);

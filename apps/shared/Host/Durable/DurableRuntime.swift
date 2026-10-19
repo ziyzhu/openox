@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import Security
 import Darwin
 import Synchronization
 @preconcurrency import JavaScriptCore
@@ -243,17 +244,21 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
             default: Log.agent.debug("PiDurable: \(message)")
             }
         }
+        let randomBytes: @convention(block) (Int) -> [UInt8]? = { count in
+            guard (0...65_536).contains(count) else { return nil }
+            if count == 0 { return [] }
+            var bytes = [UInt8](repeating: 0, count: count)
+            guard SecRandomCopyBytes(kSecRandomDefault, count, &bytes) == errSecSuccess else { return nil }
+            return bytes
+        }
+        ctx.setObject(randomBytes, forKeyedSubscript: "__oxDurableRandomBytes" as NSString)
         ctx.setObject(log, forKeyedSubscript: "__oxDurableLog" as NSString)
         ctx.setObject(request, forKeyedSubscript: "__oxDurableRequest" as NSString)
         ctx.setObject(complete, forKeyedSubscript: "__oxDurableComplete" as NSString)
         ctx.setObject(timer, forKeyedSubscript: "__oxDurableTimer" as NSString)
         ctx.setObject(clear, forKeyedSubscript: "__oxDurableClearTimer" as NSString)
-        // Benchmark-only synchronous monotonic clock, never installed in agent/snippet contexts.
-        // https://developer.apple.com/documentation/dispatch/dispatchtime/uptimenanoseconds
-        if storageDiagnostics {
-            let now: @convention(block) () -> Double = { Double(DispatchTime.now().uptimeNanoseconds) / 1_000_000 }
-            ctx.setObject(now, forKeyedSubscript: "__oxDurableNow" as NSString)
-        }
+        let now: @convention(block) () -> Double = { Double(DispatchTime.now().uptimeNanoseconds) / 1_000_000 }
+        ctx.setObject(now, forKeyedSubscript: "__oxDurableNow" as NSString)
         let resource = storageDiagnostics ? "harness-storage" : "harness"
         guard let url = Bundle.main.url(forResource: resource, withExtension: "js", subdirectory: "PiDurable.bundle") else {
             context = nil
@@ -271,7 +276,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
             };
             """, withSourceURL: URL(string: "ox-trusted://durable-command.js"))
         if let fatalError { throw failure(fatalError) }
-        Log.agent.info("PiDurable trusted context opened durable=1.0.0 ai=1.0.0 chord=1.0.0")
+        Log.agent.info("PiDurable trusted context opened")
     }
 
     private func clearTimer(_ id: Int) {

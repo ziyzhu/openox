@@ -1,5 +1,5 @@
 import type { Context } from "@earendil-works/chord";
-import { err, ok, FileError, ExecutionError, type ExecutionEnv, type FileInfo, type Result } from "@earendil-works/pi-durable/env";
+import { err, ok, LineScanner, FileError, ExecutionError, type BinaryReader, type ExecutionEnv, type FileInfo, type Result } from "@earendil-works/pi-durable/env";
 import { canonical } from "./file-paths";
 
 export interface FileBackend {
@@ -65,6 +65,30 @@ function textBackend(spec: TextFileMount): FileBackend {
       if ((await info(path)).kind === "directory") throw new FileError("is_directory", "Cannot read a directory", path);
       return files[path]!;
     },
+  };
+}
+
+export function snapshotBinaryReader(info: FileInfo, content: string | Uint8Array): BinaryReader {
+  const bytes = typeof content === "string" ? new TextEncoder().encode(content) : content.slice();
+  const metadata = { ...info, size: bytes.length };
+  let closed = false;
+  const result = async <T>(context: Context, body: () => T): Promise<Result<T, FileError>> => {
+    if (closed) return err(new FileError("invalid", "Reader closed"));
+    if (context.abortSignal?.aborted) return err(new FileError("aborted", "Read aborted"));
+    try { return ok(body()); } catch (error) { return err(error instanceof FileError ? error : new FileError("invalid", String(error))); }
+  };
+  return {
+    info: async context => result(context, () => ({ ...metadata })),
+    read: async (offset, length, context) => result(context, () => {
+      if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(length) || length < 0) throw new FileError("invalid", "Invalid byte range");
+      return bytes.slice(offset, offset + length);
+    }),
+    scanLines: async (options, context) => result(context, () => {
+      const scanner = new LineScanner(options.startLine, options.endLine);
+      scanner.push(bytes);
+      return scanner.finish();
+    }),
+    close: async () => { closed = true; },
   };
 }
 
@@ -150,6 +174,14 @@ export function mountedFileSystem(scope: string, inputs: readonly FileMount[]): 
       const content = await backend.read(target, context);
       return typeof content === "string" ? new TextEncoder().encode(content) : content;
     }),
+    openBinaryReader: async (input, options, context) => result(async () => {
+      const metadata = await info(input, context);
+      if (metadata.kind === "directory") throw new FileError("is_directory", "Cannot read a directory", input);
+      if (metadata.kind === "symlink" && options?.noFollow) throw new FileError("invalid", "Cannot open a symbolic link", input);
+      const { mount, target } = route(input);
+      return snapshotBinaryReader(metadata, await mount.backend.read(target, context));
+    }),
+    openDirReader: unavailable, watch: unavailable,
     readTextLines: async (input, options, context) => result(async () => (await text(input, context)).split("\n").slice(0, options?.maxLines)),
     openTextLineReader: async (input, context) => result(async () => {
       const value = await text(input, context);

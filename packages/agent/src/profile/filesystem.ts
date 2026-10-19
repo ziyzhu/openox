@@ -2,7 +2,7 @@ import { err, ok, getOrThrow, ExecutionError, FileError, type ExecutionEnv, type
 import { canonical, type ProfileFiles } from "./files";
 import type { ConversationId } from "@earendil-works/pi-durable";
 import type { OxConversations, ConversationListCursor } from "./conversations";
-import { mountedFileSystem, type FileBackend, type FileMount } from "../core/file-mounts";
+import { mountedFileSystem, snapshotBinaryReader, type FileBackend, type FileMount } from "../core/file-mounts";
 import { bundledSkills } from "../core/bundled-skills";
 import { conversationRecordPath, workingFilePath } from "./file-store";
 
@@ -133,6 +133,13 @@ export function profileEnv(files: ProfileFiles, conversations?: OxConversations,
     }),
     readTextFile: async path => result(() => text(path)),
     readBinaryFile: async path => result(async () => { const value = isConversation(projectionPath(path)) ? await text(path) : await files.read(path); return typeof value === "string" ? new TextEncoder().encode(value) : value; }),
+    openBinaryReader: async (path, options) => result(async () => {
+      const metadata = await info(path);
+      if (metadata.kind === "directory") throw new FileError("is_directory", "Cannot read a directory", path);
+      if (metadata.kind === "symlink" && options?.noFollow) throw new FileError("invalid", "Cannot open a symbolic link", path);
+      return snapshotBinaryReader(metadata, isConversation(projectionPath(path)) ? await text(path) : await content.read(path));
+    }),
+    openDirReader: unsupported, watch: unsupported,
     readTextLines: async (path, options) => result(async () => (await text(path)).split("\n").slice(0, options?.maxLines)),
     openTextLineReader: async path => result(async () => {
       const value = await text(path);

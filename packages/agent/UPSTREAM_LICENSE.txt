@@ -1,4 +1,4 @@
-Pi Durable, pi-ai, and Chord 1.0.0 (Pi monorepo)
+Pi Durable, pi-ai, and Chord 1.3.0 (Pi monorepo)
 https://github.com/earendil-works/pi
 
 MIT License

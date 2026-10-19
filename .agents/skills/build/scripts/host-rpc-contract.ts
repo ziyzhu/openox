@@ -1,4 +1,4 @@
-import { Type, type TObject, type TSchema } from "typebox";
+import { Type, type TSchema } from "typebox";
 import {
   Methods, Schemas, RPC_VERSION, RequestSchema, ResponseSchema, ErrorSchema, RequestBatchSchema, ResponseBatchSchema,
 } from "../../../../packages/protocol/src/contract.ts";
@@ -29,9 +29,10 @@ function swiftType(schema: TSchema): string {
 }
 
 function swiftStruct(name: string): string {
-  const schema: TObject = Schemas[name as keyof typeof Schemas];
+  const schema = Schemas[name as keyof typeof Schemas];
+  const required: readonly string[] = schema.required ?? [];
   const fields = Object.entries<TSchema>(schema.properties).map(([field, value]) =>
-    `        let ${field}: ${swiftType(value)}${schema.required?.includes(field) ? "" : "?"}`);
+    `        let ${field}: ${swiftType(value)}${required.includes(field) ? "" : "?"}`);
   return `    struct ${name}: Decodable {${fields.length ? `\n${fields.join("\n")}\n    ` : ""}}`;
 }
 

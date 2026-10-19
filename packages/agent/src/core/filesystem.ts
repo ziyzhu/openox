@@ -107,13 +107,22 @@ export function validateFileRequest(operation: FileOperation, args: FileRequest)
 function toolEnvironment(env: MountedExecutionEnv, args: FileRequest, onRead: (lines: number) => void) {
   let expected: string | undefined;
   return { ...env,
-    readBinaryFile: async (...values: Parameters<typeof env.readBinaryFile>) => {
-      const bytes = await env.readBinaryFile(...values);
-      if (bytes.ok) {
-        if (bytes.value.length > 32 * 1024 * 1024) throw new FileError("invalid", "Source exceeds 32 MiB", args.path);
-        onRead(new TextDecoder().decode(bytes.value).split("\n").length);
+    openBinaryReader: async (...values: Parameters<typeof env.openBinaryReader>) => {
+      const metadata = getOrThrow(await env.fileInfo(values[0], values[2]));
+      if (metadata.size > 32 * 1024 * 1024) throw new FileError("invalid", "Source exceeds 32 MiB", args.path);
+      const result = await env.openBinaryReader(...values);
+      if (!result.ok) return result;
+      const reader = result.value;
+      const info = getOrThrow(await reader.info(values[2]));
+      if (info.size > 32 * 1024 * 1024) {
+        await reader.close(values[2]);
+        throw new FileError("invalid", "Source exceeds 32 MiB", args.path);
       }
-      return bytes;
+      return { ...result, value: { ...reader, scanLines: async (...scan: Parameters<typeof reader.scanLines>) => {
+        const lines = await reader.scanLines(...scan);
+        if (lines.ok) onRead(lines.value.newlines + 1);
+        return lines;
+      } } };
     },
     readTextFile: async (...values: Parameters<typeof env.readTextFile>) => {
       const text = await env.readTextFile(...values);
@@ -133,6 +142,7 @@ function toolEnvironment(env: MountedExecutionEnv, args: FileRequest, onRead: (l
 async function executeFileTool(operation: "read" | "write" | "edit", args: FileRequest, env: MountedExecutionEnv, context: Context) {
   const api = new Proxy({ env }, { get: (target, name) => {
     if (name === "env") return target.env;
+    if (operation === "read" && name === "agent") throw new FileError("not_supported", "Reading images is not supported; attach the file instead", args.path);
     throw new Error(`Filesystem tools cannot access invocation capability ${String(name)}`);
   } }) as unknown as ToolExecutionApi;
   if (operation === "read") return tools.read.execute({ path: args.path!, offset: args.offset, limit: args.limit }, api, context);
@@ -140,7 +150,7 @@ async function executeFileTool(operation: "read" | "write" | "edit", args: FileR
   return tools.edit.execute({ path: args.path!, edits: args.edits! }, api, context);
 }
 function readPage(result: ToolExecutionResult, args: FileRequest, totalLines: number) {
-  const text = result.content?.flatMap(block => block.type === "text" ? [block.text] : []).join("\n") ?? "";
+  const text = result.output?.flatMap(block => block.type === "text" ? [block.text] : []).join("\n") ?? "";
   const clippedLine = result.diagnostics?.some(value => value.code === "truncated" && value.severity === "warn") ?? false;
   const next = (args.offset ?? 1) + text.split("\n").length;
   const truncated = clippedLine || next <= totalLines;

@@ -94,6 +94,7 @@ for (const name of ["harness", "harness-storage"]) {
     const timers = new Map<number, ReturnType<typeof setTimeout>>();
     const realm = createContext({
       console: undefined,
+      SharedArrayBuffer: undefined,
       __oxDurableLog() {},
       __oxDurableTimer(callback: () => void, ms: number) {
         const id = ++next;

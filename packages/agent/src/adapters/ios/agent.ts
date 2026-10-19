@@ -501,7 +501,7 @@ export class IOSAgentAdapter {
     const task = await api.getTask(api.taskId, ctx);
     if (!task || task.kind !== "pi.tool" || task.conversationId !== api.conversationId) throw new Error("Native tool requires its authoritative Pi task");
     const input = task.input as ToolTaskInput;
-    if (input.callId !== api.callId) throw new Error("Native tool task/call mismatch");
+    if (input.kind !== "model" || input.callId !== api.callId) throw new Error("Native tool task/call mismatch");
     const conversation = await session.harness.conversation(api.conversationId, ctx);
     if (!conversation) throw new Error("Native tool conversation not found");
     const active = await conversation.context(ctx);
@@ -515,9 +515,10 @@ export class IOSAgentAdapter {
     const boundary = active.messages.indexOf(assistant);
     if (boundary < 0) throw new Error("Native tool assistant is not present in canonical Pi model context");
     const prefix = active.messages.slice(0, boundary);
-    return native<ToolExecutionResult>("nativeTool", { conversationID: api.conversationId, reference: session.conversations.reference(api.conversationId),
+    const { content, ...result } = await native<Omit<ToolExecutionResult, "output"> & { content?: ToolExecutionResult["output"] }>("nativeTool", { conversationID: api.conversationId, reference: session.conversations.reference(api.conversationId),
       callID: api.callId, taskID: api.taskId, name, arguments: arguments_, assistantEntryID: input.assistant, assistant, toolCall: call,
       systemPrompt: getCurrentSystemPrompt(prefix), tools: getCurrentTools(prefix), contextMessages: prefix.filter(message => message.role !== "system") }, ctx.abortSignal);
+    return { ...result, output: content };
   }
   private async fileReceipt(path: string) {
     const session = this.current.session;

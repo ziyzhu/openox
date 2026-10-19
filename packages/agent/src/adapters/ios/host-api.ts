@@ -6,6 +6,8 @@ import { URL, URLSearchParams } from "whatwg-url";
 declare const __oxDurableTimer: (callback: () => void, milliseconds: number) => number;
 declare const __oxDurableClearTimer: (id: number) => void;
 declare const __oxDurableLog: (level: string, message: string) => void;
+declare const __oxDurableRandomBytes: (count: number) => number[] | null;
+declare const __oxDurableNow: () => number;
 
 class HostDOMException extends Error {
   constructor(message = "", name = "Error") { super(message); this.name = name; }
@@ -52,6 +54,17 @@ Object.assign(globalThis, {
   },
   AbortController: HostAbortController, AbortSignal, URL, URLSearchParams, DOMException: HostDOMException,
   structuredClone: clone,
+  performance: { now: () => __oxDurableNow() },
+  crypto: {
+    getRandomValues: <T extends ArrayBufferView>(array: T): T => {
+      if (![Int8Array, Uint8Array, Uint8ClampedArray, Int16Array, Uint16Array, Int32Array, Uint32Array, BigInt64Array, BigUint64Array].some(type => array instanceof type)) throw new TypeError("Expected an integer typed array");
+      if (array.byteLength > 65_536) throw new HostDOMException("Random values exceed 65536 bytes", "QuotaExceededError");
+      const bytes = __oxDurableRandomBytes(array.byteLength);
+      if (bytes === null) throw new Error("Secure random generation failed");
+      new Uint8Array(array.buffer, array.byteOffset, array.byteLength).set(bytes);
+      return array;
+    },
+  },
   setTimeout: (callback: (...args: unknown[]) => void, ms = 0, ...args: unknown[]) => {
     if (typeof callback !== "function") throw new TypeError("Timer callback must be a function");
     return __oxDurableTimer(() => callback(...args), Math.max(0, Math.min(Number(ms) || 0, 2_147_483_647)));

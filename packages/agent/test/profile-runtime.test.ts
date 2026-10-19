@@ -44,7 +44,7 @@ async function fixture(profileID = "fixture", onEvents: (id: ConversationId, eve
       const value = await session.filesystem.invoke(session.env, operation as FileOperation, request, context);
       const skill = /^skills\/([^/]+)\/SKILL\.md$/.exec(canonical(request.path ?? ""));
       const details = operation === "read" && skill ? await overrides.onSkillActivation?.(api.conversationId, api.callId, skill[1]!) : undefined;
-      return { content: [{ type: "text", text: JSON.stringify(value) }], ...(details === undefined ? {} : { details }) };
+      return { output: [{ type: "text", text: JSON.stringify(value) }], ...(details === undefined ? {} : { details }) };
     },
   })] }));
   sessions.push(session);

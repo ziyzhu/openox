@@ -21,9 +21,11 @@ function usesNodeRuntime(text: string) {
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const destination = `${root}apps/shared/Resources/PiDurable.bundle`;
-for (const name of ["pi-durable", "pi-ai", "chord"]) {
+const packages = { durable: "1.3.0", ai: "1.3.0", chord: "1.3.0" };
+for (const [key, version] of Object.entries(packages)) {
+  const name = key === "chord" ? key : `pi-${key}`;
   const metadata = await Bun.file(new URL("../package.json", import.meta.resolve(`@earendil-works/${name}`))).json();
-  if (metadata.version !== "1.0.0") throw new Error(`Unverified ${name} version ${metadata.version}; audit the host adapters before upgrading`);
+  if (metadata.version !== version) throw new Error(`Unverified ${name} version ${metadata.version}; audit the host adapters before upgrading`);
 }
 const result = await build({
   absWorkingDir: root,
@@ -36,7 +38,6 @@ const result = await build({
       contents: await Bun.file(`${root}packages/agent/src/adapters/ios/auth-context.ts`).text(),
       loader: "ts", resolveDir: `${root}packages/agent`,
     }));
-    // The published tools entry eagerly constructs CodingTools (including bash). Export only iOS-supported tools.
     builder.onLoad({ filter: /\/pi-durable\/dist\/tools\/index\.js$/ }, args => ({
       contents: 'export { createReadTool } from "./read.js"; export { createWriteTool } from "./write.js"; export { createEditTool } from "./edit.js";',
       loader: "js", resolveDir: fileURLToPath(new URL(".", `file://${args.path}`)),
@@ -82,5 +83,5 @@ for (const [name, text] of Object.entries({ "default-soul.md": defaultSoul })) {
 }
 await copyFile(`${root}packages/agent/UPSTREAM_LICENSE.txt`, `${destination}/UPSTREAM_LICENSE.txt`);
 await writeFile(`${destination}/manifest.json`, JSON.stringify({
-  format: 1, purpose: "isolated-native-rollout", packages: { durable: "1.0.0", ai: "1.0.0", chord: "1.0.0" }, bundles, resources,
+  format: 1, purpose: "isolated-native-rollout", packages, bundles, resources,
 }, null, 2) + "\n");
