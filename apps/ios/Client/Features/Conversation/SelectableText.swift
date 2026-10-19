@@ -506,32 +506,57 @@ struct SelectableText: UIViewRepresentable {
         parsedMarkdown(source).attributed
     }
 
-    static func attributedMarkdownProse(_ blocks: [MarkdownBlock], color: UIColor, isStreaming: Bool = false)
-        -> NSAttributedString {
+    static func attributedMarkdownProse(_ blocks: [MarkdownBlock], color: UIColor) -> NSAttributedString {
         let key = TextRenderCachePolicy.key("\(colorKey(color))|\(String(describing: blocks))")
-        if !isStreaming, let hit = proseCache.object(forKey: key) { return hit }
+        if let hit = proseCache.object(forKey: key) { return hit }
         let result = NSMutableAttributedString()
-        var previous: MarkdownBlock?
-        for block in blocks {
-            let gap = previous.map { MarkdownText.spacing(before: block, after: $0) + MarkdownText.headingInset(block) } ?? 0
-            appendProse(block, gap: gap, color: color, isStreaming: isStreaming, to: result)
-            previous = block
+        for index in blocks.indices {
+            appendProse(blocks, at: index, color: color, isStreaming: false, to: result)
         }
         let rendered = NSAttributedString(attributedString: result)
         let cost = TextRenderCachePolicy.attributedCost(utf16Count: rendered.length)
-        if !isStreaming, cost <= proseCache.totalCostLimit {
+        if cost <= proseCache.totalCostLimit {
             proseCache.setObject(rendered, forKey: key, cost: cost)
         }
         return rendered
     }
 
+    final class StreamingProse {
+        private var color: UIColor?
+        private var blocks: [MarkdownBlock] = []
+        private var ends: [Int] = []
+        private let result = NSMutableAttributedString()
+
+        func render(_ next: [MarkdownBlock], color: UIColor) -> NSAttributedString {
+            if self.color !== color {
+                self.color = color
+                blocks = []
+                ends = []
+            }
+            let kept = zip(blocks, next).prefix { $0 == $1 }.count
+            let end = kept > 0 ? ends[kept - 1] : 0
+            result.deleteCharacters(in: NSRange(location: end, length: result.length - end))
+            blocks = next
+            ends.removeSubrange(kept...)
+            for index in next.indices.dropFirst(kept) {
+                SelectableText.appendProse(next, at: index, color: color, isStreaming: true, to: result)
+                ends.append(result.length)
+            }
+            return NSAttributedString(attributedString: result)
+        }
+    }
+
     private static func appendProse(
-        _ block: MarkdownBlock,
-        gap: CGFloat,
+        _ blocks: [MarkdownBlock],
+        at index: Int,
         color: UIColor,
         isStreaming: Bool,
         to result: NSMutableAttributedString
     ) {
+        let block = blocks[index]
+        let gap = index > 0
+            ? MarkdownText.spacing(before: block, after: blocks[index - 1]) + MarkdownText.headingInset(block)
+            : 0
         let text = { (source: String) in isStreaming ? StreamingMarkdownText.balanced(source) : source }
         switch block {
         case .paragraph(let source):

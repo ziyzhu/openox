@@ -28,7 +28,8 @@ struct StreamingMarkdownText: View {
                     availableWidth: availableWidth,
                     accessibilityIdentifier: "\(accessibilityIdentifier).block.\(index)",
                     fadeKey: snapshot.fadeKey,
-                    isStreaming: snapshot.input.isStreaming
+                    isStreaming: snapshot.input.isStreaming,
+                    streamingProse: buffer.prose(at: index)
                 )
                 .id(snapshot.generation)
                 .padding(.top, MarkdownText.spacing(
@@ -57,6 +58,11 @@ struct StreamingMarkdownText: View {
         let isStreaming: Bool
     }
 
+    nonisolated fileprivate struct Settled: Sendable {
+        var utf8Count = 0
+        var blocks: [MarkdownBlock] = []
+    }
+
     @MainActor
     @Observable
     fileprivate final class Buffer {
@@ -74,6 +80,8 @@ struct StreamingMarkdownText: View {
         @ObservationIgnored private var pending: (input: Input, generation: Int, fadeKey: Int?)?
         @ObservationIgnored private var generation = 0
         @ObservationIgnored private var fadeKey: Int?
+        @ObservationIgnored private var settled = Settled()
+        @ObservationIgnored private var prose: [SelectableText.StreamingProse] = []
         @ObservationIgnored private var scheduled: Task<Void, Never>?
 
         func update(_ input: Input) {
@@ -82,6 +90,8 @@ struct StreamingMarkdownText: View {
             if !input.source.hasPrefix(previous) {
                 generation &+= 1
                 fadeKey = nil
+                settled = Settled()
+                prose.removeAll()
             }
             if input.isStreaming { fadeKey = generation }
             latest = input
@@ -102,20 +112,26 @@ struct StreamingMarkdownText: View {
                 try? await Task.sleep(for: .seconds(interval))
                 guard let self, !Task.isCancelled, let request = self.pending else { return }
                 self.pending = nil
-                let blocks = try? await MarkdownParser.shared.snapshot(
-                    source: request.input.source, isStreaming: request.input.isStreaming
+                let parsed = try? await MarkdownParser.shared.snapshot(
+                    source: request.input.source, isStreaming: request.input.isStreaming, settled: settled
                 )
                 guard !Task.isCancelled else { return }
                 scheduled = nil
-                if let blocks, request.generation == generation {
+                if let parsed, request.generation == generation {
+                    settled = parsed.settled
                     if !request.input.isStreaming, snapshot.input.isStreaming {
-                        Log.ui.debug("StreamingMarkdown.settled generation=\(generation) bytes=\(request.input.source.utf8.count) blocks=\(blocks.count)")
+                        Log.ui.debug("StreamingMarkdown.settled generation=\(generation) bytes=\(request.input.source.utf8.count) blocks=\(parsed.blocks.count)")
                     }
-                    snapshot = Snapshot(input: request.input, blocks: blocks,
+                    snapshot = Snapshot(input: request.input, blocks: parsed.blocks,
                                         generation: request.generation, fadeKey: request.fadeKey)
                 }
                 scheduleIfNeeded()
             }
+        }
+
+        func prose(at index: Int) -> SelectableText.StreamingProse {
+            while prose.count <= index { prose.append(SelectableText.StreamingProse()) }
+            return prose[index]
         }
 
         func cancel() {
@@ -436,11 +452,12 @@ private struct MarkdownRenderBlockView: View {
     let accessibilityIdentifier: String
     var fadeKey: Int? = nil
     var isStreaming = false
+    var streamingProse: SelectableText.StreamingProse? = nil
 
     var body: some View {
         switch block {
         case .prose(let blocks):
-            prose(SelectableText.attributedMarkdownProse(blocks, color: textColor.uiColor, isStreaming: isStreaming))
+            prose(attributedProse(blocks))
                 .padding(.top, SelectableText.proseTopInset(block.first))
         case .embeds(let blocks):
             ScrollView(.horizontal, showsIndicators: false) {
@@ -468,6 +485,13 @@ private struct MarkdownRenderBlockView: View {
                 isStreaming: isStreaming
             )
         }
+    }
+
+    private func attributedProse(_ blocks: [MarkdownBlock]) -> NSAttributedString {
+        if isStreaming, let streamingProse {
+            return streamingProse.render(blocks, color: textColor.uiColor)
+        }
+        return SelectableText.attributedMarkdownProse(blocks, color: textColor.uiColor)
     }
 
     @ViewBuilder
@@ -694,11 +718,23 @@ private actor MarkdownParser {
         return blocks
     }
 
-    func snapshot(source: String, isStreaming: Bool) throws -> [MarkdownBlock] {
-        guard isStreaming else { return try parse(source) }
-        let split = StreamingMarkdownText.split(source)
+    func snapshot(
+        source: String,
+        isStreaming: Bool,
+        settled: StreamingMarkdownText.Settled
+    ) throws -> (blocks: [MarkdownBlock], settled: StreamingMarkdownText.Settled) {
+        guard isStreaming else { return (try parse(source), settled) }
+        try Task.checkCancellation()
+        var settled = settled
+        let open = String(decoding: source.utf8.dropFirst(settled.utf8Count), as: UTF8.self)
+        let split = StreamingMarkdownText.split(open)
+        let consumed = open.utf8.count - split.tail.utf8.count
+        if consumed > 0 {
+            settled.blocks += MarkdownBlock.parse(split.settled)
+            settled.utf8Count += consumed
+        }
         let tail = split.inFence ? split.tail : StreamingMarkdownText.stableWords(split.tail)
-        return try parse(split.settled) + MarkdownBlock.parse(StreamingMarkdownTail.gate(tail))
+        return (settled.blocks + MarkdownBlock.parse(StreamingMarkdownTail.gate(tail)), settled)
     }
 
     func render(_ source: String) throws -> [MarkdownRenderBlock] {
