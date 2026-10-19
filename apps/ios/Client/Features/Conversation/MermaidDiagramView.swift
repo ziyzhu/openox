@@ -26,6 +26,8 @@ struct MermaidDiagramView<Fallback: View>: View {
                 if let image {
                     FileScreen(onDismiss: { zoomed = false }, dismissIdentifier: A11yID.ConversationControls.Message.diagramClose) { _ in
                         ZoomableImageView(image: image)
+                    } actions: {
+                        MermaidSourceCopyButton(source: source)
                     }
                 }
             }
@@ -47,6 +49,31 @@ struct MermaidDiagramView<Fallback: View>: View {
         } else {
             fallback()
         }
+    }
+}
+
+private struct MermaidSourceCopyButton: View {
+    let source: String
+
+    @ScaledMetric(relativeTo: .title3) private var size: CGFloat = 44
+    @State private var feedback = CopyFeedback()
+
+    var body: some View {
+        Button {
+            feedback.copy(source, logMessage: "MermaidDiagram.copySource chars=\(source.count)")
+        } label: {
+            Image(systemName: feedback.didCopy ? "checkmark" : "doc.on.doc")
+                .font(.system(.title3, weight: .semibold))
+                .foregroundStyle(Theme.Colors.onSurface)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: size, height: size)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Circle())
+        .disabled(feedback.didCopy)
+        .accessibilityLabel(A11yLabel.copyCode)
+        .accessibilityIdentifier(A11yID.ConversationControls.Message.diagramCopy)
     }
 }
 

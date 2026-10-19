@@ -228,6 +228,7 @@ nonisolated enum A11yID {
             static let imageOpen = "chat.message.image.open"
             static let imageClose = "chat.message.image.close"
             static let diagramClose = "chat.message.diagram.close"
+            static let diagramCopy = "chat.message.diagram.copy"
             static let imageRetry = "chat.message.image.retry"
         }
 
