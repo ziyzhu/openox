@@ -124,8 +124,22 @@ extension ProfileMigrator {
     }
 
     static func prepareTemporaryFiles(at root: URL, identity: UUID) async throws {
-        try await prepareFiles(at: root, profileID: identity)
-        try await preparePublicFiles(content: root, state: root, profileID: identity)
+        let runtime = DurableRuntime(databaseURL: root.appendingPathComponent("state.sqlite"), fileRoot: root) { method, _, _ in
+            throw RuntimeError.bridge("Temporary files preparation forbids native capabilities: \(method)")
+        }
+        do {
+            _ = try await runtime.command(.object(["action": .string("open"), "profileID": .string(identity.uuidString),
+                "physicalFiles": .bool(true), "prepareFiles": .bool(true), "artifactFiles": .bool(true)]))
+            let files = try await runtime.command(.object(["action": .string("filesPrepare")]))
+            let publicFiles = try await runtime.command(.object(["action": .string("publicFilesPrepare"), "splitStorage": .bool(false)]))
+            _ = try await runtime.command(.object(["action": .string("close")]))
+            await runtime.dispose()
+            try syncDurableDirectory(root)
+            Log.app.info("ProfileMigrator.temporaryFiles prepared profile=\(identity) files=\(files.jsonString()) publicFiles=\(publicFiles.jsonString())")
+        } catch {
+            await runtime.dispose()
+            throw error
+        }
     }
 
     static func importProfile(_ backup: ProfilePackage.Backup, name: String) async throws -> Profile {
