@@ -235,7 +235,7 @@ public struct GeminiProvider: ProviderClient {
             if let usage = payload["usageMetadata"] as? [String: Any] {
                 var u = Usage()
                 u.input = (usage["promptTokenCount"] as? Int) ?? 0
-                u.output = (usage["candidatesTokenCount"] as? Int) ?? 0
+                u.output = ((usage["candidatesTokenCount"] as? Int) ?? 0) + ((usage["thoughtsTokenCount"] as? Int) ?? 0)
                 u.cachedInput = (usage["cachedContentTokenCount"] as? Int) ?? 0
                 u.totalTokens = (usage["totalTokenCount"] as? Int) ?? (u.input + u.output)
                 assembler.setUsage(u)
@@ -287,10 +287,11 @@ public struct GeminiProvider: ProviderClient {
         if let t = options.temperature, !model.wireID.hasPrefix("gemini-3.") {
             generationConfig["temperature"] = t
         }
-        generationConfig["thinkingConfig"] = [
-            "includeThoughts": true,
-            "thinkingLevel": model.selectedReasoningEffort ?? "minimal",
-        ]
+        var thinkingConfig: [String: Any] = ["includeThoughts": true]
+        if let level = model.selectedReasoningEffort {
+            thinkingConfig["thinkingLevel"] = level
+        }
+        generationConfig["thinkingConfig"] = thinkingConfig
 
         var body: [String: Any] = [
             "contents": contents,
