@@ -49,6 +49,7 @@
 1. Reproduce the issue first before attempting to fix it so that you can verify the fix.
 1. Do not add unit tests; prefer E2E tests.
 1. For each commit, review lines of code and cyclomatic complexity, prefer low.
+1. For each commit, review the performance implications.
 1. For each change review, show the lines-of-code (LOC) delta, file tree diff, and call stack diff; mark non-applicable diffs explicitly.
 1. For UI change reviews, capture screenshots or videos from the simulator as appropriate and share them with the user for visual review.
 
