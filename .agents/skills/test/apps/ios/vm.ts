@@ -15,8 +15,8 @@ const release = claimSimulator(config.device);
 const evidence = await mkdtemp(join(tmpdir(),"ox-vm-integration-"));
 const functionNames = Object.keys(contracts);
 const cli = ["bun","apps/cli/src/ox.ts","--host",endpoint.href];
-async function call(args: string[], chat?: string) {
-  const result = await run([...cli,...chat ? ["--conversation",chat] : [],...args,"--json"],{capture:true});
+async function call(args: string[], conversation?: string) {
+  const result = await run([...cli,...conversation ? ["--conversation",conversation] : [],...args,"--json"],{capture:true});
   return JSON.parse(result.stdout);
 }
 let previous: string | undefined;
@@ -32,7 +32,7 @@ try {
   const schema = await call(["vm","functions"]);
   assert.deepEqual(schema,contracts,"Stub catalog drift: export vm functions from the changed build and review the contract changes");
   for (const temporary of [true,false,true]) {
-    const chat = await call(["conversation","new",...temporary ? ["--temporary"] : [],"--provider","mock","--model","mock"]);
+    const conversation = await call(["conversation","new",...temporary ? ["--temporary"] : [],"--provider","mock","--model","mock"]);
     const source = `
       const names = ${JSON.stringify(functionNames)};
       for (const name of names) {
@@ -55,15 +55,15 @@ try {
       catch(e) {if(e.code!=='permission_denied') throw e; denied=JSON.parse(JSON.stringify(e));}
       return {count:names.length,profile:parallel[0],memory:before,denied,invalid,aliases:ox.app.setModel===ox.conversation.setModel};
     `;
-    const result = await call(["vm","eval","--script",source],chat.chatId);
-    await writeFile(join(evidence,`${temporary ? "temporary" : "saved"}-${chat.chatId}.json`),JSON.stringify(result,null,2),{mode:0o600});
+    const result = await call(["vm","eval","--script",source],conversation.conversationId);
+    await writeFile(join(evidence,`${temporary ? "temporary" : "saved"}-${conversation.conversationId}.json`),JSON.stringify(result,null,2),{mode:0o600});
     assert.equal(result.value.profile.name,name);
     assert.equal(result.value.count,functionNames.length);
     assert.equal(result.value.aliases,true);
     assert.equal(result.value.memory.truncated,false);
     assert.equal(result.value.invalid.length,2);
     await call(["profile","select",previous!]);
-    await assert.rejects(call(["vm","call","ox.fs.read","--args",JSON.stringify({path:"MEMORY.md",purpose:"Reject stale Profile access"})],chat.chatId));
+    await assert.rejects(call(["vm","call","ox.fs.read","--args",JSON.stringify({path:"MEMORY.md",purpose:"Reject stale Profile access"})],conversation.conversationId));
     await call(["profile","select",created.profile.id]);
   }
   console.log(`PASS VM contracts, all namespace/function help, temporary/saved filesystem reads, parallel calls, Profile switching, validation, error serialization, read-only skill protection, aliases. Evidence: ${evidence}`);

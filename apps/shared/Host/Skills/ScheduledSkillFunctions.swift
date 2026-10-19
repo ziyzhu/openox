@@ -168,7 +168,7 @@ extension Conversation {
             }
         }
         if let lastConversationID = schedule.lastConversationID {
-            result["lastChatId"] = .string(lastConversationID.uuidString)
+            result["lastConversationId"] = .string(lastConversationID.uuidString)
         }
         return .object(result)
     }

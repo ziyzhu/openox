@@ -26,7 +26,7 @@ test("internal template materializer creates dormant current Profiles in a subpr
     const input = join(directory, "input.json");
     await writeFile(input, JSON.stringify({ version: 1, profiles: [{ id: "qa", name: "Desktop", memory: "Offline memory",
       files: [{ path: "notes/shared.txt", content: { text: "Shared bytes" } }],
-      chats: [{ id: "saved", title: "Saved offline", model: { provider: "mock", model: "mock", thinking: "high" }, favorite: true,
+      conversations: [{ id: "saved", title: "Saved offline", model: { provider: "mock", model: "mock", thinking: "high" }, favorite: true,
         files: [{ id: "note", name: "note.txt", content: { text: "Attachment bytes" } }],
         messages: [{ role: "user", text: "Read my note", attachments: ["note"] }, { role: "assistant", text: "Saved", reasoning: "No model call" }] }] }] }));
     const program = `
@@ -50,7 +50,7 @@ test("internal template materializer creates dormant current Profiles in a subpr
     expect(config.version).toBeTruthy();
     expect(await Bun.file(join(profile.content, "MEMORY.md")).text()).toBe("Offline memory");
     expect(await Bun.file(join(profile.content, "notes/shared.txt")).text()).toBe("Shared bytes");
-    expect(await Bun.file(join(profile.content, `conversations/${profile.chats.saved}/note.txt`)).text()).toBe("Attachment bytes");
+    expect(await Bun.file(join(profile.content, `conversations/${profile.conversations.saved}/note.txt`)).text()).toBe("Attachment bytes");
     const database = new Database(join(profile.state, "state.sqlite"), { readonly: true });
     try {
       expect(database.query("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -74,8 +74,8 @@ const basic = {
   version: 1,
   settings: { language: "en", defaultModel: { provider: "mock", model: "mock" } },
   userDefaults: { app: { set: { count: 3, enabled: true, bytes: { data: "YWJj" }, list: ["a", 2], nested: { dictionary: { value: "x" } }, date: { date: "2026-01-01T00:00:00Z" } }, remove: ["old"] } },
-  profiles: [{ id: "qa", name: "QA", files: [{ path: "notes/file.txt", content: { fromFile: "file.txt" } }], chats: [{ id: "conversation", title: "Chat", messages: [{ role: "user", text: "Hello" }, { role: "assistant", text: "Hi", reasoning: "A greeting." }] }] }],
-  selection: { profile: "qa", chat: "conversation" },
+  profiles: [{ id: "qa", name: "QA", files: [{ path: "notes/file.txt", content: { fromFile: "file.txt" } }], conversations: [{ id: "conversation", title: "Conversation", messages: [{ role: "user", text: "Hello" }, { role: "assistant", text: "Hi", reasoning: "A greeting." }] }] }],
+  selection: { profile: "qa", conversation: "conversation" },
 };
 
 test("template CLI validates complete JSON and relative external inputs without iOS", async () => {
@@ -92,7 +92,7 @@ test("template CLI rejects unsupported state and broken references before simula
     { ...basic, selection: { profile: "missing" } },
     { ...basic, profiles: [{ id: "qa", name: "../escape" }] },
     { ...basic, profiles: [{ id: "qa", name: "QA", files: [{ path: "../escape", content: { text: "x" } }] }] },
-    { ...basic, profiles: [{ id: "qa", name: "QA", chats: [{ id: "conversation", title: "Chat", messages: [{ role: "user", text: "Hello", attachments: ["missing"] }] }] }] },
+    { ...basic, profiles: [{ id: "qa", name: "QA", conversations: [{ id: "conversation", title: "Conversation", messages: [{ role: "user", text: "Hello", attachments: ["missing"] }] }] }] },
     { ...basic, userDefaults: { app: { set: { same: 1 }, remove: ["same"] } } },
     { ...basic, userDefaults: { app: { set: { "app.language": "en" } } } },
     { ...basic, userDefaults: { app: { set: { date: { date: "2026-02-30T00:00:00Z" } } } } },

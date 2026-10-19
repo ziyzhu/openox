@@ -113,13 +113,13 @@ function decoded(data: string): string | Uint8Array {
 }
 
 export async function materializeProfiles(template: PreparedTemplate, parent: string) {
-  if (template.profiles?.some(profile => profile.chats?.some(chat => chat.packageData))) throw new Error("Desktop conversation-package materialization is not yet supported");
+  if (template.profiles?.some(profile => profile.conversations?.some(conversation => conversation.packageData))) throw new Error("Desktop conversation-package materialization is not yet supported");
   const schemaSource = await Bun.file(new URL("../../../../apps/shared/Host/Storage/ProfileMigrator.swift", import.meta.url)).text();
   const milestones = /enum ProfileSchema\s*\{\s*static let versions = \[([^\]]+)\]/.exec(schemaSource)?.[1];
   const version = milestones && [...milestones.matchAll(/"([^"]+)"/g)].at(-1)?.[1];
   if (!version) throw new Error("Cannot resolve the native current Profile schema");
   const root = await mkdtemp(join(parent, "profiles-"));
-  const profiles: Record<string, { id: string; name: string; content: string; state: string; chats: Record<string, number> }> = {};
+  const profiles: Record<string, { id: string; name: string; content: string; state: string; conversations: Record<string, number> }> = {};
   try {
     for (const input of template.profiles ?? []) {
       const id = crypto.randomUUID().toUpperCase();
@@ -131,7 +131,7 @@ export async function materializeProfiles(template: PreparedTemplate, parent: st
       const backend = stagedFiles(content, staging);
       const runtime = await openProfileRuntime({ database: database(join(state, "state.sqlite")), profileID: id, models: dormantModels,
         fileStorage: { kind: "prepare", publicFiles: true, backend } });
-      const chats: Record<string, number> = {};
+      const conversations: Record<string, number> = {};
       try {
         await runtime.files.install([], []);
         await runtime.files.bindPhysicalFiles(true);
@@ -139,21 +139,21 @@ export async function materializeProfiles(template: PreparedTemplate, parent: st
         if (input.soul !== undefined) await runtime.files.writeDocument("SOUL.md", input.soul);
         for (const item of input.files ?? []) await runtime.files.write(item.path, decoded(item.data));
         const presentation = new ApplicationPresentation(runtime);
-        for (const chat of input.chats ?? []) {
-          const created = await presentation.create({ title: chat.title, favorite: chat.favorite, unread: chat.unread,
-            agent: chat.model && { model: { modelId: chat.model.model },
-              thinkingLevel: (["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const).find(level => level === chat.model?.thinking) },
+        for (const conversation of input.conversations ?? []) {
+          const created = await presentation.create({ title: conversation.title, favorite: conversation.favorite, unread: conversation.unread,
+            agent: conversation.model && { model: { modelId: conversation.model.model },
+              thinkingLevel: (["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const).find(level => level === conversation.model?.thinking) },
             metadata: { createdAt: Date.now() / 1000 - 978307200, attachedServiceDomains: [],
-              nativeProviderID: chat.model?.provider ?? null,
-              nativeReasoningEffort: chat.model?.thinking && !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(chat.model.thinking) ? chat.model.thinking : null } });
-          chats[chat.id] = created.conversationID;
+              nativeProviderID: conversation.model?.provider ?? null,
+              nativeReasoningEffort: conversation.model?.thinking && !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(conversation.model.thinking) ? conversation.model.thinking : null } });
+          conversations[conversation.id] = created.conversationID;
           const attachments = new Map<string, string>();
-          for (const item of chat.files ?? []) {
+          for (const item of conversation.files ?? []) {
             const path = `conversations/${created.conversationID}/${item.name}`;
             await runtime.files.write(path, decoded(item.data));
             attachments.set(item.id, (await runtime.files.record(path, false))!.id);
           }
-          const entries: EntryDraft[] = (chat.messages ?? []).map((message, index): EntryDraft => {
+          const entries: EntryDraft[] = (conversation.messages ?? []).map((message, index): EntryDraft => {
             const content: Array<{ type: "text"; text: string; oxAttachment?: string; oxProfileID?: string }> = [{ type: "text", text: message.text }];
             if (message.role === "user") {
               for (const attachment of message.attachments ?? []) {
@@ -162,19 +162,19 @@ export async function materializeProfiles(template: PreparedTemplate, parent: st
               }
               return { kind: "ox.native.turn", data: {}, model: [{ role: "user", content, timestamp: Date.now() + index }] };
             }
-            return { kind: "ox.native.turn", data: {}, model: [{ role: "assistant", api: "ox-native", provider: chat.model?.provider ?? "mock",
-              model: chat.model?.model ?? "mock", content: [...(message.reasoning ? [{ type: "thinking" as const, thinking: message.reasoning }] : []), ...content],
+            return { kind: "ox.native.turn", data: {}, model: [{ role: "assistant", api: "ox-native", provider: conversation.model?.provider ?? "mock",
+              model: conversation.model?.model ?? "mock", content: [...(message.reasoning ? [{ type: "thinking" as const, thinking: message.reasoning }] : []), ...content],
               usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
               stopReason: "stop", timestamp: Date.now() + index }] };
           });
           await presentation.populate(created.reference, entries);
-          await presentation.save(created.reference, { favorite: chat.favorite, unread: chat.unread });
+          await presentation.save(created.reference, { favorite: conversation.favorite, unread: conversation.unread });
         }
         const inspection = await runtime.inspect();
         if (inspection.inspection.tasks.length || inspection.inspection.submissions.length || inspection.inspection.scheduling !== "paused") throw new Error("Template Profile must remain dormant");
       } finally { await runtime.close(); }
       await writeFile(join(state, "profile.json"), JSON.stringify({ id, createdAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), version, contentDirectory: name }, null, 2) + "\n", { flag: "wx", mode: 0o600 });
-      profiles[input.id] = { id, name, content, state, chats };
+      profiles[input.id] = { id, name, content, state, conversations };
     }
     await rm(join(root, "staging"), { recursive: true, force: true });
     return { root, profiles };

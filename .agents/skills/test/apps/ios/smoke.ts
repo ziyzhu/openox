@@ -9,7 +9,7 @@ import { iosTarget } from "../../../setup/scripts/ios.ts";
 const config = qaCommand({
   usage: `Usage: bun run ci:ios --device ox-N [--host <ws-url>] [--bundle <id>] [--app <Ox.app>] [--output <directory>] [--loopback]
 Reserve the device and prepare the common QA state first. Host connections must already be enabled.
-Builds/launches the app and runs a temporary Mock chat. --app reuses a verified build instead of building.
+Builds/launches the app and runs a temporary Mock conversation. --app reuses a verified build instead of building.
 Never resets app data or changes credentials/settings.
 --loopback opts this Debug Simulator launch into localhost Host access; other launches remain Tailscale-only.
 Evidence stays outside the repository.`,
@@ -68,7 +68,7 @@ async function waitForHost(): Promise<void> {
 const release = claimSimulator(config.device);
 let bootedByCi = false;
 let launched = false;
-let chatId: string | undefined;
+let conversationId: string | undefined;
 let previousConversation: string | undefined;
 let evidence: string | undefined;
 let completed = false;
@@ -91,32 +91,32 @@ try {
   const rows = await ox("conversation", "list", "--active") as Array<{ id: string }>;
   previousConversation = rows[0]?.id;
   const created = await ox("conversation", "new", "--temporary", "--provider", "mock", "--model", "mock");
-  if (typeof created.chatId !== "string" || !created.chatId || created.temporary !== true || created.model !== "mock:mock") {
+  if (typeof created.conversationId !== "string" || !created.conversationId || created.temporary !== true || created.model !== "mock:mock") {
     throw new Error("Host did not return the requested temporary Mock conversation");
   }
-  chatId = created.chatId;
-  const outcome = await ox("--chat", chatId!, "conversation", "send", "2", "--timeout", "60000");
+  conversationId = created.conversationId;
+  const outcome = await ox("--conversation", conversationId!, "conversation", "send", "2", "--timeout", "60000");
   if (outcome.outcome !== "completed" || outcome.text !== "Sorry that took a moment.") {
-    throw new Error(`Mock chat did not complete as expected: ${JSON.stringify(outcome)}`);
+    throw new Error(`Mock conversation did not complete as expected: ${JSON.stringify(outcome)}`);
   }
-  const snapshot = await ox("--chat", chatId!, "conversation", "inspect", "--full");
-  if (snapshot.id !== chatId || snapshot.model?.id !== "mock" || snapshot.isBusy
+  const snapshot = await ox("--conversation", conversationId!, "conversation", "inspect", "--full");
+  if (snapshot.id !== conversationId || snapshot.model?.id !== "mock" || snapshot.isBusy
       || !JSON.stringify(snapshot.messages).includes(outcome.text)) {
     throw new Error("Completed Mock conversation snapshot is missing its reply");
   }
-  await writeFile(join(evidence, "chat.json"), JSON.stringify({ outcome, snapshot }, null, 2), { mode: 0o600 });
-  await ios.wait({ id: "chat.message.agent" }, { timeout: 10_000 });
-  await ios.screenshot(join(evidence, "chat.png"));
+  await writeFile(join(evidence, "conversation.json"), JSON.stringify({ outcome, snapshot }, null, 2), { mode: 0o600 });
+  await ios.wait({ id: "conversation.message.agent" }, { timeout: 10_000 });
+  await ios.screenshot(join(evidence, "conversation.png"));
   completed = true;
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = interrupted === "SIGINT" ? 130 : interrupted === "SIGTERM" ? 143 : 1;
 } finally {
   try {
-    if (chatId) {
-      await run(["bun", "apps/cli/src/ox.ts", "--host", endpoint, "--chat", chatId, "conversation", "stop", "--timeout", "5000"], { allowFailure: true });
+    if (conversationId) {
+      await run(["bun", "apps/cli/src/ox.ts", "--host", endpoint, "--conversation", conversationId, "conversation", "stop", "--timeout", "5000"], { allowFailure: true });
       const restore = previousConversation
-        ? ["--chat", previousConversation, "conversation", "open"] : ["conversation", "new", "--temporary"];
+        ? ["--conversation", previousConversation, "conversation", "open"] : ["conversation", "new", "--temporary"];
       const result = await run(["bun", "apps/cli/src/ox.ts", "--host", endpoint, ...restore, "--timeout", "5000"], { allowFailure: true });
       if (result.code !== 0) {
         console.error("Could not restore the previous conversation; restore it in Ox before releasing the simulator");

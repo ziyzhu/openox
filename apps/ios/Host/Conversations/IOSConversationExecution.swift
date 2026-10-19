@@ -42,19 +42,19 @@ struct IOSConversationFeedback: ConversationFeedback {
             Log.session.info("Conversation.notify skipped id=\(id) reason=active")
             return
         }
-        let chatId = id.uuidString
+        let conversationId = id.uuidString
         Task {
             do {
                 let delivered = try await NotificationProvider.shared.deliverIfAuthorized(
-                    identifier: "chat.\(chatId)", title: title, body: body
+                    identifier: "conversation.\(conversationId)", title: title, body: body
                 )
                 if delivered {
-                    Log.session.info("Conversation.notify posted id=\(chatId) bodyChars=\(body.count)")
+                    Log.session.info("Conversation.notify posted id=\(conversationId) bodyChars=\(body.count)")
                 } else {
-                    Log.session.info("Conversation.notify skipped id=\(chatId) reason=notAuthorized")
+                    Log.session.info("Conversation.notify skipped id=\(conversationId) reason=notAuthorized")
                 }
             } catch {
-                Log.session.error("Conversation.notify add failed id=\(chatId) err=\(error.localizedDescription)")
+                Log.session.error("Conversation.notify add failed id=\(conversationId) err=\(error.localizedDescription)")
             }
         }
     }

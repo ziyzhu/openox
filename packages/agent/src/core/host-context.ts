@@ -2,7 +2,7 @@ export interface HostScope { hostID: string; profileID: string }
 export interface PromptHost extends HostScope {
   functions: string[];
   serviceKinds: ("web" | "api" | "ios" | "mcp")[];
-  presentation: "chat-bubbles" | "text";
+  presentation: "conversation-bubbles" | "text";
   externalFiles: boolean;
 }
 export interface HostContext { active: HostScope; hosts: PromptHost[] }
@@ -18,7 +18,7 @@ export function activeHost(context: HostContext) {
     if (typeof host?.hostID !== "string" || !host.hostID || typeof host.profileID !== "string" || !host.profileID
       || !Array.isArray(host.functions) || !host.functions.every(name => typeof name === "string" && (name === "ox" || name.startsWith("ox.")))
       || !Array.isArray(host.serviceKinds) || !host.serviceKinds.every(kind => ["web", "api", "ios", "mcp"].includes(kind))
-      || !["chat-bubbles", "text"].includes(host.presentation) || typeof host.externalFiles !== "boolean") throw new Error("Invalid prompt host facts");
+      || !["conversation-bubbles", "text"].includes(host.presentation) || typeof host.externalFiles !== "boolean") throw new Error("Invalid prompt host facts");
     const key = JSON.stringify([host.hostID, host.profileID]);
     if (scopes.has(key)) throw new Error("Duplicate host/Profile scope");
     scopes.add(key);

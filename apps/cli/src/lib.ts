@@ -77,7 +77,6 @@ export function parseGlobalOptions(args: string[]): { context: CliContext; rest:
     ["--host", { key: "host", requirement: "a WebSocket URL" }],
     ["--profile", { key: "profile", requirement: "a Profile ID or path" }],
     ["--conversation", { key: "conversation", requirement: "a conversation id" }],
-    ["--chat", { key: "conversation", requirement: "a conversation id" }],
     ["--repository", { key: "repository", requirement: "a path or URL" }],
   ]);
   const removedOptions = new Map([
@@ -130,8 +129,7 @@ export async function runCli(
     console.log(version);
     return;
   }
-  const [requestedName, ...rest] = parsed.rest;
-  const name = requestedName === "chat" ? "conversation" : requestedName;
+  const [name, ...rest] = parsed.rest;
   if (!name || name === "help" || name === "-h" || name === "--help") {
     printUsage(program, description, groups);
     return;
@@ -167,7 +165,6 @@ const MOVED_COMMANDS: Record<string, string> = {
   soul: "ox profile soul",
   skills: "ox profile skills, ox repository skills, or ox vm skills",
   artifacts: "ox profile artifacts",
-  chats: "ox profile conversations",
   discover: "ox host list",
   logs: "ox host logs",
   providers: "ox host providers",
@@ -197,8 +194,7 @@ export async function dispatch(
   context: CliContext,
   footer?: () => void,
 ): Promise<void> {
-  const [requestedSub, ...rest] = args;
-  const sub = name === "profile" && requestedSub === "chats" ? "conversations" : requestedSub;
+  const [sub, ...rest] = args;
   if (!sub || sub === "-h" || sub === "--help") {
     console.log(`Usage: ox ${name} <subcommand> [...flags] [...args]`);
     console.log(`       ${terminalText(desc, [C.dim])}\n`);

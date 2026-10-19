@@ -149,7 +149,7 @@ nonisolated enum ConversationPackageError: LocalizedError, Sendable {
         case .unsafePath: "This conversation package contains an unsafe path."
         case .checksumMismatch: "This conversation package appears to be damaged."
         case .unsupportedVersion: "This conversation package was made by an unsupported Ox version."
-        case .invalidHeader: "This conversation package has an invalid chat.json."
+        case .invalidHeader: "This conversation package has an invalid header."
         case .invalidTranscript: "This conversation package has an invalid transcript."
         case .invalidContext: "This conversation package has invalid compacted context."
         case .missingFile(let name): "This conversation package is missing \(name)."
@@ -164,7 +164,8 @@ nonisolated enum ConversationPackageCodec {
     private static let maximumHeaderBytes = 1024 * 1024
     static let maximumEntries = 256
     private static let packageVersion = 1
-    private static let headerPath = "chat.json"
+    private static let headerPath = "conversation.json"
+    private static let legacyHeaderPath = "chat.json"
     private static let turnsPath = "turns.jsonl"
     private static let contextPath = "context.json"
     private static let artifactsPrefix = "artifacts/"
@@ -233,7 +234,8 @@ nonisolated enum ConversationPackageCodec {
             )
         }
         let byPath = Dictionary(uniqueKeysWithValues: files.map { ($0.path, $0.data) })
-        guard let headerData = byPath[headerPath], headerData.count <= maximumHeaderBytes else {
+        let headerKey = byPath[headerPath] == nil ? legacyHeaderPath : headerPath
+        guard let headerData = byPath[headerKey], headerData.count <= maximumHeaderBytes else {
             throw ConversationPackageError.invalidHeader
         }
         let header: ConversationPackageHeader
@@ -252,7 +254,7 @@ nonisolated enum ConversationPackageCodec {
               header.files.count <= maximumEntries - 1 else {
             throw ConversationPackageError.invalidHeader
         }
-        let payloadPaths = Set(byPath.keys.filter { $0 != headerPath })
+        let payloadPaths = Set(byPath.keys.filter { $0 != headerKey })
         let declaredPaths = Set(header.files.map(\.path))
         guard payloadPaths == declaredPaths,
               declaredPaths.count == header.files.count else {
@@ -297,11 +299,11 @@ nonisolated enum ConversationPackageCodec {
     static func prepare(_ payload: ConversationPackagePayload) throws -> PreparedConversationPackage {
         let root = try FileStaging.createDirectory(
             in: FileManager.default.temporaryDirectory,
-            prefix: "chat-package"
+            prefix: "conversation-package"
         )
         let directory = root.appendingPathComponent("artifacts", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { FileStaging.cleanup(root, operation: "chat-package") }
+        defer { FileStaging.cleanup(root, operation: "conversation-package") }
         for (name, data) in payload.artifacts {
             try data.write(to: directory.appendingPathComponent(name, isDirectory: false), options: .atomic)
         }

@@ -17,7 +17,7 @@ nonisolated enum ConversationPromptState {
         var host = scope
         host["functions"] = .array((OxFunctionCatalog.build().objectValue ?? [:]).keys.sorted().map(JSONValue.string))
         host["serviceKinds"] = .array(["web", "api", "ios", "mcp"].map(JSONValue.string))
-        host["presentation"] = .string("chat-bubbles")
+        host["presentation"] = .string("conversation-bubbles")
         host["externalFiles"] = .bool(true)
         return .object(["active": .object(scope), "hosts": .array([.object(host)])])
     }

@@ -1,7 +1,7 @@
 import Foundation
 
 extension OxHostProtocol {
-    static let contractVersion = 1
+    static let contractVersion = 2
 
     enum Method: String, CaseIterable {
         case describe = "host.describe"
@@ -18,20 +18,20 @@ extension OxHostProtocol {
         case connectRepositoryFolder = "repositories.connectFolder"
         case disconnectRepositoryFolder = "repositories.disconnectFolder"
         case durableStorage = "debug.durable.storage"
-        case durableConversation = "debug.durable.chat"
+        case durableConversation = "debug.durable.conversation"
         case invokeAction = "services.invoke"
         case evaluate = "services.evaluate"
         case reloadService = "services.reload"
         case refreshServiceAuth = "services.refreshAuth"
         case listServices = "services.list"
         case syncServices = "services.sync"
-        case listConversations = "chats.list"
-        case getConversation = "chats.get"
-        case openConversation = "chats.open"
-        case respondConversation = "chats.respond"
-        case newConversation = "chats.new"
-        case sendConversation = "chats.send"
-        case stopConversation = "chats.stop"
+        case listConversations = "conversations.list"
+        case getConversation = "conversations.get"
+        case openConversation = "conversations.open"
+        case respondConversation = "conversations.respond"
+        case newConversation = "conversations.new"
+        case sendConversation = "conversations.send"
+        case stopConversation = "conversations.stop"
         case listProviders = "providers.list"
         case getLogs = "logs.list"
         case getComposerFormatting = "debug.composer.formatting"
@@ -46,13 +46,13 @@ extension OxHostProtocol {
         case restoreWebsiteData = "debug.websiteData.restore"
         case setKey = "debug.providers.setKey"
         case setRegion = "debug.region.set"
-        case setAttachedService = "debug.chats.attachServices"
+        case setAttachedService = "debug.conversations.attachServices"
         case setComposerDraft = "debug.composer.setDraft"
         case setComposerMarkedText = "debug.composer.setMarkedText"
         case setPasteboardImage = "debug.pasteboard.setImage"
         case setPasteboardRichText = "debug.pasteboard.setRichText"
         case stageSharedNote = "debug.share.stageNote"
-        case setEditDraft = "debug.chat.setEditDraft"
+        case setEditDraft = "debug.conversation.setEditDraft"
     }
 
     struct EmptyRequest: Decodable {}

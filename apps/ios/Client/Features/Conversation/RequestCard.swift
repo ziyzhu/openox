@@ -154,7 +154,7 @@ struct PermissionRequestCard: View {
                     .buttonStyle(.plain)
                     .frame(width: 18, height: 18)
                     .accessibilityLabel("View arguments")
-                    .accessibilityIdentifier("chat.permissionArguments")
+                    .accessibilityIdentifier("conversation.permissionArguments")
                 }
             }
 

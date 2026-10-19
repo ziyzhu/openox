@@ -53,7 +53,7 @@ async function scene(name: string, completed = true, autoplay = false, time = 0)
   launched = true;
   const heading = ["connect", "local", "yours"].includes(name);
   await wait(heading ? "demo.chapter" : name === "providers" ? "demo.provider.chatgpt"
-    : completed && !["planning", "publishing", "creative"].includes(name) ? "chat.message.user" : "chat.input");
+    : completed && !["planning", "publishing", "creative"].includes(name) ? "conversation.message.user" : "conversation.input");
   const tree = await elements();
   check(!tree.some(element => ["demo.playPause", "demo.record", "demo.disclosure", "demo.airplane"].includes(element.AXUniqueId ?? "")), `${name}: no custom player or simulated system UI`);
   await ios.screenshot(join(directory, `${name}${autoplay ? "-autoplay" : name === "creative" ? `-${time}` : ""}.png`));
@@ -71,7 +71,7 @@ try {
   check(tree.some(element => element.AXLabel === "Import my memory from ChatGPT, Claude, and Muse into Ox, and merge duplicates."), "exact memory prompt in native user bubble");
   check(tree.some(element => element.AXUniqueId === "demo.thinking"), "native completed task trace");
   check(tree.some(element => element.AXUniqueId === "demo.reply" && element.AXLabel?.includes("private memory stores")), "source-specific memory reply includes access limits");
-  for (const id of ["chat.message.copy", "chat.message.share"]) {
+  for (const id of ["conversation.message.copy", "conversation.message.share"]) {
     check(tree.some(element => element.AXUniqueId?.startsWith(`${id}.`)), `native completed response control: ${id}`);
   }
   for (const domain of ["chatgpt.com", "claude.ai", "muse.ai"]) {
@@ -90,8 +90,8 @@ try {
     ["publishing", "Open a pull request for feature/checklist in my demo repo, email Alex the link, and add a review reminder.", ["github.com", "mail.google.com", "ios:reminders"]],
   ] as const) {
     tree = await scene(name);
-    check(await value("chat.input") === prompt, `exact ${name} prompt in native composer`);
-    const send = tree.find(element => element.AXUniqueId === "chat.send")?.frame;
+    check(await value("conversation.input") === prompt, `exact ${name} prompt in native composer`);
+    const send = tree.find(element => element.AXUniqueId === "conversation.send")?.frame;
     check(send?.width === 44 && send.height === 44, `${name} Send matches the production 44-point tap target at standard text size`);
     check(!tree.some(element => element.AXUniqueId === "demo.reply"), `${name} remains typing-only`);
     check(domains.every(domain => tree.some(element => element.AXUniqueId === `conversation.servicePill.${domain}` && element.AXValue === (domain.startsWith("ios:") ? "Permission granted" : "Signed in"))), `${name} has assigned write services with snapshot access status`);
@@ -113,9 +113,9 @@ try {
   await scene("memory", false, true);
   await wait("demo.thinking");
   tree = await elements();
-  check(!tree.some(element => element.AXUniqueId?.startsWith("chat.message.copy.")), "response controls stay hidden during work");
+  check(!tree.some(element => element.AXUniqueId?.startsWith("conversation.message.copy.")), "response controls stay hidden during work");
   await ios.wait({ id: "demo.reply" }, { timeout: 20_000, stable: 300 });
-  await ios.wait({ id: "chat.stop" }, { missing: true, timeout: 30_000, stable: 300 });
+  await ios.wait({ id: "conversation.stop" }, { missing: true, timeout: 30_000, stable: 300 });
   tree = await elements();
   check(tree.some(element => element.AXLabel === "Import my memory from ChatGPT, Claude, and Muse into Ox, and merge duplicates."), "timeline types, sends, and streams through native components");
   check(tree.some(element => element.AXUniqueId === "demo.reply" && element.AXLabel?.includes("Source labels are kept so you can review the merge.")), "word-burst stream preserves the complete reply");
@@ -133,7 +133,7 @@ try {
     await launch({ OX_APP_STORE_SCREENSHOT: name });
     await wait("demo.reply");
     tree = await elements();
-    check(tree.some(element => element.AXUniqueId === "chat.message.user"), `App Store ${name}: native user message`);
+    check(tree.some(element => element.AXUniqueId === "conversation.message.user"), `App Store ${name}: native user message`);
     check(tree.some(element => element.AXUniqueId === "demo.reply" && element.AXLabel?.includes(outcome)), `App Store ${name}: completed action fixture`);
     for (const domain of domains) {
       check(tree.some(element => element.AXUniqueId === `conversation.servicePill.${domain}` && element.AXValue === (domain.startsWith("ios:") ? "Permission granted" : "Signed in")), `App Store ${name}: assigned snapshot service ${domain}`);
@@ -147,9 +147,9 @@ try {
       };
       check(tree.some(element => element.AXLabel === prompts[name as keyof typeof prompts]), `App Store ${name}: screenshot-specific task prompt`);
     }
-    check(tree.some(element => element.AXUniqueId?.startsWith("chat.message.copy.")), `App Store ${name}: native completed response controls`);
-    check(!tree.some(element => ["demo.chapter", "demo.playPause", "demo.record", "demo.disclosure", "demo.airplane", "chat.stop", "chat.send"].includes(element.AXUniqueId ?? "")), `App Store ${name}: static app-only scene without overlays or playback`);
-    check(await value("chat.input") === "Type a message", `App Store ${name}: empty native composer placeholder`);
+    check(tree.some(element => element.AXUniqueId?.startsWith("conversation.message.copy.")), `App Store ${name}: native completed response controls`);
+    check(!tree.some(element => ["demo.chapter", "demo.playPause", "demo.record", "demo.disclosure", "demo.airplane", "conversation.stop", "conversation.send"].includes(element.AXUniqueId ?? "")), `App Store ${name}: static app-only scene without overlays or playback`);
+    check(await value("conversation.input") === "Type a message", `App Store ${name}: empty native composer placeholder`);
     const path = join(screenshotDirectory, `${String(index + 1).padStart(2, "0")}-${name}.png`);
     await ios.screenshot(path);
     const png = await readFile(path);
@@ -165,16 +165,16 @@ try {
   let fullScrollTravel = 0;
   for (const time of [0, 3, 4, 5, 10, 15, 20]) {
     tree = await scene("creative", false, false, time);
-    check(await value("chat.input") === "Type a message", `creative ${time}s: composer remains empty`);
-    const speech = tree.find(element => element.AXUniqueId === "chat.speechHold")?.frame;
+    check(await value("conversation.input") === "Type a message", `creative ${time}s: composer remains empty`);
+    const speech = tree.find(element => element.AXUniqueId === "conversation.speechHold")?.frame;
     check(speech?.width === 44 && speech.height === 44, `creative ${time}s: normal production 44-point control size`);
-    const input = tree.find(element => element.AXUniqueId === "chat.input")?.frame;
+    const input = tree.find(element => element.AXUniqueId === "conversation.input")?.frame;
     check(input && (creativeHeight === undefined || input.height === creativeHeight), `creative ${time}s: stable empty composer height`);
     creativeHeight = input?.height;
     const chips = tree.filter(element => element.AXUniqueId?.startsWith("conversation.servicePill."));
     check(chips.length === 13 && chips.every(element => element.AXValue === "Signed in"), `creative ${time}s: all 13 assistants have snapshot sign-in status`);
     check(chips.every(element => element.frame?.height === 44), `creative ${time}s: normal production 44-point chip size`);
-    check(!tree.some(element => ["chat.message.user", "demo.reply", "demo.thinking", "chat.openSidebar", "chat.modelPicker"].includes(element.AXUniqueId ?? "")), `creative ${time}s: only production chips and composer`);
+    check(!tree.some(element => ["conversation.message.user", "demo.reply", "demo.thinking", "conversation.openSidebar", "conversation.modelPicker"].includes(element.AXUniqueId ?? "")), `creative ${time}s: only production chips and composer`);
     const x = chips[0]?.frame?.x;
     if (x !== undefined) creativePositions.set(time, x);
     if (time === 0) {

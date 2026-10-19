@@ -62,7 +62,7 @@ enum OxActionIconKind: String, Equatable {
         case "artifact": .artifacts
         case "skill": .skills
         case "memory": .memory
-        case "chat": .conversations
+        case "conversation": .conversations
         case "web": .web
         case "fs": .files
         case "help": .help

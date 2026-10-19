@@ -36,7 +36,7 @@ extension Conversation {
                 throw RuntimeError.bridge("ox.conversation.delete: the conversation is no longer available.")
             }
             try await deletion.value
-            Log.session.info("bridge.chat.delete caller=\(self.id) target=\(targetID)")
+            Log.session.info("bridge.conversation.delete caller=\(self.id) target=\(targetID)")
             return .object(["id": .string(targetID.uuidString), "deleted": .bool(true)])
         }
     }

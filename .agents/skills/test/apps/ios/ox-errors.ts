@@ -8,14 +8,14 @@ import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulat
 
 const config = qaCommand({
   usage: "Usage: bun .agents/skills/test/apps/ios/ox-errors.ts --device ox-N --host <ws-url> --conversation <idle-QA-conversation>\nRequires an installed build and enabled Host. Verifies structured ox errors without changing files, settings, or policies.",
-  options: { host: { type: "string" }, chat: { type: "string" } },
+  options: { host: { type: "string" }, conversation: { type: "string" } },
 });
-if (!config.values.device || !config.values.host || !config.values.chat) throw new Error("Pass --device, --host, and --conversation explicitly");
+if (!config.values.device || !config.values.host || !config.values.conversation) throw new Error("Pass --device, --host, and --conversation explicitly");
 const endpoint = new URL(config.values.host);
 if (!["ws:", "wss:"].includes(endpoint.protocol) || Number(endpoint.port) !== config.debugPort) throw new Error(`Use the selected simulator's Host on port ${config.debugPort}`);
 const evidence = await mkdtemp(join(tmpdir(), "openox-errors-"));
 const release = claimSimulator(config.device);
-const cli = ["bun", "apps/cli/src/ox.ts", "--host", endpoint.href, "--chat", config.values.chat];
+const cli = ["bun", "apps/cli/src/ox.ts", "--host", endpoint.href, "--conversation", config.values.conversation];
 try {
   assert.ok(await requireSimulator(config.device), "Boot the reserved simulator before testing");
   const inspected = await run([...cli, "conversation", "inspect", "--json"], { capture: true });

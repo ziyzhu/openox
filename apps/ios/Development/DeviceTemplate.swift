@@ -52,11 +52,6 @@ enum DeviceTemplate {
             let soul: String?
             let files: [File]?
             let conversations: [Conversation]?
-
-            private enum CodingKeys: String, CodingKey {
-                case id, name, memory, soul, files
-                case conversations = "chats"
-            }
         }
         struct Conversation: Decodable {
             struct File: Decodable { let id: String; let name: String; let data: Data }
@@ -79,11 +74,6 @@ enum DeviceTemplate {
         struct Selection: Decodable {
             let profile: String
             let conversation: String?
-
-            private enum CodingKeys: String, CodingKey {
-                case profile
-                case conversation = "chat"
-            }
         }
         let version: Int
         let runID: UUID
@@ -243,7 +233,7 @@ enum DeviceTemplate {
 
     private static func importConversation(_ input: Request.Conversation, in scope: ProfileScope) async throws -> UUID {
         if let data = input.packageData {
-            let proposal = try ConversationPackageCodec.decode(data, sourceName: "template.chat")
+            let proposal = try ConversationPackageCodec.decode(data, sourceName: "template.conversation")
             let state = try await ProfileRepository.shared.importConversationPackage(proposal.payload, in: scope)
             return try await saveMetadata(input, state: state, in: scope)
         }
@@ -339,7 +329,7 @@ enum DeviceTemplate {
         let value: JSONValue = .object([
             "status": .string(status), "error": error.map(JSONValue.string) ?? .null,
             "profiles": .object(profiles.mapValues { .string($0.id.uuidString) }),
-            "chats": .object(conversationIDs.mapValues { .object($0.mapValues { .string($0.uuidString) }) }),
+            "conversations": .object(conversationIDs.mapValues { .object($0.mapValues { .string($0.uuidString) }) }),
         ])
         do { try JSONEncoder().encode(value).write(to: directory.appendingPathComponent("result.json"), options: .atomic) }
         catch { Log.app.error("DeviceTemplate.result write failed") }

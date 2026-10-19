@@ -133,7 +133,7 @@ UserDefaults supports strings, booleans, numbers, arrays, `{ "dictionary": {...}
 clears keys. Typed settings and raw preferences cannot conflict. Profile files can
 populate nested skills as well as shared content; conversation files own attachment bytes.
 Messages support user text/attachments and assistant text/reasoning; `packageFrom`
-imports an existing `.chat` package instead of `messages` for richer historical tool
+imports an existing `.conversation` package instead of `messages` for richer historical tool
 results and presentation. Neither path runs historical tools or calls a model.
 
 Credentials use `secret: { "env": "NAME" }` or `secret: { "fromFile": "path" }`;

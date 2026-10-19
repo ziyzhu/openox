@@ -9,15 +9,15 @@ import { waitForHost } from "./host.ts";
 
 const qa = qaCommand({
   usage: "bun .agents/skills/test/apps/ios/profile-files.ts --device ox-N --conversation <seeded-saved-Mock-QA-conversation> --app /absolute/Ox.app [--bundle id] [--profile-folder name] [--output /tmp/directory]\nWrites run-owned files, creates/deletes a run-owned conversation, relaunches, and approves deletion of only its fixtures through ordinary conversation approval. Never changes policies or credentials.",
-  options: { chat: { type: "string" }, app: { type: "string" }, bundle: { type: "string" }, "profile-folder": { type: "string" }, output: { type: "string" } },
+  options: { conversation: { type: "string" }, app: { type: "string" }, bundle: { type: "string" }, "profile-folder": { type: "string" }, output: { type: "string" } },
 });
-if (!qa.values.chat || !qa.values.app) throw new Error("Pass an idle saved Mock QA conversation and the freshly built app");
+if (!qa.values.conversation || !qa.values.app) throw new Error("Pass an idle saved Mock QA conversation and the freshly built app");
 const localConfig = await readFile(join(ROOT, "apps/ios/Local.xcconfig"), "utf8").catch(() => "");
 const bundle = qa.values.bundle ?? Bun.env.OX_BUNDLE_ID
   ?? /^OX_BUNDLE_IDENTIFIER\s*=\s*([^\s/]+)/m.exec(localConfig)?.[1] ?? "ai.openox.local";
 const directory = resolve(qa.values.output ?? `/tmp/ox-profile-files-${Date.now()}`);
 assert(directory !== ROOT && !directory.startsWith(ROOT + "/"));
-const target = ["ox", "--host", qa.debugEndpoint, "--chat", qa.values.chat];
+const target = ["ox", "--host", qa.debugEndpoint, "--conversation", qa.values.conversation];
 const ios = iosTarget(qa.device);
 const prefix = `qa-files-${crypto.randomUUID().slice(0, 8)}`;
 const shared = `/${prefix}`;
@@ -179,8 +179,8 @@ try {
   await json([...host, "conversation", "new", "--provider", "mock", "--model", "mock", "--json"]);
   await json([...host, "conversation", "send", `QA filesystem ownership ${prefix}. Reply QA only.`, "--json"]);
   const child = await json([...host, "conversation", "inspect", "--json"]);
-  assert.notEqual(child.id, qa.values.chat);
-  const childFile = (await json([...host, "--chat", child.id, "vm", "call", "ox.fs.write", "--args",
+  assert.notEqual(child.id, qa.values.conversation);
+  const childFile = (await json([...host, "--conversation", child.id, "vm", "call", "ox.fs.write", "--args",
     JSON.stringify({ path: `${prefix}/owned.md`, content: "Conversation-owned content\n", purpose: "Verify conversation ownership" }), "--json"])).value;
   const childRoot = childFile.path.split("/").slice(0, 2).join("/");
   const ownedReference = await inspectFile(childFile.path);
@@ -189,7 +189,7 @@ try {
   await call("ox.fs.copy", { from: `${ownershipRoot}/shared.md`, to: `${ownershipRoot}/survivor.md` });
   await call("ox.fs.move", { from: `${ownershipRoot}/shared.md`, to: `/${childRoot}/returned.md` });
   await json([...target, "conversation", "open", "--json"]);
-  const deletionPurpose = `Delete ${prefix} chat`;
+  const deletionPurpose = `Delete ${prefix} conversation`;
   await approve(`return await ox.conversation.delete({id:${JSON.stringify(child.id)},purpose:${JSON.stringify(deletionPurpose)}})`, deletionPurpose);
   assert(!(await call("ox.fs.list", { path: "/conversations" })).items.some((item: { path: string }) => item.path === childRoot));
   await assert.rejects(() => inspectFile(ownedReference.filename));
@@ -199,7 +199,7 @@ try {
   console.log(`PASS Profile filesystem E2E (${checks.length} check groups)`);
 } finally {
   try {
-    await writeFile(join(directory, "report.json"), JSON.stringify({ device: qa.device, chat: qa.values.chat, prefix, checks,
+    await writeFile(join(directory, "report.json"), JSON.stringify({ device: qa.device, conversation: qa.values.conversation, prefix, checks,
       limitations: ["No physical-device power-loss test", "No predecessor fixture, provider submission, or package round-trip test", "Historical reference retirement is not checked through the removed presentation API"] }, null, 2) + "\n", { mode: 0o600 });
   } finally { release(); }
 }

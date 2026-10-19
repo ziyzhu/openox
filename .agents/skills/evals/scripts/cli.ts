@@ -1,11 +1,11 @@
 import { ROOT } from "../../../lib.ts";
 
-export type EvalHost = string | { recordedChoices?(id: string): import("./types").ConversationEvidence["choices"]; request<T>(args: string[], chatId?: string, timeoutMs?: number): Promise<T> };
+export type EvalHost = string | { recordedChoices?(id: string): import("./types").ConversationEvidence["choices"]; request<T>(args: string[], conversationId?: string, timeoutMs?: number): Promise<T> };
 
-export async function ox<T>(host: EvalHost, args: string[], chatId?: string, timeoutMs = 10_000, allowOutcome = false): Promise<T> {
-  if (typeof host !== "string") return host.request<T>(args, chatId, timeoutMs);
+export async function ox<T>(host: EvalHost, args: string[], conversationId?: string, timeoutMs = 10_000, allowOutcome = false): Promise<T> {
+  if (typeof host !== "string") return host.request<T>(args, conversationId, timeoutMs);
   const child = Bun.spawn([process.execPath, "--no-env-file", `${ROOT}/apps/cli/src/ox.ts`,
-    "--host", host, ...(chatId ? ["--conversation", chatId] : []), ...args, "--json", "--timeout", String(timeoutMs)], {
+    "--host", host, ...(conversationId ? ["--conversation", conversationId] : []), ...args, "--json", "--timeout", String(timeoutMs)], {
     cwd: ROOT, stdin: "ignore", stdout: "pipe", stderr: "pipe",
   });
   const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs + 2_000);
@@ -17,15 +17,15 @@ export async function ox<T>(host: EvalHost, args: string[], chatId?: string, tim
   } finally { clearTimeout(timer); }
 }
 
-export async function vmCall<T>(host: EvalHost, chatId: string, name: string, args: Record<string, unknown>, timeoutMs: number): Promise<T> {
-  const result = await ox<{ value: T }>(host, ["vm", "call", name, "--args", JSON.stringify({ purpose: "Observe eval state", ...args })], chatId, timeoutMs);
+export async function vmCall<T>(host: EvalHost, conversationId: string, name: string, args: Record<string, unknown>, timeoutMs: number): Promise<T> {
+  const result = await ox<{ value: T }>(host, ["vm", "call", name, "--args", JSON.stringify({ purpose: "Observe eval state", ...args })], conversationId, timeoutMs);
   if (result.value === undefined) throw new Error(`Missing observation from ${name}`);
   return result.value;
 }
 
 export async function newConversation(host: EvalHost, provider: string, model: string, temporary: boolean, timeoutMs: number): Promise<string> {
-  const result = await ox<{ chatId: string; temporary: boolean; model: string }>(host,
+  const result = await ox<{ conversationId: string; temporary: boolean; model: string }>(host,
     ["conversation", "new", ...(temporary ? ["--temporary"] : []), "--provider", provider, "--model", model], undefined, timeoutMs);
-  if (!result.chatId || result.temporary !== temporary || result.model !== `${provider}:${model}`) throw new Error("Unexpected new conversation identity, mode, or model");
-  return result.chatId;
+  if (!result.conversationId || result.temporary !== temporary || result.model !== `${provider}:${model}`) throw new Error("Unexpected new conversation identity, mode, or model");
+  return result.conversationId;
 }

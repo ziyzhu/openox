@@ -32,7 +32,7 @@ console.log(`Settings E2E ${config.device}; evidence: ${evidence}`);
 type Selection = { selection: string };
 type Repository = { id: string; enabled: boolean; state: string };
 type DefaultModel = { configured: boolean; provider: { id: string }; model: { id: string }; thinkingLevel: string | null; authentication: { status: string } };
-let chat: string | undefined;
+let conversation: string | undefined;
 let previousConversation: string | undefined;
 let baseline: { language: Selection; repository: Repository; defaultModel: DefaultModel } | undefined;
 const results: unknown[] = [];
@@ -43,14 +43,14 @@ async function ox(...args: string[]): Promise<any> {
 }
 
 async function call(name: string, args: Record<string, unknown> = {}): Promise<any> {
-  assert.ok(chat, "A temporary QA conversation is required");
-  const result = await ox("--chat", chat!, "vm", "call", name, "--args", JSON.stringify({ ...args, purpose: "Verify settings controls" }));
+  assert.ok(conversation, "A temporary QA conversation is required");
+  const result = await ox("--conversation", conversation!, "vm", "call", name, "--args", JSON.stringify({ ...args, purpose: "Verify settings controls" }));
   results.push({ name, args, value: result.value });
   return result.value;
 }
 
 async function rejected(name: string, args: Record<string, unknown>, message: string): Promise<void> {
-  const result = await run(["bun", "apps/cli/src/ox.ts", "--host", endpoint.href, "--chat", chat!, "vm", "call", name,
+  const result = await run(["bun", "apps/cli/src/ox.ts", "--host", endpoint.href, "--conversation", conversation!, "vm", "call", name,
     "--args", JSON.stringify({ ...args, purpose: "Verify invalid settings" }), "--json"], { capture: true, allowFailure: true });
   assert.notEqual(result.code, 0, `${name} accepted invalid arguments`);
   assert.ok((result.stderr + result.stdout).includes(message), `${name} did not report the expected validation error`);
@@ -74,8 +74,8 @@ async function waitForSavedDefaultModel(): Promise<void> {
 
 async function newConversation(): Promise<void> {
   const created = await ox("conversation", "new", "--temporary", "--provider", "mock", "--model", "mock");
-  assert.equal(typeof created.chatId, "string");
-  chat = created.chatId;
+  assert.equal(typeof created.conversationId, "string");
+  conversation = created.conversationId;
 }
 
 const release = claimSimulator(config.device);
@@ -85,9 +85,9 @@ try {
   const active = await ox("conversation", "list", "--active");
   previousConversation = active[0]?.id;
   if (previousConversation) {
-    const snapshot = await ox("--chat", previousConversation, "conversation", "inspect");
+    const snapshot = await ox("--conversation", previousConversation, "conversation", "inspect");
     assert.equal(snapshot.isBusy, false, "Do not interrupt a running conversation");
-    const inspected = await ox("--chat", previousConversation, "vm", "inspect");
+    const inspected = await ox("--conversation", previousConversation, "vm", "inspect");
     assert.equal(inspected.value.session.temporary, false, "Preserve or close the temporary conversation before testing");
   }
   for (const name of ["ox.app.setLanguage", "ox.repository.enable", "ox.app.setDefaultModel", "ox.conversation.setModel", "ox.conversation.model", "ox.conversation.rename", "ox.repository.list"]) {
@@ -96,7 +96,7 @@ try {
   }
   await newConversation();
   const language = await call("ox.app.language");
-  const aliases = await ox("--chat", chat!, "vm", "eval", "--script", `return [
+  const aliases = await ox("--conversation", conversation!, "vm", "eval", "--script", `return [
     [ox.app.model, ox.conversation.model],
     [ox.app.setModel, ox.conversation.setModel],
     [ox.app.renameConversation, ox.conversation.rename],
@@ -171,9 +171,9 @@ try {
   }
   await ios.screenshot(join(evidence, "before-relaunch.png"));
   await waitForSavedDefaultModel();
-  chat = undefined;
+  conversation = undefined;
   await ios.launch(bundle, app, { OX_DEBUG_ENDPOINT: config.debugEndpoint, OX_HOST_LOOPBACK: endpoint.hostname === "127.0.0.1" ? "1" : "0" });
-  await ios.wait({ id: "chat.temporaryToggle" }, { timeout: 30_000, stable: 1000 });
+  await ios.wait({ id: "conversation.temporaryToggle" }, { timeout: 30_000, stable: 1000 });
   await waitForHost(endpoint.href, () => ox("host", "describe", "--timeout", "1000"));
   await newConversation();
   assert.equal((await call("ox.app.defaultModel")).model.id, "mock-text-only");
@@ -185,7 +185,7 @@ try {
   process.exitCode = 1;
 } finally {
   if (baseline) {
-    if (!chat) await newConversation().catch(error => { console.error(`Cleanup chat unavailable: ${error}`); process.exitCode = 1; });
+    if (!conversation) await newConversation().catch(error => { console.error(`Cleanup conversation unavailable: ${error}`); process.exitCode = 1; });
     for (const [name, args, reader, expected] of [
       ["ox.app.setLanguage", { selection: baseline.language.selection }, "ox.app.language", baseline.language.selection],
       ["ox.app.setDefaultModel", { selection: baseline.defaultModel.configured ? { provider: baseline.defaultModel.provider.id, model: baseline.defaultModel.model.id, thinkingLevel: baseline.defaultModel.thinkingLevel } : null }, "ox.app.defaultModel", baseline.defaultModel.configured],
@@ -203,8 +203,8 @@ try {
       } catch (error) { console.error(`Settings restoration failed: ${error}`); process.exitCode = 1; }
     }
   }
-  if (chat) {
-    const restore = previousConversation ? ["--chat", previousConversation, "conversation", "open"] : ["conversation", "new", "--temporary"];
+  if (conversation) {
+    const restore = previousConversation ? ["--conversation", previousConversation, "conversation", "open"] : ["conversation", "new", "--temporary"];
     await ox(...restore).catch(error => { console.error(`Conversation restoration failed: ${error}`); process.exitCode = 1; });
   }
   try { await writeFile(join(evidence, "results.json"), JSON.stringify(results, null, 2), { mode: 0o600 }); }

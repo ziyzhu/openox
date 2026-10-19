@@ -54,7 +54,7 @@ targets:
         OXKeychainService: ai.openox.host.local.llm
         OXWebsiteDataNamespace: ai.openox.host.local.web-profile
         OXAgentSkillTypeIdentifier: ai.openox.agent-skill
-        OXChatTypeIdentifier: ai.openox.chat
+        OXConversationTypeIdentifier: ai.openox.conversation
         OXServiceTypeIdentifier: ai.openox.service
     dependencies:
       - package: SwiftGitX

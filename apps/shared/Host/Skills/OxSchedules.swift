@@ -107,7 +107,7 @@ nonisolated enum OxSchedules {
         "recurrence": text,
         "nextFireAt": text,
         "lastRunAt": text,
-        "lastChatId": id,
+        "lastConversationId": id,
         "lastOutcome": enumeration(["succeeded", "cancelled", "failed"]),
         "lastError": text,
     ], required: ["id", "skill", "argument", "enabled", "recurrence"])

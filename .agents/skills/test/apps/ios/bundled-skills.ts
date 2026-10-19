@@ -9,9 +9,9 @@ import { bundledSkills } from "../../../../../packages/agent/src/core/bundled-sk
 
 const qa = qaCommand({
   usage: "bun .agents/skills/test/apps/ios/bundled-skills.ts --device ox-N --host ws://<assigned-host> --conversation <seeded-saved-QA-conversation> --temporary-conversation <empty-temporary-QA-conversation> [--ui-cleanup] [--output /tmp/directory]\nFor --ui-cleanup, leave the app on this Profile's Skills screen. Otherwise deletion policy must allow cleanup. Seed the saved Mock conversation with `QA bundled skill verification seed. Reply QA only.` before creating the temporary conversation. Copies/removes one run-owned Profile skill. Provider probes never save configuration.",
-  options: { host: { type: "string" }, chat: { type: "string" }, "temporary-chat": { type: "string" }, "ui-cleanup": { type: "boolean" }, output: { type: "string" } },
+  options: { host: { type: "string" }, conversation: { type: "string" }, "temporary-conversation": { type: "string" }, "ui-cleanup": { type: "boolean" }, output: { type: "string" } },
 });
-if (!qa.values.host || !qa.values.chat || !qa.values["temporary-chat"]) throw new Error("Pass explicit saved and temporary QA conversations");
+if (!qa.values.host || !qa.values.conversation || !qa.values["temporary-conversation"]) throw new Error("Pass explicit saved and temporary QA conversations");
 assert.equal(Number(new URL(qa.values.host).port), qa.debugPort);
 const directory = resolve(qa.values.output ?? `/tmp/ox-bundled-skills-${Date.now()}`);
 assert(!directory.startsWith(ROOT + "/") && directory !== ROOT);
@@ -19,19 +19,19 @@ const ios = iosTarget(qa.device);
 const checks: string[] = [];
 const copied = `qa-skill-${crypto.randomUUID().slice(0, 8)}`;
 let created = false;
-async function call(name: string, args: Record<string, unknown>, chat = qa.values.chat!) {
-  const { stdout } = await run(["ox", "--host", qa.values.host!, "--chat", chat, "vm", "call", name,
+async function call(name: string, args: Record<string, unknown>, conversation = qa.values.conversation!) {
+  const { stdout } = await run(["ox", "--host", qa.values.host!, "--conversation", conversation, "vm", "call", name,
     "--args", JSON.stringify({ ...args, purpose: "Verify bundled System skills" }), "--json"], { capture: true });
   return JSON.parse(stdout).value;
 }
-async function rejected(name: string, args: Record<string, unknown>, message: RegExp, chat = qa.values.chat!) {
+async function rejected(name: string, args: Record<string, unknown>, message: RegExp, conversation = qa.values.conversation!) {
   let failure: unknown;
-  try { await call(name, args, chat); } catch (error) { failure = error; }
+  try { await call(name, args, conversation); } catch (error) { failure = error; }
   assert(failure instanceof Error && message.test(failure.message), `${name}: expected ${message}, received ${failure}`);
   checks.push(`${name}: rejected ${message}`);
 }
 async function providerProbe(expected: string) {
-  const { stdout } = await run(["ox", "--host", qa.values.host!, "--chat", qa.values["temporary-chat"]!, "vm", "eval", "--script", `
+  const { stdout } = await run(["ox", "--host", qa.values.host!, "--conversation", qa.values["temporary-conversation"]!, "vm", "eval", "--script", `
     const provider = (await ox.provider.default({ purpose: "Inspect the bundled provider schema" }))[0];
     try { await ox.provider.save({ provider, purpose: "Verify the temporary-conversation boundary" }); throw Error("Unexpected save"); }
     catch (error) { if (!String(error).includes(${JSON.stringify(expected)})) throw error; console.log("Expected refusal"); }
@@ -43,13 +43,13 @@ await requireSimulator(qa.device);
 const release = claimSimulator(qa.device);
 try {
   await mkdir(directory, { recursive: true });
-  for (const [chat, temporary] of [[qa.values.chat, false], [qa.values["temporary-chat"], true]] as const) {
-    const { stdout } = await run(["ox", "--host", qa.values.host, "--chat", chat, "conversation", "inspect", "--json"], { capture: true });
+  for (const [conversation, temporary] of [[qa.values.conversation, false], [qa.values["temporary-conversation"], true]] as const) {
+    const { stdout } = await run(["ox", "--host", qa.values.host, "--conversation", conversation, "conversation", "inspect", "--json"], { capture: true });
     const state = JSON.parse(stdout);
     assert(state && state.isBusy === false, "Use idle QA conversations");
     const users = state.messages.filter((message: { type: string }) => message.type === "user");
     assert(temporary ? users.length === 0 : users.length === 1 && JSON.stringify(users[0]).includes("QA bundled skill verification seed."), "Use the seeded saved QA conversation and an empty temporary conversation");
-    const inspected = await run(["ox", "--host", qa.values.host, "--chat", chat, "vm", "inspect", "--json"], { capture: true });
+    const inspected = await run(["ox", "--host", qa.values.host, "--conversation", conversation, "vm", "inspect", "--json"], { capture: true });
     assert.equal(JSON.parse(inspected.stdout).value.session.temporary, temporary);
   }
   const expected = await run(["bun", "-e", "import {filesystemInputs} from './packages/agent/src/core/filesystem-contract.ts'; console.log(JSON.stringify(filesystemInputs));"], { capture: true });
@@ -59,7 +59,7 @@ try {
   for (const [name, schema] of Object.entries(schemas) as [string, { inputSchema: { required: string[] } }][]) {
     assert.equal(schema.inputSchema.required[0], "purpose", `${name} requires purpose first`);
   }
-  const rejectedPurposes = await run(["ox", "--host", qa.values.host, "--chat", qa.values.chat, "vm", "eval", "--script", `
+  const rejectedPurposes = await run(["ox", "--host", qa.values.host, "--conversation", qa.values.conversation, "vm", "eval", "--script", `
     for (const name of Object.keys(ox.fs)) {
       for (const args of [{}, { purpose: "" }, { purpose: "x".repeat(81) }]) {
         try { await ox.fs[name](args); throw Error(name + " accepted invalid purpose"); }
@@ -151,7 +151,7 @@ try {
   await rejected("ox.fs.edit", { path: editPath, edits: [{ oldText: "", newText: "append" }] }, /non-empty/);
   await rejected("ox.fs.edit", { path: editPath, edits: [{ oldText: "ALPHA", newText: "a" }, { oldText: "LPH", newText: "b" }] }, /overlap/);
   await rejected("ox.fs.edit", { path: editPath, edits: [{ oldText: "ALPHA ", newText: "unsafe fuzzy match" }] }, /exactly once/);
-  const { stdout: parallel } = await run(["ox", "--host", qa.values.host, "--chat", qa.values.chat, "vm", "eval", "--script", `
+  const { stdout: parallel } = await run(["ox", "--host", qa.values.host, "--conversation", qa.values.conversation, "vm", "eval", "--script", `
     await Promise.all([
       ox.fs.edit({ purpose: "Verify parallel edits", path: ${JSON.stringify(editPath)}, edits: [{ oldText: "ALPHA", newText: "first" }] }),
       ox.fs.edit({ purpose: "Verify parallel edits", path: ${JSON.stringify(editPath)}, edits: [{ oldText: "GAMMA", newText: "second" }] })
@@ -164,15 +164,15 @@ try {
   await rejected("ox.fs.grep", { path: pagePath, pattern: "(line)\\1" }, /invalid|escape|backreference/i);
   await call("ox.fs.grep", { path: pagePath, pattern: "(a+)+$" });
   checks.push("shared traversal/search uses bounded linear-time matching");
-  await rejected("ox.fs.write", { path: `conversations/${qa.values.chat}/conversation.json`, content: "changed" }, /isn't supported|read-only/);
+  await rejected("ox.fs.write", { path: `conversations/${qa.values.conversation}/conversation.json`, content: "changed" }, /isn't supported|read-only/);
   await rejected("ox.fs.read", { path: "state.sqlite" }, /Invalid Profile file path/);
-  await rejected("ox.fs.read", { path: `conversations/${qa.values.chat}/context.json` }, /Invalid Profile file path/);
-  await call("ox.fs.grep", { path: "skills/manage-providers", pattern: "Manage" }, qa.values["temporary-chat"]);
+  await rejected("ox.fs.read", { path: `conversations/${qa.values.conversation}/context.json` }, /Invalid Profile file path/);
+  await call("ox.fs.grep", { path: "skills/manage-providers", pattern: "Manage" }, qa.values["temporary-conversation"]);
   await providerProbe("Temporary conversations can't save changes");
-  await call("ox.fs.read", { path: copyPath }, qa.values["temporary-chat"]);
-  await rejected("ox.fs.write", { path: pagePath, content: "Temporary mutation must fail" }, /Temporary chats can't save changes/, qa.values["temporary-chat"]);
+  await call("ox.fs.read", { path: copyPath }, qa.values["temporary-conversation"]);
+  await rejected("ox.fs.write", { path: pagePath, content: "Temporary mutation must fail" }, /Temporary conversations can't save changes/, qa.values["temporary-conversation"]);
   await providerProbe("Temporary conversations can't save changes");
-  await call("ox.fs.read", { path: "skills/manage-providers/SKILL.md" }, qa.values["temporary-chat"]);
+  await call("ox.fs.read", { path: "skills/manage-providers/SKILL.md" }, qa.values["temporary-conversation"]);
   await providerProbe("Temporary conversations can't save changes");
 } finally {
   try {
@@ -183,7 +183,7 @@ try {
         await ios.wait({ label: `Delete /${copied}?` }, { timeout: 3000 });
         await ios.tap({ label: "Delete" }, { timeout: 5000, stable: 200 });
       } else await call("ox.skill.delete", { name: copied });
-      await run(["ox", "--host", qa.values.host, "--chat", qa.values.chat, "conversation", "open", "--json"], { capture: true });
+      await run(["ox", "--host", qa.values.host, "--conversation", qa.values.conversation, "conversation", "open", "--json"], { capture: true });
       await run(["ox", "--host", qa.values.host, "conversation", "new", "--temporary", "--provider", "mock", "--model", "mock", "--json"], { capture: true });
       const fresh = await run(["ox", "--host", qa.values.host, "conversation", "inspect", "--json"], { capture: true });
       const freshID = JSON.parse(fresh.stdout).id as string;

@@ -364,7 +364,7 @@ final class ConversationManager {
         if !title.isEmpty { conversation.rename(to: title) }
         register(conversation, as: ConversationID(conversation.id))
         conversation.enqueue(prompt)
-        Log.session.info("bridge.chat.start caller=\(caller.id) target=\(conversation.id)")
+        Log.session.info("bridge.conversation.start caller=\(caller.id) target=\(conversation.id)")
         return conversation.id
     }
 

@@ -83,7 +83,7 @@ struct StoppedTurnDivider: View {
         TranscriptStatusDivider(
             label: Text("Stopped"),
             systemImage: "stop.circle.fill",
-            accessibilityIdentifier: "chat.stopped"
+            accessibilityIdentifier: "conversation.stopped"
         )
     }
 }
@@ -494,7 +494,7 @@ private struct ThinkingSheet: View {
                             .font(Theme.Fonts.captionMd)
                             .foregroundStyle(.secondary)
                             .padding(.vertical, Theme.Spacing.md)
-                            .accessibilityIdentifier("chat.trace.omitted")
+                            .accessibilityIdentifier("conversation.trace.omitted")
                     }
                     ForEach(Array(displayedEntries.enumerated()), id: \.element.id) { idx, entry in
                         TraceRow(entry: entry, isLast: idx == displayedEntries.count - 1)
@@ -770,7 +770,7 @@ private struct InvocationDetailView: View {
                         .font(Theme.Fonts.captionMd)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
-                        .accessibilityIdentifier("chat.invocation.function")
+                        .accessibilityIdentifier("conversation.invocation.function")
                     if invocation.preview?.argumentsTruncated == true { previewNotice }
                     inputValue
                 }
@@ -843,7 +843,7 @@ private struct InvocationDetailView: View {
         Text("This value was shortened or omitted. Its complete contents were not saved.")
             .font(Theme.Fonts.captionMd)
             .foregroundStyle(.secondary)
-            .accessibilityIdentifier("chat.invocation.previewNotice")
+            .accessibilityIdentifier("conversation.invocation.previewNotice")
     }
 
     private var emptyValue: some View {

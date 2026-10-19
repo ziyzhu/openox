@@ -42,8 +42,8 @@
 	<string>$(OX_BUNDLE_IDENTIFIER).web-profile</string>
 	<key>OXAgentSkillTypeIdentifier</key>
 	<string>ai.openox.agent-skill</string>
-	<key>OXChatTypeIdentifier</key>
-	<string>ai.openox.chat</string>
+	<key>OXConversationTypeIdentifier</key>
+	<string>ai.openox.conversation</string>
 	<key>OXServiceTypeIdentifier</key>
 	<string>ai.openox.service</string>
 	<key>NSHumanReadableCopyright</key>
@@ -90,9 +90,9 @@
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Ox adds reminders to your Reminders list when you ask it to. It never reads your reminders.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Ox uses the camera to capture photos to attach to your chat.</string>
+	<string>Ox uses the camera to capture photos to attach to your conversation.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Ox transcribes your speech on this device. Hold the input area to talk and release to send the text to your chat.</string>
+	<string>Ox transcribes your speech on this device. Hold the input area to talk and release to send the text to your conversation.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Ox uses your approximate location to help with nearby search, local prices, and weather.</string>
 	<key>NSLocationDefaultAccuracyReduced</key>
@@ -128,9 +128,9 @@
 				<string>public.zip-archive</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Ox Chat</string>
+			<string>Ox Conversation</string>
 			<key>UTTypeIdentifier</key>
-			<string>ai.openox.chat</string>
+			<string>ai.openox.conversation</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
@@ -139,7 +139,7 @@
 					<string>chat</string>
 				</array>
 				<key>public.mime-type</key>
-				<string>application/vnd.ox.chat+zip</string>
+				<string>application/vnd.ox.conversation+zip</string>
 			</dict>
 		</dict>
 		<dict>
@@ -189,9 +189,9 @@
 				<string>public.zip-archive</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Ox Chat</string>
+			<string>Ox Conversation</string>
 			<key>UTTypeIdentifier</key>
-			<string>$(OX_BUNDLE_IDENTIFIER).chat</string>
+			<string>$(OX_BUNDLE_IDENTIFIER).conversation</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
@@ -200,7 +200,7 @@
 					<string>chat</string>
 				</array>
 				<key>public.mime-type</key>
-				<string>application/vnd.ox.chat+zip</string>
+				<string>application/vnd.ox.conversation+zip</string>
 			</dict>
 		</dict>
 	</array>
@@ -221,15 +221,15 @@
 		</dict>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>Ox Chat</string>
+			<string>Ox Conversation</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
 			<string>Owner</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>ai.openox.chat</string>
-				<string>$(OX_BUNDLE_IDENTIFIER).chat</string>
+				<string>ai.openox.conversation</string>
+				<string>$(OX_BUNDLE_IDENTIFIER).conversation</string>
 			</array>
 		</dict>
 		<dict>

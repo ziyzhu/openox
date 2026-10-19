@@ -53,12 +53,12 @@ async function listConversations(args: string[], context: CliContext): Promise<v
   printConversations(rows);
 }
 
-type SendResult = { chatId: string; outcome: string; text?: string; error?: string };
+type SendResult = { conversationId: string; outcome: string; text?: string; error?: string };
 
 async function openConversation(args: string[], context: CliContext): Promise<void> {
   const options = parseListOptions(args, "open");
   if (!context.conversation) fail("conversation open requires --conversation <full-conversation-uuid>");
-  const result = await requireHost("chats.open", context, options.timeoutMs);
+  const result = await requireHost("conversations.open", context, options.timeoutMs);
   const snapshot = (result.data as ConversationSnapshot | undefined) ?? fail("Host did not return the opened conversation");
   if (options.json) console.log(JSON.stringify(snapshot, null, 2));
   else console.log(`opened ${snapshot.id}`);
@@ -85,44 +85,44 @@ async function respondConversation(args: string[], context: CliContext): Promise
   }
   const answer = words.join(" ") === "-" ? (await Bun.stdin.text()).trim() : words.join(" ");
   if (!promptId || !answer.trim()) fail("conversation respond requires an answer and --prompt <prompt-id>");
-  const result = await requireHost("chats.respond", context, timeoutMs, { promptId, answer });
+  const result = await requireHost("conversations.respond", context, timeoutMs, { promptId, answer });
   if (json) console.log(JSON.stringify(result, null, 2));
-  else console.log(`responded ${result.promptId} (conversation ${result.chatId}); use conversation watch to follow the run`);
+  else console.log(`responded ${result.promptId} (conversation ${result.conversationId}); use conversation watch to follow the run`);
 }
 
 async function newConversation(args: string[], context: CliContext): Promise<void> {
   const options = parseNewOptions(args);
   if (Boolean(options.provider) !== Boolean(options.model)) fail("conversation new requires --provider and --model together");
-  const result = await requireHost("chats.new", context, options.timeoutMs, {
+  const result = await requireHost("conversations.new", context, options.timeoutMs, {
     ...(options.temporary ? { temporary: true } : {}),
     ...(options.provider ? { providerId: options.provider, modelId: options.model } : {}),
   });
-  if (options.attach.length) await requireHost("debug.chats.attachServices", context, options.timeoutMs, { domains: options.attach });
+  if (options.attach.length) await requireHost("debug.conversations.attachServices", context, options.timeoutMs, { domains: options.attach });
   if (options.json) console.log(JSON.stringify({ ...result, attached: options.attach }, null, 2));
-  else console.log(result.chatId);
+  else console.log(result.conversationId);
 }
 
 async function sendConversation(args: string[], context: CliContext): Promise<void> {
   const options = parseSendOptions(args);
   const text = options.text === "-" ? (await Bun.stdin.text()).trim() : options.text;
   if (!text) fail("conversation send requires message text");
-  const result = await requireHost("chats.send", context, options.timeoutMs, { text, wait: options.wait }) as SendResult;
+  const result = await requireHost("conversations.send", context, options.timeoutMs, { text, wait: options.wait }) as SendResult;
   if (options.json) console.log(JSON.stringify(result, null, 2));
   else if (result.outcome === "completed") console.log(result.text ?? "");
-  else if (result.outcome === "queued") console.log(result.chatId);
+  else if (result.outcome === "queued") console.log(result.conversationId);
   if (result.outcome === "completed" || result.outcome === "queued") return;
   const detail = result.outcome === "needsAttention"
     ? "conversation needs attention; inspect with ox conversation inspect --pending, then use ox conversation respond (or answer in Ox)"
     : result.error ?? result.outcome;
-  process.stderr.write(`conversation send ${result.outcome}: ${detail} (conversation ${result.chatId})\n`);
+  process.stderr.write(`conversation send ${result.outcome}: ${detail} (conversation ${result.conversationId})\n`);
   process.exitCode = 1;
 }
 
 async function stopConversation(args: string[], context: CliContext): Promise<void> {
   const options = parseListOptions(args, "stop");
-  const result = await requireHost("chats.stop", context, options.timeoutMs);
+  const result = await requireHost("conversations.stop", context, options.timeoutMs);
   if (options.json) console.log(JSON.stringify(result, null, 2));
-  else console.log(result.wasRunning ? `stop requested ${result.chatId}` : `idle ${result.chatId}`);
+  else console.log(result.wasRunning ? `stop requested ${result.conversationId}` : `idle ${result.conversationId}`);
 }
 
 async function conversationLogs(args: string[], context: CliContext): Promise<void> {
@@ -150,7 +150,7 @@ async function watchConversation(args: string[], context: CliContext): Promise<v
   try {
     while (!stopping) {
       try {
-        const result = await host.request("chats.get", options.timeoutMs);
+        const result = await host.request("conversations.get", options.timeoutMs);
         if (stopping) break;
         const snapshot = (result.data ?? null) as ConversationSnapshot | null;
         const projected = projectSnapshot(snapshot, options.sections);
@@ -173,7 +173,7 @@ async function watchConversation(args: string[], context: CliContext): Promise<v
 }
 
 async function fetchSnapshot(context: CliContext, timeoutMs: number): Promise<ConversationSnapshot | null> {
-  const result = await requireHost("chats.get", context, timeoutMs);
+  const result = await requireHost("conversations.get", context, timeoutMs);
   return (result.data ?? null) as ConversationSnapshot | null;
 }
 

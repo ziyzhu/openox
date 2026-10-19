@@ -42,7 +42,7 @@ if (import.meta.main) {
       'await import("@openox/protocol/catalog");',
       'await import("@openox/protocol/model-actions");',
       'await import("@openox/protocol/skills");',
-      'if (RPC_VERSION !== 1 || !validateParams("host.describe", {})) throw new Error("RPC API failed");',
+      'if (RPC_VERSION !== 2 || !validateParams("host.describe", {})) throw new Error("RPC API failed");',
       'const repository = validateRepositoryPackage({version:3,name:"Example",services:["web:example.com"],skills:[]});',
       'if ("error" in repository) throw new Error(repository.error);',
       'if (!matchesServiceDomain("mail.example.com", "example.com")) throw new Error("manifest API failed");',

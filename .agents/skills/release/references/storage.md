@@ -22,7 +22,8 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── conversation.importMemoryIntentDisplays   app-wide count of starter intent displays, capped at three
 │   │   ├── speech.voice.identifier          legacy read-aloud voice preference, ignored and retained
 │   │   ├── storage.activeProfile            active profile UUID
-│   │   └── chatgpt.installationId           per-install Codex client ID
+│   │   ├── chatgpt.installationId           retained predecessor Codex installation ID, ignored
+│   │   └── chatgpt.agentHostID              stable opaque ChatGPT plan agent Host ID
 │   ├── Application Support/
 │   │   ├── service-repositories.json        built-in, Local, Development, and installed repository enablement; conflict resolutions
 │   │   ├── mounted-repositories.json       version 1 repository bindings to Files grant IDs and relative folders
@@ -404,12 +405,13 @@ The Browser-to-built-in-function migration removes the retired `ios:browser`
 domain from persisted conversation attachments. Existing Browser inspector transcript
 rows remain readable and resolve to the intrinsic Browser runtime.
 
-Conversation sharing creates a transient `.chat` ZIP package whose `chat.json` stores
+Conversation sharing creates a transient `.conversation` ZIP package whose `conversation.json` stores
 the package and transcript schema versions, source metadata, content counts,
 service-domain disclosure, and SHA-256 inventory. `turns.jsonl` retains the
 semantic transcript; `context.json` is included only for compacted conversations so
 continuation state is not lost. Legacy packages with redundant uncompacted
-context remain readable and normalize to transcript-only storage on import. The
+context remain readable and normalize to transcript-only storage on import, as do
+older `.chat` packages with a `chat.json` header. The
 package also contains transcript- or
 checkpoint-referenced artifacts and supported sibling media dependencies.
 Import validates ZIP paths, compression, CRCs, declared hashes, transcript
@@ -806,6 +808,8 @@ the compatibility gate removes each old account only when its value exactly
 matches a bound Secret entry, retaining any unmatched account for recovery.
 Provider deauthentication removes its binding and deletes an unshared entry
 generated for that provider. Named entries remain until removed in Secrets.
+
+ChatGPT plan sign-in owns the additive `oauth:model-provider:chatgpt:siwc` Keychain record: issued OpenOx client ID, verified subject/email, tokens, scopes, and expiry. Sign-out clears tokens but retains the registration mapping and stable `chatgpt.agentHostID`. The predecessor `oauth:model-provider:chatgpt` Codex bundle remains untouched and is never sent to the new API; an upgrade requires fresh consent. Old builds ignore the new record and retain their original credentials. `ApplicationStorageMigrator` updates saved ChatGPT provider overrides from the Codex URL to the public API before registry validation; this endpoint change is not downgrade-compatible for an older build with an override, so predecessor/changed-build evidence and approval remain release gates.
 
 Flow-managed OAuth bundles remain separate Keychain items with After First Unlock
 accessibility. Their account families are `oauth:model-provider:<credential ID>`,

@@ -33,8 +33,8 @@ const rejections: Record<string, RegExp> = {
 const release = claimSimulator(qa.device);
 try {
   assert.ok(await requireSimulator(qa.device), "Boot the reserved QA simulator first");
-  const chat = (await json(["conversation", "new", "--temporary", "--provider", "mock", "--model", "mock"])).chatId;
-  const target = ["--conversation", chat];
+  const conversation = (await json(["conversation", "new", "--temporary", "--provider", "mock", "--model", "mock"])).conversationId;
+  const target = ["--conversation", conversation];
   const evaluated = await json([...target, "vm", "eval", "--script", `
     const attempt = async call => { try { return { ok: true, value: await call() }; } catch (error) { return { ok: false, error: String(error.message) }; } };
     const blocked = [];

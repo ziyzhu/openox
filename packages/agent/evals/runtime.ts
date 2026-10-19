@@ -29,7 +29,7 @@ export class EvalRuntime {
   private busy = new Set<string>();
   private temporary = new Set<string>();
   private choices = new Map<string, Array<{prompt: {id:string;prompt:string;options:string[];allowsCustomAnswer:boolean;requiresApp:boolean};answer:string}>>();
-  private hostContext: HostContext = { active: { hostID: "eval", profileID: "eval" }, hosts: [{ hostID: "eval", profileID: "eval", functions: Object.keys(catalog), serviceKinds: ["web", "api", "ios", "mcp"], presentation: "chat-bubbles", externalFiles: true }] };
+  private hostContext: HostContext = { active: { hostID: "eval", profileID: "eval" }, hosts: [{ hostID: "eval", profileID: "eval", functions: Object.keys(catalog), serviceKinds: ["web", "api", "ios", "mcp"], presentation: "conversation-bubbles", externalFiles: true }] };
   private prompts = new Map<string, {rendered:string;soul:string;memory:string}>();
   private readonly tools: Array<{ name: string; description: string; parameters: unknown }> = [];
   readonly provider: string;
@@ -95,19 +95,19 @@ export class EvalRuntime {
     if (!this.messages.has(id)) return null;
     return { id, isBusy: this.busy.has(id), messages: structuredClone(this.messages.get(id)!), blocks: [{ kind: { type: "thinking", trace: { entries: this.receipts.get(id)!.map(invocation => ({ invocation: structuredClone(invocation) })) } } }], systemPrompt: this.prompts.get(id)!.rendered, renderedSystemPrompt: this.prompts.get(id)!.rendered, soul: this.prompts.get(id)!.soul, memory: this.prompts.get(id)!.memory, tools: this.tools, model: { id: this.model } } as EvalSnapshot;
   }
-  readonly request = async <T>(args: string[], chatId?: string, timeoutMs = 30000): Promise<T> => {
-    const id = chatId ?? this.active;
+  readonly request = async <T>(args: string[], conversationId?: string, timeoutMs = 30000): Promise<T> => {
+    const id = conversationId ?? this.active;
     const flag = (name: string) => args[args.indexOf(name) + 1];
     let result: unknown;
     if (args[0] === "vm" && args[1] === "call") result = { value: await this.call(id, args[2]!, JSON.parse(flag("--args")!), false) };
     else if (args[0] === "host") result = args[1] === "logs" ? [] : this.stubs.state.providers;
     else if (args[1] === "new") {
-      const chat = await this.session.harness.createConversation({ ownership: { kind: "ownerless" }, agent: { model: { provider: this.provider, modelId: this.model }, extensions: [this.extension] } }, BACKGROUND_CONTEXT);
-      this.active = String(chat.id); this.messages.set(this.active, []); this.receipts.set(this.active, []); this.choices.set(this.active, []); if (args.includes("--temporary")) this.temporary.add(this.active);
+      const conversation = await this.session.harness.createConversation({ ownership: { kind: "ownerless" }, agent: { model: { provider: this.provider, modelId: this.model }, extensions: [this.extension] } }, BACKGROUND_CONTEXT);
+      this.active = String(conversation.id); this.messages.set(this.active, []); this.receipts.set(this.active, []); this.choices.set(this.active, []); if (args.includes("--temporary")) this.temporary.add(this.active);
       const soul = String(await this.session.files.read("SOUL.md"));
       const memory = String(await this.session.files.read("MEMORY.md"));
       this.prompts.set(this.active, {soul,memory,rendered:composeOxPrompt({hostContext:this.hostContext,soul,memory},false,oxScaffold).rendered});
-      result = { chatId: this.active, temporary: args.includes("--temporary"), model: `${this.provider}:${this.model}` };
+      result = { conversationId: this.active, temporary: args.includes("--temporary"), model: `${this.provider}:${this.model}` };
     } else if (args[1] === "inspect" || args[1] === "open") result = this.snapshot(id);
     else if (args[1] === "list") result = [...this.messages.keys()].map(id => ({ id }));
     else if (args[1] === "stop") { await this.session.abort({ profileID: "eval", conversationID: Number(id) as ConversationId }); result = {}; }
@@ -122,7 +122,7 @@ export class EvalRuntime {
           return { type: message.role };
         }) as EvalMessage[]);
         const last = turn.messages.at(-1);
-        result = { chatId: id, outcome: turn.receipt.status === "done" && last?.role === "assistant" && last.stopReason !== "error" && last.stopReason !== "aborted" ? "completed" : "failed", ...(last?.role === "assistant" && last.errorMessage ? { error: last.errorMessage } : {}) };
+        result = { conversationId: id, outcome: turn.receipt.status === "done" && last?.role === "assistant" && last.stopReason !== "error" && last.stopReason !== "aborted" ? "completed" : "failed", ...(last?.role === "assistant" && last.errorMessage ? { error: last.errorMessage } : {}) };
       } finally { clearTimeout(timer); this.busy.delete(id); }
     } else throw new Error(`Unsupported eval transport command: ${args.slice(0, 2).join(" ")}`);
     return structuredClone(result) as T;

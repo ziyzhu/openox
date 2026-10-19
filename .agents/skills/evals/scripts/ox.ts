@@ -6,35 +6,35 @@ import { receiptPrompt } from "./references.ts";
 import type { CaseBinding, Choice, ConversationEvidence, EvalCase, EvalResponse, EvalSnapshot, LogRow, TurnOutcome } from "./types.ts";
 
 export type RunOptions = { qaProfile: string; choices: boolean; humanWaitMs: number };
-const evidence = (chatId = ""): ConversationEvidence => ({ chatId, outcomes: [], choices: [] });
+const evidence = (conversationId = ""): ConversationEvidence => ({ conversationId, outcomes: [], choices: [] });
 
-async function readSystemSkill(host: EvalHost, chatId: string, path: string, remaining: () => number): Promise<string> {
-  const file = await vmCall<{ path: string; text: string; truncated: boolean; unsupported: string | null }>(host, chatId, "ox.fs.read", { path }, remaining());
+async function readSystemSkill(host: EvalHost, conversationId: string, path: string, remaining: () => number): Promise<string> {
+  const file = await vmCall<{ path: string; text: string; truncated: boolean; unsupported: string | null }>(host, conversationId, "ox.fs.read", { path }, remaining());
   if (file?.path !== path || typeof file.text !== "string" || !file.text.trim() || file.truncated !== false || file.unsupported) throw new Error("System skill observation is missing or incomplete");
   return file.text;
 }
 
-async function inspect(host: EvalHost, chatId: string, remaining: () => number): Promise<EvalSnapshot> {
-  const snapshot = await ox<EvalSnapshot>(host, ["conversation", "inspect", "--full"], chatId, remaining());
-  if (snapshot.id !== chatId || snapshot.blocks.some(block => (block.kind.trace?.omittedInvocations ?? 0) > 0)) throw new Error("Wrong conversation or incomplete Action receipts");
+async function inspect(host: EvalHost, conversationId: string, remaining: () => number): Promise<EvalSnapshot> {
+  const snapshot = await ox<EvalSnapshot>(host, ["conversation", "inspect", "--full"], conversationId, remaining());
+  if (snapshot.id !== conversationId || snapshot.blocks.some(block => (block.kind.trace?.omittedInvocations ?? 0) > 0)) throw new Error("Wrong conversation or incomplete Action receipts");
   return snapshot;
 }
 
 async function awaitTurn(host: EvalHost, target: ConversationEvidence, options: RunOptions, remaining: () => number, choice?: Choice): Promise<boolean> {
-  const snapshot = await inspect(host, target.chatId, remaining);
+  const snapshot = await inspect(host, target.conversationId, remaining);
   target.attention = snapshot;
   const prompt = snapshot.pendingPrompt;
   if (!prompt) throw new Error("needsAttention without an observable pending prompt");
   if (choice && options.choices && target.choices.length === 0 && !prompt.requiresApp
     && JSON.stringify(prompt.options) === JSON.stringify(choice.options)) {
-    await ox(host, ["conversation", "respond", choice.answer, "--prompt", prompt.id], target.chatId, remaining());
+    await ox(host, ["conversation", "respond", choice.answer, "--prompt", prompt.id], target.conversationId, remaining());
     target.choices.push({ prompt, answer: choice.answer });
   } else if (!options.humanWaitMs) return false;
-  else console.log(`HUMAN ${target.chatId}: ${prompt.prompt} (complete in QA Ox; runner never approves native gates)`);
+  else console.log(`HUMAN ${target.conversationId}: ${prompt.prompt} (complete in QA Ox; runner never approves native gates)`);
   const deadline = Date.now() + (options.humanWaitMs || Math.min(remaining(), 30_000));
   let lastPrompt = prompt.id;
   while (Date.now() < deadline) {
-    const current = await inspect(host, target.chatId, remaining);
+    const current = await inspect(host, target.conversationId, remaining);
     if (!current.isBusy && !current.pendingPrompt) {
       target.snapshot = current;
       return true;
@@ -42,7 +42,7 @@ async function awaitTurn(host: EvalHost, target: ConversationEvidence, options: 
     if (current.pendingPrompt && current.pendingPrompt.id !== lastPrompt) {
       if (!options.humanWaitMs) { target.attention = current; return false; }
       lastPrompt = current.pendingPrompt.id;
-      console.log(`HUMAN ${target.chatId}: ${current.pendingPrompt.prompt}`);
+      console.log(`HUMAN ${target.conversationId}: ${current.pendingPrompt.prompt}`);
     }
     await Bun.sleep(Math.min(250, remaining()));
   }
@@ -53,16 +53,16 @@ async function runConversation(host: EvalHost, provider: string, model: string, 
   target: ConversationEvidence, response: EvalResponse, options: RunOptions, remaining: () => number, choice?: Choice, continuing = false): Promise<void> {
   const started = Date.now();
   try {
-    if (!target.chatId) target.chatId = await newConversation(host, provider, model, temporary, remaining());
-    target.initial = await inspect(host, target.chatId, remaining);
+    if (!target.conversationId) target.conversationId = await newConversation(host, provider, model, temporary, remaining());
+    target.initial = await inspect(host, target.conversationId, remaining);
     if (!continuing && target.initial.messages.length || target.initial.isBusy !== false || target.initial.pendingPrompt) throw new Error("Expected an idle QA conversation with the declared history mode");
     for (const text of prompts) {
-      const outcome = await ox<TurnOutcome>(host, ["conversation", "send", text], target.chatId, remaining(), true);
-      if (outcome.chatId !== target.chatId || !["completed", "needsAttention", "failed", "cancelled"].includes(outcome.outcome)) throw new Error("Unexpected conversation outcome; input may have been submitted, never resubmitting");
+      const outcome = await ox<TurnOutcome>(host, ["conversation", "send", text], target.conversationId, remaining(), true);
+      if (outcome.conversationId !== target.conversationId || !["completed", "needsAttention", "failed", "cancelled"].includes(outcome.outcome)) throw new Error("Unexpected conversation outcome; input may have been submitted, never resubmitting");
       target.outcomes.push(outcome);
       if (outcome.outcome === "needsAttention") {
         if (!await awaitTurn(host, target, options, remaining, choice)) {
-          response.blocked = `Unanswered or unsupported checkpoint in ${target.chatId}`;
+          response.blocked = `Unanswered or unsupported checkpoint in ${target.conversationId}`;
           break;
         }
         outcome.outcome = "completed";
@@ -72,13 +72,13 @@ async function runConversation(host: EvalHost, provider: string, model: string, 
       }
     }
   } catch (error) { response.errors.push(String(error)); }
-  if (!target.chatId) return;
+  if (!target.conversationId) return;
   if (response.errors.length || target.outcomes.at(-1)?.outcome !== "completed") {
-    try { await ox(host, ["conversation", "stop"], target.chatId, 10_000); }
+    try { await ox(host, ["conversation", "stop"], target.conversationId, 10_000); }
     catch (error) { response.errors.push(`Stop failed: ${String(error)}`); }
   }
   try {
-    target.snapshot = await inspect(host, target.chatId, () => 10_000);
+    target.snapshot = await inspect(host, target.conversationId, () => 10_000);
     const { assistants, tools } = history(target.snapshot, target.initial?.messages.length ?? 0);
     const calls = conversationActions(target);
     const failed = calls.filter(call => "failed" in call.outcome);
@@ -100,7 +100,7 @@ async function runConversation(host: EvalHost, provider: string, model: string, 
       browserCalls,
       serviceInvocations,
     };
-    if (typeof host !== "string" && host.recordedChoices) target.choices = host.recordedChoices(target.chatId);
+    if (typeof host !== "string" && host.recordedChoices) target.choices = host.recordedChoices(target.conversationId);
     if (target.snapshot.isBusy !== false || target.snapshot.pendingPrompt) response.errors.push("Conversation did not settle; no further task or cleanup is safe");
   } catch (error) { response.errors.push(`Snapshot failed: ${String(error)}`); }
 }
@@ -115,15 +115,15 @@ export async function runCase(host: EvalHost, provider: string, model: string, t
     return budget;
   };
   try {
-    response.chatId = await newConversation(host, provider, model, test.effect === "read", remaining());
-    const profile = await vmCall<{ name: string; storage: string }>(host, response.chatId, "ox.app.profile", {}, remaining());
+    response.conversationId = await newConversation(host, provider, model, test.effect === "read", remaining());
+    const profile = await vmCall<{ name: string; storage: string }>(host, response.conversationId, "ox.app.profile", {}, remaining());
     if (profile?.name !== options.qaProfile || profile.storage !== "local") throw new Error("Expected the named local QA Profile; no task submitted");
     if (test.skill) {
       const path = `skills/${test.skill}/SKILL.md`;
-      response.systemSkill = { path, text: await readSystemSkill(host, response.chatId, path, remaining), resources: {} };
-      for (const resource of test.resources ?? []) response.systemSkill.resources[resource] = await readSystemSkill(host, response.chatId, resource, remaining);
+      response.systemSkill = { path, text: await readSystemSkill(host, response.conversationId, path, remaining), resources: {} };
+      for (const resource of test.resources ?? []) response.systemSkill.resources[resource] = await readSystemSkill(host, response.conversationId, resource, remaining);
     }
-    response.before = await observeState(host, response.chatId, binding, remaining, "before");
+    response.before = await observeState(host, response.conversationId, binding, remaining, "before");
     const preconditions = assertions(binding, response, "before");
     response.observationChecks.push(...preconditions);
     if (preconditions.some(check => !check.passed)) {
@@ -133,11 +133,11 @@ export async function runCase(host: EvalHost, provider: string, model: string, t
     const prompt = test.task.replaceAll("{{context}}", binding.context);
     await runConversation(host, provider, model, [prompt, ...(test.followups ?? []).map(text => text.replaceAll("{{context}}", binding.context))], test.effect === "read", response, response, options, remaining, test.choice);
     if (response.errors.length || response.blocked) return response;
-    response.after = await observeState(host, response.chatId, binding, remaining, "after", response.snapshot);
+    response.after = await observeState(host, response.conversationId, binding, remaining, "after", response.snapshot);
     response.observationChecks.push(...assertions(binding, response, "after"));
     if (response.systemSkill) {
       for (const [path, text] of Object.entries({ [response.systemSkill.path]: response.systemSkill.text, ...response.systemSkill.resources })) {
-        response.observationChecks.push({ detail: `System skill resource independently observed and preserved: ${path}`, passed: text === await readSystemSkill(host, response.chatId, path, remaining) });
+        response.observationChecks.push({ detail: `System skill resource independently observed and preserved: ${path}`, passed: text === await readSystemSkill(host, response.conversationId, path, remaining) });
       }
     }
     const taskChecks = [...conversationChecks(response, binding), ...actionChecks(response, binding)];
@@ -149,22 +149,22 @@ export async function runCase(host: EvalHost, provider: string, model: string, t
       response.observationChecks.push(...assertions(binding, response, "probe"));
       const probeScope = { ...binding, allowedActions: binding.allowedActions.filter(name => readers.has(name) || name === "ox.tool.help") };
       if (response.errors.length || response.blocked || conversationChecks(response.probe, probeScope, false).some(check => !check.passed)) return response;
-      response.after = await observeState(host, response.chatId, binding, remaining, "after", response.snapshot);
+      response.after = await observeState(host, response.conversationId, binding, remaining, "after", response.snapshot);
       response.observationChecks.push(...assertions(binding, response, "after").map(check => ({ ...check, detail: `After probe: ${check.detail}` })));
       if (assertions(binding, response, "after").filter(check => check.detail.startsWith("after: preserved ")).some(check => !check.passed)) return response;
     }
     if (test.effect !== "read") {
-      response.cleanup = evidence(response.chatId);
+      response.cleanup = evidence(response.conversationId);
       const cleanupDeadline = Date.now() + 30_000;
       const cleanupBudget = () => {
         const budget = cleanupDeadline - Date.now();
         if (budget <= 0) throw new Error("Cleanup deadline exceeded");
         return budget;
       };
-      await ox(host, ["conversation", "open"], response.chatId, cleanupBudget());
+      await ox(host, ["conversation", "open"], response.conversationId, cleanupBudget());
       await runConversation(host, provider, model, [receiptPrompt(binding.cleanup!, response.snapshot)], false, response.cleanup, response, { ...options, choices: false }, cleanupBudget, undefined, true);
       if (response.errors.length || response.blocked || conversationChecks(response.cleanup, binding, false, response.snapshot).some(check => !check.passed)) return response;
-      response.restored = await observeState(host, response.chatId, binding, cleanupBudget, "cleanup", response.snapshot);
+      response.restored = await observeState(host, response.conversationId, binding, cleanupBudget, "cleanup", response.snapshot);
       response.observationChecks.push(...assertions(binding, response, "cleanup"));
     }
     if (response.observationChecks.every(check => check.passed)) response.continuation = "safe";

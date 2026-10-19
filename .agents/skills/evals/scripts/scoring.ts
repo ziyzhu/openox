@@ -87,7 +87,7 @@ export function score(test: EvalCase, binding: CaseBinding, response: EvalRespon
   }
   if (test.choice) checks.push({ detail: "Declared workflow choice reached and answered exactly once", passed: response.choices.length === 1 && response.choices[0]?.answer === test.choice.answer });
   if (test.probe) {
-    checks.push({ detail: "Fresh-context probe ran independently", passed: !!response.probe && response.probe.chatId !== response.chatId && response.probe.initial?.messages.length === 0 });
+    checks.push({ detail: "Fresh-context probe ran independently", passed: !!response.probe && response.probe.conversationId !== response.conversationId && response.probe.initial?.messages.length === 0 });
     if (response.probe) checks.push(...conversationChecks(response.probe, binding, false).map(check => ({ ...check, detail: `Probe: ${check.detail}` })));
   }
   if (test.effect !== "read") {

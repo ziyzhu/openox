@@ -28,10 +28,10 @@
           }
         }
       ],
-      "chats": [
+      "conversations": [
         {
           "id": "markdown",
-          "title": "Template chat",
+          "title": "Template conversation",
           "model": {
             "provider": "mock",
             "model": "mock"
@@ -55,7 +55,7 @@
             {
               "role": "assistant",
               "reasoning": "The checklist covers the starting state and durable storage.",
-              "text": "## Ready\n- Settings are configured.\n- This chat was imported without a model call."
+              "text": "## Ready\n- Settings are configured.\n- This conversation was imported without a model call."
             }
           ]
         }
@@ -64,6 +64,6 @@
   ],
   "selection": {
     "profile": "qa",
-    "chat": "markdown"
+    "conversation": "markdown"
   }
 }

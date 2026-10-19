@@ -8,10 +8,10 @@ import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulat
 
 const qa = qaCommand({
   usage: "bun .agents/skills/test/apps/ios/browser-sites.ts --device ox-N --conversation <idle-Mock-QA-conversation>\nRequires a fresh installed build and public HTTPS. Answers Browser site prompts with Approve or Deny only; never changes policies.",
-  options: { chat: { type: "string" } },
+  options: { conversation: { type: "string" } },
 });
-if (!qa.values.chat) throw new Error("Pass an idle Mock QA conversation");
-const target = ["bun", "apps/cli/src/ox.ts", "--host", qa.debugEndpoint, "--conversation", qa.values.chat];
+if (!qa.values.conversation) throw new Error("Pass an idle Mock QA conversation");
+const target = ["bun", "apps/cli/src/ox.ts", "--host", qa.debugEndpoint, "--conversation", qa.values.conversation];
 const evidence = await mkdtemp(join(tmpdir(), "ox-browser-sites-"));
 let sequence = 0;
 async function json(args: string[]) {

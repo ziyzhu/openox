@@ -42,10 +42,6 @@ extension OxHostProtocol {
 
     struct ListConversationsResult: Encodable {
         let conversations: [ConversationRow]?
-
-        private enum CodingKeys: String, CodingKey {
-            case conversations = "chats"
-        }
     }
 
     struct ModelRow: Encodable {

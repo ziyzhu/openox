@@ -70,7 +70,7 @@ it("uses explicit prompt variants without inferring prose from capabilities and 
   expect(prompt).not.toContain("ox.service");
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,active:{hostID:'wrong',profileID:'profile-a'}}})", realm)).toThrow("unavailable");
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[...input.hostContext.hosts,...input.hostContext.hosts]}})", realm)).toThrow("Duplicate");
-  expect(runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[{...input.hostContext.hosts[0],functions:['ox'],serviceKinds:['web','api','ios','mcp'],presentation:'chat-bubbles',externalFiles:true}]}}).rendered", realm)).toBe(prompt);
+  expect(runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[{...input.hostContext.hosts[0],functions:['ox'],serviceKinds:['web','api','ios','mcp'],presentation:'conversation-bubbles',externalFiles:true}]}}).rendered", realm)).toBe(prompt);
   const full = runInContext("OxPrompts.composeOxPrompt(input,false,OxPrompts.oxScaffold).rendered", realm) as string;
   expect(full).toContain("ox.service.find");
   expect(full).toContain("ox.web.browser.waitForUserInteraction");

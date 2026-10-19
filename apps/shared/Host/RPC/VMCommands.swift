@@ -53,7 +53,7 @@ extension OxHostProtocol {
                 "contract": .string("ox"),
                 "engine": .string("javascriptcore"),
                 "lifetime": .string("profile"),
-                "sessionBinding": .string("chat"),
+                "sessionBinding": .string("conversation"),
                 "functionCount": .int(functionCount),
             ]),
             "session": sessionValue,

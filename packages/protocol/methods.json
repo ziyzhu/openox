@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "methods": {
     "host.describe": {
       "params": {
@@ -113,7 +113,7 @@
         "$ref": "./schema.json#/definitions/DurableCommandResult"
       }
     },
-    "debug.durable.chat": {
+    "debug.durable.conversation": {
       "params": {
         "$ref": "./schema.json#/definitions/DurableCommandParameters"
       },
@@ -169,7 +169,7 @@
         "$ref": "./schema.json#/definitions/SyncServicesResult"
       }
     },
-    "chats.list": {
+    "conversations.list": {
       "params": {
         "$ref": "./schema.json#/definitions/EmptyRequest"
       },
@@ -177,7 +177,7 @@
         "$ref": "./schema.json#/definitions/ListConversationsResult"
       }
     },
-    "chats.get": {
+    "conversations.get": {
       "params": {
         "$ref": "./schema.json#/definitions/SessionRequest"
       },
@@ -185,7 +185,7 @@
         "$ref": "./schema.json#/definitions/GetConversationResult"
       }
     },
-    "chats.open": {
+    "conversations.open": {
       "params": {
         "$ref": "./schema.json#/definitions/SessionRequest"
       },
@@ -193,7 +193,7 @@
         "$ref": "./schema.json#/definitions/GetConversationResult"
       }
     },
-    "chats.respond": {
+    "conversations.respond": {
       "params": {
         "$ref": "./schema.json#/definitions/RespondConversationRequest"
       },
@@ -201,7 +201,7 @@
         "$ref": "./schema.json#/definitions/RespondConversationResult"
       }
     },
-    "chats.new": {
+    "conversations.new": {
       "params": {
         "$ref": "./schema.json#/definitions/NewConversationRequest"
       },
@@ -209,7 +209,7 @@
         "$ref": "./schema.json#/definitions/NewConversationResult"
       }
     },
-    "chats.send": {
+    "conversations.send": {
       "params": {
         "$ref": "./schema.json#/definitions/SendConversationRequest"
       },
@@ -217,7 +217,7 @@
         "$ref": "./schema.json#/definitions/SendConversationResult"
       }
     },
-    "chats.stop": {
+    "conversations.stop": {
       "params": {
         "$ref": "./schema.json#/definitions/SessionRequest"
       },
@@ -337,7 +337,7 @@
         "$ref": "./schema.json#/definitions/EmptyResult"
       }
     },
-    "debug.chats.attachServices": {
+    "debug.conversations.attachServices": {
       "params": {
         "$ref": "./schema.json#/definitions/SetAttachedServiceRequest"
       },
@@ -385,7 +385,7 @@
         "$ref": "./schema.json#/definitions/EmptyResult"
       }
     },
-    "debug.chat.setEditDraft": {
+    "debug.conversation.setEditDraft": {
       "params": {
         "$ref": "./schema.json#/definitions/PromptRequest"
       },

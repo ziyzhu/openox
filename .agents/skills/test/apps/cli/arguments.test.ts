@@ -16,15 +16,13 @@ async function command(args: string[], entry = cli) {
 test("QA conversation flags and documented runner paths work without a target", async () => {
   for (const name of ["image-embed", "profile-files", "ox-errors", "service-icons", "bundled-skills"]) {
     const entry = new URL(`../ios/${name}.ts`, import.meta.url).pathname;
-    for (const flag of ["--conversation", "--chat"]) {
-      const args = [`${flag}=saved`, ...(name === "bundled-skills" ? ["--temporary-conversation=temporary"] : [])];
-      const help = await command([...args, "--help"], entry);
-      expect(help.code).toBe(0);
-      expect(help.stdout).toContain("--conversation");
-      const missingTarget = await command(args, entry);
-      expect(missingTarget.code).toBe(1);
-      expect(missingTarget.stderr).toContain("Pass --device");
-    }
+    const args = ["--conversation=saved", ...(name === "bundled-skills" ? ["--temporary-conversation=temporary"] : [])];
+    const help = await command([...args, "--help"], entry);
+    expect(help.code).toBe(0);
+    expect(help.stdout).toContain("--conversation");
+    const missingTarget = await command(args, entry);
+    expect(missingTarget.code).toBe(1);
+    expect(missingTarget.stderr).toContain("Pass --device");
   }
   const durable = new URL("../ios/durable-conversation.ts", import.meta.url).pathname;
   expect((await command(["--help"], durable)).code).toBe(0);

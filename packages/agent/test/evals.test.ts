@@ -42,17 +42,17 @@ test("real execute loop preserves filesystem state, errors, contract validation 
     "try {await ox.app.profile({purpose:'Read',unknown:true})} catch(e) {console.log(e.code)}; try {await ox.fs.delete({path:'note.txt',purpose:'Delete'})} catch(e) {console.log(e.code)}",
   ], { denied: ["ox.fs.delete"] });
   try {
-    const chat = await runtime.request<{ chatId: string }>(["conversation", "new", "--temporary"]);
-    await runtime.request(["conversation", "send", "Edit a note"], chat.chatId);
-    const snapshot = await runtime.request<EvalSnapshot>(["conversation", "inspect"], chat.chatId);
+    const conversation = await runtime.request<{ conversationId: string }>(["conversation", "new", "--temporary"]);
+    await runtime.request(["conversation", "send", "Edit a note"], conversation.conversationId);
+    const snapshot = await runtime.request<EvalSnapshot>(["conversation", "inspect"], conversation.conversationId);
     const receipts = snapshot.blocks.flatMap(block => block.kind.trace?.entries ?? []).map(entry => entry.invocation!);
     expect(receipts.slice(0, 3).every(receipt => receipt.outcome.succeeded), JSON.stringify(receipts)).toBe(true);
     expect(receipts[3]?.outcome.failed).toMatchObject({ code: "invalid_argument" });
     expect(receipts[4]?.outcome.failed).toMatchObject({ code: "permission_denied" });
-    const observed = await runtime.request<{value:{text:string}}>(["vm", "call", "ox.fs.read", "--args", JSON.stringify({path:"note.txt",purpose:"Observe"})], chat.chatId);
+    const observed = await runtime.request<{value:{text:string}}>(["vm", "call", "ox.fs.read", "--args", JSON.stringify({path:"note.txt",purpose:"Observe"})], conversation.conversationId);
     expect(observed.value.text).toBe("after");
-    const fresh = await runtime.request<{chatId:string}>(["conversation","new","--temporary"]);
-    expect((await runtime.request<EvalSnapshot>(["conversation","inspect"],fresh.chatId)).messages).toEqual([]);
+    const fresh = await runtime.request<{conversationId:string}>(["conversation","new","--temporary"]);
+    expect((await runtime.request<EvalSnapshot>(["conversation","inspect"],fresh.conversationId)).messages).toEqual([]);
   } finally { await runtime.close(); }
 }, 20000);
 
@@ -64,8 +64,8 @@ test("stub state transitions commit only after valid output and remain isolated 
   const runtime = await fixture(["await ox.app.setLanguage({selection:'zh-Hans',purpose:'Set language'}); console.log(await ox.app.language({purpose:'Verify'}));"], stubs);
   const other = await fixture([], stubs);
   try {
-    const chat = await runtime.request<{chatId:string}>(["conversation","new"]);
-    await runtime.request(["conversation","send","Use Chinese"],chat.chatId);
+    const conversation = await runtime.request<{conversationId:string}>(["conversation","new"]);
+    await runtime.request(["conversation","send","Use Chinese"],conversation.conversationId);
     expect(runtime.stubs.state.language).toEqual({selection:"zh-Hans",locale:"zh-Hans"});
     expect(other.stubs.state.language).toEqual({selection:"en",locale:"en"});
     expect(()=>runtime.stubs.call("ox.app.setLanguage",{selection:"en",purpose:"Unsupported"})).toThrow("No prepared stub");
@@ -116,10 +116,10 @@ test("fabricated completion cannot pass without actual tool receipts", async()=>
 test("invalid stub output cannot mutate state and failed calls remain observable in the agent loop",async()=>{
   const runtime=await fixture(["try {await ox.app.setLanguage({selection:'zh-Hans',purpose:'Change language'})} catch(e) {console.log(e.message)}"],{state:{language:"en"},functions:{"ox.app.setLanguage":[{result:{changed:"wrong-type"},set:{language:"zh-Hans"}}]}});
   try {
-    const chat=await runtime.request<{chatId:string}>(["conversation","new"]);
-    await runtime.request(["conversation","send","Set Chinese"],chat.chatId);
+    const conversation=await runtime.request<{conversationId:string}>(["conversation","new"]);
+    await runtime.request(["conversation","send","Set Chinese"],conversation.conversationId);
     expect(runtime.stubs.state.language).toBe("en");
-    const snapshot=await runtime.request<EvalSnapshot>(["conversation","inspect"],chat.chatId);
+    const snapshot=await runtime.request<EvalSnapshot>(["conversation","inspect"],conversation.conversationId);
     expect(snapshot.blocks[0]!.kind.trace!.entries[0]!.invocation!.outcome.failed).toMatchObject({code:"operation_failed"});
   } finally {await runtime.close();}
 });
@@ -127,9 +127,9 @@ test("invalid stub output cannot mutate state and failed calls remain observable
 test("model loop reads actual bundled System skills through the stub filesystem",async()=>{
   const runtime=await fixture(["console.log(await ox.fs.read({path:'skills/manage-providers/SKILL.md',purpose:'Read provider guidance'}));"]);
   try {
-    const chat=await runtime.request<{chatId:string}>(["conversation","new","--temporary"]);
-    await runtime.request(["conversation","send","Read provider setup instructions"],chat.chatId);
-    const snapshot=await runtime.request<EvalSnapshot>(["conversation","inspect"],chat.chatId);
+    const conversation=await runtime.request<{conversationId:string}>(["conversation","new","--temporary"]);
+    await runtime.request(["conversation","send","Read provider setup instructions"],conversation.conversationId);
+    const snapshot=await runtime.request<EvalSnapshot>(["conversation","inspect"],conversation.conversationId);
     const content=snapshot.blocks[0]!.kind.trace!.entries[0]!.invocation!.outcome.succeeded?._0 as {text:string};
     expect(content.text.trim()).toBe((await Bun.file(new URL("../skills/manage-providers/SKILL.md",import.meta.url)).text()).trim());
   } finally {await runtime.close();}
@@ -138,11 +138,11 @@ test("model loop reads actual bundled System skills through the stub filesystem"
 test("fresh conversations see changed memory while earlier prompts stay frozen and temporary writes fail",async()=>{
   const runtime=await fixture(["await ox.fs.write({path:'MEMORY.md',content:'Updated preference',purpose:'Remember preference'});"],{files:{"MEMORY.md":"Original preference"}});
   try {
-    const first=await runtime.request<{chatId:string}>(["conversation","new"]);
-    await runtime.request(["conversation","send","Remember updated preference"],first.chatId);
-    const fresh=await runtime.request<{chatId:string}>(["conversation","new","--temporary"]);
-    expect((await runtime.request<EvalSnapshot>(["conversation","inspect"],first.chatId)).memory).toBe("Original preference");
-    expect((await runtime.request<EvalSnapshot>(["conversation","inspect"],fresh.chatId)).memory).toBe("Updated preference");
-    await expect(runtime.request(["vm","call","ox.fs.write","--args",JSON.stringify({path:"MEMORY.md",content:"Forbidden",purpose:"Test temporary scope"})],fresh.chatId)).rejects.toThrow("Temporary conversations");
+    const first=await runtime.request<{conversationId:string}>(["conversation","new"]);
+    await runtime.request(["conversation","send","Remember updated preference"],first.conversationId);
+    const fresh=await runtime.request<{conversationId:string}>(["conversation","new","--temporary"]);
+    expect((await runtime.request<EvalSnapshot>(["conversation","inspect"],first.conversationId)).memory).toBe("Original preference");
+    expect((await runtime.request<EvalSnapshot>(["conversation","inspect"],fresh.conversationId)).memory).toBe("Updated preference");
+    await expect(runtime.request(["vm","call","ox.fs.write","--args",JSON.stringify({path:"MEMORY.md",content:"Forbidden",purpose:"Test temporary scope"})],fresh.conversationId)).rejects.toThrow("Temporary conversations");
   } finally {await runtime.close();}
 });

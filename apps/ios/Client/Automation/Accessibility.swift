@@ -22,9 +22,9 @@ nonisolated enum A11yID {
     }
 
     enum ConversationImport {
-        static let preview = "chatImport.preview"
-        static let cancel = "chatImport.cancel"
-        static let add = "chatImport.add"
+        static let preview = "conversationImport.preview"
+        static let cancel = "conversationImport.cancel"
+        static let add = "conversationImport.add"
     }
 
     enum Sidebar {
@@ -32,7 +32,7 @@ nonisolated enum A11yID {
         static let search = "sidebar.search"
         static let resizer = "sidebar.resizer"
         static let close = "sidebar.close"
-        static let newConversation = "sidebar.newChat"
+        static let newConversation = "sidebar.newConversation"
         static let settings = "sidebar.settings"
         static let services = "sidebar.services"
         static let artifacts = "sidebar.artifacts"
@@ -145,110 +145,110 @@ nonisolated enum A11yID {
     }
 
     enum ConversationControls {
-        static let toast = "chat.toast"
-        static let more = "chat.more"
-        static let attach = "chat.attach"
-        static let input = "chat.input"
-        static let openWebsite = "chat.openWebsite"
-        static let cancelEdit = "chat.cancelEdit"
-        static let speechHold = "chat.speechHold"
-        static let speechStatus = "chat.speechStatus"
-        static let speechCancel = "chat.speechCancel"
-        static let speechEdit = "chat.speechEdit"
-        static let send = "chat.send"
-        static let stop = "chat.stop"
-        static let activity = "chat.activity"
-        static let scrollToBottom = "chat.scrollToBottom"
-        static let openSidebar = "chat.openSidebar"
-        static let delete = "chat.delete"
-        static let export = "chat.export"
-        static let modelPicker = "chat.modelPicker"
-        static let modelSetup = "chat.modelSetup"
-        static let modelAccessNotice = "chat.modelAccessNotice"
-        static let modelRegion = "chat.modelRegion"
-        static let modelProvider = "chat.modelProvider"
+        static let toast = "conversation.toast"
+        static let more = "conversation.more"
+        static let attach = "conversation.attach"
+        static let input = "conversation.input"
+        static let openWebsite = "conversation.openWebsite"
+        static let cancelEdit = "conversation.cancelEdit"
+        static let speechHold = "conversation.speechHold"
+        static let speechStatus = "conversation.speechStatus"
+        static let speechCancel = "conversation.speechCancel"
+        static let speechEdit = "conversation.speechEdit"
+        static let send = "conversation.send"
+        static let stop = "conversation.stop"
+        static let activity = "conversation.activity"
+        static let scrollToBottom = "conversation.scrollToBottom"
+        static let openSidebar = "conversation.openSidebar"
+        static let delete = "conversation.delete"
+        static let export = "conversation.export"
+        static let modelPicker = "conversation.modelPicker"
+        static let modelSetup = "conversation.modelSetup"
+        static let modelAccessNotice = "conversation.modelAccessNotice"
+        static let modelRegion = "conversation.modelRegion"
+        static let modelProvider = "conversation.modelProvider"
         static func modelProviderOption(_ clientId: String) -> String { "conversation.modelProviderOption.\(clientId)" }
-        static let modelSelection = "chat.modelSelection"
-        static let modelSearch = "chat.modelSearch"
-        static let modelThinkingLevel = "chat.modelThinkingLevel"
-        static let modelAuthAPIKey = "chat.modelAuth.apiKey"
-        static let modelAuthOAuth = "chat.modelAuth.oauth"
-        static let modelAuthNone = "chat.modelAuth.none"
-        static let modelAPIProviders = "chat.modelAPIProviders"
-        static let modelCustomProviders = "chat.modelCustomProviders"
-        static let modelClose = "chat.modelClose"
-        static let temporaryToggle = "chat.temporaryToggle"
-        static let temporaryEmpty = "chat.temporaryEmpty"
-        static let persistedEmpty = "chat.persistedEmpty"
-        static let importMemory = "chat.importMemory"
-        static let followIntent = "chat.followIntent"
+        static let modelSelection = "conversation.modelSelection"
+        static let modelSearch = "conversation.modelSearch"
+        static let modelThinkingLevel = "conversation.modelThinkingLevel"
+        static let modelAuthAPIKey = "conversation.modelAuth.apiKey"
+        static let modelAuthOAuth = "conversation.modelAuth.oauth"
+        static let modelAuthNone = "conversation.modelAuth.none"
+        static let modelAPIProviders = "conversation.modelAPIProviders"
+        static let modelCustomProviders = "conversation.modelCustomProviders"
+        static let modelClose = "conversation.modelClose"
+        static let temporaryToggle = "conversation.temporaryToggle"
+        static let temporaryEmpty = "conversation.temporaryEmpty"
+        static let persistedEmpty = "conversation.persistedEmpty"
+        static let importMemory = "conversation.importMemory"
+        static let followIntent = "conversation.followIntent"
         static func modelOption(_ modelId: String) -> String { "conversation.modelOption.\(modelId)" }
         static func modelThinkingLevelOption(_ effort: String) -> String { "conversation.modelThinkingLevelOption.\(effort)" }
         static func modelKey(_ clientId: String) -> String { "conversation.modelKey.\(clientId)" }
         static func modelKeySignIn(_ clientId: String) -> String { "conversation.modelKeySignIn.\(clientId)" }
-        static let modelKeySignInError = "chat.modelKeySignInError"
-        static let modelKeyNotice = "chat.modelKeyNotice"
-        static let modelWebsiteAuthStatus = "chat.modelWebsiteAuthStatus"
-        static let modelKeyField = "chat.modelKeyField"
-        static let modelKeyRemove = "chat.modelKeyRemove"
-        static let modelKeyWebsite = "chat.modelKeyWebsite"
-        static let mentionLoading = "chat.mention.loading"
+        static let modelKeySignInError = "conversation.modelKeySignInError"
+        static let modelKeyNotice = "conversation.modelKeyNotice"
+        static let modelWebsiteAuthStatus = "conversation.modelWebsiteAuthStatus"
+        static let modelKeyField = "conversation.modelKeyField"
+        static let modelKeyRemove = "conversation.modelKeyRemove"
+        static let modelKeyWebsite = "conversation.modelKeyWebsite"
+        static let mentionLoading = "conversation.mention.loading"
 
         enum HTMLFile {
-            static let dismiss = "chat.htmlFile.dismiss"
+            static let dismiss = "conversation.htmlFile.dismiss"
         }
 
         enum MarkdownFile {
-            static let dismiss = "chat.markdownFile.dismiss"
-            static let edit = "chat.markdownFile.edit"
-            static let editor = "chat.markdownFile.editor"
-            static let save = "chat.markdownFile.save"
+            static let dismiss = "conversation.markdownFile.dismiss"
+            static let edit = "conversation.markdownFile.edit"
+            static let editor = "conversation.markdownFile.editor"
+            static let save = "conversation.markdownFile.save"
         }
 
         enum FileItem {
-            static let open = "chat.artifact.open"
-            static let list = "chat.artifact.list"
-            static let done = "chat.artifact.done"
+            static let open = "conversation.artifact.open"
+            static let list = "conversation.artifact.list"
+            static let done = "conversation.artifact.done"
             static func item(_ filename: String) -> String { "conversation.artifact.item.\(filename)" }
         }
 
         enum Message {
-            static let user = "chat.message.user"
-            static let agent = "chat.message.agent"
-            static let copy = "chat.message.copy"
-            static let share = "chat.message.share"
-            static let branch = "chat.message.branch"
-            static let retry = "chat.message.retry"
-            static let contextCompaction = "chat.contextCompacted"
+            static let user = "conversation.message.user"
+            static let agent = "conversation.message.agent"
+            static let copy = "conversation.message.copy"
+            static let share = "conversation.message.share"
+            static let branch = "conversation.message.branch"
+            static let retry = "conversation.message.retry"
+            static let contextCompaction = "conversation.contextCompacted"
             static func artifact(_ artifactId: String) -> String { "conversation.message.artifact.\(artifactId)" }
             static func serviceInspector(_ domain: String) -> String { "conversation.message.serviceInspector.\(domain)" }
             static func skill(_ name: String) -> String { "conversation.message.skill.\(name)" }
             static func shoveler(_ blockId: String) -> String { "conversation.message.shoveler.\(blockId)" }
-            static let videoPlay = "chat.message.video.play"
-            static let imageOpen = "chat.message.image.open"
-            static let imageClose = "chat.message.image.close"
-            static let diagramClose = "chat.message.diagram.close"
-            static let diagramCopy = "chat.message.diagram.copy"
-            static let imageRetry = "chat.message.image.retry"
+            static let videoPlay = "conversation.message.video.play"
+            static let imageOpen = "conversation.message.image.open"
+            static let imageClose = "conversation.message.image.close"
+            static let diagramClose = "conversation.message.diagram.close"
+            static let diagramCopy = "conversation.message.diagram.copy"
+            static let imageRetry = "conversation.message.image.retry"
         }
 
         enum Attach {
-            static let camera = "chat.attach.camera"
-            static let photos = "chat.attach.photos"
-            static let files = "chat.attach.files"
-            static let services = "chat.attach.services"
-            static let website = "chat.attach.website"
-            static let explore = "chat.attach.explore"
-            static let exploreBack = "chat.attach.exploreBack"
-            static let servicesLoading = "chat.attach.servicesLoading"
-            static let search = "chat.attach.search"
-            static let close = "chat.attach.close"
-            static let filter = "chat.attach.filter"
-            static let connectMCP = "chat.attach.connectMCP"
+            static let camera = "conversation.attach.camera"
+            static let photos = "conversation.attach.photos"
+            static let files = "conversation.attach.files"
+            static let services = "conversation.attach.services"
+            static let website = "conversation.attach.website"
+            static let explore = "conversation.attach.explore"
+            static let exploreBack = "conversation.attach.exploreBack"
+            static let servicesLoading = "conversation.attach.servicesLoading"
+            static let search = "conversation.attach.search"
+            static let close = "conversation.attach.close"
+            static let filter = "conversation.attach.filter"
+            static let connectMCP = "conversation.attach.connectMCP"
             static func catalogMCP(_ id: String) -> String { "conversation.attach.catalogMCP.\(id)" }
             static func mcpConnecting(_ id: String) -> String { "conversation.attach.mcpConnecting.\(id)" }
             static func retryMCP(_ id: String) -> String { "conversation.attach.retryMCP.\(id)" }
-            static let mcpEndpoint = "chat.attach.mcpEndpoint"
+            static let mcpEndpoint = "conversation.attach.mcpEndpoint"
             static func startConversation(_ domain: String) -> String { "conversation.attach.startConversation.\(domain)" }
             static func save(_ domain: String) -> String { "conversation.attach.save.\(domain)" }
             static func service(_ domain: String) -> String { "conversation.attach.service.\(domain)" }
@@ -273,7 +273,7 @@ nonisolated enum A11yID {
             static func remove(_ domain: String) -> String { "conversation.attach.remove.\(domain)" }
             static func action(_ id: String) -> String { "conversation.attach.action.\(id)" }
             static func actionApproval(_ id: String) -> String { "conversation.attach.actionApproval.\(id)" }
-            static let deviceFilesAdd = "chat.attach.deviceFiles.add"
+            static let deviceFilesAdd = "conversation.attach.deviceFiles.add"
             static func deviceFilesRemove(_ id: String) -> String { "conversation.attach.deviceFiles.remove.\(id)" }
             static func devicePermission(_ id: String) -> String { "conversation.attach.devicePermission.\(id)" }
         }
@@ -286,10 +286,10 @@ nonisolated enum A11yID {
 
         static func permissionRequest(_ icon: String) -> String { "conversation.permissionRequest.\(icon)" }
         static func step(_ icon: String) -> String { "conversation.step.\(icon)" }
-        static let permissionAcknowledgement = "chat.permissionAcknowledgement"
-        static let choiceAcknowledgement = "chat.choiceAcknowledgement"
-        static let choiceCustomInput = "chat.choice.customInput"
-        static let choiceCustomSubmit = "chat.choice.customSubmit"
+        static let permissionAcknowledgement = "conversation.permissionAcknowledgement"
+        static let choiceAcknowledgement = "conversation.choiceAcknowledgement"
+        static let choiceCustomInput = "conversation.choice.customInput"
+        static let choiceCustomSubmit = "conversation.choice.customSubmit"
         static func confirm(_ option: String) -> String { "conversation.confirm.\(option)" }
         static func confirmReceipt(_ option: String) -> String { "conversation.confirm.receipt.\(option)" }
     }

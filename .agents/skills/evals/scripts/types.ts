@@ -71,9 +71,9 @@ export type Invocation = {
 };
 export type EvalBlock = { kind: { type: string; trace?: { entries: Array<{ invocation?: Invocation }>; omittedInvocations?: number } } };
 export type EvalSnapshot = Omit<ConversationSnapshot, "messages" | "blocks"> & { messages: EvalMessage[]; blocks: EvalBlock[] };
-export type TurnOutcome = { chatId: string; outcome: string; text?: string; error?: string };
+export type TurnOutcome = { conversationId: string; outcome: string; text?: string; error?: string };
 export type ConversationEvidence = {
-  chatId: string;
+  conversationId: string;
   metrics?: {
     elapsedMs: number;
     modelResponses: number;
@@ -133,7 +133,7 @@ export type Report = {
   provider: string;
   model: string;
   catalog: unknown;
-  mode: "ox-cli-chat" | "stubbed-ox";
+  mode: "ox-cli-conversation" | "stubbed-ox";
   plannedCases: string[];
   results: CaseResult[];
 };

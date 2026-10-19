@@ -33,7 +33,7 @@ else if (args[1] === "launch") {
   const control = join(Bun.env.TEMPLATE_DATA, "Library/Caches/DeviceTemplates", Bun.env.SIMCTL_CHILD_OX_DEVICE_TEMPLATE);
   const input = JSON.parse(readFileSync(join(control, "input.json"), "utf8"));
   if (input.version !== 1) process.exit(1);
-  writeFileSync(join(control, "result.json"), JSON.stringify({ status: "applied", profiles: {}, chats: {} }));
+  writeFileSync(join(control, "result.json"), JSON.stringify({ status: "applied", profiles: {}, conversations: {} }));
 } else if (args[1] === "io") writeFileSync(args.at(-1), "fixture screenshot");
 `);
       await chmod(join(directory, tool), 0o755);

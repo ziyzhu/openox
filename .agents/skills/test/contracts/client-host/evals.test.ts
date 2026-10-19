@@ -52,7 +52,7 @@ test("reports keep simulated evidence distinct and manual review cannot promote 
     const reviewed=await command(["--review",input,"--case","app-profile-success","--decision","pass","--note","Reviewed synthetic state and answer","--output",output]);
     expect(reviewed.code,reviewed.stderr).toBe(0);
     const passed=await Bun.file(output).json() as Report;
-    expect(compare(passed,{...passed,mode:"ox-cli-chat"})[0]!.change).toBe("not-comparable");
+    expect(compare(passed,{...passed,mode:"ox-cli-conversation"})[0]!.change).toBe("not-comparable");
     expect(compare(report,passed)[0]!.change).toBe("not-comparable");
     report.results[0]!.checks[0]!.passed=false;
     await writeFile(input,JSON.stringify(report));

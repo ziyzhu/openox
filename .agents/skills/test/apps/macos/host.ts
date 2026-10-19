@@ -15,7 +15,7 @@ const app = resolve(values.app);
 const metadata = await run(["plutil", "-convert", "json", "-o", "-", join(app, "Contents/Info.plist")], { capture: true });
 const info = JSON.parse(metadata.stdout);
 if (info.CFBundleIdentifier !== "ai.openox.host.local") throw new Error("Use the development Mac Host bundle");
-for (const key of ["OXAppGroupIdentifier", "OXICloudContainerIdentifier", "OXKeychainService", "OXWebsiteDataNamespace", "OXAgentSkillTypeIdentifier", "OXChatTypeIdentifier", "OXServiceTypeIdentifier"]) {
+for (const key of ["OXAppGroupIdentifier", "OXICloudContainerIdentifier", "OXKeychainService", "OXWebsiteDataNamespace", "OXAgentSkillTypeIdentifier", "OXConversationTypeIdentifier", "OXServiceTypeIdentifier"]) {
   if (typeof info[key] !== "string" || !info[key]) throw new Error(`Missing Host configuration: ${key}`);
 }
 const existing = await run(["pgrep", "-x", "OxHost"], { capture: true, allowFailure: true });
@@ -56,10 +56,10 @@ async function start(flag = "--allow-connections") {
   throw new Error("Mac Host did not become reachable");
 }
 
-async function waitForBusy(chat: string) {
+async function waitForBusy(conversation: string) {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
-    if ((await ox("--chat", chat, "conversation", "inspect")).isBusy) return;
+    if ((await ox("--conversation", conversation, "conversation", "inspect")).isBusy) return;
     await Bun.sleep(100);
   }
   throw new Error("Run fixture did not become busy");
@@ -97,30 +97,30 @@ try {
   if (browserAccepted) throw new Error("Host accepted a browser Origin");
   await ox("conversation", "new", "--provider", "mock", "--model", "mock");
   const outcome = await ox("conversation", "send", "2", "--timeout", "60000");
-  if (outcome.outcome !== "completed" || outcome.text !== "Sorry that took a moment.") throw new Error("Mock chat did not complete");
-  const chat = outcome.chatId as string;
-  const script = await ox("--chat", chat, "vm", "eval", "--script", "return 2 + 2;");
+  if (outcome.outcome !== "completed" || outcome.text !== "Sorry that took a moment.") throw new Error("Mock conversation did not complete");
+  const conversation = outcome.conversationId as string;
+  const script = await ox("--conversation", conversation, "vm", "eval", "--script", "return 2 + 2;");
   if (script.value !== 4) throw new Error("Native JavaScript execution failed");
-  const pending = run(["bun", "apps/cli/src/ox.ts", "--host", endpoint, "--chat", chat, "conversation", "send", "2", "--timeout", "60000", "--json"], { capture: true, allowFailure: true });
-  await waitForBusy(chat);
-  await ox("--chat", chat, "conversation", "stop");
+  const pending = run(["bun", "apps/cli/src/ox.ts", "--host", endpoint, "--conversation", conversation, "conversation", "send", "2", "--timeout", "60000", "--json"], { capture: true, allowFailure: true });
+  await waitForBusy(conversation);
+  await ox("--conversation", conversation, "conversation", "stop");
   const cancelled = await pending;
-  if (cancelled.code !== 1 || !cancelled.stderr.includes("send cancelled")) throw new Error("Chat cancellation failed");
+  if (cancelled.code !== 1 || !cancelled.stderr.includes("send cancelled")) throw new Error("Conversation cancellation failed");
   await stop();
   await start();
-  await ox("--chat", chat, "conversation", "open");
-  const snapshot = await ox("--chat", chat, "conversation", "inspect", "--full");
-  if (snapshot.id !== chat || snapshot.isBusy || !JSON.stringify(snapshot.messages).includes("Sorry that took a moment.")) throw new Error("Conversation did not persist across restart");
-  await writeFile(join(evidence, "chat.json"), JSON.stringify({ outcome, script, snapshot }, null, 2));
+  await ox("--conversation", conversation, "conversation", "open");
+  const snapshot = await ox("--conversation", conversation, "conversation", "inspect", "--full");
+  if (snapshot.id !== conversation || snapshot.isBusy || !JSON.stringify(snapshot.messages).includes("Sorry that took a moment.")) throw new Error("Conversation did not persist across restart");
+  await writeFile(join(evidence, "conversation.json"), JSON.stringify({ outcome, script, snapshot }, null, 2));
   const logs = await ox("host", "logs", "--all", "--grep", "MacHost");
   await writeFile(join(evidence, "host-logs.json"), JSON.stringify(logs, null, 2));
-  const interrupted = run(["bun", "apps/cli/src/ox.ts", "--host", endpoint, "--chat", chat, "conversation", "send", "2", "--timeout", "60000"], { capture: true, allowFailure: true });
-  await waitForBusy(chat);
+  const interrupted = run(["bun", "apps/cli/src/ox.ts", "--host", endpoint, "--conversation", conversation, "conversation", "send", "2", "--timeout", "60000"], { capture: true, allowFailure: true });
+  await waitForBusy(conversation);
   await stop();
   await interrupted;
   await start();
-  await ox("--chat", chat, "conversation", "open");
-  const recovered = await ox("--chat", chat, "conversation", "inspect", "--full");
+  await ox("--conversation", conversation, "conversation", "open");
+  const recovered = await ox("--conversation", conversation, "conversation", "inspect", "--full");
   if (recovered.isBusy || !JSON.stringify(recovered.messages).includes("Sorry that took a moment.")) throw new Error("Active run did not settle safely across termination");
   await writeFile(join(evidence, "active-quit.json"), JSON.stringify(recovered, null, 2));
   await stop();
@@ -129,7 +129,7 @@ try {
   const disabled = await run(["bun", "apps/cli/src/ox.ts", "--host", endpoint, "host", "describe", "--timeout", "1000"], { capture: true, allowFailure: true });
   if (!disabled.code) throw new Error("Disabled Host accepted a connection");
   await stop();
-  console.log(`PASS native Mac Host: chat, VM, cancellation, unsupported UI, restart persistence, browser rejection, disabled access, and graceful termination during an active run. Evidence: ${evidence}; retained QA chat: ${chat}`);
+  console.log(`PASS native Mac Host: conversation, VM, cancellation, unsupported UI, restart persistence, browser rejection, disabled access, and graceful termination during an active run. Evidence: ${evidence}; retained QA conversation: ${conversation}`);
 } finally {
   await stop();
 }

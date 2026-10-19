@@ -23,7 +23,7 @@ const message = Type.Union([
   object({ role: Type.Literal("user"), text, attachments: Type.Optional(Type.Array(id)) }),
   object({ role: Type.Literal("assistant"), text, reasoning: Type.Optional(text) }),
 ]);
-const chat = object({
+const conversation = object({
   id, title: Type.String({ maxLength: 60 }), model: Type.Optional(model),
   favorite: Type.Optional(Type.Boolean()), unread: Type.Optional(Type.Boolean()),
   messages: Type.Optional(Type.Array(message, { minItems: 1, maxItems: 10000 })),
@@ -59,7 +59,7 @@ export const DeviceTemplateSchema = object({
     id, name: Type.String({ minLength: 1, maxLength: 80, pattern: "^[^/:]+$" }),
     memory: Type.Optional(text), soul: Type.Optional(text),
     files: Type.Optional(Type.Array(file, { maxItems: 10000 })),
-    chats: Type.Optional(Type.Array(chat, { maxItems: 1000 })),
+    conversations: Type.Optional(Type.Array(conversation, { maxItems: 1000 })),
   }), { maxItems: 100 })),
   websiteState: Type.Optional(object({ restoreFrom: path })),
   storage: Type.Optional(Type.Array(object({
@@ -67,7 +67,7 @@ export const DeviceTemplateSchema = object({
     path, from: path,
     provenance: object({ build: Type.String({ minLength: 1 }), storageVersion: Type.String({ minLength: 1 }) }),
   }), { maxItems: 100 })),
-  selection: Type.Optional(object({ profile: id, chat: Type.Optional(id) })),
+  selection: Type.Optional(object({ profile: id, conversation: Type.Optional(id) })),
 });
 
 export type DeviceTemplate = Static<typeof DeviceTemplateSchema>;
@@ -83,9 +83,9 @@ export type PreparedTemplate = Omit<DeviceTemplate, "keychain" | "websiteState" 
     removeAccounts?: string[];
   };
   websiteState?: { data: string };
-  profiles?: Array<Omit<NonNullable<DeviceTemplate["profiles"]>[number], "files" | "chats"> & {
+  profiles?: Array<Omit<NonNullable<DeviceTemplate["profiles"]>[number], "files" | "conversations"> & {
     files?: Array<{ path: string; data: string }>;
-    chats?: Array<Omit<NonNullable<NonNullable<DeviceTemplate["profiles"]>[number]["chats"]>[number], "files" | "packageFrom"> & {
+    conversations?: Array<Omit<NonNullable<NonNullable<DeviceTemplate["profiles"]>[number]["conversations"]>[number], "files" | "packageFrom"> & {
       packageData?: string;
       files?: Array<{ id: string; name: string; data: string }>;
     }>;
@@ -127,21 +127,21 @@ export function parseTemplate(value: unknown): DeviceTemplate {
     for (const file of profile.files ?? []) {
       if (/^(conversations|history|chats|MEMORY\.md|SOUL\.md)(\/|$)/.test(file.path)) throw new Error("Use conversation files or memory/soul fields for reserved Profile paths");
     }
-    unique((profile.chats ?? []).map(chat => chat.id), "conversation ID");
-    for (const chat of profile.chats ?? []) {
-      if ((chat.messages !== undefined) === (chat.packageFrom !== undefined) || chat.packageFrom && chat.files?.length) throw new Error("Conversation must declare messages or packageFrom, not both");
-      const files = chat.files ?? [];
+    unique((profile.conversations ?? []).map(conversation => conversation.id), "conversation ID");
+    for (const conversation of profile.conversations ?? []) {
+      if ((conversation.messages !== undefined) === (conversation.packageFrom !== undefined) || conversation.packageFrom && conversation.files?.length) throw new Error("Conversation must declare messages or packageFrom, not both");
+      const files = conversation.files ?? [];
       unique(files.map(file => file.id), "conversation file ID");
       unique(files.map(file => relativeStoragePath(file.name).toLowerCase()), "conversation filename");
       if (files.some(file => file.name.includes("/"))) throw new Error("Conversation filenames must be basenames");
-      for (const message of chat.messages ?? []) {
+      for (const message of conversation.messages ?? []) {
         if (message.role === "user" && message.attachments?.some(id => !files.some(file => file.id === id))) throw new Error("Unknown conversation attachment ID");
       }
     }
   }
   if (template.selection) {
     const profile = profiles.find(profile => profile.id === template.selection!.profile);
-    if (!profile || template.selection.chat && !profile.chats?.some(chat => chat.id === template.selection!.chat)) throw new Error("Unknown selection reference");
+    if (!profile || template.selection.conversation && !profile.conversations?.some(conversation => conversation.id === template.selection!.conversation)) throw new Error("Unknown selection reference");
   }
   const settingsKeys = { language: ["app", "app.language"], onboardingCompleted: ["app", "app.hasCompletedOnboarding"], region: ["app", "app.region"], defaultModel: ["app", "llm.defaultModel"], allowHostConnections: ["app", "host.allowConnections"] } as const;
   for (const domain of ["app", "appGroup"] as const) {
@@ -216,12 +216,12 @@ export async function prepareTemplate(template: DeviceTemplate, source: string, 
     profiles: await Promise.all((profiles ?? []).map(async profile => ({
       ...profile,
       files: await Promise.all((profile.files ?? []).map(async file => ({ path: file.path, data: await data(file.content) }))),
-      chats: await Promise.all((profile.chats ?? []).map(async chat => {
-        const { packageFrom, ...fields } = chat;
+      conversations: await Promise.all((profile.conversations ?? []).map(async conversation => {
+        const { packageFrom, ...fields } = conversation;
         return {
           ...fields,
           packageData: packageFrom ? (await read(packageFrom)).toBase64() : undefined,
-          files: await Promise.all((chat.files ?? []).map(async file => ({ id: file.id, name: file.name, data: await data(file.content) }))),
+          files: await Promise.all((conversation.files ?? []).map(async file => ({ id: file.id, name: file.name, data: await data(file.content) }))),
         };
       })),
     }))),

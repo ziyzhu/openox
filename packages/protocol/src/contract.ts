@@ -1,6 +1,6 @@
 import { Type, type Static, type TSchema } from "typebox";
 
-export const RPC_VERSION = 1;
+export const RPC_VERSION = 2;
 const S = Type.String;
 const B = Type.Boolean;
 const I = Type.Integer;
@@ -81,7 +81,7 @@ export const Schemas = {
     id: S(), title: S(), model: Type.Union([S(), Type.Null()]), createdAt: S(),
     lastActivity: Type.Union([S(), Type.Null()]), active: B(),
   }),
-  ListConversationsResult: object("ListConversationsResult", { chats: A(R("ConversationRow")) }),
+  ListConversationsResult: object("ListConversationsResult", { conversations: A(R("ConversationRow")) }),
   ConversationTool: object("ConversationTool", { name: S(), description: S(), parameters: Type.Unknown(), strict: B() }),
   ConversationSnapshot: object("ConversationSnapshot", {
     id: S(), model: R("ProviderModel"), systemPrompt: S(), renderedSystemPrompt: S(), soul: S(), memory: S(),
@@ -91,11 +91,11 @@ export const Schemas = {
   PendingConversationPrompt: object("PendingConversationPrompt", {
     id: S(), prompt: S(), options: A(S()), allowsCustomAnswer: B(), requiresApp: B(),
   }),
-  RespondConversationResult: object("RespondConversationResult", { chatId: S(), promptId: S() }),
+  RespondConversationResult: object("RespondConversationResult", { conversationId: S(), promptId: S() }),
   GetConversationResult: object("GetConversationResult", { data: optional(R("ConversationSnapshot")) }),
-  NewConversationResult: object("NewConversationResult", { chatId: S(), temporary: B(), model: S() }),
-  SendConversationResult: object("SendConversationResult", { chatId: S(), outcome: S(), text: optional(S()), error: optional(S()) }),
-  StopConversationResult: object("StopConversationResult", { chatId: S(), wasRunning: B() }),
+  NewConversationResult: object("NewConversationResult", { conversationId: S(), temporary: B(), model: S() }),
+  SendConversationResult: object("SendConversationResult", { conversationId: S(), outcome: S(), text: optional(S()), error: optional(S()) }),
+  StopConversationResult: object("StopConversationResult", { conversationId: S(), wasRunning: B() }),
   ValueResult: object("ValueResult", { value: Type.Unknown() }),
   VMLog: object("VMLog", { level: S(), message: S() }),
   VMControlResult: object("VMControlResult", { value: optional(Type.Unknown()), logs: optional(A(R("VMLog"))) }),
@@ -143,20 +143,20 @@ export const Methods = {
   "repositories.connectFolder": method("connectRepositoryFolder", "MountedRepositoryRequest", "RepositoryResult"),
   "repositories.disconnectFolder": method("disconnectRepositoryFolder", "RepositoryIDRequest", "EmptyResult"),
   "debug.durable.storage": method("durableStorage", "DurableCommandParameters", "DurableCommandResult"),
-  "debug.durable.chat": method("durableConversation", "DurableCommandParameters", "DurableCommandResult"),
+  "debug.durable.conversation": method("durableConversation", "DurableCommandParameters", "DurableCommandResult"),
   "services.invoke": method("invokeAction", "ActionRequest", "ValueResult"),
   "services.evaluate": method("evaluate", "EvaluateRequest", "ValueResult"),
   "services.reload": method("reloadService", "ServiceRequest", "ValueResult"),
   "services.refreshAuth": method("refreshServiceAuth", "ServiceRequest", "ValueResult"),
   "services.list": method("listServices", "EmptyRequest", "ListServicesResult"),
   "services.sync": method("syncServices", "EmptyRequest", "SyncServicesResult"),
-  "chats.list": method("listConversations", "EmptyRequest", "ListConversationsResult"),
-  "chats.get": method("getConversation", "SessionRequest", "GetConversationResult"),
-  "chats.open": method("openConversation", "SessionRequest", "GetConversationResult"),
-  "chats.respond": method("respondConversation", "RespondConversationRequest", "RespondConversationResult"),
-  "chats.new": method("newConversation", "NewConversationRequest", "NewConversationResult"),
-  "chats.send": method("sendConversation", "SendConversationRequest", "SendConversationResult"),
-  "chats.stop": method("stopConversation", "SessionRequest", "StopConversationResult"),
+  "conversations.list": method("listConversations", "EmptyRequest", "ListConversationsResult"),
+  "conversations.get": method("getConversation", "SessionRequest", "GetConversationResult"),
+  "conversations.open": method("openConversation", "SessionRequest", "GetConversationResult"),
+  "conversations.respond": method("respondConversation", "RespondConversationRequest", "RespondConversationResult"),
+  "conversations.new": method("newConversation", "NewConversationRequest", "NewConversationResult"),
+  "conversations.send": method("sendConversation", "SendConversationRequest", "SendConversationResult"),
+  "conversations.stop": method("stopConversation", "SessionRequest", "StopConversationResult"),
   "providers.list": method("listProviders", "EmptyRequest", "ListProvidersResult"),
   "logs.list": method("getLogs", "GetLogsRequest", "GetLogsResult"),
   "debug.composer.formatting": method("getComposerFormatting", "EmptyRequest", "ComposerFormattingResult"),
@@ -171,13 +171,13 @@ export const Methods = {
   "debug.websiteData.restore": method("restoreWebsiteData", "RestoreWebsiteDataRequest", "WebsiteDataResult"),
   "debug.providers.setKey": method("setKey", "SetKeyRequest", "EmptyResult"),
   "debug.region.set": method("setRegion", "SetRegionRequest", "EmptyResult"),
-  "debug.chats.attachServices": method("setAttachedService", "SetAttachedServiceRequest", "EmptyResult"),
+  "debug.conversations.attachServices": method("setAttachedService", "SetAttachedServiceRequest", "EmptyResult"),
   "debug.composer.setDraft": method("setComposerDraft", "PromptRequest", "EmptyResult"),
   "debug.composer.setMarkedText": method("setComposerMarkedText", "PromptRequest", "EmptyResult"),
   "debug.pasteboard.setImage": method("setPasteboardImage", "EmptyRequest", "EmptyResult"),
   "debug.pasteboard.setRichText": method("setPasteboardRichText", "PromptRequest", "EmptyResult"),
   "debug.share.stageNote": method("stageSharedNote", "PromptRequest", "EmptyResult"),
-  "debug.chat.setEditDraft": method("setEditDraft", "PromptRequest", "EmptyResult"),
+  "debug.conversation.setEditDraft": method("setEditDraft", "PromptRequest", "EmptyResult"),
 } as const;
 
 const id = Type.Union([S(), Type.Number(), Type.Null()]);

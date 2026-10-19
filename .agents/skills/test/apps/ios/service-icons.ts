@@ -7,10 +7,10 @@ import { claimSimulator, requireFreePort, requireSimulator } from "../../../setu
 
 const qa = qaCommand({
   usage: "bun .agents/skills/test/apps/ios/service-icons.ts --device ox-N --host <ws-url> --conversation <saved-QA-conversation> --domain <run-owned-MCP-domain> [--live] [--only <case,...>] [--output /tmp/directory]\nRequires an attached run-owned MCP fixture at http://127.0.0.1:<registryPort>/mcp-favicon-qa and an idle saved QA conversation. Launch Ox with the matching OX_SERVICES_ENDPOINT. Starts its fixture server, verifies native image loading through ox, and restores the saved favicon URL. --live also contacts Google, httpbingo, and httpbin for public HTTPS ICO and redirect checks.",
-  options: { host: { type: "string" }, chat: { type: "string" }, domain: { type: "string" }, live: { type: "boolean" }, only: { type: "string" }, output: { type: "string" } },
+  options: { host: { type: "string" }, conversation: { type: "string" }, domain: { type: "string" }, live: { type: "boolean" }, only: { type: "string" }, output: { type: "string" } },
 });
-const { host, chat, domain } = qa.values;
-assert(host && chat && domain, "Pass an explicit Host, saved QA conversation, and run-owned MCP fixture domain");
+const { host, conversation, domain } = qa.values;
+assert(host && conversation && domain, "Pass an explicit Host, saved QA conversation, and run-owned MCP fixture domain");
 assert.equal(Number(new URL(host).port), qa.debugPort);
 const origin = `http://127.0.0.1:${qa.registryPort}`;
 const directory = resolve(qa.values.output ?? `/tmp/ox-service-icons-${Date.now()}`);
@@ -40,7 +40,7 @@ const checks: string[] = [];
 let original: string | null | undefined;
 
 async function call(name: string, args: Record<string, unknown> = {}) {
-  const result = await run(["ox", "--host", host!, "--chat", chat!, "vm", "call", name, "--args", JSON.stringify({ ...args, purpose: "Verify run-owned favicon fixture" }), "--json"], { capture: true });
+  const result = await run(["ox", "--host", host!, "--conversation", conversation!, "vm", "call", name, "--args", JSON.stringify({ ...args, purpose: "Verify run-owned favicon fixture" }), "--json"], { capture: true });
   return JSON.parse(result.stdout).value;
 }
 async function verify(name: string, candidates: Icon[], expectedSize?: number | true, faviconUrl: string | null = null) {
@@ -87,7 +87,7 @@ const server = Bun.serve({
 });
 try {
   await mkdir(directory, { recursive: true });
-  const inspected = await run(["ox", "--host", host, "--chat", chat, "conversation", "inspect", "--json"], { capture: true });
+  const inspected = await run(["ox", "--host", host, "--conversation", conversation, "conversation", "inspect", "--json"], { capture: true });
   assert.equal(JSON.parse(inspected.stdout).isBusy, false, "Use an idle QA conversation");
   const service = (await call("ox.service.inspect", { domain })).service;
   assert.equal(service.endpoint, `${origin}/mcp-favicon-qa`, "Use only the run-owned fixture endpoint");

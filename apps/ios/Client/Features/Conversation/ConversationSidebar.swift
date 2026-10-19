@@ -182,7 +182,7 @@ struct ConversationSidebar: View {
                         CellularAutomatonLoader.small
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, Theme.Spacing.md)
-                            .accessibilityLabel("Loading your chats…")
+                            .accessibilityLabel("Loading your conversations…")
                             .task {
                                 await Task.yield()
                                 guard !Task.isCancelled else { return }

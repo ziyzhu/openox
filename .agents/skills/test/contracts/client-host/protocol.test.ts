@@ -24,8 +24,8 @@ async function exercise(options: FixtureOptions = {}) {
       message(socket, message) {
         const request = JSON.parse(String(message));
         requests.push(request.method);
-        const reply = options.invalid && request.method === "chats.list"
-          ? { jsonrpc: "2.0", id: request.id, result: { chats: null } }
+        const reply = options.invalid && request.method === "conversations.list"
+          ? { jsonrpc: "2.0", id: request.id, result: { conversations: null } }
           : hostFixtureReply(request);
         if (request.method === "host.describe" && "result" in reply) {
           reply.result = { ...reply.result as Record<string, unknown>, protocols: {
@@ -35,7 +35,7 @@ async function exercise(options: FixtureOptions = {}) {
         }
         const send = () => {
           socket.send(JSON.stringify(reply));
-          if (options.disconnectAfterSnapshot && request.method === "chats.get" && socket.data.connection === 1) socket.close();
+          if (options.disconnectAfterSnapshot && request.method === "conversations.get" && socket.data.connection === 1) socket.close();
         };
         if (request.method === "host.describe" && options.descriptionDelayMs) setTimeout(send, options.descriptionDelayMs);
         else send();
@@ -64,17 +64,17 @@ test("CLI and fixture Host conform across description and conversation create/se
     expect((await fixture.cli("host", "describe")).code).toBe(0);
     const created = await fixture.cli("conversation", "new", "--temporary", "--provider", "mock", "--model", "mock");
     expect(created.code).toBe(0);
-    const id = JSON.parse(created.stdout).chatId;
+    const id = JSON.parse(created.stdout).conversationId;
     const sent = await fixture.cli("--conversation", id, "conversation", "send", "hello");
     expect(sent.code).toBe(0);
-    expect(JSON.parse(sent.stdout)).toMatchObject({ chatId: id, outcome: "completed", text: "Hello from the fixture." });
-    const inspected = await fixture.cli("--chat", id, "chat", "inspect");
+    expect(JSON.parse(sent.stdout)).toMatchObject({ conversationId: id, outcome: "completed", text: "Hello from the fixture." });
+    const inspected = await fixture.cli("--conversation", id, "conversation", "inspect");
     expect(inspected.code).toBe(0);
     expect(JSON.parse(inspected.stdout)).toMatchObject({ id, isBusy: false });
-    const duplicated = await fixture.cli("--conversation", id, "--chat", id, "conversation", "inspect");
+    const duplicated = await fixture.cli("--conversation", id, "--conversation", id, "conversation", "inspect");
     expect(duplicated.code).toBe(1);
     expect(duplicated.stderr).toContain("may only be specified once");
-    expect(fixture.requests).toEqual(["host.describe", "host.describe", "chats.new", "host.describe", "chats.send", "host.describe", "chats.get"]);
+    expect(fixture.requests).toEqual(["host.describe", "host.describe", "conversations.new", "host.describe", "conversations.send", "host.describe", "conversations.get"]);
   } finally { fixture.close(); }
 });
 
@@ -84,7 +84,7 @@ test("CLI rejects malformed Host results without retrying a submitted request", 
     const result = await fixture.cli("conversation", "list");
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("Host returned an invalid conversation list");
-    expect(fixture.requests).toEqual(["host.describe", "chats.list"]);
+    expect(fixture.requests).toEqual(["host.describe", "conversations.list"]);
   } finally { fixture.close(); }
 });
 
@@ -108,7 +108,7 @@ test("CLI accepts the current RPC revision when the Host also supports newer rev
   const fixture = await exercise({ rpcVersions: [RPC_VERSION, RPC_VERSION + 1] });
   try {
     expect((await fixture.cli("conversation", "new", "--temporary")).code).toBe(0);
-    expect(fixture.requests).toEqual(["host.describe", "chats.new"]);
+    expect(fixture.requests).toEqual(["host.describe", "conversations.new"]);
   } finally { fixture.close(); }
 });
 
@@ -141,20 +141,20 @@ async function watchRequests(options: FixtureOptions, ready: (requests: string[]
 }
 
 test("CLI checks the interface version once for repeated requests on one connection", async () => {
-  const result = await watchRequests({}, requests => requests.filter(method => method === "chats.get").length >= 3);
+  const result = await watchRequests({}, requests => requests.filter(method => method === "conversations.get").length >= 3);
   expect(result.requests.filter(method => method === "host.describe")).toEqual(["host.describe"]);
   expect(result.stderr).toBe("");
 });
 
 test("CLI rechecks the interface after reconnecting", async () => {
-  const result = await watchRequests({ disconnectAfterSnapshot: true }, requests => requests.filter(method => method === "chats.get").length >= 2);
-  expect(result.requests.slice(0, 4)).toEqual(["host.describe", "chats.get", "host.describe", "chats.get"]);
+  const result = await watchRequests({ disconnectAfterSnapshot: true }, requests => requests.filter(method => method === "conversations.get").length >= 2);
+  expect(result.requests.slice(0, 4)).toEqual(["host.describe", "conversations.get", "host.describe", "conversations.get"]);
 });
 
 test("CLI refuses ordinary requests after reconnecting to an incompatible Host", async () => {
   const result = await watchRequests({ disconnectAfterSnapshot: true, reconnectRPCVersions: [RPC_VERSION + 1] },
     requests => requests.filter(method => method === "host.describe").length >= 2);
-  expect(result.requests).toEqual(["host.describe", "chats.get", "host.describe"]);
+  expect(result.requests).toEqual(["host.describe", "conversations.get", "host.describe"]);
   expect(result.stderr).toContain(`do not support CLI revision ${RPC_VERSION}`);
 });
 
@@ -164,6 +164,6 @@ test("CLI reports Host errors without replaying mutations", async () => {
     const result = await fixture.cli("conversation", "new", "--provider", "missing", "--model", "missing");
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("fixture rejected provider");
-    expect(fixture.requests).toEqual(["host.describe", "chats.new"]);
+    expect(fixture.requests).toEqual(["host.describe", "conversations.new"]);
   } finally { fixture.close(); }
 });

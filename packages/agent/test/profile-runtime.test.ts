@@ -67,8 +67,8 @@ test("core entry does not install host globals or runtime shims", async () => {
 test("in-process host executes an unbound Pi conversation and delivers committed events", async () => {
   const events: CommittedEvent[] = [];
   const session = await fixture("fixture", async (_, frames) => { events.push(...frames); });
-  const chat = await conversation(session);
-  const result = await session.run(chat.id, { type: "input", content: "hello", requestId: "one" });
+  const handle = await conversation(session);
+  const result = await session.run(handle.id, { type: "input", content: "hello", requestId: "one" });
   expect(result.receipt.status).toBe("done");
   expect(result.messages.at(-1)?.role).toBe("assistant");
   expect(events.some(event => event.type === "run_end")).toBe(true);
@@ -91,10 +91,10 @@ test("Profile runtimes with colliding numeric conversation IDs isolate models, f
 });
 
 test("completed request IDs deduplicate without waiting for a nonexistent second run_end", async () => {
-  const session = await fixture(); const chat = await conversation(session);
+  const session = await fixture(); const handle = await conversation(session);
   const input = { type: "input" as const, content: "hello", requestId: "same" };
-  const first = await session.run(chat.id, input);
-  const again = await session.run(chat.id, input);
+  const first = await session.run(handle.id, input);
+  const again = await session.run(handle.id, input);
   expect(again.receipt.id).toBe(first.receipt.id);
 });
 
@@ -367,7 +367,7 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(packages.skills.every(skill => skill.source === "system" && skill.files["SKILL.md"]?.startsWith("---"))).toBe(true);
     await expect(adapter.command({ action: "fileMounts", profileID: "wrong" })).rejects.toThrow("Profile mismatch");
     const scope = { hostID: "ios-host", profileID: "ios-profile" };
-    const hostContext = { active: scope, hosts: [{ ...scope, functions: ["ox"], serviceKinds: ["web", "ios", "mcp"] as ("web" | "ios" | "mcp")[], presentation: "chat-bubbles" as const, externalFiles: true }] };
+    const hostContext = { active: scope, hosts: [{ ...scope, functions: ["ox"], serviceKinds: ["web", "ios", "mcp"] as ("web" | "ios" | "mcp")[], presentation: "conversation-bubbles" as const, externalFiles: true }] };
     const config = { title: "Native", promptState: { soul: "## Voice\nBe helpful.", memory: "frozen memory", hostContext }, model: "mock", contextWindow: 100000,
       maxTokens: 1000, reasoning: false, tools: [] };
     const created = await adapter.command({ action: "conversationCreate", title: config.title,

@@ -2,7 +2,7 @@ import type { Report } from "./types.ts";
 
 export function compare(baseline: Report, candidate: Report) {
   for (const report of [baseline, candidate]) {
-    if (report.version !== 4 || !["ox-cli-chat", "stubbed-ox"].includes(report.mode) || !Array.isArray(report.results) || !Array.isArray(report.plannedCases) || !report.plannedCases.length || !report.fixtureHash) throw new Error("Unsupported eval report");
+    if (report.version !== 4 || !["ox-cli-conversation", "stubbed-ox"].includes(report.mode) || !Array.isArray(report.results) || !Array.isArray(report.plannedCases) || !report.plannedCases.length || !report.fixtureHash) throw new Error("Unsupported eval report");
     if (new Set(report.plannedCases).size !== report.plannedCases.length || report.results.some(result => !report.plannedCases.includes(result.id))) throw new Error("Invalid planned cohort");
     const keys = report.results.map(result => `${result.id}:${result.repetition}`);
     if (new Set(keys).size !== keys.length) throw new Error("Duplicate attempts in report");

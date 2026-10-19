@@ -9,7 +9,7 @@ extension OxHostProtocol {
     ) {
         Task { @MainActor in
             let conversations = conversationRows(await host.listConversations())
-            Log.agent.debug("OxHostRPC.chats.list id=\(reply.id) count=\(conversations.count)")
+            Log.agent.debug("OxHostRPC.conversations.list id=\(reply.id) count=\(conversations.count)")
             reply.success(ListConversationsResult(conversations: conversations))
         }
     }
@@ -37,7 +37,7 @@ extension OxHostProtocol {
                     reply.success(GetConversationResult(data: nil))
                     return
                 }
-                Log.agent.debug("OxHostRPC.chats.get id=\(reply.id) session=\(session.id)")
+                Log.agent.debug("OxHostRPC.conversations.get id=\(reply.id) session=\(session.id)")
                 reply.success(GetConversationResult(data: try await ConversationSnapshot(session)))
             } catch { reply.failure(error.localizedDescription) }
         }
@@ -55,7 +55,7 @@ extension OxHostProtocol {
         Task { @MainActor in
             do {
                 let conversation = try await conversationManager.openForClient(rawID)
-                Log.agent.info("OxHostRPC.chats.open id=\(reply.id) conversation=\(conversation.id)")
+                Log.agent.info("OxHostRPC.conversations.open id=\(reply.id) conversation=\(conversation.id)")
                 reply.success(GetConversationResult(data: try await ConversationSnapshot(conversation)))
             } catch { reply.failure(error.localizedDescription) }
         }
@@ -74,16 +74,16 @@ extension OxHostProtocol {
                 }
                 let id = try resolveClientConversationID(host.conversations, command.sessionId,
                                                        missing: HostConversationControlError.stalePrompt.localizedDescription)
-                Log.agent.info("OxHostRPC.chats.respond id=\(reply.id) conversation=\(id) prompt=\(promptID)")
+                Log.agent.info("OxHostRPC.conversations.respond id=\(reply.id) conversation=\(id) prompt=\(promptID)")
                 let controller = EmbeddedHostConversationController(host: host)
                 let conversationID = try await controller.respondToPrompt(promptID, in: id, answer: command.answer)
-                reply.success(RespondConversationResult(chatId: conversationID.uuidString, promptId: promptID.uuidString))
+                reply.success(RespondConversationResult(conversationId: conversationID.uuidString, promptId: promptID.uuidString))
             } catch { reply.failure(error.localizedDescription) }
         }
     }
 
     struct RespondConversationResult: Encodable {
-        let chatId: String
+        let conversationId: String
         let promptId: String
     }
 
@@ -128,8 +128,8 @@ extension OxHostProtocol {
             )
         }
         let model = "\(conversation.modelSelection.providerID):\(conversation.modelSelection.modelID)"
-        Log.agent.info("OxHostRPC.chats.new id=\(reply.id) conversation=\(conversation.id) temporary=\(conversation.isTemporary) model=\(model)")
-        reply.success(NewConversationResult(chatId: conversation.id.uuidString, temporary: conversation.isTemporary, model: model))
+        Log.agent.info("OxHostRPC.conversations.new id=\(reply.id) conversation=\(conversation.id) temporary=\(conversation.isTemporary) model=\(model)")
+        reply.success(NewConversationResult(conversationId: conversation.id.uuidString, temporary: conversation.isTemporary, model: model))
     }
 
     @MainActor
@@ -143,7 +143,7 @@ extension OxHostProtocol {
             do {
                 let id = try resolveClientConversationID(host.conversations, command.sessionId,
                                                        missing: "no active conversation; create one with conversations.new")
-                Log.agent.info("OxHostRPC.chats.send id=\(reply.id) conversation=\(id) chars=\(command.text.count) wait=\(command.wait ?? true)")
+                Log.agent.info("OxHostRPC.conversations.send id=\(reply.id) conversation=\(id) chars=\(command.text.count) wait=\(command.wait ?? true)")
                 let controller = EmbeddedHostConversationController(host: host)
                 let result = try await controller.sendText(command.text, to: id,
                                                            mode: command.wait == false ? .enqueue : .untilAttention)
@@ -161,39 +161,39 @@ extension OxHostProtocol {
         Task { @MainActor in
             do {
                 let id = try resolveClientConversationID(host.conversations, command.sessionId, missing: "no active conversation")
-                Log.agent.info("OxHostRPC.chats.stop id=\(reply.id) conversation=\(id)")
+                Log.agent.info("OxHostRPC.conversations.stop id=\(reply.id) conversation=\(id)")
                 let result = try await EmbeddedHostConversationController(host: host).stopConversation(id)
-                reply.success(StopConversationResult(chatId: result.conversationID.uuidString, wasRunning: result.wasRunning))
+                reply.success(StopConversationResult(conversationId: result.conversationID.uuidString, wasRunning: result.wasRunning))
             } catch { reply.failure(error.localizedDescription) }
         }
     }
 
     struct NewConversationResult: Encodable {
-        let chatId: String
+        let conversationId: String
         let temporary: Bool
         let model: String
     }
 
     struct SendConversationResult: Encodable {
-        let chatId: String
+        let conversationId: String
         let outcome: String
         var text: String?
         var error: String?
 
-        init(chatId: String, outcome: String) {
-            self.chatId = chatId
+        init(conversationId: String, outcome: String) {
+            self.conversationId = conversationId
             self.outcome = outcome
         }
 
         init(_ result: HostConversationSendResult) {
             switch result.outcome {
-            case .queued: self.init(chatId: result.conversationID.uuidString, outcome: "queued")
-            case .observed(let outcome): self.init(chatId: result.conversationID.uuidString, outcome: outcome)
+            case .queued: self.init(conversationId: result.conversationID.uuidString, outcome: "queued")
+            case .observed(let outcome): self.init(conversationId: result.conversationID.uuidString, outcome: outcome)
             }
         }
 
-        init(chatId: String, outcome: ConversationSubmissionOutcome) {
-            self.init(chatId: chatId, outcome: outcome.logLabel)
+        init(conversationId: String, outcome: ConversationSubmissionOutcome) {
+            self.init(conversationId: conversationId, outcome: outcome.logLabel)
             switch outcome {
             case .completed(let response): text = response
             case .failed(let message): error = message
@@ -203,7 +203,7 @@ extension OxHostProtocol {
     }
 
     struct StopConversationResult: Encodable {
-        let chatId: String
+        let conversationId: String
         let wasRunning: Bool
     }
 

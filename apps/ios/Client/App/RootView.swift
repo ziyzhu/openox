@@ -785,14 +785,14 @@ struct RootView: View {
             onLoadMore: { await conversations.loadMoreSummaries() },
             onSearch: { await conversations.loadAllSummaries() },
             onNewConversation: {
-                sidebarAction("newChat") {
+                sidebarAction("newConversation") {
                     let conversation = conversations.startNewConversation()
-                    requestComposerFocus(for: conversation, reason: "newChat")
+                    requestComposerFocus(for: conversation, reason: "newConversation")
                     autoCloseSidebar()
                 }
             },
             onOpen: { meta in
-                sidebarAction("openChat") {
+                sidebarAction("openConversation") {
                     openConversationFromSidebar(meta.id)
                 }
             },
@@ -803,7 +803,7 @@ struct RootView: View {
                 }
             },
             onRename: { meta, title in
-                sidebarAction("renameChat") {
+                sidebarAction("renameConversation") {
                     conversations.rename(meta.id, to: title)
                     refreshCompactSidebar()
                 }
@@ -1047,7 +1047,7 @@ struct RootView: View {
         Log.ui.info("RootView.servicesStartConversation service=\(service.domain)")
         let conversation = conversations.startNewConversation()
         conversation.setAttachedServices([service])
-        requestComposerFocus(for: conversation, reason: "serviceStartChat")
+        requestComposerFocus(for: conversation, reason: "serviceStartConversation")
         presentation = nil
     }
 

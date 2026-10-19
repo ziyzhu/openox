@@ -437,8 +437,8 @@ struct ConversationPage: View {
         .onChange(of: ObjectIdentifier(conversation)) { _, _ in
             sendHandoff = .idle
             scroller.cancelSendHandoff()
-            speechInput.cancel(reason: "chatChanged")
-            cancelEditing(reason: "chatChanged", keepFocus: false)
+            speechInput.cancel(reason: "conversationChanged")
+            cancelEditing(reason: "conversationChanged", keepFocus: false)
         }
         .onChange(of: editedBlockID) { _, blockID in
             if blockID == nil {

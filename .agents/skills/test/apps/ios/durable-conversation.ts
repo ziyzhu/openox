@@ -26,9 +26,9 @@ process.once("SIGTERM", () => interrupt("SIGTERM"));
 const ios = iosTarget(qa.device);
 async function launch(enabled: boolean) {
   evidence.launch = await ios.launch(bundle, qa.values.app!, { OX_DEBUG_ENDPOINT: qa.debugEndpoint, OX_DURABLE_TEMPORARY_SESSION: enabled ? caseID : "" });
-  await ios.wait({ id: "chat.temporaryToggle" }, { timeout: 20_000, stable: 1000 });
+  await ios.wait({ id: "conversation.temporaryToggle" }, { timeout: 20_000, stable: 1000 });
   const tree = await ios.describe();
-  check(nodes(tree).some(node => node.AXUniqueId === "chat.modelPicker" && node.AXLabel === "Model: Mock"), "Select native Mock before the campaign; provider state is not changed automatically");
+  check(nodes(tree).some(node => node.AXUniqueId === "conversation.modelPicker" && node.AXLabel === "Model: Mock"), "Select native Mock before the campaign; provider state is not changed automatically");
 }
 async function logs(): Promise<string[]> {
   await ios.pull(bundle, "Library/Application Support/logs.jsonl", `${directory}/logs`);
@@ -47,19 +47,19 @@ async function attach() {
   const attached = (messages: string[]) => messages.map(message => /PiDurable rollout attached temporary=([A-F0-9-]+) case=([A-F0-9-]+)/.exec(message))
     .filter(match => match?.[2] === caseID);
   const count = attached(await logs()).length;
-  await ios.tap({ id: "chat.temporaryToggle" }, { timeout: 5000, stable: 200 });
+  await ios.tap({ id: "conversation.temporaryToggle" }, { timeout: 5000, stable: 200 });
   return waitForLog(messages => {
     const matches = attached(messages);
     return matches.length > count ? matches.at(-1)?.[1] : undefined;
   });
 }
 async function post(text: string) {
-  await ios.tap({ id: "chat.input" }, { timeout: 5000, stable: 1000 });
-  await ios.wait({ id: "chat.input" }, { stable: 1000 });
+  await ios.tap({ id: "conversation.input" }, { timeout: 5000, stable: 1000 });
+  await ios.wait({ id: "conversation.input" }, { stable: 1000 });
   await ios.text(text);
-  const draft = nodes(await ios.describe()).find(node => node.AXUniqueId === "chat.input");
+  const draft = nodes(await ios.describe()).find(node => node.AXUniqueId === "conversation.input");
   check(draft?.AXValue === text, "Composer did not receive exact input; never retry an uncertain send");
-  await ios.tap({ id: "chat.send" }, { timeout: 5000, stable: 200 });
+  await ios.tap({ id: "conversation.send" }, { timeout: 5000, stable: 200 });
 }
 function metricFields(message: string) {
   return Object.fromEntries([...message.matchAll(/\b([A-Za-z]+)=([^\s]+)/g)].map(match => [match[1]!, match[2]!]));
@@ -115,11 +115,11 @@ async function send(conversationID: string, text: string, stop = false) {
   const previous = new Set(summaries(await logs()).map(message => metricFields(message).submission));
   await post(text);
   if (stop) {
-    await ios.wait({ id: "chat.stop" }, { timeout: 10_000 });
-    await ios.tap({ id: "chat.stop" });
+    await ios.wait({ id: "conversation.stop" }, { timeout: 10_000 });
+    await ios.tap({ id: "conversation.stop" });
   }
   await waitForLog(messages => summaries(messages).some(message => !previous.has(metricFields(message).submission) && metricFields(message).outcome === outcome) ? true : undefined);
-  await ios.wait({ id: "chat.stop" }, { missing: true, timeout: 10_000, stable: 1000 });
+  await ios.wait({ id: "conversation.stop" }, { missing: true, timeout: 10_000, stable: 1000 });
   verifyTelemetry(await logs(), conversationID, text, stop);
 }
 function nativeModelStarts(messages: string[], temporaryID: string) {
@@ -134,9 +134,9 @@ async function stopWithQueuedInput(conversationID: string) {
   await post("13");
   await waitForLog(messages => nativeModelStarts(messages, conversationID).length > started ? true : undefined);
   await post("2");
-  await ios.tap({ id: "chat.stop" }, { timeout: 5000 });
+  await ios.tap({ id: "conversation.stop" }, { timeout: 5000 });
   await waitForLog(messages => count(messages, "aborted") > count(before, "aborted") && count(messages, "completed") > count(before, "completed") ? true : undefined);
-  await ios.wait({ id: "chat.stop" }, { missing: true, timeout: 10_000, stable: 1000 });
+  await ios.wait({ id: "conversation.stop" }, { missing: true, timeout: 10_000, stable: 1000 });
   check(JSON.stringify(await ios.describe()).includes("Sorry that took a moment."), "Queued input completes after Stop without a late abort or presentation race");
   const after = (await logs()).slice(before.length);
   const workers = after.filter(message => message.includes(`Conversation.worker start id=${conversationID}`));
@@ -154,13 +154,13 @@ async function verifyModelChanges(conversationID: string) {
     const baseline = await logs();
     await post(prompt);
     await waitForLog(messages => matches(messages, "Conversation.modelChange pending") > matches(baseline, "Conversation.modelChange pending") ? true : undefined);
-    if (stop) await ios.tap({ id: "chat.stop" }, { timeout: 5000 });
+    if (stop) await ios.tap({ id: "conversation.stop" }, { timeout: 5000 });
     await waitForLog(messages => matches(messages, `Conversation.runOne end`) > matches(baseline, "Conversation.runOne end")
       && messages.some(message => message.includes(`Conversation.runOne end id=${conversationID} outcome=${outcome}`)) ? true : undefined);
     const after = await logs();
     check(matches(after, "Conversation.modelChange cancelled") > matches(baseline, "Conversation.modelChange cancelled"), "Stop or failure cancels the pending selection");
     check(matches(after, "Conversation.modelChange applied") === matches(baseline, "Conversation.modelChange applied"), "Cancelled selections never apply");
-    await ios.wait({ id: "chat.stop" }, { missing: true, timeout: 10_000, stable: 500 });
+    await ios.wait({ id: "conversation.stop" }, { missing: true, timeout: 10_000, stable: 500 });
     await ios.screenshot(`${directory}/model-${outcome}.png`);
   }
   const baseline = await logs();
@@ -212,8 +212,8 @@ try {
     await ios.screenshot(`${directory}/reasoning.png`);
     await send(firstConversation, "74");
     const progressTree = nodes(await ios.describe());
-    const progressTurn = progressTree.slice(progressTree.findIndex(node => node.AXUniqueId === "chat.message.user" && node.AXLabel === "74"));
-    const answerIndex = progressTurn.findIndex(node => node.AXUniqueId === "chat.message.agent" && node.AXLabel === "The progress update stayed in order.");
+    const progressTurn = progressTree.slice(progressTree.findIndex(node => node.AXUniqueId === "conversation.message.user" && node.AXLabel === "74"));
+    const answerIndex = progressTurn.findIndex(node => node.AXUniqueId === "conversation.message.agent" && node.AXLabel === "The progress update stayed in order.");
     check(answerIndex >= 0, "Reasoning cannot split the final answer into separate transcript rows");
     const thinkingRows = progressTurn.filter(node => node.type === "Button" && /^(Thought for|Share progress|List artifacts)/.test(node.AXLabel ?? ""));
     check(thinkingRows.length === 2 && thinkingRows.every(node => progressTurn.indexOf(node) < answerIndex), "Each progress phase has one thinking row before the final answer, with no late duplicate");

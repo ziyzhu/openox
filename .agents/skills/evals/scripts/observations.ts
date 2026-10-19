@@ -32,27 +32,27 @@ function complete(value: unknown): boolean {
   return true;
 }
 
-async function observe(host: EvalHost, chatId: string, reader: Reader, remaining: () => number, snapshot?: EvalSnapshot): Promise<unknown> {
-  if (reader.kind === "vm") return vmCall(host, chatId, reader.name, resolveReferences(reader.args, snapshot) as Record<string, unknown>, remaining());
+async function observe(host: EvalHost, conversationId: string, reader: Reader, remaining: () => number, snapshot?: EvalSnapshot): Promise<unknown> {
+  if (reader.kind === "vm") return vmCall(host, conversationId, reader.name, resolveReferences(reader.args, snapshot) as Record<string, unknown>, remaining());
   if (reader.kind === "skill") {
-    const file = await vmCall<{ text: string; truncated: boolean; unsupported: string | null }>(host, chatId, "ox.fs.read", { path: `skills/${reader.name}/SKILL.md` }, remaining());
+    const file = await vmCall<{ text: string; truncated: boolean; unsupported: string | null }>(host, conversationId, "ox.fs.read", { path: `skills/${reader.name}/SKILL.md` }, remaining());
     if (!file || typeof file.text !== "string" || file.truncated !== false || file.unsupported) throw new Error("Missing complete skill text");
     return parseSkill(file.text, reader.name);
   }
   if (reader.kind === "conversation") {
     const id = resolveReferences(reader.id, snapshot);
     if (typeof id !== "string" || !id) throw new Error("Observed conversation reference is not an ID");
-    return ox(host, ["conversation", "inspect", "--full"], id === "{{task}}" ? chatId : id, remaining());
+    return ox(host, ["conversation", "inspect", "--full"], id === "{{task}}" ? conversationId : id, remaining());
   }
   return ox(host, reader.command === "providers" ? ["host", "providers"] : ["conversation", "list"], undefined, remaining());
 }
 
-export async function observeState(host: EvalHost, chatId: string, binding: CaseBinding, remaining: () => number, phase: "before" | "after" | "cleanup", snapshot?: EvalSnapshot): Promise<ObservedState> {
+export async function observeState(host: EvalHost, conversationId: string, binding: CaseBinding, remaining: () => number, phase: "before" | "after" | "cleanup", snapshot?: EvalSnapshot): Promise<ObservedState> {
   const state: ObservedState = { values: {} };
   let bytes = 0;
   for (const [name, reader] of Object.entries(binding.observations)) {
     if (reader.phases && !reader.phases.includes(phase)) continue;
-    const value = await observe(host, chatId, reader, remaining, snapshot);
+    const value = await observe(host, conversationId, reader, remaining, snapshot);
     if (value === undefined || !complete(value)) throw new Error(`Missing or incomplete observation: ${name}`);
     bytes += Buffer.byteLength(JSON.stringify(value));
     if (bytes > 1_048_576) throw new Error(`Observations exceed total evidence budget at ${name}`);

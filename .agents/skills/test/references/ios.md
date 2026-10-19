@@ -25,17 +25,17 @@ Profiles. Diagnostic RPCs remain DEBUG Simulator-only. SQLite copies must includ
 WAL/SHM; they are diagnostics, not Profile exports or power-loss evidence.
 
 Verify behavior or independent effects, not just taps, queued sends, or idle status.
-After Profile selection, reconnect the Host socket before issuing another request. For persisted conversations, use the chat ID returned by Send; the initial ID from New can change when the conversation is first saved.
+After Profile selection, reconnect the Host socket before issuing another request. For persisted conversations, use the conversation ID returned by Send; the initial ID from New can change when the conversation is first saved.
 For native switches that ignore an idb default tap, verify the current hit target, use `idb ui tap --duration 0.15`, and assert the resulting AX value. Refresh frames after CLI mutations change a visible list.
 For transcript comparisons, use immutable historical turns: VM calls append receipts.
-For chat opening, verify the final visible tail after Markdown layout expands, then
+For conversation opening, verify the final visible tail after Markdown layout expands, then
 scroll away and reopen; an initial bottom geometry sample alone does not prove success.
 
 Verify streaming-rendering changes in video across paragraph/fence boundaries and completion; content assertions and settled screenshots do not establish visual continuity.
 For Liquid Glass chrome, compare frame-by-frame geometry and material lifetimes, not just
 spring duration or settled screenshots. Hidden controls must disappear visually as well as from AX.
 
-Verify Send handoffs in video for empty/populated chats, short/multiline/long drafts,
+Verify Send handoffs in video for empty/populated conversations, short/multiline/long drafts,
 keyboard visible/hidden, and scrolled history. Confirm non-queued cases have `posted`
 receipts; inspect rising motion separately from queue promotion and final anchoring.
 Track previous visible rows alongside the incoming bubble; a stable final anchor

@@ -19,7 +19,7 @@ appendFileSync(Bun.env.IOS_TRACE, JSON.stringify(call) + "\\n");
 if (tool === "plutil") console.log(Bun.env.IOS_APP_BUNDLE);
 else if (tool === "xcrun" && args[1] === "list") console.log(Bun.env.IOS_INVENTORY);
 else if (tool === "xcodebuild" && Bun.env.IOS_LAUNCH_FAIL === "true") { console.error("fixture build failed"); process.exit(1); }
-else if (tool === "idb" && args[1] === "describe-all") console.log(JSON.stringify([{ AXUniqueId: "chat.message.agent", frame: { x: 0, y: 0, width: 44, height: 44 } }]));
+else if (tool === "idb" && args[1] === "describe-all") console.log(JSON.stringify([{ AXUniqueId: "conversation.message.agent", frame: { x: 0, y: 0, width: 44, height: 44 } }]));
 else console.log("{}");
 `);
       await chmod(join(directory, tool), 0o755);
@@ -34,8 +34,8 @@ if (args[0] !== "apps/cli/src/ox.ts") {
 appendFileSync(Bun.env.IOS_TRACE, JSON.stringify(["ox", ...args.slice(1)]) + "\\n");
 const command = args[args.indexOf("conversation") + 1];
 const text = "Sorry that took a moment.";
-const snapshot = { id: "fixture-chat", model: { id: "mock" }, isBusy: false, messages: [{ content: text }] };
-const result = command === "list" ? [] : command === "new" ? { chatId: "fixture-chat", temporary: Bun.env.IOS_TEMPORARY === "true", model: "mock:mock" }
+const snapshot = { id: "fixture-conversation", model: { id: "mock" }, isBusy: false, messages: [{ content: text }] };
+const result = command === "list" ? [] : command === "new" ? { conversationId: "fixture-conversation", temporary: Bun.env.IOS_TEMPORARY === "true", model: "mock:mock" }
   : command === "send" ? { outcome: "completed", text } : command === "inspect" ? snapshot : {};
 console.log(JSON.stringify(result));
 `);

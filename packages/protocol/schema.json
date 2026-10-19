@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "urn:openox:host-rpc:1",
+  "$id": "urn:openox:host-rpc:2",
   "title": "OpenOx Host JSON-RPC messages",
   "anyOf": [
     {
@@ -984,10 +984,10 @@
     "ListConversationsResult": {
       "type": "object",
       "required": [
-        "chats"
+        "conversations"
       ],
       "properties": {
-        "chats": {
+        "conversations": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/ConversationRow"
@@ -1111,11 +1111,11 @@
     "RespondConversationResult": {
       "type": "object",
       "required": [
-        "chatId",
+        "conversationId",
         "promptId"
       ],
       "properties": {
-        "chatId": {
+        "conversationId": {
           "type": "string"
         },
         "promptId": {
@@ -1136,12 +1136,12 @@
     "NewConversationResult": {
       "type": "object",
       "required": [
-        "chatId",
+        "conversationId",
         "temporary",
         "model"
       ],
       "properties": {
-        "chatId": {
+        "conversationId": {
           "type": "string"
         },
         "temporary": {
@@ -1156,11 +1156,11 @@
     "SendConversationResult": {
       "type": "object",
       "required": [
-        "chatId",
+        "conversationId",
         "outcome"
       ],
       "properties": {
-        "chatId": {
+        "conversationId": {
           "type": "string"
         },
         "outcome": {
@@ -1178,11 +1178,11 @@
     "StopConversationResult": {
       "type": "object",
       "required": [
-        "chatId",
+        "conversationId",
         "wasRunning"
       ],
       "properties": {
-        "chatId": {
+        "conversationId": {
           "type": "string"
         },
         "wasRunning": {

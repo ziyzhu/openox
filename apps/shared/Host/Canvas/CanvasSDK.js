@@ -28,7 +28,7 @@ globalThis.__oxCreateCanvasSDK = (catalog, send) => {
       return response.value;
     };
     Object.defineProperty(call, "help", {
-      value: () => (catalog.help[name] || name) + "\n\nCanvas resolves services automatically; chat attachment instructions do not apply.",
+      value: () => (catalog.help[name] || name) + "\n\nCanvas resolves services automatically; conversation attachment instructions do not apply.",
     });
     parent[path.at(-1)] = Object.freeze(call);
   }

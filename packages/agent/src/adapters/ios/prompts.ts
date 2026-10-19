@@ -5,6 +5,6 @@ import type { HostContext } from "../../core/host-context";
 export function composeIOSPrompt(input: SystemPromptInput, isolated = false) {
   const scope = { hostID: "ios", profileID: "local" };
   const hostContext: HostContext = input.hostContext ?? { active: scope, hosts: [{ ...scope, functions: ["ox"],
-    serviceKinds: ["web", "ios", "mcp"], presentation: "chat-bubbles", externalFiles: true }] };
+    serviceKinds: ["web", "ios", "mcp"], presentation: "conversation-bubbles", externalFiles: true }] };
   return composeOxPrompt({ ...input, hostContext }, isolated, oxScaffold);
 }
