@@ -17,7 +17,7 @@
 1. AGENTS.md should not reference skills, vice versa, they should stay independent.
 1. Do not invent new concepts unless the user confirms.
 1. Do not introduce new abstractions without permission for simple changes.
-1. No source code file should be >2000 lines
+1. No source code file should be >2000 lines or >50 KB
 
 ## Architecture and Storage
 
