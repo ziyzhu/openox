@@ -145,6 +145,7 @@ nonisolated enum SkillFiles {
 extension ProfileRepository {
     func skills(in scope: ProfileScope) async throws -> [Skill] {
         let files = try await profileFiles(prefix: "skills/", in: scope)
+        if let loaded = loadedSkills[scope], loaded.files == files { return loaded.skills }
         let names = Set(try files.map { file in
             let parts = file.path.split(separator: "/", omittingEmptySubsequences: false)
             guard parts.count >= 3, parts[0] == "skills", SkillFiles.isUserName(String(parts[1])) else {
@@ -156,7 +157,9 @@ extension ProfileRepository {
         for name in names.sorted() {
             skills.append(try await loadSkill(name: name, files: files.filter { $0.path.hasPrefix("skills/\(name)/") }, in: scope))
         }
-        return skills.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        skills.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        loadedSkills[scope] = files.allSatisfy { $0.sha256 != nil } ? (files, skills) : nil
+        return skills
     }
 
     func skill(named rawName: String, in scope: ProfileScope) async throws -> Skill {

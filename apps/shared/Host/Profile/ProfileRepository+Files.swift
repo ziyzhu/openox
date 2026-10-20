@@ -1,7 +1,7 @@
 import Foundation
 
 extension ProfileRepository {
-    nonisolated struct DurableProfileFile: Codable, Sendable {
+    nonisolated struct DurableProfileFile: Codable, Equatable, Sendable {
         let path: String
         let size: Int
         let mtime: Double

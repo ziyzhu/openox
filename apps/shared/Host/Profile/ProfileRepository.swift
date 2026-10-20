@@ -4,6 +4,7 @@ actor ProfileRepository {
     static let shared = ProfileRepository()
     nonisolated let debugSaveGate = ProfileRepositorySaveGate()
     private var deleted: [ProfileScope: Set<ConversationID>] = [:]
+    var loadedSkills: [ProfileScope: (files: [DurableProfileFile], skills: [Skill])] = [:]
 
     nonisolated static func localDocuments() -> URL {
         (try? FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)) ?? FileManager.default.temporaryDirectory
