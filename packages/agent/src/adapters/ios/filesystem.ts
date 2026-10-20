@@ -46,8 +46,8 @@ export async function invokeFilesystem(runtime: ProfileRuntime, capability: stri
   if (runtime.files.physical) {
     const search = operation === "glob" || operation === "grep";
     const base = canonical(args.path ?? "");
-    const includeConversationRecords = operation !== "grep" || base === "conversations" || base.startsWith("conversations/");
-    const profileInputs = search ? profileMounts(runtime.files, runtime.conversations, await runtime.files.snapshot(signal, base), includeConversationRecords) : runtime.env.mounts;
+    const records = operation !== "grep" || base === "conversations" || base.startsWith("conversations/") ? "named" : "excluded";
+    const profileInputs = search ? profileMounts(runtime.files, runtime.conversations, await runtime.files.snapshot(signal, base), records) : runtime.env.mounts;
     for (const mount of profileInputs.filter(mount => mount.path === "")) {
       if (mount.source.kind !== "backend") throw new Error("Invalid Profile file mount");
       const profile = mount.source.backend;

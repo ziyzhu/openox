@@ -87,6 +87,12 @@ export class OxConversations {
     await conversation.commit(async tx => { (await tx.doc(ConversationReadState, conversation.id)).lastReadEntryID = entryID; }, context);
   }
 
+  async visible(reference: ConversationReference) {
+    const id = this.id(reference);
+    const [files, presentation] = await Promise.all([this.harness.snapshot(ProfileFileState, context), this.harness.snapshot(ConversationPresentation, id, context)]);
+    return presentation?.visible === true && !files?.deletedConversations.includes(id);
+  }
+
   async metadata(reference: ConversationReference) {
     const conversation = await this.handle(reference);
     const [record, presentation, favorite, readState, agent, newest] = await Promise.all([
@@ -104,12 +110,18 @@ export class OxConversations {
 
   /** A page scans at most `limit` Pi records. Hidden records can yield an empty page with `next`. */
   async list(limit = 100, cursor?: ConversationListCursor) {
+    const page = await this.references(limit, cursor);
+    return { items: await Promise.all(page.items.map(reference => this.metadata(reference))), next: page.next };
+  }
+
+  async references(limit = 100, cursor?: ConversationListCursor) {
     if (cursor && cursor.profileID !== this.profileID) throw new Error("Conversation list Profile mismatch");
     this.ready();
     const page = await this.harness.commit(tx => tx.scanConversations({}, pageSize(limit), cursor?.pi), context);
     const deleted = (await this.harness.snapshot(ProfileFileState, context))?.deletedConversations ?? [];
-    const metadata = await Promise.all(page.items.filter(record => !deleted.includes(record.id)).map(record => this.metadata(this.reference(record.id))));
-    return { items: metadata.filter(item => item.presentation?.visible),
+    const candidates = page.items.filter(record => !deleted.includes(record.id));
+    const presentations = await Promise.all(candidates.map(record => this.harness.snapshot(ConversationPresentation, record.id, context)));
+    return { items: candidates.filter((_, index) => presentations[index]?.visible).map(record => this.reference(record.id)),
       next: page.next ? { profileID: this.profileID, pi: page.next } : undefined };
   }
 
