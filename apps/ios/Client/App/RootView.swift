@@ -100,14 +100,12 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
     let workspace: Workspace
 
     @State private var dragPhase = DragPhase.idle
-    @State private var settlingBlurRadius: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private let minimumDistance: CGFloat = 8
     private let horizontalIntentRatio: CGFloat = 1.2
     private let maximumBlurRadius: CGFloat = 5
-    private let blurRamp = Animation.smooth(duration: 0.07)
 
     private var travel: CGFloat {
         let settled = page == .sidebar ? size.width : 0
@@ -124,39 +122,36 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
     }
 
     private var blurRadius: CGFloat {
-        guard blurAllowed else { return 0 }
-        return max(dragBlurRadius, settlingBlurRadius)
-    }
-
-    private var dragBlurRadius: CGFloat {
-        guard case .active = dragPhase else { return 0 }
-        return maximumBlurRadius * progress
+        blurAllowed ? maximumBlurRadius * min(1, progress * 5) : 0
     }
 
     var body: some View {
         ZStack(alignment: .leading) {
-            sidebar
-                .frame(width: size.width)
-                .offset(x: reduceMotion ? 0 : travel - size.width)
-                .opacity(reduceMotion ? progress : 1)
-                .allowsHitTesting(page == .sidebar && !interaction.actionsSuppressed)
-                .accessibilityHidden(page != .sidebar)
-
             workspace
                 .environment(\.sidebarInteraction, interaction)
                 .safeAreaPadding(safeAreaInsets)
                 .ignoresSafeArea(.container)
                 .blur(radius: blurRadius)
-                .offset(x: reduceMotion ? 0 : travel)
+                .offset(x: reduceMotion ? 0 : travel * 0.4)
                 .opacity(reduceMotion ? 1 - progress : 1)
                 .allowsHitTesting(page == .workspace && !interaction.actionsSuppressed)
                 .accessibilityHidden(page != .workspace)
+
+            sidebar
+                .frame(width: size.width)
+                .background(
+                    Theme.Colors.conversationSurface.opacity(
+                        reduceTransparency ? 1 : pow(progress, 4)
+                    ),
+                    ignoresSafeAreaEdges: .all
+                )
+                .offset(x: reduceMotion ? 0 : (travel - size.width) * 2 / 3)
+                .opacity(reduceMotion ? progress : min(1, progress * 6))
+                .allowsHitTesting(page == .sidebar && !interaction.actionsSuppressed)
+                .accessibilityHidden(page != .sidebar)
         }
         .contentShape(Rectangle())
         .simultaneousGesture(pageDrag, isEnabled: gestureEnabled)
-        .onChange(of: blurAllowed) { _, allowed in
-            if !allowed { settlingBlurRadius = 0 }
-        }
     }
 
     private var pageDrag: some Gesture {
@@ -183,7 +178,6 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
                         return
                     }
                     if page == .workspace { onOpeningDrag() }
-                    settlingBlurRadius = 0
                     interaction.dragActive = true
                     interaction.actionsSuppressed = true
                     dragPhase = .active(
@@ -231,26 +225,15 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
 
     private func settle(on target: CompactPage) {
         let animation = reduceMotion ? Theme.Animation.press : RootView.sidebarSettleAnimation
-        let returnsToOrigin = target == page
         withAnimation(animation, completionCriteria: .logicallyComplete) {
             page = target
             dragPhase = .idle
         } completion: {
             interaction.dragActive = false
         }
-        if returnsToOrigin { beginSettlingBlur() }
         Task { @MainActor in
             await Task.yield()
             interaction.actionsSuppressed = false
-        }
-    }
-
-    private func beginSettlingBlur() {
-        guard blurAllowed else { return }
-        withAnimation(blurRamp, completionCriteria: .logicallyComplete) {
-            settlingBlurRadius = maximumBlurRadius
-        } completion: {
-            withAnimation(Theme.Animation.quick) { settlingBlurRadius = 0 }
         }
     }
 }
@@ -1107,10 +1090,10 @@ struct RootView: View {
     }
 
     private static let sidebarSpring: Animation = .smooth(duration: 0.3)
-    fileprivate static let sidebarSettleAnimation: Animation = .smooth(duration: 0.25)
+    fileprivate static let sidebarSettleAnimation: Animation = .spring(duration: 0.3, bounce: 0)
 
     private var sidebarAnimation: Animation {
-        reduceMotion ? Theme.Animation.quick : Self.sidebarSpring
+        reduceMotion ? Theme.Animation.quick : (isSplitLayout ? Self.sidebarSpring : Self.sidebarSettleAnimation)
     }
 
     private func setSidebar(

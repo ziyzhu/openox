@@ -43,7 +43,8 @@ struct ConversationSidebar: View {
                 .accessibilityIdentifier(A11yID.Sidebar.panel)
                 .safeAreaBar(edge: .top, alignment: .leading, spacing: 0) { header }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .background(Theme.Colors.conversationSurface, ignoresSafeAreaEdges: .all)
+                .background(Theme.Colors.conversationSurface.opacity(horizontalSizeClass == .compact ? 0 : 1), ignoresSafeAreaEdges: .all)
+                .containerBackground(Theme.Colors.conversationSurface.opacity(horizontalSizeClass == .compact ? 0 : 1), for: .navigation)
                 .toolbar {
                     DefaultToolbarItem(kind: .search, placement: .bottomBar)
                     ToolbarSpacer(.fixed, placement: .bottomBar)
