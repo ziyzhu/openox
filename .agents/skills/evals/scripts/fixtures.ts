@@ -74,7 +74,7 @@ export function effects(test: EvalCase, binding: CaseBinding) {
 export function fixtureTemplate(selected: EvalCase[], qaProfile: string) {
   const simple = new Set(["ox.app.info", "ox.app.profile", "ox.app.profiles", "ox.app.notifications", "ox.app.language", "ox.app.defaultModel", "ox.provider.default", "ox.provider.list", "ox.repository.list", "ox.schedule.list", "ox.secret.list"]);
   return { version: 1, qaProfile, cases: Object.fromEntries(selected.map(test => [test.id,
-    ["manage-skills-create", "manage-skills-fresh-use"].includes(test.id) ? skillFixture(qaProfile, !!test.probe) :
+    ["evolve-create", "evolve-fresh-use"].includes(test.id) ? skillFixture(qaProfile, !!test.probe) :
     test.variant === "success" && test.function && simple.has(test.function) ? {
       context: "Report the actual current state concisely. Do not change files, configuration, accounts or services.",
       observations: { profile: { kind: "vm", name: "ox.app.profile", args: {} }, outcome: { kind: "vm", name: test.function, args: {} }, memory: { kind: "vm", name: "ox.fs.read", args: { path: "MEMORY.md" } } },
@@ -100,7 +100,7 @@ function skillFixture(qaProfile: string, probe: boolean): CaseBinding {
   const description = "Repeat a supplied text prefix a requested number of times.";
   const instructions = "When asked to repeat a prefix, reply with only the prefix repeated count times, without separators. Do not modify files or use services.";
   return {
-    context: `Name: ${name}. Description exactly ${JSON.stringify(description)}. Instructions exactly ${JSON.stringify(instructions)}. Create only this Profile skill, with no dependencies or extra resources. Present the required proposal checkpoint before writing. Preserve all unrelated files and settings.`,
+    context: `Name: ${name}. Description exactly ${JSON.stringify(description)}. Instructions exactly ${JSON.stringify(instructions)}. Create only this Profile skill, with no dependencies or extra resources. Proceed without a separate proposal checkpoint. Preserve all unrelated files and settings.`,
     ...(probe ? { probeContext: `Read and use Profile skill ${name} with prefix ${prefix} and count ${count}.` } : {}),
     observations: {
       profile: { kind: "vm", name: "ox.app.profile", args: {} },

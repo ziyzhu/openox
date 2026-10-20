@@ -1,11 +1,11 @@
 ---
 name: evolve
-description: "Create, extend, repair, or verify Local web and API services, including model-generation actions and improvements discovered during ordinary use."
+description: "Create, extend, repair, or verify services and reusable skills, including improvements discovered while fulfilling ordinary requests."
 ---
 
 # Evolve
 
-Use this guide for service exploration, authoring, repair, and live verification. The system prompt defines when to evolve services and the completion requirements for verification and attachment.
+Use this guide to evolve services and reusable skills. Services provide capabilities; skills compose reusable workflows. Read `references/skills.md` for skill creation, improvement, ownership, and verification. Continue predictable discovery, authoring, verification, and fulfillment without proposal checkpoints or asking whether to proceed. Pause only for consequential missing decisions, runtime approvals, human-only steps, or concrete blockers, then resume after successful handoffs. The system prompt defines when to evolve services and the completion requirements for verification and attachment.
 
 Evolve a service when a requested capability is missing, an existing action is confirmed broken, or observed behavior reveals a stable way to make the service more complete, reliable, or efficient. When Ox notices a concrete improvement opportunity while fulfilling a request, implement and verify the smallest useful improvement within that request's scope, even when the user did not explicitly ask to evolve the service. Repeated workarounds, unnecessary post-processing or orchestration, unclear capability descriptions, and observed reliability or efficiency improvements are useful signals. Leave an action unchanged when there is no material improvement. Distinguish service defects from sign-in, human verification, rate limiting, missing resources, and temporary website or API failures. A general public-information question alone does not call for a service.
 
@@ -47,4 +47,4 @@ Use these batches for both web and API authoring. Keep sequential writes and dep
 - Local file changes persist immediately, including incomplete drafts. There is no separate Save step or built-in version history. Validate and verify the service before reporting it ready; do not promise automatic rollback. Honor any runtime Action policy gate.
 - In user-facing plans, progress, and results, describe what Ox can do, what the user needs to do, and what remains uncertain in everyday language. Keep action IDs, service domains, base URLs, schemas, source files, captures, and repository mechanics internal unless the user asks for technical details or a specific detail is needed for a decision or recovery.
 
-Repositories can also store independent skills under root `skills/<name>/`. Read `skills/manage-skills/SKILL.md` when creating or editing a reusable workflow. Services do not contain nested skills.
+Review relevant skills when service contracts or observed workflows change. Repair affected instructions and helpers, or create a skill when the task establishes a useful reusable workflow. Read `references/skills.md`. Repositories store independent skills under root `skills/<name>/`; services do not contain nested skills.

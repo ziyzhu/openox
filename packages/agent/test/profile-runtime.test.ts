@@ -148,7 +148,7 @@ test("one execute filesystem surface composes scoped text and physical mounts wi
   const models = createModels();
   const faux = fauxProvider({ provider: "fixture", models: [{ id: "mock" }], tokensPerSecond: 100_000 });
   const tool = (name: string, args: ToolCall["arguments"]) => fauxAssistantMessage([{ type: "toolCall", id: crypto.randomUUID(), name: "execute", arguments: { operation: name, args: { purpose: "Verify mounted filesystem", ...args } } }], { stopReason: "toolUse" });
-  faux.setResponses([tool("read", { path: "skills/manage-skills/SKILL.md" }), tool("read", { path: "notes/private/readme.md" }),
+  faux.setResponses([tool("read", { path: "skills/evolve/SKILL.md" }), tool("read", { path: "notes/private/readme.md" }),
     tool("write", { path: "working/note.md", content: "original" }), tool("edit", { path: "working/note.md", edits: [{ oldText: "original", newText: "edited" }] }),
     tool("read", { path: "working/note.md" }), tool("write", { path: "notes/private/readme.md", content: "forbidden" }),
     tool("write", { path: "working/../MEMORY.md", content: "forbidden" }), tool("read", { path: "working/denied.md" }),
@@ -172,13 +172,13 @@ test("one execute filesystem surface composes scoped text and physical mounts wi
     const second = await fixture("mount-second", undefined, { mounts: [
       { path: "notes/shared", access: "readOnly", source: { kind: "text", files: { "readme.md": "second shared notes" } } },
     ] });
-    expect((await profileEnv(first.files, first.conversations).readTextFile("skills/manage-skills/SKILL.md", context)).ok).toBe(false);
+    expect((await profileEnv(first.files, first.conversations).readTextFile("skills/evolve/SKILL.md", context)).ok).toBe(false);
     const firstConversation = await conversation(first); const secondConversation = await conversation(second);
     expect(firstConversation.id).toBe(secondConversation.id);
     const result = await first.run(firstConversation.id, { type: "input", content: "Use the mounted files" });
     const results = result.messages.filter(message => message.role === "toolResult");
     expect(results).toHaveLength(8);
-    expect(activations).toEqual(["manage-skills"]);
+    expect(activations).toEqual(["evolve"]);
     expect(results[0]!.details).toBe("native activation context");
     expect(results.map(message => message.isError === true)).toEqual([false, false, false, false, false, true, true, true]);
     expect(JSON.stringify(results[1])).toContain("first private notes");
@@ -363,7 +363,7 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(mounts.mounts[0]!.files).toEqual({ "readme.md": "native notes" });
     const packages = await adapter.command({ action: "skillPackages" }) as { scope: string; skills: { name: string; source: string; files: Record<string, string> }[] };
     expect(packages.scope).toBe("ios-profile");
-    expect(packages.skills.map(skill => skill.name)).toEqual(["evolve", "import-memory", "manage-providers", "manage-skills", "visualize"]);
+    expect(packages.skills.map(skill => skill.name)).toEqual(["evolve", "import-memory", "manage-providers", "visualize"]);
     expect(packages.skills.every(skill => skill.source === "system" && skill.files["SKILL.md"]?.startsWith("---"))).toBe(true);
     await expect(adapter.command({ action: "fileMounts", profileID: "wrong" })).rejects.toThrow("Profile mismatch");
     const scope = { hostID: "ios-host", profileID: "ios-profile" };

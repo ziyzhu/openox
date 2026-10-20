@@ -25,24 +25,11 @@ Test the trigger and workflow against two realistic requests that should use the
 
 Identify the external capability needed by each step. Search with `ox.service.find`, read the strongest candidates at their returned `manifestPath`, and compare their domains, descriptions, and actions.
 
-Recommend the smallest useful set of service domains. An empty set is valid. Explain what each service contributes and let the user add, remove, or replace services.
-
-Present this checkpoint before writing:
-
-```text
-Name:
-Runs when:
-Inputs:
-Workflow:
-Output:
-Services:
-```
-
-Then call `ox.user.choose` with `Create skill`, `Revise proposal`, and `Cancel`. Write only after `Create skill`. Revise and present the checkpoint again when requested.
+Choose the smallest useful set of service domains from verified capabilities; an empty set is valid. Reuse established workflow requirements and proceed without a separate proposal or creation confirmation. Ask only when a consequential choice cannot be inferred from the request and observed evidence.
 
 ## Write the skill
 
-Use a short lowercase kebab-case name. Retired system names remain reserved for compatibility. Other duplicate names require a source selection. Create the accepted skill with `ox.skill.create`, passing its name, description, instructions, and service domains. This writes one canonical `skills/<name>/SKILL.md` file:
+Use a short lowercase kebab-case name. Bundled System names are reserved. Other duplicate names require a source selection. Create the skill with `ox.skill.create`, passing its name, description, instructions, and service domains. This writes one canonical `skills/<name>/SKILL.md` file:
 
 ```markdown
 ---
@@ -54,12 +41,12 @@ services: example.com
 Review completed work...
 ```
 
-Omit `services` when the set is empty. Store accepted service domains only in frontmatter.
+Omit `services` when the set is empty. Store verified service domains only in frontmatter.
 
 Write the body as an execution prompt. Use imperative steps, decision rules, the required output shape, checkpoints, and stopping conditions. Keep one-time task details and attachment mechanics outside the skill.
 
 The skill may use available `ox.*` functions and packaged resources under `skills/<name>/references/` and `skills/<name>/scripts/`. Read references with `ox.fs.read`; run JavaScript helpers with `ox.skill.run` under normal Action policies. Its runtime has no shell, filesystem outside Ox's virtual layout, package installation, browser globals, or ambient network access.
 
-Read an existing file before replacing it and prefer `ox.fs.edit` for focused revisions. Read the final skill back and verify its name, description, services, instructions, and trigger boundaries against the accepted proposal. Use `ox.skill.delete` when the user asks to remove a Profile-owned skill.
+Read an existing file before replacing it and prefer `ox.fs.edit` for focused revisions. Read the final skill back and verify its name, description, services, instructions, and trigger boundaries against the task requirements and observed workflow. Use `ox.skill.delete` when the user asks to remove a Profile-owned skill.
 
 Copying, sharing, and scheduling a skill must preserve its complete resources. Repository updates never modify independent Profile copies. Use a distinct name or have the user select a source when a name conflicts.
