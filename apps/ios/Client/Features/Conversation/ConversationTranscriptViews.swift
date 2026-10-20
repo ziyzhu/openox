@@ -735,20 +735,22 @@ struct ResponseFooterBlockView: View, Equatable {
 
     var body: some View {
         HStack(spacing: 1) {
-            iconButton(
-                systemName: controls.isCopied ? "checkmark" : "doc.on.doc",
-                label: A11yLabel.copyMessage,
-                id: actionIdentifier(A11yID.ConversationControls.Message.copy),
-                disabled: controls.isCopied
-            ) {
-                controls.onCopy(text)
+            if !text.isEmpty {
+                iconButton(
+                    systemName: controls.isCopied ? "checkmark" : "doc.on.doc",
+                    label: A11yLabel.copyMessage,
+                    id: actionIdentifier(A11yID.ConversationControls.Message.copy),
+                    disabled: controls.isCopied
+                ) {
+                    controls.onCopy(text)
+                }
+                ShareLink(item: text) {
+                    controlIcon(systemName: "square.and.arrow.up")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(A11yLabel.shareMessage)
+                .accessibilityIdentifier(actionIdentifier(A11yID.ConversationControls.Message.share))
             }
-            ShareLink(item: text) {
-                controlIcon(systemName: "square.and.arrow.up")
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(A11yLabel.shareMessage)
-            .accessibilityIdentifier(actionIdentifier(A11yID.ConversationControls.Message.share))
             if controls.canMutate {
                 iconButton(
                     systemName: "arrow.branch",
