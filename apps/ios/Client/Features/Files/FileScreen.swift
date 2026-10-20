@@ -240,7 +240,7 @@ struct FileZoomPreviewScreen: View {
         if let image, loadState == .ready {
             ZoomableImageView(image: image)
                 .accessibilityLabel(file.userFacingName)
-                .accessibilityIdentifier("artifacts.preview.ready")
+                .accessibilityIdentifier("files.preview.ready")
         } else if loadState == .loading {
             loading
         } else {
@@ -265,7 +265,7 @@ struct FileZoomPreviewScreen: View {
 
     private var loading: some View {
         ContentLoadingView(label: "Loading file…")
-            .accessibilityIdentifier("artifacts.preview.loading")
+            .accessibilityIdentifier("files.preview.loading")
     }
 
     private var unavailable: some View {
@@ -425,7 +425,7 @@ private struct ZoomablePDFView: UIViewRepresentable {
         let view = PDFView()
         view.document = document
         view.isAccessibilityElement = true
-        view.accessibilityIdentifier = "artifacts.preview.ready"
+        view.accessibilityIdentifier = "files.preview.ready"
         view.accessibilityLabel = accessibilityLabel
         view.autoScales = true
         view.displayDirection = .vertical

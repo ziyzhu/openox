@@ -35,7 +35,7 @@ nonisolated enum A11yID {
         static let newConversation = "sidebar.newConversation"
         static let settings = "sidebar.settings"
         static let services = "sidebar.services"
-        static let files = "sidebar.artifacts"
+        static let files = "sidebar.files"
         static let skills = "sidebar.skills"
         static func row(_ sessionId: String) -> String { "sidebar.row.\(sessionId)" }
         static func deleteRow(_ sessionId: String) -> String { "sidebar.deleteRow.\(sessionId)" }
@@ -44,23 +44,23 @@ nonisolated enum A11yID {
     }
 
     enum Files {
-        static let ready = "artifacts.ready"
-        static let transitioning = "artifacts.transitioning"
-        static let search = "artifacts.search"
-        static let filterAndSort = "artifacts.filterAndSort"
-        static let add = "artifacts.add"
-        static let addFiles = "artifacts.add.files"
-        static let addPhotos = "artifacts.add.photos"
-        static let addCamera = "artifacts.add.camera"
-        static let previewDismiss = "artifacts.preview.dismiss"
-        static let renameSubmit = "artifacts.rename.submit"
-        static let deleteConfirm = "artifacts.delete.confirm"
-        static func item(_ id: String) -> String { "artifacts.item.\(id)" }
-        static func filter(_ id: String) -> String { "artifacts.filter.\(id)" }
-        static func save(_ id: String) -> String { "artifacts.save.\(id)" }
-        static func share(_ id: String) -> String { "artifacts.share.\(id)" }
-        static func rename(_ id: String) -> String { "artifacts.rename.\(id)" }
-        static func delete(_ id: String) -> String { "artifacts.delete.\(id)" }
+        static let ready = "files.ready"
+        static let transitioning = "files.transitioning"
+        static let search = "files.search"
+        static let filterAndSort = "files.filterAndSort"
+        static let add = "files.add"
+        static let addFiles = "files.add.files"
+        static let addPhotos = "files.add.photos"
+        static let addCamera = "files.add.camera"
+        static let previewDismiss = "files.preview.dismiss"
+        static let renameSubmit = "files.rename.submit"
+        static let deleteConfirm = "files.delete.confirm"
+        static func item(_ id: String) -> String { "files.item.\(id)" }
+        static func filter(_ id: String) -> String { "files.filter.\(id)" }
+        static func save(_ id: String) -> String { "files.save.\(id)" }
+        static func share(_ id: String) -> String { "files.share.\(id)" }
+        static func rename(_ id: String) -> String { "files.rename.\(id)" }
+        static func delete(_ id: String) -> String { "files.delete.\(id)" }
     }
 
     enum Settings {
@@ -82,7 +82,7 @@ nonisolated enum A11yID {
         static let memoryEditor = "settings.memoryEditor"
         static let memorySave = "settings.memorySave"
         static let memoryCopy = "settings.memoryCopy"
-        static let files = "settings.artifacts"
+        static let files = "settings.files"
         static let skills = "settings.skills"
         static let skillSearch = "settings.skills.search"
         static let skillServiceSearch = "settings.skillServices.search"
@@ -203,10 +203,10 @@ nonisolated enum A11yID {
         }
 
         enum FileItem {
-            static let open = "conversation.artifact.open"
-            static let list = "conversation.artifact.list"
-            static let done = "conversation.artifact.done"
-            static func item(_ filename: String) -> String { "conversation.artifact.item.\(filename)" }
+            static let open = "conversation.file.open"
+            static let list = "conversation.file.list"
+            static let done = "conversation.file.done"
+            static func item(_ filename: String) -> String { "conversation.file.item.\(filename)" }
         }
 
         enum Message {
@@ -217,7 +217,7 @@ nonisolated enum A11yID {
             static let branch = "conversation.message.branch"
             static let retry = "conversation.message.retry"
             static let contextCompaction = "conversation.contextCompacted"
-            static func file(_ fileID: String) -> String { "conversation.message.artifact.\(fileID)" }
+            static func file(_ fileID: String) -> String { "conversation.message.file.\(fileID)" }
             static func serviceInspector(_ domain: String) -> String { "conversation.message.serviceInspector.\(domain)" }
             static func skill(_ name: String) -> String { "conversation.message.skill.\(name)" }
             static func skillResult(_ id: String, blockID: UUID) -> String { "conversation.message.skillResult.\(blockID.uuidString).\(id)" }
