@@ -200,7 +200,6 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
                 let changesPage = max(abs(translation), predicted) > size.width * 0.3
                 let target = changesPage ? opposite(of: origin) : origin
                 Log.ui.info("RootView.sidebarDrag phase=end origin=\(origin.rawValue) translation=\(Int(translation)) predicted=\(Int(predicted)) target=\(target.rawValue)")
-                if target != origin { Haptics.impact(.sidebarSettled) }
                 settle(on: target)
             }
     }
@@ -582,6 +581,9 @@ struct RootView: View {
         .overlay {
             CurrentConversationActivityObserver(conversation: conversations.current, onAwaitingUser: handleAwaitingUser)
         }
+        .onChange(of: compactPage) { _, page in
+            if page == .sidebar { Haptics.impact(.sidebarSettled) }
+        }
         .onChange(of: horizontalSizeClass, initial: true) { _, _ in
             guard UIDevice.current.userInterfaceIdiom == .pad else { return }
             Log.ui.info("RootView.layoutSwitch split=\(isSplitLayout)")
@@ -942,7 +944,6 @@ struct RootView: View {
     }
 
     private func openConversationFromSidebar(_ id: UUID) {
-        Haptics.impact(.conversationOpened)
         guard !isSplitLayout, showSidebar else {
             compactConversationTransition = .idle
             openConversation(id)

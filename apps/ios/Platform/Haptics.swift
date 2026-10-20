@@ -6,7 +6,6 @@ enum Haptics {
         case attachmentMenu
         case agentDeltaReceived
         case artifactTabSelected
-        case conversationOpened
         case copy
         case editStarted
         case permissionPersistenceToggled
@@ -29,7 +28,7 @@ enum Haptics {
     static func impact(_ event: Event) {
         Log.ui.debug("Haptics.impact event=\(event.rawValue)")
         switch event {
-        case .agentDeltaReceived, .artifactTabSelected, .conversationOpened, .sidebarSettled, .speechStarted, .speechStopped:
+        case .agentDeltaReceived, .artifactTabSelected, .speechStarted, .speechStopped:
             driver.impact(.medium)
         default:
             driver.impact(.light)
