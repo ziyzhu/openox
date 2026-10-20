@@ -223,6 +223,9 @@ nonisolated enum A11yID {
             static func artifact(_ artifactId: String) -> String { "conversation.message.artifact.\(artifactId)" }
             static func serviceInspector(_ domain: String) -> String { "conversation.message.serviceInspector.\(domain)" }
             static func skill(_ name: String) -> String { "conversation.message.skill.\(name)" }
+            static func skillResult(_ id: String) -> String { "conversation.message.skillResult.\(id)" }
+            static func skillDetails(_ id: String) -> String { "conversation.skillDetails.\(id)" }
+            static func schedule(_ id: String) -> String { "conversation.message.schedule.\(id)" }
             static func shoveler(_ blockId: String) -> String { "conversation.message.shoveler.\(blockId)" }
             static let videoPlay = "chat.message.video.play"
             static let imageOpen = "chat.message.image.open"

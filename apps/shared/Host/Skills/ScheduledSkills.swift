@@ -350,8 +350,10 @@ final class ScheduledSkills {
         updated[index].lastRunAt = date
         updated[index].lastOutcome = bounded(outcome)
         updated[index].lastConversationID = conversationID
-        updated[index].nextFireAt = updated[index].recurrence.next(after: date)
-        if updated[index].nextFireAt == nil { updated[index].isEnabled = false }
+        if updated[index].isEnabled {
+            updated[index].nextFireAt = updated[index].recurrence.next(after: date)
+            if updated[index].nextFireAt == nil { updated[index].isEnabled = false }
+        }
         try save(updated, reason: "run", scheduleID: id)
     }
 
