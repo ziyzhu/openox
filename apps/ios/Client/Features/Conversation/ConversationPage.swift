@@ -74,6 +74,7 @@ struct ConversationPage: View {
         }
     }
     @FocusState private var composerFocused: Bool
+    @State private var webInputFocused = false
     @State private var editedBlockID: UUID?
     @State private var editDraft = AttributedString()
     @State private var pendingFilePreview: FileItem?
@@ -267,7 +268,7 @@ struct ConversationPage: View {
     private var page: some View {
         let interaction = activeInteraction
         let isSignIn = if case .serviceControl(let item) = interaction, case .signIn = item.control { true } else { false }
-        let showsComposer = (interaction == nil || isSignIn) && isModelConfigured
+        let showsComposer = (interaction == nil || isSignIn) && isModelConfigured && !webInputFocused
         let authProbe = conversation.pendingServiceControl.flatMap { item -> Conversation.PendingServiceControl? in
             guard isAttached(item.control), case .signIn = item.control else { return nil }
             return item
@@ -391,6 +392,7 @@ struct ConversationPage: View {
                 .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0), value: dockedPrompt?.id)
         }
         .background(Theme.Colors.conversationSurface)
+        .background(ConversationWebInputFocus(isFocused: $webInputFocused))
         .overlay(alignment: .bottom) {
             if !showsComposer, dockedPrompt == nil, scroller.showsJumpButton {
                 ScrollToBottomButton(composerButtonSize: composerButtonSize) {
@@ -433,6 +435,9 @@ struct ConversationPage: View {
         }
         .onChange(of: showsComposer) { _, visible in
             if !visible { composerFocused = false }
+        }
+        .onChange(of: webInputFocused) { _, focused in
+            Log.ui.info("ConversationUX.webInput conversation=\(conversation.id) focused=\(focused)")
         }
         .onChange(of: ObjectIdentifier(conversation)) { _, _ in
             sendHandoff = .idle
