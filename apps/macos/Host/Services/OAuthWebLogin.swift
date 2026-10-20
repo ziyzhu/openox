@@ -5,10 +5,10 @@ import SwiftUI
 
 @MainActor
 enum OAuthWebLogin {
-    static func present(authorizeURL: URL, redirectPrefix: String) async -> URL? {
+    static func present(authorizeURL: URL, redirectPrefix: String, prefersEphemeralSession: Bool = false) async -> URL? {
         let flow = MacOAuthSession()
         return await withTaskCancellationHandler {
-            await flow.run(authorizeURL: authorizeURL, redirectURI: redirectPrefix)
+            await flow.run(authorizeURL: authorizeURL, redirectURI: redirectPrefix, prefersEphemeralSession: prefersEphemeralSession)
         } onCancel: {
             Task { @MainActor in flow.finish(nil) }
         }
@@ -50,7 +50,7 @@ private final class MacOAuthSession: NSObject, ASWebAuthenticationPresentationCo
         owner!.window
     }
 
-    func run(authorizeURL: URL, redirectURI: String) async -> URL? {
+    func run(authorizeURL: URL, redirectURI: String, prefersEphemeralSession: Bool) async -> URL? {
         guard !Task.isCancelled, let redirect = URL(string: redirectURI) else { return nil }
         return await withCheckedContinuation { continuation in
             self.continuation = continuation
@@ -65,7 +65,7 @@ private final class MacOAuthSession: NSObject, ASWebAuthenticationPresentationCo
                 catch { finish(nil) }
             }
             if redirect.scheme == "http" {
-                startLoopback(authorizeURL: authorizeURL, redirect: redirect)
+                startLoopback(authorizeURL: authorizeURL, redirect: redirect, prefersEphemeralSession: prefersEphemeralSession)
             } else {
                 let callback: ASWebAuthenticationSession.Callback
                 if redirect.scheme == "https", let host = redirect.host { callback = .https(host: host, path: redirect.path) }
@@ -75,13 +75,14 @@ private final class MacOAuthSession: NSObject, ASWebAuthenticationPresentationCo
                     Task { @MainActor in self?.finish(url) }
                 }
                 session.presentationContextProvider = self
+                session.prefersEphemeralWebBrowserSession = prefersEphemeralSession
                 self.session = session
                 if !session.start() { finish(nil) }
             }
         }
     }
 
-    private func startLoopback(authorizeURL: URL, redirect: URL) {
+    private func startLoopback(authorizeURL: URL, redirect: URL, prefersEphemeralSession: Bool) {
         guard ["localhost", "127.0.0.1"].contains(redirect.host ?? ""),
               let number = redirect.port, let rawPort = UInt16(exactly: number), rawPort > 0,
               let port = NWEndpoint.Port(rawValue: rawPort) else { finish(nil); return }
@@ -94,7 +95,9 @@ private final class MacOAuthSession: NSObject, ASWebAuthenticationPresentationCo
                     switch state {
                     case .ready:
                         guard self?.continuation != nil else { return }
-                        if !NSWorkspace.shared.open(authorizeURL) { self?.finish(nil) }
+                        if prefersEphemeralSession {
+                            self?.startAuthentication(authorizeURL: authorizeURL)
+                        } else if !NSWorkspace.shared.open(authorizeURL) { self?.finish(nil) }
                     case .failed: self?.finish(nil)
                     default: break
                     }
@@ -114,6 +117,17 @@ private final class MacOAuthSession: NSObject, ASWebAuthenticationPresentationCo
             Log.network.error("MacOAuth.listener failed error=\(error.localizedDescription)")
             finish(nil)
         }
+    }
+
+    private func startAuthentication(authorizeURL: URL) {
+        let session = ASWebAuthenticationSession(url: authorizeURL, callbackURLScheme: nil) { [weak self] url, _ in
+            Task { @MainActor in self?.finish(url) }
+        }
+        session.presentationContextProvider = self
+        session.prefersEphemeralWebBrowserSession = true
+        self.session = session
+        Log.network.info("MacOAuth.authentication starting ephemeral=true")
+        if !session.start() { finish(nil) }
     }
 
     private func receive(_ connection: NWConnection, redirect: URL, buffer: Data = Data()) {

@@ -32,10 +32,10 @@ final class MacHostApplication: NSObject, NSApplicationDelegate {
             conversationExecution: MacConversationExecution(),
             conversationFeedback: MacConversationFeedback(),
             executionPolicy: { true },
-            activateSchedules: { try ScheduledSkillScheduler.shared.activate() },
-            deactivateSchedules: { await ScheduledSkillScheduler.shared.stop() }
+            activateSchedules: { try await ScheduleScheduler.shared.activate() },
+            deactivateSchedules: { await ScheduleScheduler.shared.stop() }
         )
-        ScheduledSkillScheduler.shared.configure(host: host)
+        ScheduleScheduler.shared.configure(host: host)
         let access = HostAccess()
         if ProcessInfo.processInfo.arguments.contains("--allow-connections") { access.enabled = true }
         if ProcessInfo.processInfo.arguments.contains("--disable-connections") { access.enabled = false }
@@ -73,7 +73,7 @@ final class MacHostApplication: NSObject, NSApplicationDelegate {
         startup?.cancel()
         transport?.stop()
         termination = Task {
-            let scheduleShutdown = Task { await ScheduledSkillScheduler.shared.stop() }
+            let scheduleShutdown = Task { await ScheduleScheduler.shared.stop() }
             let flushed = await host?.conversations.stopAllAndFlush() ?? true
             await scheduleShutdown.value
             Log.app.info("MacHost terminating flushed=\(flushed)")
@@ -81,7 +81,7 @@ final class MacHostApplication: NSObject, NSApplicationDelegate {
             if !flushed {
                 termination = nil
                 transport?.reconcile()
-                do { try ScheduledSkillScheduler.shared.activate() }
+                do { try await ScheduleScheduler.shared.activate() }
                 catch { Log.app.error("MacHost schedules resume failed error=\(error.localizedDescription)") }
             }
             sender.reply(toApplicationShouldTerminate: flushed)

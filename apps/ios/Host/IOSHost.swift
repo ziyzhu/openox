@@ -31,8 +31,8 @@ final class IOSHost: OxHost {
             conversationExecution: IOSConversationExecution(),
             conversationFeedback: IOSConversationFeedback(),
             executionPolicy: { UIApplication.shared.applicationState == .active },
-            activateSchedules: { try ScheduledSkillScheduler.shared.activate() },
-            deactivateSchedules: { await ScheduledSkillScheduler.shared.stop() }
+            activateSchedules: { try await ScheduleScheduler.shared.activate() },
+            deactivateSchedules: { await ScheduleScheduler.shared.stop() }
         )
         recoveryObservers = [
             NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in

@@ -37,7 +37,7 @@ export async function validateCases(tests: EvalCase[]): Promise<void> {
       || !test.evidence.outcome || !test.evidence.preserved || test.effect !== "read" && !test.evidence.cleanup
       || test.variant !== "success" && !test.evidence.condition) throw new Error(`Incomplete scenario contract: ${test.id}`);
     if (test.choice && (JSON.stringify(test.choice.options) !== JSON.stringify(["Create skill", "Revise proposal", "Cancel"])
-      || !test.choice.options.includes(test.choice.answer) || test.skill !== "manage-skills")) throw new Error(`Unsupported automatic workflow choice: ${test.id}`);
+      || !test.choice.options.includes(test.choice.answer) || test.skill !== "evolve")) throw new Error(`Unsupported automatic workflow choice: ${test.id}`);
     if (test.probe && (!test.evidence.probe || test.probe.includes("{{context}}"))) throw new Error(`Probe must use independent inputs: ${test.id}`);
     if (test.resources?.some(path => !test.skill || !path.startsWith(`skills/${test.skill}/references/`) || path.includes(".."))) throw new Error(`Invalid required skill resource: ${test.id}`);
   }

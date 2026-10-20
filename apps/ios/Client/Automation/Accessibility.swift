@@ -98,10 +98,7 @@ nonisolated enum A11yID {
         static func skillRow(_ name: String) -> String { "settings.skill.\(name)" }
         static func skillShare(_ name: String) -> String { "settings.skillShare.\(name)" }
         static func skillDelete(_ name: String) -> String { "settings.skillDelete.\(name)" }
-        static func skillSchedule(_ name: String) -> String { "settings.skillSchedule.\(name)" }
         static let scheduleSave = "settings.scheduleSave"
-        static func scheduleRow(_ id: String) -> String { "settings.schedule.\(id)" }
-        static func scheduleEnabled(_ id: String) -> String { "settings.scheduleEnabled.\(id)" }
         static let storeICloud = "settings.storeICloud"
         static let storeStatus = "settings.storeStatus"
         static let activeProfile = "settings.activeProfile"
@@ -223,6 +220,9 @@ nonisolated enum A11yID {
             static func artifact(_ artifactId: String) -> String { "conversation.message.artifact.\(artifactId)" }
             static func serviceInspector(_ domain: String) -> String { "conversation.message.serviceInspector.\(domain)" }
             static func skill(_ name: String) -> String { "conversation.message.skill.\(name)" }
+            static func skillResult(_ id: String, blockID: UUID) -> String { "conversation.message.skillResult.\(blockID.uuidString).\(id)" }
+            static func skillDetails(_ id: String) -> String { "conversation.skillDetails.\(id)" }
+            static func schedule(_ id: String) -> String { "conversation.message.schedule.\(id)" }
             static func shoveler(_ blockId: String) -> String { "conversation.message.shoveler.\(blockId)" }
             static let videoPlay = "conversation.message.video.play"
             static let imageOpen = "conversation.message.image.open"

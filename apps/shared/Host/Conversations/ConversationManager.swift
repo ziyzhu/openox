@@ -300,6 +300,11 @@ final class ConversationManager {
         if let pending = recoveryPreparation, pending.scope == scope { return try await pending.task.value }
         let task = Task<Void, Error> { @MainActor [weak self] in
             guard let self else { throw CancellationError() }
+            do { try await Schedules.shared.load() }
+            catch {
+                Log.session.warning("ConversationManager.scheduleRecovery unavailable error=\(error.localizedDescription)")
+                _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("schedulesRecover")]))
+            }
             let plan = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("recoveryPlan")]))
             let pending = (plan.objectValue?["tasks"]?.arrayValue ?? []) + (plan.objectValue?["submissions"]?.arrayValue ?? [])
             var conversations: [Int: Conversation] = [:]
@@ -395,18 +400,19 @@ final class ConversationManager {
         return conversation
     }
 
-    func runScheduledSkill(
-        _ schedule: ScheduledSkill,
+    func runSchedule(
+        _ schedule: Schedule,
+        token: UUID,
         executionLease: Conversation.ExecutionLease
     ) async -> (ConversationSubmissionOutcome, UUID?) {
         ensureRepositoryScope()
         guard repositoryScope.profileID == schedule.profileID else {
-            return (.failed("The scheduled skill's Profile is not active."), nil)
+            return (.failed("The schedule's Profile is not active."), nil)
         }
         let services: [Service]
         do {
             services = try await serviceManager.prepareServices(
-                domains: schedule.skill.services,
+                domains: schedule.services,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
             )
         } catch is CancellationError {
@@ -417,20 +423,43 @@ final class ConversationManager {
         }
         ensureRepositoryScope()
         guard repositoryScope.profileID == schedule.profileID else {
-            return (.failed("The scheduled skill's Profile is not active."), nil)
+            return (.failed("The schedule's Profile is not active."), nil)
         }
-        let conversation = makeConversation(
-            executionLease: executionLease,
-            scheduledSkillID: schedule.id
-        )
-        conversation.rename(to: "Scheduled /\(schedule.skill.displayName)")
-        conversation.setAttachedServices(services)
-        register(conversation, as: ConversationID(conversation.id))
-        let invocation = UserSkillInvocation(skill: schedule.skill, argument: schedule.argument)
-        let outcome = await conversation.submitUntilAttention(
-            invocation.expandedIntent,
-            skillInvocation: invocation
-        )
+        let conversation: Conversation
+        if let targetID = schedule.conversationID {
+            do { conversation = try await loadForClient(targetID) }
+            catch { return (.failed("The schedule's conversation is unavailable."), nil) }
+            guard !conversation.isBusy, Schedules.shared.run(in: conversation.id) == nil else {
+                return (.failed("The schedule's conversation is busy. Resume the schedule when it is ready."), targetID)
+            }
+        } else {
+            conversation = makeConversation(executionLease: executionLease, scheduleID: schedule.id)
+            conversation.rename(to: schedule.name)
+            register(conversation, as: ConversationID(conversation.id))
+        }
+        do { try await conversation.durablePreparation?.value }
+        catch { return (.failed(error.localizedDescription), nil) }
+        guard !Task.isCancelled, Schedules.shared.schedule(id: schedule.id)?.state == .running(token),
+              StorageRoot.shared.activeId == schedule.profileID else { return (.cancelled, nil) }
+        let attachedDomains = Set(conversation.attachedServices.map(\.domain))
+        conversation.setAttachedServices(conversation.attachedServices + services.filter { !attachedDomains.contains($0.domain) })
+        do { try await Schedules.shared.bind(id: schedule.id, token: token, conversationID: conversation.id) }
+        catch { return (.failed(error.localizedDescription), conversation.id) }
+        defer { Schedules.shared.unbind(conversationID: conversation.id, token: token) }
+        let outcome = await withTaskCancellationHandler {
+            await conversation.submitUntilAttention(schedule.expandedIntent, skillInvocation: schedule.legacyInvocation)
+        } onCancel: {
+            Task { @MainActor in
+                if Schedules.shared.run(in: conversation.id)?.token == token { conversation.cancelAll() }
+            }
+        }
+        if Task.isCancelled {
+            conversation.cancelAll()
+            await conversation.waitForRun()
+        } else if case .cancelled = outcome {
+            conversation.cancelAll()
+            await conversation.waitForRun()
+        }
         _ = await flushAllNow()
         Log.session.info("ConversationManager.scheduled finished schedule=\(schedule.id) conversation=\(conversation.id) outcome=\(outcome.logLabel)")
         return (outcome, conversation.id)
@@ -850,7 +879,7 @@ final class ConversationManager {
     private func makeConversation(
         retention: ConversationRetention = .persisted,
         executionLease: Conversation.ExecutionLease = .userInitiated,
-        scheduledSkillID: UUID? = nil
+        scheduleID: UUID? = nil
     ) -> Conversation {
         let client = providerRegistry.newSessionClient
         let selection = providerRegistry.sessionModel
@@ -867,7 +896,7 @@ final class ConversationManager {
             serviceManager: serviceManager,
             retention: retention,
             executionLease: executionLease,
-            scheduledSkillID: scheduledSkillID
+            scheduleID: scheduleID
         )
         attachPersistence(conversation)
         Log.session.info("ConversationManager created conversation=\(conversation.id) retention=\(String(describing: retention))")

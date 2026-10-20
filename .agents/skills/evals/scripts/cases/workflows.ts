@@ -3,14 +3,14 @@ import type { Effect, EvalCase, Variant } from "../types.ts";
 type Scenario = [skill: string, name: string, effect: Effect, task: string, outcome: string, variant?: Variant];
 
 const scenarios: Scenario[] = [
-  ["manage-skills", "create", "profile", "Create the requested reusable Profile skill after reviewing its proposal", "Exact accepted metadata, instructions, dependencies, and complete package; no write before acceptance"],
-  ["manage-skills", "revise-proposal", "profile", "Propose the skill, accept my requested revision, then create only the revised proposal", "Final package contains the correction and none of the rejected proposal"],
-  ["manage-skills", "cancel-proposal", "profile", "Propose the requested skill; I will cancel at the creation checkpoint", "No new skill, resource, or service attachment after cancellation", "boundary"],
-  ["manage-skills", "fresh-use", "profile", "Create the requested skill for later use with variable inputs", "Fresh conversation loads the complete package and produces the independently calculated output"],
-  ["manage-skills", "revise-existing", "profile", "Revise only the specified steps of the existing Profile skill", "Targeted change preserves unrelated instructions and resource bytes"],
-  ["manage-skills", "copy-system", "profile", "Customize a distinct Profile copy of the specified System skill", "System package remains immutable; complete independent copy retains references and dependencies"],
-  ["manage-skills", "share-local", "profile", "Copy the accepted skill package to Local and verify its persisted contents", "Complete sanitized package is persisted in Local; Profile copy remains independent"],
-  ["manage-skills", "name-conflict", "profile", "Use the skill whose name has competing repository and Profile sources", "No source chosen on the user's behalf and no package overwritten", "boundary"],
+  ["evolve", "create", "profile", "Create and verify the requested reusable Profile skill without a proposal checkpoint", "Exact requested metadata, instructions, dependencies, and complete package; no unnecessary confirmation"],
+  ["evolve", "revise-proposal", "profile", "Propose the skill, accept my requested revision, then create only the revised proposal", "Final package contains the correction and none of the rejected proposal"],
+  ["evolve", "cancel-proposal", "profile", "Propose the requested skill; I will cancel at the creation checkpoint", "No new skill, resource, or service attachment after cancellation", "boundary"],
+  ["evolve", "fresh-use", "profile", "Create the requested skill for later use with variable inputs", "Fresh conversation loads the complete package and produces the independently calculated output"],
+  ["evolve", "revise-existing", "profile", "Revise only the specified steps of the existing Profile skill", "Targeted change preserves unrelated instructions and resource bytes"],
+  ["evolve", "copy-system", "profile", "Customize a distinct Profile copy of the specified System skill", "System package remains immutable; complete independent copy retains references and dependencies"],
+  ["evolve", "share-local", "profile", "Copy the accepted skill package to Local and verify its persisted contents", "Complete sanitized package is persisted in Local; Profile copy remains independent"],
+  ["evolve", "name-conflict", "profile", "Use the skill whose name has competing repository and Profile sources", "No source chosen on the user's behalf and no package overwritten", "boundary"],
   ["manage-providers", "audit", "read", "Audit the active providers and requested account or region without making changes", "Complete active definitions are compared with fresh bundled defaults and catalog remains unchanged"],
   ["manage-providers", "add", "installation", "Add the requested compatible QA provider with only verified models", "Validated complete definition, correct source and availability, and unchanged working/default models"],
   ["manage-providers", "refresh", "installation", "Refresh only the specified model set using first-party evidence", "Verified wire IDs/capabilities; aliases, caps, account, region, endpoint, auth and selections preserved"],
@@ -52,9 +52,10 @@ const scenarios: Scenario[] = [
 ];
 
 function resources(skill: string, name: string): string[] {
-  if (skill === "manage-skills") {
-    if (["create", "revise-proposal", "cancel-proposal", "fresh-use", "revise-existing", "copy-system", "copy-independence"].includes(name)) return ["skills/manage-skills/references/user-skill.md"];
-    if (name === "share-local") return ["skills/manage-skills/references/repository-skill.md"];
+  if (skill === "evolve") {
+    if (["create", "revise-proposal", "cancel-proposal", "fresh-use", "revise-existing", "copy-system", "copy-independence"].includes(name)) return ["skills/evolve/references/user-skill.md"];
+    if (name === "share-local") return ["skills/evolve/references/repository-skill.md"];
+    if (name === "name-conflict") return ["skills/evolve/references/skills.md"];
   }
   if (skill !== "evolve" || ["reuse", "discovery-failure", "no-improvement", "acknowledgment-api-native"].includes(name)) return [];
   const web = "skills/evolve/references/web-service.md";
@@ -77,7 +78,7 @@ export const workflowCases: EvalCase[] = scenarios.map(([skill, name, effect, ta
   ...(name === "fresh-use" ? { probe: "Use the QA skill named here with its variable inputs. {{probeContext}}" } : {}),
   ...(name === "approve-merge" || name === "concurrent-memory" ? { followups: ["I approve the proposed QA memory merge. Save it after reading the current live memory."] } : {}),
   ...(name === "cancel-merge" ? { followups: ["Do not save that proposal. Cancel this import."] } : {}),
-  ...(skill === "manage-skills" && ["create", "fresh-use", "cancel-proposal"].includes(name) ? {
+  ...(skill === "evolve" && ["cancel-proposal"].includes(name) ? {
     choice: { options: ["Create skill", "Revise proposal", "Cancel"], answer: name === "cancel-proposal" ? "Cancel" : "Create skill" },
   } : {}),
   rubric: `${outcome}. Review all applicable instructions and references of skills/${skill}/SKILL.md against task history and independent evidence. Discovery alone is insufficient. Use prepared stub outcomes for handoffs and remote state. Missing state, concurrency, or cleanup evidence remains unverified; do not infer actual UI rendering or remote effects from simulated receipts.`,

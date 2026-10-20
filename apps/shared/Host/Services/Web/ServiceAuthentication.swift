@@ -214,6 +214,7 @@ extension Service {
     }
 
     private func performAccessRequest(using presenter: (any ServiceAuthPresenting)?, source: AuthSignInSource) async throws -> AccessRequestOutcome {
+        let policy: AccessPolicy = source == .conversationCard ? .cached : .current
         if let iOS = iOSService {
             let current = await iOS.permissionState()
             _ = await iOS.updatePermission(from: current)
@@ -221,18 +222,15 @@ extension Service {
             return signInState.isAuthenticated ? .completed : .incomplete
         }
         if let mcp = remoteMCPService {
-            await checkAccess(policy: .current, reason: .modelSignIn)
+            await checkAccess(policy: policy, reason: .modelSignIn)
             if source != .serviceDetail, signInState.isAuthenticated { return .completed }
             let descriptor = try await mcp.authorize()
             applyResolvedDefinition(ServiceDefinition(mcp: descriptor, metadata: definition), reason: .serviceDetail)
             return signInState.isAuthenticated ? .completed : .incomplete
         }
-        await checkAccess(policy: .current, reason: .modelSignIn)
+        await checkAccess(policy: policy, reason: .modelSignIn)
         guard !Task.isCancelled else { return .incomplete }
         guard !signInState.isAuthenticated, auth != .notRequired else { return .completed }
-        await attemptSilentSignIn(reason: .modelSignIn)
-        guard !signInState.isAuthenticated else { return .completed }
-
         if let apiService {
             guard !auth.isSigningIn else { return .incomplete }
             let previous = auth.observation

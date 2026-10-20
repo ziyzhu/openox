@@ -41,6 +41,18 @@ final class OxClient {
         self.conversationController = conversationController ?? EmbeddedHostConversationController(host: host)
     }
 
+    func updateSchedule(id: UUID, name: String, prompt: String, condition: String?, deadline: Date?, recurrence: ScheduleRecurrence) async throws {
+        try await host.updateSchedule(id: id, name: name, prompt: prompt, condition: condition, deadline: deadline, recurrence: recurrence)
+    }
+
+    func setScheduleEnabled(_ enabled: Bool, id: UUID) async throws {
+        try await host.setScheduleEnabled(enabled, id: id)
+    }
+
+    func deleteSchedule(_ id: UUID) async throws {
+        try await host.deleteSchedule(id)
+    }
+
     func prepareStorage() async throws {
         try await host.prepareStorage()
     }

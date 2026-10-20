@@ -2,7 +2,7 @@ import SwiftUI
 
 @Observable
 final class ConversationViewportLayout {
-    static let responseComposerSpacing: CGFloat = 48
+    static let responseComposerSpacing: CGFloat = 36
 
     var composerHeight: CGFloat = 0
     var contentFloorHeight: CGFloat = 0
@@ -16,7 +16,7 @@ final class ConversationViewportLayout {
 
     func measureViewport(_ height: CGFloat, bottomMargin: CGFloat, focused: Bool) {
         contentFloorHeight = max(0, height - bottomMargin)
-        if !focused { anchorFloor = max(anchorFloor, contentFloorHeight) }
+        if !focused { anchorFloor = contentFloorHeight }
     }
 
     func slack(anchorContentHeight: CGFloat?) -> CGFloat {

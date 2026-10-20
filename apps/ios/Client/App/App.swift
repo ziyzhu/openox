@@ -9,7 +9,7 @@ struct OxApp: App {
         #if DEBUG
         guard !OxDemoLaunch.enabled && !OxAppStoreScreenshotLaunch.enabled else { return }
         #endif
-        ScheduledSkillScheduler.shared.register()
+        ScheduleScheduler.shared.register()
     }
 
     var body: some Scene {
@@ -149,7 +149,7 @@ private struct OxApplicationView: View {
                         Log.app.warning("OxHost transport unavailable: preparation failed")
                     }
                     await AppRegion.shared.refresh()
-                    ScheduledSkillScheduler.shared.refresh()
+                    await ScheduleScheduler.shared.refresh()
                 }
             }
     }

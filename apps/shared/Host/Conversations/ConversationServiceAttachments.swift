@@ -163,9 +163,6 @@ final class ConversationServiceAttachments {
         let unchanged = replacement.count == services.count
             && zip(replacement, services).allSatisfy { pair in pair.0 === pair.1 }
         guard !unchanged else { return }
-        let added = replacement.filter { candidate in
-            !services.contains { $0 === candidate }
-        }
         let removed = services.filter { candidate in
             !replacement.contains { $0 === candidate }
         }
@@ -174,9 +171,6 @@ final class ConversationServiceAttachments {
         Log.session.info("Conversation.setAttachedServices id=\(id) attached=\(replacement.map(\.domain).joined(separator: ",")) selected=\(conversation.isSelected)")
         if conversation.isSelected {
             serviceManager.setAttachedServices(replacement, for: id)
-            for service in added {
-                Task { await service.checkAccess(reason: .attach) }
-            }
         }
         for svc in replacement {
             Task { _ = await svc.loadManifest() }

@@ -74,6 +74,7 @@ nonisolated enum Actions {
     static let scheduleList = "ox.schedule.list"
     static let scheduleDelete = "ox.schedule.delete"
     static let scheduleEnable = "ox.schedule.enable"
+    static let scheduleComplete = "ox.schedule.complete"
     static let scheduleRun = "ox.schedule.run"
     static let memoryRead = "ox.memory.read"
     static let memoryWrite = "ox.memory.write"
@@ -99,7 +100,7 @@ nonisolated enum Actions {
         repositoryConflicts, repositoryResolve,
         serviceAttach, serviceSignIn, serviceSolve, servicePayment, serviceDetach,
         skillCreate, skillCopy, skillDelete, skillShare,
-        scheduleCreate, scheduleList, scheduleDelete, scheduleEnable, scheduleRun,
+        scheduleCreate, scheduleList, scheduleDelete, scheduleEnable, scheduleRun, scheduleComplete,
         memoryRead, memoryWrite, memoryReplaceText,
         userChoose, userFollow, userProgress,
     ]
@@ -114,7 +115,7 @@ nonisolated enum Actions {
 
     static func defaultPolicy(for action: String) -> ActionPolicy {
         guard builtIn.contains(action) else { return .ask }
-        return action.hasSuffix(".delete") || action == fsRmdir || action == providerGenerate ? .ask : .allow
+        return action.hasSuffix(".delete") || action == fsRmdir || action == providerGenerate || [scheduleCreate, scheduleEnable, scheduleRun].contains(action) ? .ask : .allow
     }
 
     static func label(for action: String) -> String? {
@@ -183,11 +184,12 @@ nonisolated enum Actions {
         case skillCreate: L10n.string("Create a skill")
         case skillCopy: L10n.string("Copy a skill")
         case skillDelete: L10n.string("Delete a skill")
-        case scheduleCreate: L10n.string("Schedule a skill")
-        case scheduleList: L10n.string("List scheduled skills")
-        case scheduleDelete: L10n.string("Delete a scheduled skill")
-        case scheduleEnable: L10n.string("Change a scheduled skill")
-        case scheduleRun: L10n.string("Run a scheduled skill")
+        case scheduleComplete: L10n.string("Complete this schedule")
+        case scheduleCreate: L10n.string("Create a schedule")
+        case scheduleList: L10n.string("List schedules")
+        case scheduleDelete: L10n.string("Delete a schedule")
+        case scheduleEnable: L10n.string("Change a schedule")
+        case scheduleRun: L10n.string("Run a schedule")
         case memoryRead: L10n.string("Read memory")
         case memoryWrite, memoryReplaceText: L10n.string("Update memory")
         case widgetShoveler: L10n.string("Display cards")

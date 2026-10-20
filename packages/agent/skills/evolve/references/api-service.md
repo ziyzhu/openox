@@ -46,7 +46,7 @@ Install synchronously exactly once and register every declared action exactly on
 
 ## Workflow
 
-1. Discover existing coverage and read official API documentation. For Google, use Google Discovery documents and googleworkspace/cli as request and workflow references.
+1. Search existing repository coverage with `ox.service.find`. If none fits, discover the remote API through `ox.web.search` and official documentation, or read the supplied documentation directly. An empty repository search does not mean the API is unavailable. Verify the base URL, operations, and authentication before authoring; never guess endpoints. For Google, use Google Discovery documents and googleworkspace/cli as request and workflow references.
 2. Identify bounded operations, permissions, pagination, and mutation effects. Reuse the user's approved scope; ask only about meaningful unresolved decisions. When ordinary API use reveals a concrete improvement, fulfill the original request first, then implement the smallest useful change within its scope without waiting for an explicit evolution request. Follow the main guide's one-pass, no-extra-prompt, and no-extra-effect boundaries; explain opportunities that need expanded scope or user input instead.
 3. Read existing Local source before editing and preserve unrelated work. Create or copy the service, edit through `ox.fs`, then call `ox.service.validate` and `ox.service.attach`. Local edits persist immediately, including incomplete drafts.
 4. Complete setup through `ox.service.signIn`. Inspect contracts and invoke names such as `api:google-calendar:listCalendars`.

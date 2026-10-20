@@ -6,10 +6,10 @@ Deliver a useful Local service from live website evidence and report its verifie
 
 Use when a website task has no suitable service or action after successful discovery, when an existing action is confirmed broken, or when ordinary service use or Browser reveals a stable improvement to an existing service. Act on concrete improvements within the request's scope even without an explicit evolution request. Extra Browser steps, repeated post-processing or orchestration, unclear capability descriptions, and a faster or more reliable observed implementation are useful improvement signals. Leave the service unchanged when there is no material improvement. If discovery fails, report that blocker instead of claiming a capability is missing. Diagnose sign-in, human verification, rate limiting, missing resources, and temporary website failures before treating an action as broken. General public-information questions need no service.
 
-1. When the service lacks a requested action, use `ox.web.browser` to explore the website; the action catalog alone does not establish that the website lacks the capability. Inspect the needed Browser contracts and fulfill the original request while collecting evidence for only the needed actions and handoffs.
-2. As soon as a read or confirmed effect is supported, put a complete user-facing answer before any subsequent authoring tool calls in the same response; do not wait for service creation. For mutations, prefer observation followed by one approved service invocation; Browser may execute instead when practical. Preserve approval and human-handoff boundaries either way.
-3. Compare the requested outcome with what the current service supplied. Create, extend, or repair the smallest action that removes a clear stable gap, even when the original task succeeded through a workaround. Prefer improving an implementation without changing its contract; add an action for a distinct capability and improve metadata when routing was the problem. Stop when there is no material improvement. Use the original request to establish minimal action scope without asking for scope confirmation. Ask only for missing information needed to proceed. Runtime attachment policies and live-mutation approval still apply.
-4. Validate and verify the service using the workflow below. Browser success alone does not verify a handler. If creation or editing is blocked, continue authorized Browser fulfillment and report the persistence limitation.
+1. Discover the product domain's existing web service and use its available actions. Inspect missing capabilities through Browser; the action catalog alone does not establish that the website lacks them.
+2. Use observed evidence to extend that service or create one when successful discovery finds none. Browser is the intermediary for building reusable actions. Prefer observation followed by one approved service invocation for mutations. If Browser already completed an effect, preserve it and never repeat it for verification.
+3. Validate, attach, and verify the resulting service, then use its actions to complete the request. Continue without a separate proposal checkpoint. If authoring is blocked, continue authorized Browser fulfillment and report the limitation.
+4. Improve relevant reusable skills when changed contracts or observed work reveal a concrete workflow improvement. Read `references/skills.md` for ownership and authoring. Preserve unrelated workflows and keep one-time details out of skills.
 
 Run at most one bounded improvement pass after fulfilling the request. Optional improvement must not cause another user prompt, approval, sign-in, or external effect, and new user input takes priority. Never repeat a completed mutation for evidence or testing. Track pending, completed, and uncertain effects; inspect resulting state before retrying uncertain effects, and ask if uncertainty remains. Disclose unexecuted handlers as partially verified at completion.
 
@@ -44,7 +44,7 @@ Consult one existing service only when it clarifies the implementation. Choose t
 - `oftendining.com`: approved preparation and user-owned payment.
 - `matchatennis.com`: nested schemas.
 
-Inspect the selected manifest and relevant available source; Bundled `actions.js` is readable without copying. Read `skills/manage-skills/SKILL.md` only when reusable guidance must be authored around verified actions.
+Inspect the selected manifest and relevant available source; Bundled `actions.js` is readable without copying. Read `references/skills.md` only when reusable guidance must be authored around verified actions.
 
 ## 2. Observe the website
 
@@ -134,7 +134,7 @@ Read existing Local source before editing and preserve unrelated work. Local cha
 
 Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. File operations enforce filesystem safety without validating service contents or changing running attachments. Local source is a working draft: files may temporarily be incomplete, missing, or inconsistent while you edit them in any order. Finish the complete set of edits, then call `ox.service.validate({ domain, purpose })` to check the whole service without changing or activating it. Fix any reported error and retry. Attachment uses the same service validator and rejects invalid drafts. A successful file write alone does not mean the service is ready to run.
 
-Author `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl` (include a verified icon whenever one can be obtained), optional local `$defs`, `actions`, and optional locale overlays. Skills belong at the repository root, not in service manifests or directories. Preserve repository skills that depend on this service; author new ones through `skills/manage-skills/SKILL.md` after actions are verified.
+Author `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl` (include a verified icon whenever one can be obtained), optional local `$defs`, `actions`, and optional locale overlays. Skills belong at the repository root, not in service manifests or directories. Preserve repository skills that depend on this service; author new ones through `references/skills.md` after actions are verified.
 
 Every action has:
 
@@ -254,7 +254,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 8. Exercise applicable empty, terminal pagination, missing-resource, stale-state, concurrency, and authentication boundaries. A paginated action must advance a source cursor or another deterministic continuation; never expose a fabricated numeric cursor over only the currently rendered DOM snapshot.
 9. Request separate approval before invoking a live mutation; follow the bootstrap single-execution rule.
 10. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
-11. Inspect repository skills that depend on this service when action IDs or contracts changed and identify skills that need revision through `skills/manage-skills/SKILL.md`.
+11. Inspect repository skills that depend on this service when action IDs or contracts changed and revise affected skills through `references/skills.md`.
 12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this conversation.
 13. For customer-facing services, verify the stable HTTPS favicon URL loads anonymously through the native image loader within its format, size, and redirect limits. Reload the service and visually confirm its avatar represents the product in light and dark mode. Preserve a working icon; otherwise try official candidates, including usable smaller images, before Google's cache. If none works, report the limitation without blocking service delivery.
 14. Stop capture with `discard: true` and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion or ending an abandoned or blocked run.

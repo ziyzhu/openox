@@ -62,9 +62,6 @@ extension ConversationBlock {
         let id: TurnID
         var blocks: [ConversationBlock] = []
         var thinkingCount = 0
-        var footerSourceBlockID: UUID? = nil
-        var footerCreatedAt: Date? = nil
-        var footerText: [String] = []
     }
 
     static func project(
@@ -74,6 +71,7 @@ extension ConversationBlock {
         interaction: Conversation.Interaction?
     ) -> [ConversationBlock] {
         var projectedTurns: [ProjectedTurn] = []
+        let activeTurnID = thinkingActivity?.turnID ?? (isBusy ? sources.last?.turnID : nil)
         let pendingServiceControl: Conversation.PendingServiceControl? = if case .serviceControl(let control) = interaction { control } else { nil }
         let serviceControlLocation = pendingServiceControl.flatMap { pending in
             if let source = pending.source { return source }
@@ -149,14 +147,6 @@ extension ConversationBlock {
                     return true
                 }
             }
-            if !visibleItems.isEmpty {
-                projectedTurns[turnIndex].footerSourceBlockID = block.id
-                projectedTurns[turnIndex].footerCreatedAt = block.createdAt
-                projectedTurns[turnIndex].footerText += visibleItems.compactMap { _, item -> String? in
-                    guard case .text(let text) = item, !text.isEmpty else { return nil }
-                    return text
-                }
-            }
             for (index, item) in visibleItems {
                 let id = contentItemID(blockID: block.id, index: index)
                 let kind: Kind
@@ -172,6 +162,22 @@ extension ConversationBlock {
                     createdAt: block.createdAt,
                     kind: kind,
                     spacingBefore: ConversationTranscriptMetrics.blockSpacing
+                ))
+            }
+            if !visibleItems.isEmpty {
+                let text = visibleItems.compactMap { _, item -> String? in
+                    guard case .text(let text) = item, !text.isEmpty else { return nil }
+                    return text
+                }.joined(separator: "\n\n")
+                projectedTurns[turnIndex].blocks.append(ConversationBlock(
+                    id: StableID.uuid("conversation.block.\(block.id.uuidString).footer"),
+                    sourceBlockID: block.id,
+                    createdAt: block.createdAt,
+                    kind: .responseFooter(
+                        text: text,
+                        phase: source.turnID == activeTurnID && block.id == sources.last?.block.id ? .streaming : .settled
+                    ),
+                    spacingBefore: ConversationTranscriptMetrics.responseFooterSpacing
                 ))
             }
         }
@@ -198,7 +204,6 @@ extension ConversationBlock {
             }
         }
 
-        let activeTurnID = thinkingActivity?.turnID ?? (isBusy ? sources.last?.turnID : nil)
         let blocks = projectedTurns.flatMap { turn in
             var turnBlocks = turn.blocks
             var invocations: [Invocation] = []
@@ -215,20 +220,7 @@ extension ConversationBlock {
                 turnBlocks[lastThinking].sourceInvocations = invocations
                 turnBlocks[lastThinking].isLiveThinking = thinkingActivity?.turnID == turn.id
             }
-            guard let sourceBlockID = turn.footerSourceBlockID,
-                  let createdAt = turn.footerCreatedAt else { return turnBlocks }
-            let text = turn.footerText.joined(separator: "\n\n")
-            guard !text.isEmpty else { return turnBlocks }
-            return turnBlocks + [ConversationBlock(
-                id: StableID.uuid("conversation.turn.\(turn.id.rawValue.uuidString).footer"),
-                sourceBlockID: sourceBlockID,
-                createdAt: createdAt,
-                kind: .responseFooter(
-                    text: text,
-                    phase: turn.id == activeTurnID ? .streaming : .settled
-                ),
-                spacingBefore: ConversationTranscriptMetrics.responseFooterSpacing
-            )]
+            return turnBlocks
         }
         return blocks.enumerated().map { index, block in
             guard index > 0, blocks[index - 1].isThinking, block.isThinking else { return block }

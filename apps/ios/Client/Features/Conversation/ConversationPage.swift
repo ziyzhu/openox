@@ -74,6 +74,7 @@ struct ConversationPage: View {
         }
     }
     @FocusState private var composerFocused: Bool
+    @State private var webInputFocused = false
     @State private var editedBlockID: UUID?
     @State private var editDraft = AttributedString()
     @State private var pendingFilePreview: FileItem?
@@ -267,7 +268,7 @@ struct ConversationPage: View {
     private var page: some View {
         let interaction = activeInteraction
         let isSignIn = if case .serviceControl(let item) = interaction, case .signIn = item.control { true } else { false }
-        let showsComposer = (interaction == nil || isSignIn) && isModelConfigured
+        let showsComposer = (interaction == nil || isSignIn) && isModelConfigured && !webInputFocused
         let authProbe = conversation.pendingServiceControl.flatMap { item -> Conversation.PendingServiceControl? in
             guard isAttached(item.control), case .signIn = item.control else { return nil }
             return item
@@ -372,7 +373,7 @@ struct ConversationPage: View {
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                VStack(spacing: 0) {
+                ZStack(alignment: .bottom) {
                     if showsComposer {
                         composerDock(
                             isConversationEmpty: conversation.canChangeRetention && blocks.isEmpty,
@@ -391,6 +392,7 @@ struct ConversationPage: View {
                 .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0), value: dockedPrompt?.id)
         }
         .background(Theme.Colors.conversationSurface)
+        .background(ConversationWebInputFocus(isFocused: $webInputFocused))
         .overlay(alignment: .bottom) {
             if !showsComposer, dockedPrompt == nil, scroller.showsJumpButton {
                 ScrollToBottomButton(composerButtonSize: composerButtonSize) {
@@ -434,6 +436,9 @@ struct ConversationPage: View {
         .onChange(of: showsComposer) { _, visible in
             if !visible { composerFocused = false }
         }
+        .onChange(of: webInputFocused) { _, focused in
+            Log.ui.info("ConversationUX.webInput conversation=\(conversation.id) focused=\(focused)")
+        }
         .onChange(of: ObjectIdentifier(conversation)) { _, _ in
             sendHandoff = .idle
             scroller.cancelSendHandoff()
@@ -476,7 +481,6 @@ struct ConversationPage: View {
                     : "\(updated.count) services updated"
                 toast = Toast(message: msg)
             }
-            await refreshAttachedServiceAuth()
         }
         .task(id: authProbe?.id) {
             await resolveSignInControl(authProbe)
@@ -1188,6 +1192,13 @@ struct ConversationPage: View {
                     focused: anyInputFocused
                 )
             }
+            .onChange(of: dockClearance) { _, clearance in
+                viewportLayout.measureViewport(
+                    outer.size.height,
+                    bottomMargin: clearance,
+                    focused: anyInputFocused
+                )
+            }
             .onAppear {
                 latestSubmissionID = nil
                 sendHandoff = .idle
@@ -1527,6 +1538,8 @@ struct ConversationPage: View {
             onCustomFocusChange: { choiceInputFocused = $0 }
         )
             .id(pending.id)
+            .frame(maxWidth: .infinity)
+            .fixedSize(horizontal: false, vertical: true)
             .background(
                 Theme.Colors.conversationSurface,
                 in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
@@ -1544,7 +1557,7 @@ struct ConversationPage: View {
                         .transition(.opacity)
                 }
             }
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .transition(.opacity)
             .onAppear {
                 Log.ui.info("ConversationUX.promptDock conversation=\(conversation.id) prompt=\(pending.id) kind=\(pending.kind.rawValue) secret=\(pending.secretEntry != nil) phase=presented")
             }
@@ -1568,16 +1581,6 @@ struct ConversationPage: View {
         conversation.attachedServices.contains { $0.domain == control.domain }
     }
 
-    private func refreshAttachedServiceAuth() async {
-        await withTaskGroup(of: Void.self) { group in
-            for service in conversation.attachedServices {
-                group.addTask { @MainActor in
-                    await service.checkAccess(reason: .conversationOpen)
-                }
-            }
-        }
-    }
-
     private func resolveSignInControl(_ item: Conversation.PendingServiceControl?) async {
         guard let item,
               case .signIn(let domain, _) = item.control,
@@ -1588,8 +1591,6 @@ struct ConversationPage: View {
             Log.ui.info("ConversationPage.authProbe canceled conversation=\(conversation.id) domain=\(domain)")
             return
         }
-        await service.attemptSilentSignIn(reason: .conversationOpen)
-        guard !Task.isCancelled else { return }
         Log.ui.info("ConversationPage.authProbe done conversation=\(conversation.id) domain=\(domain) state=\(service.signInState.rawValue)")
         if service.signInState.isAuthenticated {
             conversation.resolveServiceControl(id: item.id, result: service.accessResult())

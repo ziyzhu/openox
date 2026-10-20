@@ -7,9 +7,9 @@ import modelService from "../../skills/evolve/references/model-service.md" with 
 import webService from "../../skills/evolve/references/web-service.md" with { type: "text" };
 import importMemory from "../../skills/import-memory/SKILL.md" with { type: "text" };
 import manageProviders from "../../skills/manage-providers/SKILL.md" with { type: "text" };
-import manageSkills from "../../skills/manage-skills/SKILL.md" with { type: "text" };
-import repositorySkill from "../../skills/manage-skills/references/repository-skill.md" with { type: "text" };
-import userSkill from "../../skills/manage-skills/references/user-skill.md" with { type: "text" };
+import skillGuide from "../../skills/evolve/references/skills.md" with { type: "text" };
+import repositorySkill from "../../skills/evolve/references/repository-skill.md" with { type: "text" };
+import userSkill from "../../skills/evolve/references/user-skill.md" with { type: "text" };
 import visualize from "../../skills/visualize/SKILL.md" with { type: "text" };
 
 export type BundledSkill = Omit<Skill, "services" | "resources"> & {
@@ -27,8 +27,8 @@ function skill(name: string, text: string, resources: Record<string, string> = {
 }
 export const bundledSkills: readonly BundledSkill[] = Object.freeze([
   skill("evolve", evolve, { "references/api-service.md": apiService, "references/helpers.js": helpers,
-    "references/model-schemas.md": modelSchemas, "references/model-service.md": modelService, "references/web-service.md": webService }),
+    "references/model-schemas.md": modelSchemas, "references/model-service.md": modelService, "references/web-service.md": webService,
+    "references/skills.md": skillGuide, "references/user-skill.md": userSkill, "references/repository-skill.md": repositorySkill }),
   skill("import-memory", importMemory), skill("manage-providers", manageProviders),
-  skill("manage-skills", manageSkills, { "references/repository-skill.md": repositorySkill, "references/user-skill.md": userSkill }),
   skill("visualize", visualize),
 ]);

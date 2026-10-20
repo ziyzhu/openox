@@ -43,7 +43,8 @@ struct ConversationSidebar: View {
                 .accessibilityIdentifier(A11yID.Sidebar.panel)
                 .safeAreaBar(edge: .top, alignment: .leading, spacing: 0) { header }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .background(Theme.Colors.conversationSurface, ignoresSafeAreaEdges: .all)
+                .background(Theme.Colors.conversationSurface.opacity(horizontalSizeClass == .compact ? 0 : 1), ignoresSafeAreaEdges: .all)
+                .containerBackground(Theme.Colors.conversationSurface.opacity(horizontalSizeClass == .compact ? 0 : 1), for: .navigation)
                 .toolbar {
                     DefaultToolbarItem(kind: .search, placement: .bottomBar)
                     ToolbarSpacer(.fixed, placement: .bottomBar)
@@ -292,7 +293,7 @@ private struct SidebarRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: Theme.Spacing.sm) {
                     activityIndicator
-                    if meta.scheduledSkillID != nil {
+                    if meta.scheduleID != nil {
                         Image(systemName: "clock")
                             .font(.system(.body, weight: .medium))
                             .foregroundStyle(Theme.Colors.conversationSecondary)
@@ -355,7 +356,7 @@ private struct SidebarRow: View {
     }
 
     private var scheduledAccessibilityValue: String {
-        meta.scheduledSkillID == nil ? "" : L10n.string("Scheduled")
+        meta.scheduleID == nil ? "" : L10n.string("Scheduled")
     }
 
     @ViewBuilder

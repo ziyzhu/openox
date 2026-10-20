@@ -602,9 +602,6 @@ final class ServiceOperations {
         return try await tracked(Actions.serviceSignIn, .object(["domain": .string(domain)]), purpose: purpose) {
             authenticationRecovery.clear()
             await service.checkAccess(policy: .current, reason: .modelSignIn)
-            if service.auth.isSignedOut {
-                await service.attemptSilentSignIn(reason: .modelSignIn)
-            }
             if service.signInState.isAuthenticated {
                 Log.session.info("bridge.service.signIn already authenticated domain=\(domain) auth=\(service.signInState.rawValue)")
                 return service.accessResult()

@@ -57,7 +57,7 @@ Logical templates serialized with current types and provenance labels alone do
 not prove compatibility. Use `storage` replay entries for exact encoded data,
 including required preferences, app-group state, and SQLite sidecars captured
 with the app stopped. Provision device-bound credentials, bookmarks, and OS
-permissions separately; never put secrets in tracked templates.
+permissions separately; never put secrets in tracked templates. Preserve the Profile root directory identity when replaying its contents; replacing the directory itself can invalidate its bookmark even at the same path.
 
 Validate both templates offline, then replay each on an isolated, reserved
 simulator using the matching build, bundle identifier, and explicit write

@@ -155,8 +155,8 @@ export async function check(): Promise<string> {
   const migrationFiles = allSwiftFiles.map(file => relative(ROOT, file)).filter(path => migrationFile.test(path));
   const migrationCallers: Record<string, Set<string>> = {
     StorageMigrator: new Set(["apps/shared/Host/Storage/StorageMigration.swift", "apps/ios/Host/IOSHost.swift", "apps/shared/Host/HostRuntime.swift"]),
-    ProfileMigrator: new Set([...migrationFiles, "apps/shared/Host/Profile/ProfileRepository.swift", "apps/shared/Host/Storage/StorageRoot.swift", "apps/shared/Host/Durable/DurableProfileStore.swift", "apps/shared/Host/RPC/DebugDurableConversation.swift"]),
-    ApplicationStorageMigrator: new Set([...migrationFiles, "apps/shared/Host/Skills/ScheduledSkills.swift"]),
+    ProfileMigrator: new Set([...migrationFiles, "apps/shared/Host/Profile/ProfileRepository.swift", "apps/shared/Host/Storage/StorageRoot.swift", "apps/shared/Host/Durable/DurableProfileStore.swift", "apps/shared/Host/RPC/DebugDurableConversation.swift", "apps/shared/Host/Schedules/Schedules.swift"]),
+    ApplicationStorageMigrator: new Set(migrationFiles),
     CredentialMigrator: new Set(migrationFiles),
     RepositoryMigrator: new Set([...migrationFiles, "apps/shared/Host/Services/Repository/Repository.swift"]),
     StorageMigrationSupport: new Set(migrationFiles),

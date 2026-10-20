@@ -14,7 +14,7 @@ final class HostRuntime: OxHost {
     var executionAvailable: Bool { executionPolicy() }
 
     private let executionPolicy: @MainActor () -> Bool
-    private let activateSchedules: @MainActor () throws -> Void
+    private let activateSchedules: @MainActor () async throws -> Void
     private let deactivateSchedules: @MainActor () async -> Void
     private var preparation: Preparation?
     private var optionalRecovery: Task<Void, Never>?
@@ -26,7 +26,7 @@ final class HostRuntime: OxHost {
         conversationExecution: any ConversationExecution,
         conversationFeedback: any ConversationFeedback,
         executionPolicy: @escaping @MainActor () -> Bool,
-        activateSchedules: @escaping @MainActor () throws -> Void,
+        activateSchedules: @escaping @MainActor () async throws -> Void,
         deactivateSchedules: @escaping @MainActor () async -> Void = {}
     ) {
         services = serviceManager
@@ -83,7 +83,10 @@ final class HostRuntime: OxHost {
             await conversations.loadSummariesNow()
             Log.app.info("HostRuntime Profile summaries id=\(scope.profileID?.uuidString ?? "none") durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1_000))")
         }
-        try activateSchedules()
+        await profileSummaryLoad?.value
+        do { try await activateSchedules() }
+        catch { Log.app.warning("HostRuntime schedules unavailable recoveryRequired=true error=\(error.localizedDescription)") }
+        resumeOptionalStorageRecovery()
         Log.app.info("HostRuntime Profile changed id=\(StorageRoot.shared.activeId?.uuidString ?? "none") durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1_000))")
     }
 
@@ -129,7 +132,7 @@ final class HostRuntime: OxHost {
             return
         }
         guard let profile = preparation?.profile,
-              services.localRecoveryMessage != nil || ScheduledSkills.shared.preparation?.failureMessage != nil else { return }
+              services.localRecoveryMessage != nil || Schedules.shared.preparation?.failureMessage != nil else { return }
         optionalRecovery = Task { @MainActor in
             defer { optionalRecovery = nil }
             do {
@@ -195,7 +198,7 @@ final class HostRuntime: OxHost {
                 _ = UserMemory.shared
                 try await UserMemory.shared.waitUntilCurrent()
                 await services.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
-                do { try activateSchedules() }
+                do { try await activateSchedules() }
                 catch { Log.app.warning("HostRuntime schedules unavailable recoveryRequired=true error=\(error.localizedDescription)") }
                 #if DEBUG && targetEnvironment(simulator)
                 try await DeviceTemplate.finish(conversations: conversations)

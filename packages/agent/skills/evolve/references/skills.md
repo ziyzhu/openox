@@ -1,11 +1,6 @@
----
-name: manage-skills
-description: "Create, inspect, customize, revise, copy to Local, or delete reusable skills owned by a Profile or repository."
----
+# Reusable Skills
 
-# Manage Skills
-
-Create or change durable skills only when the user requests it. Use memory for personal preferences and complete one-time tasks directly.
+Create or improve a skill when the user requests one or task evidence establishes a useful reusable workflow. Improve relevant existing skills before creating overlapping ones. Keep personal preferences in memory and one-time task details out of skills. Continue authoring and verification without a proposal checkpoint; ask only for consequential missing decisions. Scheduling still requires an explicit request.
 
 All skills execute through the agent in the Ox VM. Use its `ox.*` APIs, virtual filesystem, and normal service Actions. Do not assume a terminal, Node.js, a host filesystem, or authenticated services.
 
