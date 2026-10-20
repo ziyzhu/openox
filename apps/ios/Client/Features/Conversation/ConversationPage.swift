@@ -1193,6 +1193,13 @@ struct ConversationPage: View {
                     focused: anyInputFocused
                 )
             }
+            .onChange(of: dockClearance) { _, clearance in
+                viewportLayout.measureViewport(
+                    outer.size.height,
+                    bottomMargin: clearance,
+                    focused: anyInputFocused
+                )
+            }
             .onAppear {
                 latestSubmissionID = nil
                 sendHandoff = .idle
