@@ -24,7 +24,7 @@ export interface ProfileRuntimeOptions {
   models: Models;
   registry?: Registry;
   settings?: HarnessSettings;
-  artifacts?: FilePayloadStore;
+  filePayloads?: FilePayloadStore;
   fileStorage?: { kind: "physical" | "prepare"; backend: ProfileFileBackend; publicFiles?: boolean };
   mounts?: readonly FileMount[];
   /** Only for the explicitly retained, purgeable SQLite-blob fixtures. */
@@ -70,7 +70,7 @@ export class ProfileRuntime {
     this.harness = harness;
     this.registry = registry;
     this.options = options;
-    this.files = new ProfileFiles(harness, options.database, options.profileID, options.createBlobID, options.artifacts,
+    this.files = new ProfileFiles(harness, options.database, options.profileID, options.createBlobID, options.filePayloads,
       options.fileStorage?.kind === "prepare" ? "prepare" : options.fileStorage ? "physical" : "legacy", options.fileStorage?.backend, options.fileStorage?.publicFiles);
     this.conversations = new OxConversations(options.profileID, harness, () => this.ready(), reference => this.prepareConversation(reference));
     this.index = new ConversationIndexer(harness, options.profileID, error => options.onReport?.(error));
@@ -91,7 +91,7 @@ export class ProfileRuntime {
       return runtime;
     } catch (error) {
       try { if (harness) await harness.close(context); else await options.database.close(); }
-      finally { await options.artifacts?.close(); await options.fileStorage?.backend.close(); }
+      finally { await options.filePayloads?.close(); await options.fileStorage?.backend.close(); }
       throw error;
     }
   }

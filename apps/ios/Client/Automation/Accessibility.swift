@@ -35,7 +35,7 @@ nonisolated enum A11yID {
         static let newConversation = "sidebar.newConversation"
         static let settings = "sidebar.settings"
         static let services = "sidebar.services"
-        static let artifacts = "sidebar.artifacts"
+        static let files = "sidebar.artifacts"
         static let skills = "sidebar.skills"
         static func row(_ sessionId: String) -> String { "sidebar.row.\(sessionId)" }
         static func deleteRow(_ sessionId: String) -> String { "sidebar.deleteRow.\(sessionId)" }
@@ -82,7 +82,7 @@ nonisolated enum A11yID {
         static let memoryEditor = "settings.memoryEditor"
         static let memorySave = "settings.memorySave"
         static let memoryCopy = "settings.memoryCopy"
-        static let artifacts = "settings.artifacts"
+        static let files = "settings.artifacts"
         static let skills = "settings.skills"
         static let skillSearch = "settings.skills.search"
         static let skillServiceSearch = "settings.skillServices.search"
@@ -217,7 +217,7 @@ nonisolated enum A11yID {
             static let branch = "conversation.message.branch"
             static let retry = "conversation.message.retry"
             static let contextCompaction = "conversation.contextCompacted"
-            static func artifact(_ artifactId: String) -> String { "conversation.message.artifact.\(artifactId)" }
+            static func file(_ fileID: String) -> String { "conversation.message.artifact.\(fileID)" }
             static func serviceInspector(_ domain: String) -> String { "conversation.message.serviceInspector.\(domain)" }
             static func skill(_ name: String) -> String { "conversation.message.skill.\(name)" }
             static func skillResult(_ id: String, blockID: UUID) -> String { "conversation.message.skillResult.\(blockID.uuidString).\(id)" }
@@ -333,7 +333,7 @@ enum A11yLabel {
     static var pin: String { L10n.string("Pin", comment: "") }
     static var unpin: String { L10n.string("Unpin", comment: "") }
     static var services: String { L10n.string("Services", comment: "") }
-    static var artifacts: String { L10n.string("Files", comment: "") }
+    static var files: String { L10n.string("Files", comment: "") }
     static var skills: String { L10n.string("Skills", comment: "") }
     static var openSidebar: String { L10n.string("Open conversation history", comment: "") }
     static var resizeSidebar: String { L10n.string("Resize conversation history", comment: "") }

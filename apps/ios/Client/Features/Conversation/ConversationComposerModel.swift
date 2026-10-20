@@ -32,7 +32,7 @@ final class ConversationComposerModel {
     enum DraftAttachment: Identifiable, Equatable {
         enum ID: Hashable {
             case operation(UUID)
-            case artifact(String)
+            case file(String)
         }
 
         case importing(PendingAttachment)
@@ -41,7 +41,7 @@ final class ConversationComposerModel {
         var id: ID {
             switch self {
             case .importing(let pending): .operation(pending.id)
-            case .ready(let artifact): .artifact(artifact.id)
+            case .ready(let file): .file(file.id)
             }
         }
     }
@@ -178,7 +178,7 @@ final class ConversationComposerModel {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard canSubmit else { return nil }
         let attachments = draftAttachments.compactMap { item -> FileItem? in
-            if case .ready(let artifact) = item { artifact } else { nil }
+            if case .ready(let file) = item { file } else { nil }
         }
         let message = Message(id: draftID, text: text, attachments: attachments)
         draft = ""
@@ -213,9 +213,9 @@ final class ConversationComposerModel {
         Log.ui.info("ConversationComposer.import begin draft=\(importingDraftID) import=\(pending.id) name=\(displayName)")
         importTasks[pending.id] = Task { [weak self] in
             do {
-                let artifact = try await operation()
+                let file = try await operation()
                 guard !Task.isCancelled else { return }
-                self?.finishImport(pending.id, draftID: importingDraftID, artifact: artifact)
+                self?.finishImport(pending.id, draftID: importingDraftID, file: file)
             } catch is CancellationError {
                 self?.cancelImport(pending.id, draftID: importingDraftID)
             } catch {
@@ -232,7 +232,7 @@ final class ConversationComposerModel {
         Log.ui.info("ConversationComposer.attachment remove draft=\(draftID) item=\(item.id)")
     }
 
-    private func finishImport(_ id: UUID, draftID importingDraftID: UUID, artifact: FileItem) {
+    private func finishImport(_ id: UUID, draftID importingDraftID: UUID, file: FileItem) {
         importTasks.removeValue(forKey: id)
         guard draftID == importingDraftID else {
             draftAttachments.removeAll { $0.id == .operation(id) }
@@ -240,8 +240,8 @@ final class ConversationComposerModel {
             return
         }
         guard let index = draftAttachments.firstIndex(where: { $0.id == .operation(id) }) else { return }
-        draftAttachments[index] = .ready(artifact)
-        Log.ui.info("ConversationComposer.import ready draft=\(draftID) import=\(id) artifact=\(artifact.id)")
+        draftAttachments[index] = .ready(file)
+        Log.ui.info("ConversationComposer.import ready draft=\(draftID) import=\(id) artifact=\(file.id)")
     }
 
     private func cancelImport(_ id: UUID, draftID importingDraftID: UUID) {

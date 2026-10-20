@@ -129,7 +129,7 @@ actor ProfileRepository {
         let fields = value.objectValue ?? [:]
         let meta = try decodeMeta(fields, reference: reference, scope: scope)
         let turns = try DurableConversationProjection.turns(from: fields["entries"]?.arrayValue ?? [], scope: scope, files: FileDirectoryListing(files: [:]))
-        let files = try await artifactListing(for: turns, in: scope).files ?? [:]
+        let files = try await fileListing(for: turns, in: scope).files ?? [:]
         let resolved = turns.map { turn in
             turn.mappingFiles { files[$0.fileName] ?? files[$0.fileName.lowercased()] ?? $0 }
         }
@@ -232,14 +232,14 @@ actor ProfileRepository {
         let reference = try decodeReference(value, scope: scope)
         do {
             var names: [String: String] = [:], dependencies: [String: String] = [:]
-            for (name, data) in prepared.artifacts {
-                let artifact = try await importFile(data: data, suggestedName: name, in: scope, conversation: reference)
-                names[name.lowercased()] = artifact.fileName
-                dependencies[name.lowercased()] = artifact.displayName
+            for (name, data) in prepared.files {
+                let file = try await importFile(data: data, suggestedName: name, in: scope, conversation: reference)
+                names[name.lowercased()] = file.fileName
+                dependencies[name.lowercased()] = file.displayName
             }
             let directory = scope.root.appendingPathComponent("conversations/\(reference.conversationID)")
-            let materialized = try prepared.materialized(artifactNames: names, directory: directory, dependencyNames: dependencies)
-            for (name, data) in materialized.artifacts { _ = try await writeFile(data: data, named: name, in: scope) }
+            let materialized = try prepared.materialized(fileNames: names, directory: directory, dependencyNames: dependencies)
+            for (name, data) in materialized.files { _ = try await writeFile(data: data, named: name, in: scope) }
             let alias = "ox-native:" + UUID().uuidString
             let entries = try materialized.turns.map { turn -> JSONValue in
                 .object(["kind": .string("ox.native.turn"), "data": .object(["turn": try encoded(turn)]),

@@ -837,11 +837,11 @@ struct RootView: View {
                              guard conversations.contains(id) else { return }
                              openConversation(id)
                          },
-                         onRenameFile: { artifact, newFilename in
-                             try await conversations.renameFile(artifact, to: newFilename)
+                         onRenameFile: { file, newFilename in
+                             try await conversations.renameFile(file, to: newFilename)
                          },
-                         onDeleteFile: { artifact in
-                             try await conversations.deleteFile(artifact)
+                         onDeleteFile: { file in
+                             try await conversations.deleteFile(file)
                          },
                          onExploreServices: { showServices(for: conversation.id) },
                          onFileNavigationChange: setChildNavigationActive,
@@ -1057,26 +1057,26 @@ struct RootView: View {
     }
 
     private func renameFile(
-        _ artifact: FileItem,
+        _ file: FileItem,
         to newFilename: String,
         in scope: ProfileScope
     ) async throws -> FileItem {
         if scope.profileID == storage.activeId {
-            return try await conversations.renameFile(artifact, to: newFilename)
+            return try await conversations.renameFile(file, to: newFilename)
         }
         return try await ProfileRepository.shared.renameFile(
-            named: artifact.fileName,
+            named: file.fileName,
             to: newFilename,
             in: scope
         )
     }
 
-    private func deleteFile(_ artifact: FileItem, in scope: ProfileScope) async throws {
+    private func deleteFile(_ file: FileItem, in scope: ProfileScope) async throws {
         if scope.profileID == storage.activeId {
-            try await conversations.deleteFile(artifact)
+            try await conversations.deleteFile(file)
             return
         }
-        _ = try await ProfileRepository.shared.deleteFile(named: artifact.fileName, in: scope)
+        _ = try await ProfileRepository.shared.deleteFile(named: file.fileName, in: scope)
     }
 
     private func setChildNavigationActive(_ active: Bool) {
@@ -1242,8 +1242,8 @@ struct RootView: View {
         if areas.contains(.skills) {
             Skills.shared.refresh()
         }
-        if areas.contains(.artifacts) {
-            conversations.artifactFilesChanged()
+        if areas.contains(.files) {
+            conversations.filesChanged()
         }
         if areas.contains(.conversations), reason != "filesystem" || showSidebar {
             await conversations.loadSummariesNow()

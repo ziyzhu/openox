@@ -11,7 +11,7 @@ nonisolated struct DurableConversationRoute: Sendable {
     let session: DurableProfileStore.Session
     let conversationID: Int
     let profileID: UUID
-    let artifactScope: ProfileScope?
+    let fileScope: ProfileScope?
     let reference: DurableConversationReference?
 
     var runtimeReference: JSONValue {
@@ -52,7 +52,7 @@ extension Conversation {
             }
         }
         try await session.host.bind(conversationID: conversationID, scope: scope, configuration: configuration, runtime: session.runtime,
-                                    runtimeProfileID: route.profileID.uuidString, artifactScope: route.artifactScope,
+                                    runtimeProfileID: route.profileID.uuidString, fileScope: route.fileScope,
                                     isolatedFiles: route.reference == nil) { [weak self] event in
             await self?.receiveAgentEvent(event)
         }
@@ -147,7 +147,7 @@ extension Conversation {
             "conversationID": .int(route.conversationID)]))
         guard let messages = result.objectValue?["messages"]?.arrayValue else { throw RuntimeError.bridge("Invalid Pi conversation context") }
         return try messages.map {
-            try DurableMessageCodec.decode($0, scope: scope, artifactScope: route.artifactScope)
+            try DurableMessageCodec.decode($0, scope: scope, fileScope: route.fileScope)
         }
     }
 }

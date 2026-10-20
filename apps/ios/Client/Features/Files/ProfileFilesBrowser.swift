@@ -110,10 +110,10 @@ private struct ProfileFilesBrowser: ViewModifier {
                 }
             }
             .navigationDestination(item: $preview) { selected in
-                if selected.artifact.usesDedicatedPreview {
-                    FileNavigationPage(artifact: selected.artifact, scope: selected.scope)
+                if selected.file.usesDedicatedPreview {
+                    FileNavigationPage(file: selected.file, scope: selected.scope)
                 } else {
-                    FilePreviewPresentation(artifact: selected.artifact, scope: selected.scope)
+                    FilePreviewPresentation(file: selected.file, scope: selected.scope)
                 }
             }
             .alert("Couldn't open file", isPresented: Binding(
@@ -140,9 +140,9 @@ private struct ProfileFilesBrowser: ViewModifier {
                     return
                 }
                 let relative = path.dropFirst(root.count).joined(separator: "/")
-                let artifact = try await ProfileRepository.shared.artifact(named: "/" + relative, in: scope)
+                let file = try await ProfileRepository.shared.file(named: "/" + relative, in: scope)
                 try Task.checkCancellation()
-                preview = FileZoomPreview(artifact: artifact, sourceID: "profile-files:\(artifact.id)", scope: scope)
+                preview = FileZoomPreview(file: file, sourceID: "profile-files:\(file.id)", scope: scope)
                 Log.ui.info("ProfileFiles.browser selected profile=\(scope.profileID?.uuidString ?? "temporary") path=\(relative)")
             } catch is CancellationError {
             } catch {

@@ -4,50 +4,50 @@ import UniformTypeIdentifiers
 import WebKit
 
 struct HTMLFileScreen: View {
-    let artifact: FileItem
+    let file: FileItem
     let scope: ProfileScope?
 
-    init(artifact: FileItem, scope: ProfileScope? = StorageRoot.currentScope) {
-        self.artifact = artifact
+    init(file: FileItem, scope: ProfileScope? = StorageRoot.currentScope) {
+        self.file = file
         self.scope = scope
     }
 
     var body: some View {
         GeometryReader { geometry in
             HTMLFileView(
-                artifact: artifact,
+                file: file,
                 scope: scope,
-                modifiedAt: artifact.modifiedAt,
+                modifiedAt: file.modifiedAt,
                 safeAreaInsets: geometry.safeAreaInsets
             )
         }
         .background(Theme.Colors.conversationSurface)
-        .navigationTitle(artifact.userFacingName)
+        .navigationTitle(file.userFacingName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                FileShareButton(artifact: artifact, scope: scope) {
+                FileShareButton(file: file, scope: scope) {
                     Image(systemName: "square.and.arrow.up")
                 }
                 .accessibilityLabel(A11yLabel.shareFile)
-                .accessibilityIdentifier(A11yID.Files.share(artifact.id))
+                .accessibilityIdentifier(A11yID.Files.share(file.id))
             }
         }
     }
 }
 
 struct HTMLFileView: View {
-    let artifact: FileItem
+    let file: FileItem
     let modifiedAt: Date?
     let safeAreaInsets: EdgeInsets
     private let source: FilePreviewSource
 
-    init(artifact: FileItem, scope: ProfileScope?, modifiedAt: Date?, safeAreaInsets: EdgeInsets) {
-        self.artifact = artifact
+    init(file: FileItem, scope: ProfileScope?, modifiedAt: Date?, safeAreaInsets: EdgeInsets) {
+        self.file = file
         self.modifiedAt = modifiedAt
         self.safeAreaInsets = safeAreaInsets
-        source = FilePreviewSource(artifact: artifact, scope: scope)
+        source = FilePreviewSource(file: file, scope: scope)
     }
 
     private enum Phase {
@@ -80,7 +80,7 @@ struct HTMLFileView: View {
             case .loadingHTML(let document), .ready(let document):
                 HTMLFileWebView(
                     document: document,
-                    title: artifact.userFacingName,
+                    title: file.userFacingName,
                     serviceManager: serviceManager,
                     safeAreaInsets: safeAreaInsets,
                     isReady: phase.isReady,
@@ -90,7 +90,7 @@ struct HTMLFileView: View {
             case .failed(let message):
                 ContentUnavailableView(
                     "File unavailable",
-                    systemImage: artifact.exists ? "exclamationmark.triangle" : "questionmark.folder",
+                    systemImage: file.exists ? "exclamationmark.triangle" : "questionmark.folder",
                     description: Text(message)
                 )
             }
@@ -109,11 +109,11 @@ struct HTMLFileView: View {
             let document = try await HTMLFileDocument.read(source)
             guard !Task.isCancelled else { return }
             phase = .loadingHTML(document)
-            Log.ui.info("HTMLFileView.load filename=\(artifact.fileName) bytes=\(document.byteCount)")
+            Log.ui.info("HTMLFileView.load filename=\(file.fileName) bytes=\(document.byteCount)")
         } catch {
             guard !Task.isCancelled else { return }
             phase = .failed(error.localizedDescription)
-            Log.ui.error("HTMLFileView.load filename=\(artifact.fileName) error=\(error.localizedDescription)")
+            Log.ui.error("HTMLFileView.load filename=\(file.fileName) error=\(error.localizedDescription)")
         }
     }
 
@@ -165,7 +165,7 @@ nonisolated struct HTMLFileDocument: Hashable, Sendable {
     let byteCount: Int
 
     static func read(_ source: FilePreviewSource) async throws -> Self {
-        guard source.artifact.kind == .html else { throw FileError.unsupportedType(source.artifact.fileName) }
+        guard source.file.kind == .html else { throw FileError.unsupportedType(source.file.fileName) }
         guard let scope = source.scope else { throw CocoaError(.fileReadNoPermission) }
         let baseURL = HTMLFilePage.documentURL(for: source)
         let data = try await source.read()
@@ -260,7 +260,7 @@ enum HTMLFilePage {
     static let mapHandler = "oxMap"
     nonisolated static func documentURL(for source: FilePreviewSource) -> URL {
         guard let root = source.scope?.root.standardizedFileURL.pathComponents else { return CanvasWebBridge.documentURL }
-        let path = source.artifact.fileURL.standardizedFileURL.pathComponents.dropFirst(root.count).joined(separator: "/")
+        let path = source.file.fileURL.standardizedFileURL.pathComponents.dropFirst(root.count).joined(separator: "/")
         var components = URLComponents()
         components.scheme = resourceScheme
         components.path = "/" + path

@@ -688,30 +688,30 @@ final class ConversationManager {
         persist(meta)
     }
 
-    func renameFile(_ artifact: FileItem, to newFilename: String) async throws -> FileItem {
+    func renameFile(_ file: FileItem, to newFilename: String) async throws -> FileItem {
         ensureRepositoryScope()
         let scope = repositoryScope
-        let renamed = try await repository.renameFile(named: artifact.fileName, to: newFilename, in: scope)
+        let renamed = try await repository.renameFile(named: file.fileName, to: newFilename, in: scope)
         guard repositoryScope == scope else { return renamed }
         let directory = renamed.fileURL.deletingLastPathComponent()
         for conversation in records.values.compactMap({ $0.hydration.conversation }) {
-            conversation.renameFileReferences(from: artifact.fileName, to: renamed.fileName, directory: directory)
+            conversation.renameFileReferences(from: file.fileName, to: renamed.fileName, directory: directory)
         }
-        Log.session.info("ConversationManager.renameFile from=\(artifact.fileName) to=\(renamed.fileName)")
+        Log.session.info("ConversationManager.renameFile from=\(file.fileName) to=\(renamed.fileName)")
         return renamed
     }
 
-    func deleteFile(_ artifact: FileItem) async throws {
+    func deleteFile(_ file: FileItem) async throws {
         ensureRepositoryScope()
         let scope = repositoryScope
-        _ = try await repository.deleteFile(named: artifact.fileName, in: scope)
-        artifactFilesChanged()
-        Log.session.info("ConversationManager.deleteFile file=\(artifact.fileName)")
+        _ = try await repository.deleteFile(named: file.fileName, in: scope)
+        filesChanged()
+        Log.session.info("ConversationManager.deleteFile file=\(file.fileName)")
     }
 
-    func artifactFilesChanged() {
+    func filesChanged() {
         for conversation in records.values.compactMap({ $0.hydration.conversation }) {
-            conversation.artifactFilesChanged()
+            conversation.filesChanged()
         }
     }
 
@@ -953,7 +953,7 @@ final class ConversationManager {
                 let session = try await DurableProfileStore.shared.session(in: conversation.scope)
                 try conversation.installDurableRoute(DurableConversationRoute(session: session,
                     conversationID: reference.conversationID, profileID: reference.profileID,
-                    artifactScope: conversation.scope, reference: reference))
+                    fileScope: conversation.scope, reference: reference))
                 if oldID != reference.compatibilityID, var record = records.removeValue(forKey: oldID) {
                     if case .debouncing(_, let task) = record.persistence { task.cancel() }
                     record.persistence = .clean

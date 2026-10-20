@@ -57,11 +57,11 @@ extension OxHostProtocol {
             var installed: [FileItem] = []
             var created: [FileItem] = []
             do {
-                for artifact in command.artifacts {
-                    let existing = try await ProfileRepository.shared.artifacts(in: scope)
+                for file in command.artifacts {
+                    let existing = try await ProfileRepository.shared.files(in: scope)
                     let imported = try await FileImporter.importDataAsync(
-                        artifact.data,
-                        suggestedName: artifact.name,
+                        file.data,
+                        suggestedName: file.name,
                         in: scope
                     )
                     if let duplicate = existing.first(where: { sameBootstrapFile($0, imported) }) {
@@ -76,8 +76,8 @@ extension OxHostProtocol {
                 Log.app.info("OxHostRPC.debug.artifacts.bootstrap count=\(names.count) files=\(names.joined(separator: ","))")
                 reply.success(BootstrapFilesResult(artifacts: names))
             } catch {
-                for artifact in created.reversed() {
-                    _ = try? await ProfileRepository.shared.deleteFile(named: artifact.fileName, in: scope)
+                for file in created.reversed() {
+                    _ = try? await ProfileRepository.shared.deleteFile(named: file.fileName, in: scope)
                 }
                 Log.app.error("OxHostRPC.debug.artifacts.bootstrap imported=\(created.count) failed=\(error.localizedDescription)")
                 reply.failure(error.localizedDescription)
@@ -96,12 +96,12 @@ extension OxHostProtocol {
         }
         Task { @MainActor in
             do {
-                let artifact = try await ProfileRepository.shared.writeFile(
+                let file = try await ProfileRepository.shared.writeFile(
                     data: command.data,
                     named: command.name,
                     in: scope
                 )
-                Log.app.info("OxHostRPC.debug.artifacts.write file=\(artifact.fileName) bytes=\(command.data.count)")
+                Log.app.info("OxHostRPC.debug.artifacts.write file=\(file.fileName) bytes=\(command.data.count)")
                 reply.success()
             } catch {
                 reply.failure(error.localizedDescription)

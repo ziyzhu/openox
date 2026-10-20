@@ -45,12 +45,12 @@ function owned(path: string) {
  */
 export class ProfileFiles {
   private tail: Promise<unknown> = Promise.resolve();
-  get immutableFiles() { return this.artifacts !== undefined; }
+  get immutableFiles() { return this.filePayloads !== undefined; }
   private harness: Harness;
   private db: SqliteDatabase;
   readonly identity: string;
   private createBlobID?: () => Promise<string>;
-  private artifacts?: FilePayloadStore;
+  private filePayloads?: FilePayloadStore;
   private bindingMode: "legacy" | "physical" | "prepare";
   private store?: ProfileFileStore;
   private publicFiles = false;
@@ -87,17 +87,17 @@ export class ProfileFiles {
   async deleteConversation(id: ConversationId) { await this.store?.deleteConversation(id); }
 
   constructor(harness: Harness, db: SqliteDatabase, identity: string,
-    createBlobID?: () => Promise<string>, artifacts?: FilePayloadStore, bindingMode: "legacy" | "physical" | "prepare" = "legacy",
+    createBlobID?: () => Promise<string>, filePayloads?: FilePayloadStore, bindingMode: "legacy" | "physical" | "prepare" = "legacy",
     backend?: ProfileFileBackend, publicFiles = false) {
     this.harness = harness;
     this.db = db;
     this.identity = identity;
     this.createBlobID = createBlobID;
-    this.artifacts = artifacts;
+    this.filePayloads = filePayloads;
     this.bindingMode = bindingMode;
     if (bindingMode !== "legacy") {
       if (!backend) throw new Error("Physical filesystem backend is required");
-      if (bindingMode === "physical" && artifacts) throw new Error("Current filesystem cannot use the legacy file backend");
+      if (bindingMode === "physical" && filePayloads) throw new Error("Current filesystem cannot use the legacy file backend");
       this.store = new ProfileFileStore(harness, backend, publicFiles);
       this.publicFiles = publicFiles;
     }
@@ -109,10 +109,10 @@ export class ProfileFiles {
     if (!this.identity) throw new Error("An immutable Profile identity is required");
     const existing = await this.harness.snapshot(ProfileIndex, context);
     if (existing?.identity && existing.identity !== this.identity) throw new Error("Profile identity does not match immutable runtime scope");
-    const backend = this.bindingMode === "physical" ? this.publicFiles ? "public-profile-files-v1" : "profile-files-v1" : this.artifacts ? "artifact-files-v1" : "fixture-blobs-v1";
+    const backend = this.bindingMode === "physical" ? this.publicFiles ? "public-profile-files-v1" : "profile-files-v1" : this.filePayloads ? "artifact-files-v1" : "fixture-blobs-v1";
     const binding = await this.harness.snapshot(FilesystemBinding, context);
     if (binding?.backend && binding.backend !== backend && !(this.bindingMode === "prepare" && ["workspace-files-v1", "profile-files-v1", "public-profile-files-v1"].includes(binding.backend))) throw new Error("Filesystem backend mismatch; explicit conversion is required");
-    if (this.artifacts || this.bindingMode !== "legacy") {
+    if (this.filePayloads || this.bindingMode !== "legacy") {
       if (await this.db.get("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('ox_blobs', 'ox_blob_chunks') LIMIT 1")) {
         throw new Error("Legacy blob fixture requires explicit conversion; open a fresh file-backed fixture");
       }
@@ -157,13 +157,13 @@ export class ProfileFiles {
     }
   }
   async flush() { await this.tail; await this.store?.flush(); }
-  async close() { await this.tail; await this.artifacts?.close(); await this.store?.close(); }
+  async close() { await this.tail; await this.filePayloads?.close(); await this.store?.close(); }
   flushFile(path: string) {
     path = canonical(path);
     return this.serialize(async () => {
       if (this.store && (!this.isStoredDocument(path) || this.publicFiles && publicDocument(path))) { await this.store.flush(); return; }
       if (!(await this.index())[path]) throw new FileError("not_found", "File not found", path);
-      if (this.artifacts && path.startsWith("artifacts/")) await this.artifacts.flush(legacyFilePath(path));
+      if (this.filePayloads && path.startsWith("artifacts/")) await this.filePayloads.flush(legacyFilePath(path));
     });
   }
   /** Historical attachment access does not depend on membership in the visible file index. */
@@ -171,12 +171,12 @@ export class ProfileFiles {
     return this.store ? this.store.read(path, true) : this.serialize(() => this.readStoredFile(legacyFilePath(path)));
   }
   private async readStoredFile(path: string): Promise<string | Uint8Array> {
-    if (!this.artifacts) throw new Error("File payload storage is not installed");
+    if (!this.filePayloads) throw new Error("File payload storage is not installed");
     const record = await this.harness.snapshot(LegacyProfileFile, path, context);
     if (!record || record.path !== path) throw new FileError("not_found", "File reference not found", path);
     validateFileRecord(record, path, record.size);
     if (record.size > (record.binary ? binaryLimit : textLimit)) throw new Error("File exceeds size limit");
-    const bytes = await this.artifacts.read(record);
+    const bytes = await this.filePayloads.read(record);
     if (bytes.length !== record.size) throw new Error("File size does not match committed reference");
     return record.binary ? bytes : new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   }
@@ -198,7 +198,7 @@ export class ProfileFiles {
     if (this.publicFiles && publicDocument(path)) return this.physicalStore().read(path);
     const metadata = (await this.index())[path];
     if (!metadata) throw new FileError("not_found", "File not found", path);
-    if (this.artifacts && path.startsWith("artifacts/")) return this.readStoredFile(legacyFilePath(path));
+    if (this.filePayloads && path.startsWith("artifacts/")) return this.readStoredFile(legacyFilePath(path));
     const file = await this.harness.snapshot(ProfileFile, path, context);
     if (!file) throw new Error("Missing Profile document");
     if (!metadata.binary) return file.text;
@@ -228,19 +228,19 @@ export class ProfileFiles {
     }
     await this.serialize(async () => {
       if (!(await this.index())[path] && Object.keys(await this.index()).length >= 10_000) throw new Error("Profile file count limit reached");
-      if (this.artifacts && path.startsWith("artifacts/")) {
+      if (this.filePayloads && path.startsWith("artifacts/")) {
         if (await this.harness.snapshot(LegacyProfileFile, path, context)) {
           throw new FileError("invalid", "Legacy file references are immutable; choose a distinct filename", path);
         }
         const bytes = typeof content === "string" ? new TextEncoder().encode(content) : content;
-        const receipt = validateFileRecord(await this.artifacts.publish(legacyFilePath(path), bytes), path, size);
+        const receipt = validateFileRecord(await this.filePayloads.publish(legacyFilePath(path), bytes), path, size);
         await this.harness.commit(async tx => {
           Object.assign(await tx.doc(LegacyProfileFile, path, null), receipt, { binary: typeof content !== "string" });
           (await tx.doc(ProfileIndex)).files[path] = { size, mtime: Date.now(), binary: typeof content !== "string" };
         }, context);
         return;
       }
-      if (this.artifacts && typeof content !== "string") throw new FileError("invalid", "Profile documents require UTF-8 text", path);
+      if (this.filePayloads && typeof content !== "string") throw new FileError("invalid", "Profile documents require UTF-8 text", path);
       let blob = "";
       if (typeof content !== "string") {
         blob = await this.createBlobID!();
@@ -265,7 +265,7 @@ export class ProfileFiles {
     if (this.store && !this.isStoredDocument(path)) { await this.store.edit(path, edits); return; }
     owned(path);
     if (this.publicFiles && publicDocument(path)) { await this.physicalStore().edit(path, edits, true); return; }
-    if (this.artifacts && path.startsWith("artifacts/")) {
+    if (this.filePayloads && path.startsWith("artifacts/")) {
       throw new FileError("not_supported", "Legacy file references are immutable; write the edited content to a distinct filename", path);
     }
     await this.serialize(async () => {
@@ -294,11 +294,11 @@ export class ProfileFiles {
     owned(path);
     await this.serialize(() => this.harness.commit(async tx => {
       delete (await tx.doc(ProfileIndex)).files[path];
-      if (!this.artifacts || !path.startsWith("artifacts/")) await tx.retireDoc(ProfileFile, path);
+      if (!this.filePayloads || !path.startsWith("artifacts/")) await tx.retireDoc(ProfileFile, path);
     }, context));
   }
   async collectOrphanBlobs() {
-    if (this.artifacts) throw new Error("File reclamation requires a complete history/export reference set; automatic deletion is disabled");
+    if (this.filePayloads) throw new Error("File reclamation requires a complete history/export reference set; automatic deletion is disabled");
     return this.serialize(async () => {
       const referenced = new Set<string>();
       for (const path of Object.keys(await this.index())) {

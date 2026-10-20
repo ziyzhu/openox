@@ -12,7 +12,7 @@ nonisolated enum FileStore {
     static let metadataName = "artifact.json"
     private static let savedIndexName = ".saved.json"
 
-    static func artifact(
+    static func file(
         named name: String,
         in directory: URL,
         listing: FileDirectoryListing = FileDirectoryListing()
@@ -36,12 +36,12 @@ nonisolated enum FileStore {
             ],
             options: [.skipsHiddenFiles]
         ) else { return [] }
-        return files.compactMap { file in
-            artifact(at: file, in: directory)
+        return files.compactMap { url in
+            file(at: url, in: directory)
         }
     }
 
-    private static func artifact(at file: URL, in directory: URL) -> FileItem? {
+    private static func file(at file: URL, in directory: URL) -> FileItem? {
         let keys: Set<URLResourceKey> = [
             .isRegularFileKey,
             .fileSizeKey,

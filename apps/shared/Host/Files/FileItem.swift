@@ -4,12 +4,12 @@ import Synchronization
 import UniformTypeIdentifiers
 
 extension Notification.Name {
-    static let artifactChanged = Notification.Name("ai.oxcraft.artifactChanged")
+    static let fileChanged = Notification.Name("ai.oxcraft.fileChanged")
 }
 
 nonisolated extension CodingUserInfoKey {
     static let profileScope = CodingUserInfoKey(rawValue: "profileScope")!
-    static let artifactDirectoryListing = CodingUserInfoKey(rawValue: "artifactDirectoryListing")!
+    static let fileDirectoryListing = CodingUserInfoKey(rawValue: "fileDirectoryListing")!
 }
 
 nonisolated final class FileDirectoryListing: Sendable {
@@ -131,11 +131,11 @@ nonisolated public struct FileItem: Equatable, Sendable, Identifiable, Codable {
             throw CocoaError(.fileNoSuchFile)
         }
         let fileName = try decoder.singleValueContainer().decode(String.self)
-        let listing = decoder.userInfo[.artifactDirectoryListing] as? FileDirectoryListing ?? FileDirectoryListing()
+        let listing = decoder.userInfo[.fileDirectoryListing] as? FileDirectoryListing ?? FileDirectoryListing()
         if let files = listing.files {
             self = files[fileName] ?? files[fileName.lowercased()] ?? FileItem(fileName: fileName, directory: directory, availability: .unavailable)
         } else {
-            self = try FileStore.artifact(named: fileName, in: directory, listing: listing)
+            self = try FileStore.file(named: fileName, in: directory, listing: listing)
         }
     }
 

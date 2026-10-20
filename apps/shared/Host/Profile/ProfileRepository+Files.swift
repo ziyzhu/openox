@@ -22,7 +22,7 @@ extension ProfileRepository {
         let hidden: Bool?
         let aliases: [String]?
 
-        func artifact(in scope: ProfileScope) -> FileItem {
+        func file(in scope: ProfileScope) -> FileItem {
             FileItem(fileName: reference ?? path.split(separator: "/").last.map(String.init) ?? path,
                      directory: scope.root, relativePath: path, size: size)
         }
@@ -64,7 +64,7 @@ extension ProfileRepository {
         ]))
     }
 
-    func artifactListing(for turns: [Turn], in scope: ProfileScope) async throws -> FileDirectoryListing {
+    func fileListing(for turns: [Turn], in scope: ProfileScope) async throws -> FileDirectoryListing {
         var names = Set<String>()
         for turn in turns {
             _ = turn.mappingFiles { file in
@@ -86,7 +86,7 @@ extension ProfileRepository {
                 guard record.reference == name || record.aliases?.contains(name) == true,
                       record.hidden != true, record.size >= 0, record.size <= (record.binary ? FileLimits.fileBytes : FileLimits.textBytes),
                       record.sha256.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { throw CocoaError(.fileReadCorruptFile) }
-                let file = record.artifact(in: scope)
+                let file = record.file(in: scope)
                 references[name] = file
                 references[name.lowercased()] = file
             }
@@ -94,7 +94,7 @@ extension ProfileRepository {
         return FileDirectoryListing(files: references)
     }
 
-    func artifacts(in scope: ProfileScope) async throws -> [FileItem] {
+    func files(in scope: ProfileScope) async throws -> [FileItem] {
         let files = try await profileFiles(prefix: "", in: scope).filter { $0.reference != nil }
         return try files.map { file in
             guard let name = file.reference, try profileFileName(name) == name,
@@ -104,16 +104,16 @@ extension ProfileRepository {
         }.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
     }
 
-    func materializeFile(_ artifact: FileItem, in scope: ProfileScope) async throws -> FileItem {
-        let record = try await requiredFileRecord(named: artifact.fileName, in: scope)
+    func materializeFile(_ file: FileItem, in scope: ProfileScope) async throws -> FileItem {
+        let record = try await requiredFileRecord(named: file.fileName, in: scope)
         let expectedURL = scope.root.appendingPathComponent(record.path)
-        let legacyURL = scope.root.appendingPathComponent("artifacts").appendingPathComponent(artifact.fileName)
-        guard [expectedURL.standardizedFileURL, legacyURL.standardizedFileURL].contains(artifact.fileURL.standardizedFileURL) else { throw CocoaError(.fileReadNoPermission) }
-        return try await self.artifact(named: artifact.fileName, in: scope)
+        let legacyURL = scope.root.appendingPathComponent("artifacts").appendingPathComponent(file.fileName)
+        guard [expectedURL.standardizedFileURL, legacyURL.standardizedFileURL].contains(file.fileURL.standardizedFileURL) else { throw CocoaError(.fileReadNoPermission) }
+        return try await self.file(named: file.fileName, in: scope)
     }
 
-    func artifact(named name: String, in scope: ProfileScope) async throws -> FileItem {
-        try await requiredFileRecord(named: name, in: scope).artifact(in: scope)
+    func file(named name: String, in scope: ProfileScope) async throws -> FileItem {
+        try await requiredFileRecord(named: name, in: scope).file(in: scope)
     }
 
     func importFile(data: Data, suggestedName: String, in scope: ProfileScope, conversation: DurableConversationReference? = nil) async throws -> FileItem {
@@ -134,14 +134,14 @@ extension ProfileRepository {
         guard data.count <= FileLimits.fileBytes else {
             throw FileError.fileTooLarge(bytes: data.count, limit: FileLimits.fileBytes)
         }
-        let artifact = FileItem(fileName: name, directory: scope.root.appendingPathComponent("artifacts", isDirectory: true))
-        let text = artifact.kind == .text || artifact.kind == .html ? try artifactText(data) : nil
+        let file = FileItem(fileName: name, directory: scope.root.appendingPathComponent("artifacts", isDirectory: true))
+        let text = file.kind == .text || file.kind == .html ? try fileText(data) : nil
         let path: String
         if let conversation {
             guard conversation.profileID == scope.profileID else { throw CocoaError(.fileReadNoPermission) }
             path = "conversations/\(conversation.conversationID)/" + name
         } else {
-            path = try await artifactRecord(named: name, in: scope)?.path ?? "imports/" + name
+            path = try await fileRecord(named: name, in: scope)?.path ?? "imports/" + name
         }
         if let text {
             _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
@@ -150,45 +150,45 @@ extension ProfileRepository {
         } else {
             try await DurableProfileStore.shared.writeFile(data: data, path: path, in: scope)
         }
-        let published = try await self.artifact(named: path, in: scope)
+        let published = try await self.file(named: path, in: scope)
         Log.app.info("ProfileRepository.artifact publish profile=\(scope.profileID?.uuidString ?? "temporary") file=\(name) bytes=\(data.count) binary=\(text == nil)")
         return published
     }
 
     func readMarkdownFile(named name: String, in scope: ProfileScope) async throws -> MarkdownFileDocument {
         let record = try await requiredFileRecord(named: name, in: scope)
-        guard record.artifact(in: scope).isMarkdown else { throw FileError.unsupportedType(name) }
+        guard record.file(in: scope).isMarkdown else { throw FileError.unsupportedType(name) }
         let bytes = try await readFileBytes(record, in: scope)
-        return MarkdownFileDocument(source: try artifactText(bytes), byteCount: bytes.count)
+        return MarkdownFileDocument(source: try fileText(bytes), byteCount: bytes.count)
     }
 
     func writeMarkdownFile(_ source: String, named name: String, in scope: ProfileScope) async throws -> FileItem {
         let record = try await requiredFileRecord(named: name, in: scope)
-        guard record.artifact(in: scope).isMarkdown else { throw FileError.unsupportedType(name) }
+        guard record.file(in: scope).isMarkdown else { throw FileError.unsupportedType(name) }
         return try await publishFileVersion(source, of: record, in: scope)
     }
 
     func renameFile(named name: String, to newName: String, in scope: ProfileScope) async throws -> FileItem {
         let record = try await requiredFileRecord(named: name, in: scope)
         let destination = try profileFileName(newName)
-        let source = record.artifact(in: scope)
-        if destination == source.fileURL.lastPathComponent { return try await artifact(named: name, in: scope) }
+        let source = record.file(in: scope)
+        if destination == source.fileURL.lastPathComponent { return try await file(named: name, in: scope) }
         let relative = (record.path.split(separator: "/").dropLast().map(String.init) + [destination]).joined(separator: "/")
         _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
             "action": .string("fileMove"), "path": .string(record.path), "prefix": .string(relative),
         ]))
         Log.app.info("ProfileRepository.artifact move profile=\(scope.profileID?.uuidString ?? "temporary") from=\(record.path) to=\(relative)")
-        return try await artifact(named: relative, in: scope)
+        return try await file(named: relative, in: scope)
     }
 
     func deleteFile(named name: String, in scope: ProfileScope) async throws -> FileItem {
         let record = try await requiredFileRecord(named: name, in: scope)
         try await removeProfileFile(path: record.reference ?? record.path, in: scope)
         Log.app.info("ProfileRepository.artifact remove profile=\(scope.profileID?.uuidString ?? "temporary") file=\(name) physicalBytesRemoved=true")
-        return record.artifact(in: scope)
+        return record.file(in: scope)
     }
 
-    private func artifactRecord(named name: String, in scope: ProfileScope) async throws -> DurableFileRecord? {
+    private func fileRecord(named name: String, in scope: ProfileScope) async throws -> DurableFileRecord? {
         let path = name.contains("/") ? name.trimmingCharacters(in: CharacterSet(charactersIn: "/")) : try profileFileName(name)
         let result = try await DurableProfileStore.shared.command(scope: scope, value: .object([
             "action": .string("fileStat"), "path": .string(path), "byPath": .bool(name.contains("/")),
@@ -204,7 +204,7 @@ extension ProfileRepository {
     }
 
     private func requiredFileRecord(named name: String, in scope: ProfileScope) async throws -> DurableFileRecord {
-        guard let record = try await artifactRecord(named: name, in: scope) else { throw FileError.missing(name) }
+        guard let record = try await fileRecord(named: name, in: scope) else { throw FileError.missing(name) }
         return record
     }
 
@@ -226,7 +226,7 @@ extension ProfileRepository {
         return bytes
     }
 
-    private func artifactText(_ data: Data) throws -> String {
+    private func fileText(_ data: Data) throws -> String {
         guard data.count <= FileLimits.textBytes else {
             throw FileError.textTooLarge(bytes: data.count, limit: FileLimits.textBytes)
         }
@@ -236,11 +236,11 @@ extension ProfileRepository {
 
     private func publishFileVersion(_ text: String, of record: DurableFileRecord, in scope: ProfileScope) async throws -> FileItem {
         let data = Data(text.utf8)
-        _ = try artifactText(data)
+        _ = try fileText(data)
         _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
             "action": .string("fileWrite"), "path": .string(record.path), "text": .string(text),
         ]))
-        return try await artifact(named: record.artifact(in: scope).fileName, in: scope)
+        return try await file(named: record.file(in: scope).fileName, in: scope)
     }
 
     private func availableFileName(_ suggested: String, in scope: ProfileScope) async throws -> String {
@@ -248,7 +248,7 @@ extension ProfileRepository {
         let files = try await profileFiles(prefix: "imports/", in: scope)
         let visibleCollision = files.contains { $0.path.caseInsensitiveCompare("imports/" + cleaned) == .orderedSame }
         if !visibleCollision, !cleaned.hasPrefix("."), cleaned.utf8.count <= 240,
-           try await artifactRecord(named: cleaned, in: scope) == nil { return cleaned }
+           try await fileRecord(named: cleaned, in: scope) == nil { return cleaned }
         return versionedFileName(cleaned)
     }
 

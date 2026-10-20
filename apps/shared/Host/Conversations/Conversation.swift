@@ -451,14 +451,14 @@ final class Conversation: Identifiable {
                 let suggestedName = URL(fileURLWithPath: filename).pathExtension.isEmpty
                     ? "\(filename).\(fileExtension)"
                     : filename
-                let artifact = try await FileImporter.importDataAsync(
+                let file = try await FileImporter.importDataAsync(
                     attachment.data,
                     suggestedName: suggestedName,
                     in: scope
                 )
-                embedFile(artifact)
-                Log.session.info("Conversation.importBrowserExport filename=\(artifact.fileName) bytes=\(attachment.data.count)")
-                return artifact
+                embedFile(file)
+                Log.session.info("Conversation.importBrowserExport filename=\(file.fileName) bytes=\(attachment.data.count)")
+                return file
             },
             choose: { [unowned self] prompt in
                 if let purpose = prompt.purpose {
@@ -517,31 +517,31 @@ final class Conversation: Identifiable {
         }
 
         let key: Key
-        let artifacts: [FileItem]
+        let files: [FileItem]
     }
 
-    private(set) var artifactFilesRevision = 0
-    @ObservationIgnored private var artifactRefreshTask: Task<Void, Never>?
+    private(set) var filesRevision = 0
+    @ObservationIgnored private var filesRefreshTask: Task<Void, Never>?
     @ObservationIgnored private var referencedFilesCache: ReferencedFilesCache?
     var transcript: [Block] { document.projection }
     var transcriptBlockCount: Int { document.blockCount }
     var referencedFiles: [FileItem] {
-        let key = ReferencedFilesCache.Key(references: document.artifactReferencesRevision, files: artifactFilesRevision)
-        if let cache = referencedFilesCache, cache.key == key { return cache.artifacts }
-        let artifacts = document.referencedFiles
-        referencedFilesCache = ReferencedFilesCache(key: key, artifacts: artifacts)
-        return artifacts
+        let key = ReferencedFilesCache.Key(references: document.fileReferencesRevision, files: filesRevision)
+        if let cache = referencedFilesCache, cache.key == key { return cache.files }
+        let files = document.referencedFiles
+        referencedFilesCache = ReferencedFilesCache(key: key, files: files)
+        return files
     }
     var blocksWithTurnID: [(block: Block, turnID: TurnID)] { document.blocksWithTurnID() }
 
-    func artifactFilesChanged() {
-        artifactFilesRevision &+= 1
+    func filesChanged() {
+        filesRevision &+= 1
         guard !isTemporary else { return }
-        artifactRefreshTask?.cancel()
-        artifactRefreshTask = Task { [weak self] in
+        filesRefreshTask?.cancel()
+        filesRefreshTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let listing = try await repository.artifactListing(for: state.turns, in: scope)
+                let listing = try await repository.fileListing(for: state.turns, in: scope)
                 guard !Task.isCancelled, let files = listing.files else { return }
                 document.refreshFiles(files)
             } catch {
@@ -916,7 +916,7 @@ final class Conversation: Identifiable {
         document.apply(.beginExecution(source: source))
     }
 
-    func executionAttachments() -> (artifacts: [FileItem], transient: [TransientAttachment]) {
+    func executionAttachments() -> (files: [FileItem], transient: [TransientAttachment]) {
         (
             currentExecutionFiles,
             currentExecutionTransientAttachments.sorted { $0.sequence < $1.sequence }.map(\.attachment)
@@ -985,13 +985,13 @@ final class Conversation: Identifiable {
         interactions.notifyPending()
     }
 
-    func embedFile(_ artifact: FileItem) {
+    func embedFile(_ file: FileItem) {
         let standalone = ensureExecutionContext()
-        appendExecutionFile(artifact)
-        document.apply(.embedFile(artifact))
-        NotificationCenter.default.post(name: .artifactChanged, object: artifact.fileURL)
+        appendExecutionFile(file)
+        document.apply(.embedFile(file))
+        NotificationCenter.default.post(name: .fileChanged, object: file.fileURL)
         if standalone { finishStandaloneExecution() }
-        Log.session.info("Conversation.embedFile filename=\(artifact.fileName)")
+        Log.session.info("Conversation.embedFile filename=\(file.fileName)")
     }
 
     private func embedServiceInspector(_ link: ServiceInspectorLink) {
@@ -1008,23 +1008,23 @@ final class Conversation: Identifiable {
         Log.session.info("Conversation.embedSkill name=\(skill.name)")
     }
 
-    private func attachMedia(_ artifact: FileItem) {
+    private func attachMedia(_ file: FileItem) {
         let standalone = ensureExecutionContext()
-        appendExecutionFile(artifact)
-        document.apply(.attachMedia(artifact))
+        appendExecutionFile(file)
+        document.apply(.attachMedia(file))
         if standalone { finishStandaloneExecution() }
-        Log.session.info("Conversation.attachMedia filename=\(artifact.fileName)")
+        Log.session.info("Conversation.attachMedia filename=\(file.fileName)")
     }
 
     func renameFileReferences(from oldName: String, to newName: String, directory: URL) {
         document.renameFileReferences(from: oldName, to: newName, directory: directory)
     }
 
-    private func appendExecutionFile(_ artifact: FileItem) {
+    private func appendExecutionFile(_ file: FileItem) {
         guard !currentExecutionFiles.contains(where: {
-            $0.fileName.caseInsensitiveCompare(artifact.fileName) == .orderedSame
+            $0.fileName.caseInsensitiveCompare(file.fileName) == .orderedSame
         }) else { return }
-        currentExecutionFiles.append(artifact)
+        currentExecutionFiles.append(file)
     }
 
     @discardableResult

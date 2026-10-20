@@ -130,7 +130,7 @@ test("file-backed host integrates actual Pi SQLite commits, physical files, hist
   models.setProvider(provider.provider);
   const openSession = async () => {
     const runtime = await openProfileRuntime({ database: backend(`${directory}/state.sqlite`).db, profileID: "physical-profile",
-      models, registry: createRegistry(), artifacts: host() });
+      models, registry: createRegistry(), filePayloads: host() });
     runtime.registry.install(defineExtension({ name: "fixture-attachment", tools: [defineTool({
       name: "execute", description: "Attach an owned immutable file", parameters: Type.Object({ path: Type.String() }),
       replay: "unsafe", execute: async ({ path }) => {
@@ -185,11 +185,11 @@ test("file-backed host integrates actual Pi SQLite commits, physical files, hist
         agent: { model: { provider: "native-source", modelId: "model" }, thinkingLevel: "high" }, metadata: { createdAt: 42, scheduledSkillID: "schedule" },
         entries: [{ kind: "pi.user", model: [old], data: { retained: "application data" } },
           { kind: "pi.reset", head: "self", model: [summary] }, { kind: "pi.user", model: [tail] }], expectedContext: [summary, tail] }] };
-    const installation = await installOxProfile(draft, { database: backend(`${installed}/state.sqlite`).db, artifacts: host(installed) });
+    const installation = await installOxProfile(draft, { database: backend(`${installed}/state.sqlite`).db, filePayloads: host(installed) });
     expect(installation.conversations).toHaveLength(1);
     expect(installation.conversations[0]!.key).toBe("source-key");
     const installedSession = await openProfileRuntime({ database: backend(`${installed}/state.sqlite`).db,
-      profileID: draft.profileID, models: createModels(), artifacts: host(installed) });
+      profileID: draft.profileID, models: createModels(), filePayloads: host(installed) });
     try {
       const reference = installation.conversations[0]!.reference;
       expect((await installedSession.conversations.history(reference)).items).toHaveLength(3);
@@ -215,20 +215,20 @@ test("file-backed host integrates actual Pi SQLite commits, physical files, hist
       yield { ...draft.conversations[0]!, key: "second-source" };
     }
     const streamedResult = await installOxProfile({ ...draft, conversations: [] }, {
-      database: backend(`${streamed}/state.sqlite`).db, artifacts: host(streamed), conversations: conversations(),
+      database: backend(`${streamed}/state.sqlite`).db, filePayloads: host(streamed), conversations: conversations(),
     });
     expect(streamedResult.conversations.map(value => value.key)).toEqual(["source-key", "second-source"]);
     const streamedProbe = backend(`${streamed}/state.sqlite`);
     try { expect(await streamedProbe.db.all("SELECT id FROM entries")).toHaveLength(6); }
     finally { await streamedProbe.db.close(); }
-    await expect(installOxProfile(draft, { database: backend(`${installed}/state.sqlite`).db, artifacts: host(installed) })).rejects.toThrow("fresh staged database");
+    await expect(installOxProfile(draft, { database: backend(`${installed}/state.sqlite`).db, filePayloads: host(installed) })).rejects.toThrow("fresh staged database");
     const untouched = backend(`${installed}/state.sqlite`);
     expect(await untouched.db.all("SELECT id FROM entries")).toHaveLength(3);
     await untouched.db.close();
     const foreign = `${directory}/foreign`;
     await mkdir(foreign);
     await expect(installOxProfile({ ...draft, profileID: "another-profile" },
-      { database: backend(`${foreign}/state.sqlite`).db, artifacts: host(foreign) })).rejects.toThrow("owning Profile");
+      { database: backend(`${foreign}/state.sqlite`).db, filePayloads: host(foreign) })).rejects.toThrow("owning Profile");
     await writeFile(`${directory}/artifacts/chart.bin`, new Uint8Array([1, 1, 1]));
     await expect(session.files.read("artifacts/chart.bin")).rejects.toThrow("digest");
     await session.close();

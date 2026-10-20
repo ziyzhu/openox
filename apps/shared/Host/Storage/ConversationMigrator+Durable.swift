@@ -7,7 +7,7 @@ extension ConversationMigrator {
         sources: [String: JSONValue], scope: ProfileScope, names: Set<String>, store: DurableFileStore) throws -> JSONValue {
         let decoder = JSONDecoder()
         decoder.userInfo[.profileScope] = scope
-        decoder.userInfo[.artifactDirectoryListing] = FileDirectoryListing()
+        decoder.userInfo[.fileDirectoryListing] = FileDirectoryListing()
         let metadata = try decodeMigrationValue(ConversationMeta.self, from: data, decoder: decoder, path: "chat.json")
         guard metadata.schemaVersion == ConversationFormat.currentSchemaVersion, let metadataSource = sources["metadata"] else {
             throw StorageMigrationError.invalidApplicationStorage("conversation source schema")

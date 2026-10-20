@@ -14,7 +14,7 @@ extension EnvironmentValues {
 
 enum ConversationLinkDestination: Equatable {
     case web(URL)
-    case artifact(String)
+    case conversationFile(String)
     case file(String)
     case unsupported(URL)
 
@@ -27,7 +27,7 @@ enum ConversationLinkDestination: Equatable {
             self = path.isEmpty ? .unsupported(url) : .file(path)
         case "sandbox":
             let filename = url.lastPathComponent.removingPercentEncoding ?? url.lastPathComponent
-            self = filename.isEmpty ? .unsupported(url) : .artifact(filename)
+            self = filename.isEmpty ? .unsupported(url) : .conversationFile(filename)
         default:
             self = .unsupported(url)
         }

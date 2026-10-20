@@ -103,7 +103,7 @@ nonisolated enum ContentItem: Equatable, Codable {
         case let .shoveler(shoveler): try c.encode(shoveler, forKey: .shoveler)
         case let .video(video): try c.encode(video, forKey: .video)
         case let .image(image): try c.encode(image, forKey: .image)
-        case let .artifact(artifact): try c.encode(artifact, forKey: .artifact)
+        case let .artifact(file): try c.encode(file, forKey: .artifact)
         case let .skill(skill): try c.encode(skill, forKey: .skill)
         }
     }

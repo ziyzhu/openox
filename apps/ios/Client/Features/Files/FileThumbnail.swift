@@ -76,7 +76,7 @@ struct FileThumbnail: View {
                 case .text:
                     filePreview(symbol: "doc.text")
                 case .html:
-                    artifactPreview
+                    libraryPreview
                 case .file:
                     filePreview(symbol: "doc")
                 }
@@ -87,7 +87,7 @@ struct FileThumbnail: View {
         .frame(width: style.size, height: style.size)
         .background(background ?? style.background, in: shape)
         .clipShape(shape)
-        .artifactPreviewTransitionSource(attachment, sourceID: previewSourceID)
+        .filePreviewTransitionSource(attachment, sourceID: previewSourceID)
         .task(id: attachment.fileURL) {
             image = nil
             guard attachment.availability == .local else { return }
@@ -96,7 +96,7 @@ struct FileThumbnail: View {
             let size = CGSize(width: style.size * 3, height: style.size * 3)
             let targetPixelSize = max(1, Int((style.size * displayScale).rounded(.up)))
             do {
-                let data = try await FilePreviewSource(artifact: attachment, scope: scope).read()
+                let data = try await FilePreviewSource(file: attachment, scope: scope).read()
                 let loaded = await Task.detached(priority: .utility) {
                     if kind == .image { return Self.thumbnail(data: data, targetPixelSize: targetPixelSize) }
                     return PDFDocument(data: data)?.page(at: 0)?.thumbnail(of: size, for: .cropBox)
@@ -161,9 +161,9 @@ struct FileThumbnail: View {
         }
     }
 
-    private var artifactPreview: some View {
+    private var libraryPreview: some View {
         VStack(spacing: 4) {
-            LibraryDestinationIcon(.artifacts)
+            LibraryDestinationIcon(.files)
                 .foregroundStyle(Theme.Colors.onSurface)
             if style.showsName {
                 Text(attachment.userFacingName)

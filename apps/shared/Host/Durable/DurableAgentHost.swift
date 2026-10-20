@@ -22,7 +22,7 @@ actor DurableAgentHost {
         let emit: EventSink
         weak var runtime: DurableRuntime?
         let runtimeProfileID: String
-        let artifactScope: ProfileScope?
+        let fileScope: ProfileScope?
         let isolatedFiles: Bool
         let latency: TurnLatencyTrace?
         let turnID: UUID?
@@ -118,17 +118,17 @@ actor DurableAgentHost {
     }
 
     func bind(conversationID: Int, scope: ProfileScope, configuration: AgentConfiguration, runtime: DurableRuntime,
-              runtimeProfileID: String, artifactScope: ProfileScope? = nil, isolatedFiles: Bool, emit: @escaping EventSink) throws {
+              runtimeProfileID: String, fileScope: ProfileScope? = nil, isolatedFiles: Bool, emit: @escaping EventSink) throws {
         guard (0...9_007_199_254_740_991).contains(conversationID), configuration.shouldStopAfterTurn == nil else {
             throw RuntimeError.bridge("Invalid Pi conversation identity or unsupported shouldStopAfterTurn hook")
         }
         let previous = bindings[conversationID]
-        if let previous, previous.runtime !== runtime || previous.scope != scope || previous.runtimeProfileID != runtimeProfileID || previous.artifactScope != artifactScope || previous.isolatedFiles != isolatedFiles {
+        if let previous, previous.runtime !== runtime || previous.scope != scope || previous.runtimeProfileID != runtimeProfileID || previous.fileScope != fileScope || previous.isolatedFiles != isolatedFiles {
             throw RuntimeError.bridge("Native conversation cannot change its immutable Profile route")
         }
         previous?.toolHydration?.task.cancel()
         bindings[conversationID] = Binding(scope: scope, configuration: configuration, emit: emit, runtime: runtime,
-                                          runtimeProfileID: runtimeProfileID, artifactScope: artifactScope, isolatedFiles: isolatedFiles,
+                                          runtimeProfileID: runtimeProfileID, fileScope: fileScope, isolatedFiles: isolatedFiles,
                                           latency: LogContext.latency, turnID: LogContext.turnID)
     }
 
@@ -178,7 +178,7 @@ actor DurableAgentHost {
             var messages: [Message] = []
             for value in fields["messages"]?.arrayValue ?? [] {
                 messages.append(try await DurableMessageCodec.decodeModel(value, scope: binding.scope,
-                    artifactScope: binding.artifactScope, runtime: runtime, runtimeProfileID: binding.runtimeProfileID, inputs: inputs))
+                    fileScope: binding.fileScope, runtime: runtime, runtimeProfileID: binding.runtimeProfileID, inputs: inputs))
             }
             if !compaction, let transform = config.transformContext {
                 messages = await transform(TransformContextRequest(messages: messages, model: config.model))
@@ -260,7 +260,7 @@ actor DurableAgentHost {
                 throw RuntimeError.bridge("Native tool call does not match its provider generation")
             }
             if let storedCall = fields["toolCall"],
-               try DurableMessageCodec.decodeToolCall(storedCall, scope: binding.scope, artifactScope: binding.artifactScope) != call {
+               try DurableMessageCodec.decodeToolCall(storedCall, scope: binding.scope, fileScope: binding.fileScope) != call {
                 throw RuntimeError.bridge("Native tool call does not match its authoritative Pi call")
             }
             try Task.checkCancellation()
@@ -271,7 +271,7 @@ actor DurableAgentHost {
             if terminate, assistant.content.filter({ if case .toolCall = $0 { return true }; return false }).count > 1 {
                 throw RuntimeError.bridge("Pi Durable cannot terminate a multi-tool round from one native result; the effect may have completed. Inspect before retrying")
             }
-            let profileID = (binding.artifactScope ?? binding.scope).profileID
+            let profileID = (binding.fileScope ?? binding.scope).profileID
             guard message.transientAttachments.isEmpty || profileID != nil else {
                 throw RuntimeError.bridge("Transient media requires a qualified artifact owner")
             }
@@ -350,14 +350,14 @@ actor DurableAgentHost {
               let storedCall = fields["toolCall"], let callID = fields["callID"]?.stringValue,
               let name = fields["name"]?.stringValue, let arguments = fields["arguments"],
               tools.contains(where: { $0.objectValue?["name"]?.stringValue == name }),
-              case .assistant(let actual) = try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope) else {
+              case .assistant(let actual) = try DurableMessageCodec.decode(value, scope: binding.scope, fileScope: binding.fileScope) else {
             throw RuntimeError.bridge("Missing authoritative Pi assistant, context, or positional tool set")
         }
         let calls = actual.content.compactMap { block -> ToolCall? in
             if case .toolCall(let call) = block { return call }
             return nil
         }
-        let call = try DurableMessageCodec.decodeToolCall(storedCall, scope: binding.scope, artifactScope: binding.artifactScope)
+        let call = try DurableMessageCodec.decodeToolCall(storedCall, scope: binding.scope, fileScope: binding.fileScope)
         guard Set(calls.map(\.id)).count == calls.count, calls.contains(call), call.id == callID, call.name == name, call.arguments == arguments else {
             throw RuntimeError.bridge("Recovered native tool does not match its actual Pi assistant")
         }
@@ -365,10 +365,10 @@ actor DurableAgentHost {
         var messages: [Message] = []
         for message in values {
             try Task.checkCancellation()
-            messages.append(try await DurableMessageCodec.decodeModel(message, scope: binding.scope, artifactScope: binding.artifactScope,
+            messages.append(try await DurableMessageCodec.decodeModel(message, scope: binding.scope, fileScope: binding.fileScope,
                 runtime: runtime, runtimeProfileID: binding.runtimeProfileID, inputs: inputs))
         }
-        guard case .assistant(let assistant) = try await DurableMessageCodec.decodeModel(value, scope: binding.scope, artifactScope: binding.artifactScope,
+        guard case .assistant(let assistant) = try await DurableMessageCodec.decodeModel(value, scope: binding.scope, fileScope: binding.fileScope,
             runtime: runtime, runtimeProfileID: binding.runtimeProfileID, inputs: inputs) else {
             throw RuntimeError.bridge("Recovered Pi message is not an assistant")
         }
@@ -391,16 +391,16 @@ actor DurableAgentHost {
             events = [.generationStarted(model: binding.configuration.model.id, turnID: binding.turnID)]
         case "message_start":
             if let value = fields["message"], value.objectValue?["role"]?.stringValue != "system" {
-                events = [.messageStart(try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope))]
+                events = [.messageStart(try DurableMessageCodec.decode(value, scope: binding.scope, fileScope: binding.fileScope))]
             }
         case "message_update":
-            if let value = fields["partial"], case .assistant(let partial) = try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope) {
+            if let value = fields["partial"], case .assistant(let partial) = try DurableMessageCodec.decode(value, scope: binding.scope, fileScope: binding.fileScope) {
                 events = binding.reasoningEvents(partial, completed: false)
                 events.append(.messageUpdate(partial, event: .start(partial: partial)))
             }
         case "message_end":
             if let value = fields["entry"]?.objectValue?["model"]?.arrayValue?.first, value.objectValue?["role"]?.stringValue != "system" {
-                let message = try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope)
+                let message = try DurableMessageCodec.decode(value, scope: binding.scope, fileScope: binding.fileScope)
                 if case .assistant(let assistant) = message {
                     binding.assistant = assistant
                     events += binding.reasoningEvents(assistant, completed: true)
@@ -419,7 +419,7 @@ actor DurableAgentHost {
         case "tool_execution_end":
             if let id = fields["toolCallId"]?.stringValue, let call = binding.calls.removeValue(forKey: id),
                let value = fields["entry"]?.objectValue?["model"]?.arrayValue?.first,
-               case .toolResult(let result) = try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope) {
+               case .toolResult(let result) = try DurableMessageCodec.decode(value, scope: binding.scope, fileScope: binding.fileScope) {
                 binding.results.append(result)
                 binding.latency?.recordCallCompleted(id: id, failed: result.isError)
                 events = [.toolExecutionEnd(toolCall: call, result: result)]

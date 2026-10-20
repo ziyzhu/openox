@@ -111,7 +111,7 @@ extension Conversation {
             })
             items = rootItems
         case .artifacts:
-            items = try await repository.artifacts(in: scope).map {
+            items = try await repository.files(in: scope).map {
                 fileSystemItem(path: "artifacts/\($0.fileName)", type: "file", size: $0.size)
             }
         case .resource(let path):
@@ -273,10 +273,10 @@ extension Conversation {
             return try FileLibrary.read(data: data, kind: textDotfile ? .text : kind, options: .init())
         }
 
-        init(artifact: FileItem, data: Data, reference: String? = nil) {
-            filename = artifact.displayName
-            mimeType = artifact.mimeType
-            kind = artifact.kind
+        init(file: FileItem, data: Data, reference: String? = nil) {
+            filename = file.displayName
+            mimeType = file.mimeType
+            kind = file.kind
             self.data = data
             self.reference = reference
         }
@@ -290,7 +290,7 @@ extension Conversation {
                   "operation": .string("read"), "arguments": .object(["path": .string(path), "purpose": .string("Show file")]),
                   "profileID": .string(route.profileID.uuidString), "conversationID": .int(route.conversationID)])),
               let normalized = validated.objectValue?["path"]?.stringValue else { return nil }
-        return await durableFile(path: normalized)?.artifact
+        return await durableFile(path: normalized)?.file
     }
 
     public func messageFiles() async -> [FileItem] {
@@ -313,27 +313,27 @@ extension Conversation {
         return files
     }
 
-    func durableFile(path: String) async -> (artifact: FileItem, record: JSONValue)? {
+    func durableFile(path: String) async -> (file: FileItem, record: JSONValue)? {
         guard let route = durableRoute,
               let result = try? await route.session.runtime.command(.object(["action": .string("fileStat"), "path": .string(path), "byPath": .bool(true)])),
               let record = result.objectValue?["file"]?.objectValue, record["hidden"]?.boolValue != true,
               let actual = record["path"]?.stringValue, let reference = record["reference"]?.stringValue else { return nil }
-        return (FileItem(fileName: reference, directory: route.artifactScope?.root ?? scope.root, relativePath: actual), .object(record))
+        return (FileItem(fileName: reference, directory: route.fileScope?.root ?? scope.root, relativePath: actual), .object(record))
     }
 
     func fileSystemMedia(path: String) async throws -> FileSystemMedia {
-        if let route = durableRoute, let file = await durableFile(path: path) {
-            let data = try await route.session.runtime.readFile(file.record)
-            return FileSystemMedia(artifact: file.artifact, data: data, reference: file.artifact.fileName)
+        if let route = durableRoute, let durable = await durableFile(path: path) {
+            let data = try await route.session.runtime.readFile(durable.record)
+            return FileSystemMedia(file: durable.file, data: data, reference: durable.file.fileName)
         }
         let location = try await fileSystemLocation(path)
         try await authorizeFileAccess(location, operation: .read)
         let media: FileSystemMedia
         switch location {
         case .artifact(let name):
-            let artifact = try await repository.artifact(named: name, in: scope)
+            let file = try await repository.file(named: name, in: scope)
             let data = try await repository.readFileData(named: name, in: scope)
-            media = FileSystemMedia(artifact: artifact, data: data)
+            media = FileSystemMedia(file: file, data: data)
         case .deviceItem:
             media = try await withDeviceFile(location, mode: .read) { url in
                 let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
@@ -344,8 +344,8 @@ extension Conversation {
                 let file = try FileHandle(forReadingFrom: url)
                 defer { try? file.close() }
                 let data = try file.read(upToCount: FileLimits.fileBytes + 1) ?? Data()
-                let artifact = FileItem(fileName: url.lastPathComponent, directory: url.deletingLastPathComponent())
-                return FileSystemMedia(artifact: artifact, data: data)
+                let item = FileItem(fileName: url.lastPathComponent, directory: url.deletingLastPathComponent())
+                return FileSystemMedia(file: item, data: data)
             }
         default:
             throw RuntimeError.bridge("Media requires a Profile file or a file inside an attached Files folder: \(location.path)")
@@ -490,7 +490,7 @@ extension Conversation {
         let root = path.split(separator: "/").first.map(String.init) ?? ""
         if ["MEMORY.md", "SOUL.md", "skills", "services", "files"].contains(root) {
             try await requireWritableFileContext(fileSystemLocation(path), action: action)
-        } else if !isTemporary || durableRoute?.artifactScope == nil {
+        } else if !isTemporary || durableRoute?.fileScope == nil {
             try requireProfileMutation(action)
         }
     }
@@ -607,9 +607,9 @@ extension Conversation {
         case .soul:
             return try fileSystemTextRead(Soul.shared.text)
         case .artifact(let name):
-            let artifact = try await repository.artifact(named: name, in: scope)
+            let file = try await repository.file(named: name, in: scope)
             return try await Task.detached(priority: .userInitiated) {
-                try FileLibrary.read(artifact, options: .init())
+                try FileLibrary.read(file, options: .init())
             }.value
         case .resource(let path):
             return try fileSystemTextRead(await resourceFiles().text(path))
@@ -659,10 +659,10 @@ extension Conversation {
         case .soul:
             return Soul.shared.text
         case .artifact(let name):
-            let artifact = try await repository.artifact(named: name, in: scope)
-            guard artifact.exists else { throw FileError.missing(name) }
+            let file = try await repository.file(named: name, in: scope)
+            guard file.exists else { throw FileError.missing(name) }
             let data = try await Task.detached(priority: .userInitiated) {
-                try Data(contentsOf: artifact.fileURL)
+                try Data(contentsOf: file.fileURL)
             }.value
             guard data.count <= FileLimits.textBytes else {
                 throw FileError.textTooLarge(bytes: data.count, limit: FileLimits.textBytes)
@@ -715,9 +715,9 @@ extension Conversation {
             Soul.shared.text = content
             return fileSystemItem(path: location.path, type: "file", size: data.count)
         case .artifact(let name):
-            let artifact = try await repository.writeFile(data: data, named: name, in: scope)
-            embedFile(artifact)
-            return fileSystemItem(path: "artifacts/\(artifact.fileName)", type: "file", size: artifact.size ?? data.count)
+            let file = try await repository.writeFile(data: data, named: name, in: scope)
+            embedFile(file)
+            return fileSystemItem(path: "artifacts/\(file.fileName)", type: "file", size: file.size ?? data.count)
         case .skillFile(let name):
             try await skillsMount.requireWritable(name: name, path: location.path)
             guard let skill = SkillFiles.parse(content, directoryName: name) else {

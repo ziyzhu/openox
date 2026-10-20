@@ -19,10 +19,10 @@ nonisolated final class ProviderFileInputs: Sendable {
         Self.groups.withLock { _ = $0.removeValue(forKey: id) }
     }
 
-    func snapshot(_ artifact: FileItem, data: Data) throws -> FileItem {
+    func snapshot(_ file: FileItem, data: Data) throws -> FileItem {
         try Self.groups.withLock { groups in
             guard var group = groups[id] else { throw RuntimeError.bridge("Provider file input scope is closed") }
-            if let existing = group.sources[artifact.fileURL] {
+            if let existing = group.sources[file.fileURL] {
                 guard group.bytes[existing.fileURL] == data else { throw RuntimeError.bridge("Immutable file changed during model input preparation") }
                 return existing
             }
@@ -30,8 +30,8 @@ nonisolated final class ProviderFileInputs: Sendable {
                 throw RuntimeError.bridge("Verified provider file inputs exceed their bounded memory budget")
             }
             let directory = URL(string: "ox-model-input://\(id.uuidString)/\(UUID().uuidString)/")!
-            let snapshot = FileItem(fileName: artifact.fileName, directory: directory, size: data.count)
-            group.sources[artifact.fileURL] = snapshot
+            let snapshot = FileItem(fileName: file.fileName, directory: directory, size: data.count)
+            group.sources[file.fileURL] = snapshot
             group.bytes[snapshot.fileURL] = data
             group.size += data.count
             groups[id] = group
@@ -46,16 +46,16 @@ nonisolated final class ProviderFileInputs: Sendable {
         }
     }
 
-    func cached(_ artifact: FileItem) -> FileItem? {
-        Self.groups.withLock { $0[id]?.sources[artifact.fileURL] }
+    func cached(_ file: FileItem) -> FileItem? {
+        Self.groups.withLock { $0[id]?.sources[file.fileURL] }
     }
 
-    static func read(_ artifact: FileItem) throws -> Data {
-        guard artifact.fileURL.scheme == "ox-model-input", let host = artifact.fileURL.host, let id = UUID(uuidString: host) else {
+    static func read(_ file: FileItem) throws -> Data {
+        guard file.fileURL.scheme == "ox-model-input", let host = file.fileURL.host, let id = UUID(uuidString: host) else {
             throw RuntimeError.bridge("Provider attachment has not been verified by its native file owner")
         }
         return try groups.withLock { groups in
-            guard let data = groups[id]?.bytes[artifact.fileURL] else {
+            guard let data = groups[id]?.bytes[file.fileURL] else {
                 throw RuntimeError.bridge("Verified provider attachment scope has expired")
             }
             return data
@@ -71,7 +71,7 @@ nonisolated final class ProviderFileInputs: Sendable {
             case .toolResult(let result): content = result.content
             }
             for block in content {
-                if case .attachment(let artifact) = block { _ = try read(artifact) }
+                if case .attachment(let file) = block { _ = try read(file) }
             }
         }
     }

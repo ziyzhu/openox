@@ -22,7 +22,7 @@ extension OxHostProtocol {
 
     @MainActor
     static func prepareDurableTemporaryConversation(_ conversation: Conversation, caseID: UUID) async throws {
-        _ = try await DurableConversationController.attach(conversation, caseID: caseID, artifactFiles: true)
+        _ = try await DurableConversationController.attach(conversation, caseID: caseID, fileBacked: true)
     }
 
     @MainActor
@@ -48,8 +48,8 @@ private enum DurableConversationController {
         let runtime: DurableRuntime
         let host: DurableAgentHost
         let scope: ProfileScope
-        let artifactFiles: Bool
-        let artifactScope: ProfileScope?
+        let fileBacked: Bool
+        let fileScope: ProfileScope?
         var conversations: [UUID: Conversation] = [:]
         var opening = true
         var closing = false
@@ -57,7 +57,7 @@ private enum DurableConversationController {
     static var sessions: [UUID: Session] = [:]
     static var attaching: Set<UUID> = []
 
-    static func attach(_ conversation: Conversation, caseID: UUID, artifactFiles requestedBackend: Bool?) async throws -> JSONValue {
+    static func attach(_ conversation: Conversation, caseID: UUID, fileBacked requestedBackend: Bool?) async throws -> JSONValue {
         guard conversation.isTemporary, !conversation.isBusy else { throw RuntimeError.bridge("Durable rollout requires an idle temporary conversation") }
         guard !attaching.contains(conversation.id), !sessions.contains(where: { $0.key != caseID && $0.value.conversations[conversation.id] != nil }) else {
             throw RuntimeError.bridge("Conversation already belongs to another durable Session or attachment")
@@ -73,15 +73,15 @@ private enum DurableConversationController {
             if physical { try await ProfileMigrator.prepareTemporaryFiles(at: directory, identity: caseID) }
             let runtime = DurableRuntime(databaseURL: directory.appending(path: physical ? "state.sqlite" : "session.sqlite"),
                 fileRoot: physical ? directory : nil) { method, params, stream in try await host.handle(method, params, stream: stream) }
-            let artifactScope = physical ? ProfileScope(profileID: caseID, root: directory, location: .local) : nil
-            sessions[caseID] = Session(runtime: runtime, host: host, scope: conversation.scope, artifactFiles: physical, artifactScope: artifactScope)
+            let fileScope = physical ? ProfileScope(profileID: caseID, root: directory, location: .local) : nil
+            sessions[caseID] = Session(runtime: runtime, host: host, scope: conversation.scope, fileBacked: physical, fileScope: fileScope)
             do {
-                _ = try await runtime.command(JSONValue.object(["action": .string("open"), "profileID": .string(caseID.uuidString), "artifactFiles": .bool(physical), "physicalFiles": .bool(physical), "publicFiles": .bool(physical)]).jsonString())
+                _ = try await runtime.command(JSONValue.object(["action": .string("open"), "profileID": .string(caseID.uuidString), "fileBacked": .bool(physical), "physicalFiles": .bool(physical), "publicFiles": .bool(physical)]).jsonString())
                 sessions[caseID]?.opening = false
             } catch { await runtime.dispose(); sessions.removeValue(forKey: caseID); throw error }
         }
         guard var session = sessions[caseID], !session.opening, !session.closing, session.scope == conversation.scope,
-              requestedBackend == nil || requestedBackend == session.artifactFiles else { throw RuntimeError.bridge("Session unavailable or bound to another Profile scope") }
+              requestedBackend == nil || requestedBackend == session.fileBacked else { throw RuntimeError.bridge("Session unavailable or bound to another Profile scope") }
         guard session.conversations.count < 8 || session.conversations[conversation.id] != nil else { throw RuntimeError.bridge("Durable Session conversation limit reached") }
         let resources = try await session.runtime.fileMounts(scope: caseID)
         let conversationID: Int
@@ -97,7 +97,7 @@ private enum DurableConversationController {
         }
         try conversation.installDurableRoute(DurableConversationRoute(
             session: .init(runtime: session.runtime, host: session.host, scope: conversation.scope, resources: resources, skills: try await session.runtime.skillPackages(scope: caseID)),
-            conversationID: conversationID, profileID: caseID, artifactScope: session.artifactScope, reference: nil))
+            conversationID: conversationID, profileID: caseID, fileScope: session.fileScope, reference: nil))
         session.conversations[conversation.id] = conversation; sessions[caseID] = session
         Log.agent.info("PiDurable rollout attached temporary=\(conversation.id) case=\(caseID) conversation=\(conversationID) profile=\(conversation.scope.profileID?.uuidString ?? "nil")")
         return .object(["attached": .bool(true), "conversationID": .int(conversationID)])
@@ -114,7 +114,7 @@ private enum DurableConversationController {
             _ = try await session.runtime.command(JSONValue.object(["action": .string("close")]).jsonString())
             await session.runtime.dispose()
             sessions.removeValue(forKey: entry.key)
-            if entry.key != OxHostProtocol.durableTemporarySessionID, let root = session.artifactScope?.root { try FileManager.default.removeItem(at: root) }
+            if entry.key != OxHostProtocol.durableTemporarySessionID, let root = session.fileScope?.root { try FileManager.default.removeItem(at: root) }
         } catch { Log.agent.error("PiDurable temporary close failed=\(error.localizedDescription)") }
     }
 
@@ -124,7 +124,7 @@ private enum DurableConversationController {
             guard case .found(let conversation?) = OxHostProtocol.resolveSession(conversations, request.sessionId), conversation.isTemporary, !conversation.isBusy else {
                 throw RuntimeError.bridge("Durable rollout requires an idle temporary conversation; persisted conversations remain behind the storage migration gate")
             }
-            return try await attach(conversation, caseID: request.caseID, artifactFiles: request.artifactFiles)
+            return try await attach(conversation, caseID: request.caseID, fileBacked: request.artifactFiles)
         }
         guard var session = sessions[request.caseID], !session.opening, !session.closing else { throw RuntimeError.bridge("Attach an isolated durable Session first") }
         guard ["inspect", "fileWrite", "fileRead", "fileReference", "fileRemove", "conversationList", "conversationMetadata",

@@ -82,8 +82,8 @@ struct ImageWidgetView: View {
         do {
             let data: Data
             switch image.source {
-            case let .artifact(artifact):
-                data = try await FilePreviewSource(artifact: artifact, scope: scope).read()
+            case let .artifact(file):
+                data = try await FilePreviewSource(file: file, scope: scope).read()
             case let .remote(value):
                 let request = try WebFetchRequest(url: value)
                 guard request.url.scheme == "https" else { throw ImagePreparationError.invalid }

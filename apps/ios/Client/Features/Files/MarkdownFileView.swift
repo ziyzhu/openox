@@ -2,24 +2,24 @@ import SwiftUI
 import UIKit
 
 struct MarkdownFileScreen: View {
-    @State private var artifact: FileItem
+    @State private var file: FileItem
     let scope: ProfileScope?
 
-    init(artifact: FileItem, scope: ProfileScope?) {
-        _artifact = State(initialValue: artifact)
+    init(file: FileItem, scope: ProfileScope?) {
+        _file = State(initialValue: file)
         self.scope = scope
     }
 
     var body: some View {
-        MarkdownFileView(artifact: $artifact, scope: scope)
-            .navigationTitle(artifact.userFacingName)
+        MarkdownFileView(file: $file, scope: scope)
+            .navigationTitle(file.userFacingName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
     }
 }
 
 struct MarkdownFileView: View {
-    @Binding var artifact: FileItem
+    @Binding var file: FileItem
     let scope: ProfileScope?
 
     private enum Phase {
@@ -55,7 +55,7 @@ struct MarkdownFileView: View {
                 case .viewing:
                     ScrollView {
                         VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                            MarkdownText(document.source, accessibilityIdentifier: "file.\(artifact.id)")
+                            MarkdownText(document.source, accessibilityIdentifier: "file.\(file.id)")
                         }
                         .frame(maxWidth: Theme.ContainerWidth.readable, alignment: .leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -66,7 +66,7 @@ struct MarkdownFileView: View {
                     .scrollIndicators(.hidden)
                     .contentShape(Rectangle())
                     .dismissesSelectableTextSelection {
-                        Log.ui.info("MarkdownFileView.dismissTextSelection filename=\(artifact.fileName)")
+                        Log.ui.info("MarkdownFileView.dismissTextSelection filename=\(file.fileName)")
                     }
                 case .editing:
                     TextEditor(text: $draft)
@@ -76,13 +76,13 @@ struct MarkdownFileView: View {
                         .frame(maxWidth: Theme.ContainerWidth.readable)
                         .padding(.horizontal, Theme.Spacing.lg)
                         .padding(.vertical, Theme.Spacing.md)
-                        .accessibilityLabel(artifact.userFacingName)
+                        .accessibilityLabel(file.userFacingName)
                         .accessibilityIdentifier(A11yID.ConversationControls.MarkdownFile.editor)
                 }
             case .failed(let message):
                 ContentUnavailableView(
                     "File unavailable",
-                    systemImage: artifact.exists ? "exclamationmark.triangle" : "questionmark.folder",
+                    systemImage: file.exists ? "exclamationmark.triangle" : "questionmark.folder",
                     description: Text(message)
                 )
             }
@@ -119,27 +119,27 @@ struct MarkdownFileView: View {
     private func load() async {
         phase = .loading
         do {
-            guard let scope = FilePreviewSource(artifact: artifact, scope: scope).scope else { throw CocoaError(.fileReadNoPermission) }
+            guard let scope = FilePreviewSource(file: file, scope: scope).scope else { throw CocoaError(.fileReadNoPermission) }
             let document = try await ProfileRepository.shared.readMarkdownFile(
-                named: artifact.fileName,
+                named: file.fileName,
                 in: scope
             )
             guard !Task.isCancelled else { return }
             draft = document.source
             mode = .viewing
             phase = .ready(document)
-            Log.ui.info("MarkdownFileView.load filename=\(artifact.fileName) bytes=\(document.byteCount)")
+            Log.ui.info("MarkdownFileView.load filename=\(file.fileName) bytes=\(document.byteCount)")
         } catch {
             guard !Task.isCancelled else { return }
             phase = .failed(error.localizedDescription)
-            Log.ui.error("MarkdownFileView.load filename=\(artifact.fileName) error=\(error.localizedDescription)")
+            Log.ui.error("MarkdownFileView.load filename=\(file.fileName) error=\(error.localizedDescription)")
         }
     }
 
     private func edit(_ document: MarkdownFileDocument) {
         draft = document.source
         mode = .editing
-        Log.ui.info("MarkdownFileView.edit filename=\(artifact.fileName)")
+        Log.ui.info("MarkdownFileView.edit filename=\(file.fileName)")
         Haptics.impact(.editStarted)
     }
 
@@ -153,14 +153,14 @@ struct MarkdownFileView: View {
         isSaving = true
         Task {
             do {
-                guard let scope = FilePreviewSource(artifact: artifact, scope: scope).scope else { throw CocoaError(.fileReadNoPermission) }
+                guard let scope = FilePreviewSource(file: file, scope: scope).scope else { throw CocoaError(.fileReadNoPermission) }
                 let published = try await ProfileRepository.shared.writeMarkdownFile(
                     source,
-                    named: artifact.fileName,
+                    named: file.fileName,
                     in: scope
                 )
                 guard !Task.isCancelled else { return }
-                artifact = published
+                file = published
                 isSaving = false
                 draft = source
                 mode = .viewing
@@ -172,7 +172,7 @@ struct MarkdownFileView: View {
                 guard !Task.isCancelled else { return }
                 isSaving = false
                 saveError = error.localizedDescription
-                Log.ui.error("MarkdownFileView.save filename=\(artifact.fileName) error=\(error.localizedDescription)")
+                Log.ui.error("MarkdownFileView.save filename=\(file.fileName) error=\(error.localizedDescription)")
             }
         }
     }

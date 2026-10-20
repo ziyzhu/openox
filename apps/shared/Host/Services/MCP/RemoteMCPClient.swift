@@ -46,7 +46,7 @@ nonisolated struct RemoteMCPFile: Sendable {
 
 nonisolated struct RemoteMCPToolResult: Sendable {
     let value: JSONValue
-    let artifacts: [RemoteMCPFile]
+    let files: [RemoteMCPFile]
 }
 
 nonisolated enum RemoteMCPError: LocalizedError, Sendable {
@@ -200,7 +200,7 @@ actor RemoteMCPClient {
             throw RemoteMCPError.tool(Self.contentText(fields["content"]) ?? "The MCP tool reported an error.")
         }
         let value = fields["structuredContent"] ?? fields["content"] ?? .null
-        return RemoteMCPToolResult(value: value, artifacts: try Self.artifacts(fields["content"], value: value))
+        return RemoteMCPToolResult(value: value, files: try Self.files(fields["content"], value: value))
     }
 
     func disconnect() {
@@ -639,16 +639,16 @@ actor RemoteMCPClient {
         let mimeType: String
     }
 
-    private static func artifacts(_ content: JSONValue?, value: JSONValue) throws -> [RemoteMCPFile] {
-        let decoded = try content?.arrayValue?.compactMap(artifactContent) ?? []
+    private static func files(_ content: JSONValue?, value: JSONValue) throws -> [RemoteMCPFile] {
+        let decoded = try content?.arrayValue?.compactMap(fileContent) ?? []
         let structuredFilename = decoded.count == 1 ? resultFilename(value) : nil
-        return decoded.enumerated().map { index, artifact in
-            let filename = artifact.filename ?? structuredFilename ?? fallbackFilename(mimeType: artifact.mimeType, index: index, count: decoded.count)
-            return RemoteMCPFile(data: artifact.data, suggestedFilename: filename, mimeType: artifact.mimeType)
+        return decoded.enumerated().map { index, file in
+            let filename = file.filename ?? structuredFilename ?? fallbackFilename(mimeType: file.mimeType, index: index, count: decoded.count)
+            return RemoteMCPFile(data: file.data, suggestedFilename: filename, mimeType: file.mimeType)
         }
     }
 
-    private static func artifactContent(_ value: JSONValue) throws -> FileContent? {
+    private static func fileContent(_ value: JSONValue) throws -> FileContent? {
         guard let fields = value.objectValue, let type = fields["type"]?.stringValue else { return nil }
         if type == "image" {
             guard let encoded = fields["data"]?.stringValue,

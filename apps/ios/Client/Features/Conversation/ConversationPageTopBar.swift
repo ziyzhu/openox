@@ -40,7 +40,7 @@ struct ConversationPageTopBar: View {
             }
             if hasFiles {
                 Button(action: onShowFiles) {
-                    Label("Files", systemImage: OxActionIconKind.artifacts.systemImage)
+                    Label("Files", systemImage: OxActionIconKind.files.systemImage)
                 }
                 .accessibilityIdentifier(A11yID.ConversationControls.FileItem.open)
             }

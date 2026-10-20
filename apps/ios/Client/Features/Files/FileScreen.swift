@@ -4,12 +4,12 @@ import SwiftUI
 import UIKit
 
 struct FileZoomPreview: Identifiable, Hashable {
-    let artifact: FileItem
+    let file: FileItem
     let sourceID: String
     let scope: ProfileScope?
 
-    init(artifact: FileItem, sourceID: String, scope: ProfileScope? = StorageRoot.currentScope) {
-        self.artifact = artifact
+    init(file: FileItem, sourceID: String, scope: ProfileScope? = StorageRoot.currentScope) {
+        self.file = file
         self.sourceID = sourceID
         self.scope = scope
     }
@@ -30,17 +30,17 @@ private struct FilePreviewNamespaceKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    var artifactPreviewNamespace: Namespace.ID? {
+    var filePreviewNamespace: Namespace.ID? {
         get { self[FilePreviewNamespaceKey.self] }
         set { self[FilePreviewNamespaceKey.self] = newValue }
     }
 }
 
 private struct FilePreviewTransitionSource: ViewModifier {
-    let artifact: FileItem
+    let file: FileItem
     let sourceID: String?
 
-    @Environment(\.artifactPreviewNamespace) private var namespace
+    @Environment(\.filePreviewNamespace) private var namespace
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -56,8 +56,8 @@ private struct FilePreviewTransitionSource: ViewModifier {
 }
 
 extension View {
-    func artifactPreviewTransitionSource(_ artifact: FileItem, sourceID: String?) -> some View {
-        modifier(FilePreviewTransitionSource(artifact: artifact, sourceID: sourceID))
+    func filePreviewTransitionSource(_ file: FileItem, sourceID: String?) -> some View {
+        modifier(FilePreviewTransitionSource(file: file, sourceID: sourceID))
     }
 }
 
@@ -126,20 +126,20 @@ extension FileScreen where Actions == EmptyView {
 }
 
 struct FileNavigationPage: View {
-    let artifact: FileItem
+    let file: FileItem
     let scope: ProfileScope?
 
-    init(artifact: FileItem, scope: ProfileScope? = StorageRoot.currentScope) {
-        self.artifact = artifact
+    init(file: FileItem, scope: ProfileScope? = StorageRoot.currentScope) {
+        self.file = file
         self.scope = scope
     }
 
     var body: some View {
         Group {
-            if artifact.kind == .html {
-                HTMLFileScreen(artifact: artifact, scope: scope)
-            } else if artifact.isMarkdown {
-                MarkdownFileScreen(artifact: artifact, scope: scope)
+            if file.kind == .html {
+                HTMLFileScreen(file: file, scope: scope)
+            } else if file.isMarkdown {
+                MarkdownFileScreen(file: file, scope: scope)
             }
         }
     }
@@ -157,7 +157,7 @@ struct FileZoomPreviewScreen: View {
         case unavailable
     }
 
-    let artifact: FileItem
+    let file: FileItem
     let chrome: Chrome
     private let source: FilePreviewSource
     @State private var image: UIImage?
@@ -168,10 +168,10 @@ struct FileZoomPreviewScreen: View {
     @State private var closesWithQuickLook = false
     @Environment(\.dismiss) private var dismiss
 
-    init(artifact: FileItem, chrome: Chrome, scope: ProfileScope? = StorageRoot.currentScope) {
-        self.artifact = artifact
+    init(file: FileItem, chrome: Chrome, scope: ProfileScope? = StorageRoot.currentScope) {
+        self.file = file
         self.chrome = chrome
-        source = FilePreviewSource(artifact: artifact, scope: scope)
+        source = FilePreviewSource(file: file, scope: scope)
     }
 
     @ViewBuilder
@@ -186,15 +186,15 @@ struct FileZoomPreviewScreen: View {
                 preview
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Theme.Colors.conversationSurface)
-                    .navigationTitle(artifact.userFacingName)
+                    .navigationTitle(file.userFacingName)
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar(.visible, for: .navigationBar)
             }
         }
         .onAppear {
-            Log.ui.info("FileZoomPreviewScreen.load filename=\(artifact.fileName) kind=\(artifact.kind.rawValue)")
+            Log.ui.info("FileZoomPreviewScreen.load filename=\(file.fileName) kind=\(file.kind.rawValue)")
         }
-        .task(id: artifact.fileURL) {
+        .task(id: file.fileURL) {
             await loadFile()
         }
         .quickLookPreview($previewURL)
@@ -209,19 +209,19 @@ struct FileZoomPreviewScreen: View {
 
     @ViewBuilder
     private var preview: some View {
-        switch artifact.kind {
+        switch file.kind {
         case .image:
             imagePreview
         case .pdf:
             if let pdfDocument, loadState == .ready {
-                ZoomablePDFView(document: pdfDocument, accessibilityLabel: artifact.userFacingName)
+                ZoomablePDFView(document: pdfDocument, accessibilityLabel: file.userFacingName)
             } else if loadState == .loading {
                 loading
             } else {
                 unavailable
             }
         case .text, .file:
-            if artifact.isSVG {
+            if file.isSVG {
                 imagePreview
             } else if let snapshot, loadState == .ready {
                 openFileButton(snapshot)
@@ -239,7 +239,7 @@ struct FileZoomPreviewScreen: View {
     private var imagePreview: some View {
         if let image, loadState == .ready {
             ZoomableImageView(image: image)
-                .accessibilityLabel(artifact.userFacingName)
+                .accessibilityLabel(file.userFacingName)
                 .accessibilityIdentifier("artifacts.preview.ready")
         } else if loadState == .loading {
             loading
@@ -257,7 +257,7 @@ struct FileZoomPreviewScreen: View {
                 Label("Open file", systemImage: "doc")
             }
             .buttonStyle(.bordered)
-            .accessibilityLabel(artifact.userFacingName)
+            .accessibilityLabel(file.userFacingName)
         } else {
             unavailable
         }
@@ -272,7 +272,7 @@ struct FileZoomPreviewScreen: View {
         ContentUnavailableView(
             "File unavailable",
             systemImage: "questionmark.folder",
-            description: Text(artifact.userFacingName)
+            description: Text(file.userFacingName)
         )
     }
 
@@ -300,7 +300,7 @@ struct FileZoomPreviewScreen: View {
         loadState = .loading
         let started = ContinuousClock.now
         do {
-            switch artifact.kind {
+            switch file.kind {
             case .image:
                 let data = try await source.read()
                 let loaded = await Task.detached(priority: .userInitiated) { UIImage(data: data) }.value
@@ -314,7 +314,7 @@ struct FileZoomPreviewScreen: View {
                 pdfDocument = loaded
                 loadState = loaded == nil ? .unavailable : .ready
             case .text, .file:
-                if artifact.isSVG { try await loadSVG() } else { try await loadSnapshot() }
+                if file.isSVG { try await loadSVG() } else { try await loadSnapshot() }
             case .html:
                 loadState = .unavailable
             }
@@ -322,9 +322,9 @@ struct FileZoomPreviewScreen: View {
             return
         } catch {
             loadState = .unavailable
-            Log.ui.error("FileZoomPreviewScreen.read file=\(artifact.fileName) error=\(error.localizedDescription)")
+            Log.ui.error("FileZoomPreviewScreen.read file=\(file.fileName) error=\(error.localizedDescription)")
         }
-        Log.ui.info("FileZoomPreviewScreen.ready filename=\(artifact.fileName) kind=\(artifact.kind.rawValue) success=\(loadState == .ready) elapsed=\(ContinuousClock.now - started)")
+        Log.ui.info("FileZoomPreviewScreen.ready filename=\(file.fileName) kind=\(file.kind.rawValue) success=\(loadState == .ready) elapsed=\(ContinuousClock.now - started)")
     }
 }
 

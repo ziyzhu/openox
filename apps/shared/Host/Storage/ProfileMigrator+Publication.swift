@@ -129,7 +129,7 @@ extension ProfileMigrator {
         }
         do {
             _ = try await runtime.command(.object(["action": .string("open"), "profileID": .string(identity.uuidString),
-                "physicalFiles": .bool(true), "prepareFiles": .bool(true), "artifactFiles": .bool(true)]))
+                "physicalFiles": .bool(true), "prepareFiles": .bool(true), "fileBacked": .bool(true)]))
             let files = try await runtime.command(.object(["action": .string("filesPrepare")]))
             let publicFiles = try await runtime.command(.object(["action": .string("publicFilesPrepare"), "splitStorage": .bool(false)]))
             _ = try await runtime.command(.object(["action": .string("close")]))
@@ -236,7 +236,7 @@ extension ProfileMigrator {
         }
         do {
             _ = try await runtime.command(.object(["action": .string("open"), "profileID": .string(profileID.uuidString),
-                "artifactFiles": .bool(true), "prepareFiles": .bool(true)]))
+                "fileBacked": .bool(true), "prepareFiles": .bool(true)]))
             let result = try await runtime.command(.object(["action": .string("filesPrepare")]))
             _ = try await runtime.command(.object(["action": .string("close")]))
             await runtime.dispose()
@@ -255,7 +255,7 @@ extension ProfileMigrator {
         }
         do {
             _ = try await runtime.command(.object(["action": .string("open"), "profileID": .string(profileID.uuidString),
-                "physicalFiles": .bool(true), "prepareFiles": .bool(true), "artifactFiles": .bool(true)]))
+                "physicalFiles": .bool(true), "prepareFiles": .bool(true), "fileBacked": .bool(true)]))
             let result = try await runtime.command(.object(["action": .string("publicFilesPrepare"), "splitStorage": .bool(content != state)]))
             _ = try await runtime.command(.object(["action": .string("close")]))
             await runtime.dispose()
@@ -295,7 +295,7 @@ extension ProfileMigrator {
         }
         do {
             _ = try await runtime.command(.object(["action": .string("open"), "profileID": .string(profile.id.uuidString),
-                "physicalFiles": .bool(true), "prepareFiles": .bool(true), "artifactFiles": .bool(true)]))
+                "physicalFiles": .bool(true), "prepareFiles": .bool(true), "fileBacked": .bool(true)]))
             let result = try await runtime.command(.object(["action": .string("publicFilesInventory")]))
             for file in result.objectValue?["files"]?.arrayValue ?? [] {
                 guard let path = file.objectValue?["path"]?.stringValue, path.hasPrefix("artifacts/"), path.split(separator: "/").count == 2 else {

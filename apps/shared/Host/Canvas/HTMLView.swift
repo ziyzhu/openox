@@ -307,19 +307,19 @@ final class HTMLView {
         return try await messages.present(recipients: recipients, body: body)
     }
 
-    private func receiveFiles(_ artifacts: [RemoteMCPFile]) throws {
+    private func receiveFiles(_ files: [RemoteMCPFile]) throws {
         try requireRunning()
-        let added = artifacts.reduce(0) { $0 + $1.data.count }
-        guard outputBytes + added <= 20 * 1_048_576, outputs.count + artifacts.count <= 32 else {
+        let added = files.reduce(0) { $0 + $1.data.count }
+        guard outputBytes + added <= 20 * 1_048_576, outputs.count + files.count <= 32 else {
             throw RuntimeError.bridge("HTML output limit reached")
         }
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
-        for artifact in artifacts {
-            let name = (try? FileStore.validatedFilename(artifact.suggestedFilename)) ?? "output.dat"
+        for output in files {
+            let name = (try? FileStore.validatedFilename(output.suggestedFilename)) ?? "output.dat"
             let filename = "\(UUID().uuidString.prefix(8))-\(name)"
             let file = outputDirectory.appendingPathComponent(filename)
-            try artifact.data.write(to: file, options: .atomic)
-            outputBytes += artifact.data.count
+            try output.data.write(to: file, options: .atomic)
+            outputBytes += output.data.count
             outputs.append(FileItem(fileName: filename, directory: outputDirectory))
         }
     }

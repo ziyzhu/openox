@@ -41,7 +41,7 @@ struct MarkdownEmbedView: View {
         case nil:
             Color.clear.frame(height: 52)
         case .found(let file) where file.kind == .html:
-            InlineCanvasCard(artifact: file, rowID: StableID.uuid("markdown.embed.\(path)"))
+            InlineCanvasCard(file: file, rowID: StableID.uuid("markdown.embed.\(path)"))
         case .found(let file) where file.kind == .image || file.isSVG:
             ImageWidgetView(image: ImageWidget(source: .artifact(file)))
         case .found(let file) where file.isVideo:
@@ -52,11 +52,11 @@ struct MarkdownEmbedView: View {
             }
             .buttonStyle(.plain)
             .accessibilityHint(String(format: L10n.string("Opens %@"), file.userFacingName))
-            .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(file.id))
+            .accessibilityIdentifier(A11yID.ConversationControls.Message.file(file.id))
         case .removed:
             removedLine
                 .accessibilityLabel(String(format: L10n.string("%@, deleted file"), removedName))
-                .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(removedName))
+                .accessibilityIdentifier(A11yID.ConversationControls.Message.file(removedName))
         }
     }
 

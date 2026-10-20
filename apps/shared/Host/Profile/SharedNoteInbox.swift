@@ -20,12 +20,12 @@ nonisolated enum SharedNoteInbox {
                 let data = try await Task.detached(priority: .userInitiated) {
                     try Data(contentsOf: payload.file)
                 }.value
-                let artifact = try await FileImporter.importDataAsync(
+                let file = try await FileImporter.importDataAsync(
                     data,
                     suggestedName: payload.file.lastPathComponent,
                     in: scope
                 )
-                imported.append(artifact)
+                imported.append(file)
                 try await Task.detached(priority: .utility) {
                     try FileManager.default.removeItem(at: payload.directory)
                 }.value

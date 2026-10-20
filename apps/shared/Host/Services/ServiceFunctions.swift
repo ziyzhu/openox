@@ -9,13 +9,13 @@ extension Conversation: OxFunctionBridge {
                   let name = fields["name"]?.stringValue, let mimeType = fields["mimeType"]?.stringValue else {
                 throw WebsiteProviderError("Invalid website attachment reference", kind: .unsupportedInput)
             }
-            let stored = try await repository.artifact(named: name, in: scope)
-            let artifact = try await repository.materializeFile(stored, in: scope)
-            guard artifact.exists, artifact.mimeType == mimeType,
-                  let size = artifact.size, size <= FileLimits.fileBytes else {
+            let stored = try await repository.file(named: name, in: scope)
+            let file = try await repository.materializeFile(stored, in: scope)
+            guard file.exists, file.mimeType == mimeType,
+                  let size = file.size, size <= FileLimits.fileBytes else {
                 throw WebsiteProviderError("Website attachment is unavailable, too large, or has a different MIME type", kind: .unsupportedInput)
             }
-            let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: artifact.fileURL) }.value
+            let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: file.fileURL) }.value
             total += data.count
             guard !data.isEmpty, total <= FileLimits.fileBytes else {
                 throw WebsiteProviderError("Website attachments exceed the upload limit", kind: .unsupportedInput)

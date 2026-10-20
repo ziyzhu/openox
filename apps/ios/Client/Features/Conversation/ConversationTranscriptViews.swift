@@ -20,14 +20,14 @@ private struct AttachmentThumb: View {
 }
 
 private struct ConversationFileRow: View {
-    let artifact: FileItem
+    let file: FileItem
     var previewSourceID: String? = nil
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
-            if artifact.exists {
+            if file.exists {
                 FileThumbnail(
-                    attachment: artifact,
+                    attachment: file,
                     style: .row,
                     previewSourceID: previewSourceID
                 )
@@ -39,23 +39,23 @@ private struct ConversationFileRow: View {
                     .background(Theme.Colors.conversationSurface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             }
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text(artifact.userFacingName)
+                Text(file.userFacingName)
                     .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(artifact.exists ? Theme.Colors.onSurface : Theme.Colors.conversationSecondary)
+                    .foregroundStyle(file.exists ? Theme.Colors.onSurface : Theme.Colors.conversationSecondary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                if let typeName = artifact.userFacingTypeName, artifact.exists {
+                if let typeName = file.userFacingTypeName, file.exists {
                     Text(typeName)
                         .font(Theme.Fonts.caption)
                         .foregroundStyle(Theme.Colors.conversationSecondary)
-                } else if !artifact.exists {
+                } else if !file.exists {
                     Text("Deleted file")
                         .font(Theme.Fonts.caption)
                         .foregroundStyle(Theme.Colors.conversationSecondary)
                 }
             }
             Spacer(minLength: Theme.Spacing.sm)
-            if artifact.exists {
+            if file.exists {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.Colors.conversationSecondary)
@@ -479,7 +479,7 @@ struct BlockView: View, Equatable {
     let isThinkingTail: Bool
     var allowsLoader = true
     let controls: MessageControls
-    let artifactControls: FileControls
+    let fileControls: FileControls
     let onOpenAttachment: (FileItem, String) -> Void
     let onOpenSkill: (Skill) -> Void
     let onOpenLink: (URL) -> Void
@@ -492,8 +492,8 @@ struct BlockView: View, Equatable {
             && lhs.allowsLoader == rhs.allowsLoader
             && lhs.controls.isCopied == rhs.controls.isCopied
             && lhs.editMenuCanMutate == rhs.editMenuCanMutate
-            && lhs.artifactControls.revision == rhs.artifactControls.revision
-            && lhs.artifactControls.canMutate == rhs.artifactControls.canMutate
+            && lhs.fileControls.revision == rhs.fileControls.revision
+            && lhs.fileControls.canMutate == rhs.fileControls.canMutate
     }
 
     private var editMenuCanMutate: Bool? {
@@ -656,36 +656,36 @@ struct BlockView: View, Equatable {
                     case let .image(image):
                         ImageWidgetView(image: image)
                             .padding(.horizontal, 4)
-                    case let .artifact(artifact):
-                        if artifact.exists {
-                            let sourceID = "block:\(block.id.uuidString):\(index):\(artifact.id)"
+                    case let .artifact(file):
+                        if file.exists {
+                            let sourceID = "block:\(block.id.uuidString):\(index):\(file.id)"
                             Group {
-                                if artifact.kind == .html && isLatestCanvas {
-                                    InlineCanvasCard(artifact: artifact, rowID: block.id)
+                                if file.kind == .html && isLatestCanvas {
+                                    InlineCanvasCard(file: file, rowID: block.id)
                                 } else {
-                                    artifactRow(artifact, sourceID: sourceID)
+                                    fileRow(file, sourceID: sourceID)
                                 }
                             }
                             .padding(.horizontal, 4)
                             .contextMenuPreviewShape()
                             .contextMenu {
-                                FileContextMenu(artifact: artifact, canMutate: artifactControls.canMutate) {
-                                    artifactControls.onRename(artifact)
+                                FileContextMenu(file: file, canMutate: fileControls.canMutate) {
+                                    fileControls.onRename(file)
                                 } onDelete: {
-                                    artifactControls.onDelete(artifact)
+                                    fileControls.onDelete(file)
                                 }
                             } preview: {
-                                FileContextMenuPreview(artifact: artifact)
+                                FileContextMenuPreview(file: file)
                             }
                         } else {
-                            ConversationFileRow(artifact: artifact)
+                            ConversationFileRow(file: file)
                                 .padding(.horizontal, 4)
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel(String(
                                     format: L10n.string("Deleted file: %@"),
-                                    artifact.userFacingName
+                                    file.userFacingName
                                 ))
-                                .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(artifact.id))
+                                .accessibilityIdentifier(A11yID.ConversationControls.Message.file(file.id))
                         }
                     case let .skill(skill):
                         if skill.owner != .system {
@@ -701,14 +701,14 @@ struct BlockView: View, Equatable {
         }
     }
 
-    private func artifactRow(_ artifact: FileItem, sourceID: String) -> some View {
-        Button { onOpenAttachment(artifact, sourceID) } label: {
-            ConversationFileRow(artifact: artifact, previewSourceID: sourceID)
+    private func fileRow(_ file: FileItem, sourceID: String) -> some View {
+        Button { onOpenAttachment(file, sourceID) } label: {
+            ConversationFileRow(file: file, previewSourceID: sourceID)
         }
         .buttonStyle(.plain)
         .modifier(ConversationInteractiveRowSurface())
-        .accessibilityLabel(artifact.userFacingAccessibilityLabel)
-        .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(artifact.id))
+        .accessibilityLabel(file.userFacingAccessibilityLabel)
+        .accessibilityIdentifier(A11yID.ConversationControls.Message.file(file.id))
     }
 
     private func agentText(_ text: String, index: Int) -> some View {

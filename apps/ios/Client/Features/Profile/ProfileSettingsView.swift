@@ -331,7 +331,7 @@ private struct ProfileContentsView: View {
                     SettingsDisclosureRow(title: "Files", value: Text(""))
                 }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier(A11yID.Settings.artifacts)
+                .accessibilityIdentifier(A11yID.Settings.files)
 
                 Divider().settingsContentInset()
 

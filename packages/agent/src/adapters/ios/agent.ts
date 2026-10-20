@@ -36,7 +36,7 @@ type CommandScope = { profileID?: string; conversationID?: ConversationId; refer
 type Command = CommandScope & (
   | { action: "composePrompt"; promptState: SystemPromptInput }
   | { action: "installProfile"; draft: NormalizedProfileDraft; conversationCount?: number }
-  | { action: "open"; profileID: string; mounts?: TextFileMount[]; artifactFiles?: boolean; physicalFiles?: boolean; prepareFiles?: boolean; publicFiles?: boolean }
+  | { action: "open"; profileID: string; mounts?: TextFileMount[]; fileBacked?: boolean; physicalFiles?: boolean; prepareFiles?: boolean; publicFiles?: boolean }
   | { action: "attach"; config: Config }
   | { action: "filesystemValidate"; operation: FileOperation; arguments: FileRequest }
   | { action: "filesystemAbort"; capability: string }
@@ -65,7 +65,7 @@ type Command = CommandScope & (
   | { action: "fileWriteBinary"; path: string; base64: string }
   | { action: "fileRead" | "fileReference" | "fileReadBinary" | "fileRemove"; path: string }
   | { action: "fileStat"; path: string; byPath?: boolean }
-  | { action: "fileAdopt"; artifact: FileRecord & { binary: boolean; saved: boolean } }
+  | { action: "fileAdopt"; file: FileRecord & { binary: boolean; saved: boolean } }
   | { action: "fileSaved"; path: string; saved: boolean }
   | { action: "fileMove"; path: string; prefix: string }
   | { action: "filesPrepare" | "publicFilesInventory" | "applicationLoad" | "applicationSummary" | "applicationDelete" | "conversationMetadata" | "conversationContext"
@@ -74,7 +74,7 @@ type Command = CommandScope & (
 interface OpenedSession {
   session: ProfileRuntime;
   application: ApplicationPresentation;
-  artifacts?: FilePayloadStore;
+  filePayloads?: FilePayloadStore;
   preparingFiles: boolean;
   publicFiles: boolean;
 }
@@ -121,23 +121,23 @@ export class IOSAgentAdapter {
         }
       }
       return installOxProfile(args.draft, { database: nativeDatabase((op, sql, params) => native("sql", { op, sql, params })),
-        artifacts: nativeFilePayloads(), conversations: count === undefined ? undefined : conversations() });
+        filePayloads: nativeFilePayloads(), conversations: count === undefined ? undefined : conversations() });
     }
     if (args.action === "open") {
       if (this.opened) throw new Error("Profile runtime already open");
       this.models = createModels();
       this.attachments.clear(); this.providerRoutes.clear();
       const preparingFiles = args.prepareFiles === true;
-      const artifacts = args.artifactFiles && (!args.physicalFiles || preparingFiles) ? nativeFilePayloads() : undefined;
+      const filePayloads = args.fileBacked && (!args.physicalFiles || preparingFiles) ? nativeFilePayloads() : undefined;
       const database = nativeDatabase((op, sql, params) => native("sql", { op, sql, params }));
       const session: ProfileRuntime = await openProfileRuntime({ database, models: this.models, profileID: args.profileID,
-        artifacts,
+        filePayloads,
         fileStorage: args.physicalFiles || args.prepareFiles ? { kind: preparingFiles ? "prepare" : "physical", backend: nativeFiles(), publicFiles: args.publicFiles } : undefined,
         mounts: args.mounts?.map(({ path, files, access }) => {
           if (access !== "readOnly") throw new Error("Native text mounts must be read-only");
           return { path, access, source: { kind: "text", files } };
         }),
-        createBlobID: args.artifactFiles ? undefined : () => native<string>("uuid", {}),
+        createBlobID: args.fileBacked ? undefined : () => native<string>("uuid", {}),
         settings: { retry: { enabled: true, maxRetries: 2 }, toolExecution: "parallel" },
         decodeConversation: (sources, files) => fileRequest("conversationDecode", { profileID: args.profileID, sources,
           names: files.filter(file => !file.hidden).flatMap(file => [file.path.split("/").at(-1)!, ...(file.aliases ?? []).map(alias => alias.replace(/^artifacts\//, ""))]) }),
@@ -148,7 +148,7 @@ export class IOSAgentAdapter {
         onReport: error => { void native("report", { message: String(error) }); },
       });
       try {
-        this.opened = { session, application: new ApplicationPresentation(session), artifacts, preparingFiles, publicFiles: args.publicFiles === true };
+        this.opened = { session, application: new ApplicationPresentation(session), filePayloads, preparingFiles, publicFiles: args.publicFiles === true };
         return { opened: true };
       } catch (error) { await session.close(); throw error; }
     }
@@ -289,7 +289,7 @@ export class IOSAgentAdapter {
         const record = !file || ("hidden" in file && file.hidden) ? null : { ...file, reference: "id" in file ? file.id : file.path };
         return { file: record };
       }
-      case "fileAdopt": await this.adopt(args.artifact); return this.fileReceipt(args.artifact.path);
+      case "fileAdopt": await this.adopt(args.file); return this.fileReceipt(args.file.path);
       case "fileSaved": await this.fileSaved(args.path, args.saved); return {};
       case "fileMove":
         await session.files.move(args.path, args.prefix); return this.fileReceipt(args.prefix);
@@ -550,9 +550,9 @@ export class IOSAgentAdapter {
     const index = session.files.physical ? (await session.harness.snapshot(ProfileIndex, context))?.files ?? {} : await session.files.index();
     const entries = Object.entries(index).filter(([path]) => matching(path));
     const files = await Promise.all(entries.map(async ([path, metadata]) => {
-      const artifact = this.current.artifacts && path.startsWith("artifacts/") ? await session.harness.snapshot(LegacyProfileFile, path, context) : undefined;
-      const file = artifact ? undefined : await session.harness.snapshot(ProfileFile, path, context);
-      return { path, ...metadata, saved: artifact?.saved ?? file?.saved ?? false, ...(artifact ? { sha256: artifact.sha256 } : {}) };
+      const legacy = this.current.filePayloads && path.startsWith("artifacts/") ? await session.harness.snapshot(LegacyProfileFile, path, context) : undefined;
+      const file = legacy ? undefined : await session.harness.snapshot(ProfileFile, path, context);
+      return { path, ...metadata, saved: legacy?.saved ?? file?.saved ?? false, ...(legacy ? { sha256: legacy.sha256 } : {}) };
     }));
     let listed = files;
     if (session.files.physical) {
@@ -628,17 +628,17 @@ export class IOSAgentAdapter {
     await this.current.session.harness.commit(async tx => {
       const index = await tx.doc(ProfileIndex);
       if (!index.files[path]) throw new Error("File is not visible");
-      if (this.current.artifacts) (await tx.doc(LegacyProfileFile, path, null)).saved = saved;
+      if (this.current.filePayloads) (await tx.doc(LegacyProfileFile, path, null)).saved = saved;
       else (await tx.doc(ProfileFile, path, null)).saved = saved;
     }, context);
   }
   private async adopt(file: FileRecord & { binary: boolean; saved: boolean }) {
-    const { artifacts, session } = this.current;
-    if (!artifacts || !file || typeof file.binary !== "boolean" || typeof file.saved !== "boolean" || !Number.isSafeInteger(file.size) || file.size < 0 || file.size > (file.binary ? 32 * 1024 * 1024 : 200 * 1024)) throw new Error("Invalid file-backed adoption");
+    const { filePayloads, session } = this.current;
+    if (!filePayloads || !file || typeof file.binary !== "boolean" || typeof file.saved !== "boolean" || !Number.isSafeInteger(file.size) || file.size < 0 || file.size > (file.binary ? 32 * 1024 * 1024 : 200 * 1024)) throw new Error("Invalid file-backed adoption");
     validateFileRecord(file, file.path, file.size);
-    const bytes = await artifacts.read(file);
+    const bytes = await filePayloads.read(file);
     if (!file.binary) new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    await artifacts.flush(file.path);
+    await filePayloads.flush(file.path);
     await session.harness.commit(async tx => {
       const record = await tx.doc(LegacyProfileFile, file.path, null);
       const index = await tx.doc(ProfileIndex);

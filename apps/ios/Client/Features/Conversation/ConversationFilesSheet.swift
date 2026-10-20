@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ConversationFilesSheet: View {
-    let artifacts: [FileItem]
+    let files: [FileItem]
     let onOpenFile: (FileItem) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -10,15 +10,15 @@ struct ConversationFilesSheet: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: Theme.Spacing.sm) {
-                    ForEach(artifacts) { artifact in
+                    ForEach(files) { file in
                         Button {
-                            Log.ui.info("ConversationFilesSheet.navigation select filename=\(artifact.fileName)")
-                            onOpenFile(artifact)
+                            Log.ui.info("ConversationFilesSheet.navigation select filename=\(file.fileName)")
+                            onOpenFile(file)
                         } label: {
-                            FileLibraryRow(artifact: artifact)
+                            FileLibraryRow(file: file)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityIdentifier(A11yID.ConversationControls.FileItem.item(artifact.id))
+                        .accessibilityIdentifier(A11yID.ConversationControls.FileItem.item(file.id))
                     }
                 }
                 .padding(.horizontal, Theme.Spacing.lg)

@@ -5,14 +5,14 @@ struct ConversationImportView: View {
     let coordinator: ConversationImportCoordinator
     let conversations: ConversationManager
 
-    private var artifactBytes: Int {
+    private var fileBytes: Int {
         proposal.header.files.reduce(0) { total, file in
             file.path.hasPrefix("artifacts/") ? total + file.bytes : total
         }
     }
 
-    private var artifactSize: String {
-        ByteCountFormatter.string(fromByteCount: Int64(artifactBytes), countStyle: .file)
+    private var filesSize: String {
+        ByteCountFormatter.string(fromByteCount: Int64(fileBytes), countStyle: .file)
     }
 
     var body: some View {
@@ -36,7 +36,7 @@ struct ConversationImportView: View {
                 .accessibilityIdentifier(A11yID.ConversationImport.preview)
 
                 Label(
-                    "\(proposal.header.artifactCount) files · \(artifactSize)",
+                    "\(proposal.header.artifactCount) files · \(filesSize)",
                     systemImage: "doc.on.doc"
                 )
                 .font(Theme.Fonts.bodySm)

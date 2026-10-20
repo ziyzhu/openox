@@ -28,7 +28,7 @@ export interface NormalizedProfileDraft {
 }
 export interface ProfileInstallHost {
   database: SqliteDatabase;
-  artifacts: FilePayloadStore;
+  filePayloads: FilePayloadStore;
   conversations?: AsyncIterable<NormalizedProfileDraft["conversations"][number]>;
 }
 export const ConversationApplicationMetadata = defineDoc<{ fields: JsonObject }>({
@@ -171,17 +171,17 @@ export async function installOxProfile(draft: NormalizedProfileDraft, host: Prof
     for (const file of draft.documents) await session.files.write(file.path, file.text);
     for (const file of draft.artifacts) {
       if (file.size > (file.binary ? 32 * 1024 * 1024 : 200 * 1024)) throw new Error("Profile file exceeds supported size");
-      await host.artifacts.read(file);
-      await host.artifacts.flush(file.path);
+      await host.filePayloads.read(file);
+      await host.filePayloads.flush(file.path);
       await session.harness.commit(async tx => {
         Object.assign(await tx.doc(LegacyProfileFile, file.path, null), file);
         (await tx.doc(ProfileIndex)).files[file.path] = { size: file.size, mtime: 0, binary: file.binary };
       }, context);
     }
     for (const file of draft.payloads ?? []) {
-      if (!host.artifacts.verifyPayload) throw new Error("Profile installation requires a streaming payload verifier");
-      await host.artifacts.verifyPayload(file);
-      await host.artifacts.flush(file.path);
+      if (!host.filePayloads.verifyPayload) throw new Error("Profile installation requires a streaming payload verifier");
+      await host.filePayloads.verifyPayload(file);
+      await host.filePayloads.flush(file.path);
       await session.harness.commit(async tx => {
         Object.assign(await tx.doc(LegacyProfileFile, file.path, null), file, { binary: true, saved: false });
       }, context);
@@ -206,6 +206,6 @@ export async function installOxProfile(draft: NormalizedProfileDraft, host: Prof
     return { conversations };
   } finally {
     if (session) await session.close();
-    else { try { await host.database.close(); } finally { await host.artifacts.close(); } }
+    else { try { await host.database.close(); } finally { await host.filePayloads.close(); } }
   }
 }

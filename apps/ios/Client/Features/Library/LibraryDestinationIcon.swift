@@ -2,13 +2,13 @@ import SwiftUI
 
 enum LibraryDestination {
     case services
-    case artifacts
+    case files
     case skills
 
     var title: LocalizedStringKey {
         switch self {
         case .services: "Services"
-        case .artifacts: "Files"
+        case .files: "Files"
         case .skills: "Skills"
         }
     }
@@ -16,7 +16,7 @@ enum LibraryDestination {
 
 enum OxActionIconKind: String, Equatable {
     case services
-    case artifacts
+    case fileLibrary
     case skills
     case memory
     case conversations
@@ -59,7 +59,7 @@ enum OxActionIconKind: String, Equatable {
         self = switch namespace {
         case "app": .device
         case "service": .services
-        case "artifact": .artifacts
+        case "artifact": .fileLibrary
         case "skill": .skills
         case "memory": .memory
         case "conversation": .conversations
@@ -75,7 +75,7 @@ enum OxActionIconKind: String, Equatable {
     var libraryDestination: LibraryDestination? {
         switch self {
         case .services: .services
-        case .artifacts: .artifacts
+        case .fileLibrary: .files
         case .skills: .skills
         default: nil
         }
@@ -84,7 +84,7 @@ enum OxActionIconKind: String, Equatable {
     var systemImage: String {
         switch self {
         case .services: "square.grid.2x2"
-        case .artifacts: "square.on.square"
+        case .fileLibrary: "square.on.square"
         case .skills: "command"
         case .memory: "brain"
         case .conversations: "bubble.left.and.bubble.right"
@@ -158,7 +158,7 @@ struct LibraryDestinationIcon: View {
                     let tile = Path(roundedRect: CGRect(origin: origin, size: CGSize(width: 7, height: 7)), cornerRadius: 2)
                     context.stroke(tile, with: .foreground, style: stroke)
                 }
-            case .artifacts:
+            case .files:
                 let back = Path { path in
                     path.move(to: CGPoint(x: 9, y: 2))
                     path.addLine(to: CGPoint(x: 17, y: 2))

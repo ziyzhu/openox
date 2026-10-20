@@ -61,10 +61,10 @@ struct MessageContextMenuPreview: View {
                         .lineLimit(12)
                 }
 
-                ForEach(attachments.prefix(2)) { artifact in
+                ForEach(attachments.prefix(2)) { file in
                     HStack(spacing: Theme.Spacing.sm) {
-                        FileThumbnail(attachment: artifact, style: .row)
-                        Text(artifact.userFacingName)
+                        FileThumbnail(attachment: file, style: .row)
+                        Text(file.userFacingName)
                             .font(Theme.Fonts.bodySm)
                             .foregroundStyle(Theme.Colors.conversationSecondary)
                             .lineLimit(2)

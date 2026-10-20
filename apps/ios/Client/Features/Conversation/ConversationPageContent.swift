@@ -244,8 +244,8 @@ extension ConversationBlock {
         for block in blocks {
             guard case .agentContent(let items) = block.kind else { continue }
             for (index, item) in items.enumerated() {
-                guard case .artifact(let artifact) = item, artifact.kind == .html else { continue }
-                latest[artifact.fileURL] = contentItemID(blockID: block.id, index: index)
+                guard case .artifact(let file) = item, file.kind == .html else { continue }
+                latest[file.fileURL] = contentItemID(blockID: block.id, index: index)
             }
         }
         return latest

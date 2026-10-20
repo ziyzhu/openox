@@ -53,8 +53,8 @@ extension Scenario {
             case .toolResult(let value): value.content
             }
             return content.compactMap { block in
-                guard case .attachment(let artifact) = block else { return nil }
-                return "artifacts/\(artifact.fileName)"
+                guard case .attachment(let file) = block else { return nil }
+                return "artifacts/\(file.fileName)"
             }
         }
         let hasFileState = filePaths.isEmpty

@@ -3,7 +3,7 @@ import Foundation
 
 nonisolated enum ConversationProjection {
     private enum EmbedKey: Hashable {
-        case artifact(String)
+        case file(String)
         case serviceInspector(String)
         case skill(String)
     }
@@ -97,25 +97,25 @@ nonisolated enum ConversationProjection {
     }
 
     nonisolated private static func wireAction(_ step: Step, callId: String, at: Date) -> (ToolCall, ToolResultMessage) {
-        func result(_ name: String, _ text: String, artifacts: [FileItem] = [], isError: Bool) -> ToolResultMessage {
+        func result(_ name: String, _ text: String, files: [FileItem] = [], isError: Bool) -> ToolResultMessage {
             ToolResultMessage(toolCallId: callId, toolName: name,
-                              content: [.text(TextContent(text))] + artifacts.map(ContentBlock.attachment), isError: isError, timestamp: at)
+                              content: [.text(TextContent(text))] + files.map(ContentBlock.attachment), isError: isError, timestamp: at)
         }
         switch step.kind {
         case let .execute(exec):
             let call = ToolCall(id: callId, name: "execute", arguments: .object(["source": .string(exec.source)]))
-            let artifacts = exec.effects.reduce(into: [FileItem]()) { artifacts, effect in
-                let artifact: FileItem?
+            let files = exec.effects.reduce(into: [FileItem]()) { files, effect in
+                let file: FileItem?
                 switch effect {
-                case let .artifact(value), let .media(value): artifact = value
-                case .invocation, .progress, .serviceControl, .serviceInspector, .shoveler, .video, .image, .skill: artifact = nil
+                case let .artifact(value), let .media(value): file = value
+                case .invocation, .progress, .serviceControl, .serviceInspector, .shoveler, .video, .image, .skill: file = nil
                 }
-                guard let artifact, !artifacts.contains(where: {
-                    $0.fileName.caseInsensitiveCompare(artifact.fileName) == .orderedSame
+                guard let file, !files.contains(where: {
+                    $0.fileName.caseInsensitiveCompare(file.fileName) == .orderedSame
                 }) else { return }
-                artifacts.append(artifact)
+                files.append(file)
             }
-            return (call, result("execute", exec.output, artifacts: artifacts, isError: exec.isError))
+            return (call, result("execute", exec.output, files: files, isError: exec.isError))
         case let .confirm(prompt):
             let call = ToolCall(id: callId, name: "ask_user_confirmation", arguments: .object(["body": .string(prompt.prompt)]))
             return (call, result("ask_user_confirmation", prompt.answer ?? "", isError: false))
@@ -270,14 +270,14 @@ nonisolated enum ConversationProjection {
                                 flushTrace()
                                 openGroup(at: createdAt, entry: entry)
                                 bubble.append(.image(image))
-                            case let .artifact(artifact):
+                            case let .artifact(file):
                                 guard consumeEmbed(
-                                    .artifact(artifact.fileName.lowercased()),
+                                    .file(file.fileName.lowercased()),
                                     from: &remainingEmbedCounts
                                 ) else { continue }
                                 flushTrace()
                                 openGroup(at: createdAt, entry: entry)
-                                bubble.append(.artifact(artifact))
+                                bubble.append(.artifact(file))
                             case let .skill(skill):
                                 guard consumeEmbed(
                                     .skill(skill.name.lowercased()),
@@ -327,7 +327,7 @@ nonisolated enum ConversationProjection {
             for effect in execution.effects {
                 let key: EmbedKey?
                 switch effect {
-                case let .artifact(artifact): key = .artifact(artifact.fileName.lowercased())
+                case let .artifact(file): key = .file(file.fileName.lowercased())
                 case let .serviceInspector(link): key = .serviceInspector(link.domain.lowercased())
                 case let .skill(skill): key = .skill(skill.name.lowercased())
                 case .invocation, .progress, .serviceControl, .shoveler, .video, .image, .media: key = nil

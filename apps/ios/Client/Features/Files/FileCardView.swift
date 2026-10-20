@@ -230,7 +230,7 @@ private enum FileCardLoader {
 
     static func load(file: FileItem, scope: ProfileScope?, format: FileCardFormat) async throws -> Result {
         guard format.hasPreview else { return Result(content: .fallback) }
-        let snapshot = try await FilePreviewSource(artifact: file, scope: scope).snapshot()
+        let snapshot = try await FilePreviewSource(file: file, scope: scope).snapshot()
         switch format {
         case .text, .markdown, .table:
             let source = try await text(at: snapshot.url)

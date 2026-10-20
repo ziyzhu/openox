@@ -66,7 +66,7 @@ struct FileContextMenuPreview: View {
         case unavailable
     }
 
-    let artifact: FileItem
+    let file: FileItem
     var scope: ProfileScope? = StorageRoot.currentScope
     @State private var previewContent = PreviewContent.loading
 
@@ -77,11 +77,11 @@ struct FileContextMenuPreview: View {
                 .background(Theme.Colors.surfaceSunken)
 
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text(artifact.userFacingName)
+                Text(file.userFacingName)
                     .font(Theme.Fonts.title)
                     .foregroundStyle(Theme.Colors.onSurface)
                     .lineLimit(2)
-                if let type = artifact.userFacingTypeName {
+                if let type = file.userFacingTypeName {
                     Text(type)
                         .font(Theme.Fonts.caption)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
@@ -92,7 +92,7 @@ struct FileContextMenuPreview: View {
         .frame(width: 300)
         .background(Theme.Colors.surface)
         .accessibilityElement(children: .combine)
-        .task(id: artifact.fileURL) {
+        .task(id: file.fileURL) {
             let loaded = await loadPreview()
             guard !Task.isCancelled else { return }
             previewContent = loaded
@@ -120,7 +120,7 @@ struct FileContextMenuPreview: View {
             }
             .scrollIndicators(.hidden)
         case .unavailable:
-            Image(systemName: artifact.kind == .html ? "paintbrush.pointed" : "doc")
+            Image(systemName: file.kind == .html ? "paintbrush.pointed" : "doc")
                 .font(.system(size: 40, weight: .regular))
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -128,12 +128,12 @@ struct FileContextMenuPreview: View {
     }
 
     private func loadPreview() async -> PreviewContent {
-        let artifact = artifact
-        guard artifact.kind != .html, artifact.kind != .file else { return .unavailable }
+        let file = file
+        guard file.kind != .html, file.kind != .file else { return .unavailable }
         do {
-            let data = try await FilePreviewSource(artifact: artifact, scope: scope).read()
+            let data = try await FilePreviewSource(file: file, scope: scope).read()
             return await Task.detached(priority: .utility) {
-                switch artifact.kind {
+                switch file.kind {
                 case .image:
                     return UIImage(data: data).map(PreviewContent.image) ?? .unavailable
                 case .pdf:
@@ -150,7 +150,7 @@ struct FileContextMenuPreview: View {
         } catch is CancellationError {
             return .unavailable
         } catch {
-            Log.ui.error("FileContextMenuPreview.read file=\(artifact.fileName) error=\(error.localizedDescription)")
+            Log.ui.error("FileContextMenuPreview.read file=\(file.fileName) error=\(error.localizedDescription)")
             return .unavailable
         }
     }

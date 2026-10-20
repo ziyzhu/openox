@@ -22,15 +22,15 @@ nonisolated enum FileLibrary {
         let modifiedAt: String?
         let exists: Bool
 
-        init(_ artifact: FileItem) {
-            filename = artifact.fileName
-            type = artifact.typeIdentifier
-            mimeType = artifact.mimeType
-            kind = artifact.kind.rawValue
-            size = artifact.size
-            createdAt = artifact.createdAt?.ISO8601Format()
-            modifiedAt = artifact.modifiedAt?.ISO8601Format()
-            exists = artifact.exists
+        init(_ file: FileItem) {
+            filename = file.fileName
+            type = file.typeIdentifier
+            mimeType = file.mimeType
+            kind = file.kind.rawValue
+            size = file.size
+            createdAt = file.createdAt?.ISO8601Format()
+            modifiedAt = file.modifiedAt?.ISO8601Format()
+            exists = file.exists
         }
     }
 
@@ -56,24 +56,24 @@ nonisolated enum FileLibrary {
         }
     }
 
-    static func list(_ artifacts: [FileItem], options: ListOptions) -> Listing {
-        let matching = artifacts
+    static func list(_ files: [FileItem], options: ListOptions) -> Listing {
+        let matching = files
             .filter { options.query.isEmpty || $0.fileName.localizedCaseInsensitiveContains(options.query) }
             .sorted { $0.fileName.localizedStandardCompare($1.fileName) == .orderedAscending }
         let limit = clamp(options.limit, min: 1, max: 100)
         return Listing(items: matching.prefix(limit).map(Item.init), truncated: matching.count > limit)
     }
 
-    static func read(_ artifact: FileItem, options: ReadOptions) throws -> Read {
-        guard artifact.exists else {
+    static func read(_ file: FileItem, options: ReadOptions) throws -> Read {
+        guard file.exists else {
             return Read(text: nil, truncated: false, unsupported: "Missing file.")
         }
-        if let size = artifact.size, size > FileLimits.fileBytes {
+        if let size = file.size, size > FileLimits.fileBytes {
             throw FileError.fileTooLarge(bytes: size, limit: FileLimits.fileBytes)
         }
         return try read(
-            data: Data(contentsOf: artifact.fileURL),
-            kind: artifact.kind,
+            data: Data(contentsOf: file.fileURL),
+            kind: file.kind,
             options: options
         )
     }

@@ -153,7 +153,7 @@ struct ActionSettingsView: View {
 }
 
 private enum BuiltInActionGroup: String, CaseIterable, Identifiable {
-    case conversations, models, web, artifacts, memory, skills, services, repositories, settings
+    case conversations, models, web, files, memory, skills, services, repositories, settings
 
     var id: String { rawValue }
 
@@ -162,7 +162,7 @@ private enum BuiltInActionGroup: String, CaseIterable, Identifiable {
         case .conversations: "Conversations"
         case .models: "Models & secrets"
         case .web: "Web & browser"
-        case .artifacts: "Files & images"
+        case .files: "Files & images"
         case .memory: "Memory"
         case .skills: "Skills & schedules"
         case .services: "Services"
@@ -182,7 +182,7 @@ private enum BuiltInActionGroup: String, CaseIterable, Identifiable {
         case Actions.appRenameConversation: return .conversations
         case Actions.appModel, Actions.appDefaultModel, Actions.appSetModel, Actions.appSetDefaultModel: return .models
         case Actions.appRepositories: return .repositories
-        case Actions.outputRead: return .artifacts
+        case Actions.outputRead: return .files
         default: break
         }
         // Group by user-facing feature, not by permission policy or storage source.
@@ -190,7 +190,7 @@ private enum BuiltInActionGroup: String, CaseIterable, Identifiable {
         case "conversation", "user": .conversations
         case "provider", "secret": .models
         case "web": .web
-        case "artifact", "vision", "widget": .artifacts
+        case "artifact", "vision", "widget": .files
         case "memory": .memory
         case "skill", "schedule": .skills
         case "service": .services

@@ -102,7 +102,7 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
         Log.session.info("tool.output maxBytes=\(JavaScriptOutputLimits.maxBytes) maxLines=\(JavaScriptOutputLimits.maxLines) outputBytes=\(output.text.utf8.count) truncated=\(output.truncated)")
         session.finishExecution(output: output.text, isError: failed)
         return ToolResult(
-            content: [.text(TextContent(output.text))] + attachments.artifacts.map(ContentBlock.attachment),
+            content: [.text(TextContent(output.text))] + attachments.files.map(ContentBlock.attachment),
             diagnosticContent: diagnosticContent,
             isError: failed,
             truncated: output.truncated,

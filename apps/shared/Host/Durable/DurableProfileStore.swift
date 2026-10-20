@@ -68,7 +68,7 @@ actor DurableProfileStore {
                 try await host.handle(method, params, stream: stream)
             }
             do {
-                _ = try await runtime.command(JSONValue.object(["action": .string("open"), "profileID": .string(profileID.uuidString), "artifactFiles": .bool(true), "physicalFiles": .bool(true), "publicFiles": .bool(true)]).jsonString())
+                _ = try await runtime.command(JSONValue.object(["action": .string("open"), "profileID": .string(profileID.uuidString), "fileBacked": .bool(true), "physicalFiles": .bool(true), "publicFiles": .bool(true)]).jsonString())
                 let resources = try await runtime.fileMounts(scope: profileID)
                 Log.agent.info("PiDurable Profile opened profile=\(profileID)")
                 return Session(runtime: runtime, host: host, scope: scope, resources: resources, skills: try await runtime.skillPackages(scope: profileID))

@@ -6,7 +6,7 @@ nonisolated enum ProfileContentArea: String, CaseIterable, Sendable {
     case memory
     case skills
     case conversations = "chats"
-    case artifacts
+    case files
 
     static let all = Set(allCases)
 
@@ -23,7 +23,7 @@ nonisolated enum ProfileContentArea: String, CaseIterable, Sendable {
         case "skills": return [.skills]
         case "chats": return [.conversations]
         case "profile.json": return [.configuration]
-        default: return [.artifacts]
+        default: return [.files]
         }
     }
 }
@@ -67,8 +67,8 @@ private final class ProfileDirectoryPresenter: NSObject, NSFilePresenter, @unche
 @MainActor
 final class ActiveProfileMonitor {
     private var presenter: ProfileDirectoryPresenter?
-    private var artifactMetadataQuery: NSMetadataQuery?
-    private var artifactMetadataObservers: [NSObjectProtocol] = []
+    private var fileMetadataQuery: NSMetadataQuery?
+    private var fileMetadataObservers: [NSObjectProtocol] = []
     private var root: URL?
     private var pending: Set<ProfileContentArea> = []
     private var debounceTask: Task<Void, Never>?
@@ -100,10 +100,10 @@ final class ActiveProfileMonitor {
         pending = []
         changed = nil
         root = nil
-        artifactMetadataQuery?.stop()
-        artifactMetadataQuery = nil
-        artifactMetadataObservers.forEach(NotificationCenter.default.removeObserver)
-        artifactMetadataObservers = []
+        fileMetadataQuery?.stop()
+        fileMetadataQuery = nil
+        fileMetadataObservers.forEach(NotificationCenter.default.removeObserver)
+        fileMetadataObservers = []
         guard let presenter else { return }
         NSFileCoordinator.removeFilePresenter(presenter)
         self.presenter = nil
@@ -134,15 +134,15 @@ final class ActiveProfileMonitor {
             directory.path + "/"
         )
         for name in [Notification.Name.NSMetadataQueryDidFinishGathering, .NSMetadataQueryDidUpdate] {
-            artifactMetadataObservers.append(NotificationCenter.default.addObserver(
+            fileMetadataObservers.append(NotificationCenter.default.addObserver(
                 forName: name,
                 object: query,
                 queue: .main
             ) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.record([.artifacts]) }
+                Task { @MainActor [weak self] in self?.record([.files]) }
             })
         }
-        artifactMetadataQuery = query
+        fileMetadataQuery = query
         query.start()
     }
 }

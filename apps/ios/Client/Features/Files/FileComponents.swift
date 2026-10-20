@@ -7,7 +7,7 @@ struct FileLibraryRow: View {
         case selection(Bool)
     }
 
-    let artifact: FileItem
+    let file: FileItem
     var accessory: Accessory = .disclosure
     var showsContainer = true
     var horizontalPadding = Theme.Spacing.md
@@ -18,13 +18,13 @@ struct FileLibraryRow: View {
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
             FileThumbnail(
-                attachment: artifact,
+                attachment: file,
                 style: .library,
                 background: showsContainer ? Theme.Colors.surfaceSunken : Theme.Colors.surface,
                 scope: scope
             )
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text(artifact.userFacingName)
+                Text(file.userFacingName)
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
                     .lineLimit(2)
@@ -60,56 +60,56 @@ struct FileLibraryRow: View {
             }
         }
         .contentShape(Rectangle())
-        .artifactPreviewTransitionSource(artifact, sourceID: previewSourceID)
+        .filePreviewTransitionSource(file, sourceID: previewSourceID)
     }
 
     private var metadata: String? {
         let values = [
-            artifact.userFacingTypeName,
-            artifact.availabilityDescription,
-            artifact.modifiedAt?.formatted(date: .abbreviated, time: .omitted),
+            file.userFacingTypeName,
+            file.availabilityDescription,
+            file.modifiedAt?.formatted(date: .abbreviated, time: .omitted),
         ].compactMap { $0 }
         return values.isEmpty ? nil : values.joined(separator: " · ")
     }
 }
 
 struct FileContextMenu: View {
-    let artifact: FileItem
+    let file: FileItem
     let canMutate: Bool
     let onRename: () -> Void
     let onDelete: () -> Void
     var scope: ProfileScope? = StorageRoot.currentScope
 
     var body: some View {
-        if artifact.availability == .local {
-            FileShareButton(artifact: artifact, scope: scope) {
+        if file.availability == .local {
+            FileShareButton(file: file, scope: scope) {
                 Label("Share", systemImage: "square.and.arrow.up")
             }
             .accessibilityLabel(A11yLabel.shareFile)
-            .accessibilityIdentifier(A11yID.Files.share(artifact.id))
+            .accessibilityIdentifier(A11yID.Files.share(file.id))
 
             if canMutate {
                 Button(action: onRename) {
                     Label("Rename", systemImage: "pencil")
                 }
-                .accessibilityIdentifier(A11yID.Files.rename(artifact.id))
+                .accessibilityIdentifier(A11yID.Files.rename(file.id))
 
                 Button(role: .destructive, action: onDelete) {
                     Label("Delete", systemImage: "trash")
                 }
-                .accessibilityIdentifier(A11yID.Files.delete(artifact.id))
+                .accessibilityIdentifier(A11yID.Files.delete(file.id))
             }
         }
     }
 }
 
 struct FilePreviewPresentation: View {
-    let artifact: FileItem
+    let file: FileItem
     var scope: ProfileScope? = StorageRoot.currentScope
 
     var body: some View {
         FileZoomPreviewScreen(
-            artifact: artifact,
+            file: file,
             chrome: .navigation,
             scope: scope
         )
@@ -123,7 +123,7 @@ struct FileZoomPreviewPresentation: View {
 
     var body: some View {
         FileZoomPreviewScreen(
-            artifact: preview.artifact,
+            file: preview.file,
             chrome: .immersive(onDismiss: onDismiss),
             scope: preview.scope
         )
@@ -139,7 +139,7 @@ private struct FileZoomPreviewCover: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scrollDisabled(presentation.isDismissing)
-            .environment(\.artifactPreviewNamespace, namespace)
+            .environment(\.filePreviewNamespace, namespace)
             .fullScreenCover(item: presentation.binding, onDismiss: finishDismissal) { presented in
                 FileZoomPreviewPresentation(preview: presented, namespace: namespace) {
                     presentation.dismiss()
@@ -148,7 +148,7 @@ private struct FileZoomPreviewCover: ViewModifier {
     }
 
     private func finishDismissal() {
-        presentation.finishDismissal { onDismiss($0.artifact) }
+        presentation.finishDismissal { onDismiss($0.file) }
     }
 }
 
@@ -158,8 +158,8 @@ enum FileMutation: Equatable {
     case deleting(FileItem)
     case deleteFailed(String)
 
-    static func rename(_ artifact: FileItem) -> FileMutation {
-        .renaming(artifact, draft: artifact.userFacingName)
+    static func rename(_ file: FileItem) -> FileMutation {
+        .renaming(file, draft: file.userFacingName)
     }
 }
 
@@ -174,9 +174,9 @@ private struct FileMutationAlerts: ViewModifier {
                 TextField("Name", text: renameDraft)
                 Button("Cancel", role: .cancel) { mutation = nil }
                 Button("Rename") {
-                    guard case .renaming(let artifact, let draft) = mutation else { return }
+                    guard case .renaming(let file, let draft) = mutation else { return }
                     mutation = nil
-                    onRename(artifact, draft)
+                    onRename(file, draft)
                 }
                 .disabled(!canSubmitRename)
                 .accessibilityIdentifier(A11yID.Files.renameSubmit)
@@ -189,9 +189,9 @@ private struct FileMutationAlerts: ViewModifier {
             .alert("Delete this file?", isPresented: presented { if case .deleting = $0 { true } else { false } }) {
                 Button("Cancel", role: .cancel) { mutation = nil }
                 Button("Delete", role: .destructive) {
-                    guard case .deleting(let artifact) = mutation else { return }
+                    guard case .deleting(let file) = mutation else { return }
                     mutation = nil
-                    onDelete(artifact)
+                    onDelete(file)
                 }
                 .accessibilityIdentifier(A11yID.Files.deleteConfirm)
             } message: {
@@ -218,15 +218,15 @@ private struct FileMutationAlerts: ViewModifier {
                 return draft
             },
             set: {
-                guard case .renaming(let artifact, _) = mutation else { return }
-                mutation = .renaming(artifact, draft: $0)
+                guard case .renaming(let file, _) = mutation else { return }
+                mutation = .renaming(file, draft: $0)
             }
         )
     }
 
     private var canSubmitRename: Bool {
-        guard case .renaming(let artifact, let draft) = mutation else { return false }
-        return !draft.isEmpty && draft != artifact.userFacingName
+        guard case .renaming(let file, let draft) = mutation else { return false }
+        return !draft.isEmpty && draft != file.userFacingName
     }
 
     private var failureMessage: String {
@@ -238,7 +238,7 @@ private struct FileMutationAlerts: ViewModifier {
 }
 
 extension View {
-    func artifactZoomPreviewCover(
+    func fileZoomPreviewCover(
         presentation: ZoomPresentation<FileZoomPreview>,
         namespace: Namespace.ID,
         onDismiss: @escaping (FileItem) -> Void
@@ -250,7 +250,7 @@ extension View {
         ))
     }
 
-    func artifactMutationAlerts(
+    func fileMutationAlerts(
         _ mutation: Binding<FileMutation?>,
         onRename: @escaping (FileItem, String) -> Void,
         onDelete: @escaping (FileItem) -> Void

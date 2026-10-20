@@ -624,28 +624,28 @@ struct ConversationComposer: View, Equatable {
         }
     }
 
-    private var artifactAccessibilityLabel: String {
+    private var filesAccessibilityLabel: String {
         String(localized: "\(conversationFiles.count) files")
     }
 
-    private var artifactButton: some View {
+    private var filesButton: some View {
         Menu {
-            ForEach(conversationFiles) { artifact in
+            ForEach(conversationFiles) { file in
                 Button {
-                    Haptics.impact(.artifactTabSelected)
-                    Log.ui.info("ConversationComposer.artifactSelect conversation=\(sessionID) filename=\(artifact.fileName)")
-                    onOpenConversationFile(artifact)
+                    Haptics.impact(.fileTabSelected)
+                    Log.ui.info("ConversationComposer.artifactSelect conversation=\(sessionID) filename=\(file.fileName)")
+                    onOpenConversationFile(file)
                 } label: {
                     Label(
-                        artifact.userFacingName,
-                        systemImage: artifactSystemImage(artifact)
+                        file.userFacingName,
+                        systemImage: fileSystemImage(file)
                     )
                 }
-                .accessibilityIdentifier(A11yID.ConversationControls.FileItem.item(artifact.id))
+                .accessibilityIdentifier(A11yID.ConversationControls.FileItem.item(file.id))
             }
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: OxActionIconKind.artifacts.systemImage)
+                Image(systemName: OxActionIconKind.files.systemImage)
                 Text("Files")
                 Text(verbatim: "· \(conversationFiles.count)")
                     .foregroundStyle(Theme.Colors.conversationSecondary)
@@ -659,12 +659,12 @@ struct ConversationComposer: View, Equatable {
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: Capsule())
         .minimumTouchTarget()
-        .accessibilityLabel(Text(verbatim: artifactAccessibilityLabel))
+        .accessibilityLabel(Text(verbatim: filesAccessibilityLabel))
         .accessibilityIdentifier(A11yID.ConversationControls.FileItem.open)
     }
 
-    private func artifactSystemImage(_ artifact: FileItem) -> String {
-        artifact.kind == .html ? "sparkles.rectangle.stack" : FileCardFormat(file: artifact).symbol
+    private func fileSystemImage(_ file: FileItem) -> String {
+        file.kind == .html ? "sparkles.rectangle.stack" : FileCardFormat(file: file).symbol
     }
 
     private var composerTopStrip: some View {
@@ -672,7 +672,7 @@ struct ConversationComposer: View, Equatable {
             GlassEffectContainer(spacing: Theme.Spacing.sm) {
                 HStack(spacing: Theme.Spacing.sm) {
                     if !conversationFiles.isEmpty {
-                        artifactButton
+                        filesButton
                     }
                     ForEach(attachedServices) { attachedServicePill($0) }
                     if isEditingMessage {

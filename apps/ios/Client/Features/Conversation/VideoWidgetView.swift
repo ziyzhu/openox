@@ -124,15 +124,15 @@ private struct VideoWidgetAsset {
 
     static func asset(for source: VideoWidget.Source, scope: ProfileScope?, serviceManager: ServiceManager) async -> Self? {
         switch source {
-        case let .artifact(artifact):
-            guard artifact.isVideo else { return nil }
+        case let .artifact(file):
+            guard file.isVideo else { return nil }
             do {
-                let snapshot = try await FilePreviewSource(artifact: artifact, scope: scope).snapshot()
+                let snapshot = try await FilePreviewSource(file: file, scope: scope).snapshot()
                 return Self(asset: AVURLAsset(url: snapshot.url), snapshot: snapshot)
             } catch is CancellationError {
                 return nil
             } catch {
-                Log.ui.error("VideoWidgetAsset.read file=\(artifact.fileName) error=\(error.localizedDescription)")
+                Log.ui.error("VideoWidgetAsset.read file=\(file.fileName) error=\(error.localizedDescription)")
                 return nil
             }
         case let .remote(value):

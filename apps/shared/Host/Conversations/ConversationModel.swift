@@ -438,18 +438,18 @@ nonisolated extension ConversationFormat {
 
 nonisolated extension Turn {
     func replacingFile(named oldName: String, with newName: String, directory: URL) -> Turn {
-        mappingFiles { artifact in
-            artifact.fileName.caseInsensitiveCompare(oldName) == .orderedSame
+        mappingFiles { file in
+            file.fileName.caseInsensitiveCompare(oldName) == .orderedSame
                 ? FileItem(fileName: newName, directory: directory)
-                : artifact
+                : file
         }
     }
 
     func mappingFiles(_ replace: (FileItem) -> FileItem) -> Turn {
         func replaceContent(_ content: [ContentBlock]) -> [ContentBlock] {
             content.map { block in
-                guard case .attachment(let artifact) = block else { return block }
-                return .attachment(replace(artifact))
+                guard case .attachment(let file) = block else { return block }
+                return .attachment(replace(file))
             }
         }
         switch self {
@@ -465,8 +465,8 @@ nonisolated extension Turn {
                 guard case var .execute(execution) = turn.steps[index].kind else { continue }
                 execution.effects = execution.effects.map { effect in
                     switch effect {
-                    case let .artifact(artifact): return .artifact(replace(artifact))
-                    case let .media(artifact): return .media(replace(artifact))
+                    case let .artifact(file): return .artifact(replace(file))
+                    case let .media(file): return .media(replace(file))
                     case let .shoveler(shoveler):
                         return .shoveler(Shoveler(
                             cards: shoveler.cards.map { card in
@@ -480,13 +480,13 @@ nonisolated extension Turn {
                             }
                         ))
                     case let .video(video):
-                        guard case let .artifact(artifact) = video.source else { return effect }
+                        guard case let .artifact(file) = video.source else { return effect }
                         return .video(VideoWidget(
-                            source: .artifact(replace(artifact))
+                            source: .artifact(replace(file))
                         ))
                     case let .image(image):
-                        guard let artifact = image.source.artifact else { return effect }
-                        return .image(ImageWidget(source: .artifact(replace(artifact))))
+                        guard let file = image.source.artifact else { return effect }
+                        return .image(ImageWidget(source: .artifact(replace(file))))
                     case .invocation, .progress, .serviceControl, .serviceInspector, .skill: return effect
                     }
                 }

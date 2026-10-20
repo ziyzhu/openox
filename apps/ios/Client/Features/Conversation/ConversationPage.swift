@@ -81,8 +81,8 @@ struct ConversationPage: View {
     @State private var navigationFile: FileItem?
     @State private var navigationSkill: SkillDraft?
     @State private var photoPickerItems: [PhotosPickerItem] = []
-    @State private var artifactMutation: FileMutation?
-    @State private var artifactRevision = 0
+    @State private var fileMutation: FileMutation?
+    @State private var fileRevision = 0
 
     private enum ModalPresentation: Identifiable {
         case modelPicker
@@ -91,7 +91,7 @@ struct ConversationPage: View {
         case photos
         case files
         case attachment(URL)
-        case artifacts
+        case conversationFiles
         case botControl(ServiceHandoffSession)
         case serviceAuth(ServiceAuthSession)
 
@@ -103,7 +103,7 @@ struct ConversationPage: View {
             case .photos: "photos"
             case .files: "files"
             case .attachment(let url): "attachment:\(url.absoluteString)"
-            case .artifacts: "artifacts"
+            case .conversationFiles: "conversationFiles"
             case .botControl(let session): "botControl:\(session.id)"
             case .serviceAuth(let session): "serviceAuth:\(session.id)"
             }
@@ -176,7 +176,7 @@ struct ConversationPage: View {
         Binding(
             get: {
                 switch modalPresentation {
-                case .modelPicker, .serviceDetail, .artifacts: modalPresentation
+                case .modelPicker, .serviceDetail, .conversationFiles: modalPresentation
                 default: nil
                 }
             },
@@ -227,21 +227,21 @@ struct ConversationPage: View {
     var body: some View {
         NavigationStack {
             page
-                .navigationDestination(isPresented: artifactNavigationPresented) {
-                    if let artifact = navigationFile {
+                .navigationDestination(isPresented: fileNavigationPresented) {
+                    if let file = navigationFile {
                         Group {
-                            if artifact.usesDedicatedPreview {
-                                FileNavigationPage(artifact: artifact)
+                            if file.usesDedicatedPreview {
+                                FileNavigationPage(file: file)
                             } else {
-                                FilePreviewPresentation(artifact: artifact)
+                                FilePreviewPresentation(file: file)
                             }
                         }
                             .onAppear {
-                                Log.ui.info("ConversationPage.artifactNavigation present conversation=\(conversation.id) filename=\(artifact.fileName)")
+                                Log.ui.info("ConversationPage.artifactNavigation present conversation=\(conversation.id) filename=\(file.fileName)")
                                 onFileNavigationChange(true)
                             }
                             .onDisappear {
-                                Log.ui.info("ConversationPage.artifactNavigation return conversation=\(conversation.id) filename=\(artifact.fileName)")
+                                Log.ui.info("ConversationPage.artifactNavigation return conversation=\(conversation.id) filename=\(file.fileName)")
                                 onFileNavigationChange(false)
                             }
                     }
@@ -325,11 +325,11 @@ struct ConversationPage: View {
                 browserPageMount.reconcile(page: browserPage, ownerIDs: servicePageOwnerIDs)
             }
             .toast($toast, accessibilityIdentifier: A11yID.ConversationControls.toast)
-            .environment(\.conversationFileResolver, ConversationFileResolver(revision: conversation.artifactFilesRevision) { [conversation] path in
+            .environment(\.conversationFileResolver, ConversationFileResolver(revision: conversation.filesRevision) { [conversation] path in
                 await conversation.messageFile(path: path)
             })
             .task(id: MessageFilesKey(conversation: conversation.id, blocks: conversation.transcriptBlockCount,
-                                      isBusy: conversation.isBusy, files: conversation.artifactFilesRevision)) {
+                                      isBusy: conversation.isBusy, files: conversation.filesRevision)) {
                 guard !conversation.isBusy else { return }
                 messageFiles = await conversation.messageFiles()
             }
@@ -525,11 +525,11 @@ struct ConversationPage: View {
                         )
                     }
                     .presentationDetents([.medium, .large])
-                case .artifacts:
-                    ConversationFilesSheet(artifacts: conversationFiles) { artifact in
-                        pendingFilePreview = artifact
+                case .conversationFiles:
+                    ConversationFilesSheet(files: conversationFiles) { file in
+                        pendingFilePreview = file
                         modalPresentation = nil
-                        Log.ui.info("ConversationPage.artifactPreview select conversation=\(conversation.id) filename=\(artifact.fileName)")
+                        Log.ui.info("ConversationPage.artifactPreview select conversation=\(conversation.id) filename=\(file.fileName)")
                     }
                     .presentationDetents([.medium, .large])
                 case .camera, .photos, .files, .attachment, .botControl, .serviceAuth:
@@ -550,7 +550,7 @@ struct ConversationPage: View {
                 BotControlSheetView(session: session)
             case .serviceAuth(let session):
                 ServiceSessionSheetView(session: session, mode: .signIn, returnsInline: true)
-            case .modelPicker, .serviceDetail, .photos, .files, .attachment, .artifacts:
+            case .modelPicker, .serviceDetail, .photos, .files, .attachment, .conversationFiles:
                 EmptyView()
             }
         }
@@ -589,8 +589,8 @@ struct ConversationPage: View {
                 )
             }
         }
-        .artifactMutationAlerts(
-            $artifactMutation,
+        .fileMutationAlerts(
+            $fileMutation,
             onRename: renameFile,
             onDelete: deleteFile
         )
@@ -630,16 +630,16 @@ struct ConversationPage: View {
             onShowSidebar: onShowSidebar,
             onToggleTemporary: onToggleTemporary,
             onPickModel: { modalPresentation = .modelPicker },
-            onShowFiles: { modalPresentation = .artifacts },
+            onShowFiles: { modalPresentation = .conversationFiles },
             onCopyTranscript: { copyTranscript(blockCount: blockCount) },
             onDeleteConversation: { alertPresentation = .deleteConversation }
         )
     }
 
     private func presentPendingFilePreview() {
-        guard let artifact = pendingFilePreview else { return }
+        guard let file = pendingFilePreview else { return }
         pendingFilePreview = nil
-        navigationFile = artifact
+        navigationFile = file
     }
 
     private func sheetDidDismiss() {
@@ -658,7 +658,7 @@ struct ConversationPage: View {
         presentPendingFilePreview()
     }
 
-    private var artifactNavigationPresented: Binding<Bool> {
+    private var fileNavigationPresented: Binding<Bool> {
         Binding(
             get: { navigationFile != nil },
             set: { presented in
@@ -842,12 +842,12 @@ struct ConversationPage: View {
         )
     }
 
-    private var artifactControls: FileControls {
+    private var fileControls: FileControls {
         FileControls(
-            revision: artifactRevision,
+            revision: fileRevision,
             canMutate: !conversation.isTemporary,
             onRename: { beginRenamingFile($0) },
-            onDelete: { artifactMutation = .deleting($0) }
+            onDelete: { fileMutation = .deleting($0) }
         )
     }
 
@@ -970,9 +970,9 @@ struct ConversationPage: View {
 
     private func transcriptContentBlock(_ block: ConversationBlock, latestCanvasBlockIDs: [URL: UUID]) -> some View {
         let isTail = block.sourceBlockID == conversation.transcript.last?.id
-        let isLatestCanvas: Bool = if case .agentContent(.artifact(let artifact)) = block.kind,
-                                      artifact.kind == .html {
-            latestCanvasBlockIDs[artifact.fileURL] == block.id
+        let isLatestCanvas: Bool = if case .agentContent(.artifact(let file)) = block.kind,
+                                      file.kind == .html {
+            latestCanvasBlockIDs[file.fileURL] == block.id
         } else {
             false
         }
@@ -988,8 +988,8 @@ struct ConversationPage: View {
                 sourceBlockID: block.sourceBlockID,
                 editableBlock: editableBlock(block)
             ),
-            artifactControls: artifactControls,
-            onOpenAttachment: { artifact, sourceID in openAttachment(artifact, sourceID: sourceID) },
+            fileControls: fileControls,
+            onOpenAttachment: { file, sourceID in openAttachment(file, sourceID: sourceID) },
             onOpenSkill: { openSkill($0) },
             onOpenLink: { openLink($0) }
         )
@@ -1059,7 +1059,7 @@ struct ConversationPage: View {
     private func queuedRow(_ queued: Conversation.QueuedMessage, identified: Bool = true) -> some View {
         let row = QueuedBubble(
             message: queued,
-            onOpenAttachment: { artifact, sourceID in openAttachment(artifact, sourceID: sourceID) },
+            onOpenAttachment: { file, sourceID in openAttachment(file, sourceID: sourceID) },
             onOpenSkill: { openSkill($0) }
         ) { conversation.cancelQueued(queued.id) }
             .transition(.opacity)
@@ -1467,7 +1467,7 @@ struct ConversationPage: View {
             isEmbedded: isEmbedded,
             iconButtonSize: iconButtonSize,
             composerButtonSize: composerButtonSize,
-            onOpenAttachment: { artifact, sourceID in openAttachment(artifact, sourceID: sourceID) },
+            onOpenAttachment: { file, sourceID in openAttachment(file, sourceID: sourceID) },
             onOpenConversationFile: { openAttachment($0) },
             onPasteImages: ingestPastedImages,
             onOpenService: { serviceDetailPresentation.wrappedValue = $0 },
@@ -1753,16 +1753,16 @@ struct ConversationPage: View {
         switch ConversationLinkDestination(url) {
         case .web(let url):
             LinkOpener.open(url: url, serviceManager: serviceManager)
-        case .artifact(let filename):
-            guard let artifact = conversationFiles.first(where: {
+        case .conversationFile(let filename):
+            guard let file = conversationFiles.first(where: {
                 $0.fileName.caseInsensitiveCompare(filename) == .orderedSame
                     || $0.displayName.caseInsensitiveCompare(filename) == .orderedSame
             }) else {
                 Log.ui.warning("ConversationPage.openLink disposition=missing-artifact filename=\(filename)")
                 return
             }
-            Log.ui.info("ConversationPage.openLink disposition=artifact filename=\(artifact.fileName)")
-            openAttachment(artifact)
+            Log.ui.info("ConversationPage.openLink disposition=artifact filename=\(file.fileName)")
+            openAttachment(file)
         case .file(let path):
             Task {
                 guard let file = await conversation.messageFile(path: path), file.exists else {
@@ -1778,32 +1778,32 @@ struct ConversationPage: View {
         }
     }
 
-    private func beginRenamingFile(_ artifact: FileItem) {
-        artifactMutation = .rename(artifact)
+    private func beginRenamingFile(_ file: FileItem) {
+        fileMutation = .rename(file)
     }
 
-    private func renameFile(_ artifact: FileItem, to newFilename: String) {
+    private func renameFile(_ file: FileItem, to newFilename: String) {
         Task {
             do {
-                let renamed = try await onRenameFile(artifact, newFilename)
-                artifactRevision += 1
-                Log.ui.info("ConversationPage.renameFile conversation=\(conversation.id) from=\(artifact.fileName) to=\(renamed.fileName)")
+                let renamed = try await onRenameFile(file, newFilename)
+                fileRevision += 1
+                Log.ui.info("ConversationPage.renameFile conversation=\(conversation.id) from=\(file.fileName) to=\(renamed.fileName)")
             } catch {
-                Log.ui.error("ConversationPage.renameFile conversation=\(conversation.id) from=\(artifact.fileName) error=\(error.localizedDescription)")
-                artifactMutation = .renameFailed(error.localizedDescription)
+                Log.ui.error("ConversationPage.renameFile conversation=\(conversation.id) from=\(file.fileName) error=\(error.localizedDescription)")
+                fileMutation = .renameFailed(error.localizedDescription)
             }
         }
     }
 
-    private func deleteFile(_ artifact: FileItem) {
+    private func deleteFile(_ file: FileItem) {
         Task {
             do {
-                try await onDeleteFile(artifact)
-                artifactRevision += 1
-                Log.ui.info("ConversationPage.deleteFile conversation=\(conversation.id) file=\(artifact.fileName)")
+                try await onDeleteFile(file)
+                fileRevision += 1
+                Log.ui.info("ConversationPage.deleteFile conversation=\(conversation.id) file=\(file.fileName)")
             } catch {
-                Log.ui.error("ConversationPage.deleteFile conversation=\(conversation.id) file=\(artifact.fileName) error=\(error.localizedDescription)")
-                artifactMutation = .deleteFailed(error.localizedDescription)
+                Log.ui.error("ConversationPage.deleteFile conversation=\(conversation.id) file=\(file.fileName) error=\(error.localizedDescription)")
+                fileMutation = .deleteFailed(error.localizedDescription)
             }
         }
     }

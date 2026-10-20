@@ -511,11 +511,11 @@ nonisolated struct ToolResultParts {
     let media: [TransientAttachment]
 
     init(_ result: ToolResultMessage, label: String) {
-        let artifactReferences = result.content.compactMap { block -> String? in
-            guard case .attachment(let artifact) = block else { return nil }
-            return FilePromptReference.text(for: artifact)
+        let fileReferences = result.content.compactMap { block -> String? in
+            guard case .attachment(let file) = block else { return nil }
+            return FilePromptReference.text(for: file)
         }
-        let sourceText = [result.content.concatenatedText, artifactReferences.joined(separator: "\n\n")]
+        let sourceText = [result.content.concatenatedText, fileReferences.joined(separator: "\n\n")]
             .filter { !$0.isEmpty }
             .joined(separator: "\n\n")
         text = sourceText
@@ -572,8 +572,8 @@ nonisolated extension Array where Element == ContentBlock {
 nonisolated func requiredInputModalities(in messages: [Message]) -> Set<ProviderModelModality> {
     var modalities: Set<ProviderModelModality> = [.text]
 
-    func include(_ artifact: FileItem) {
-        switch artifact.kind {
+    func include(_ file: FileItem) {
+        switch file.kind {
         case .image: modalities.insert(.image)
         case .pdf: modalities.insert(.pdf)
         case .text, .html, .file: break
@@ -592,11 +592,11 @@ nonisolated func requiredInputModalities(in messages: [Message]) -> Set<Provider
         switch message {
         case .user(let user):
             for block in user.content {
-                if case .attachment(let artifact) = block { include(artifact) }
+                if case .attachment(let file) = block { include(file) }
             }
         case .toolResult(let result):
             for block in result.content {
-                if case .attachment(let artifact) = block { include(artifact) }
+                if case .attachment(let file) = block { include(file) }
             }
             result.transientAttachments.forEach(include)
         case .assistant:

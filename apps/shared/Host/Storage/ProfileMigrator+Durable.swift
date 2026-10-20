@@ -187,7 +187,7 @@ extension ProfileMigrator {
         let scope = ProfileScope(profileID: profile.id, root: profile.url, location: .local)
         let decoder = JSONDecoder()
         decoder.userInfo[.profileScope] = scope
-        decoder.userInfo[.artifactDirectoryListing] = FileDirectoryListing()
+        decoder.userInfo[.fileDirectoryListing] = FileDirectoryListing()
         var documents: [[String: Any]] = []
         var artifacts: [[String: Any]] = []
         let conversationDirectory = destination.appendingPathComponent(".migration-conversations", isDirectory: true)

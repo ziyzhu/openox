@@ -75,14 +75,14 @@ private struct ShovelerCardContainer: View {
 
     @ViewBuilder
     var body: some View {
-        if let artifact = card.artifact, artifact.exists {
-            Button { onOpenFile(artifact, sourceID) } label: {
+        if let file = card.artifact, file.exists {
+            Button { onOpenFile(file, sourceID) } label: {
                 cardView
-                    .artifactPreviewTransitionSource(artifact, sourceID: sourceID)
+                    .filePreviewTransitionSource(file, sourceID: sourceID)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier(sourceID)
-            .accessibilityHint(String(format: L10n.string("Opens %@"), artifact.userFacingName))
+            .accessibilityHint(String(format: L10n.string("Opens %@"), file.userFacingName))
         } else {
             cardView
         }

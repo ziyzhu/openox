@@ -4,20 +4,20 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 nonisolated struct FilePreviewSource: Sendable {
-    let artifact: FileItem
+    let file: FileItem
     let scope: ProfileScope?
 
-    init(artifact: FileItem, scope: ProfileScope? = StorageRoot.currentScope) {
-        self.artifact = artifact
+    init(file: FileItem, scope: ProfileScope? = StorageRoot.currentScope) {
+        self.file = file
         let root = scope?.root.standardizedFileURL.pathComponents
-        let path = artifact.fileURL.standardizedFileURL.pathComponents
+        let path = file.fileURL.standardizedFileURL.pathComponents
         self.scope = root.map { path.count > $0.count && path.starts(with: $0) } == true ? scope : nil
     }
 
     func read() async throws -> Data {
         guard let scope, scope.profileID != nil else { throw CocoaError(.fileReadNoPermission) }
         try Task.checkCancellation()
-        let data = try await ProfileRepository.shared.readFileData(named: artifact.fileName, in: scope)
+        let data = try await ProfileRepository.shared.readFileData(named: file.fileName, in: scope)
         try Task.checkCancellation()
         return data
     }
@@ -26,9 +26,9 @@ nonisolated struct FilePreviewSource: Sendable {
         guard let scope, scope.profileID != nil else { throw CocoaError(.fileReadNoPermission) }
         try Task.checkCancellation()
         let snapshot = try await Task.detached(priority: .userInitiated) {
-            try FilePreviewSnapshot(artifact: artifact)
+            try FilePreviewSnapshot(file: file)
         }.value
-        try await ProfileRepository.shared.copyFile(named: artifact.fileName, to: snapshot.url, in: scope)
+        try await ProfileRepository.shared.copyFile(named: file.fileName, to: snapshot.url, in: scope)
         try Task.checkCancellation()
         try await Task.detached(priority: .userInitiated) {
             try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: snapshot.url.path)
@@ -41,8 +41,8 @@ nonisolated final class FilePreviewSnapshot: Sendable {
     let url: URL
     private let directory: URL
 
-    init(artifact: FileItem) throws {
-        let name = try FileStore.validatedFilename(artifact.displayName)
+    init(file: FileItem) throws {
+        let name = try FileStore.validatedFilename(file.displayName)
         directory = try FileStaging.createDirectory(in: FileManager.default.temporaryDirectory, prefix: "artifact-preview")
         url = directory.appendingPathComponent(name, isDirectory: false)
         do {
@@ -76,12 +76,12 @@ nonisolated private struct FileShareContent: Transferable, Sendable {
         DataRepresentation(exportedContentType: type) { (content: FileShareContent) in
             do { return try await content.source.read() }
             catch {
-                Log.ui.error("FileShare.read file=\(content.source.artifact.fileName) error=\(error.localizedDescription)")
+                Log.ui.error("FileShare.read file=\(content.source.file.fileName) error=\(error.localizedDescription)")
                 throw error
             }
         }
-        .exportingCondition { UTType($0.source.artifact.typeIdentifier)?.conforms(to: type) == true }
-        .suggestedFileName { $0.source.artifact.displayName }
+        .exportingCondition { UTType($0.source.file.typeIdentifier)?.conforms(to: type) == true }
+        .suggestedFileName { $0.source.file.displayName }
     }
 }
 
@@ -89,13 +89,13 @@ struct FileShareButton<Label: View>: View {
     private let source: FilePreviewSource
     private let label: Label
 
-    init(artifact: FileItem, scope: ProfileScope? = StorageRoot.currentScope, @ViewBuilder label: () -> Label) {
-        source = FilePreviewSource(artifact: artifact, scope: scope)
+    init(file: FileItem, scope: ProfileScope? = StorageRoot.currentScope, @ViewBuilder label: () -> Label) {
+        source = FilePreviewSource(file: file, scope: scope)
         self.label = label()
     }
 
     var body: some View {
-        ShareLink(item: FileShareContent(source: source), preview: SharePreview(Text(source.artifact.userFacingName))) {
+        ShareLink(item: FileShareContent(source: source), preview: SharePreview(Text(source.file.userFacingName))) {
             label
         }
         .disabled(source.scope == nil)

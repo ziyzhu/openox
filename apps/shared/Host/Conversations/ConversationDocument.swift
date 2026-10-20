@@ -41,7 +41,7 @@ nonisolated struct ConversationDocument: Sendable {
     private(set) var turns: [Turn]
     private(set) var projection: [Block]
     private(set) var sourceTurnIDs: [RenderBlockID: TurnID]
-    private(set) var artifactReferencesRevision = UUID()
+    private(set) var fileReferencesRevision = UUID()
     private var nextBlockOrdinal: Int
 
     init(turns: [Turn] = []) {
@@ -92,9 +92,9 @@ nonisolated struct ConversationDocument: Sendable {
                                 case let .shoveler(shoveler): state.apply(.embedShoveler(shoveler))
                                 case let .video(video): state.apply(.embedVideo(video))
                                 case let .image(image): state.apply(.embedImage(image))
-                                case let .artifact(artifact): state.apply(.embedFile(artifact))
+                                case let .artifact(file): state.apply(.embedFile(file))
                                 case let .skill(skill): state.apply(.embedSkill(skill))
-                                case let .media(artifact): state.apply(.attachMedia(artifact))
+                                case let .media(file): state.apply(.attachMedia(file))
                                 }
                             }
                             if let trace = execution.invocationTrace { state.apply(.setInvocationTrace(trace)) }
@@ -299,9 +299,9 @@ nonisolated struct ConversationDocument: Sendable {
         var seen = Set<String>()
         var result: [FileItem] = []
         for block in projection.reversed() {
-            for artifact in Self.artifacts(in: block) where artifact.exists {
-                if seen.insert(artifact.fileName.lowercased()).inserted {
-                    result.append(artifact)
+            for file in Self.files(in: block) where file.exists {
+                if seen.insert(file.fileName.lowercased()).inserted {
+                    result.append(file)
                 }
             }
         }
@@ -324,14 +324,14 @@ nonisolated struct ConversationDocument: Sendable {
         reproject()
     }
 
-    private static func artifacts(in block: Block) -> [FileItem] {
+    private static func files(in block: Block) -> [FileItem] {
         switch block.kind {
         case .userText(_, let attachments), .userSkill(_, let attachments):
             attachments
         case .agentContent(let items):
             items.flatMap { item in
                 switch item {
-                case .artifact(let artifact): return [artifact]
+                case .artifact(let file): return [file]
                 case .shoveler(let shoveler): return shoveler.cards.compactMap(\.artifact)
                 case .video(let video): return video.source.artifact.map { [$0] } ?? []
                 case .image(let image): return image.source.artifact.map { [$0] } ?? []
@@ -401,14 +401,14 @@ nonisolated struct ConversationDocument: Sendable {
         case let .embedImage(image):
             mutateExecution { $0.effects.append(.image(image)) }
             reconcileTail()
-        case let .embedFile(artifact):
-            embedFile(artifact)
+        case let .embedFile(file):
+            embedFile(file)
             reconcileTail()
         case let .embedSkill(skill):
             embedSkill(skill)
             reconcileTail()
-        case let .attachMedia(artifact):
-            attachMedia(artifact)
+        case let .attachMedia(file):
+            attachMedia(file)
         case let .appendInvocation(invocation):
             appendInvocation(invocation)
             reconcileTail()
@@ -725,10 +725,10 @@ nonisolated struct ConversationDocument: Sendable {
         mutateExecution { $0.effects.append(.video(video)) }
     }
 
-    private mutating func embedFile(_ artifact: FileItem) {
-        upsertExecutionEffect(.artifact(artifact)) { effect in
+    private mutating func embedFile(_ file: FileItem) {
+        upsertExecutionEffect(.artifact(file)) { effect in
             guard case let .artifact(existing) = effect else { return false }
-            return existing.fileName.caseInsensitiveCompare(artifact.fileName) == .orderedSame
+            return existing.fileName.caseInsensitiveCompare(file.fileName) == .orderedSame
         }
     }
 
@@ -752,8 +752,8 @@ nonisolated struct ConversationDocument: Sendable {
         }
     }
 
-    private mutating func attachMedia(_ artifact: FileItem) {
-        mutateExecution { $0.effects.append(.media(artifact)) }
+    private mutating func attachMedia(_ file: FileItem) {
+        mutateExecution { $0.effects.append(.media(file)) }
     }
 
     private mutating func finishExecution(output: String, isError: Bool) {
@@ -978,10 +978,10 @@ nonisolated struct ConversationDocument: Sendable {
             let start = index == stepIndex ? effectIndex + 1 : 0
             for effect in execution.effects.dropFirst(start) {
                 switch effect {
-                case let .artifact(artifact):
+                case let .artifact(file):
                     guard invocation.name == "ox.artifact.present",
                           let filename,
-                          artifact.fileName.caseInsensitiveCompare(filename) == .orderedSame else { continue }
+                          file.fileName.caseInsensitiveCompare(filename) == .orderedSame else { continue }
                     let completed: Bool
                     if index != stepIndex, execution.source.isEmpty, case .succeeded = execution.outcome {
                         completed = true
@@ -1056,7 +1056,7 @@ nonisolated struct ConversationDocument: Sendable {
             (RenderBlockID(block.id), turns[entry].id)
         })
         nextBlockOrdinal = projection.count
-        artifactReferencesRevision = UUID()
+        fileReferencesRevision = UUID()
     }
 
     private mutating func reconcileTail() {
@@ -1082,13 +1082,13 @@ nonisolated struct ConversationDocument: Sendable {
         projection.replaceSubrange(blockStart..<projection.endIndex, with: projected.map(\.0))
         for (block, entry) in projected { sourceTurnIDs[RenderBlockID(block.id)] = turns[entry].id }
         nextBlockOrdinal = projection.count
-        artifactReferencesRevision = UUID()
+        fileReferencesRevision = UUID()
     }
 
     private mutating func appendBlock(_ block: Block, entry: Int) {
         projection.append(block)
         sourceTurnIDs[RenderBlockID(block.id)] = turns[entry].id
-        artifactReferencesRevision = UUID()
+        fileReferencesRevision = UUID()
     }
 
     private func validateIDs() {

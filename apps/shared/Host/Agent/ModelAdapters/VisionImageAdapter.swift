@@ -23,18 +23,18 @@ nonisolated struct VisionImageAdapter: ModelAdapter {
             var content: [ContentBlock] = []
             var transformed = false
             for block in user.content {
-                guard case .attachment(let artifact) = block, artifact.kind == .image else {
+                guard case .attachment(let file) = block, file.kind == .image else {
                     content.append(block)
                     continue
                 }
-                guard let data = try? ProviderFileInputs.read(artifact),
-                      let analysis = await analysis(data: data, filename: artifact.fileName, mimeType: artifact.mimeType) else {
-                    Log.agent.error("VisionImageAdapter couldn't analyze artifact=\(artifact.fileName)")
-                    content.append(.text(TextContent(FileReferenceAdapter.recovery(kind: .image, source: FilePromptReference.text(for: artifact)))))
+                guard let data = try? ProviderFileInputs.read(file),
+                      let analysis = await analysis(data: data, filename: file.fileName, mimeType: file.mimeType) else {
+                    Log.agent.error("VisionImageAdapter couldn't analyze artifact=\(file.fileName)")
+                    content.append(.text(TextContent(FileReferenceAdapter.recovery(kind: .image, source: FilePromptReference.text(for: file)))))
                     transformed = true
                     continue
                 }
-                content.append(.text(TextContent("\(FilePromptReference.text(for: artifact))\n\n\(analysis)")))
+                content.append(.text(TextContent("\(FilePromptReference.text(for: file))\n\n\(analysis)")))
                 transformed = true
             }
             guard transformed else { return message }
@@ -45,18 +45,18 @@ nonisolated struct VisionImageAdapter: ModelAdapter {
             var content: [ContentBlock] = []
             var transformed = false
             for block in result.content {
-                guard case .attachment(let artifact) = block, artifact.kind == .image else {
+                guard case .attachment(let file) = block, file.kind == .image else {
                     content.append(block)
                     continue
                 }
-                guard let data = try? ProviderFileInputs.read(artifact),
-                      let analysis = await analysis(data: data, filename: artifact.fileName, mimeType: artifact.mimeType) else {
-                    Log.agent.error("VisionImageAdapter couldn't analyze tool artifact=\(artifact.fileName)")
-                    content.append(.text(TextContent(FileReferenceAdapter.recovery(kind: .image, source: FilePromptReference.text(for: artifact)))))
+                guard let data = try? ProviderFileInputs.read(file),
+                      let analysis = await analysis(data: data, filename: file.fileName, mimeType: file.mimeType) else {
+                    Log.agent.error("VisionImageAdapter couldn't analyze tool artifact=\(file.fileName)")
+                    content.append(.text(TextContent(FileReferenceAdapter.recovery(kind: .image, source: FilePromptReference.text(for: file)))))
                     transformed = true
                     continue
                 }
-                content.append(.text(TextContent("\n\n\(FilePromptReference.text(for: artifact))\n\n\(analysis)")))
+                content.append(.text(TextContent("\n\n\(FilePromptReference.text(for: file))\n\n\(analysis)")))
                 transformed = true
             }
 

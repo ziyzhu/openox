@@ -50,7 +50,7 @@ nonisolated enum DurableConversationProjection {
     private static func annotations(from entries: [JSONValue], scope: ProfileScope, files: FileDirectoryListing?) -> [Turn] {
         let decoder = JSONDecoder()
         decoder.userInfo[.profileScope] = scope
-        decoder.userInfo[.artifactDirectoryListing] = files
+        decoder.userInfo[.fileDirectoryListing] = files
         var latest: [Turn] = []
         var seen = Set<TurnID>()
         for entry in entries.reversed() {
@@ -81,7 +81,7 @@ nonisolated enum DurableConversationProjection {
                 finishAgent()
                 let intent = user.content.concatenatedText
                 let attachments = user.content.compactMap { block -> FileItem? in
-                    if case .attachment(let artifact) = block { return artifact }
+                    if case .attachment(let file) = block { return file }
                     return nil
                 }
                 let rich = annotations.compactMap { turn -> (UserTurn, TurnID)? in
@@ -137,9 +137,9 @@ nonisolated enum DurableConversationProjection {
                     toolDecorations[stepID] = matching
                     let kind = DurableConversationProjection.action(for: call, decoration: matching.last, id: stepID)
                     agent?.steps.append(Step(id: stepID, generation: generationID, kind: kind, toolCall: call))
-                case .attachment(let artifact):
+                case .attachment(let file):
                     agent?.steps.append(Step(id: stepID, generation: generationID,
-                                            kind: .execute(Execution(source: "", effects: [.artifact(artifact)], outcome: .succeeded(output: "")))))
+                                            kind: .execute(Execution(source: "", effects: [.artifact(file)], outcome: .succeeded(output: "")))))
                 }
             }
             for step in rich?.steps ?? [] where step.toolCall == nil && step.toolResult == nil {
@@ -180,9 +180,9 @@ nonisolated enum DurableConversationProjection {
                     execution.effects[effectIndex] = .invocation(invocation)
                 }
                 for block in result.content {
-                    guard case .attachment(let artifact) = block,
-                          !execution.effects.contains(.artifact(artifact)) else { continue }
-                    execution.effects.append(.artifact(artifact))
+                    guard case .attachment(let file) = block,
+                          !execution.effects.contains(.artifact(file)) else { continue }
+                    execution.effects.append(.artifact(file))
                 }
                 for activated in result.activatedSkills {
                     guard !execution.effects.contains(where: {

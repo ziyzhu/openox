@@ -411,7 +411,7 @@ struct SelectableText: UIViewRepresentable {
             switch ConversationLinkDestination(url) {
             case .web:
                 return UITextItem.MenuConfiguration(menu: defaultMenu)
-            case .artifact, .file:
+            case .conversationFile, .file:
                 let open = UIAction(title: L10n.string("Open", comment: "Opens a file linked from an assistant message."),
                                     image: UIImage(systemName: "arrow.up.right.circle")) { [weak self] _ in
                     self?.open(url)

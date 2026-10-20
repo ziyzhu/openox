@@ -245,9 +245,9 @@ final class RemoteMCPService {
             let result = try await client.callTool(name: actionID, arguments: args)
             let outputViolations = JSONSchemaValidator.validate(result.value, against: outputSchema, definitions: [:])
             guard outputViolations.isEmpty else { return .failure(Service.InvokeError.invalidOutput(name, outputViolations)) }
-            try await receiveFiles(result.artifacts)
+            try await receiveFiles(result.files)
             service.setAuth(.authorized)
-            Log.service.info("RemoteMCP.invoke completed name=\(name) artifacts=\(result.artifacts.count)")
+            Log.service.info("RemoteMCP.invoke completed name=\(name) artifacts=\(result.files.count)")
             return .success(result.value)
         } catch RemoteMCPError.authorizationRequired {
             requiresAuthorization = true
@@ -262,9 +262,9 @@ final class RemoteMCPService {
                 let result = try await client.callTool(name: actionID, arguments: args)
                 let outputViolations = JSONSchemaValidator.validate(result.value, against: outputSchema, definitions: [:])
                 guard outputViolations.isEmpty else { return .failure(Service.InvokeError.invalidOutput(name, outputViolations)) }
-                try await receiveFiles(result.artifacts)
+                try await receiveFiles(result.files)
                 service.setAuth(.authorized)
-                Log.service.info("RemoteMCP.invoke completed-after-refresh name=\(name) artifacts=\(result.artifacts.count)")
+                Log.service.info("RemoteMCP.invoke completed-after-refresh name=\(name) artifacts=\(result.files.count)")
                 return .success(result.value)
             } catch {
                 service.setAuth(.notAuthorized)

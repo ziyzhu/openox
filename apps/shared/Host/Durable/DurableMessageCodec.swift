@@ -16,9 +16,9 @@ nonisolated enum DurableMessageCodec {
                 return object(["type": "toolCall", "id": call.id, "name": call.name, "arguments": call.arguments.toAny(),
                                "thoughtSignature": call.thoughtSignature, "oxProviderItemID": call.providerItemID,
                                "oxProviderCallID": call.providerCallID])
-            case .attachment(let artifact):
-                var reference: [String: JSONValue] = ["type": .string("text"), "text": .string("[Attachment: artifacts/\(artifact.fileName)]"),
-                                                      "oxAttachment": .string(artifact.fileName)]
+            case .attachment(let file):
+                var reference: [String: JSONValue] = ["type": .string("text"), "text": .string("[Attachment: artifacts/\(file.fileName)]"),
+                                                      "oxAttachment": .string(file.fileName)]
                 if let profileID { reference["oxProfileID"] = .string(profileID.uuidString) }
                 return .object(reference)
             }
@@ -82,30 +82,30 @@ nonisolated enum DurableMessageCodec {
         ])
     }
 
-    static func decodeModel(_ value: JSONValue, scope: ProfileScope, artifactScope: ProfileScope? = nil, runtime: DurableRuntime,
+    static func decodeModel(_ value: JSONValue, scope: ProfileScope, fileScope: ProfileScope? = nil, runtime: DurableRuntime,
                             runtimeProfileID: String? = nil, inputs: ProviderFileInputs) async throws -> Message {
-        let message = try decode(value, scope: scope, artifactScope: artifactScope, includeTransientReferences: false)
+        let message = try decode(value, scope: scope, fileScope: fileScope, includeTransientReferences: false)
         let references = (value.objectValue?["content"]?.arrayValue ?? []).filter { $0.objectValue?["oxTransientAttachment"] != nil }
-        let ownerID = runtimeProfileID ?? (artifactScope ?? scope).profileID?.uuidString
+        let ownerID = runtimeProfileID ?? (fileScope ?? scope).profileID?.uuidString
         var result: ToolResultMessage
         switch message {
         case .user(var user):
             guard references.isEmpty else { throw RuntimeError.bridge("Transient media requires a tool result") }
-            user.content = try await modelContent(user.content, scope: scope, artifactScope: artifactScope, runtime: runtime, runtimeProfileID: ownerID, inputs: inputs)
+            user.content = try await modelContent(user.content, scope: scope, fileScope: fileScope, runtime: runtime, runtimeProfileID: ownerID, inputs: inputs)
             return .user(user)
         case .assistant(var assistant):
             guard references.isEmpty else { throw RuntimeError.bridge("Transient media requires a tool result") }
-            assistant.content = try await modelContent(assistant.content, scope: scope, artifactScope: artifactScope, runtime: runtime, runtimeProfileID: ownerID, inputs: inputs)
+            assistant.content = try await modelContent(assistant.content, scope: scope, fileScope: fileScope, runtime: runtime, runtimeProfileID: ownerID, inputs: inputs)
             return .assistant(assistant)
         case .toolResult(let tool):
             result = tool
-            result.content = try await modelContent(tool.content, scope: scope, artifactScope: artifactScope, runtime: runtime, runtimeProfileID: ownerID, inputs: inputs)
+            result.content = try await modelContent(tool.content, scope: scope, fileScope: fileScope, runtime: runtime, runtimeProfileID: ownerID, inputs: inputs)
         }
         for reference in references {
             guard let fields = reference.objectValue, let descriptor = fields["oxTransientAttachment"]?.objectValue,
                   let name = fields["oxAttachment"]?.stringValue,
                   let profileID = fields["oxProfileID"]?.stringValue,
-                  profileID == (artifactScope ?? scope).profileID?.uuidString,
+                  profileID == (fileScope ?? scope).profileID?.uuidString,
                   let size = descriptor["size"]?.intValue, (0...32 * 1024 * 1024).contains(size),
                   let digest = descriptor["sha256"]?.stringValue,
                   digest.count == 64, digest.allSatisfy({ "0123456789abcdef".contains($0) }),
@@ -123,26 +123,26 @@ nonisolated enum DurableMessageCodec {
                 continue
             }
             let data = try await runtime.readFile(descriptor: current)
-            let artifact = FileItem(fileName: name, directory: (artifactScope ?? scope).root,
+            let file = FileItem(fileName: name, directory: (fileScope ?? scope).root,
                 relativePath: current.objectValue?["path"]?.stringValue ?? "artifacts/\(name)", size: data.count)
-            _ = try inputs.snapshot(artifact, data: data)
-            let prepared = try WebAttachmentFactory.make(data: data, filename: artifact.displayName, mimeType: artifact.mimeType)
+            _ = try inputs.snapshot(file, data: data)
+            let prepared = try WebAttachmentFactory.make(data: data, filename: file.displayName, mimeType: file.mimeType)
             result.transientAttachments.append(TransientAttachment(kind: prepared.kind, mimeType: prepared.mimeType,
-                displayName: prepared.displayName, data: prepared.data, reference: artifact.fileName))
+                displayName: prepared.displayName, data: prepared.data, reference: file.fileName))
         }
         return .toolResult(result)
     }
 
-    private static func modelContent(_ content: [ContentBlock], scope: ProfileScope, artifactScope: ProfileScope?, runtime: DurableRuntime,
+    private static func modelContent(_ content: [ContentBlock], scope: ProfileScope, fileScope: ProfileScope?, runtime: DurableRuntime,
                                      runtimeProfileID: String?, inputs: ProviderFileInputs) async throws -> [ContentBlock] {
         var verified: [ContentBlock] = []
         for block in content {
-            guard case .attachment(let artifact) = block else { verified.append(block); continue }
-            if let cached = inputs.cached(artifact) { verified.append(.attachment(cached)); continue }
-            let directory = artifact.fileURL.deletingLastPathComponent().standardizedFileURL
+            guard case .attachment(let file) = block else { verified.append(block); continue }
+            if let cached = inputs.cached(file) { verified.append(.attachment(cached)); continue }
+            let directory = file.fileURL.deletingLastPathComponent().standardizedFileURL
             let owner: ProfileScope
-            if let artifactScope, directory.path == artifactScope.root.appendingPathComponent("artifacts", isDirectory: true).standardizedFileURL.path {
-                owner = artifactScope
+            if let fileScope, directory.path == fileScope.root.appendingPathComponent("artifacts", isDirectory: true).standardizedFileURL.path {
+                owner = fileScope
             } else if directory.path == scope.root.appendingPathComponent("artifacts", isDirectory: true).standardizedFileURL.path {
                 owner = scope
             } else {
@@ -155,22 +155,22 @@ nonisolated enum DurableMessageCodec {
                 let session = try await DurableProfileStore.shared.session(in: owner)
                 reader = session.runtime
             }
-            let path = artifact.fileName
+            let path = file.fileName
             let request = JSONValue.object(["action": .string("fileStat"), "path": .string(path)])
             let metadata = try JSONDecoder().decode(JSONValue.self, from: Data(try await reader.command(request.jsonString()).utf8))
             guard let descriptor = metadata.objectValue?["file"], descriptor != .null else {
-                verified.append(.text(TextContent("[File unavailable: \(artifact.displayName)]")))
+                verified.append(.text(TextContent("[File unavailable: \(file.displayName)]")))
                 continue
             }
             let data = try await reader.readFile(descriptor: descriptor)
-            let resolved = FileItem(fileName: artifact.fileName, directory: owner.root,
+            let resolved = FileItem(fileName: file.fileName, directory: owner.root,
                 relativePath: descriptor.objectValue?["path"]?.stringValue ?? path, size: data.count)
             verified.append(.attachment(try inputs.snapshot(resolved, data: data)))
         }
         return verified
     }
 
-    static func decode(_ value: JSONValue, scope: ProfileScope, artifactScope: ProfileScope? = nil, includeTransientReferences: Bool = true, files: FileDirectoryListing? = nil) throws -> Message {
+    static func decode(_ value: JSONValue, scope: ProfileScope, fileScope: ProfileScope? = nil, includeTransientReferences: Bool = true, files: FileDirectoryListing? = nil) throws -> Message {
         guard let fields = value.objectValue, let role = fields["role"]?.stringValue else { throw RuntimeError.bridge("Invalid Pi message") }
         let timestamp = Date(timeIntervalSince1970: (fields["timestamp"]?.doubleValue ?? 0) / 1000)
         let values = fields["content"]?.arrayValue ?? fields["content"]?.stringValue.map {
@@ -178,7 +178,7 @@ nonisolated enum DurableMessageCodec {
         } ?? []
         let content = try values.filter {
             $0.objectValue?["oxTransientContext"]?.boolValue != true && (includeTransientReferences || $0.objectValue?["oxTransientAttachment"] == nil)
-        }.map { try decodeBlock($0, scope: scope, artifactScope: artifactScope, files: files) }
+        }.map { try decodeBlock($0, scope: scope, fileScope: fileScope, files: files) }
         switch role {
         case "user":
             let context = values.filter { $0.objectValue?["oxTransientContext"]?.boolValue == true }
@@ -201,8 +201,8 @@ nonisolated enum DurableMessageCodec {
             return .assistant(message)
         case "toolResult":
             if let encoded = fields["details"]?.stringValue, let data = Data(base64Encoded: encoded) {
-                let decoder = JSONDecoder(); decoder.userInfo[.profileScope] = artifactScope ?? scope
-                decoder.userInfo[.artifactDirectoryListing] = files
+                let decoder = JSONDecoder(); decoder.userInfo[.profileScope] = fileScope ?? scope
+                decoder.userInfo[.fileDirectoryListing] = files
                 var result = try decoder.decode(ToolResultMessage.self, from: data)
                 // Historical native details retain ancillary fields, not a competing
                 // attachment authority. Use the already-validated qualified content.
@@ -216,21 +216,21 @@ nonisolated enum DurableMessageCodec {
         }
     }
 
-    static func decodeToolCall(_ value: JSONValue, scope: ProfileScope, artifactScope: ProfileScope? = nil) throws -> ToolCall {
-        guard case .toolCall(let call) = try decodeBlock(value, scope: scope, artifactScope: artifactScope) else {
+    static func decodeToolCall(_ value: JSONValue, scope: ProfileScope, fileScope: ProfileScope? = nil) throws -> ToolCall {
+        guard case .toolCall(let call) = try decodeBlock(value, scope: scope, fileScope: fileScope) else {
             throw RuntimeError.bridge("Expected an authoritative Pi tool call")
         }
         return call
     }
 
-    private static func decodeBlock(_ value: JSONValue, scope: ProfileScope, artifactScope: ProfileScope?, files: FileDirectoryListing? = nil) throws -> ContentBlock {
+    private static func decodeBlock(_ value: JSONValue, scope: ProfileScope, fileScope: ProfileScope?, files: FileDirectoryListing? = nil) throws -> ContentBlock {
         let fields = value.objectValue ?? [:]
         if let name = fields["oxAttachment"]?.stringValue {
             _ = try FileStore.validatedFilename(name)
             let owner: ProfileScope
             if let profileID = fields["oxProfileID"]?.stringValue {
                 guard let identity = UUID(uuidString: profileID) else { throw RuntimeError.bridge("Invalid attachment Profile identity") }
-                if let artifactScope, artifactScope.profileID == identity { owner = artifactScope }
+                if let fileScope, fileScope.profileID == identity { owner = fileScope }
                 else if scope.profileID == identity { owner = scope }
                 else { throw RuntimeError.bridge("Attachment reference belongs to another Profile") }
             } else { owner = scope } // Existing UUID-bound cache/legacy codec compatibility.

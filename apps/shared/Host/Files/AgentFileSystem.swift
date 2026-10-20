@@ -51,7 +51,7 @@ extension Conversation {
             if ["write", "edit", "rm", "mkdir", "move", "copy"].contains(name) {
                 for candidate in [path, args["to"]?.stringValue].compactMap({ $0 }) {
                     let root = candidate.split(separator: "/").first.map(String.init) ?? ""
-                    let temporaryFiles = isTemporary && route.artifactScope != nil && !["MEMORY.md", "SOUL.md", "skills", "history"].contains(root)
+                    let temporaryFiles = isTemporary && route.fileScope != nil && !["MEMORY.md", "SOUL.md", "skills", "history"].contains(root)
                     if !["files", "services"].contains(root), !temporaryFiles { try requireProfileMutation(action) }
                 }
             }

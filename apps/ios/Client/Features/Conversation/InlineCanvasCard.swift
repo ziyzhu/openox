@@ -41,10 +41,10 @@ private final class InlineCanvasSession {
         """
 
     init(source: FilePreviewSource, serviceManager: ServiceManager) {
-        let artifact = source.artifact
+        let file = source.file
         self.source = source
         let presentations = AppPresentationCoordinator()
-        let canvas = HTMLView(title: artifact.userFacingName, serviceManager: serviceManager, presentations: presentations, messages: AppPresentations.live.messages)
+        let canvas = HTMLView(title: file.userFacingName, serviceManager: serviceManager, presentations: presentations, messages: AppPresentations.live.messages)
         self.presentations = presentations
         self.canvas = canvas
         page = HTMLFilePage.make(scope: source.scope, canvas: canvas, documentURL: HTMLFilePage.documentURL(for: source))
@@ -56,22 +56,22 @@ private final class InlineCanvasSession {
     }
 
     func load() async {
-        let artifact = source.artifact
+        let file = source.file
         do {
             let document = try await HTMLFileDocument.read(source)
             try Task.checkCancellation()
-            Log.ui.info("InlineCanvas.loading filename=\(artifact.fileName) bytes=\(document.byteCount)")
+            Log.ui.info("InlineCanvas.loading filename=\(file.fileName) bytes=\(document.byteCount)")
             for try await event in page.load(html: document.html, baseURL: document.baseURL) {
                 guard event == .finished else { continue }
                 try Task.checkCancellation()
                 phase = .ready
-                Log.ui.info("InlineCanvas.ready filename=\(artifact.fileName)")
+                Log.ui.info("InlineCanvas.ready filename=\(file.fileName)")
             }
         } catch is CancellationError {
             page.stopLoading()
         } catch {
             phase = .failed(error.localizedDescription)
-            Log.ui.error("InlineCanvas.failed filename=\(artifact.fileName) error=\(error.localizedDescription)")
+            Log.ui.error("InlineCanvas.failed filename=\(file.fileName) error=\(error.localizedDescription)")
         }
     }
 
@@ -84,7 +84,7 @@ private final class InlineCanvasSession {
                 contentWorld: .defaultClient
             ) as? Double, !Task.isCancelled else { return }
             contentHeight = CGFloat(value)
-            Log.ui.debug("InlineCanvas.contentHeight filename=\(source.artifact.fileName) height=\(Int(value))")
+            Log.ui.debug("InlineCanvas.contentHeight filename=\(source.file.fileName) height=\(Int(value))")
         }
     }
 
@@ -95,14 +95,14 @@ private final class InlineCanvasSession {
 }
 
 struct InlineCanvasCard: View {
-    let artifact: FileItem
+    let file: FileItem
     let rowID: UUID
     private let source: FilePreviewSource
 
-    init(artifact: FileItem, rowID: UUID, scope: ProfileScope? = StorageRoot.currentScope) {
-        self.artifact = artifact
+    init(file: FileItem, rowID: UUID, scope: ProfileScope? = StorageRoot.currentScope) {
+        self.file = file
         self.rowID = rowID
-        source = FilePreviewSource(artifact: artifact, scope: scope)
+        source = FilePreviewSource(file: file, scope: scope)
     }
 
     @Environment(ServiceManager.self) private var serviceManager
@@ -115,7 +115,7 @@ struct InlineCanvasCard: View {
         Group {
             if let session, !isPresented {
                 InlineCanvasPageCard(
-                    artifact: artifact,
+                    file: file,
                     session: session,
                     rowID: rowID,
                     pageMount: pageMount,
@@ -125,22 +125,22 @@ struct InlineCanvasCard: View {
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     InlineCanvasPlaceholder(message: String(localized: "Loading HTML…"), isFailure: false)
-                        .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(artifact.id))
-                    InlineCanvasFileLink(artifact: artifact, open: nil)
+                        .accessibilityIdentifier(A11yID.ConversationControls.Message.file(file.id))
+                    InlineCanvasFileLink(file: file, open: nil)
                 }
             }
         }
         .fullScreenCover(isPresented: $isPresented, onDismiss: restore) {
             if let session {
-                InlineCanvasExpandedView(artifact: artifact, session: session) {
+                InlineCanvasExpandedView(file: file, session: session) {
                     isPresented = false
                 }
                 .appPresentations(session.presentations)
             }
         }
-        .task(id: artifact.modifiedAt) { await load() }
-        .onReceive(NotificationCenter.default.publisher(for: .artifactChanged)) { notification in
-            guard let fileURL = notification.object as? URL, fileURL == artifact.fileURL else { return }
+        .task(id: file.modifiedAt) { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: .fileChanged)) { notification in
+            guard let fileURL = notification.object as? URL, fileURL == file.fileURL else { return }
             Task { await load() }
         }
         .onDisappear {
@@ -155,7 +155,7 @@ struct InlineCanvasCard: View {
 
     private func load() async {
         guard !isPresented else { return }
-        let modifiedAt = artifact.modifiedAt
+        let modifiedAt = file.modifiedAt
         guard session == nil || loadedModifiedAt != modifiedAt else { return }
         session?.close()
         pageMount.clear()
@@ -171,29 +171,29 @@ struct InlineCanvasCard: View {
         guard session === loaded, loaded.isReady,
               await pageMount.detach(page: loaded.page, ownerID: rowID) else { return }
         isPresented = true
-        Log.ui.info("InlineCanvas.expand filename=\(artifact.fileName)")
+        Log.ui.info("InlineCanvas.expand filename=\(file.fileName)")
     }
 
     private func restore() {
         guard let session else { return }
         pageMount.restore(page: session.page, ownerID: rowID)
-        if loadedModifiedAt != artifact.modifiedAt {
+        if loadedModifiedAt != file.modifiedAt {
             Task { await load() }
         }
-        Log.ui.info("InlineCanvas.restore filename=\(artifact.fileName)")
+        Log.ui.info("InlineCanvas.restore filename=\(file.fileName)")
     }
 }
 
 private struct InlineCanvasPageCard: View {
-    let artifact: FileItem
+    let file: FileItem
     let session: InlineCanvasSession
     let rowID: UUID
     let pageMount: WebPageMountCoordinator
     let expand: () -> Void
     @Bindable private var canvas: HTMLView
 
-    init(artifact: FileItem, session: InlineCanvasSession, rowID: UUID, pageMount: WebPageMountCoordinator, expand: @escaping () -> Void) {
-        self.artifact = artifact
+    init(file: FileItem, session: InlineCanvasSession, rowID: UUID, pageMount: WebPageMountCoordinator, expand: @escaping () -> Void) {
+        self.file = file
         self.session = session
         self.rowID = rowID
         self.pageMount = pageMount
@@ -213,8 +213,8 @@ private struct InlineCanvasPageCard: View {
             content
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
                 .accessibilityElement(children: .contain)
-                .accessibilityIdentifier(A11yID.ConversationControls.Message.artifact(artifact.id))
-            InlineCanvasFileLink(artifact: artifact, open: session.isReady ? expand : nil)
+                .accessibilityIdentifier(A11yID.ConversationControls.Message.file(file.id))
+            InlineCanvasFileLink(file: file, open: session.isReady ? expand : nil)
             CanvasInteractionView(canvas: canvas)
         }
         .animation(.spring(duration: 0.3, bounce: 0), value: session.contentHeight)
@@ -244,14 +244,14 @@ private struct InlineCanvasPageCard: View {
 }
 
 private struct InlineCanvasFileLink: View {
-    let artifact: FileItem
+    let file: FileItem
     let open: (() -> Void)?
 
     var body: some View {
         Button {
             open?()
         } label: {
-            Text(artifact.userFacingName)
+            Text(file.userFacingName)
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
                 .underline(pattern: .dot)
@@ -263,7 +263,7 @@ private struct InlineCanvasFileLink: View {
         .buttonStyle(.plain)
         .disabled(open == nil)
         .accessibilityHint(String(localized: "Open HTML"))
-        .accessibilityIdentifier(A11yID.ConversationControls.canvasExpand(artifact.id))
+        .accessibilityIdentifier(A11yID.ConversationControls.canvasExpand(file.id))
     }
 }
 
@@ -293,13 +293,13 @@ private struct InlineCanvasPlaceholder: View {
 }
 
 private struct InlineCanvasExpandedView: View {
-    let artifact: FileItem
+    let file: FileItem
     let session: InlineCanvasSession
     let dismiss: () -> Void
     @Bindable private var canvas: HTMLView
 
-    init(artifact: FileItem, session: InlineCanvasSession, dismiss: @escaping () -> Void) {
-        self.artifact = artifact
+    init(file: FileItem, session: InlineCanvasSession, dismiss: @escaping () -> Void) {
+        self.file = file
         self.session = session
         self.dismiss = dismiss
         canvas = session.canvas
@@ -310,7 +310,7 @@ private struct InlineCanvasExpandedView: View {
             WebContentView(page: session.page, mode: .canvas)
                 .background(Theme.Colors.conversationSurface)
                 .safeAreaInset(edge: .bottom) { CanvasInteractionView(canvas: canvas) }
-                .navigationTitle(artifact.userFacingName)
+                .navigationTitle(file.userFacingName)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
@@ -318,11 +318,11 @@ private struct InlineCanvasExpandedView: View {
                             .accessibilityIdentifier(A11yID.ServiceInspector.close)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        FileShareButton(artifact: artifact, scope: session.source.scope) {
+                        FileShareButton(file: file, scope: session.source.scope) {
                             Image(systemName: "square.and.arrow.up")
                         }
                         .accessibilityLabel(A11yLabel.shareFile)
-                        .accessibilityIdentifier(A11yID.Files.share(artifact.id))
+                        .accessibilityIdentifier(A11yID.Files.share(file.id))
                     }
                 }
         }

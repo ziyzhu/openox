@@ -215,20 +215,20 @@ private extension UIColor {
 }
 
 private struct SharedImportPayload {
-    let artifacts: [SharedFilePayload]
+    let files: [SharedFilePayload]
 
     var preview: String {
-        if artifacts.count == 1 { return artifacts[0].preview }
-        return artifacts.prefix(4).map(\.fileName).joined(separator: "\n")
+        if files.count == 1 { return files[0].preview }
+        return files.prefix(4).map(\.fileName).joined(separator: "\n")
     }
 
     var status: String {
-        if artifacts.count == 1 {
+        if files.count == 1 {
             return String(localized: "It’ll appear in Files the next time you open Ox.")
         }
         return String.localizedStringWithFormat(
             String(localized: "%lld items will appear in Files the next time you open Ox."),
-            artifacts.count
+            files.count
         )
     }
 }
@@ -240,7 +240,7 @@ private struct SharedFilePayload {
 }
 
 private enum LoadedAttachment {
-    case artifact(SharedFilePayload)
+    case file(SharedFilePayload)
     case link(SharedFilePayload)
     case text(String)
 }
@@ -253,7 +253,7 @@ private enum SharedItemReader {
     static func read(_ inputItems: [Any]) async throws -> SharedImportPayload {
         var titles: [String] = []
         var textParts: [String] = []
-        var artifacts: [SharedFilePayload] = []
+        var files: [SharedFilePayload] = []
         let extensionItems = inputItems.compactMap { $0 as? NSExtensionItem }
         let providers = extensionItems.flatMap { $0.attachments ?? [] }
         ShareLog.logger.info("SharedItemReader.read items=\(extensionItems.count) providers=\(providers.count)")
@@ -266,9 +266,9 @@ private enum SharedItemReader {
             for provider in item.attachments ?? [] {
                 guard let attachment = try await attachment(from: provider, title: itemTitle) else { continue }
                 switch attachment {
-                case .artifact(let artifact): artifacts.append(artifact)
-                case .link(let artifact):
-                    artifacts.append(artifact)
+                case .file(let file): files.append(file)
+                case .link(let file):
+                    files.append(file)
                     containsLink = true
                 case .text(let text): append(text, to: &textParts)
                 }
@@ -282,7 +282,7 @@ private enum SharedItemReader {
             let data = Data(text.utf8)
             guard data.count <= maximumTextBytes else { throw SharedItemError.tooLarge }
             let title = titles.first ?? firstLineTitle(text) ?? String(localized: "Shared Note")
-            artifacts.insert(
+            files.insert(
                 SharedFilePayload(
                     fileName: fileName(sanitizedTitle(title), defaultExtension: "md"),
                     data: data,
@@ -292,19 +292,19 @@ private enum SharedItemReader {
             )
         }
 
-        guard !artifacts.isEmpty else {
+        guard !files.isEmpty else {
             let identifiers = providers.flatMap(\.registeredTypeIdentifiers).joined(separator: ",")
             ShareLog.logger.error("SharedItemReader.unsupported providerTypes=\(identifiers, privacy: .public)")
             throw SharedItemError.unsupported
         }
-        ShareLog.logger.info("SharedItemReader.ready artifacts=\(artifacts.count) textParts=\(textParts.count)")
-        return SharedImportPayload(artifacts: artifacts)
+        ShareLog.logger.info("SharedItemReader.ready artifacts=\(files.count) textParts=\(textParts.count)")
+        return SharedImportPayload(files: files)
     }
 
     private static func attachment(from provider: NSItemProvider, title: String?) async throws -> LoadedAttachment? {
         if provider.hasItemConformingToTypeIdentifier(UTType.pdf.identifier),
            let data = await data(from: provider, identifier: UTType.pdf.identifier) {
-            return .artifact(try artifact(
+            return .file(try payload(
                 data: data,
                 suggestedName: provider.suggestedName,
                 fallbackName: String(localized: "Shared PDF"),
@@ -317,7 +317,7 @@ private enum SharedItemReader {
             return [UTType.jpeg, .png, .gif, .webP, .heic, .heif].contains { type.conforms(to: $0) }
         }), let data = await data(from: provider, identifier: identifier) {
             let fileExtension = UTType(identifier)?.preferredFilenameExtension ?? "jpg"
-            return .artifact(try artifact(
+            return .file(try payload(
                 data: data,
                 suggestedName: provider.suggestedName,
                 fallbackName: String(localized: "Shared Image"),
@@ -328,8 +328,8 @@ private enum SharedItemReader {
         if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier),
            let url = await sharedURL(from: provider) {
             if url.isFileURL {
-                if let artifact = try fileFile(at: url, from: provider) {
-                    return .artifact(artifact)
+                if let file = try localFile(at: url, from: provider) {
+                    return .file(file)
                 }
             } else {
                 let urlString = url.absoluteString
@@ -362,7 +362,7 @@ private enum SharedItemReader {
                 }
                 if let suggestedName = provider.suggestedName,
                    !URL(fileURLWithPath: suggestedName).pathExtension.isEmpty {
-                    return .artifact(try artifact(
+                    return .file(try payload(
                         data: data,
                         suggestedName: suggestedName,
                         fallbackName: String(localized: "Shared Text"),
@@ -383,7 +383,7 @@ private enum SharedItemReader {
         return nil
     }
 
-    private static func fileFile(at url: URL, from provider: NSItemProvider) throws -> SharedFilePayload? {
+    private static func localFile(at url: URL, from provider: NSItemProvider) throws -> SharedFilePayload? {
         let type = UTType(filenameExtension: url.pathExtension)
             ?? provider.registeredTypeIdentifiers.compactMap(UTType.init).first(where: supportedFileType)
         guard let type, supportedFileType(type) else { return nil }
@@ -399,7 +399,7 @@ private enum SharedItemReader {
         if isText {
             guard data.count <= maximumTextBytes else { throw SharedItemError.tooLarge }
             guard let text = decodedText(data, type: type) else { return nil }
-            return try artifact(
+            return try payload(
                 data: data,
                 suggestedName: provider.suggestedName ?? url.lastPathComponent,
                 fallbackName: String(localized: "Shared Text"),
@@ -408,7 +408,7 @@ private enum SharedItemReader {
             )
         }
 
-        return try artifact(
+        return try payload(
             data: data,
             suggestedName: provider.suggestedName ?? url.lastPathComponent,
             fallbackName: String(localized: type.conforms(to: .pdf) ? "Shared PDF" : "Shared Image"),
@@ -497,7 +497,7 @@ private enum SharedItemReader {
         }
     }
 
-    private static func artifact(
+    private static func payload(
         data: Data,
         suggestedName: String?,
         fallbackName: String,
@@ -595,14 +595,14 @@ private enum SharedItemWriter {
         try FileManager.default.createDirectory(at: stagingRoot, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: pendingRoot, withIntermediateDirectories: true)
 
-        for artifact in payload.artifacts {
+        for file in payload.files {
             let identifier = UUID().uuidString
             let staging = stagingRoot.appendingPathComponent(identifier, isDirectory: true)
             let pending = pendingRoot.appendingPathComponent(identifier, isDirectory: true)
             try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
             do {
-                let file = staging.appendingPathComponent(artifact.fileName, isDirectory: false)
-                try artifact.data.write(to: file, options: [.atomic, .completeFileProtectionUnlessOpen])
+                let destination = staging.appendingPathComponent(file.fileName, isDirectory: false)
+                try file.data.write(to: destination, options: [.atomic, .completeFileProtectionUnlessOpen])
                 try FileManager.default.moveItem(at: staging, to: pending)
             } catch {
                 try? FileManager.default.removeItem(at: staging)
