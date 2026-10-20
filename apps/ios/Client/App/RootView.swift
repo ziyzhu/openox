@@ -866,7 +866,7 @@ struct RootView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Theme.Colors.surface)
+                .background(Theme.Colors.conversationSurface)
                 .transition(.opacity)
                 .zIndex(1)
             }
