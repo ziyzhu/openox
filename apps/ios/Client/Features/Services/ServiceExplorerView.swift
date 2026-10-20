@@ -455,6 +455,9 @@ private struct RemoteMCPDetailView: View {
             )
             guard !Task.isCancelled else { return }
             phase = .connected(service)
+            if case .attach = primaryAction, !isAttached(service) {
+                onPrimaryAction(service)
+            }
         } catch is CancellationError {
         } catch {
             guard !Task.isCancelled else { return }

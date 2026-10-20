@@ -182,7 +182,11 @@ enum RemoteMCPOAuth {
         let state = UUID().uuidString
         let authorizeURL = try authorizationURL(server: server, registration: credential.registration, pkce: pkce, state: state)
         Log.service.info("RemoteMCPOAuth.authorize presenting issuer=\(LogPrivacy.url(server.issuer.absoluteString))")
-        guard let callback = await OAuthWebLogin.present(authorizeURL: authorizeURL, redirectPrefix: redirectURI) else {
+        guard let callback = await OAuthWebLogin.present(
+            authorizeURL: authorizeURL,
+            redirectPrefix: redirectURI,
+            prefersEphemeralSession: true
+        ) else {
             throw RemoteMCPError.oauth("Sign-in was cancelled.")
         }
         if let message = OAuthSupport.queryValue("error_description", in: callback)

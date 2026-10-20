@@ -1,19 +1,18 @@
 import UIKit
 import SafariServices
 import Network
+import AuthenticationServices
 
-// Drives an OAuth authorize flow whose client registers an http://localhost
-// loopback redirect (the Codex CLI contract). Google blocks OAuth inside
-// embedded WKWebViews ("disallowed_useragent"), so we render the authorize page
-// in the system browser (SFSafariViewController, real Safari engine + shared
-// session) and catch the loopback redirect with a tiny on-device HTTP listener
-// bound to 127.0.0.1 — the same shape RFC 8252 native apps use.
 @MainActor
 enum OAuthWebLogin {
-    static func present(authorizeURL: URL, redirectPrefix: String) async -> URL? {
-        await withCheckedContinuation { (cont: CheckedContinuation<URL?, Never>) in
-            let session = LoopbackOAuthSession(redirectPrefix: redirectPrefix)
-            session.start(authorizeURL: authorizeURL) { cont.resume(returning: $0) }
+    static func present(authorizeURL: URL, redirectPrefix: String, prefersEphemeralSession: Bool = false) async -> URL? {
+        let session = LoopbackOAuthSession(redirectPrefix: redirectPrefix, prefersEphemeralSession: prefersEphemeralSession)
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                session.start(authorizeURL: authorizeURL) { continuation.resume(returning: $0) }
+            }
+        } onCancel: {
+            Task { @MainActor in session.finish(nil) }
         }
     }
 
@@ -122,18 +121,23 @@ private final class DeviceAuthorizationSession: NSObject, SFSafariViewController
 }
 
 @MainActor
-private final class LoopbackOAuthSession: NSObject, SFSafariViewControllerDelegate {
+private final class LoopbackOAuthSession: NSObject, SFSafariViewControllerDelegate, ASWebAuthenticationPresentationContextProviding {
     private let listener: LoopbackRedirectListener?
+    private let prefersEphemeralSession: Bool
     private var safari: SFSafariViewController?
+    private var authenticationSession: ASWebAuthenticationSession?
+    private var anchor: UIWindow?
     private var onResult: ((URL?) -> Void)?
     private var retain: LoopbackOAuthSession?
 
-    init(redirectPrefix: String) {
+    init(redirectPrefix: String, prefersEphemeralSession: Bool) {
         listener = LoopbackRedirectListener(redirectURI: redirectPrefix)
+        self.prefersEphemeralSession = prefersEphemeralSession
         super.init()
     }
 
     func start(authorizeURL: URL, onResult: @escaping (URL?) -> Void) {
+        guard !Task.isCancelled else { onResult(nil); return }
         self.onResult = onResult
         retain = self
 
@@ -145,7 +149,7 @@ private final class LoopbackOAuthSession: NSObject, SFSafariViewControllerDelega
         do {
             try listener.start(
                 onReady: { [weak self] in
-                    Task { @MainActor in self?.openSafari(authorizeURL) }
+                    Task { @MainActor in self?.openBrowser(authorizeURL) }
                 },
                 onFailure: { [weak self] error in
                     Task { @MainActor in
@@ -164,9 +168,28 @@ private final class LoopbackOAuthSession: NSObject, SFSafariViewControllerDelega
         }
     }
 
-    private func openSafari(_ authorizeURL: URL) {
+    private func openBrowser(_ authorizeURL: URL) {
         guard onResult != nil, let presenter = Self.topViewController() else {
             finish(nil)
+            return
+        }
+        if prefersEphemeralSession {
+            guard let window = presenter.view.window else { finish(nil); return }
+            anchor = window
+            let session = ASWebAuthenticationSession(url: authorizeURL, callbackURLScheme: nil) { [weak self] url, error in
+                Task { @MainActor in
+                    guard let self, self.onResult != nil else { return }
+                    if let error {
+                        Log.ui.info("OAuthWebLogin.authentication ended code=\((error as NSError).code)")
+                    }
+                    self.finish(url)
+                }
+            }
+            session.presentationContextProvider = self
+            session.prefersEphemeralWebBrowserSession = true
+            authenticationSession = session
+            Log.ui.info("OAuthWebLogin.authentication starting ephemeral=true")
+            if !session.start() { finish(nil) }
             return
         }
         let safari = SFSafariViewController(url: authorizeURL)
@@ -181,10 +204,17 @@ private final class LoopbackOAuthSession: NSObject, SFSafariViewControllerDelega
         finish(nil)
     }
 
-    private func finish(_ url: URL?) {
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        anchor!
+    }
+
+    func finish(_ url: URL?) {
         guard let onResult else { return }
         self.onResult = nil
         listener?.stop()
+        authenticationSession?.cancel()
+        authenticationSession = nil
+        anchor = nil
         if let safari, safari.presentingViewController != nil {
             safari.dismiss(animated: true)
         }
