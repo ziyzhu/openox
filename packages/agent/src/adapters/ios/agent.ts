@@ -23,6 +23,11 @@ import { composeTurnContext, type SystemPromptInput, type TurnState } from "../.
 import { activeHost, sameScope, type HostScope } from "../../core/host-context";
 import { decodeBase64, encodeBase64 } from "../../core/base64";
 
+import { readSchedules, replaceSchedules, importSchedules, recoverScheduledRuns } from "../../profile/schedules";
+import type { JsonObject } from "@earendil-works/pi-durable";
+
+import { prepareProfileExport, importProfileIdentity } from "../../profile/portability";
+
 const context = BACKGROUND_CONTEXT;
 interface Config { title?: string; promptState: SystemPromptInput; isolatedFiles?: boolean; model: string; contextWindow: number; maxTokens: number;
   reasoning: boolean; tools: (Tool & { executionMode?: ToolExecutionMode })[]; toolExecutionMode?: ToolExecutionMode;
@@ -38,6 +43,9 @@ type Command = CommandScope & (
   | { action: "filesystem"; capability: string; fileMounts: NativeFileMount[]; operation: FileOperation; arguments: FileRequest }
   | { action: "publicFilesPrepare"; splitStorage?: boolean }
   | { action: "profileImportIdentity"; identity: string }
+  | { action: "schedulesRead" | "schedulesRecover" }
+  | { action: "schedulesReplace"; revision: number; records: Record<string, JsonObject>; host: string }
+  | { action: "schedulesImport"; records: Record<string, JsonObject>; host: string }
   | ({ action: "conversationCreate"; entries?: EntryDraft[] } & ApplicationPresentationChange)
   | ({ action: "applicationSave" } & ApplicationPresentationChange)
   | { action: "conversationPopulate"; entries: EntryDraft[] }
@@ -176,21 +184,12 @@ export class IOSAgentAdapter {
     };
     const attached = () => { const ref = required(); this.route(ref.conversationID); return ref; };
     switch (args.action) {
-      case "profileExportCheck": {
-        const inspection = await session.harness.inspect(context);
-        if (inspection.tasks.length || inspection.submissions.length) throw new Error("Stop running conversations and finish queued messages before exporting this Profile");
-        if (session.files.physical && (await session.files.state()).pending.length) throw new Error("Finish pending file changes before exporting this Profile");
-        await session.files.flush();
-        return {};
-      }
-      case "profileImportIdentity": {
-        if (!this.current.preparingFiles || !/^[0-9a-f-]{36}$/i.test(args.identity)) throw new Error("Profile import requires isolated storage preparation");
-        const inspection = await session.harness.inspect(context);
-        if (inspection.tasks.length || inspection.submissions.length) throw new Error("Backups containing pending actions cannot be imported");
-        if ((await session.files.state()).pending.length) throw new Error("Backups containing pending file changes cannot be imported");
-        await session.harness.commit(async tx => { (await tx.doc(ProfileIndex)).identity = args.identity; }, context);
-        return {};
-      }
+      case "schedulesRead": return readSchedules(session.harness);
+      case "schedulesRecover": return recoverScheduledRuns(session.harness, session.conversations.profileID);
+      case "schedulesReplace": return replaceSchedules(session.harness, args.revision, args.records, args.host);
+      case "schedulesImport": return importSchedules(session.harness, args.records, args.host);
+      case "profileExportCheck": return prepareProfileExport(session);
+      case "profileImportIdentity": return importProfileIdentity(session, args.identity, this.current.preparingFiles);
       case "filesPrepare": return this.prepareFiles();
       case "publicFilesPrepare": return this.preparePublicFiles(args.splitStorage === true);
       case "publicFilesInventory":

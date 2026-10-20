@@ -292,7 +292,7 @@ private struct SidebarRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: Theme.Spacing.sm) {
                     activityIndicator
-                    if meta.scheduledSkillID != nil {
+                    if meta.scheduleID != nil {
                         Image(systemName: "clock")
                             .font(.system(.body, weight: .medium))
                             .foregroundStyle(Theme.Colors.conversationSecondary)
@@ -355,7 +355,7 @@ private struct SidebarRow: View {
     }
 
     private var scheduledAccessibilityValue: String {
-        meta.scheduledSkillID == nil ? "" : L10n.string("Scheduled")
+        meta.scheduleID == nil ? "" : L10n.string("Scheduled")
     }
 
     @ViewBuilder

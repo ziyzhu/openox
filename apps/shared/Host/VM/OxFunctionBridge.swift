@@ -50,11 +50,12 @@ public protocol OxFunctionBridge: AnyObject {
     func copySkill(source: String, name: String, purpose: String) async throws -> JSONValue?
     func shareSkill(name: String, purpose: String) async throws -> JSONValue?
     func deleteSkill(name: String, purpose: String) async throws -> JSONValue?
-    func createScheduledSkill(skillName: String, argument: String?, frequency: String, fireAt: String?, hour: Int?, minute: Int?, weekday: String?, timeZone: String?, purpose: String) async throws -> JSONValue?
-    func listScheduledSkills(purpose: String) async throws -> JSONValue?
-    func deleteScheduledSkill(id: String, purpose: String) async throws -> JSONValue?
-    func enableScheduledSkill(id: String, enabled: Bool, purpose: String) async throws -> JSONValue?
-    func runScheduledSkill(id: String, purpose: String) async throws -> JSONValue?
+    func createSchedule(options: JSONValue, purpose: String) async throws -> JSONValue?
+    func completeSchedule(purpose: String) async throws -> JSONValue?
+    func listSchedules(purpose: String) async throws -> JSONValue?
+    func deleteSchedule(id: String, purpose: String) async throws -> JSONValue?
+    func enableSchedule(id: String, enabled: Bool, purpose: String) async throws -> JSONValue?
+    func runSchedule(id: String, purpose: String) async throws -> JSONValue?
     func reportProgress(message: String, purpose: String) async throws -> JSONValue?
     func followUser(intents: JSONValue, purpose: String) async throws -> JSONValue?
     func chooseUser(body: String, options: [String], purpose: String) async throws -> JSONValue?

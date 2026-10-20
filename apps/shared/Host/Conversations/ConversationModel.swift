@@ -212,7 +212,7 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
     var attachedServiceDomains: [String]
     var preview: String?
     var hasUnreadResponse: Bool
-    var scheduledSkillID: UUID?
+    var scheduleID: UUID?
     var lastMessageAt: Date?
 
     init(
@@ -227,7 +227,7 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         attachedServiceDomains: [String],
         preview: String?,
         hasUnreadResponse: Bool = false,
-        scheduledSkillID: UUID? = nil,
+        scheduleID: UUID? = nil,
         lastMessageAt: Date? = nil
     ) {
         self.schemaVersion = schemaVersion
@@ -241,7 +241,7 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         self.attachedServiceDomains = attachedServiceDomains
         self.preview = preview
         self.hasUnreadResponse = hasUnreadResponse
-        self.scheduledSkillID = scheduledSkillID
+        self.scheduleID = scheduleID
         self.lastMessageAt = lastMessageAt
     }
 
@@ -266,7 +266,7 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         case attachedServiceDomains
         case preview
         case hasUnreadResponse
-        case scheduledSkillID
+        case scheduleID = "scheduledSkillID"
     }
 
     init(from decoder: Decoder) throws {
@@ -282,7 +282,7 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         attachedServiceDomains = try values.decode([String].self, forKey: .attachedServiceDomains)
         preview = try values.decodeIfPresent(String.self, forKey: .preview)
         hasUnreadResponse = try values.decodeIfPresent(Bool.self, forKey: .hasUnreadResponse) ?? false
-        scheduledSkillID = try values.decodeIfPresent(UUID.self, forKey: .scheduledSkillID)
+        scheduleID = try values.decodeIfPresent(UUID.self, forKey: .scheduleID)
         lastMessageAt = nil
     }
 }

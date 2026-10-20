@@ -7,7 +7,7 @@ import Observation
 final class Conversation: Identifiable {
     private(set) var id: UUID
     let createdAt: Date
-    let scheduledSkillID: UUID?
+    let scheduleID: UUID?
     let javaScriptOutputs = JavaScriptOutputStore()
     @ObservationIgnored private(set) var durableRoute: DurableConversationRoute?
     @ObservationIgnored var preparedConfiguration: AgentConfiguration?
@@ -703,10 +703,10 @@ final class Conversation: Identifiable {
          serviceManager: ServiceManager,
          retention: ConversationRetention = .persisted,
          executionLease: ExecutionLease = .userInitiated,
-         scheduledSkillID: UUID? = nil) {
+         scheduleID: UUID? = nil) {
         self.id = id
         self.createdAt = createdAt
-        self.scheduledSkillID = scheduledSkillID
+        self.scheduleID = scheduleID
         self.client = client
         self.modelSelection = ModelSelection(
             region: selection.region,
@@ -814,7 +814,7 @@ final class Conversation: Identifiable {
             serviceManager: serviceManager,
             retention: retention,
             executionLease: executionLease,
-            scheduledSkillID: meta.scheduledSkillID
+            scheduleID: meta.scheduleID
         )
         monoRepositoryHash = meta.monoRepositoryHash
         customTitle = meta.title
@@ -839,7 +839,7 @@ final class Conversation: Identifiable {
             attachedServiceDomains: serviceAttachments.domains,
             preview: transcriptPreview,
             hasUnreadResponse: hasUnreadResponse,
-            scheduledSkillID: scheduledSkillID,
+            scheduleID: scheduleID,
             lastMessageAt: document.lastMessageAt
         )
     }
@@ -1203,10 +1203,6 @@ final class Conversation: Identifiable {
             Log.session.info("Conversation.temporary blocked action=\(action)")
             throw OxFunctionError(code: "profile_required", message: "\(action): Temporary conversations can't save changes.", recovery: "Ask the user to continue in a Profile stored on this device to keep this result.")
         }
-    }
-
-    func confirmScheduledSkillChange(action: String, prompt: String) async throws {
-        try await interactions.confirmScheduledSkillChange(action: action, prompt: prompt)
     }
 
     @discardableResult

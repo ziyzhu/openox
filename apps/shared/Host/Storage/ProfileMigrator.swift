@@ -35,6 +35,7 @@ nonisolated enum ProfileSchema {
         "2026-10-14-visible-profile",
         "2026-10-14-internal-profile-state",
         "2026-10-15-lazy-conversations",
+        "2026-10-20-schedules",
     ]
     static var current: String { versions.last! }
 
@@ -77,6 +78,8 @@ nonisolated enum ProfileMigrator {
     static let filesystemProfileVersion = "2026-10-10-profile-files"
 
     static let internalStateVersion = "2026-10-14-internal-profile-state"
+
+    static let schedulesVersion = "2026-10-20-schedules"
 
     static let lazyConversationVersion = "2026-10-15-lazy-conversations"
 
@@ -266,13 +269,13 @@ extension ProfileMigrator {
             Log.app.info("StorageMigrator.internalState published id=\(profile.id)")
         }
         var manifest = config
-        manifest.version = lazyConversationVersion
-        if config.version != lazyConversationVersion {
+        manifest.version = schedulesVersion
+        if config.version != schedulesVersion {
             try ProfileIO.writeConfig(manifest, to: profile.url)
             try syncDurableDirectory(profile.url)
         }
         var prepared = profile
-        prepared.version = lazyConversationVersion
+        prepared.version = schedulesVersion
         return prepared
     }
 
@@ -286,7 +289,7 @@ extension ProfileMigrator {
         }
         var migrated = profile
         migrated.version = config.version
-        if config.version == internalStateVersion || config.version == lazyConversationVersion {
+        if [internalStateVersion, lazyConversationVersion, schedulesVersion].contains(config.version) {
             await progress(String(localized: "Preparing Profile files…"))
             return try await prepareInternalState(migrated, config: config)
         }
@@ -372,7 +375,7 @@ extension ProfileMigrator {
         try publishDurableJournal(journal)
         do { try FileManager.default.removeItem(at: working) }
         catch { Log.app.warning("StorageMigrator.pi workingCopy cleanup deferred error=\(error.localizedDescription)") }
-        migrated.version = lazyConversationVersion
+        migrated.version = schedulesVersion
         Log.app.info("StorageMigrator.pi activated id=\(profile.id) sourcePreserved=true")
         return try await migrate(migrated, progress: progress)
     }

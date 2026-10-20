@@ -80,7 +80,7 @@ test("execute exposes namespace and function help without process, network, or d
   expect(result).toContain("inputSchema");
   expect(result).toContain("EvalError");
   expect(calls).toEqual([]);
-  expect(Object.keys(catalog)).toHaveLength(98);
+  expect(Object.keys(catalog)).toHaveLength(99);
 });
 
 test("cancellation terminates runaway execute code without a Host or simulator", async () => {

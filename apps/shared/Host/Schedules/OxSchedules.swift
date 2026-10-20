@@ -10,16 +10,27 @@ nonisolated enum OxSchedules {
                     "ox.schedule.create",
                     ModelGuidance.text("ox.schedule.create"),
                     input: object([
-                        "skill": text,
-                        "argument": longText,
-                        "frequency": enumeration(["once", "daily", "weekly"]),
+                        "name": text,
+                        "prompt": longText,
+                        "condition": longText,
+                        "deadline": text,
+                        "conversation": enumeration(["current", "new"]),
+                        "services": .object(["type": .string("array"), "items": text, "maxItems": .int(100)]),
+                        "intervalSeconds": integer(30, 31_536_000),
+                        "frequency": enumeration(["once", "interval", "daily", "weekly"]),
                         "fireAt": text,
                         "hour": integer(0, 23),
                         "minute": integer(0, 59),
                         "weekday": enumeration(["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]),
                         "timeZone": text,
-                    ], required: ["skill", "frequency"]),
+                    ], required: ["name", "prompt", "frequency"]),
                     output: schedule
+                ),
+                entry(
+                    "ox.schedule.complete",
+                    ModelGuidance.text("ox.schedule.complete"),
+                    input: object([:]),
+                    output: object(["id": id, "completed": boolean], required: ["id", "completed"])
                 ),
                 entry(
                     "ox.schedule.list",
@@ -48,46 +59,40 @@ nonisolated enum OxSchedules {
             ]
         },
         installNatives: { context, env in
-            let create: @convention(block) (String, JSValue, String, JSValue, JSValue, JSValue, JSValue, JSValue, JSValue) -> JSValue = {
-                skill, argument, frequency, fireAt, hour, minute, weekday, timeZone, purpose in
-                env.call {
-                    try await $0.createScheduledSkill(
-                        skillName: skill,
-                        argument: optionalString(argument),
-                        frequency: frequency,
-                        fireAt: optionalString(fireAt),
-                        hour: jsValueToJSON(hour)?.intValue,
-                        minute: jsValueToJSON(minute)?.intValue,
-                        weekday: optionalString(weekday),
-                        timeZone: optionalString(timeZone),
-                        purpose: purpose.toString()!
-                    )
-                }
+            let create: @convention(block) (JSValue, JSValue) -> JSValue = { options, purpose in
+                let value = jsValueToJSON(options) ?? .object([:])
+                return env.call { try await $0.createSchedule(options: value, purpose: purpose.toString()!) }
             }
             context.setObject(create as AnyObject, forKeyedSubscript: "__nativeScheduleCreate" as NSString)
 
+            let complete: @convention(block) (JSValue) -> JSValue = { purpose in
+                env.call { try await $0.completeSchedule(purpose: purpose.toString()!) }
+            }
+            context.setObject(complete as AnyObject, forKeyedSubscript: "__nativeScheduleComplete" as NSString)
+
             let list: @convention(block) (JSValue) -> JSValue = { purpose in
-                env.call { try await $0.listScheduledSkills(purpose: purpose.toString()!) }
+                env.call { try await $0.listSchedules(purpose: purpose.toString()!) }
             }
             context.setObject(list as AnyObject, forKeyedSubscript: "__nativeScheduleList" as NSString)
 
             let delete: @convention(block) (String, JSValue) -> JSValue = { id, purpose in
-                env.call { try await $0.deleteScheduledSkill(id: id, purpose: purpose.toString()!) }
+                env.call { try await $0.deleteSchedule(id: id, purpose: purpose.toString()!) }
             }
             context.setObject(delete as AnyObject, forKeyedSubscript: "__nativeScheduleDelete" as NSString)
 
             let enable: @convention(block) (String, Bool, JSValue) -> JSValue = { id, enabled, purpose in
-                env.call { try await $0.enableScheduledSkill(id: id, enabled: enabled, purpose: purpose.toString()!) }
+                env.call { try await $0.enableSchedule(id: id, enabled: enabled, purpose: purpose.toString()!) }
             }
             context.setObject(enable as AnyObject, forKeyedSubscript: "__nativeScheduleEnable" as NSString)
 
             let run: @convention(block) (String, JSValue) -> JSValue = { id, purpose in
-                env.call { try await $0.runScheduledSkill(id: id, purpose: purpose.toString()!) }
+                env.call { try await $0.runSchedule(id: id, purpose: purpose.toString()!) }
             }
             context.setObject(run as AnyObject, forKeyedSubscript: "__nativeScheduleRun" as NSString)
         },
         jsFragment: """
-          create: (value) => { const options = __oxOptions(value, 'ox.schedule.create'); return __nativeScheduleCreate(String(options.skill), options.argument ?? null, String(options.frequency), options.fireAt ?? null, options.hour ?? null, options.minute ?? null, options.weekday ?? null, options.timeZone ?? null, String(options.purpose)); },
+          create: (value) => { const options = __oxOptions(value, 'ox.schedule.create'); return __nativeScheduleCreate(options, String(options.purpose)); },
+          complete: (value) => { const options = __oxOptions(value, 'ox.schedule.complete'); return __nativeScheduleComplete(String(options.purpose)); },
           list: (value) => { const options = __oxOptions(value, 'ox.schedule.list'); return __nativeScheduleList(String(options.purpose)); },
           delete: (value) => { const options = __oxOptions(value, 'ox.schedule.delete'); return __nativeScheduleDelete(String(options.id), String(options.purpose)); },
           enable: (value) => { const options = __oxOptions(value, 'ox.schedule.enable'); return __nativeScheduleEnable(String(options.id), Boolean(options.enabled), String(options.purpose)); },
@@ -101,8 +106,12 @@ nonisolated enum OxSchedules {
     private static let boolean: JSONValue = .object(["type": .string("boolean")])
     private static let schedule = object([
         "id": id,
-        "skill": text,
-        "argument": longText,
+        "name": text,
+        "prompt": longText,
+        "condition": longText,
+        "deadline": text,
+        "conversationId": id,
+        "status": enumeration(["active", "running", "paused", "completed", "expired"]),
         "enabled": boolean,
         "recurrence": text,
         "nextFireAt": text,
@@ -110,11 +119,7 @@ nonisolated enum OxSchedules {
         "lastChatId": id,
         "lastOutcome": enumeration(["succeeded", "cancelled", "failed"]),
         "lastError": text,
-    ], required: ["id", "skill", "argument", "enabled", "recurrence"])
-
-    private static func optionalString(_ value: JSValue) -> String? {
-        jsValueToJSON(value)?.stringValue
-    }
+    ], required: ["id", "name", "prompt", "status", "enabled", "recurrence"])
 
     private static func string(min: Int = 1, max: Int) -> JSONValue {
         .object(["type": .string("string"), "minLength": .int(min), "maxLength": .int(max)])

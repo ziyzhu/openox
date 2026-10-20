@@ -31,7 +31,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── RepositoryMigrationBackups/     retained predecessor repository-skill migration sources
 │   │   ├── external-profiles.json           selected Profile folder bookmarks and optional display names
 │   │   ├── device-folder-grants.json         Profile-bound native folder bookmarks; nullable profileId means unassigned
-│   │   ├── scheduled-skills.json             device-owned scheduled skill snapshots
+│   │   ├── scheduled-skills.json             legacy schedule migration source
 │   │   ├── Profiles/<uuid>/profile.json    predecessor registration and downgrade guard
 │   │   ├── Profiles/<uuid>/state.sqlite    retained predecessor database; inactive after portable migration
 │   │   ├── Profiles/<uuid>/staging/        private owner lock and recoverable transfer staging
@@ -211,7 +211,7 @@ Physical image results use `oxAttachment`/`oxProfileID`, not image Base64 in his
 Temporary native routing still retains explicit `ox.chat` UUID compatibility.
 Portable Profiles activate Pi after the storage gate at their selected folder. No simultaneous cross-device editing or raw active-database export is supported. Native UI testing uses direct simulator interaction; Host RPC still requires authorized VPN ingress without loopback exceptions.
 
-Profile export captures a complete, closed snapshot, validates its SHA-256 inventory, and returns a directory containing visible files plus `profile.json`, `.ox/state.sqlite`, and `.ox/payloads`. The format-1 ZIP is an internal temporary encoding, not the exported document. Capture refuses pending tasks, submissions, and file changes, closes/checkpoints the runtime, and coordinates the folder read without a file ownership lock. Exports retain the Profile identity and are bounded to 128 MiB and 10,000 entries. Credentials, folder grants, schedules, app settings, staging, temporary conversations, and migration journals are excluded. Files chooses the destination; a completed save does not establish completed iCloud upload. Open Existing opens the exported directory in place; there is no separate Import action. Create accepts a Files-selected parent and publishes a verified fresh Profile there. Move first closes the source, verifies a complete copy including empty directories, switches its bookmark, and retains the original until explicit removal confirmation. Removal checks the original inventory again; changed originals remain untouched. Missing remembered folders stay unavailable and can be reconnected only to the same Profile identity; they do not silently select another copy or create an empty replacement. Optional bookmark display names are additive; older records remain readable.
+Profile export captures a complete, closed snapshot, validates its SHA-256 inventory, and returns a directory containing visible files plus `profile.json`, `.ox/state.sqlite`, and `.ox/payloads`. The format-1 ZIP is an internal temporary encoding, not the exported document. Capture refuses pending tasks, submissions, and file changes, closes/checkpoints the runtime, and coordinates the folder read without a file ownership lock. Exports retain the Profile identity and are bounded to 128 MiB and 10,000 entries. Credentials, folder grants, app settings, staging, temporary conversations, and migration journals are excluded; schedules are included in the Profile database. Files chooses the destination; a completed save does not establish completed iCloud upload. Open Existing opens the exported directory in place; there is no separate Import action. Create accepts a Files-selected parent and publishes a verified fresh Profile there. Move first closes the source, verifies a complete copy including empty directories, switches its bookmark, and retains the original until explicit removal confirmation. Removal checks the original inventory again; changed originals remain untouched. Missing remembered folders stay unavailable and can be reconnected only to the same Profile identity; they do not silently select another copy or create an empty replacement. Optional bookmark display names are additive; older records remain readable.
 
 `ProfileMigrator.stageDurableProfile` builds an unpublished portable Profile from the last native representation, preserving source fingerprints, link rejection, and Profile publication journals. Initial native-to-Pi publication still materializes and copies the complete legacy source; deferred decoding is not lazy first-upgrade iCloud downloading. Earlier native milestones still run on a verified working copy. Metadata, transcripts, and optional checkpoints are archived in streaming 128 KiB buffers and referenced by ordinary `ox.native.conversation`, `ox.native.transcript`, and `ox.native.context` entries. No per-conversation progress document, status, or journal is stored.
 
@@ -626,23 +626,38 @@ intact. Repository packages using the reserved name must be renamed by their
 author; frozen invocations, schedules, and transcripts remain unchanged. Provider
 catalog storage and credential ownership are unchanged.
 
-`Application Support/scheduled-skills.json` is a version 2 device-owned document
-containing at most 100 scheduled invocations. Each record binds to one Profile UUID
-and stores a frozen complete skill-package snapshot, optional argument, one-time/daily/weekly
-recurrence, time zone, next occurrence, enabled state, and bounded last-run outcome
-with its result conversation UUID. The file is prepared and validated by `StorageMigrator` when schedules load;
-unknown versions and malformed or duplicate records disable scheduling and edits,
-retain the file, and defer to automatic recovery without blocking ordinary conversations.
-It follows Application Support's normal device-backup policy and never syncs through
-the Profile, preventing one iCloud Profile from executing on several devices.
+Schedules are a version 1 Pi Durable session-scoped document, `ox.schedules`, in
+each Profile's `.ox/state.sqlite`. Its ID-keyed records hold prompt definitions,
+recurrence, optional condition/deadline and conversation references, execution
+state, and bounded run outcomes. A revision protects writes from stale snapshots;
+native mutation intent is serialized before committing. The Host owns execution
+and observes a cache scoped to the active Profile; switching Profiles unloads it.
 
-Only schedules bound to the active Profile execute. A due record for another
-Profile advances once as a failed occurrence and notifies when authorized. Each run
-uses the saved skill snapshot, creates an unselected persisted conversation in the bound
-Profile, and advances to the next future occurrence after completion, failure, or
-cancellation. Missed recurring occurrences coalesce into one run rather than being
-replayed. One-time schedules disable after their occurrence. iOS background
-processing is best-effort and may begin after the stored next-occurrence date.
+Profile milestone `2026-10-20-schedules` gates older readers before database access.
+ProfileMigrator lazily imports the owning Profile's records from the legacy
+`Application Support/scheduled-skills.json` (versions 1–3), preserving schedule IDs
+and frozen legacy invocations. The source stays intact for inactive Profiles.
+The document's `legacyImported` marker is committed with the records so deletion
+or interruption cannot resurrect a legacy schedule. Later writes use only Pi.
+Unknown/malformed legacy data isolates scheduling and retains the source for retry.
+
+Profile exports include schedules in the database. Import remaps Profile ownership,
+pauses active/running schedules, and clears old conversation links. Opening on a
+different Host also pauses active schedules; explicit resumption is required.
+Moving a Profile on the same Host retains its schedules. Conversation forks do not
+copy the session-scoped document. Profile removal removes its schedule ownership.
+
+Only schedules in the active Profile execute; inactive-Profile schedules stay due.
+A persisted running token claims each occurrence before execution. The run uses
+an existing idle conversation when explicitly selected, or creates an unselected
+persisted conversation. Its conversation UUID is saved before submission. The
+active run alone can mark its own condition complete. Pause, deletion, expiry, and
+Host shutdown cancel active checks. Failed or interrupted runs pause for review;
+restart never silently replays an uncertain effect. Missed intervals coalesce into
+one check; the next interval starts after completion. One-time schedules complete
+after success. Deadlines are enforced before claiming and during execution. iOS
+uses a foreground timer plus best-effort BGProcessing requests; suspended apps
+cannot guarantee exact polling intervals. macOS uses its own timer and wake hook.
 
 Opening a Profile uses the Files folder picker. Ox validates the selected
 directory's `profile.json`, saves a security-scoped bookmark, and activates the

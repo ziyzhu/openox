@@ -450,12 +450,12 @@ nonisolated enum ApplicationStorageMigrator {
         }
     }
 
-    static func prepareScheduledSkills(at file: URL) throws -> [ScheduledSkill] {
+    static func prepareLegacySchedules(at file: URL) throws -> [Schedule] {
         guard FileManager.default.fileExists(atPath: file.path) else { return [] }
         try migrateScheduledSkillPackages(at: file)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        let document = try decoder.decode(ScheduledSkillsDocument.self, from: Data(contentsOf: file))
+        let document = try decoder.decode(LegacySchedulesDocument.self, from: Data(contentsOf: file))
         let schedules = try document.validated().schedules
         Log.app.info("StorageMigrator.schedules prepared version=\(document.version) count=\(schedules.count)")
         return schedules
@@ -463,21 +463,44 @@ nonisolated enum ApplicationStorageMigrator {
 
     private static func migrateScheduledSkillPackages(at file: URL) throws {
         guard var document = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any],
-              document["version"] as? Int == 1, var schedules = document["schedules"] as? [[String: Any]] else { return }
-        for index in schedules.indices {
-            guard var skill = schedules[index]["skill"] as? [String: Any], let instructions = skill["instructions"] as? String else { throw SkillError.invalidPackage }
-            skill["instructions"] = StorageMigrationSupport.migratedSkillInstructions(instructions)
-            if let name = skill["name"] as? String, ["import-memory", "manage-artifacts", "manage-services", "manage-skills"].contains(name) { skill["name"] = "user-" + name }
-            schedules[index]["skill"] = skill
+              let version = document["version"] as? Int else { throw ScheduleError.invalidSchedule }
+        guard (1...LegacySchedulesDocument.currentVersion).contains(version) else {
+            throw ScheduleError.unsupportedVersion(version)
         }
-        document["version"] = 2
-        document["schedules"] = schedules
-        let data = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
+        guard version < LegacySchedulesDocument.currentVersion else { return }
+        guard var schedules = document["schedules"] as? [[String: Any]] else { throw ScheduleError.invalidSchedule }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        _ = try decoder.decode(ScheduledSkillsDocument.self, from: data).validated()
+        for index in schedules.indices {
+            guard var skill = schedules[index]["skill"] as? [String: Any],
+                  let instructions = skill["instructions"] as? String else { throw SkillError.invalidPackage }
+            if version == 1 {
+                skill["instructions"] = StorageMigrationSupport.migratedSkillInstructions(instructions)
+                if let name = skill["name"] as? String, ["import-memory", "manage-artifacts", "manage-services", "manage-skills"].contains(name) {
+                    skill["name"] = "user-" + name
+                }
+            }
+            let package = try decoder.decode(Skill.self, from: JSONSerialization.data(withJSONObject: skill))
+            let argument = schedules[index]["argument"] as? String ?? ""
+            guard argument.count <= Schedules.maximumArgumentCharacters else { throw ScheduleError.argumentTooLong }
+            let invocation = UserSkillInvocation(skill: package, argument: argument)
+            schedules[index]["name"] = package.displayName
+            schedules[index]["prompt"] = invocation.expandedIntent
+            schedules[index]["services"] = package.services
+            schedules[index]["legacyInvocation"] = ["skill": skill, "argument": argument]
+            let enabled = schedules[index]["isEnabled"] as? Bool == true
+            let finished = schedules[index]["nextFireAt"] == nil || schedules[index]["nextFireAt"] is NSNull
+            schedules[index]["state"] = [enabled ? "active" : finished ? "completed" : "paused": [:]]
+            schedules[index].removeValue(forKey: "skill")
+            schedules[index].removeValue(forKey: "argument")
+            schedules[index].removeValue(forKey: "isEnabled")
+        }
+        document["version"] = LegacySchedulesDocument.currentVersion
+        document["schedules"] = schedules
+        let data = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
+        _ = try decoder.decode(LegacySchedulesDocument.self, from: data).validated()
         try data.write(to: file, options: .atomic)
-        Log.app.info("StorageMigrator.scheduledSkills from=1 to=2 count=\(schedules.count)")
+        Log.app.info("StorageMigrator.scheduledSkills from=\(version) to=3 count=\(schedules.count)")
     }
 
     nonisolated private static func removeLegacyFile(_ url: URL, directory: URL) throws {
@@ -576,5 +599,17 @@ nonisolated enum ApplicationStorageMigrator {
             throw StorageMigrationError.invalidApplicationStorage("provider catalog")
         }
         Log.app.info("StorageMigrator.providerCatalog removedWebsiteOverrides=\(removed) providers=\(next.providers.count)")
+    }
+}
+
+nonisolated struct LegacySchedulesDocument: Codable {
+    static let currentVersion = 3
+    var version: Int
+    var schedules: [Schedule]
+
+    func validated() throws -> Self {
+        guard version == Self.currentVersion else { throw ScheduleError.unsupportedVersion(version) }
+        _ = try Schedule.validated(schedules)
+        return self
     }
 }

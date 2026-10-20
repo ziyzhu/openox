@@ -124,7 +124,7 @@ final class ConversationViewportController {
         case reading
     }
 
-    private static let jumpThreshold: CGFloat = 32
+    private static let jumpThreshold: CGFloat = 24
     private static let keyboardAnimation = Animation.spring(duration: 0.26, bounce: 0)
 
     private(set) var showsJumpButton = false

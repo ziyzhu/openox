@@ -2,8 +2,8 @@
 import Foundation
 
 @MainActor
-final class ScheduledSkillScheduler {
-    static let shared = ScheduledSkillScheduler()
+final class ScheduleScheduler {
+    static let shared = ScheduleScheduler()
 
     private var identifier: String {
         "\(Bundle.main.bundleIdentifier ?? "ai.openox").scheduled-skills"
@@ -12,6 +12,8 @@ final class ScheduledSkillScheduler {
     private var registered = false
     private var active = false
     private var work: Task<Void, Never>?
+    private var timer: Task<Void, Never>?
+    private var runningID: UUID?
 
     private init() {}
 
@@ -27,65 +29,81 @@ final class ScheduledSkillScheduler {
             }
         }
         if accepted {
-            Log.app.info("ScheduledSkillScheduler.register id=\(identifier)")
+            Log.app.info("ScheduleScheduler.register id=\(identifier)")
         } else {
-            Log.app.error("ScheduledSkillScheduler.register rejected id=\(identifier)")
+            Log.app.error("ScheduleScheduler.register rejected id=\(identifier)")
         }
     }
 
-    func activate() throws {
+    func activate() async throws {
         guard !active else {
             submitNext()
             return
         }
         register()
-        do { try ScheduledSkills.shared.load() }
+        do { try await Schedules.shared.load() }
         catch {
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
             throw error
         }
-        ScheduledSkills.shared.onChange = { [weak self] in
-            self?.submitNext()
+        Schedules.shared.onChange = { [weak self] in
+            Task { @MainActor in await self?.refresh() }
         }
         active = true
-        refresh()
+        await refresh()
     }
 
     func stop() async {
         active = false
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
+        timer?.cancel()
+        timer = nil
         work?.cancel()
         await work?.value
         work = nil
-        Log.app.info("ScheduledSkillScheduler.stop")
+        Schedules.shared.unload()
+        Log.app.info("ScheduleScheduler.stop")
     }
 
-    func refresh() {
+    func refresh() async {
         guard active else { return }
-        guard work == nil, !ScheduledSkills.shared.due(at: Date()).isEmpty else {
-            submitNext()
-            return
+        do { try await Schedules.shared.expire() }
+        catch { Log.app.error("Schedule.expire failed error=\(error.localizedDescription)") }
+        guard active else { return }
+        if let runningID {
+            let state = Schedules.shared.schedule(id: runningID)?.state
+            if state != .completed {
+                if case .running = state {} else { work?.cancel() }
+            }
         }
-        startProcessing(executionLease: .userInitiated)
+        timer?.cancel()
+        timer = nil
+        if work == nil, !Schedules.shared.due(at: Date()).isEmpty {
+            startProcessing(executionLease: .userInitiated)
+        } else {
+            armTimer()
+            submitNext()
+        }
     }
 
-    func runNow(id: UUID) {
-        guard active, ScheduledSkills.shared.isLoaded else {
-            Log.app.warning("ScheduledSkillScheduler.runNow blocked id=\(id) recoveryRequired=true")
-            return
+    private func armTimer() {
+        guard active else { return }
+        let candidate = work == nil ? Schedules.shared.nextEnabledDate() : runningID.flatMap { Schedules.shared.schedule(id: $0)?.deadline }
+        guard let next = candidate else { return }
+        let delay = max(1, next.timeIntervalSinceNow)
+        timer = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(delay))
+                try Task.checkCancellation()
+                await self?.refresh()
+            } catch {}
         }
-        guard work == nil else {
-            Log.app.info("ScheduledSkillScheduler.runNow queued id=\(id)")
-            try? ScheduledSkills.shared.fireNow(id: id)
-            return
-        }
-        do {
-            try ScheduledSkills.shared.fireNow(id: id)
-        } catch {
-            Log.app.error("ScheduledSkillScheduler.runNow failed id=\(id) error=\(error.localizedDescription)")
-            return
-        }
-        startProcessing(executionLease: .userInitiated)
+    }
+
+    func runNow(id: UUID) async throws {
+        guard active, Schedules.shared.isLoaded else { throw ScheduleError.invalidSchedule }
+        try await Schedules.shared.fireNow(id: id)
+        await refresh()
     }
 
     private func startProcessing(executionLease: Conversation.ExecutionLease) {
@@ -93,14 +111,14 @@ final class ScheduledSkillScheduler {
             guard let self else { return }
             await self.processDue(executionLease: executionLease)
             self.work = nil
-            self.submitNext()
+            await self.refresh()
         }
     }
 
     private func submitNext() {
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
-        guard active, let next = ScheduledSkills.shared.nextEnabledDate() else {
-            Log.app.info("ScheduledSkillScheduler.submit disposition=empty")
+        guard active, let next = Schedules.shared.nextEnabledDate() else {
+            Log.app.info("ScheduleScheduler.submit disposition=empty")
             return
         }
         let request = BGProcessingTaskRequest(identifier: identifier)
@@ -108,10 +126,10 @@ final class ScheduledSkillScheduler {
         request.requiresNetworkConnectivity = true
         do {
             try BGTaskScheduler.shared.submit(request)
-            Log.app.info("ScheduledSkillScheduler.submit next=\(ISODate.string(from: next))")
+            Log.app.info("ScheduleScheduler.submit next=\(ISODate.string(from: next))")
         } catch {
             let failure = error as NSError
-            Log.app.error("ScheduledSkillScheduler.submit failed domain=\(failure.domain) code=\(failure.code) error=\(failure.localizedDescription)")
+            Log.app.error("ScheduleScheduler.submit failed domain=\(failure.domain) code=\(failure.code) error=\(failure.localizedDescription)")
         }
     }
 
@@ -131,20 +149,20 @@ final class ScheduledSkillScheduler {
             }
             do {
                 try await IOSHost.shared.prepare()
-                guard self.active, ScheduledSkills.shared.isLoaded else {
+                guard self.active, Schedules.shared.isLoaded else {
                     task.setTaskCompleted(success: false)
                     self.work = nil
-                    self.submitNext()
+                    await self.refresh()
                     return
                 }
                 await self.processDue(executionLease: .externallyManaged)
                 task.setTaskCompleted(success: !Task.isCancelled)
             } catch {
-                Log.app.error("ScheduledSkillScheduler.run failed error=\(error.localizedDescription)")
+                Log.app.error("ScheduleScheduler.run failed error=\(error.localizedDescription)")
                 task.setTaskCompleted(success: false)
             }
             self.work = nil
-            self.submitNext()
+            await self.refresh()
         }
         work = worker
         task.expirationHandler = { [weak self] in
@@ -152,33 +170,44 @@ final class ScheduledSkillScheduler {
                 self?.work?.cancel()
             }
         }
-        Log.app.info("ScheduledSkillScheduler.start due=\(ScheduledSkills.shared.due(at: Date()).count)")
+        Log.app.info("ScheduleScheduler.start due=\(Schedules.shared.due(at: Date()).count)")
     }
 
     private func processDue(executionLease: Conversation.ExecutionLease) async {
-        for schedule in ScheduledSkills.shared.due(at: Date()) {
+        for schedule in Schedules.shared.due(at: Date()) {
             guard !Task.isCancelled else { return }
+            guard let current = Schedules.shared.schedule(id: schedule.id), current.state == .active else { continue }
+            runningID = schedule.id
+            let token: UUID
+            do { token = try await Schedules.shared.claim(id: schedule.id) }
+            catch {
+                runningID = nil
+                Log.app.error("Schedule.claim failed id=\(schedule.id) error=\(error.localizedDescription)")
+                continue
+            }
             let outcome: ConversationSubmissionOutcome
             let conversationID: UUID?
             if StorageRoot.shared.activeId == schedule.profileID {
-                (outcome, conversationID) = await IOSHost.shared.conversations.runScheduledSkill(
+                (outcome, conversationID) = await IOSHost.shared.conversations.runSchedule(
                     schedule,
+                    token: token,
                     executionLease: executionLease
                 )
             } else {
                 outcome = .failed("Open the schedule's Profile to run it.")
                 conversationID = nil
             }
-            let runOutcome: ScheduledSkillRunOutcome = switch outcome {
+            let runOutcome: ScheduleRunOutcome = switch outcome {
             case .completed: .succeeded
             case .failed(let message): .failed(message)
             case .cancelled: .cancelled
-            case .needsAttention: .failed("The scheduled skill needs attention in Ox.")
+            case .needsAttention: .failed("The schedule needs attention in Ox.")
             }
+            runningID = nil
             do {
-                try ScheduledSkills.shared.record(id: schedule.id, outcome: runOutcome, conversationID: conversationID)
+                try await Schedules.shared.record(id: schedule.id, token: token, outcome: runOutcome, conversationID: conversationID)
             } catch {
-                Log.app.error("ScheduledSkillScheduler.record failed id=\(schedule.id) error=\(error.localizedDescription)")
+                Log.app.error("ScheduleScheduler.record failed id=\(schedule.id) error=\(error.localizedDescription)")
             }
             if case .failed(let message) = runOutcome {
                 await notifyFailure(schedule: schedule, message: message)
@@ -186,15 +215,15 @@ final class ScheduledSkillScheduler {
         }
     }
 
-    private func notifyFailure(schedule: ScheduledSkill, message: String) async {
+    private func notifyFailure(schedule: Schedule, message: String) async {
         do {
             _ = try await NotificationProvider.shared.deliverIfAuthorized(
                 identifier: "scheduled-skill.\(schedule.id.uuidString)",
-                title: "Scheduled /\(schedule.skill.displayName) needs attention",
+                title: "\(schedule.name) needs attention",
                 body: message
             )
         } catch {
-            Log.app.error("ScheduledSkillScheduler.notify failed id=\(schedule.id) error=\(error.localizedDescription)")
+            Log.app.error("ScheduleScheduler.notify failed id=\(schedule.id) error=\(error.localizedDescription)")
         }
     }
 }

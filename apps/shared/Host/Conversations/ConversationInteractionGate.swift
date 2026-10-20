@@ -315,23 +315,6 @@ final class ConversationInteractionGate {
         }
     }
 
-    func confirmScheduledSkillChange(action: String, prompt: String) async throws {
-        permissionNeeded()
-        let cancel = L10n.string("Cancel")
-        let permission = PermissionPresentation(title: "Ox - \(action)", purpose: prompt)
-        let answer = await awaitPrompt(
-            prompt: permission.prompt,
-            options: [action, cancel],
-            kind: .permission,
-            presentation: .application,
-            autoApproval: nil,
-            permission: permission
-        )
-        guard answer == action else {
-            throw RuntimeError.bridge("The scheduled skill change was cancelled.")
-        }
-    }
-
     private func requestApproval(
         action: String,
         defaultPolicy: ActionPolicy,

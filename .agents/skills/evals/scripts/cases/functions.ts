@@ -80,7 +80,8 @@ const groups: Record<string, Record<string, string>> = {
     delete: "Delete only the QA skill preserving saved invocation and schedule snapshots",
   },
   schedule: {
-    create: "Schedule the skill with explicit recurrence, timezone, argument, and frozen package",
+    create: "Schedule a prompt with explicit recurrence, conversation destination, condition, and deadline",
+    complete: "Complete only the active scheduled check after its condition and final action succeed",
     list: "Inspect schedules distinguishing next fire time from last observed outcome",
     delete: "Delete only the requested QA schedule",
     enable: "Enable or disable only the requested QA schedule",
@@ -125,7 +126,7 @@ const groups: Record<string, Record<string, string>> = {
 };
 
 const installation = new Set(["app.setLanguage", "app.setDefaultModel", "provider.save", "provider.delete", "provider.authenticate", "provider.deauthenticate"]);
-const profile = new Set(["conversation.rename", "conversation.setModel", "conversation.start", "conversation.delete", "fs.write", "fs.edit", "fs.delete", "fs.mkdir", "fs.rmdir", "fs.move", "fs.copy", "repository.resolve", "repository.connect", "repository.sync", "repository.enable", "repository.disconnect", "service.create", "service.update", "service.copy", "service.delete", "service.attach", "service.detach", "skill.create", "skill.copy", "skill.share", "skill.delete", "schedule.create", "schedule.delete", "schedule.enable", "secret.add", "secret.delete"]);
+const profile = new Set(["conversation.rename", "conversation.setModel", "conversation.start", "conversation.delete", "fs.write", "fs.edit", "fs.delete", "fs.mkdir", "fs.rmdir", "fs.move", "fs.copy", "repository.resolve", "repository.connect", "repository.sync", "repository.enable", "repository.disconnect", "service.create", "service.update", "service.copy", "service.delete", "service.attach", "service.detach", "skill.create", "skill.copy", "skill.share", "skill.delete", "schedule.create", "schedule.complete", "schedule.delete", "schedule.enable", "secret.add", "secret.delete"]);
 const external = new Set(["provider.generate", "service.invoke", "service.signIn", "service.solve", "service.pay", "skill.run", "schedule.run", ...Object.keys(groups["web.browser"]!).map(name => `web.browser.${name}`)]);
 
 export function effectFor(name: string): Effect {
@@ -148,7 +149,7 @@ const journeys: Array<[string, string, string[]]> = [
   ["human-verification", "Complete the supplied QA operation that requires human verification and independently check its operation-specific outcome", ["service.solve"]],
   ["sandbox-checkout", "Complete the requested sandbox checkout and distinguish pending payment from independently verified purchase", ["service.pay"]],
   ["skill-package-lifecycle", "Create the approved reusable QA helper, execute it with variable inputs, make an independent copy, share the accepted package into Local and delete only the disposable copy", ["skill.create", "skill.run", "skill.copy", "skill.share", "skill.delete"]],
-  ["schedule-lifecycle", "Schedule the supplied QA skill, inspect its fire time, disable and re-enable it, run it once and inspect the child outcome, then delete the run-owned schedule", ["schedule.create", "schedule.enable", "schedule.run", "schedule.delete"]],
+  ["schedule-lifecycle", "Schedule the supplied QA prompt with a condition and deadline, pause and resume it, inspect a run, complete only its satisfied active condition, then delete the run-owned schedule", ["schedule.create", "schedule.enable", "schedule.run", "schedule.complete", "schedule.delete"]],
   ["secret-lifecycle", "Inspect credential metadata, connect the QA service through native secret entry and remove only the run-owned credential after verifying the task", ["secret.list", "secret.add", "secret.delete"]],
   ["clarify-and-complete", "Resolve the supplied ambiguous request with a decisive choice, report progress during actual work and offer useful follow-up intents after completion", ["user.choose", "user.progress", "user.follow"]],
   ["image-research", "Read the supplied QA image, research the identified subject and verify the relevant public source before answering with grounded links and one embedded public image whose direct image URL loads", ["vision.analyze", "web.search", "web.fetch"]],
