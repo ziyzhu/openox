@@ -19,6 +19,10 @@ Every newly authored customer-facing service, including API services, requires a
 
 For web-service authoring, read `references/helpers.js` only when a helper is needed. It is copyable source for `actions.js`, not an installed library, module, or runtime import.
 
+For MCP or API connection requests, `ox.service.find` searches existing services in enabled repositories, not the public internet. Use a supplied endpoint or official documentation directly. When no existing service fits and the endpoint is unknown, use `ox.web.search` and fetch official documentation to discover remote MCP endpoints or API access; an empty repository search does not establish that no integration exists. Verify endpoint URLs, transport, and authentication from official evidence rather than guessing.
+
+Connect a remote MCP server with `ox.service.create({ purpose, kind: "mcp", endpoint, transport? })`; omit domain and use the returned domain to inspect, attach, and verify its tools. MCP creation saves immediately and may request sign-in. Do not author API handlers for an MCP server or assume a local stdio server has a remote HTTPS endpoint. If only local installation is documented, report that limitation and investigate a documented API alternative within the request.
+
 Read `references/api-service.md` for direct HTTP API services with API-key, Basic, Bearer, or OAuth authentication.
 
 Read `references/model-service.md` when adding or editing website conversation Actions. Websites remain services, not Ox model providers; never build a browser bridge for the agent loop. API-backed providers are managed through `skills/manage-providers/SKILL.md`.
