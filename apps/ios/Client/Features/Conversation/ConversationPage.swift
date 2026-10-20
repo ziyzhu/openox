@@ -481,7 +481,6 @@ struct ConversationPage: View {
                     : "\(updated.count) services updated"
                 toast = Toast(message: msg)
             }
-            await refreshAttachedServiceAuth()
         }
         .task(id: authProbe?.id) {
             await resolveSignInControl(authProbe)
@@ -1582,16 +1581,6 @@ struct ConversationPage: View {
         conversation.attachedServices.contains { $0.domain == control.domain }
     }
 
-    private func refreshAttachedServiceAuth() async {
-        await withTaskGroup(of: Void.self) { group in
-            for service in conversation.attachedServices {
-                group.addTask { @MainActor in
-                    await service.checkAccess(reason: .conversationOpen)
-                }
-            }
-        }
-    }
-
     private func resolveSignInControl(_ item: Conversation.PendingServiceControl?) async {
         guard let item,
               case .signIn(let domain, _) = item.control,
@@ -1602,8 +1591,6 @@ struct ConversationPage: View {
             Log.ui.info("ConversationPage.authProbe canceled conversation=\(conversation.id) domain=\(domain)")
             return
         }
-        await service.attemptSilentSignIn(reason: .conversationOpen)
-        guard !Task.isCancelled else { return }
         Log.ui.info("ConversationPage.authProbe done conversation=\(conversation.id) domain=\(domain) state=\(service.signInState.rawValue)")
         if service.signInState.isAuthenticated {
             conversation.resolveServiceControl(id: item.id, result: service.accessResult())

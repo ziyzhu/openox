@@ -144,6 +144,10 @@ final class ServiceAuthSession {
             return .invalidated
         }
         guard outcome != .acknowledged else { return .acknowledged }
+        if outcome == .signedIn, probeObservation.result?.outcome == .signedIn {
+            Log.service.info("ServiceAuthSession verification domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) outcome=signedIn source=detector")
+            return .signedIn
+        }
         let result = await service.getSignInState(in: flowSession).outcome
         if result == .signedIn {
             Log.service.info("ServiceAuthSession verification domain=\(service.domain) attempt=\(id.uuidString.prefix(8)) outcome=signedIn")
