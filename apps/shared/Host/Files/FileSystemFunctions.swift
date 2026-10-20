@@ -56,8 +56,18 @@ extension Conversation {
         case "read":
             value = try await readFileBackend(path: path)
         case "write":
-            guard let content = arguments.objectValue?["content"]?.stringValue else { throw RuntimeError.bridge("Missing file content") }
-            value = try await writeFileBackend(path: path, content: content, expected: arguments.objectValue?["expected"]?.stringValue)
+            let fields = arguments.objectValue
+            if let base64 = fields?["base64"]?.stringValue {
+                value = try await writeFileBackend(path: path, base64: base64)
+            } else {
+                guard let content = fields?["content"]?.stringValue else { throw RuntimeError.bridge("Missing file content") }
+                value = try await writeFileBackend(path: path, content: content, expected: fields?["expected"]?.stringValue)
+            }
+        case "mkdir", "rmdir":
+            value = try await directoryFileBackend(path: path, remove: operation == "rmdir", recursive: arguments.objectValue?["recursive"]?.boolValue ?? false)
+        case "move", "copy":
+            guard let destination = arguments.objectValue?["to"]?.stringValue else { throw RuntimeError.bridge("Missing transfer destination") }
+            value = try await transferFileBackend(from: path, to: destination, copy: operation == "copy")
         case "delete":
             value = try await deleteFileBackend(path: path)
         case "activate":
@@ -361,6 +371,64 @@ extension Conversation {
         }
         Log.session.info("bridge.fs.write path=\(location.path) bytes=\(content.utf8.count)")
         return item
+    }
+
+    private func writeFileBackend(path: String, base64: String) async throws -> JSONValue {
+        let location = try await fileSystemLocation(path)
+        guard case .deviceItem = location else { throw VirtualFileSystem.Error.unsupportedMutation(location.path) }
+        guard base64.utf8.count <= (FileLimits.fileBytes + 2) / 3 * 4, let data = Data(base64Encoded: base64) else {
+            throw RuntimeError.bridge("Invalid or oversized file Base64")
+        }
+        try await requireWritableFileContext(location, action: Actions.fsWrite)
+        try await authorizeFileAccess(location, operation: .write)
+        try await fileMutationCoordinator.perform(key: fileMutationKey(location)) {
+            try await self.writeDeviceFile(location, data: data)
+        }
+        Log.session.info("bridge.fs.write path=\(location.path) bytes=\(data.count) binary=true")
+        return fileSystemItem(path: location.path, type: "file", size: data.count)
+    }
+
+    private func directoryFileBackend(path: String, remove: Bool, recursive: Bool) async throws -> JSONValue {
+        let location = try await fileSystemLocation(path)
+        guard case .deviceItem = location else {
+            guard !remove, try await fileSystemIsDirectory(location) else { throw VirtualFileSystem.Error.unsupportedMutation(location.path) }
+            _ = try await listFileBackend(path: path)
+            return .null
+        }
+        try await requireWritableFileContext(location, action: remove ? Actions.fsRmdir : Actions.fsMkdir)
+        try await authorizeFileAccess(location, operation: remove ? .delete : .write)
+        try await fileMutationCoordinator.perform(key: fileMutationKey(location)) {
+            try await self.withDeviceFile(location, mode: remove ? .delete : .write) { url in
+                guard remove else { return try FileManager.default.createDirectory(at: url, withIntermediateDirectories: recursive) }
+                guard try url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true else {
+                    throw VirtualFileSystem.Error.notDirectory(location.path)
+                }
+                guard try recursive || FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]).isEmpty else {
+                    throw VirtualFileSystem.Error.notEmpty(location.path)
+                }
+                try FileManager.default.removeItem(at: url)
+            }
+        }
+        Log.session.info("bridge.fs.directory path=\(location.path) remove=\(remove) recursive=\(recursive)")
+        return .null
+    }
+
+    private func transferFileBackend(from path: String, to destinationPath: String, copy: Bool) async throws -> JSONValue {
+        let source = try await fileSystemLocation(path)
+        let destination = try await fileSystemLocation(destinationPath)
+        guard case .deviceItem(let grantID, let from) = source, case .deviceItem(let destinationID, let to) = destination else {
+            throw VirtualFileSystem.Error.unsupportedMutation(source.path)
+        }
+        guard grantID == destinationID else { throw VirtualFileSystem.Error.crossFolderTransfer(source.path) }
+        guard !to.map({ $0.lowercased() }).starts(with: from.map { $0.lowercased() }) else { throw VirtualFileSystem.Error.intoSourceTree(destination.path) }
+        try await requireWritableFileContext(destination, action: copy ? Actions.fsCopy : Actions.fsMove)
+        try await authorizeFileAccess(source, operation: copy ? .read : .write)
+        try await authorizeFileAccess(destination, operation: .write)
+        try await fileMutationCoordinator.perform(key: fileMutationKey(source)) {
+            try await DeviceFolderStore.shared.transfer(grantID: grantID, from: from, to: to, profileId: self.scope.profileID, copy: copy)
+        }
+        Log.session.info("bridge.fs.transfer from=\(source.path) to=\(destination.path) copy=\(copy)")
+        return .null
     }
 
     private func deleteFileBackend(path: String) async throws -> JSONValue {
@@ -683,25 +751,26 @@ extension Conversation {
             try await servicesMount.writeSource(kind: kind, domain: domain, path: path, content: content)
             return fileSystemItem(path: location.path, type: "file", size: data.count)
         case .deviceItem:
-            try await withDeviceFile(location, mode: .write) { url in
-                let parent = url.deletingLastPathComponent()
-                guard (try parent.resourceValues(forKeys: [.isDirectoryKey])).isDirectory == true else {
-                    throw VirtualFileSystem.Error.notDirectory(parent.lastPathComponent)
-                }
-                if let expected {
-                    let file = try FileHandle(forReadingFrom: url)
-                    defer { try? file.close() }
-                    let current = try file.read(upToCount: FileLimits.textBytes + 1) ?? Data()
-                    guard String(data: current, encoding: .utf8) == expected else {
-                        throw OxFunctionError(code: "file_changed", message: "File changed after reading: \(location.path)", recovery: "Read the file again with ox.fs.read, then rebuild the edit from the current content.")
-                    }
-                }
-                try Task.checkCancellation()
-                try data.write(to: url, options: .atomic)
-            }
+            try await writeDeviceFile(location, data: data, expected: expected)
             return fileSystemItem(path: location.path, type: "file", size: data.count)
         case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .conversations, .conversation, .conversationMetadata, .conversationTurns, .files, .deviceFolder:
             throw VirtualFileSystem.Error.notFile(location.path)
+        }
+    }
+
+    private func writeDeviceFile(_ location: VirtualFileSystem.Location, data: Data, expected: String? = nil) async throws {
+        try await withDeviceFile(location, mode: .write) { url in
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if let expected {
+                let file = try FileHandle(forReadingFrom: url)
+                defer { try? file.close() }
+                let current = try file.read(upToCount: FileLimits.textBytes + 1) ?? Data()
+                guard String(data: current, encoding: .utf8) == expected else {
+                    throw OxFunctionError(code: "file_changed", message: "File changed after reading: \(location.path)", recovery: "Read the file again with ox.fs.read, then rebuild the edit from the current content.")
+                }
+            }
+            try Task.checkCancellation()
+            try data.write(to: url, options: .atomic)
         }
     }
 

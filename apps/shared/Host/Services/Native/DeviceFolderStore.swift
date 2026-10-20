@@ -153,6 +153,13 @@ final class DeviceFolderStore {
         }.value
     }
 
+    func transfer(grantID: String, from: [String], to: [String], profileId: UUID?, copy: Bool) async throws {
+        let grant = try requireGrant(grantID, profileId: profileId)
+        try await Task.detached(priority: .userInitiated) {
+            try Self.transfer(grant: grant, from: from, to: to, copy: copy)
+        }.value
+    }
+
     nonisolated private static func prepareGrant(_ url: URL) throws -> (name: String, bookmark: Data) {
         guard url.startAccessingSecurityScopedResource() else { throw StoreError.denied(url.lastPathComponent) }
         defer { url.stopAccessingSecurityScopedResource() }
@@ -170,6 +177,57 @@ final class DeviceFolderStore {
         mode: AccessMode,
         _ body: (URL) throws -> T
     ) throws -> T {
+        try accessing(grant) { root in
+            let target = try safeTarget(root: root, components: relativePath)
+            let coordinator = NSFileCoordinator()
+            var coordinationError: NSError?
+            var result: Result<T, any Error>?
+            switch mode {
+            case .read:
+                coordinator.coordinate(readingItemAt: target, options: [], error: &coordinationError) { coordinatedURL in
+                    result = Result { try body(coordinatedURL) }
+                }
+            case .write:
+                coordinator.coordinate(writingItemAt: target, options: [], error: &coordinationError) { coordinatedURL in
+                    result = Result { try body(coordinatedURL) }
+                }
+            case .delete:
+                coordinator.coordinate(writingItemAt: target, options: .forDeleting, error: &coordinationError) { coordinatedURL in
+                    result = Result { try body(coordinatedURL) }
+                }
+            }
+            return try coordinated(result, coordinationError)
+        }
+    }
+
+    nonisolated private static func transfer(grant: Grant, from: [String], to: [String], copy: Bool) throws {
+        try accessing(grant) { root in
+            let source = try safeTarget(root: root, components: from)
+            let destination = try safeTarget(root: root, components: to)
+            let coordinator = NSFileCoordinator()
+            var coordinationError: NSError?
+            var result: Result<Void, any Error>?
+            let accessor: (URL, URL) -> Void = { source, destination in
+                result = Result {
+                    try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    if copy { return try FileManager.default.copyItem(at: source, to: destination) }
+                    coordinator.item(at: source, willMoveTo: destination)
+                    try FileManager.default.moveItem(at: source, to: destination)
+                    coordinator.item(at: source, didMoveTo: destination)
+                }
+            }
+            if copy {
+                coordinator.coordinate(readingItemAt: source, options: [], writingItemAt: destination, options: .forReplacing,
+                                       error: &coordinationError, byAccessor: accessor)
+            } else {
+                coordinator.coordinate(writingItemAt: source, options: .forMoving, writingItemAt: destination, options: .forReplacing,
+                                       error: &coordinationError, byAccessor: accessor)
+            }
+            try coordinated(result, coordinationError)
+        }
+    }
+
+    nonisolated private static func accessing<T>(_ grant: Grant, _ body: (URL) throws -> T) throws -> T {
         var stale = false
         let root: URL
         do {
@@ -180,24 +238,10 @@ final class DeviceFolderStore {
         guard !stale else { throw StoreError.staleGrant(grant.name) }
         guard root.startAccessingSecurityScopedResource() else { throw StoreError.denied(grant.name) }
         defer { root.stopAccessingSecurityScopedResource() }
-        let target = try safeTarget(root: root, components: relativePath)
-        let coordinator = NSFileCoordinator()
-        var coordinationError: NSError?
-        var result: Result<T, any Error>?
-        switch mode {
-        case .read:
-            coordinator.coordinate(readingItemAt: target, options: [], error: &coordinationError) { coordinatedURL in
-                result = Result { try body(coordinatedURL) }
-            }
-        case .write:
-            coordinator.coordinate(writingItemAt: target, options: [], error: &coordinationError) { coordinatedURL in
-                result = Result { try body(coordinatedURL) }
-            }
-        case .delete:
-            coordinator.coordinate(writingItemAt: target, options: .forDeleting, error: &coordinationError) { coordinatedURL in
-                result = Result { try body(coordinatedURL) }
-            }
-        }
+        return try body(root)
+    }
+
+    nonisolated private static func coordinated<T>(_ result: Result<T, any Error>?, _ coordinationError: NSError?) throws -> T {
         if let coordinationError { throw StoreError.coordination(coordinationError.localizedDescription) }
         guard let result else { throw StoreError.coordination("No coordinated URL was returned.") }
         return try result.get()

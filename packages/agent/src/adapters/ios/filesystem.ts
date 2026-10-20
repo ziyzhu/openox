@@ -3,6 +3,7 @@ import { FileError, type FileInfo } from "@earendil-works/pi-durable/env";
 import type { ProfileRuntime } from "../../profile/runtime";
 import { mountedFileSystem, type FileBackend, type FileMount } from "../../core/file-mounts";
 import { canonical } from "../../core/file-paths";
+import { encodeBase64 } from "../../core/base64";
 import type { FileOperation, FileRequest } from "../../core/filesystem";
 import { native } from "./bridge";
 import { conversationRecordPath } from "../../profile/file-store";
@@ -32,10 +33,13 @@ export async function invokeFilesystem(runtime: ProfileRuntime, capability: stri
       return result.text;
     },
     write: async (path, content, _context, expected) => {
-      if (typeof content !== "string") throw new FileError("not_supported", "Binary writes are limited to conversation and shared Profile folders", path);
-      await call("write", path, { content, expected: expected ?? originals.get(path) });
+      await call("write", path, typeof content === "string" ? { content, expected: expected ?? originals.get(path) } : { base64: encodeBase64(content) });
     },
     remove: async path => { await call("delete", path); },
+    createDirectory: async (path, _context, recursive) => { await call("mkdir", path, { recursive: recursive ?? false }); },
+    removeDirectory: async (path, recursive) => { await call("rmdir", path, { recursive }); },
+    move: async (from, to) => { await call("move", from, { to }); },
+    copy: async (from, to) => { await call("copy", from, { to }); },
   };
   const inputs: FileMount[] = mounts.filter(mount => mount.path !== "" && (!runtime.files.physical || !["artifacts", "conversations"].includes(mount.path))).map(mount => ({ ...mount, visibility: mount.path === "history" ? "unlisted" : "listed",
     source: { kind: "backend", backend, path: mount.path } }));

@@ -472,13 +472,27 @@ export class ProfileFileStore {
   }
   copy(input: string, destination: string) {
     const source = workingFilePath(input), target = workingFilePath(destination);
+    if (managed(source) || managed(target) || beneath(target, source)) throw new FileError("invalid", "Cannot copy managed directories or into the source tree", source);
     return this.serialize(async () => {
       const state = await this.state(); this.assertActive(state, source); this.assertActive(state, target);
       if (this.findPath(state, target)) throw new FileError("invalid", "Destination already exists", target);
       const file = Object.values(state.files).find(file => file.path === source);
-      if (!file || file.hidden) throw new FileError("not_supported", "Copy requires a visible file", source);
-      const bytes = await this.backend.read(file);
-      return this.writeLocked(target, file.binary ? bytes : new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+      if (file && !file.hidden) {
+        const bytes = await this.backend.read(file);
+        return this.writeLocked(target, file.binary ? bytes : new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+      }
+      if (!state.directories.includes(source)) throw new FileError("not_found", "Source not found", source);
+      const copied = Object.values(state.files).filter(file => beneath(file.path, source));
+      if (copied.some(file => file.hidden)) throw new FileError("permission_denied", "Private blobs cannot be copied", source);
+      const directories = [...this.parents(state, target, true),
+        ...state.directories.filter(path => beneath(path, source)).map(path => target + path.slice(source.length)).sort((a, b) => a.length - b.length)];
+      const files = { ...state.files }, operations: FileMutation[] = directories.map(path => ({ op: "mkdir", path }));
+      for (const file of copied) {
+        const path = target + file.path.slice(source.length), staged = await this.backend.stage(await this.backend.read(file)), id = await this.identifier(path);
+        files[id] = { ...staged, id, path, binary: file.binary, saved: false, mtime: Date.now(), owner: owner(path) };
+        operations.push({ op: "replace", path, source: staged.path, size: staged.size, sha256: staged.sha256, previous: null });
+      }
+      await this.commit(files, [...state.directories, ...directories], operations);
     }, undefined, [source, target]);
   }
   saved(input: string, saved: boolean) {

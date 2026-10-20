@@ -99,6 +99,9 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case notDirectory(String)
         case notFile(String)
         case unsupportedMutation(String)
+        case notEmpty(String)
+        case crossFolderTransfer(String)
+        case intoSourceTree(String)
 
         var errorDescription: String? {
             switch self {
@@ -106,6 +109,9 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .notDirectory(let path): "Not a directory: \(path)"
             case .notFile(let path): "Not a file: \(path)"
             case .unsupportedMutation(let path): "This operation isn't supported for \(path)."
+            case .notEmpty(let path): "Directory is not empty: \(path)"
+            case .crossFolderTransfer(let path): "Moves and copies must stay within one chosen folder: \(path)"
+            case .intoSourceTree(let path): "Cannot move or copy into the source tree: \(path)"
             }
         }
     }

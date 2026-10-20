@@ -8,8 +8,8 @@ import { iosTarget } from "../../../setup/scripts/ios.ts";
 import { waitForHost } from "./host.ts";
 
 const qa = qaCommand({
-  usage: "bun .agents/skills/test/apps/ios/profile-files.ts --device ox-N --conversation <seeded-saved-Mock-QA-conversation> --app /absolute/Ox.app [--bundle id] [--profile-folder name] [--output /tmp/directory]\nWrites run-owned files, creates/deletes a run-owned conversation, relaunches, and approves deletion of only its fixtures through ordinary conversation approval. Never changes policies or credentials.",
-  options: { conversation: { type: "string" }, app: { type: "string" }, bundle: { type: "string" }, "profile-folder": { type: "string" }, output: { type: "string" } },
+  usage: "bun .agents/skills/test/apps/ios/profile-files.ts --device ox-N --conversation <seeded-saved-Mock-QA-conversation> --app /absolute/Ox.app [--bundle id] [--profile-folder name] [--files-grant id] [--output /tmp/directory]\nWrites run-owned files, creates/deletes a run-owned conversation, relaunches, and approves deletion of only its fixtures through ordinary conversation approval. Never changes policies or credentials.",
+  options: { conversation: { type: "string" }, app: { type: "string" }, bundle: { type: "string" }, "profile-folder": { type: "string" }, "files-grant": { type: "string" }, output: { type: "string" } },
 });
 if (!qa.values.conversation || !qa.values.app) throw new Error("Pass an idle saved Mock QA conversation and the freshly built app");
 const localConfig = await readFile(join(ROOT, "apps/ios/Local.xcconfig"), "utf8").catch(() => "");
@@ -112,8 +112,14 @@ try {
   assert.equal(attachment.contentType, "text/html");
   assert.equal((await inspectFile(current.filename)).filename, current.filename);
   await call("ox.fs.mkdir", { path: `${shared}/empty` });
+  await call("ox.fs.copy", { from: `${shared}/nested`, to: `${shared}/nested-copy` });
+  const directoryCopy = await inspectFile(`${shared}/nested-copy/current.html`);
+  assert.notEqual(directoryCopy.filename, current.filename);
+  assert.equal((await call("ox.fs.read", { path: `${shared}/nested-copy/current.html` })).text, "<h1>Current HTML</h1>\n");
+  await rejected("ox.fs.copy", { from: `${shared}/nested`, to: `${shared}/nested/inside` });
+  await rejected("ox.fs.copy", { from: `/${conversationRoot}`, to: `${shared}/illegal-copy` });
   await rejected("ox.fs.move", { from: `/${conversationRoot}`, to: `${shared}/illegal` });
-  checks.push("conversation cwd, checked edits, moves retiring old references, independent copies, current MIME type and managed roots");
+  checks.push("conversation cwd, checked edits, moves retiring old references, independent file and directory copies, current MIME type and managed roots");
   if (qa.values["profile-folder"]) {
     const folder = qa.values["profile-folder"];
     assert(!folder.includes("/") && ![".", ".."].includes(folder));
@@ -160,6 +166,28 @@ try {
     await rm(await physical(skillRoot), { recursive: true });
     await rejected("ox.fs.read", { path: `/skills/${skillName}/references/data.txt` });
     checks.push("public-only content, external create/edit/move/delete/recreate, authoritative Memory and physical user skills");
+  }
+  if (qa.values["files-grant"]) {
+    const mounted = `/files/${qa.values["files-grant"]}/${prefix}`, pixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    await call("ox.fs.write", { path: `${mounted}/new/note.md`, content: "Version one\n" });
+    await call("ox.fs.edit", { path: `${mounted}/new/note.md`, edits: [{ oldText: "Version one", newText: "Version two" }] });
+    assert.equal((await call("ox.fs.write", { path: `${mounted}/new/pixel.png`, base64: pixel })).size, 70);
+    await call("ox.fs.mkdir", { path: `${mounted}/deep/nested`, recursive: true });
+    await call("ox.fs.mkdir", { path: `${mounted}/deep/nested`, recursive: true });
+    await call("ox.fs.copy", { from: `${mounted}/new/note.md`, to: `${mounted}/deep/copy.md` });
+    await rejected("ox.fs.copy", { from: `${mounted}/new/note.md`, to: `${mounted}/deep/copy.md` });
+    await call("ox.fs.copy", { from: `${mounted}/deep`, to: `${mounted}/deep-copy` });
+    assert.equal((await call("ox.fs.read", { path: `${mounted}/deep-copy/copy.md` })).text, "Version two\n");
+    assert((await call("ox.fs.list", { path: `${mounted}/deep-copy` })).items.some((item: { path: string }) => item.path.endsWith("/deep-copy/nested")));
+    await rejected("ox.fs.copy", { from: `${mounted}/deep`, to: `${mounted}/deep/inside` });
+    await call("ox.fs.move", { from: `${mounted}/deep`, to: `${mounted}/moved` });
+    assert.equal((await call("ox.fs.read", { path: `${mounted}/moved/copy.md` })).text, "Version two\n");
+    await rejected("ox.fs.move", { from: `${mounted}/new/note.md`, to: `${shared}/from-files.md` });
+    await rejected("ox.fs.move", { from: `${mounted}/new/note.md`, to: `/files/${prefix}-other/note.md` });
+    const mountedPurpose = `Remove mounted ${prefix}`;
+    await approve(`return await ox.fs.rmdir({path:${JSON.stringify(mounted)},recursive:true,purpose:${JSON.stringify(mountedPurpose)}})`, mountedPurpose);
+    await rejected("ox.fs.list", { path: mounted });
+    checks.push("chosen Files folders support text and binary writes, edits, directories, in-folder file and directory copies and moves, and approved recursive removal, but reject cross-mount transfers");
   }
   await ios.launch(bundle, resolve(qa.values.app), { OX_HOST_LOOPBACK: "1", OX_DEBUG_ENDPOINT: qa.debugEndpoint });
   await ready();

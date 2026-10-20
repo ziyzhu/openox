@@ -47,6 +47,9 @@ nonisolated struct OxFunctionError: LocalizedError, Sendable {
             case .notDirectory: ("not_directory", "Use ox.fs.list to locate a directory, or ox.fs.read to read a file.")
             case .notFile: ("not_file", "Use ox.fs.list to inspect this path and select a readable file.")
             case .unsupportedMutation: ("not_supported", "Inspect the path with ox.fs.list and the operation's help. Use a writable destination; do not bypass source permissions.")
+            case .notEmpty: ("invalid_argument", "Use ox.fs.list to inspect the directory; pass recursive: true only when its contents should be removed.")
+            case .crossFolderTransfer: ("not_supported", "Keep the source and destination inside the same chosen folder.")
+            case .intoSourceTree: ("invalid_argument", "Choose a destination outside the source directory.")
             }
             return Self(code: guidance.0, message: error.localizedDescription, recovery: guidance.1)
         }
