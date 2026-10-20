@@ -135,7 +135,6 @@ private struct AttachMenuCard: View {
         action: @escaping () -> Void
     ) -> some View {
         Button {
-            Haptics.impact(.attachmentChoice)
             action()
         } label: {
             HStack(spacing: Theme.Spacing.md) {

@@ -1702,7 +1702,6 @@ struct ConversationPage: View {
     private func beginEditing(_ block: Block) {
         guard case let .userText(text, _) = block.kind else { return }
         Log.ui.info("ConversationPage.beginEditing conversation=\(conversation.id) block=\(block.id) chars=\(text.count)")
-        Haptics.impact(.editStarted)
         composer.setAttachmentMenuPresented(false)
         editDraft = AttributedString(text)
         withAnimation(Theme.Animation.handoff, completionCriteria: .logicallyComplete) {

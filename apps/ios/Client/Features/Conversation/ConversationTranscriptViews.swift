@@ -450,7 +450,6 @@ struct QueuedBubble: View {
                 }
             }
             Button {
-                Haptics.impact(.queuedMessageCancelled)
                 onCancel()
             } label: {
                 HStack(spacing: 3) {

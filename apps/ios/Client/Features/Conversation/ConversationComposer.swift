@@ -632,7 +632,6 @@ struct ConversationComposer: View, Equatable {
         Menu {
             ForEach(conversationFiles) { file in
                 Button {
-                    Haptics.impact(.fileTabSelected)
                     Log.ui.info("ConversationComposer.fileSelect conversation=\(sessionID) filename=\(file.fileName)")
                     onOpenConversationFile(file)
                 } label: {
@@ -698,7 +697,6 @@ struct ConversationComposer: View, Equatable {
 
     private var editingMessageChip: some View {
         Button {
-            Haptics.impact(.selectionConfirmed)
             onCancelEdit()
         } label: {
             HStack(spacing: 8) {
@@ -846,7 +844,7 @@ struct ConversationComposer: View, Equatable {
     }
 
     private func showHoldToTalkHint() {
-        Haptics.impact(.selectionConfirmed)
+        Haptics.impact(.holdToTalkHint)
         speech.notice = L10n.string(
             "Press and hold to talk.",
             comment: "Hint shown when the user taps instead of holding the microphone button."
@@ -869,7 +867,6 @@ struct ConversationComposer: View, Equatable {
     private var attachButton: some View {
         Button {
             guard !isEditingMessage else { return }
-            Haptics.impact(.attachmentMenu)
             setMenu(composer.surface != .attachments)
         } label: {
             Image(systemName: "plus")

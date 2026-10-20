@@ -651,7 +651,7 @@ struct ModelPickerContent: View {
             ))
             Log.ui.info("ModelPicker.select client=\(selected.client.id) model=\(selected.model.id) reasoning=\(selected.model.selectedReasoningEffort ?? "unavailable") region=\(selectedRegion.rawValue)")
             onSelect(selected.client, selected.model, selected.selection)
-            Haptics.success(.settingsSaved)
+            Haptics.selection(.modelSelected)
         } catch {
             providerCredentialError = error.localizedDescription
         }
@@ -692,7 +692,7 @@ struct ModelPickerContent: View {
         selectedModelID = model.id
         loadCredentialDraft()
         selectDefaultReasoningEffort()
-        Haptics.success(.settingsSaved)
+        Haptics.selection(.modelSelected)
     }
 
     private func authenticationDidComplete(for client: any ProviderClient) {

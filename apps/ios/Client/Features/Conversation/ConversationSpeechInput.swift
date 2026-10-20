@@ -108,7 +108,7 @@ final class ConversationSpeechInput {
         }
         if selection != action {
             state = .recording(action)
-            Haptics.impact(.selectionConfirmed)
+            Haptics.selection(.speechActionChanged)
             Log.ui.info("SpeechInput.selection action=\(action.rawValue)")
         }
     }
@@ -135,7 +135,7 @@ final class ConversationSpeechInput {
         let action = action ?? selection
         guard action != .cancel else {
             cancel(reason: "slideCancel")
-            Haptics.impact(.stop)
+            Haptics.impact(.speechCancelled)
             return
         }
         state = .finalizing(action)
@@ -192,6 +192,7 @@ final class ConversationSpeechInput {
         Log.ui.error("SpeechInput.failed error=\(error.localizedDescription)")
         cancel(reason: "error")
         notice = error.localizedDescription
+        Haptics.error(.speechFailed)
     }
 
     private func setDeadline(seconds: Int, message: String) {

@@ -70,6 +70,7 @@ private struct ShareView: View {
             .padding(ShareTheme.outerInset)
         }
         .task { await load() }
+        .sensoryFeedback(.impact(weight: .light), trigger: adding) { _, adding in adding }
     }
 
     @ViewBuilder
@@ -161,7 +162,6 @@ private struct ShareView: View {
     private func add() {
         guard let payload else { return }
         adding = true
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         do {
             try SharedItemWriter.enqueue(payload)
             onComplete()

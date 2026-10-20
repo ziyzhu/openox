@@ -2,20 +2,20 @@ import UIKit
 
 enum Haptics {
     enum Event: String {
-        case attachmentChoice
-        case attachmentMenu
         case agentDeltaReceived
-        case fileTabSelected
         case copy
-        case editStarted
-        case permissionPersistenceToggled
-        case queuedMessageCancelled
-        case selectionConfirmed
+        case fileSaveFailed
+        case fileSaved
+        case holdToTalkHint
+        case modelSelected
+        case requestAnswered
+        case serviceAttached
+        case sidebarSettled
+        case speechActionChanged
+        case speechCancelled
+        case speechFailed
         case speechStarted
         case speechStopped
-        case serviceAttached
-        case settingsSaved
-        case sidebarSettled
         case stop
     }
 
@@ -28,22 +28,33 @@ enum Haptics {
     static func impact(_ event: Event) {
         Log.ui.debug("Haptics.impact event=\(event.rawValue)")
         switch event {
-        case .agentDeltaReceived, .fileTabSelected, .speechStarted, .speechStopped:
+        case .agentDeltaReceived, .speechStarted, .speechStopped:
             driver.impact(.medium)
         default:
             driver.impact(.light)
         }
     }
 
+    static func selection(_ event: Event) {
+        Log.ui.debug("Haptics.selection event=\(event.rawValue)")
+        driver.selection()
+    }
+
     static func success(_ event: Event) {
         Log.ui.debug("Haptics.success event=\(event.rawValue)")
-        driver.success()
+        driver.notify(.success)
+    }
+
+    static func error(_ event: Event) {
+        Log.ui.debug("Haptics.error event=\(event.rawValue)")
+        driver.notify(.error)
     }
 
     private final class Driver {
         private weak var view: UIView?
         private var lightImpactGenerator: UIImpactFeedbackGenerator?
         private var mediumImpactGenerator: UIImpactFeedbackGenerator?
+        private var selectionGenerator: UISelectionFeedbackGenerator?
         private var notificationGenerator: UINotificationFeedbackGenerator?
 
         func prepareImpact() {
@@ -58,10 +69,15 @@ enum Haptics {
             generator?.prepare()
         }
 
-        func success() {
+        func selection() {
             refresh()
-            notificationGenerator?.notificationOccurred(.success)
-            notificationGenerator?.prepare()
+            selectionGenerator?.selectionChanged()
+            selectionGenerator?.prepare()
+        }
+
+        func notify(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+            refresh()
+            notificationGenerator?.notificationOccurred(type)
         }
 
         private func refresh() {
@@ -69,6 +85,7 @@ enum Haptics {
                 view = nil
                 lightImpactGenerator = nil
                 mediumImpactGenerator = nil
+                selectionGenerator = nil
                 notificationGenerator = nil
                 return
             }
@@ -76,6 +93,7 @@ enum Haptics {
             view = activeView
             lightImpactGenerator = UIImpactFeedbackGenerator(style: .light, view: activeView)
             mediumImpactGenerator = UIImpactFeedbackGenerator(style: .medium, view: activeView)
+            selectionGenerator = UISelectionFeedbackGenerator(view: activeView)
             notificationGenerator = UINotificationFeedbackGenerator(view: activeView)
         }
 

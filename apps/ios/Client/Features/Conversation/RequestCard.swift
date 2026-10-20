@@ -221,7 +221,7 @@ struct PermissionRequestCard: View {
 
     private func select(_ option: String) {
         guard submittedSelection == nil else { return }
-        Haptics.impact(.selectionConfirmed)
+        Haptics.impact(.requestAnswered)
         guard !reduceMotion else {
             submittedSelection = option
             onSelect(option)
@@ -521,7 +521,7 @@ struct RequestCardOptions: View {
 
     private func select(_ option: String) {
         guard effectiveSelection == nil else { return }
-        Haptics.impact(.selectionConfirmed)
+        Haptics.impact(.requestAnswered)
         guard !reduceMotion else {
             submittedSelection = option
             onSelect(option)

@@ -140,7 +140,6 @@ struct MarkdownFileView: View {
         draft = document.source
         mode = .editing
         Log.ui.info("MarkdownFileView.edit filename=\(file.fileName)")
-        Haptics.impact(.editStarted)
     }
 
     private func save() {
@@ -167,11 +166,12 @@ struct MarkdownFileView: View {
                 let document = MarkdownFileDocument(source: source, byteCount: source.utf8.count)
                 phase = .ready(document)
                 Log.ui.info("MarkdownFileView.save filename=\(published.fileName) bytes=\(document.byteCount)")
-                Haptics.success(.settingsSaved)
+                Haptics.success(.fileSaved)
             } catch {
                 guard !Task.isCancelled else { return }
                 isSaving = false
                 saveError = error.localizedDescription
+                Haptics.error(.fileSaveFailed)
                 Log.ui.error("MarkdownFileView.save filename=\(file.fileName) error=\(error.localizedDescription)")
             }
         }

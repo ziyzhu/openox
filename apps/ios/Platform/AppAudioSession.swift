@@ -33,6 +33,7 @@ nonisolated enum AppAudioSession {
     private static func activate(owner: UUID, category: AVAudioSession.Category, mode: AVAudioSession.Mode, options: AVAudioSession.CategoryOptions) throws {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(category, mode: mode, options: options)
+        try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
         try session.setActive(true)
         activeOwner.withLock { $0 = owner }
     }
