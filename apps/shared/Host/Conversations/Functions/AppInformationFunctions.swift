@@ -3,15 +3,11 @@ import Foundation
 extension Conversation {
     public func renameConversation(title: String, purpose: String) async throws -> JSONValue? {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let wordCount = trimmed.split(whereSeparator: \.isWhitespace).count
         guard !trimmed.isEmpty else {
             throw RuntimeError.bridge("ox.conversation.rename: title must not be empty.")
         }
-        guard trimmed.count <= 60 else {
-            throw RuntimeError.bridge("ox.conversation.rename: title must contain at most 60 characters.")
-        }
-        guard wordCount <= 10 else {
-            throw RuntimeError.bridge("ox.conversation.rename: title must contain at most 10 words.")
+        guard trimmed.count <= 50 else {
+            throw RuntimeError.bridge("ox.conversation.rename: title must contain at most 50 characters.")
         }
         let previousAgentTitle = latestAgentConversationTitle
         let args = JSONValue.object(["title": .string(trimmed)])
@@ -25,7 +21,7 @@ extension Conversation {
             }
             let renamed = customTitle != trimmed
             if renamed { rename(to: trimmed) }
-            Log.session.info("bridge.app.renameConversation agentTitle changed=\(renamed) words=\(wordCount) chars=\(trimmed.count)")
+            Log.session.info("bridge.app.renameConversation agentTitle changed=\(renamed) chars=\(trimmed.count)")
             return .object([
                 "renamed": .bool(renamed),
                 "title": .string(trimmed),

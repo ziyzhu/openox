@@ -26,8 +26,8 @@ nonisolated enum OxConversations {
                         "title": .object([
                             "type": .string("string"),
                             "minLength": .int(1),
-                            "maxLength": .int(60),
-                            "description": .string("A concise 1–10 word title describing the conversation's purpose."),
+                            "maxLength": .int(50),
+                            "description": .string("A concise title of at most 50 characters describing the conversation's purpose."),
                         ]),
                     ], required: ["title"]),
                     "outputSchema": object([
