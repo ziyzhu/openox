@@ -81,6 +81,10 @@ private struct ConversationScheduleDetails: View {
                     Label("Runs may be delayed while Ox is in the background.", systemImage: "info.circle")
                         .font(Theme.Fonts.caption)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
+                        .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                 }
                 if !schedule.prompt.isEmpty {
@@ -109,6 +113,8 @@ private struct ConversationScheduleDetails: View {
                 Text("Schedule unavailable")
             }
         }
+        .contentMargins(.top, 16, for: .scrollContent)
+        .listSectionSpacing(16)
         .scrollContentBackground(.hidden)
         .background(Theme.Colors.background)
         .navigationTitle(schedule?.name ?? L10n.string("Schedule"))
