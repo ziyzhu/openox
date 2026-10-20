@@ -410,7 +410,7 @@ extension ProfileMigrator {
         }
         for folder in folders { try fm.removeItem(at: folder) }
         if !folders.isEmpty {
-            Log.app.info("StorageMigrator.flattenLegacyFiles root=\(root.lastPathComponent) artifacts=\(folders.count)")
+            Log.app.info("StorageMigrator.flattenLegacyFiles root=\(root.lastPathComponent) files=\(folders.count)")
         }
     }
 

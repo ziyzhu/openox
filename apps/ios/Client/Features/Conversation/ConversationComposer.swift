@@ -633,7 +633,7 @@ struct ConversationComposer: View, Equatable {
             ForEach(conversationFiles) { file in
                 Button {
                     Haptics.impact(.fileTabSelected)
-                    Log.ui.info("ConversationComposer.artifactSelect conversation=\(sessionID) filename=\(file.fileName)")
+                    Log.ui.info("ConversationComposer.fileSelect conversation=\(sessionID) filename=\(file.fileName)")
                     onOpenConversationFile(file)
                 } label: {
                     Label(

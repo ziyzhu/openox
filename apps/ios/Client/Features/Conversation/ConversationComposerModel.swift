@@ -241,7 +241,7 @@ final class ConversationComposerModel {
         }
         guard let index = draftAttachments.firstIndex(where: { $0.id == .operation(id) }) else { return }
         draftAttachments[index] = .ready(file)
-        Log.ui.info("ConversationComposer.import ready draft=\(draftID) import=\(id) artifact=\(file.id)")
+        Log.ui.info("ConversationComposer.import ready draft=\(draftID) import=\(id) file=\(file.id)")
     }
 
     private func cancelImport(_ id: UUID, draftID importingDraftID: UUID) {

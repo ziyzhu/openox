@@ -247,7 +247,7 @@ final class RemoteMCPService {
             guard outputViolations.isEmpty else { return .failure(Service.InvokeError.invalidOutput(name, outputViolations)) }
             try await receiveFiles(result.files)
             service.setAuth(.authorized)
-            Log.service.info("RemoteMCP.invoke completed name=\(name) artifacts=\(result.files.count)")
+            Log.service.info("RemoteMCP.invoke completed name=\(name) files=\(result.files.count)")
             return .success(result.value)
         } catch RemoteMCPError.authorizationRequired {
             requiresAuthorization = true
@@ -264,7 +264,7 @@ final class RemoteMCPService {
                 guard outputViolations.isEmpty else { return .failure(Service.InvokeError.invalidOutput(name, outputViolations)) }
                 try await receiveFiles(result.files)
                 service.setAuth(.authorized)
-                Log.service.info("RemoteMCP.invoke completed-after-refresh name=\(name) artifacts=\(result.files.count)")
+                Log.service.info("RemoteMCP.invoke completed-after-refresh name=\(name) files=\(result.files.count)")
                 return .success(result.value)
             } catch {
                 service.setAuth(.notAuthorized)

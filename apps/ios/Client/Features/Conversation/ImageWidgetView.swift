@@ -102,12 +102,12 @@ struct ImageWidgetView: View {
             }
             try Task.checkCancellation()
             state = .ready(loaded)
-            Log.ui.info("ImageWidgetView.load ready source=\(image.source.artifact == nil ? "remote" : "artifact") bytes=\(data.count)")
+            Log.ui.info("ImageWidgetView.load ready source=\(image.source.artifact == nil ? "remote" : "file") bytes=\(data.count)")
         } catch is CancellationError {
         } catch {
             guard !Task.isCancelled else { return }
             state = .failed
-            Log.ui.error("ImageWidgetView.load failed source=\(image.source.artifact == nil ? "remote" : "artifact") error=\(LogPrivacy.text(error.localizedDescription))")
+            Log.ui.error("ImageWidgetView.load failed source=\(image.source.artifact == nil ? "remote" : "file") error=\(LogPrivacy.text(error.localizedDescription))")
         }
     }
 }

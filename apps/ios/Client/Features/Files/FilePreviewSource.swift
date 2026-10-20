@@ -43,17 +43,17 @@ nonisolated final class FilePreviewSnapshot: Sendable {
 
     init(file: FileItem) throws {
         let name = try FileStore.validatedFilename(file.displayName)
-        directory = try FileStaging.createDirectory(in: FileManager.default.temporaryDirectory, prefix: "artifact-preview")
+        directory = try FileStaging.createDirectory(in: FileManager.default.temporaryDirectory, prefix: "file-preview")
         url = directory.appendingPathComponent(name, isDirectory: false)
         do {
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
         } catch {
-            FileStaging.cleanup(directory, operation: "artifact-preview")
+            FileStaging.cleanup(directory, operation: "file-preview")
             throw error
         }
     }
 
-    deinit { FileStaging.cleanup(directory, operation: "artifact-preview") }
+    deinit { FileStaging.cleanup(directory, operation: "file-preview") }
 }
 
 nonisolated private struct FileShareContent: Transferable, Sendable {

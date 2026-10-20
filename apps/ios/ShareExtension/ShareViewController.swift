@@ -297,7 +297,7 @@ private enum SharedItemReader {
             ShareLog.logger.error("SharedItemReader.unsupported providerTypes=\(identifiers, privacy: .public)")
             throw SharedItemError.unsupported
         }
-        ShareLog.logger.info("SharedItemReader.ready artifacts=\(files.count) textParts=\(textParts.count)")
+        ShareLog.logger.info("SharedItemReader.ready files=\(files.count) textParts=\(textParts.count)")
         return SharedImportPayload(files: files)
     }
 

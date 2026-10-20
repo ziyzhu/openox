@@ -237,11 +237,11 @@ struct ConversationPage: View {
                             }
                         }
                             .onAppear {
-                                Log.ui.info("ConversationPage.artifactNavigation present conversation=\(conversation.id) filename=\(file.fileName)")
+                                Log.ui.info("ConversationPage.fileNavigation present conversation=\(conversation.id) filename=\(file.fileName)")
                                 onFileNavigationChange(true)
                             }
                             .onDisappear {
-                                Log.ui.info("ConversationPage.artifactNavigation return conversation=\(conversation.id) filename=\(file.fileName)")
+                                Log.ui.info("ConversationPage.fileNavigation return conversation=\(conversation.id) filename=\(file.fileName)")
                                 onFileNavigationChange(false)
                             }
                     }
@@ -529,7 +529,7 @@ struct ConversationPage: View {
                     ConversationFilesSheet(files: conversationFiles) { file in
                         pendingFilePreview = file
                         modalPresentation = nil
-                        Log.ui.info("ConversationPage.artifactPreview select conversation=\(conversation.id) filename=\(file.fileName)")
+                        Log.ui.info("ConversationPage.filePreview select conversation=\(conversation.id) filename=\(file.fileName)")
                     }
                     .presentationDetents([.medium, .large])
                 case .camera, .photos, .files, .attachment, .botControl, .serviceAuth:
@@ -1758,10 +1758,10 @@ struct ConversationPage: View {
                 $0.fileName.caseInsensitiveCompare(filename) == .orderedSame
                     || $0.displayName.caseInsensitiveCompare(filename) == .orderedSame
             }) else {
-                Log.ui.warning("ConversationPage.openLink disposition=missing-artifact filename=\(filename)")
+                Log.ui.warning("ConversationPage.openLink disposition=missing-file filename=\(filename)")
                 return
             }
-            Log.ui.info("ConversationPage.openLink disposition=artifact filename=\(file.fileName)")
+            Log.ui.info("ConversationPage.openLink disposition=file filename=\(file.fileName)")
             openAttachment(file)
         case .file(let path):
             Task {

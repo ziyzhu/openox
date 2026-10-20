@@ -151,7 +151,7 @@ extension ProfileRepository {
             try await DurableProfileStore.shared.writeFile(data: data, path: path, in: scope)
         }
         let published = try await self.file(named: path, in: scope)
-        Log.app.info("ProfileRepository.artifact publish profile=\(scope.profileID?.uuidString ?? "temporary") file=\(name) bytes=\(data.count) binary=\(text == nil)")
+        Log.app.info("ProfileRepository.file publish profile=\(scope.profileID?.uuidString ?? "temporary") file=\(name) bytes=\(data.count) binary=\(text == nil)")
         return published
     }
 
@@ -177,14 +177,14 @@ extension ProfileRepository {
         _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
             "action": .string("fileMove"), "path": .string(record.path), "prefix": .string(relative),
         ]))
-        Log.app.info("ProfileRepository.artifact move profile=\(scope.profileID?.uuidString ?? "temporary") from=\(record.path) to=\(relative)")
+        Log.app.info("ProfileRepository.file move profile=\(scope.profileID?.uuidString ?? "temporary") from=\(record.path) to=\(relative)")
         return try await file(named: relative, in: scope)
     }
 
     func deleteFile(named name: String, in scope: ProfileScope) async throws -> FileItem {
         let record = try await requiredFileRecord(named: name, in: scope)
         try await removeProfileFile(path: record.reference ?? record.path, in: scope)
-        Log.app.info("ProfileRepository.artifact remove profile=\(scope.profileID?.uuidString ?? "temporary") file=\(name) physicalBytesRemoved=true")
+        Log.app.info("ProfileRepository.file remove profile=\(scope.profileID?.uuidString ?? "temporary") file=\(name) physicalBytesRemoved=true")
         return record.file(in: scope)
     }
 

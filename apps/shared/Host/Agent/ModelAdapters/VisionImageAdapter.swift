@@ -29,7 +29,7 @@ nonisolated struct VisionImageAdapter: ModelAdapter {
                 }
                 guard let data = try? ProviderFileInputs.read(file),
                       let analysis = await analysis(data: data, filename: file.fileName, mimeType: file.mimeType) else {
-                    Log.agent.error("VisionImageAdapter couldn't analyze artifact=\(file.fileName)")
+                    Log.agent.error("VisionImageAdapter couldn't analyze file=\(file.fileName)")
                     content.append(.text(TextContent(FileReferenceAdapter.recovery(kind: .image, source: FilePromptReference.text(for: file)))))
                     transformed = true
                     continue
@@ -51,7 +51,7 @@ nonisolated struct VisionImageAdapter: ModelAdapter {
                 }
                 guard let data = try? ProviderFileInputs.read(file),
                       let analysis = await analysis(data: data, filename: file.fileName, mimeType: file.mimeType) else {
-                    Log.agent.error("VisionImageAdapter couldn't analyze tool artifact=\(file.fileName)")
+                    Log.agent.error("VisionImageAdapter couldn't analyze tool file=\(file.fileName)")
                     content.append(.text(TextContent(FileReferenceAdapter.recovery(kind: .image, source: FilePromptReference.text(for: file)))))
                     transformed = true
                     continue
