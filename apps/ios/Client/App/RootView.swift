@@ -141,7 +141,7 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
                 .frame(width: size.width)
                 .background(
                     Theme.Colors.conversationSurface.opacity(
-                        reduceTransparency ? 1 : pow(progress, 4)
+                        reduceTransparency ? 1 : pow(Double(progress), 4)
                     ),
                     ignoresSafeAreaEdges: .all
                 )
