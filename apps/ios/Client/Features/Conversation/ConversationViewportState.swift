@@ -2,7 +2,7 @@ import SwiftUI
 
 @Observable
 final class ConversationViewportLayout {
-    static let responseComposerSpacing: CGFloat = 48
+    static let responseComposerSpacing: CGFloat = 36
 
     var composerHeight: CGFloat = 0
     var contentFloorHeight: CGFloat = 0
