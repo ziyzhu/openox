@@ -10,7 +10,8 @@ export type FileMutation =
   | { op: "mkdir"; path: string }
   | { op: "replace"; path: string; source: string; size: number; sha256: string; previous: { size: number; sha256: string } | null }
   | { op: "move"; path: string; source: string; size: number; sha256: string }
-  | { op: "remove"; path: string; directory: boolean };
+  | { op: "remove"; path: string; directory: boolean }
+  | { op: "trash"; path: string; directory: boolean; recursive: boolean };
 export interface ProfileFileBackend {
   stage(bytes: Uint8Array): Promise<FileRecord>;
   apply(operations: FileMutation[]): Promise<void | { conflict: boolean }>;
@@ -38,15 +39,20 @@ export type ProfileFileRecord = {
   stamp?: string;
 }
 export type FileObservation = FileRecord & { binary: boolean; mtime: number; stamp: string };
-export const ProfileFileState = defineDoc<{
+type ProfileFileStateValue = {
   initialized: boolean;
   files: Record<string, ProfileFileRecord>;
   directories: string[];
   deletedConversations: number[];
   pending: FileMutation[];
   pendingIndex?: { files: Record<string, ProfileFileRecord | null>; directories: string[] } | null;
-}>({
-  kind: "ox.workspace", version: 1, scope: "session",
+};
+export const ProfileFileState = defineDoc<ProfileFileStateValue>({
+  kind: "ox.workspace", version: 2, scope: "session",
+  migrate: (value, fromVersion) => {
+    if (fromVersion !== 1) throw new Error("Unsupported Profile file state version");
+    return value as ProfileFileStateValue;
+  },
   initial: () => ({ initialized: false, files: {}, directories: [], deletedConversations: [], pending: [], pendingIndex: null }),
   checkpointWhen: (_, __, info) => info.deltasSinceBase >= 31,
 });
@@ -109,7 +115,7 @@ export class ProfileFileStore {
     if (!state.pending.length) return true;
     const result = await this.backend.apply(state.pending);
     if (result?.conflict) {
-      if (!this.external) throw new FileError("invalid", "Profile file recovery requires storage preparation");
+      if (!this.external && !state.pending.every(operation => operation.op === "trash")) throw new FileError("invalid", "Profile file recovery requires storage preparation");
       await this.reconcile(true);
       return false;
     }
@@ -207,7 +213,9 @@ export class ProfileFileStore {
       else { state.files = files; state.directories = directories; state.pendingIndex = null; }
       state.pending = operations;
     }, context);
-    if (!(await this.recover())) throw new FileError("invalid", "External changes interrupted the operation; inspect current files before continuing");
+    if (!(await this.recover())) throw new FileError("invalid", operations.every(operation => operation.op === "trash")
+      ? "Native trash failed or the source changed; no permanent-delete fallback was used. Inspect the current files and storage provider."
+      : "External changes interrupted the operation; inspect current files before continuing");
   }
   private resolve(state: Awaited<ReturnType<ProfileFileStore["state"]>>, input: string, reference = true) {
     const path = canonical(input), files = Object.values(state.files);
@@ -434,7 +442,10 @@ export class ProfileFileStore {
       if (directory !== isDirectory) throw new FileError(directory ? "not_directory" : "is_directory", "Entry has the wrong type", path);
       if (!this.findPath(state, path)) throw new FileError("not_found", "File not found", path);
       if (directory && !recursive && [...state.directories, ...Object.values(state.files).map(file => file.path)].some(child => child !== path && beneath(child, path))) throw new FileError("invalid", "Directory is not empty", path);
-      await this.removeLocked(state, path);
+      const files = Object.fromEntries(Object.entries(state.files).filter(([, file]) => !beneath(file.path, path)));
+      await this.commit(files, state.directories.filter(directory => !beneath(directory, path)), [
+        { op: "trash", path, directory, recursive },
+      ]);
     }, undefined, [path]);
   }
   private async removeLocked(state: Awaited<ReturnType<ProfileFileStore["state"]>>, path: string, conversation?: number) {

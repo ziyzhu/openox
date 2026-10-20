@@ -38,9 +38,8 @@ nonisolated enum Actions {
     static let outputRead = "ox.output.read"
     static let fsWrite = "ox.fs.write"
     static let fsEdit = "ox.fs.edit"
-    static let fsDelete = "ox.fs.delete"
+    static let fsRm = "ox.fs.rm"
     static let fsMkdir = "ox.fs.mkdir"
-    static let fsRmdir = "ox.fs.rmdir"
     static let fsMove = "ox.fs.move"
     static let fsCopy = "ox.fs.copy"
     static let fsGlob = "ox.fs.glob"
@@ -93,7 +92,7 @@ nonisolated enum Actions {
         appModel, appDefaultModel, appSetModel, appSetDefaultModel, appActionPolicies, appRepositories,
         appLogs, appRenameConversation,
         webSearch, webFetch,
-        fsList, fsRead, fsAttach, fsWrite, fsEdit, fsDelete, fsMkdir, fsRmdir, fsMove, fsCopy, fsGlob, fsGrep,
+        fsList, fsRead, fsAttach, fsWrite, fsEdit, fsRm, fsMkdir, fsMove, fsCopy, fsGlob, fsGrep,
         visionAnalyze,
         serviceFind, serviceList, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryEnable, repositoryDisconnect,
@@ -115,7 +114,7 @@ nonisolated enum Actions {
 
     static func defaultPolicy(for action: String) -> ActionPolicy {
         guard builtIn.contains(action) else { return .ask }
-        return action.hasSuffix(".delete") || action == fsRmdir || action == providerGenerate || [scheduleCreate, scheduleEnable, scheduleRun].contains(action) ? .ask : .allow
+        return action.hasSuffix(".delete") || action == fsRm || action == providerGenerate || [scheduleCreate, scheduleEnable, scheduleRun].contains(action) ? .ask : .allow
     }
 
     static func label(for action: String) -> String? {
@@ -154,7 +153,7 @@ nonisolated enum Actions {
         case fsRead, outputRead: L10n.string("Read a file")
         case fsWrite: L10n.string("Write a file")
         case fsEdit: L10n.string("Edit a file")
-        case fsDelete, fsRmdir: L10n.string("Delete a file")
+        case fsRm: L10n.string("Delete a file")
         case fsMkdir, fsMove, fsCopy: L10n.string("Write a file")
         case fsGlob: L10n.string("Find files")
         case fsGrep: L10n.string("Search files")

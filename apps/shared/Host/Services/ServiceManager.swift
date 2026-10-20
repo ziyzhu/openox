@@ -750,8 +750,8 @@ final class ServiceManager {
         try await repository.updateLocalManifest(kind: kind.repositoryKind, id: domain, fields: fields)
     }
 
-    func deleteServiceSource(kind: ServicesMount.Kind, domain: String, path: [String]) async throws {
-        try await repository.deleteLocalSource(kind: kind.repositoryKind, id: domain, path: path)
+    func deleteServiceSource(kind: ServicesMount.Kind, domain: String, path: [String], recursive: Bool) async throws {
+        try await repository.deleteLocalSource(kind: kind.repositoryKind, id: domain, path: path, recursive: recursive)
     }
 
     func serviceSourcePaths(kind: ServicesMount.Kind, domain: String) async throws -> [String] {

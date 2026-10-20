@@ -94,7 +94,7 @@ actor DurableAgentHost {
               let operation = fields["op"]?.stringValue,
               capability.roots.contains(String(root)) || (operation == "read" && capability.roots.contains("")),
               fields["to"]?.stringValue.map({ capability.roots.contains(String($0.split(separator: "/").first ?? "")) }) ?? true,
-              ["info", "list", "read", "write", "delete", "activate", "mkdir", "rmdir", "move", "copy"].contains(operation) else {
+              ["info", "list", "read", "write", "rm", "activate", "mkdir", "move", "copy"].contains(operation) else {
             let fields = params.objectValue
             let capability = fields?["capability"]?.stringValue.flatMap { fileCapabilities[$0] }
             Log.agent.error("Filesystem.capability.rejected known=\(capability != nil) cancelled=\(capability?.cancelled.withLock { $0 } ?? false) scopeMatches=\(capability?.scope == StorageRoot.currentScope) operation=\(fields?["op"]?.stringValue ?? "missing") path=\(fields?["path"]?.stringValue ?? "missing") roots=\(capability?.roots.sorted().joined(separator: ",") ?? "missing")")
@@ -103,10 +103,7 @@ actor DurableAgentHost {
         if operation == "write", !["write", "edit"].contains(capability.operation) {
             throw RuntimeError.bridge("Filesystem capability cannot write")
         }
-        if operation == "delete", capability.operation != "delete" {
-            throw RuntimeError.bridge("Filesystem capability cannot delete")
-        }
-        if ["mkdir", "rmdir", "move", "copy"].contains(operation), capability.operation != operation {
+        if ["rm", "mkdir", "move", "copy"].contains(operation), capability.operation != operation {
             throw RuntimeError.bridge("Filesystem capability cannot \(operation)")
         }
         if operation == "activate", capability.operation != "read" {

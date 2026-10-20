@@ -163,8 +163,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
             return .service(kind, parts[2])
         case let parts where parts.count >= 4 && parts[0] == "services":
             guard let kind = ServicesMount.Kind(rawValue: parts[1]),
-                  ServicesMount.isID(parts[2]),
-                  parts.dropFirst(3).allSatisfy({ !$0.hasPrefix(".") }) else {
+                  ServicesMount.isID(parts[2]) else {
                 throw Error.invalidPath(rawPath)
             }
             return .serviceItem(kind, parts[2], Array(parts.dropFirst(3)))

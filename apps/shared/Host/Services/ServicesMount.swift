@@ -89,8 +89,8 @@ struct ServicesMount {
         try await manager.writeServiceSource(kind: kind, domain: domain, path: path, data: Data(content.utf8))
     }
 
-    func deleteSource(kind: Kind, domain: String, path: [String]) async throws {
-        try await manager.deleteServiceSource(kind: kind, domain: domain, path: path)
+    func deleteSource(kind: Kind, domain: String, path: [String], recursive: Bool) async throws {
+        try await manager.deleteServiceSource(kind: kind, domain: domain, path: path, recursive: recursive)
     }
 
     func sourcePaths(kind: Kind, domain: String) async throws -> [String] {

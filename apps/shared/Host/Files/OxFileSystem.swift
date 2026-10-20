@@ -3,7 +3,7 @@ import JavaScriptCore
 
 nonisolated enum OxFileSystem {
     static let actions = [Actions.fsList, Actions.fsRead, Actions.fsAttach, Actions.visionAnalyze,
-                          Actions.fsWrite, Actions.fsEdit, Actions.fsDelete, Actions.fsMkdir, Actions.fsRmdir, Actions.fsMove, Actions.fsCopy, Actions.fsGlob, Actions.fsGrep]
+                          Actions.fsWrite, Actions.fsEdit, Actions.fsRm, Actions.fsMkdir, Actions.fsMove, Actions.fsCopy, Actions.fsGlob, Actions.fsGrep]
 
     static let function = OxFunction(
         namespace: "fs",
@@ -21,9 +21,8 @@ nonisolated enum OxFileSystem {
           attach: (value) => __nativeFS('attach', __oxOptions(value, 'ox.fs.attach')),
           write: (value) => __nativeFS('write', __oxOptions(value, 'ox.fs.write')),
           edit: (value) => __nativeFS('edit', __oxOptions(value, 'ox.fs.edit')),
-          delete: (value) => __nativeFS('delete', __oxOptions(value, 'ox.fs.delete')),
+          rm: (value) => __nativeFS('rm', __oxOptions(value, 'ox.fs.rm')),
           mkdir: (value) => __nativeFS('mkdir', __oxOptions(value, 'ox.fs.mkdir')),
-          rmdir: (value) => __nativeFS('rmdir', __oxOptions(value, 'ox.fs.rmdir')),
           move: (value) => __nativeFS('move', __oxOptions(value, 'ox.fs.move')),
           copy: (value) => __nativeFS('copy', __oxOptions(value, 'ox.fs.copy')),
           glob: (value) => __nativeFS('glob', __oxOptions(value, 'ox.fs.glob')),

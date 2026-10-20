@@ -11,7 +11,7 @@ import { profileMounts } from "../../profile/filesystem";
 
 export interface NativeFileMount { path: string; access: "readOnly" | "readWrite" }
 export async function invokeFilesystem(runtime: ProfileRuntime, capability: string, mounts: NativeFileMount[], operation: FileOperation, args: FileRequest, signal: AbortSignal) {
-  if (!capability || !Array.isArray(mounts) || !["list", "read", "write", "edit", "delete", "mkdir", "rmdir", "move", "copy", "glob", "grep"].includes(operation)) throw new Error("Invalid filesystem capability");
+  if (!capability || !Array.isArray(mounts) || !["list", "read", "write", "edit", "rm", "mkdir", "move", "copy", "glob", "grep"].includes(operation)) throw new Error("Invalid filesystem capability");
   const context = withAbortSignal(signal, BACKGROUND_CONTEXT);
   const originals = new Map<string, string>();
   const call = async <T>(op: string, path: string, values: object = {}) => {
@@ -35,9 +35,9 @@ export async function invokeFilesystem(runtime: ProfileRuntime, capability: stri
     write: async (path, content, _context, expected) => {
       await call("write", path, typeof content === "string" ? { content, expected: expected ?? originals.get(path) } : { base64: encodeBase64(content) });
     },
-    remove: async path => { await call("delete", path); },
+    remove: async path => { await call("rm", path); },
     createDirectory: async (path, _context, recursive) => { await call("mkdir", path, { recursive: recursive ?? false }); },
-    removeDirectory: async (path, recursive) => { await call("rmdir", path, { recursive }); },
+    removeDirectory: async (path, recursive) => { await call("rm", path, { recursive }); },
     move: async (from, to) => { await call("move", from, { to }); },
     copy: async (from, to) => { await call("copy", from, { to }); },
   };

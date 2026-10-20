@@ -39,8 +39,8 @@ test("real execute loop preserves filesystem state, errors, contract validation 
     "console.log(await ox.fs.write({path:'note.txt',content:'before',purpose:'Write note'}));",
     "console.log(await ox.fs.edit({path:'note.txt',edits:[{oldText:'before',newText:'after'}],purpose:'Edit note'}));",
     "console.log(await ox.fs.read({path:'note.txt',purpose:'Read note'}));",
-    "try {await ox.app.profile({purpose:'Read',unknown:true})} catch(e) {console.log(e.code)}; try {await ox.fs.delete({path:'note.txt',purpose:'Delete'})} catch(e) {console.log(e.code)}",
-  ], { denied: ["ox.fs.delete"] });
+    "try {await ox.app.profile({purpose:'Read',unknown:true})} catch(e) {console.log(e.code)}; try {await ox.fs.rm({path:'note.txt',purpose:'Trash'})} catch(e) {console.log(e.code)}",
+  ], { denied: ["ox.fs.rm"] });
   try {
     const conversation = await runtime.request<{ conversationId: string }>(["conversation", "new", "--temporary"]);
     await runtime.request(["conversation", "send", "Edit a note"], conversation.conversationId);
@@ -80,7 +80,7 @@ test("execute exposes namespace and function help without process, network, or d
   expect(result).toContain("inputSchema");
   expect(result).toContain("EvalError");
   expect(calls).toEqual([]);
-  expect(Object.keys(catalog)).toHaveLength(99);
+  expect(Object.keys(catalog)).toHaveLength(98);
 });
 
 test("cancellation terminates runaway execute code without a Host or simulator", async () => {

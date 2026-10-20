@@ -71,7 +71,7 @@ export class EvalRuntime {
     try {
       this.stubs.validate(name, args);
       const profileMutation = ["ox.skill.create", "ox.skill.copy", "ox.skill.delete"].includes(name) ||
-        ["write", "edit", "delete", "mkdir", "rmdir", "move", "copy"].some(operation => name === `ox.fs.${operation}`) &&
+        ["write", "edit", "rm", "mkdir", "move", "copy"].some(operation => name === `ox.fs.${operation}`) &&
         [args.path, args.from, args.to].some(path => typeof path === "string" && /^(MEMORY\.md|SOUL\.md|skills)(\/|$)/.test(canonical(path)));
       if (this.temporary.has(id) && profileMutation) throw new StubError("permission_denied", "Temporary conversations cannot mutate Profile documents");
       let value: unknown;

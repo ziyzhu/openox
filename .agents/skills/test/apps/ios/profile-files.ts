@@ -185,7 +185,7 @@ try {
     await rejected("ox.fs.move", { from: `${mounted}/new/note.md`, to: `${shared}/from-files.md` });
     await rejected("ox.fs.move", { from: `${mounted}/new/note.md`, to: `/files/${prefix}-other/note.md` });
     const mountedPurpose = `Remove mounted ${prefix}`;
-    await approve(`return await ox.fs.rmdir({path:${JSON.stringify(mounted)},recursive:true,purpose:${JSON.stringify(mountedPurpose)}})`, mountedPurpose);
+    await approve(`return await ox.fs.rm({path:${JSON.stringify(mounted)},recursive:true,purpose:${JSON.stringify(mountedPurpose)}})`, mountedPurpose);
     await rejected("ox.fs.list", { path: mounted });
     checks.push("chosen Files folders support text and binary writes, edits, directories, in-folder file and directory copies and moves, and approved recursive removal, but reject cross-mount transfers");
   }
@@ -198,7 +198,7 @@ try {
   assert.equal((await call("ox.fs.list", { path: `${shared}/empty` })).items.length, 0);
   checks.push("current file contents, paths, and empty directories persist through process reopen");
   const removalPurpose = `Remove ${prefix}`;
-  await approve(`return await ox.fs.rmdir({path:${JSON.stringify(shared)},recursive:true,purpose:${JSON.stringify(removalPurpose)}})`, removalPurpose);
+  await approve(`return await ox.fs.rm({path:${JSON.stringify(shared)},recursive:true,purpose:${JSON.stringify(removalPurpose)}})`, removalPurpose);
   assert(!(await call("ox.fs.list", { path: "/" })).items.some((item: { path: string }) => item.path === prefix));
   await assert.rejects(() => inspectFile(original.filename));
   await rejected("ox.fs.read", { path: `${shared}/nested/current.html` });
@@ -223,7 +223,7 @@ try {
   await assert.rejects(() => inspectFile(ownedReference.filename));
   assert.equal((await call("ox.fs.read", { path: `${ownershipRoot}/survivor.md` })).text, "Conversation-owned content\n");
   checks.push("conversation deletion reclaims transferred-back owned files without retaining referenced bytes or deleting shared copies");
-  await approve(`return await ox.fs.rmdir({path:${JSON.stringify(ownershipRoot)},recursive:true,purpose:${JSON.stringify(removalPurpose)}})`, removalPurpose);
+  await approve(`return await ox.fs.rm({path:${JSON.stringify(ownershipRoot)},recursive:true,purpose:${JSON.stringify(removalPurpose)}})`, removalPurpose);
   console.log(`PASS Profile filesystem E2E (${checks.length} check groups)`);
 } finally {
   try {

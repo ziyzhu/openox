@@ -31,9 +31,10 @@ nonisolated final class DurableFileDirectory {
         if privateStage, parts.count == 2, ["artifacts", ".files", "staging"].contains(parts[0]), parts[1].hasPrefix(".stage-"), UUID(uuidString: String(parts[1].dropFirst(7))) != nil { return parts }
         let reserved = (privateContent ? [] : ["payloads", "staging"]) + ["profile.json", "state.sqlite", "state.sqlite-wal", "state.sqlite-shm", "skill-selections.json", "services", "files", "history", "chats"]
         guard !path.isEmpty, path.utf8.count <= 4096, parts.count <= 64,
-              !reserved.contains(parts[0].lowercased()), !parts[0].lowercased().hasPrefix("state.sqlite-"), parts.allSatisfy({ !$0.isEmpty && !$0.hasPrefix(".") && $0.utf8.count <= 240 && !$0.contains("\\") && !$0.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) }) else {
+              !reserved.contains(parts[0].lowercased()), !parts[0].lowercased().hasPrefix("state.sqlite-"), parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && ![".ox", ".files"].contains($0.lowercased()) && !$0.lowercased().hasPrefix(".ox-stage-") && !$0.lowercased().hasPrefix(".stage-") && $0.utf8.count <= 240 && !$0.contains("\\") && !$0.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) }) else {
             throw failure("Invalid Profile file path", code: EACCES)
         }
+        guard path.lowercased() != "artifacts/.saved.json" else { throw failure("Private file metadata is not accessible", code: EACCES) }
         if parts[0] == "conversations", parts.count > 1 {
             guard let id = Int(parts[1]), id >= 0, String(id) == parts[1] else { throw failure("Invalid conversation directory", code: EINVAL) }
         }
@@ -224,6 +225,16 @@ nonisolated final class DurableFileDirectory {
                 guard !(try existing(directory, name, directory: false)) else { throw failure("Destination already exists", code: EEXIST) }
                 guard let source = operation["source"] as? String, let size = operation["size"] as? Int, let digest = operation["sha256"] as? String else { throw failure("Invalid move", code: EINVAL) }
                 try verify(source, size: size, digest: digest)
+            case "trash":
+                guard let isDirectory = operation["directory"] as? Bool,
+                      let recursive = operation["recursive"] as? Bool,
+                      try existing(directory, name, directory: isDirectory) else { throw failure("Invalid trash source", code: ENOENT) }
+                if isDirectory, !recursive {
+                    let fd = openat(directory, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+                    guard fd >= 0 else { throw failure("Pin directory trash") }
+                    defer { Darwin.close(fd) }
+                    guard try entries(fd).isEmpty else { throw failure("Directory is not empty", code: ENOTEMPTY) }
+                }
             case "remove":
                 let isDirectory = operation["directory"] as? Bool == true
                 guard try existing(directory, name, directory: isDirectory) else { throw failure("Entry disappeared before deletion", code: ENOENT) }
@@ -246,7 +257,7 @@ nonisolated final class DurableFileDirectory {
             let directory: Int32, name: String
             do { (directory, name) = try parent(path) }
             catch {
-                if op == "remove", (error as NSError).code == Int(ENOENT) { continue }
+                if ["remove", "trash"].contains(op), (error as NSError).code == Int(ENOENT) { continue }
                 throw error
             }
             defer { Darwin.close(directory) }
@@ -254,6 +265,31 @@ nonisolated final class DurableFileDirectory {
             case "mkdir":
                 if !(try existing(directory, name, directory: true)) {
                     guard mkdirat(directory, name, 0o700) == 0 else { throw failure("Create Profile directory") }
+                }
+            case "trash":
+                guard let isDirectory = operation["directory"] as? Bool else { throw failure("Invalid trash operation", code: EINVAL) }
+                if try existing(directory, name, directory: isDirectory) {
+                    try validate([operation])
+                    let url = root.appendingPathComponent(path)
+                    let coordinator = NSFileCoordinator()
+                    var coordinationError: NSError?
+                    var result: Result<Void, any Error>?
+                    coordinator.coordinate(writingItemAt: url, options: .forDeleting, error: &coordinationError) { coordinatedURL in
+                        result = Result {
+                            try self.validate([operation])
+                            var expected = stat(), current = stat()
+                            guard fstatat(directory, name, &expected, AT_SYMLINK_NOFOLLOW) == 0,
+                                  lstat(coordinatedURL.path, &current) == 0,
+                                  current.st_dev == expected.st_dev, current.st_ino == expected.st_ino else {
+                                throw self.failure("Trash source changed during coordination", code: EBUSY)
+                            }
+                            try FileManager.default.trashItem(at: coordinatedURL, resultingItemURL: nil)
+                        }
+                    }
+                    if let coordinationError { throw coordinationError }
+                    guard let result else { throw failure("Native trash did not run", code: EIO) }
+                    try result.get()
+                    Log.agent.info("ProfileFiles.trash path=\(path) directory=\(isDirectory)")
                 }
             case "remove":
                 guard let isDirectory = operation["directory"] as? Bool else { throw failure("Invalid removal", code: EINVAL) }

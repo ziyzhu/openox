@@ -103,7 +103,7 @@ nonisolated final class DurableFileStore {
                 }
             } catch {
                 let failure = error as NSError
-                if op == "filesApply", failure.domain == "OxDurablePayload" ||
+                if op == "filesApply", operations.allSatisfy({ $0["op"] as? String == "trash" }) || failure.domain == "OxDurablePayload" ||
                     (failure.domain == "OxProfileFiles" && [ENOENT, EEXIST, ENOTEMPTY, EACCES, ELOOP].contains(Int32(failure.code))) {
                     Log.agent.warning("Filesystem.recovery conflict operations=\(operations.count) domain=\(failure.domain) code=\(failure.code)")
                     return ["conflict": true]

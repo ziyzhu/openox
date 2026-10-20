@@ -96,6 +96,11 @@ nonisolated enum ApplicationStorageMigrator {
                     let action = canonicalApprovalAction(entry.key)
                     if migratedActions[action] == nil { migratedActions[action] = entry.value }
                 }
+                if migratedActions[Actions.fsRm] == nil {
+                    let removalPolicies = ["ox.fs.delete", "ox.fs.rmdir"].compactMap { storedActions[$0] }
+                    if removalPolicies.contains(.block) { migratedActions[Actions.fsRm] = .block }
+                    else if removalPolicies.contains(.ask) { migratedActions[Actions.fsRm] = .ask }
+                }
                 configuration.actions = migratedActions
                 if migratedFormat || configuration.actions != storedActions,
                    let updated = try? JSONEncoder().encode(configuration) {

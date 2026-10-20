@@ -98,7 +98,7 @@ try {
   assert((await call("ox.fs.grep", { path: "skills/manage-skills", pattern: "Create" })).matches.length > 0);
   await rejected("ox.fs.write", { path, content: "changed" }, /reserved|isn't supported|read-only/);
   await rejected("ox.fs.edit", { path, edits: [{ oldText: "# Manage Skills", newText: "changed" }] }, /reserved|isn't supported|read-only/);
-  await rejected("ox.fs.delete", { path }, /reserved|isn't supported|read-only/);
+  await rejected("ox.fs.rm", { path }, /reserved|isn't supported|read-only/);
   await rejected("ox.fs.write", { path: "guidance/manage-skills/guide.md", content: "changed" }, /reserved|isn't supported|read-only/);
   await rejected("ox.fs.read", { path: "guidance/../MEMORY.md" }, /Invalid (Profile file|virtual) path/);
   await rejected("ox.fs.read", { path: "skills/manage-skills/references/missing.md" }, /No skill named|missing|not found/i);

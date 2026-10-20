@@ -63,13 +63,13 @@ extension Conversation {
                 guard let content = fields?["content"]?.stringValue else { throw RuntimeError.bridge("Missing file content") }
                 value = try await writeFileBackend(path: path, content: content, expected: fields?["expected"]?.stringValue)
             }
-        case "mkdir", "rmdir":
-            value = try await directoryFileBackend(path: path, remove: operation == "rmdir", recursive: arguments.objectValue?["recursive"]?.boolValue ?? false)
+        case "mkdir":
+            value = try await directoryFileBackend(path: path, recursive: arguments.objectValue?["recursive"]?.boolValue ?? false)
         case "move", "copy":
             guard let destination = arguments.objectValue?["to"]?.stringValue else { throw RuntimeError.bridge("Missing transfer destination") }
             value = try await transferFileBackend(from: path, to: destination, copy: operation == "copy")
-        case "delete":
-            value = try await deleteFileBackend(path: path)
+        case "rm":
+            value = try await removeFileBackend(path: path, recursive: arguments.objectValue?["recursive"]?.boolValue ?? false)
         case "activate":
             let location = try await fileSystemLocation(path)
             guard case .skillFile(let name) = location else { throw RuntimeError.bridge("Invalid skill activation path") }
@@ -216,7 +216,7 @@ extension Conversation {
             if record.objectValue?["file"] != .null, record.objectValue?["file"] != nil {
                 let media = try await fileSystemMedia(path: path)
                 let result = try await Task.detached(priority: .userInitiated) {
-                    try FileLibrary.read(data: media.data, kind: media.kind, options: .init())
+                    try media.read()
                 }.value
                 let unsupported = media.kind == .image
                     ? try ModelPromptRenderer.shared.render(.imageReadGuidance, input: .object(["path": .string(path)])) : result.unsupported
@@ -267,6 +267,11 @@ extension Conversation {
         let kind: FileItem.Kind
         let data: Data
         let reference: String?
+
+        func read() throws -> FileLibrary.Read {
+            let textDotfile = kind == .file && filename.hasPrefix(".") && !data.contains(0) && String(data: data, encoding: .utf8) != nil
+            return try FileLibrary.read(data: data, kind: textDotfile ? .text : kind, options: .init())
+        }
 
         init(artifact: FileItem, data: Data, reference: String? = nil) {
             filename = artifact.displayName
@@ -388,28 +393,21 @@ extension Conversation {
         return fileSystemItem(path: location.path, type: "file", size: data.count)
     }
 
-    private func directoryFileBackend(path: String, remove: Bool, recursive: Bool) async throws -> JSONValue {
+    private func directoryFileBackend(path: String, recursive: Bool) async throws -> JSONValue {
         let location = try await fileSystemLocation(path)
         guard case .deviceItem = location else {
-            guard !remove, try await fileSystemIsDirectory(location) else { throw VirtualFileSystem.Error.unsupportedMutation(location.path) }
+            guard try await fileSystemIsDirectory(location) else { throw VirtualFileSystem.Error.unsupportedMutation(location.path) }
             _ = try await listFileBackend(path: path)
             return .null
         }
-        try await requireWritableFileContext(location, action: remove ? Actions.fsRmdir : Actions.fsMkdir)
-        try await authorizeFileAccess(location, operation: remove ? .delete : .write)
+        try await requireWritableFileContext(location, action: Actions.fsMkdir)
+        try await authorizeFileAccess(location, operation: .write)
         try await fileMutationCoordinator.perform(key: fileMutationKey(location)) {
-            try await self.withDeviceFile(location, mode: remove ? .delete : .write) { url in
-                guard remove else { return try FileManager.default.createDirectory(at: url, withIntermediateDirectories: recursive) }
-                guard try url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true else {
-                    throw VirtualFileSystem.Error.notDirectory(location.path)
-                }
-                guard try recursive || FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]).isEmpty else {
-                    throw VirtualFileSystem.Error.notEmpty(location.path)
-                }
-                try FileManager.default.removeItem(at: url)
+            try await self.withDeviceFile(location, mode: .write) { url in
+                try FileManager.default.createDirectory(at: url, withIntermediateDirectories: recursive)
             }
         }
-        Log.session.info("bridge.fs.directory path=\(location.path) remove=\(remove) recursive=\(recursive)")
+        Log.session.info("bridge.fs.mkdir path=\(location.path) recursive=\(recursive)")
         return .null
     }
 
@@ -431,29 +429,32 @@ extension Conversation {
         return .null
     }
 
-    private func deleteFileBackend(path: String) async throws -> JSONValue {
+    private func removeFileBackend(path: String, recursive: Bool) async throws -> JSONValue {
         let location = try await fileSystemLocation(path)
         try Task.checkCancellation()
-        try await self.requireWritableFileContext(location, action: Actions.fsDelete)
-        try await self.authorizeFileAccess(location, operation: .delete)
-        switch location {
-        case .artifact(let name):
-            _ = try await repository.deleteFile(named: name, in: scope)
-        case .skill(let name), .skillFile(let name):
-            try await skillsMount.delete(name: name)
-            refreshUserSkills()
-        case .skillResource(let name, let path):
-            var skill = try await skillsMount.entry(named: name).skill
-            guard skill.resources?.removeValue(forKey: path) != nil else { throw SkillError.missing(path) }
-            _ = try await skillsMount.save(skill)
-        case .serviceItem(let kind, let domain, let path):
-            try await servicesMount.deleteSource(kind: kind, domain: domain, path: path)
-        case .deviceItem:
-            try await self.deleteDeviceFile(location)
-        default:
-            throw VirtualFileSystem.Error.unsupportedMutation(location.path)
+        try await requireWritableFileContext(location, action: Actions.fsRm)
+        try await authorizeFileAccess(location, operation: .delete)
+        if case .serviceItem(let kind, let domain, let path) = location {
+            try await fileMutationCoordinator.perform(key: fileMutationKey(location)) {
+                try await self.servicesMount.deleteSource(kind: kind, domain: domain, path: path, recursive: recursive)
+            }
+            return .object(["path": .string(location.path), "deleted": .bool(true)])
         }
-        Log.session.info("bridge.fs.delete path=\(location.path)")
+        guard case .deviceItem = location else { throw VirtualFileSystem.Error.unsupportedMutation(location.path) }
+        try await fileMutationCoordinator.perform(key: fileMutationKey(location)) {
+            try await self.withDeviceFile(location, mode: .delete) { url in
+                let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey])
+                guard values.isRegularFile == true || values.isDirectory == true else {
+                    throw VirtualFileSystem.Error.unsupportedMutation(location.path)
+                }
+                if values.isDirectory == true, !recursive,
+                   try !FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil).isEmpty {
+                    throw VirtualFileSystem.Error.notEmpty(location.path)
+                }
+                try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            }
+        }
+        Log.session.info("bridge.fs.rm path=\(location.path) recursive=\(recursive) trashed=true")
         return .object(["path": .string(location.path), "deleted": .bool(true)])
     }
 
@@ -484,7 +485,7 @@ extension Conversation {
     }
 
     func requireWritableFileAction(_ action: String, args: Any?) async throws {
-        guard [Actions.fsWrite, Actions.fsEdit, Actions.fsDelete].contains(action),
+        guard [Actions.fsWrite, Actions.fsEdit, Actions.fsRm].contains(action),
               let path = (args as? [String: Any])?["path"] as? String else { return }
         let root = path.split(separator: "/").first.map(String.init) ?? ""
         if ["MEMORY.md", "SOUL.md", "skills", "services", "files"].contains(root) {
@@ -577,7 +578,7 @@ extension Conversation {
             let urls = try FileManager.default.contentsOfDirectory(
                 at: directory,
                 includingPropertiesForKeys: Array(keys),
-                options: [.skipsHiddenFiles]
+                options: []
             )
             return try urls.compactMap { url in
                 let values = try url.resourceValues(forKeys: keys)
@@ -595,14 +596,6 @@ extension Conversation {
                 }
                 return nil
             }
-        }
-    }
-
-    private func deleteDeviceFile(_ location: VirtualFileSystem.Location) async throws {
-        try await withDeviceFile(location, mode: .delete) { url in
-            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey])
-            guard values.isRegularFile == true else { throw VirtualFileSystem.Error.unsupportedMutation(location.path) }
-            try FileManager.default.removeItem(at: url)
         }
     }
 
@@ -639,14 +632,12 @@ extension Conversation {
         case .deviceItem:
             let media = try await fileSystemMedia(path: location.path)
             let result = try await Task.detached(priority: .userInitiated) {
-                try FileLibrary.read(data: media.data, kind: media.kind, options: .init())
+                try media.read()
             }.value
             let unsupported: String?
             switch media.kind {
             case .image:
                 unsupported = try ModelPromptRenderer.shared.render(.imageReadGuidance, input: .object(["path": .string(location.path)]))
-            case .file:
-                unsupported = ModelGuidance.text("file.conversion")
             default:
                 unsupported = result.unsupported
             }

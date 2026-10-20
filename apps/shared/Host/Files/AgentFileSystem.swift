@@ -3,8 +3,7 @@ import Foundation
 extension Conversation {
     public func fileSystemOperation(name: String, arguments: JSONValue) async throws -> JSONValue? {
         let actions = ["list": Actions.fsList, "read": Actions.fsRead, "write": Actions.fsWrite,
-                       "edit": Actions.fsEdit, "delete": Actions.fsDelete, "mkdir": Actions.fsMkdir,
-                       "rmdir": Actions.fsRmdir, "move": Actions.fsMove, "copy": Actions.fsCopy,
+                       "edit": Actions.fsEdit, "rm": Actions.fsRm, "mkdir": Actions.fsMkdir, "move": Actions.fsMove, "copy": Actions.fsCopy,
                        "glob": Actions.fsGlob, "grep": Actions.fsGrep]
         if name == "attach", let args = arguments.objectValue, let path = args["path"]?.stringValue {
             if path.lowercased().hasPrefix("http:") || path.lowercased().hasPrefix("https:") {
@@ -49,7 +48,7 @@ extension Conversation {
             recorded["bytes"] = .int(base64.utf8.count / 4 * 3)
         }
         return try await tracked(action, .object(recorded), purpose: purpose) {
-            if ["write", "edit", "delete", "mkdir", "rmdir", "move", "copy"].contains(name) {
+            if ["write", "edit", "rm", "mkdir", "move", "copy"].contains(name) {
                 for candidate in [path, args["to"]?.stringValue].compactMap({ $0 }) {
                     let root = candidate.split(separator: "/").first.map(String.init) ?? ""
                     let temporaryFiles = isTemporary && route.artifactScope != nil && !["MEMORY.md", "SOUL.md", "skills", "history"].contains(root)

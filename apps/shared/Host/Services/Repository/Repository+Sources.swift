@@ -35,7 +35,7 @@ extension Repository {
         return try FileManager.default.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey],
-            options: [.skipsHiddenFiles]
+            options: []
         ).compactMap { url in
             let values = try url.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey])
             guard values.isSymbolicLink != true else { return nil }
@@ -114,14 +114,20 @@ extension Repository {
         Log.service.info("Repository.local update id=\(id) kind=\(kind.rawValue) fields=\(fields.keys.sorted().joined(separator: ","))")
     }
 
-    func deleteLocalSource(kind: ServiceKind, id: String, path: [String]) throws {
+    func deleteLocalSource(kind: ServiceKind, id: String, path: [String], recursive: Bool) throws {
+        guard !path.isEmpty else { throw Failure(message: "Use service deletion for a service root.") }
         let source = try editableSource(kind: kind, id: id)
         let url = try sourceURL(source, path: path)
-        guard try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else {
-            throw Failure(message: "Only Local service files can be deleted.")
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey])
+        guard values.isRegularFile == true || values.isDirectory == true else {
+            throw Failure(message: "Only Local service files and directories can be trashed.")
         }
-        try FileManager.default.removeItem(at: url)
-        Log.service.info("Repository.local delete id=\(id) path=\(path.joined(separator: "/"))")
+        if values.isDirectory == true, !recursive,
+           try !FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil).isEmpty {
+            throw Failure(message: "Directory is not empty; recursive removal is required.")
+        }
+        try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        Log.service.info("Repository.local trash id=\(id) path=\(path.joined(separator: "/")) recursive=\(recursive)")
     }
 
     func validateLocalSource(kind: ServiceKind, id: String) throws {
@@ -142,7 +148,7 @@ extension Repository {
         let source = try await readableSource(kind: kind, id: id)
         if !source.provenance.exposesFullSource { return ["services/\(kind.rawValue)/\(id)/service.json"] }
         var paths: [String] = []
-        try Self.forEachFile(in: source.root, options: [.skipsHiddenFiles, .skipsPackageDescendants]) { _, values, path in
+        try Self.forEachFile(in: source.root, options: [.skipsPackageDescendants]) { _, values, path in
             guard values.isSymbolicLink != true, values.isRegularFile == true else { return true }
             var relative = path
             if relative == "manifest.json" {
@@ -178,7 +184,7 @@ extension Repository {
 
     func sourceURL(_ source: ActiveSource, path: [String], legacyFallback: Bool = false) throws -> URL {
         guard path.allSatisfy({
-            !$0.isEmpty && $0 != "." && $0 != ".." && !$0.hasPrefix(".") && !$0.contains("/") && !$0.contains("\\")
+            !$0.isEmpty && $0 != "." && $0 != ".." && ![".ox", ".files"].contains($0.lowercased()) && !$0.lowercased().hasPrefix(".stage-") && !$0.lowercased().hasPrefix(".ox-stage-") && !$0.contains("/") && !$0.contains("\\")
         }) else {
             throw Failure(message: "Invalid service path")
         }

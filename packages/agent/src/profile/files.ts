@@ -289,9 +289,9 @@ export class ProfileFiles {
   }
   async remove(path: string, directory = false, recursive = false) {
     path = canonical(path);
-    if (this.store && (!this.isStoredDocument(path) || this.publicFiles && directory)) { await this.store.remove(path, directory, recursive); return; }
+    if (["MEMORY.md", "SOUL.md", "skill-selections.json"].includes(path)) throw new FileError("permission_denied", "Profile documents cannot be removed", path);
+    if (this.store && (this.publicFiles || !this.isStoredDocument(path))) { await this.store.remove(path, directory, recursive); return; }
     owned(path);
-    if (this.publicFiles && publicDocument(path)) { await this.physicalStore().documentBatch([], [path]); return; }
     await this.serialize(() => this.harness.commit(async tx => {
       delete (await tx.doc(ProfileIndex)).files[path];
       if (!this.artifacts || !path.startsWith("artifacts/")) await tx.retireDoc(ProfileFile, path);

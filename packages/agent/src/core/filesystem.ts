@@ -11,7 +11,7 @@ import { bundledSkills } from "./bundled-skills";
 import { decodeBase64 } from "./base64";
 
 const tools = { read: createReadTool(), write: createWriteTool(), edit: createEditTool() };
-export type FileOperation = "list" | "read" | "write" | "edit" | "delete" | "mkdir" | "rmdir" | "move" | "copy" | "glob" | "grep";
+export type FileOperation = "list" | "read" | "write" | "edit" | "rm" | "mkdir" | "move" | "copy" | "glob" | "grep";
 export interface FileRequest {
   path?: string; from?: string; to?: string; recursive?: boolean; purpose?: string; offset?: number; limit?: number; content?: string; base64?: string;
   edits?: { oldText: string; newText: string }[]; pattern?: string;
@@ -21,7 +21,7 @@ type SearchMatch = { path: string; line: number; text: string; before: string[];
 type Candidates = { paths: string[]; truncated: boolean; diagnostics: { severity: string; code: string; message: string }[] };
 const maximumFiles = 1_000;
 const maximumEntries = 10_000;
-const mutations = new Set(["write", "edit", "delete", "mkdir", "rmdir", "move", "copy"]);
+const mutations = new Set(["write", "edit", "rm", "mkdir", "move", "copy"]);
 const immutableRoots = new Set(bundledSkills.map(skill => `skills/${skill.name}`));
 const encoder = new TextEncoder();
 const item = (info: FileInfo & { cloud?: string | null }) => ({ path: canonical(info.path), name: info.name, type: info.kind,
@@ -277,10 +277,6 @@ export class AgentFileSystem {
       getOrThrow(await env.createDir(path, { recursive: args.recursive ?? false }, context));
       return item(getOrThrow(await env.fileInfo(path, context)));
     }
-    if (operation === "rmdir") {
-      getOrThrow(await env.removeDirectory(path, args.recursive ?? false, context));
-      return { path, deleted: true };
-    }
     if (operation === "move" || operation === "copy") {
       getOrThrow(await env.transfer(path, args.to!, operation === "copy", context));
       return item(getOrThrow(await env.fileInfo(args.to!, context)));
@@ -290,9 +286,12 @@ export class AgentFileSystem {
       const count = args.options?.limit ?? 50;
       return { items: entries.slice(0, count).map(item), truncated: entries.length > count };
     }
-    if (operation === "delete") {
-      if ((getOrThrow(await env.fileInfo(path, context))).kind === "directory") throw new FileError("is_directory", "Use rmdir for directories", path);
-      getOrThrow(await env.remove(path, undefined, context));
+    if (operation === "rm") {
+      if ((getOrThrow(await env.fileInfo(path, context))).kind === "directory") {
+        getOrThrow(await env.removeDirectory(path, args.recursive ?? false, context));
+      } else {
+        getOrThrow(await env.remove(path, undefined, context));
+      }
       return { path, deleted: true };
     }
     if (operation === "glob" || operation === "grep") return this.search(env, operation, args, context);
