@@ -18,7 +18,7 @@ export interface FileRequest {
   options?: { limit?: number; glob?: string; ignoreCase?: boolean; literal?: boolean; contextLines?: number };
 }
 type SearchMatch = { path: string; line: number; text: string; before: string[]; after: string[] };
-type Candidates = { paths: string[]; truncated: boolean };
+type Candidates = { paths: string[]; truncated: boolean; diagnostics: { severity: string; code: string; message: string }[] };
 const maximumFiles = 1_000;
 const maximumEntries = 10_000;
 const mutations = new Set(["write", "edit", "delete", "mkdir", "rmdir", "move", "copy"]);
@@ -161,6 +161,7 @@ function readPage(result: ToolExecutionResult, args: FileRequest, totalLines: nu
 async function fileCandidates(env: MountedExecutionEnv, root: FileInfo, excluded: Set<string>, context: Context): Promise<Candidates> {
   const pending = [root];
   const paths: string[] = [];
+  const diagnostics: Candidates["diagnostics"] = [];
   let visited = 0;
   let truncated = false;
   while (pending.length) {
@@ -169,10 +170,18 @@ async function fileCandidates(env: MountedExecutionEnv, root: FileInfo, excluded
     if (++visited > maximumEntries || paths.length >= maximumFiles) { truncated = true; break; }
     const path = canonical(info.path);
     if (excluded.has(path)) continue;
-    if (info.kind === "directory") pending.push(...getOrThrow(await env.listDir(path, context)));
-    else if (info.kind === "file") paths.push(path);
+    if (info.kind === "directory") {
+      const result = await env.listDir(path, context);
+      context.abortSignal?.throwIfAborted();
+      if (result.ok) pending.push(...result.value);
+      else {
+        if (info === root || !["not_found", "not_directory", "permission_denied", "unknown"].includes(result.error.code)) throw result.error;
+        truncated = true;
+        diagnostics.push({ severity: "warn", code: result.error.code, message: `Could not search ${path}: ${result.error.message}` });
+      }
+    } else if (info.kind === "file") paths.push(path);
   }
-  return { paths: paths.sort(), truncated };
+  return { paths: paths.sort(), truncated, diagnostics };
 }
 async function searchFile(env: MountedExecutionEnv, path: string, remainingBytes: number, context: Context) {
   const info = getOrThrow(await env.fileInfo(path, context));
@@ -225,7 +234,7 @@ async function grepFiles(env: MountedExecutionEnv, candidates: Candidates, args:
     matches.push(...searchLines(path, file.text, match, contextLines, count - matches.length, context));
     if (matches.length >= count) { truncated = true; break; }
   }
-  return { matches, scannedFiles, skippedFiles, truncated };
+  return { matches, scannedFiles, skippedFiles, truncated, diagnostics: candidates.diagnostics };
 }
 
 export class AgentFileSystem {
@@ -315,6 +324,6 @@ export class AgentFileSystem {
     if (operation === "grep") return grepFiles(env, candidates, args, match, context);
     const paths = candidates.paths.filter(path => match.test(relativePath(base, path)));
     const count = options.limit ?? 100;
-    return { paths: paths.slice(0, count), truncated: candidates.truncated || paths.length > count };
+    return { paths: paths.slice(0, count), truncated: candidates.truncated || paths.length > count, diagnostics: candidates.diagnostics };
   }
 }
