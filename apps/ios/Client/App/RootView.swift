@@ -133,23 +133,18 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
                 .ignoresSafeArea(.container)
                 .blur(radius: blurRadius)
                 .offset(x: reduceMotion ? 0 : travel * 0.4)
-                .opacity(reduceMotion ? 1 - progress : 1)
+                .opacity(1 - progress)
                 .allowsHitTesting(page == .workspace && !interaction.actionsSuppressed)
                 .accessibilityHidden(page != .workspace)
 
             sidebar
                 .frame(width: size.width)
-                .background(
-                    Theme.Colors.conversationSurface.opacity(
-                        reduceTransparency ? 1 : pow(Double(progress), 4)
-                    ),
-                    ignoresSafeAreaEdges: .all
-                )
                 .offset(x: reduceMotion ? 0 : (travel - size.width) * 2 / 3)
-                .opacity(reduceMotion ? progress : min(1, progress * 6))
+                .opacity(progress)
                 .allowsHitTesting(page == .sidebar && !interaction.actionsSuppressed)
                 .accessibilityHidden(page != .sidebar)
         }
+        .background(Theme.Colors.conversationSurface, ignoresSafeAreaEdges: .all)
         .contentShape(Rectangle())
         .simultaneousGesture(pageDrag, isEnabled: gestureEnabled)
     }
