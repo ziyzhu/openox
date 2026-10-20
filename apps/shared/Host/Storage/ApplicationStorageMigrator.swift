@@ -530,7 +530,7 @@ nonisolated enum ApplicationStorageMigrator {
         if let existing {
             let catalog = try JSONDecoder().decode(ProviderCatalog.self, from: existing)
             if catalog.format == 2 {
-                try removeWebsiteProviderOverrides(from: catalog, defaults: defaults)
+                try prepareProviderOverrides(from: catalog, defaults: defaults)
                 return
             }
             guard catalog.format == 1 else {
@@ -550,7 +550,7 @@ nonisolated enum ApplicationStorageMigrator {
                 let deleted: [String]
             }
             let overlay = try JSONDecoder().decode(Overlay.self, from: existing)
-            let providers = overlay.providers.filter { $0.api != .web }
+            let providers = overlay.providers.filter { $0.api != .web }.map(prepareChatGPTProvider)
             try ProviderCatalog(providers: providers).validate()
             guard Set(overlay.deleted).count == overlay.deleted.count,
                   Set(overlay.deleted).isDisjoint(with: Set(overlay.providers.map(\.id))) else {
@@ -593,18 +593,30 @@ nonisolated enum ApplicationStorageMigrator {
         Log.app.info("StorageMigrator.providerCatalog migrated format=\(catalog.format) providers=\(catalog.providers.count) source=\(existing == nil ? "legacy" : "overlay")")
     }
 
-    private static func removeWebsiteProviderOverrides(from catalog: ProviderCatalog, defaults: UserDefaults) throws {
+    private static func prepareProviderOverrides(from catalog: ProviderCatalog, defaults: UserDefaults) throws {
         var next = catalog
         next.providers.removeAll { $0.api == .web }
+        next.providers = next.providers.map(prepareChatGPTProvider)
         try next.validate()
         let removed = catalog.providers.count - next.providers.count
-        guard removed > 0 else { return }
+        guard next != catalog else { return }
         let encoded = try JSONEncoder().encode(next)
         defaults.set(encoded, forKey: ProviderRegistry.catalogKey)
         guard defaults.data(forKey: ProviderRegistry.catalogKey) == encoded else {
             throw StorageMigrationError.invalidApplicationStorage("provider catalog")
         }
-        Log.app.info("StorageMigrator.providerCatalog removedWebsiteOverrides=\(removed) providers=\(next.providers.count)")
+        Log.app.info("StorageMigrator.providerCatalog removedWebsiteOverrides=\(removed) updatedOverrides=true providers=\(next.providers.count)")
+    }
+
+    private static func prepareChatGPTProvider(_ provider: ProviderDefinition) -> ProviderDefinition {
+        guard provider.id == "chatgpt", provider.auth.adapter == "chatgpt",
+              provider.url.absoluteString == "https://chatgpt.com/backend-api/codex/" else { return provider }
+        var updated = provider
+        updated.url = ChatGPTOAuth.responsesURL.deletingLastPathComponent()
+        updated.options?.streaming = nil
+        updated.options?.accountHeader = nil
+        updated.options?.sessionHeader = "x-session-id"
+        return updated
     }
 }
 

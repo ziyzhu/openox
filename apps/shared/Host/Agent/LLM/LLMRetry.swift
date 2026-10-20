@@ -30,6 +30,8 @@ private nonisolated func isRetryableLLMFailure(message: String, kind: LLMFailure
     let value = message.lowercased()
     let permanentLimits = [
         "insufficient_quota",
+        "subscription_sharing_usage_limit_exceeded",
+        "chatgpt plan usage limit reached",
         "out of budget",
         "quota exceeded",
         "quota is exhausted",

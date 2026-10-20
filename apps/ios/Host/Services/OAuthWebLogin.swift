@@ -234,8 +234,6 @@ private final class LoopbackOAuthSession: NSObject, SFSafariViewControllerDelega
     }
 }
 
-// A single-shot HTTP listener on 127.0.0.1 that resolves with the first request
-// hitting the registered callback path, then serves a "return to the app" page.
 private final class LoopbackRedirectListener {
     private let port: NWEndpoint.Port
     private let base: URL
@@ -250,7 +248,8 @@ private final class LoopbackRedirectListener {
         guard let comps = URLComponents(string: redirectURI),
               let portValue = comps.port,
               let port = NWEndpoint.Port(rawValue: UInt16(portValue)),
-              let base = URL(string: "http://localhost:\(portValue)") else { return nil }
+              comps.scheme == "http", ["localhost", "127.0.0.1"].contains(comps.host ?? ""),
+              let base = URL(string: "http://\(comps.host!):\(portValue)") else { return nil }
         self.port = port
         self.base = base
         callbackPath = comps.path
@@ -303,8 +302,14 @@ private final class LoopbackRedirectListener {
                 .flatMap { String(data: $0, encoding: .utf8) }
                 .flatMap(Self.requestTarget)
             let callback = target
-                .flatMap { URL(string: $0, relativeTo: self.base)?.absoluteURL }
-                .flatMap { $0.path == self.callbackPath ? $0 : nil }
+                .flatMap { URLComponents(string: $0) }
+                .flatMap { target -> URL? in
+                    guard target.scheme == nil, target.host == nil, target.path == self.callbackPath else { return nil }
+                    var components = URLComponents(url: self.base, resolvingAgainstBaseURL: false)
+                    components?.path = target.path
+                    components?.query = target.query
+                    return components?.url
+                }
             self.servePage(over: connection)
             if let callback { self.complete(callback) }
         }

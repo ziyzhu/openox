@@ -39,7 +39,7 @@ nonisolated struct ProviderModelDiscovery: Codable, Equatable, Sendable {
     private func request(for definition: ProviderDefinition) async throws -> URLRequest {
         var url = definition.url.appendingPathComponent("models")
         switch format {
-        case .chatgpt: url.append(queryItems: [URLQueryItem(name: "client_version", value: "1.0.0")])
+        case .chatgpt: break
         case .gemini: url.append(queryItems: [URLQueryItem(name: "pageSize", value: "1000")])
         case .anthropic: url.append(queryItems: [URLQueryItem(name: "limit", value: "1000")])
         case .openai: break
@@ -79,7 +79,8 @@ nonisolated struct ProviderModelDiscovery: Codable, Equatable, Sendable {
         let efforts = Self.reasoningEfforts(entry) ?? catalogModel?.reasoningEfforts ?? []
         let model = ProviderModel(
             id: id,
-            displayName: catalogModel?.displayName ?? Self.string(entry, ["display_name", "displayName", "name"]) ?? id,
+            displayName: (format == .chatgpt ? entry["display_name"] as? String : nil)
+                ?? catalogModel?.displayName ?? Self.string(entry, ["display_name", "displayName", "name"]) ?? id,
             maxTokens: min(limit, cap ?? limit, context),
             maxContext: context,
             supportsTools: true,
@@ -99,6 +100,7 @@ nonisolated struct ProviderModelDiscovery: Codable, Equatable, Sendable {
     }
 
     private func isListed(_ entry: [String: Any]) -> Bool {
+        if format == .chatgpt, entry["visibility"] as? String != "list" { return false }
         if entry["visibility"] as? String == "hide" || entry["status"] as? String == "Shutdown" { return false }
         if entry["model_picker_enabled"] as? Bool == false || Self.value(entry, "policy.state") as? String == "disabled" { return false }
         if let methods = entry["supportedGenerationMethods"] as? [String] { return methods.contains("generateContent") }

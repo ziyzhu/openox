@@ -51,7 +51,8 @@ nonisolated enum ProviderClientFactory {
                 extraBody: options?.extraBody ?? [:], reasoningEffort: LLMReasoningEffort(rawValue: options?.reasoningEffort ?? "") ?? .none,
                 serviceTier: { tiers[$0.id] },
                 streamingTransport: options?.streaming == "websocket-with-sse-fallback"
-                    ? .webSocketWithServerSentEventsFallback(accountHeader: options?.accountHeader ?? "ChatGPT-Account-Id") : .serverSentEvents
+                    ? .webSocketWithServerSentEventsFallback(accountHeader: options?.accountHeader ?? "ChatGPT-Account-Id") : .serverSentEvents,
+                chatGPTPlanUsage: definition.auth.adapter == "chatgpt"
             )
         case .anthropicMessages:
             native = AnthropicMessagesTransport(

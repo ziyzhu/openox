@@ -153,11 +153,9 @@
       ],
       "name": "ChatGPT",
       "options": {
-        "accountHeader": "ChatGPT-Account-Id",
-        "sessionHeader": "session-id",
-        "streaming": "websocket-with-sse-fallback"
+        "sessionHeader": "x-session-id"
       },
-      "url": "https://chatgpt.com/backend-api/codex/"
+      "url": "https://api.openai.com/v1/"
     },
     "discovery": {
       "catalog": "openai",

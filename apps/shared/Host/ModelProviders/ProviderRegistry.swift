@@ -86,6 +86,10 @@ final class ProviderRegistry {
         guard let found = discovered[definition.id]?.models else { return definition }
         let pinned = Set(definition.models.flatMap { [$0.id, $0.wireID ?? $0.id] })
         var merged = definition
+        if definition.auth.adapter == "chatgpt" {
+            let available = Set(found.map(\.id))
+            merged.models.removeAll { !available.contains($0.wireID ?? $0.id) }
+        }
         merged.models += found.filter { !pinned.contains($0.id) }
         return merged
     }

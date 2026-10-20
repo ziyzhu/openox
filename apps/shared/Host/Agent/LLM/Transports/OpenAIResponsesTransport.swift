@@ -14,6 +14,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
     public let reasoningEffort: LLMReasoningEffort
     public let serviceTier: @Sendable (ProviderModel) -> String?
     public let streamingTransport: OpenAIResponsesStreamingTransport
+    public let chatGPTPlanUsage: Bool
     public var reasoningPolicy: LLMReasoningPolicy { reasoningEffort.policy }
     public func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { .openAIResponses }
     public init(
@@ -33,7 +34,8 @@ public struct OpenAIResponsesTransport: ProviderClient {
         extraBody: [String: JSONValue] = [:],
         reasoningEffort: LLMReasoningEffort = .none,
         serviceTier: @escaping @Sendable (ProviderModel) -> String? = { _ in nil },
-        streamingTransport: OpenAIResponsesStreamingTransport = .serverSentEvents
+        streamingTransport: OpenAIResponsesStreamingTransport = .serverSentEvents,
+        chatGPTPlanUsage: Bool = false
     ) {
         self.id = id
         self.displayName = displayName
@@ -51,6 +53,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
         self.reasoningEffort = reasoningEffort
         self.serviceTier = serviceTier
         self.streamingTransport = streamingTransport
+        self.chatGPTPlanUsage = chatGPTPlanUsage
     }
 
     public func prepareAuthentication() async -> LLMPreparationOutcome {
@@ -432,10 +435,19 @@ public struct OpenAIResponsesTransport: ProviderClient {
                 assembler.setRawStopReason(response?["status"] as? String)
                 let error = response?["error"] as? [String: Any]
                 let details = response?["incomplete_details"] as? [String: Any]
-                let message = (error?["message"] as? String)
-                    ?? (details?["reason"] as? String).map { "incomplete: \($0)" }
-                    ?? "response failed"
-                Log.network.error("\(label) response.failed: \(LogPrivacy.text(message, limit: 2_048))")
+                let code = error?["code"] as? String
+                let message: String
+                switch code {
+                case "subscription_sharing_usage_limit_exceeded":
+                    message = "ChatGPT plan usage limit reached. Manage OpenOx limits in ChatGPT Settings > Usage, or choose another provider."
+                case "subscription_sharing_usage_unavailable":
+                    message = "ChatGPT plan usage is unavailable. Check your plan and OpenOx access in ChatGPT Settings, or choose another provider."
+                default:
+                    message = (error?["message"] as? String)
+                        ?? (details?["reason"] as? String).map { "incomplete: \($0)" }
+                        ?? "response failed"
+                }
+                Log.network.error("\(label) response.failed code=\(code ?? "unknown") param=\(error?["param"] as? String ?? "none") message=\(LogPrivacy.text(message, limit: 2_048))")
                 assembler.fail(message); failed = true; return false
             case "response.completed", "response.incomplete":
                 guard let response = evt["response"] as? [String: Any] else { return true }
@@ -550,6 +562,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
                             "arguments": toolCall.arguments.jsonString(),
                             "call_id": toolCall.id,
                         ]
+                        if chatGPTPlanUsage { item["namespace"] = "ox" }
                         if let providerItemID = toolCall.providerItemID, !providerItemID.isEmpty {
                             item["id"] = providerItemID
                         }
@@ -597,11 +610,13 @@ public struct OpenAIResponsesTransport: ProviderClient {
                         ])
                     }
                 }
-                input.append([
+                var item: [String: Any] = [
                     "type": "function_call_output",
                     "call_id": r.toolCallId,
                     "output": parts.media.isEmpty ? resultText : output,
-                ])
+                ]
+                if chatGPTPlanUsage { item["namespace"] = "ox" }
+                input.append(item)
             }
         }
 
@@ -629,6 +644,14 @@ public struct OpenAIResponsesTransport: ProviderClient {
         if let serviceTier { body["service_tier"] = serviceTier }
         if let promptCacheKey { body["prompt_cache_key"] = promptCacheKey }
         if let sp = systemPrompt, !sp.isEmpty { body["instructions"] = sp }
+        if chatGPTPlanUsage {
+            for key in ["background", "conversation", "max_output_tokens", "max_tool_calls", "metadata", "moderation", "multi_agent", "prompt", "prompt_cache_retention", "safety_identifier", "temperature", "top_logprobs", "top_p", "truncation", "user", "previous_response_id"] {
+                body.removeValue(forKey: key)
+            }
+            body["store"] = false
+            body["stream"] = true
+            body["tools"] = toolDecls.isEmpty ? [] : [["type": "namespace", "name": "ox", "description": "Ox tools", "tools": toolDecls]]
+        }
         return try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
     }
 

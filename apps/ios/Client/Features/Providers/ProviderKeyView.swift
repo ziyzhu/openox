@@ -150,7 +150,7 @@ struct ProviderAuthenticationView: View {
                     if busy {
                         CellularAutomatonLoader.small
                     }
-                    Text(busy ? "Signing in…" : "Sign in with \(account.providerName)")
+                    Text(busy ? "Signing in…" : client.id == "chatgpt" ? "Continue with ChatGPT" : "Sign in with \(account.providerName)")
                 }
             }
             .buttonStyle(.plain)
@@ -166,7 +166,7 @@ struct ProviderAuthenticationView: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Theme.Colors.primary)
             VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: plan.map { "\(account.providerName) \($0)" } ?? "Signed in to \(account.providerName)")
+                Text(verbatim: client.id == "chatgpt" ? String(localized: "Using ChatGPT plan") : plan.map { "\(account.providerName) \($0)" } ?? "Signed in to \(account.providerName)")
                     .font(Theme.Fonts.labelMd)
                     .foregroundStyle(Theme.Colors.onSurface)
                 if let accountLabel {
