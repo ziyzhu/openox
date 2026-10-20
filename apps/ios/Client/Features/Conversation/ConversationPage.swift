@@ -373,7 +373,7 @@ struct ConversationPage: View {
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                VStack(spacing: 0) {
+                ZStack(alignment: .bottom) {
                     if showsComposer {
                         composerDock(
                             isConversationEmpty: conversation.canChangeRetention && blocks.isEmpty,
@@ -1539,6 +1539,8 @@ struct ConversationPage: View {
             onCustomFocusChange: { choiceInputFocused = $0 }
         )
             .id(pending.id)
+            .frame(maxWidth: .infinity)
+            .fixedSize(horizontal: false, vertical: true)
             .background(
                 Theme.Colors.conversationSurface,
                 in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
@@ -1556,7 +1558,7 @@ struct ConversationPage: View {
                         .transition(.opacity)
                 }
             }
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .transition(.opacity)
             .onAppear {
                 Log.ui.info("ConversationUX.promptDock conversation=\(conversation.id) prompt=\(pending.id) kind=\(pending.kind.rawValue) secret=\(pending.secretEntry != nil) phase=presented")
             }
