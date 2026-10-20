@@ -8,7 +8,6 @@ final class ConversationSpeechInput {
     enum ReleaseAction: String {
         case send
         case cancel
-        case edit
     }
 
     enum State: Equatable {
@@ -16,7 +15,7 @@ final class ConversationSpeechInput {
         case preparing(holding: Bool)
         case starting
         case recording(ReleaseAction)
-        case finalizing(ReleaseAction)
+        case finalizing
     }
 
     private(set) var state = State.idle
@@ -24,13 +23,12 @@ final class ConversationSpeechInput {
     private(set) var startedAt = Date()
     private(set) var usesAccessibleControls = false
     var notice: String?
-    @ObservationIgnored var cancelFrame = CGRect.zero
-    @ObservationIgnored var editFrame = CGRect.zero
+    @ObservationIgnored var composerFrame = CGRect.zero
     @ObservationIgnored private var session: OnDeviceSpeechRecording?
     @ObservationIgnored private var sessionID: UUID?
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var deadline: Task<Void, Never>?
-    @ObservationIgnored private var completion: ((String, ReleaseAction) -> Void)?
+    @ObservationIgnored private var completion: ((String) -> Void)?
 
     var isPresented: Bool { state != .idle }
 
@@ -39,13 +37,10 @@ final class ConversationSpeechInput {
     }
 
     var selection: ReleaseAction {
-        switch state {
-        case .recording(let action), .finalizing(let action): action
-        default: .send
-        }
+        if case .recording(let action) = state { action } else { .send }
     }
 
-    func begin(accessible: Bool = false, completion: @escaping (String, ReleaseAction) -> Void) {
+    func begin(accessible: Bool = false, completion: @escaping (String) -> Void) {
         guard state == .idle else { return }
         let id = UUID()
         let recording = OnDeviceSpeechRecording()
@@ -97,15 +92,7 @@ final class ConversationSpeechInput {
 
     func move(to point: CGPoint, distance: CGFloat) {
         guard isRecording else { return }
-        let action: ReleaseAction = if distance < 32 {
-            .send
-        } else if isInActionArea(point, for: cancelFrame) {
-            .cancel
-        } else if isInActionArea(point, for: editFrame) {
-            .edit
-        } else {
-            .send
-        }
+        let action: ReleaseAction = distance >= 32 && exitsComposer(point) ? .cancel : .send
         if selection != action {
             state = .recording(action)
             Haptics.selection(.speechActionChanged)
@@ -113,11 +100,10 @@ final class ConversationSpeechInput {
         }
     }
 
-    private func isInActionArea(_ point: CGPoint, for frame: CGRect) -> Bool {
-        !frame.isEmpty
-            && point.x >= frame.minX
-            && point.x < frame.maxX
-            && point.y < frame.maxY + 16
+    private func exitsComposer(_ point: CGPoint) -> Bool {
+        guard !composerFrame.isEmpty else { return false }
+        let slack: CGFloat = selection == .cancel ? 0 : 12
+        return point.y < composerFrame.minY - slack || point.x < composerFrame.minX - slack
     }
 
     func release(action: ReleaseAction? = nil) {
@@ -138,7 +124,7 @@ final class ConversationSpeechInput {
             Haptics.impact(.speechCancelled)
             return
         }
-        state = .finalizing(action)
+        state = .finalizing
         level = 0
         recording.stopCapture()
         Haptics.impact(.speechStopped)
@@ -155,8 +141,8 @@ final class ConversationSpeechInput {
                     notice = L10n.string("No speech detected. Nothing was sent.", comment: "")
                     return
                 }
-                Log.ui.info("SpeechInput.completed session=\(id) action=\(action.rawValue) chars=\(text.count)")
-                completion?(text, action)
+                Log.ui.info("SpeechInput.completed session=\(id) chars=\(text.count)")
+                completion?(text)
             } catch where !(error is CancellationError) {
                 guard sessionID == id else { return }
                 fail(error)

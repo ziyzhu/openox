@@ -475,12 +475,6 @@ struct ConversationComposer: View, Equatable {
 
     private var composerCluster: some View {
         VStack(alignment: .leading, spacing: Self.topStripSpacing) {
-            if speech.isPresented {
-                HoldToTalkCard(speech: speech)
-                    .padding(.bottom, Self.surfaceSpacing - Self.topStripSpacing)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-
             if showsTopStrip && !floatsTopStrip {
                 composerTopStrip
                     .transition(topStripTransition)
@@ -491,14 +485,14 @@ struct ConversationComposer: View, Equatable {
                 followIntentStrip
                 composerRow
             }
-            .accessibilityHidden(speech.isPresented)
             .frame(maxWidth: .infinity, alignment: .leading)
             .clipShape(composerShape)
             .background {
                 Color.clear
-                    .glassEffect(.regular, in: composerShape)
+                    .glassEffect(composerGlass, in: composerShape)
                     .id(colorScheme)
             }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { speech.composerFrame = $0 }
         }
         .animation(
             reduceMotion ? nil : .spring(duration: 0.28, bounce: 0),
@@ -511,6 +505,10 @@ struct ConversationComposer: View, Equatable {
                     .transition(topStripTransition)
             }
         }
+    }
+
+    private var composerGlass: Glass {
+        speech.selection == .cancel ? .regular.tint(Theme.Colors.error.color(for: colorScheme).opacity(0.18)) : .regular
     }
 
     private var composerShape: RoundedRectangle {
@@ -693,6 +691,9 @@ struct ConversationComposer: View, Equatable {
         .scrollClipDisabled()
         .frame(minHeight: Theme.Size.minimumTouchTarget)
         .excludesCompactPageSwitch(includingAreaBelow: true)
+        .opacity(speech.isPresented ? 0.4 : 1)
+        .allowsHitTesting(!speech.isPresented)
+        .accessibilityHidden(speech.isPresented)
     }
 
     private var editingMessageChip: some View {
@@ -720,7 +721,7 @@ struct ConversationComposer: View, Equatable {
 
     private var composerRow: some View {
         ZStack(alignment: .leading) {
-            if inputText.isEmpty, !hidesPlaceholder {
+            if inputText.isEmpty, !hidesPlaceholder, !speech.isPresented {
                 Group {
                     if isEditingMessage {
                         Text("Edit message", comment: "Placeholder shown while editing a previously sent message.")
@@ -751,7 +752,9 @@ struct ConversationComposer: View, Equatable {
                 .padding(.top, -textEditorVerticalInset + textEditorOpticalOffset)
                 .padding(.bottom, -textEditorVerticalInset - textEditorOpticalOffset)
                 .focused(fieldFocused)
+                .opacity(speech.isPresented ? 0 : 1)
                 .allowsHitTesting(!speech.isPresented)
+                .accessibilityHidden(speech.isPresented)
                 .accessibilityIdentifier(A11yID.ConversationControls.input)
                 .onGeometryChange(for: CGRect.self) {
                     $0.frame(in: .global).offsetBy(dx: textLineFragmentPadding, dy: 0)
@@ -777,9 +780,20 @@ struct ConversationComposer: View, Equatable {
         .excludesCompactPageSwitch()
         .padding(.leading, iconButtonSize - textLineFragmentPadding)
         .padding(.trailing, trailingControlsWidth)
+        .overlay {
+            if speech.isPresented {
+                HoldToTalkWaveform(speech: speech)
+                    .padding(.leading, Theme.Spacing.lg)
+                    .padding(.trailing, trailingControlsWidth + Theme.Spacing.sm)
+                    .transition(.opacity)
+            }
+        }
         .overlay(alignment: .bottomLeading) {
-            attachButton
-                .padding(.bottom, 1)
+            if !speech.isPresented {
+                attachButton
+                    .padding(.bottom, 1)
+                    .transition(.opacity)
+            }
         }
         .overlay(alignment: .bottomTrailing) {
             trailingControl
@@ -810,11 +824,21 @@ struct ConversationComposer: View, Equatable {
         }
     }
 
+    private var speechControlFill: Color {
+        switch speech.state {
+        case .idle: .clear
+        case .recording(.cancel): Theme.Colors.error.color(for: colorScheme)
+        default: Theme.Colors.composerSend.color(for: colorScheme)
+        }
+    }
+
     private var speechControl: some View {
         Image(systemName: "mic.fill")
             .font(.system(.subheadline, weight: .bold))
-            .foregroundStyle(Theme.Colors.onSurface)
+            .foregroundStyle(speech.isPresented ? Theme.Colors.onPrimary : Theme.Colors.onSurface)
             .frame(width: composerButtonSize, height: composerButtonSize)
+            .background(speechControlFill, in: Circle())
+            .scaleEffect(speech.isRecording ? 1.12 : 1)
             .padding(.leading, 4)
             .padding(.trailing, 6)
             .padding(.vertical, 5)
@@ -840,7 +864,9 @@ struct ConversationComposer: View, Equatable {
             .accessibilityLabel("Hold to talk")
             .accessibilityHint("Press and hold to talk.")
             .accessibilityIdentifier(A11yID.ConversationControls.speechHold)
-            .accessibilityAction { onSpeechBegin(true) }
+            .accessibilityAction {
+                if speech.isPresented { speech.release(action: .send) } else { onSpeechBegin(true) }
+            }
     }
 
     private func showHoldToTalkHint() {

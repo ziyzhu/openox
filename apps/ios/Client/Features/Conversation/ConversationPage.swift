@@ -367,11 +367,6 @@ struct ConversationPage: View {
             }
         let composedTranscript = transcript
             .accessibilityHidden(speechInput.isPresented)
-            .overlay {
-                if speechInput.isPresented {
-                    HoldToTalkBackdrop()
-                }
-            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 ZStack(alignment: .bottom) {
                     if showsComposer {
@@ -1645,21 +1640,17 @@ struct ConversationPage: View {
         let draftID = composer.draftID
         let draft = composer.attributedDraft
         composer.setAttachmentMenuPresented(false)
-        speechInput.begin(accessible: accessible) { text, action in
+        speechInput.begin(accessible: accessible) { text in
             guard composer.draftID == draftID, composer.attributedDraft == draft else {
                 speechInput.notice = L10n.string("The draft changed while recording. Nothing was sent.", comment: "")
                 return
             }
             composer.appendDictation(text)
-            if action == .edit {
-                composerFocused = true
+            if let invocation = composer.slashInvocation {
+                submitSkill(invocation.skill, argument: invocation.argument)
             } else {
-                if let invocation = composer.slashInvocation {
-                    submitSkill(invocation.skill, argument: invocation.argument)
-                } else {
-                    composer.delayStopControl()
-                    send()
-                }
+                composer.delayStopControl()
+                send()
             }
         }
     }

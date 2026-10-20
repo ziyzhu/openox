@@ -4138,16 +4138,6 @@
         }
       }
     },
-    "Edit text" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "编辑文字"
-          }
-        }
-      }
-    },
     "Editable on this device" : {
       "localizations" : {
         "zh-Hans" : {
@@ -8216,16 +8206,6 @@
         }
       }
     },
-    "Release to edit text" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "松开编辑文字"
-          }
-        }
-      }
-    },
     "Release to send" : {
       "localizations" : {
         "zh-Hans" : {
@@ -10580,16 +10560,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在转文字并发送…"
-          }
-        }
-      }
-    },
-    "Transcribing…" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在转文字…"
           }
         }
       }

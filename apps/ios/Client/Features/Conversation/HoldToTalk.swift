@@ -111,151 +111,64 @@ struct HoldToTalkArea: UIViewRepresentable {
     }
 }
 
-struct HoldToTalkBackdrop: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        ZStack {
-            Theme.Colors.conversationSurface.color(for: colorScheme).opacity(0.6)
-            LinearGradient(
-                colors: [.clear, Theme.Colors.background.color(for: colorScheme)],
-                startPoint: .center,
-                endPoint: .bottom
-            )
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-}
-
-struct HoldToTalkCard: View {
+struct HoldToTalkWaveform: View {
     let speech: ConversationSpeechInput
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private var accent: Color {
         (speech.selection == .cancel ? Theme.Colors.error : Theme.Colors.primary).color(for: colorScheme)
     }
 
-    private var instruction: LocalizedStringKey {
+    private var status: LocalizedStringKey {
         switch speech.state {
         case .idle: ""
         case .preparing, .starting: "Preparing speech…"
-        case .finalizing(.edit): "Transcribing…"
         case .finalizing: "Transcribing and sending…"
         case .recording(.cancel): "Release to cancel"
-        case .recording(.edit): "Release to edit text"
         case .recording(.send): "Release to send"
         }
     }
 
     var body: some View {
-        recordingCard
-            .frame(maxWidth: 480)
-            .frame(maxWidth: .infinity)
-            .accessibilityAddTraits(.isModal)
-            .accessibilityAction(.escape) { speech.cancel(reason: "accessibilityEscape") }
-            .onAppear {
-                if speech.usesAccessibleControls {
-                    UIAccessibility.post(notification: .screenChanged, argument: nil)
+        Group {
+            if speech.isRecording {
+                TimelineView(.animation(minimumInterval: 0.05, paused: reduceMotion)) { context in
+                    waveform(at: context.date)
                 }
-            }
-    }
-
-    private var recordingCard: some View {
-        VStack(spacing: Theme.Spacing.xl) {
-            VStack(spacing: Theme.Spacing.md) {
-                feedback
-                    .frame(height: 48)
-                    .padding(.bottom, Theme.Spacing.xs)
-                    .accessibilityHidden(true)
-                Text(instruction)
-                    .font(Theme.Fonts.headline)
-                    .foregroundStyle(speech.selection == .cancel ? Theme.Colors.error : Theme.Colors.onSurface)
-                    .multilineTextAlignment(.center)
-                    .accessibilityIdentifier(A11yID.ConversationControls.speechStatus)
-                    .accessibilityAction(named: Text("Stop and send")) { speech.release(action: .send) }
-            }
-            HStack(spacing: Theme.Spacing.md) {
-                target(.cancel, title: "Cancel", symbol: "xmark")
-                target(.edit, title: "Edit text", symbol: "text.cursor")
-            }
-        }
-        .padding(Theme.Spacing.xl)
-        .background {
-            let shape = RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
-            if reduceTransparency {
-                shape.fill(Theme.Colors.surface)
             } else {
-                shape.fill(Theme.Colors.surface.opacity(0.84))
-                    .glassEffect(.regular, in: shape)
+                CellularAutomatonLoader(size: 20, tint: accent)
             }
         }
-        .overlay {
-            RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
-                .strokeBorder(Theme.Colors.onSurface.opacity(0.06), lineWidth: 1)
-                .allowsHitTesting(false)
-        }
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.2 : 0.06), radius: 24, y: 8)
-    }
-
-    @ViewBuilder
-    private var feedback: some View {
-        if speech.isRecording {
-            TimelineView(.animation(minimumInterval: 0.05, paused: reduceMotion)) { context in
-                waveform(at: context.date)
+        .frame(maxWidth: .infinity, maxHeight: 22)
+        .accessibilityElement()
+        .accessibilityLabel(status)
+        .accessibilityIdentifier(A11yID.ConversationControls.speechStatus)
+        .accessibilityAction(named: Text("Stop and send")) { speech.release(action: .send) }
+        .accessibilityAction(named: Text("Cancel")) { speech.cancel(reason: "accessibilityCancel") }
+        .accessibilityAction(.escape) { speech.cancel(reason: "accessibilityEscape") }
+        .onAppear {
+            if speech.usesAccessibleControls {
+                UIAccessibility.post(notification: .screenChanged, argument: nil)
             }
-            .frame(width: 190)
-        } else {
-            CellularAutomatonLoader(size: 32, tint: accent)
         }
     }
-
     private func waveform(at date: Date) -> some View {
         Canvas { context, size in
             let time = date.timeIntervalSinceReferenceDate
-            let cell: CGFloat = 4
-            let spacing = (size.width - cell) / 26
-            for column in 0..<27 {
-                let envelope = 0.35 + 0.65 * sin(Double(column) / 26 * .pi)
+            let cell: CGFloat = 3
+            let columns = max(Int(size.width / 6), 2)
+            let spacing = (size.width - cell) / CGFloat(columns - 1)
+            for column in 0..<columns {
+                let envelope = 0.35 + 0.65 * sin(Double(column) / Double(columns - 1) * .pi)
                 let variation = reduceMotion ? 0.8 : 0.5 + 0.5 * abs(sin(time * 4 + Double(column) * 0.55))
-                let height = Int((sqrt(Double(speech.level)) * envelope * variation * 3).rounded())
-                for row in -3...3 {
-                    let rect = CGRect(x: CGFloat(column) * spacing, y: size.height / 2 + CGFloat(row) * 6 - cell / 2, width: cell, height: cell)
-                    let opacity = abs(row) <= height ? 1.0 : 0.1
-                    context.fill(Path(roundedRect: rect, cornerRadius: 1), with: .color(accent.opacity(opacity)))
+                let height = Int((sqrt(Double(speech.level)) * envelope * variation * 2).rounded())
+                for row in -2...2 {
+                    let rect = CGRect(x: CGFloat(column) * spacing, y: size.height / 2 + CGFloat(row) * 4.5 - cell / 2, width: cell, height: cell)
+                    let opacity = abs(row) <= height ? 1.0 : 0.12
+                    context.fill(Path(roundedRect: rect, cornerRadius: 0.75), with: .color(accent.opacity(opacity)))
                 }
             }
-        }
-    }
-
-    private func target(_ action: ConversationSpeechInput.ReleaseAction, title: LocalizedStringKey, symbol: String) -> some View {
-        let selected = speech.selection == action
-        let color = (action == .cancel ? Theme.Colors.error : Theme.Colors.primary).color(for: colorScheme)
-        return Button {
-            if action == .cancel { speech.cancel(reason: "cancelButton") }
-            else { speech.release(action: action) }
-        } label: {
-            Label(title, systemImage: symbol)
-                .font(Theme.Fonts.labelMd)
-                .foregroundStyle(selected ? color : Theme.Colors.onSurface.color(for: colorScheme))
-                .frame(maxWidth: .infinity, minHeight: 52)
-                .background(selected ? color.opacity(0.14) : Theme.Colors.surfaceSunken.color(for: colorScheme), in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
-                .overlay {
-                    RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                        .strokeBorder(selected ? color.opacity(0.5) : .clear, lineWidth: 1.5)
-                }
-                .scaleEffect(selected ? 1.03 : 1)
-                .animation(reduceMotion ? nil : Theme.Animation.quick, value: selected)
-        }
-        .buttonStyle(.plain)
-        .disabled(action == .edit && !speech.isRecording)
-        .accessibilityIdentifier(action == .cancel ? A11yID.ConversationControls.speechCancel : A11yID.ConversationControls.speechEdit)
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
-            if action == .cancel { speech.cancelFrame = frame }
-            else { speech.editFrame = frame }
         }
     }
 }
