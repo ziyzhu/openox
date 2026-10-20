@@ -7,6 +7,7 @@ nonisolated enum BrowserFunctionCatalog {
         let description: String
         let inputSchema: JSONValue
         let outputSchema: JSONValue
+        var hasModelGuidance = false
 
         var name: String { "\(publicNamespace).\(id)" }
 
@@ -24,10 +25,14 @@ nonisolated enum BrowserFunctionCatalog {
 
         var functionSchema: JSONValue {
             .object([
-                "description": .string("\(description) `await \(name)({ purpose, ... })`."),
+                "description": .string(modelDescription),
                 "inputSchema": inputSchema,
                 "outputSchema": outputSchema,
             ])
+        }
+
+        private var modelDescription: String {
+            hasModelGuidance ? ModelGuidance.text(name) : "\(description) `await \(name)({ purpose, ... })`."
         }
     }
 
@@ -44,7 +49,8 @@ nonisolated enum BrowserFunctionCatalog {
                 ["url": string(description: "Absolute public HTTPS URL, or loopback HTTP in a simulator.", minimum: 1, maximum: 8_192)],
                 required: ["url"]
             ),
-            outputSchema: object(["url": string()], required: ["url"])
+            outputSchema: object(["url": string()], required: ["url"]),
+            hasModelGuidance: true
         ),
         Action(
             id: "reload",
@@ -154,7 +160,8 @@ nonisolated enum BrowserFunctionCatalog {
                 )],
                 required: ["script"]
             ),
-            outputSchema: .object([:])
+            outputSchema: .object([:]),
+            hasModelGuidance: true
         ),
         Action(
             id: "exportPdf",
