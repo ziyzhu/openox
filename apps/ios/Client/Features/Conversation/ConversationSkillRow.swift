@@ -6,7 +6,7 @@ struct ConversationSkillRow: View {
 
     @State private var skills = Skills.shared
     @State private var presentedSkill: Skill?
-    @State private var profileID: UUID?
+    @State private var profileID = StorageRoot.shared.activeId
 
     private var displayedSkill: Skill {
         skills.all.first { $0.id == skill.id } ?? skill
@@ -14,7 +14,6 @@ struct ConversationSkillRow: View {
 
     var body: some View {
         Button {
-            profileID = StorageRoot.shared.activeId
             presentedSkill = displayedSkill
         } label: {
             HStack(spacing: Theme.Spacing.md) {
@@ -29,6 +28,7 @@ struct ConversationSkillRow: View {
                     if !displayedSkill.description.isEmpty {
                         Text(verbatim: displayedSkill.description)
                             .font(Theme.Fonts.caption)
+                            .lineLimit(2)
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .multilineTextAlignment(.leading)
                     }
@@ -63,7 +63,7 @@ private struct ConversationSkillDetails: View {
     @State private var editing: SkillDraft?
 
     private var currentSkill: Skill? {
-        guard profileID == StorageRoot.shared.activeId else { return nil }
+        guard let profileID, profileID == StorageRoot.shared.activeId else { return nil }
         return skills.all.first { $0.id == skill.id }
     }
 
@@ -88,6 +88,11 @@ private struct ConversationSkillDetails: View {
         }
         .scrollIndicators(.hidden)
         .background(Theme.Colors.background)
+        .task {
+            skills.refresh()
+            await skills.waitUntilCurrent()
+            Log.ui.info("ConversationSkillDetails opened name=\(skill.name) profile=\(profileID?.uuidString ?? "none") active=\(StorageRoot.shared.activeId?.uuidString ?? "none") editable=\(currentSkill?.owner.isWritable ?? false)")
+        }
         .navigationTitle(displayedSkill.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

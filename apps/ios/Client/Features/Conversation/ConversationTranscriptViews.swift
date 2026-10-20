@@ -691,7 +691,7 @@ struct BlockView: View, Equatable {
                         if skill.owner != .system {
                             ConversationSkillRow(
                                 skill: skill,
-                                accessibilityIdentifier: A11yID.ConversationControls.Message.skillResult(skill.id)
+                                accessibilityIdentifier: A11yID.ConversationControls.Message.skillResult(skill.id, blockID: block.id)
                             )
                         }
                     }

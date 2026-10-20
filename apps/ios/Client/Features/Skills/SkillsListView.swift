@@ -38,7 +38,6 @@ struct SkillsListView: View {
 
     @Binding private var editing: SkillDraft?
     @State private var pendingDelete: Skill?
-    @State private var scheduledSkills = ScheduledSkills.shared
     @State private var query = ""
 
     init(
@@ -154,19 +153,11 @@ struct SkillsListView: View {
         }
     }
 
-    private var activeSchedules: [ScheduledSkill] {
-        scheduledSkills.schedules(profileID: profileID)
-    }
-
-    private var scheduledSkillNames: Set<String> {
-        Set(activeSchedules.map(\.skill.name))
-    }
-
     private func row(_ skill: Skill) -> some View {
         SidebarSafeSkillButton(skill: skill) {
             editing = SkillDraft(skill)
         } label: {
-            SkillLibraryRow(skill: skill, hasSchedules: scheduledSkillNames.contains(skill.name))
+            SkillLibraryRow(skill: skill)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(A11yID.Settings.skillRow(skill.name))
@@ -203,12 +194,6 @@ struct SkillsListView: View {
 
 struct SkillLibraryRow: View {
     let skill: Skill
-    let hasSchedules: Bool
-
-    init(skill: Skill, hasSchedules: Bool = false) {
-        self.skill = skill
-        self.hasSchedules = hasSchedules
-    }
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
@@ -222,12 +207,6 @@ struct SkillLibraryRow: View {
                     .lineLimit(2)
             }
             Spacer(minLength: 0)
-            if hasSchedules {
-                Image(systemName: "clock")
-                    .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .accessibilityLabel("Scheduled")
-            }
         }
         .padding(.vertical, Theme.Spacing.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -372,10 +351,6 @@ struct SkillEditorView: View {
                     .disabled(!owner.isWritable)
 
                 serviceSection.disabled(!owner.isWritable)
-
-                if let skill = persistedSkill {
-                    SkillSchedulesSection(skill: skill, profileID: profileID)
-                }
             }
             .padding(Theme.Spacing.lg)
         }
