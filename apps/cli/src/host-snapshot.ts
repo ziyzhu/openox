@@ -84,8 +84,8 @@ export function summarizeBlock(block: any): { kind: string; summary: string } {
   if (kind === "agentContent") {
     const items: any[] = value.items ?? [];
     const text = items.filter(item => item?.text != null).map(item => item.text).join(" ");
-    const artifacts = items.filter(item => item?.artifact != null).length;
-    return { kind, summary: `${oneLine(text)}${artifacts ? ` · ${artifacts} artifact${artifacts === 1 ? "" : "s"}` : ""}` };
+    const files = items.filter(item => item?.artifact != null).length;
+    return { kind, summary: `${oneLine(text)}${files ? ` · ${files} file${files === 1 ? "" : "s"}` : ""}` };
   }
   if (kind === "confirm") return { kind, summary: oneLine(value.prompt ?? "") };
   if (kind === "stepGroup") {

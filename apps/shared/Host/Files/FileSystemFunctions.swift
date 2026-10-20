@@ -343,7 +343,7 @@ extension Conversation {
                 return FileSystemMedia(artifact: artifact, data: data)
             }
         default:
-            throw RuntimeError.bridge("Media requires an artifact or a file inside an attached Files folder: \(location.path)")
+            throw RuntimeError.bridge("Media requires a Profile file or a file inside an attached Files folder: \(location.path)")
         }
         guard media.data.count <= FileLimits.fileBytes else {
             throw FileError.fileTooLarge(bytes: media.data.count, limit: FileLimits.fileBytes)

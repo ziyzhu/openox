@@ -159,10 +159,10 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "exportPdf",
             label: "Export PDF",
-            description: "Export Browser's complete page as a PDF attachment or named Profile artifact.",
+            description: "Export Browser's complete page as a PDF attachment or named Profile file.",
             inputSchema: object([
                 "filename": string(
-                    description: "Optional artifact basename, never a path.",
+                    description: "Optional file basename, never a path.",
                     minimum: 1,
                     maximum: 255
                 ),
@@ -176,8 +176,8 @@ nonisolated enum BrowserFunctionCatalog {
                 "pages": integer(minimum: 1),
                 "bytes": integer(minimum: 1),
                 "attached": boolean,
-                "artifact": nullableString,
-            ], required: ["url", "contentType", "pages", "bytes", "attached", "artifact"])
+                "file": nullableString,
+            ], required: ["url", "contentType", "pages", "bytes", "attached", "file"])
         ),
         Action(
             id: "waitForUserInteraction",

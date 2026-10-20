@@ -12,13 +12,13 @@
         }
       }
     },
-    "%lld items will appear in Artifacts the next time you open Ox." : {
+    "%lld items will appear in Files the next time you open Ox." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld 个项目将在下次打开 Ox 时出现在资料中。"
+            "value" : "%lld 个项目将在下次打开 Ox 时出现在文件中。"
           }
         }
       }
@@ -67,13 +67,13 @@
         }
       }
     },
-    "It’ll appear in Artifacts the next time you open Ox." : {
+    "It’ll appear in Files the next time you open Ox." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "下次打开 Ox 时，它会出现在资料中。"
+            "value" : "下次打开 Ox 时，它会出现在文件中。"
           }
         }
       }

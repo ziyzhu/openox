@@ -120,7 +120,7 @@ ox profile list [--json]
 ox --profile <path> profile memory
 ox --profile <path> profile soul
 ox --profile <path> profile skills [name] [--json]
-ox --profile <path> profile artifacts [filename] [--json]
+ox --profile <path> profile files [filename] [--json]
 ox --profile <path> profile conversations [id] [--json]
 ```
 

@@ -270,19 +270,19 @@ export async function printSkills(
   });
 }
 
-async function artifacts(args: string[], context: CliContext): Promise<void> {
+async function files(args: string[], context: CliContext): Promise<void> {
   const parsed = request(args);
   if (parsed.help) {
-    console.log("Usage: ox --profile <path> profile artifacts [filename] [--json]");
+    console.log("Usage: ox --profile <path> profile files [filename] [--json]");
     return;
   }
   const root = profileRoot(context);
   if (parsed.value) {
-    if (parsed.json) fail("--json cannot be used when printing an artifact");
+    if (parsed.json) fail("--json cannot be used when printing a file");
     const path = directChild(join(root, "artifacts"), parsed.value);
-    if (!existsSync(path) || !statSync(path).isFile()) fail(`artifact not found: ${parsed.value}`);
+    if (!existsSync(path) || !statSync(path).isFile()) fail(`file not found: ${parsed.value}`);
     if (fileAvailability(path) === "cloudOnly") {
-      fail(`artifact is in iCloud and has not been downloaded: ${parsed.value}`);
+      fail(`file is in iCloud and has not been downloaded: ${parsed.value}`);
     }
     process.stdout.write(readFileSync(path));
     return;
@@ -341,7 +341,7 @@ export const PROFILE_COMMANDS: Record<string, SubCommand> = {
   memory: { desc: "Print the Profile's MEMORY.md", fn: memory },
   soul: { desc: "Print the Profile's SOUL.md", fn: soul },
   skills: { desc: "List the Profile's skills, or print one", fn: skills },
-  artifacts: { desc: "List the Profile's artifacts, or print one", fn: artifacts },
+  files: { desc: "List the Profile's files, or print one", fn: files },
   conversations: { desc: "List the Profile's saved conversations, or print one transcript", fn: conversations },
 };
 

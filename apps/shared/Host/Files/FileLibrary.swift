@@ -66,7 +66,7 @@ nonisolated enum FileLibrary {
 
     static func read(_ artifact: FileItem, options: ReadOptions) throws -> Read {
         guard artifact.exists else {
-            return Read(text: nil, truncated: false, unsupported: "Missing artifact.")
+            return Read(text: nil, truncated: false, unsupported: "Missing file.")
         }
         if let size = artifact.size, size > FileLimits.fileBytes {
             throw FileError.fileTooLarge(bytes: size, limit: FileLimits.fileBytes)

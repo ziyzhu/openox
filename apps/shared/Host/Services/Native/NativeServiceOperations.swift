@@ -140,12 +140,12 @@ final class NativeServiceOperations {
             let pdf = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
                 .exportPDF(authorizeSite: authorizeSite)
-            let artifact: FileItem?
+            let file: FileItem?
             if let filename = fields["filename"]?.stringValue {
-                artifact = try await importFile(pdf.attachment, filename)
+                file = try await importFile(pdf.attachment, filename)
             } else {
                 try attachTransient(pdf.attachment)
-                artifact = nil
+                file = nil
             }
             return .object([
                 "url": pdf.url.map { .string($0.absoluteString) } ?? .null,
@@ -153,7 +153,7 @@ final class NativeServiceOperations {
                 "pages": .int(pdf.pages),
                 "bytes": .int(pdf.attachment.data.count),
                 "attached": .bool(true),
-                "artifact": artifact.map { .string($0.fileName) } ?? .null,
+                "file": file.map { .string($0.fileName) } ?? .null,
             ])
         case ("ios:browser", "waitForUserInteraction"):
             let session = serviceManager.browserActionSessions.session(for: browser, ownerID: id)
