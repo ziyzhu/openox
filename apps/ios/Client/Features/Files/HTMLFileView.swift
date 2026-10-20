@@ -6,6 +6,7 @@ import WebKit
 struct HTMLFileScreen: View {
     let file: FileItem
     let scope: ProfileScope?
+    @State private var changes = 0
 
     init(file: FileItem, scope: ProfileScope? = StorageRoot.currentScope) {
         self.file = file
@@ -20,6 +21,11 @@ struct HTMLFileScreen: View {
                 modifiedAt: file.modifiedAt,
                 safeAreaInsets: geometry.safeAreaInsets
             )
+            .id(changes)
+        }
+        .onPresentedFileChange(file.fileURL) {
+            changes += 1
+            Log.ui.info("HTMLFileScreen.fileChanged filename=\(file.fileName) changes=\(changes)")
         }
         .background(Theme.Colors.conversationSurface)
         .navigationTitle(file.userFacingName)
@@ -161,23 +167,22 @@ nonisolated struct HTMLFileDocument: Hashable, Sendable {
 
     let html: String
     let baseURL: URL
-    let scope: ProfileScope
+    let scope: ProfileScope?
     let byteCount: Int
 
     static func read(_ source: FilePreviewSource) async throws -> Self {
         guard source.file.kind == .html else { throw FileError.unsupportedType(source.file.fileName) }
-        guard let scope = source.scope else { throw CocoaError(.fileReadNoPermission) }
         let baseURL = HTMLFilePage.documentURL(for: source)
         let data = try await source.read()
         guard data.count <= FileLimits.textBytes else {
             throw FileError.textTooLarge(bytes: data.count, limit: FileLimits.textBytes)
         }
-        guard let source = String(data: data, encoding: .utf8) else { throw FileError.textNotUTF8 }
-        let secured = "<!doctype html><html><head><meta http-equiv=\"Content-Security-Policy\" content=\"\(contentSecurityPolicy)\"></head><body>\(source)</body></html>"
+        guard let text = String(data: data, encoding: .utf8) else { throw FileError.textNotUTF8 }
+        let secured = "<!doctype html><html><head><meta http-equiv=\"Content-Security-Policy\" content=\"\(contentSecurityPolicy)\"></head><body>\(text)</body></html>"
         return Self(
             html: secured,
             baseURL: baseURL,
-            scope: scope,
+            scope: source.scope,
             byteCount: data.count
         )
     }

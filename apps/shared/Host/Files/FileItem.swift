@@ -169,6 +169,7 @@ nonisolated public enum FileError: LocalizedError {
     case invalidFilename(String)
     case filenameExists(String)
     case missing(String)
+    case changedSinceRead(String)
     case textNotFound
     case textAmbiguous(matches: Int)
     case textNotUTF8
@@ -186,6 +187,7 @@ nonisolated public enum FileError: LocalizedError {
         case .invalidFilename(let name): return String(format: L10n.string("Invalid filename: %@", comment: ""), name)
         case .filenameExists(let name): return String(format: L10n.string("A file named %@ already exists.", comment: ""), name)
         case .missing(let name): return String(format: L10n.string("Deleted file: %@", comment: ""), name)
+        case .changedSinceRead(let name): return String(format: L10n.string("%@ changed after you opened it. Reopen it to see the latest version.", comment: ""), name)
         case .textNotFound: return L10n.string("The text to replace wasn't found.", comment: "")
         case .textAmbiguous(let matches): return String(format: L10n.string("The text to replace matched %lld locations; make it more specific.", comment: ""), matches)
         case .textNotUTF8: return L10n.string("Text file isn't UTF-8.", comment: "")

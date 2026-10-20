@@ -38,6 +38,7 @@ struct MarkdownFileView: View {
     @State private var draft = ""
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var changes = 0
 
     private var isDirty: Bool {
         guard case .ready(let document) = phase else { return false }
@@ -105,7 +106,12 @@ struct MarkdownFileView: View {
                 }
             }
         }
-        .task { await load() }
+        .task(id: changes) { await load() }
+        .onPresentedFileChange(file.fileURL) {
+            guard mode == .viewing else { return }
+            changes += 1
+            Log.ui.info("MarkdownFileView.fileChanged filename=\(file.fileName) changes=\(changes)")
+        }
         .alert("Couldn't save Markdown", isPresented: Binding(
             get: { saveError != nil },
             set: { if !$0 { saveError = nil } }
@@ -119,11 +125,7 @@ struct MarkdownFileView: View {
     private func load() async {
         phase = .loading
         do {
-            guard let scope = FilePreviewSource(file: file, scope: scope).scope else { throw CocoaError(.fileReadNoPermission) }
-            let document = try await ProfileRepository.shared.readMarkdownFile(
-                named: file.fileName,
-                in: scope
-            )
+            let document = try await FilePreviewSource(file: file, scope: scope).readMarkdown()
             guard !Task.isCancelled else { return }
             draft = document.source
             mode = .viewing
@@ -144,7 +146,7 @@ struct MarkdownFileView: View {
 
     private func save() {
         guard !isSaving else { return }
-        guard isDirty else {
+        guard isDirty, case .ready(let previous) = phase else {
             mode = .viewing
             return
         }
@@ -152,12 +154,7 @@ struct MarkdownFileView: View {
         isSaving = true
         Task {
             do {
-                guard let scope = FilePreviewSource(file: file, scope: scope).scope else { throw CocoaError(.fileReadNoPermission) }
-                let published = try await ProfileRepository.shared.writeMarkdownFile(
-                    source,
-                    named: file.fileName,
-                    in: scope
-                )
+                let published = try await FilePreviewSource(file: file, scope: scope).writeMarkdown(source, replacing: previous.source)
                 guard !Task.isCancelled else { return }
                 file = published
                 isSaving = false

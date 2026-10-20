@@ -283,14 +283,30 @@ extension Conversation {
     }
 
     public func messageFile(path: String) async -> FileItem? {
+        guard let normalized = await messageFilePath(path) else { return nil }
+        if let durable = await durableFile(path: normalized) { return durable.file }
+        return await deviceMessageFile(path: normalized)
+    }
+
+    private func messageFilePath(_ path: String) async -> String? {
         guard !path.contains(":") else { return nil }
         _ = try? await durablePreparation?.value
         guard let route = durableRoute,
               let validated = try? await route.session.runtime.command(.object(["action": .string("filesystemValidate"),
                   "operation": .string("read"), "arguments": .object(["path": .string(path), "purpose": .string("Show file")]),
-                  "profileID": .string(route.profileID.uuidString), "conversationID": .int(route.conversationID)])),
-              let normalized = validated.objectValue?["path"]?.stringValue else { return nil }
-        return await durableFile(path: normalized)?.file
+                  "profileID": .string(route.profileID.uuidString), "conversationID": .int(route.conversationID)])) else { return nil }
+        return validated.objectValue?["path"]?.stringValue
+    }
+
+    private func deviceMessageFile(path: String) async -> FileItem? {
+        guard case .deviceItem(let grantID, let components)? = try? await fileSystemLocation(path) else { return nil }
+        do {
+            let url = try DeviceFolderStore.shared.repositoryRoot(grantID: grantID, relativePath: components, profileId: scope.profileID)
+            return FileItem(fileName: path, directory: url.deletingLastPathComponent(), relativePath: url.lastPathComponent)
+        } catch {
+            Log.session.warning("Conversation.messageFile device grant=\(grantID) error=\(error.localizedDescription)")
+            return nil
+        }
     }
 
     public func messageFiles() async -> [FileItem] {
@@ -306,7 +322,7 @@ extension Conversation {
         }
         var files: [FileItem] = []
         for path in paths {
-            guard let file = await messageFile(path: path), file.exists,
+            guard let normalized = await messageFilePath(path), let file = await durableFile(path: normalized)?.file, file.exists,
                   !files.contains(where: { $0.fileName == file.fileName }) else { continue }
             files.append(file)
         }

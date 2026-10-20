@@ -4,22 +4,88 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 nonisolated struct FilePreviewSource: Sendable {
+    nonisolated enum Origin: Sendable {
+        case profile(ProfileScope)
+        case device(grantID: String, path: [String], profileID: UUID)
+        case unavailable
+    }
+
     let file: FileItem
-    let scope: ProfileScope?
+    let origin: Origin
+
+    var scope: ProfileScope? {
+        guard case .profile(let scope) = origin else { return nil }
+        return scope
+    }
 
     init(file: FileItem, scope: ProfileScope? = StorageRoot.currentScope) {
         self.file = file
         let root = scope?.root.standardizedFileURL.pathComponents
         let path = file.fileURL.standardizedFileURL.pathComponents
-        self.scope = root.map { path.count > $0.count && path.starts(with: $0) } == true ? scope : nil
+        let reference = file.fileName.split(separator: "/").map(String.init)
+        if let scope, let root, path.count > root.count, path.starts(with: root) {
+            origin = .profile(scope)
+        } else if let profileID = scope?.profileID, reference.count > 2, reference[0] == "files" {
+            origin = .device(grantID: reference[1], path: Array(reference.dropFirst(2)), profileID: profileID)
+        } else {
+            origin = .unavailable
+        }
     }
 
     func read() async throws -> Data {
-        guard let scope, scope.profileID != nil else { throw CocoaError(.fileReadNoPermission) }
         try Task.checkCancellation()
-        let data = try await ProfileRepository.shared.readFileData(named: file.fileName, in: scope)
+        let data: Data
+        switch origin {
+        case .profile(let scope) where scope.profileID != nil:
+            data = try await ProfileRepository.shared.readFileData(named: file.fileName, in: scope)
+        case .device(let grantID, let path, let profileID):
+            data = try await DeviceFolderStore.shared.coordinate(grantID: grantID, relativePath: path, profileId: profileID, mode: .read) { url in
+                let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+                guard size <= FileLimits.fileBytes else { throw FileError.fileTooLarge(bytes: size, limit: FileLimits.fileBytes) }
+                return try Data(contentsOf: url)
+            }
+        case .profile, .unavailable:
+            throw CocoaError(.fileReadNoPermission)
+        }
         try Task.checkCancellation()
         return data
+    }
+
+    func readMarkdown() async throws -> MarkdownFileDocument {
+        switch origin {
+        case .profile(let scope):
+            return try await ProfileRepository.shared.readMarkdownFile(named: file.fileName, in: scope)
+        case .device:
+            guard file.isMarkdown else { throw FileError.unsupportedType(file.fileName) }
+            let data = try await read()
+            return MarkdownFileDocument(source: try Self.text(data), byteCount: data.count)
+        case .unavailable:
+            throw CocoaError(.fileReadNoPermission)
+        }
+    }
+
+    func writeMarkdown(_ source: String, replacing previous: String) async throws -> FileItem {
+        switch origin {
+        case .profile(let scope):
+            return try await ProfileRepository.shared.writeMarkdownFile(source, named: file.fileName, in: scope)
+        case .device(let grantID, let path, let profileID):
+            guard file.isMarkdown else { throw FileError.unsupportedType(file.fileName) }
+            let data = Data(source.utf8)
+            guard data.count <= FileLimits.textBytes else { throw FileError.textTooLarge(bytes: data.count, limit: FileLimits.textBytes) }
+            try await DeviceFolderStore.shared.coordinate(grantID: grantID, relativePath: path, profileId: profileID, mode: .write) { url in
+                guard try Self.text(Data(contentsOf: url)) == previous else { throw FileError.changedSinceRead(url.lastPathComponent) }
+                try data.write(to: url, options: .atomic)
+            }
+            return file
+        case .unavailable:
+            throw CocoaError(.fileWriteNoPermission)
+        }
+    }
+
+    private static func text(_ data: Data) throws -> String {
+        guard data.count <= FileLimits.textBytes else { throw FileError.textTooLarge(bytes: data.count, limit: FileLimits.textBytes) }
+        guard let text = String(data: data, encoding: .utf8) else { throw FileError.textNotUTF8 }
+        return text
     }
 
     func snapshot() async throws -> FilePreviewSnapshot {
