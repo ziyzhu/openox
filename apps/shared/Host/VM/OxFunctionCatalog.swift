@@ -97,14 +97,14 @@ nonisolated enum OxFunctionCatalog {
             if namespace == "ox" {
                 let functions = catalogEntries.compactMap { name, schema -> String? in
                     guard name.dropFirst(3).contains(".") == false,
-                          let description = compactDescription(name: name, schema: schema, includesUsage: true) else { return nil }
+                          let description = compactDescription(schema) else { return nil }
                     return "\(name) — \(description)"
                 }.sorted()
                 lines = functions + namespaceDescriptions.map { "ox.\($0.0) — \($0.1)" }
             } else {
                 lines = catalogEntries.compactMap { name, schema -> String? in
                     guard name.hasPrefix(namespace + "."),
-                          let description = compactDescription(name: name, schema: schema, includesUsage: true) else { return nil }
+                          let description = compactDescription(schema) else { return nil }
                     return "\(name) — \(description)"
                 }.sorted()
             }
@@ -112,41 +112,12 @@ nonisolated enum OxFunctionCatalog {
         }))
     }
 
-    static func helpTree(includesSummaries: Bool = false) -> String {
-        let catalog = catalogEntries
-        var lines = ["ox"]
-        let rootHelpers = catalog.compactMap { name, schema -> (String, String)? in
-            guard name.dropFirst("ox.".count).contains(".") == false,
-                  let description = compactDescription(name: name, schema: schema, includesUsage: true, includesSummary: includesSummaries) else { return nil }
-            return (name, description)
-        }.sorted { $0.0 < $1.0 }
-        for helper in rootHelpers {
-            lines.append("├── \(helper.0) — \(helper.1)")
-        }
-        for (namespaceIndex, namespace) in namespaceDescriptions.enumerated() {
-            let isLastNamespace = namespaceIndex == namespaceDescriptions.count - 1
-            lines.append("\(isLastNamespace ? "└──" : "├──") \(namespace.0) — \(namespace.1)")
-            let prefix = isLastNamespace ? "    " : "│   "
-            let helpers = catalog.compactMap { name, schema -> (String, String)? in
-                let namespacePrefix = "ox.\(namespace.0)."
-                guard name.hasPrefix(namespacePrefix),
-                      let description = compactDescription(name: name, schema: schema, includesUsage: true, includesSummary: includesSummaries) else { return nil }
-                return (String(name.dropFirst(namespacePrefix.count)), description)
-            }.sorted { $0.0 < $1.0 }
-            for (helperIndex, helper) in helpers.enumerated() {
-                let branch = helperIndex == helpers.count - 1 ? "└──" : "├──"
-                lines.append("\(prefix)\(branch) ox.\(namespace.0).\(helper.0) — \(helper.1)")
-            }
-        }
-        return lines.joined(separator: "\n")
+    static func contracts() -> String {
+        let namespaces = namespaceDescriptions.map { "ox.\($0.0) — \($0.1)" }
+        return (namespaces + ["", "Contracts (JSON):", buildCompact().jsonString()]).joined(separator: "\n")
     }
 
-    private static func compactDescription(
-        name: String,
-        schema: JSONValue,
-        includesUsage: Bool = false,
-        includesSummary: Bool = true
-    ) -> String? {
+    private static func compactDescription(_ schema: JSONValue) -> String? {
         guard case .object(let fields) = schema,
               let description = fields["description"]?.stringValue else { return nil }
         let oneLine = description
@@ -156,16 +127,12 @@ nonisolated enum OxFunctionCatalog {
         var usageText: String?
         if let usage = oneLine.range(of: ": `") {
             summary = String(oneLine[..<usage.lowerBound])
-            if includesUsage,
-               let end = oneLine[usage.upperBound...].firstIndex(of: "`") {
+            if let end = oneLine[usage.upperBound...].firstIndex(of: "`") {
                 usageText = String(oneLine[usage.upperBound..<end])
             }
         } else {
             let endings = [". ", "? ", "! "].compactMap { oneLine.range(of: $0)?.lowerBound }
             summary = endings.min().map { String(oneLine[...$0]) } ?? oneLine
-        }
-        if !includesSummary {
-            return usageText.map { "`\($0)`" } ?? "`\(name).help()`"
         }
         let sentence = summary.last.map { ".?!".contains($0) } == true ? summary : "\(summary)."
         return usageText.map { "\(sentence) `\($0)`" } ?? sentence

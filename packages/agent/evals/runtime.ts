@@ -8,6 +8,7 @@ import { googleProvider } from "@earendil-works/pi-ai/providers/google";
 import { Type } from "typebox";
 import { nativeDatabase } from "../src/sqlite";
 import { openProfileRuntime, canonical, composeOxPrompt, composeTurnContext, bundledSkills, executeGuidance, type ProfileRuntime, type FileOperation, type HostContext, type TurnState } from "../src/index";
+import { guidanceText } from "../src/core/guidance-texts";
 import { memoryFiles } from "./files";
 import { execute } from "./execute";
 import { catalog, Stubs, StubError, type StubFixture } from "./stubs";
@@ -16,6 +17,9 @@ export type Call = { name: string; args: Record<string, unknown>; result?: unkno
 export type AttachedService = TurnState["attachedServices"][number];
 type Messages = Awaited<ReturnType<ProfileRuntime["run"]>>["messages"];
 export type Turn = { status: "completed" | "failed" | "timeout"; error?: string; systemPrompt: string; messages: Messages; calls: Call[] };
+
+const namespaces = ["app", "conversation", "provider", "repository", "secret", "service", "user", "web", "fs", "output", "skill", "schedule", "vision"];
+const contractCatalog = () => [...namespaces.map(name => `ox.${name} — ${guidanceText(`namespace.${name}`)}`), "", "Contracts (JSON):", JSON.stringify(catalog)].join("\n");
 
 export function evalModels(provider: string): Models {
   const factories: Record<string, () => Provider> = { openai: openaiProvider, anthropic: anthropicProvider, google: googleProvider };
@@ -52,7 +56,7 @@ export class EvalRuntime {
     }), profileID: "eval", mounts: [{ path: "", access: "readWrite", source: { kind: "backend", backend: memoryFiles(fixture.files) } }], models, registry: createRegistry(), createBlobID: async () => crypto.randomUUID(), settings: { retry: { enabled: false }, compaction: { enabled: false } } });
     try {
       for (const [path, text] of Object.entries({ "MEMORY.md": "", ...fixture.files })) { if (path === "MEMORY.md" || path.startsWith("skills/")) await runtime.session.files.write(path, text); }
-      const description = executeGuidance({ catalog: Object.keys(catalog).join("\n"), variant: "ox", timeoutSeconds: 10, maxLines: 1000, maxBytes: 262144, canCancelLoops: true });
+      const description = executeGuidance({ catalog: contractCatalog(), variant: "ox", timeoutSeconds: 10, maxLines: 1000, maxBytes: 262144, canCancelLoops: true });
       const parameters = Type.Object({ source: Type.String({ minLength: 1, maxLength: 100000 }) });
       runtime.extension = defineExtension({ name: "eval-ox", sections: [section("ox", input => runtime.prompts.get(String(input.conversationId))!, { tag: false })], tools: [defineTool({ name: "execute", description, parameters, replay: "unsafe",
         execute: async ({ source }, api, context) => {
