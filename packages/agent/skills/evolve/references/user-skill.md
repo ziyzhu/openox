@@ -13,7 +13,7 @@ Establish through concrete examples:
 - The expected output and its success criteria.
 - Important failure, privacy, and safety boundaries.
 
-Ask one decisive question at a time when its answer changes the reusable workflow. Use `ox.user.choose` with 2–4 likely answers; its custom-answer path covers anything else. Stop once the workflow can be explained without inventing consequential details.
+Infer the workflow from the request, memory, and existing skills. Ask only if a consequential detail cannot be inferred, using `ox.user.choose` with 2–4 likely answers.
 
 Inspect existing user skills with `ox.fs.glob` and `ox.fs.read` to avoid duplicate names or overlapping instructions. When adapting an existing Profile or repository skill, use `ox.skill.copy` to create the Profile-owned starting point.
 
