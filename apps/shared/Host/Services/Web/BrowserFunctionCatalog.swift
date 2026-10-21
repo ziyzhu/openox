@@ -194,7 +194,8 @@ nonisolated enum BrowserFunctionCatalog {
                 ["instructions": string(minimum: 1, maximum: 1_000)],
                 required: ["instructions"]
             ),
-            outputSchema: object(["completed": boolean], required: ["completed"])
+            outputSchema: object(["completed": boolean], required: ["completed"]),
+            hasModelGuidance: true
         ),
         Action(
             id: "injectScript",

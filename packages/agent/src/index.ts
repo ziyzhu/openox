@@ -6,7 +6,7 @@ export { mountedFileSystem, type FileBackend, type FileMount, type TextFileMount
 export { composeSystemPrompt, composeTurnContext, responseDirective, defaultSoul,
   type SystemPromptInput, type PromptScaffold, type TurnState, type ResponseLanguage } from "./core/prompts";
 export { providerIdentity } from "./core/provider-prompts";
-export { composeOxPrompt, portableScaffold, oxScaffold } from "./core/ox-prompts";
+export { composeOxPrompt, oxScaffold } from "./core/ox-prompts";
 export { activeHost, sameScope, hostContextText, type HostScope, type PromptHost, type HostContext } from "./core/host-context";
 export { executeGuidance, type ExecuteGuidanceInput } from "./core/tool-prompts";
 export { runtimeEvent, failureReceipt, outputTruncation, imageReadGuidance, type RuntimeEvent } from "./core/runtime-prompts";

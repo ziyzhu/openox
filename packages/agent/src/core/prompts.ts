@@ -49,6 +49,9 @@ export function composeTurnContext(state: TurnState) {
     .map(skill => `- \`skills/${skill.name}/SKILL.md\` — ${normalized(skill.description)}`),
     ...state.skillConflicts.map(name => `- /${name}: choose a source in Skills before use.`)].join("\n");
   const host = state.hostContext ? activeHost(state.hostContext) : undefined;
+  const presentation = host?.presentation === "conversation-bubbles"
+    ? "## Replies\nReplies render as Markdown conversation bubbles. Put ![title](path) on its own line to show a file inline, or use a direct public image URL. Link supporting files with [title](path). A fenced mermaid block renders as a diagram."
+    : host?.presentation === "text" ? "## Replies\nReplies render as text with Markdown support. Link supporting files with [title](path)." : "";
   const services = state.attachedServices.length === 0 ? "" : ["## Attached Services",
     ...[...state.attachedServices].sort((a, b) => ordered(a.domain, b.domain)).flatMap(service => {
       const description = normalized(service.description ?? "");
@@ -61,6 +64,6 @@ export function composeTurnContext(state: TurnState) {
     })].join("\n");
   const files = state.filePaths.length === 0 ? "" : ["## Conversation Files", ...state.filePaths.map(path => `- \`${path}\``)].join("\n");
   const storage = host?.externalFiles === false ? temporaryProfileStorage : temporaryStorage;
-  const content = join([skills, state.hostContext ? hostContextText(state.hostContext) : "", services, files, state.storageMode === "temporary" ? storage : "", responseDirective(state.responseLanguage)]);
+  const content = join([skills, state.hostContext ? hostContextText(state.hostContext) : "", presentation, services, files, state.storageMode === "temporary" ? storage : "", responseDirective(state.responseLanguage)]);
   return `<turn-state>\n${content}\n</turn-state>`;
 }

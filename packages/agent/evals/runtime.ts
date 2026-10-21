@@ -7,7 +7,7 @@ import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import { googleProvider } from "@earendil-works/pi-ai/providers/google";
 import { Type } from "typebox";
 import { nativeDatabase } from "../src/sqlite";
-import { openProfileRuntime, canonical, composeOxPrompt, composeTurnContext, bundledSkills, oxScaffold, executeGuidance, defaultSoul, type ProfileRuntime, type FileOperation, type HostContext } from "../src/index";
+import { openProfileRuntime, canonical, composeOxPrompt, composeTurnContext, bundledSkills, executeGuidance, defaultSoul, type ProfileRuntime, type FileOperation, type HostContext } from "../src/index";
 import { memoryFiles } from "./files";
 import { execute } from "./execute";
 import { catalog, Stubs, StubError, type StubFixture } from "./stubs";
@@ -106,7 +106,7 @@ export class EvalRuntime {
       this.active = String(conversation.id); this.messages.set(this.active, []); this.receipts.set(this.active, []); this.choices.set(this.active, []); if (args.includes("--temporary")) this.temporary.add(this.active);
       const soul = String(await this.session.files.read("SOUL.md"));
       const memory = String(await this.session.files.read("MEMORY.md"));
-      this.prompts.set(this.active, {soul,memory,rendered:composeOxPrompt({hostContext:this.hostContext,soul,memory},false,oxScaffold).rendered});
+      this.prompts.set(this.active, {soul,memory,rendered:composeOxPrompt({hostContext:this.hostContext,soul,memory}).rendered});
       result = { conversationId: this.active, temporary: args.includes("--temporary"), model: `${this.provider}:${this.model}` };
     } else if (args[1] === "inspect" || args[1] === "open") result = this.snapshot(id);
     else if (args[1] === "list") result = [...this.messages.keys()].map(id => ({ id }));

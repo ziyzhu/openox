@@ -1,6 +1,6 @@
 import { beforeAll, expect, it } from "bun:test";
 import { createContext, runInContext } from "node:vm";
-import { defaultSoul, responseDirective } from "../src/core/prompts";
+import { composeTurnContext, defaultSoul, responseDirective, type TurnState } from "../src/core/prompts";
 import { providerIdentity } from "../src/core/provider-prompts";
 import { guidanceTexts } from "../src/core/guidance-texts";
 import { nativeGuidanceSource } from "../native-guidance";
@@ -54,14 +54,13 @@ it("ships a standalone prompt renderer and byte-identical default SOUL without a
   }
 });
 
-it("uses explicit prompt variants without inferring prose from capabilities and rejects ambiguous ownership in the shipped renderer", async () => {
+it("shares the core across hosts, supplies presentation in turn context, and rejects ambiguous ownership in the shipped renderer", async () => {
   const realm = createContext({ console: undefined });
   runInContext(await Bun.file(new URL("../../../apps/shared/Resources/PiDurable.bundle/prompts.js", import.meta.url)).text(), realm);
   const scope = { hostID: "desktop-host", profileID: "profile-a" };
   realm.input = { soul: "## Voice\nBe direct.", memory: "frozen", hostContext: { active: scope,
     hosts: [{ ...scope, functions: ["ox.fs.read", "ox.fs.edit", "ox.fs.write"], serviceKinds: [], presentation: "text", externalFiles: false }] } };
   const prompt = runInContext("OxPrompts.composeOxPrompt(input).rendered", realm) as string;
-  expect(prompt).toContain("text with Markdown support");
   expect(prompt).toContain("frozen");
   expect(prompt).not.toContain("iOS");
   expect(prompt).not.toContain("Browser");
@@ -71,9 +70,17 @@ it("uses explicit prompt variants without inferring prose from capabilities and 
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,active:{hostID:'wrong',profileID:'profile-a'}}})", realm)).toThrow("unavailable");
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[...input.hostContext.hosts,...input.hostContext.hosts]}})", realm)).toThrow("Duplicate");
   expect(runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[{...input.hostContext.hosts[0],functions:['ox'],serviceKinds:['web','api','ios','mcp'],presentation:'conversation-bubbles',externalFiles:true}]}}).rendered", realm)).toBe(prompt);
-  const full = runInContext("OxPrompts.composeOxPrompt(input,false,OxPrompts.oxScaffold).rendered", realm) as string;
-  expect(full).toContain("ox.service.find");
-  expect(full).toContain("ox.web.browser.waitForUserInteraction");
+  const state: TurnState = { skills: [], skillConflicts: [], attachedServices: [], filePaths: [], storageMode: "temporary", responseLanguage: null,
+    hostContext: { active: scope, hosts: [{ ...scope, functions: ["ox.fs.read"], serviceKinds: [], presentation: "text", externalFiles: false }] } };
+  const textContext = composeTurnContext(state);
+  expect(textContext).toContain("text with Markdown support");
+  expect(textContext).not.toContain("files/<folder-id>");
+  state.hostContext!.hosts[0]!.presentation = "conversation-bubbles";
+  state.hostContext!.hosts[0]!.externalFiles = true;
+  const conversationContext = composeTurnContext(state);
+  expect(conversationContext).toContain("Markdown conversation bubbles");
+  expect(conversationContext).toContain("![title](path)");
+  expect(conversationContext).toContain("files/<folder-id>");
   realm.guide = { catalog: "ox.fs.read", variant: "portable", timeoutSeconds: 10, maxLines: 100, maxBytes: 2048, canCancelLoops: true };
   const guide = runInContext("OxPrompts.executeGuidance(guide)", realm) as string;
   expect(guide).toContain("10 seconds");
@@ -82,7 +89,7 @@ it("uses explicit prompt variants without inferring prose from capabilities and 
   expect(guide).not.toContain("ox.web.fetch");
   expect(guide).not.toContain("does not forcibly stop");
   expect(guide).toContain("supports interrupting JavaScript loops");
-  expect(runInContext("OxPrompts.executeGuidance({...guide,variant:'ox'})", realm)).toContain("ox.service.inspect");
+  expect(runInContext("OxPrompts.executeGuidance({...guide,variant:'ox'})", realm)).toContain("synchronous .help()");
   expect(() => runInContext("OxPrompts.executeGuidance({...guide,variant:'website'})", realm)).toThrow("Unknown execution guidance variant");
   expect(() => runInContext("OxPrompts.executeGuidance({...guide,variant:'__proto__'})", realm)).toThrow("Unknown execution guidance variant");
 });
