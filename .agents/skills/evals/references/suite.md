@@ -9,7 +9,16 @@ bun run evals --list
 bun run evals --validate
 bun run evals --provider anthropic --model <model-id>
 bun run evals --provider openai --model <model-id> --case proceed-without-asking --repeat 5
+bun run evals --provider anthropic --model <model-id> --baseline HEAD --repeat 5
 ```
+
+`--baseline <ref>` compares prompts: it checks out the ref in a temporary git
+worktree, overlays the current cases, runner and stubs, and runs every case
+against both the baseline and the working tree (`candidate`), alternating order
+by repetition. Only `packages/agent` prompts, guidance, contracts and skills
+differ between variants; the baseline must keep the runtime API the current
+harness uses, otherwise its runs error. Commit or keep the prompt change in the
+working tree and pass the ref to compare against.
 
 Providers are `openai`, `anthropic`, and `google`, using their standard API-key
 environment variables and installed model catalogs. Each case runs once by default
@@ -18,7 +27,9 @@ with its own `timeoutMs` or 120000 ms. `--jobs` sets concurrency (default 4).
 Each invocation writes a new directory (temporary by default, `--output` must be
 outside the repository) containing `report.json`, `report.txt`, and `runs/*.json`
 with each run's system prompt, messages, `ox.*` calls and checks. The summary lists
-pass counts per case and flags errored and flaky cases. Any errored run withholds
+pass counts per case and variant, and flags errored and flaky cases; with a
+baseline it also flags regressions, improvements, saturated cases that pass
+everywhere and cases that fail everywhere. Any errored run withholds
 the headline pass rate and exits 1; failing checks are results and exit 0. One
 repetition cannot establish stability.
 

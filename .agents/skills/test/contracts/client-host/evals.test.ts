@@ -19,8 +19,9 @@ test("eval CLI validates code-defined cases against the native function catalog"
   expect(help.stdout).toContain("No Host or simulator");
 });
 
-test("eval CLI rejects runs without a model, unknown cases and in-repository reports", async () => {
+test("eval CLI rejects runs without a model, unknown cases, unknown baselines and in-repository reports", async () => {
   expect((await command([])).code).toBe(1);
   expect((await command(["--provider", "openai", "--model", "m", "--case", "missing"])).stderr).toContain("Unknown case");
   expect((await command(["--provider", "openai", "--model", "m", "--output", join(ROOT, "eval-output")])).stderr).toContain("outside the repository");
+  expect((await command(["--provider", "openai", "--model", "m", "--baseline", "no-such-ref"])).stderr).toContain("rev-parse");
 });

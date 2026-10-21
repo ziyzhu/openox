@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { cp, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -9,10 +10,11 @@ import { validateCatalog } from "./catalog.ts";
 import { summarize } from "./report.ts";
 import type { Outcome, RunRecord } from "./types.ts";
 
-type Variant = { name: string; root: string; revision: string; dirty: boolean };
+type Variant = { name: string; root: string; revision: string; dirty: boolean; ref?: string };
 type Task = { id: string; variant: Variant; repetition: number };
 
 const usage = `Usage: bun run evals --provider <id> --model <id> [options]
+  --baseline <ref>       Also run each case against the prompts at this git ref
   --case <id>            Run only this case; repeatable (default: all cases)
   --repeat <1..20>       Runs per case and variant (default 1)
   --timeout <ms>         Override each case's limit (default: case timeoutMs or 120000)
@@ -43,6 +45,23 @@ async function outputDirectory(path?: string): Promise<string> {
   return directory;
 }
 
+async function baseline(ref: string): Promise<Variant> {
+  const revision = git(ROOT, "rev-parse", "--verify", `${ref}^{commit}`);
+  const root = await mkdtemp(join(tmpdir(), "ox-evals-baseline-"));
+  git(ROOT, "worktree", "add", "--detach", root, revision);
+  try {
+    for (const path of [".agents/skills/evals", "packages/agent/evals"]) {
+      await rm(join(root, path), { recursive: true, force: true });
+      await cp(join(ROOT, path), join(root, path), { recursive: true });
+    }
+    const workspaces = ["", ...(await Promise.all(["apps", "packages"].map(async parent => (await readdir(join(ROOT, parent))).map(name => join(parent, name))))).flat()];
+    for (const workspace of workspaces) {
+      if (existsSync(join(ROOT, workspace, "node_modules")) && existsSync(join(root, workspace))) await symlink(join(ROOT, workspace, "node_modules"), join(root, workspace, "node_modules"));
+    }
+  } catch (error) { git(ROOT, "worktree", "remove", "--force", root); throw error; }
+  return { name: "baseline", root, revision, dirty: false, ref };
+}
+
 async function arm(task: Task, provider: string, model: string, timeout: string, directory: string): Promise<RunRecord> {
   const name = `${task.id}.${task.variant.name}.${task.repetition}`;
   const output = join(directory, "runs", `${name}.json`);
@@ -67,7 +86,7 @@ async function main(): Promise<void> {
   const { values } = parseArgs({ args: Bun.argv.slice(2), options: {
     help: { type: "boolean" }, list: { type: "boolean" }, validate: { type: "boolean" },
     provider: { type: "string" }, model: { type: "string" }, case: { type: "string", multiple: true },
-    repeat: { type: "string", default: "1" }, timeout: { type: "string" }, jobs: { type: "string", default: "4" }, output: { type: "string" },
+    baseline: { type: "string" }, repeat: { type: "string", default: "1" }, timeout: { type: "string" }, jobs: { type: "string", default: "4" }, output: { type: "string" },
   }, strict: true });
   if (values.help) return console.log(usage);
   const ids = await caseIds();
@@ -81,19 +100,27 @@ async function main(): Promise<void> {
   for (const id of selected) if (!ids.includes(id)) throw new Error(`Unknown case: ${id}`);
   const repetitions = integer(values.repeat!, 1, 20);
   const timeout = values.timeout ? String(integer(values.timeout, 1, 600_000)) : "default";
-  const variants: Variant[] = [{ name: "candidate", root: ROOT, revision: git(ROOT, "rev-parse", "HEAD"), dirty: git(ROOT, "status", "--porcelain").length > 0 }];
   const directory = await outputDirectory(values.output);
+  const candidate: Variant = { name: "candidate", root: ROOT, revision: git(ROOT, "rev-parse", "HEAD"), dirty: git(ROOT, "status", "--porcelain").length > 0 };
+  const variants = values.baseline ? [await baseline(values.baseline), candidate] : [candidate];
+  try { await evaluateVariants(variants, selected, { provider: values.provider, model: values.model, repetitions, timeout, jobs: integer(values.jobs!, 1, 16), directory }); }
+  finally { if (values.baseline) git(ROOT, "worktree", "remove", "--force", variants[0]!.root); }
+}
+
+type Options = { provider: string; model: string; repetitions: number; timeout: string; jobs: number; directory: string };
+
+async function evaluateVariants(variants: Variant[], selected: string[], { provider, model, repetitions, timeout, jobs, directory }: Options) {
   await mkdir(join(directory, "runs"));
   const tasks = selected.flatMap(id => Array.from({ length: repetitions }, (_, index) => index + 1).flatMap(repetition =>
     (repetition % 2 ? variants : [...variants].reverse()).map(variant => ({ id, variant, repetition }))));
-  const runs = await pool(tasks, integer(values.jobs!, 1, 16), async task => {
-    const record = await arm(task, values.provider!, values.model!, timeout, directory);
+  const runs = await pool(tasks, jobs, async task => {
+    const record = await arm(task, provider, model, timeout, directory);
     console.log(`${record.status.toUpperCase()} ${record.case} ${record.variant} #${record.repetition}`);
     return record;
   });
   const names = variants.map(variant => variant.name);
   const summary = summarize(runs, names, repetitions);
-  const report = { version: 5, startedAt: new Date().toISOString(), provider: values.provider, model: values.model, repetitions, timeout,
+  const report = { version: 5, startedAt: new Date().toISOString(), provider, model, repetitions, timeout,
     variants: variants.map(({ root: _root, ...variant }) => variant), runs };
   await writeFile(join(directory, "report.json"), JSON.stringify(report, null, 2), { mode: 0o600 });
   await writeFile(join(directory, "report.txt"), summary + "\n", { mode: 0o600 });

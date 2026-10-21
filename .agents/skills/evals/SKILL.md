@@ -27,8 +27,8 @@ filesystem or network APIs; only the declared stub dispatch is exposed.
 
 When changing prompts or guidance, add or update a case that targets the changed
 behavior, including a counter-case when the change could be gamed by always or
-never doing something. Compare the same model, cases and limits, with enough
-repetitions to see flakiness. Describe pass-rate differences without claiming
+never doing something. Compare with `--baseline <ref>` so both variants share
+the same model, cases, stubs and limits, with enough repetitions to see flakiness. Describe pass-rate differences without claiming
 statistical improvements or native platform correctness. Keep reports outside Git.
 
 Run `bun run evals --validate`, `bun run typecheck`,
