@@ -364,6 +364,9 @@ public struct OpenAIChatTransport: ProviderClient {
         }
         for m in messages {
             switch m {
+            case .system(let system):
+                try flushToolMedia()
+                if !system.text.isEmpty { msgs.append(["role": "system", "content": system.text]) }
             case .user(let u):
                 try flushToolMedia()
                 msgs.append(try buildUserMessage(u))

@@ -41,6 +41,8 @@ nonisolated struct ToolExchangeAdapter: ModelAdapter {
             case .user:
                 flushPending()
                 transformed.append(message)
+            case .system:
+                transformed.append(message)
             }
         }
         flushPending()

@@ -530,6 +530,7 @@ private nonisolated extension ContentBlock {
 private nonisolated extension Message {
     var attachedFiles: [FileItem] {
         switch self {
+        case .system: []
         case .user(let value): value.content.compactMap(\.attachedFile)
         case .assistant(let value): value.content.compactMap(\.attachedFile)
         case .toolResult(let value): value.content.compactMap(\.attachedFile)
@@ -538,6 +539,8 @@ private nonisolated extension Message {
 
     func replacingFiles(_ names: [String: String], directory: URL) -> Message {
         switch self {
+        case .system:
+            return self
         case .user(var value):
             value.content = value.content.map { $0.replacingFiles(names, directory: directory) }
             return .user(value)

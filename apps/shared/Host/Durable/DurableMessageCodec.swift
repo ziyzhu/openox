@@ -39,11 +39,10 @@ nonisolated enum DurableMessageCodec {
 
     static func message(_ message: Message, provider: String, profileID: UUID? = nil) -> JSONValue {
         switch message {
+        case .system(let system):
+            return .object(["role": .string("system"), "text": .string(system.text), "timestamp": .double(system.timestamp.timeIntervalSince1970 * 1000)])
         case .user(let user):
-            var content = blocks(user.content, profileID: profileID)
-            if let context = user.transientContext {
-                content.append(.object(["type": .string("text"), "text": .string(context), "oxTransientContext": .bool(true)]))
-            }
+            let content = blocks(user.content, profileID: profileID)
             return .object(["role": .string("user"), "content": .array(content), "timestamp": .double(user.timestamp.timeIntervalSince1970 * 1000)])
         case .assistant(let assistant):
             return object(["role": "assistant", "api": "ox-native", "provider": provider, "model": assistant.model,
@@ -89,6 +88,8 @@ nonisolated enum DurableMessageCodec {
         let ownerID = runtimeProfileID ?? (fileScope ?? scope).profileID?.uuidString
         var result: ToolResultMessage
         switch message {
+        case .system:
+            return message
         case .user(var user):
             guard references.isEmpty else { throw RuntimeError.bridge("Transient media requires a tool result") }
             user.content = try await modelContent(user.content, scope: scope, fileScope: fileScope, runtime: runtime, runtimeProfileID: ownerID, inputs: inputs)
@@ -180,10 +181,10 @@ nonisolated enum DurableMessageCodec {
             $0.objectValue?["oxTransientContext"]?.boolValue != true && (includeTransientReferences || $0.objectValue?["oxTransientAttachment"] == nil)
         }.map { try decodeBlock($0, scope: scope, fileScope: fileScope, files: files) }
         switch role {
+        case "system":
+            return .system(SystemMessage(text: fields["text"]?.stringValue ?? "", timestamp: timestamp))
         case "user":
-            let context = values.filter { $0.objectValue?["oxTransientContext"]?.boolValue == true }
-                .compactMap { $0.objectValue?["text"]?.stringValue }.joined(separator: "\n")
-            return .user(UserMessage(content: content, transientContext: context.isEmpty ? nil : context, timestamp: timestamp))
+            return .user(UserMessage(content: content, timestamp: timestamp))
         case "assistant":
             var message = AssistantMessage(model: fields["model"]?.stringValue ?? "unknown", content: content)
             message.timestamp = timestamp

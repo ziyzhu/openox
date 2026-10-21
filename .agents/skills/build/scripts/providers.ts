@@ -3,7 +3,7 @@ import { ROOT, runCheck } from "../../../lib.ts";
 
 const providersPath = join(ROOT, "apps/shared/Host/ModelProviders/providers.json");
 const formats = new Set(["openai", "gemini", "chatgpt", "anthropic"]);
-const ruleOptions = new Set(["serviceTier", "adaptiveThinking", "replayReasoning"]);
+const ruleOptions = new Set(["serviceTier", "adaptiveThinking", "replayReasoning", "systemUpdates"]);
 
 type Rule = { match?: unknown; exclude?: unknown; options?: Record<string, unknown>; outputTokens?: unknown };
 type BundledProvider = {

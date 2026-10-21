@@ -3,10 +3,10 @@ export { openProfileRuntime, ProfileRuntime, type ProfileRuntimeOptions, type Co
 export { ProfileFiles, ProfileFile, ProfileIndex, LegacyProfileFile, canonical } from "./profile/files";
 export { profileEnv, profileMounts } from "./profile/filesystem";
 export { mountedFileSystem, type FileBackend, type FileMount, type TextFileMount, type MountedExecutionEnv } from "./core/file-mounts";
-export { composeSystemPrompt, composeTurnContext, responseDirective,
+export { composeSystemPrompt, composeTurnSections, renderSections, responseDirective,
   type SystemPromptInput, type PromptScaffold, type TurnState, type ResponseLanguage } from "./core/prompts";
 export { providerIdentity } from "./core/provider-prompts";
-export { composeOxPrompt, oxScaffold } from "./core/ox-prompts";
+export { composeOxPrompt, composeOxTurnSections, oxScaffold } from "./core/ox-prompts";
 export { activeHost, sameScope, hostContextText, type HostScope, type PromptHost, type HostContext } from "./core/host-context";
 export { executeGuidance, type ExecuteGuidanceInput } from "./core/tool-prompts";
 export { runtimeEvent, failureReceipt, outputTruncation, imageReadGuidance, type RuntimeEvent } from "./core/runtime-prompts";

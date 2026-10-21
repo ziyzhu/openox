@@ -66,6 +66,7 @@ extension Conversation {
             "nativeReasoningEffort": thinkingLevel == nil ? effort.map(JSONValue.string) ?? .null : .null,
             "contextWindow": .int(configuration.model.maxContext), "maxTokens": .int(configuration.model.maxTokens),
             "reasoning": .bool(configuration.model.reasoning),
+            "systemUpdates": .bool(configuration.model.systemUpdates && configuration.client.wireProtocol(for: configuration.model) != .geminiGenerateContent),
             "toolExecutionMode": .string(configuration.toolExecutionMode == .parallel ? "parallel" : "sequential"),
             "tools": .array(configuration.tools.map { .object([
                 "name": .string($0.name), "description": .string($0.description), "parameters": $0.parameters,

@@ -17,6 +17,9 @@
             "text"
           ],
           "name": "GPT-6 Sol",
+          "options": {
+            "systemUpdates": true
+          },
           "output": [
             "text"
           ],
@@ -40,7 +43,8 @@
           ],
           "name": "GPT-6 Sol · Fast",
           "options": {
-            "serviceTier": "priority"
+            "serviceTier": "priority",
+            "systemUpdates": true
           },
           "output": [
             "text"
@@ -65,6 +69,9 @@
             "text"
           ],
           "name": "GPT-6 Astra",
+          "options": {
+            "systemUpdates": true
+          },
           "output": [
             "text"
           ],
@@ -87,7 +94,8 @@
           ],
           "name": "GPT-6 Astra · Fast",
           "options": {
-            "serviceTier": "priority"
+            "serviceTier": "priority",
+            "systemUpdates": true
           },
           "output": [
             "text"
@@ -111,6 +119,9 @@
             "text"
           ],
           "name": "GPT-6 Luna",
+          "options": {
+            "systemUpdates": true
+          },
           "output": [
             "text"
           ],
@@ -134,7 +145,8 @@
           ],
           "name": "GPT-6 Luna · Fast",
           "options": {
-            "serviceTier": "priority"
+            "serviceTier": "priority",
+            "systemUpdates": true
           },
           "output": [
             "text"
@@ -164,6 +176,48 @@
         {
           "match": "*",
           "outputTokens": 16384
+        },
+        {
+          "match": "gpt-5.4",
+          "options": {
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "gpt-5.4-mini",
+          "options": {
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "gpt-5.4-pro",
+          "options": {
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "gpt-5.5",
+          "options": {
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "gpt-5.6-*",
+          "options": {
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "gpt-6-*",
+          "options": {
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "gpt-6.1-*",
+          "options": {
+            "systemUpdates": true
+          }
         }
       ]
     },
@@ -1396,6 +1450,9 @@
             "text"
           ],
           "name": "GPT-6 Sol",
+          "options": {
+            "systemUpdates": true
+          },
           "output": [
             "text"
           ],
@@ -1418,6 +1475,9 @@
             "text"
           ],
           "name": "GPT-6 Astra",
+          "options": {
+            "systemUpdates": true
+          },
           "output": [
             "text"
           ],
@@ -1439,6 +1499,9 @@
             "text"
           ],
           "name": "GPT-6 Luna",
+          "options": {
+            "systemUpdates": true
+          },
           "output": [
             "text"
           ],
@@ -1461,7 +1524,51 @@
     },
     "discovery": {
       "catalog": "openai",
-      "format": "openai"
+      "format": "openai",
+      "rules": [
+        {
+          "match": "gpt-5.4",
+          "options": {
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "gpt-5.4-mini",
+          "options": {
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "gpt-5.4-pro",
+          "options": {
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "gpt-5.5",
+          "options": {
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "gpt-5.6-*",
+          "options": {
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "gpt-6-*",
+          "options": {
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "gpt-6.1-*",
+          "options": {
+            "systemUpdates": true
+          }
+        }
+      ]
     },
     "legacyCredentialID": "openai",
     "legacyID": "openai",
@@ -1518,7 +1625,8 @@
           ],
           "name": "Claude Opus 5.5",
           "options": {
-            "adaptiveThinking": true
+            "adaptiveThinking": true,
+            "systemUpdates": true
           },
           "output": [
             "text"
@@ -1542,7 +1650,8 @@
           ],
           "name": "Claude Fable 5.1",
           "options": {
-            "adaptiveThinking": true
+            "adaptiveThinking": true,
+            "systemUpdates": true
           },
           "output": [
             "text"
@@ -1579,6 +1688,54 @@
       "catalog": "anthropic",
       "format": "anthropic",
       "rules": [
+        {
+          "match": "claude-fable-5",
+          "options": {
+            "adaptiveThinking": true,
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "claude-fable-5-1",
+          "options": {
+            "adaptiveThinking": true,
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "claude-haiku-5-5",
+          "options": {
+            "adaptiveThinking": true,
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "claude-opus-5",
+          "options": {
+            "adaptiveThinking": true,
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "claude-opus-5-5",
+          "options": {
+            "adaptiveThinking": true,
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "claude-sonnet-5-5",
+          "options": {
+            "adaptiveThinking": true,
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "claude-opus-4-8",
+          "options": {
+            "systemUpdates": true
+          }
+        },
         {
           "match": "claude-sonnet-5*",
           "options": {
@@ -1676,7 +1833,8 @@
           ],
           "name": "Claude Opus 5.5",
           "options": {
-            "adaptiveThinking": true
+            "adaptiveThinking": true,
+            "systemUpdates": true
           },
           "output": [
             "text"
@@ -1700,7 +1858,8 @@
           ],
           "name": "Claude Fable 5.1",
           "options": {
-            "adaptiveThinking": true
+            "adaptiveThinking": true,
+            "systemUpdates": true
           },
           "output": [
             "text"
@@ -1748,6 +1907,54 @@
       "catalog": "anthropic",
       "format": "anthropic",
       "rules": [
+        {
+          "match": "claude-fable-5",
+          "options": {
+            "adaptiveThinking": true,
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "claude-fable-5-1",
+          "options": {
+            "adaptiveThinking": true,
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "claude-haiku-5-5",
+          "options": {
+            "adaptiveThinking": true,
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "claude-opus-5",
+          "options": {
+            "adaptiveThinking": true,
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "claude-opus-5-5",
+          "options": {
+            "adaptiveThinking": true,
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "claude-sonnet-5-5",
+          "options": {
+            "adaptiveThinking": true,
+            "systemUpdates": true
+          }
+        },
+        {
+          "match": "claude-opus-4-8",
+          "options": {
+            "systemUpdates": true
+          }
+        },
         {
           "match": "claude-sonnet-5*",
           "options": {

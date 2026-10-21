@@ -1,14 +1,27 @@
-import type { Api, AssistantMessage, AssistantMessageEvent, Model, SimpleStreamOptions, TranscriptContext } from "@earendil-works/pi-ai";
+import type { Api, AssistantMessage, AssistantMessageEvent, Message, Model, SimpleStreamOptions, TranscriptContext } from "@earendil-works/pi-ai";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
-import { getCurrentSystemPrompt, getCurrentTools } from "@earendil-works/pi-ai/utils/transcript";
+import { getCurrentTools, getInitialSystemMessage, resolveTranscript, withoutInitialSystemMessage } from "@earendil-works/pi-ai/utils/transcript";
+import { getSystemMessageText, renderSystemMessageUpdate } from "@earendil-works/pi-ai";
 import { native } from "./bridge";
 import type { ConversationReference } from "../../profile/conversations";
 
 export const emptyUsage = () => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } });
 
-/** Swift's contract has a leading prompt/tools, not positional system messages. Use Pi's specified collapse semantics. */
-export function nativeStream(reference: ConversationReference, model: Model<Api>, transcript: TranscriptContext, options?: SimpleStreamOptions) {
+function nativeTranscript(transcript: TranscriptContext, systemUpdates: boolean) {
+  const { messages } = resolveTranscript(transcript, systemUpdates);
+  const initial = getInitialSystemMessage(messages);
+  const ordered: (Message | { role: "system"; text: string; timestamp: number })[] = [];
+  for (const message of withoutInitialSystemMessage(messages)) {
+    if (message.role !== "system") { ordered.push(message); continue; }
+    let index = ordered.length;
+    while (index > 0 && ordered[index - 1]!.role === "user") index--;
+    ordered.splice(index, 0, { role: "system", text: renderSystemMessageUpdate(message), timestamp: message.timestamp });
+  }
+  return { systemPrompt: initial ? getSystemMessageText(initial) : "", messages: ordered };
+}
+
+export function nativeStream(reference: ConversationReference, model: Model<Api>, transcript: TranscriptContext, systemUpdates: boolean, options?: SimpleStreamOptions) {
   const output = createAssistantMessageEventStream();
   let terminal = false;
   let partial: AssistantMessage = { role: "assistant", api: model.api, provider: model.provider, model: model.id,
@@ -19,7 +32,7 @@ export function nativeStream(reference: ConversationReference, model: Model<Api>
       const tools = getCurrentTools(transcript.messages);
       const purpose = options?.cacheRetention === "none" && tools.length === 0 ? "compaction" : "generation";
       await native("nativeModel", { conversationID: reference.conversationID, reference, purpose, streamOptions: { maxTokens: options?.maxTokens, cacheRetention: options?.cacheRetention },
-        systemPrompt: getCurrentSystemPrompt(transcript.messages), tools, messages: transcript.messages.filter(message => message.role !== "system") },
+        tools, ...nativeTranscript(transcript, systemUpdates) },
       options?.signal, value => {
         const event = value as AssistantMessageEvent;
         if (terminal) {

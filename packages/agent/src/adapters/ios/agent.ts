@@ -19,7 +19,8 @@ import { resolveFileRequest, validateFileRequest, type FileOperation, type FileR
 import { nativeFilePayloads } from "./file-payloads";
 import { fileRequest, nativeFiles } from "./files";
 import { composeIOSPrompt } from "./prompts";
-import { composeTurnContext, type SystemPromptInput, type TurnState } from "../../core/prompts";
+import type { SystemPromptInput, TurnState } from "../../core/prompts";
+import { composeOxTurnSections } from "../../core/ox-prompts";
 import { activeHost, sameScope, type HostScope } from "../../core/host-context";
 import { decodeBase64, encodeBase64 } from "../../core/base64";
 
@@ -30,7 +31,7 @@ import { prepareProfileExport, importProfileIdentity } from "../../profile/porta
 
 const context = BACKGROUND_CONTEXT;
 interface Config { title?: string; promptState: SystemPromptInput; isolatedFiles?: boolean; model: string; contextWindow: number; maxTokens: number;
-  reasoning: boolean; tools: (Tool & { executionMode?: ToolExecutionMode })[]; toolExecutionMode?: ToolExecutionMode;
+  reasoning: boolean; systemUpdates?: boolean; tools: (Tool & { executionMode?: ToolExecutionMode })[]; toolExecutionMode?: ToolExecutionMode;
   providerID?: string; thinkingLevel?: ModelThinkingLevel | null; nativeReasoningEffort?: string | null }
 type CommandScope = { profileID?: string; conversationID?: ConversationId; reference?: ConversationReference | null };
 type Command = CommandScope & (
@@ -225,10 +226,15 @@ export class IOSAgentAdapter {
           if (!expected || !sameScope(expected, activeHost(args.turnState.hostContext))) throw new Error("Turn state does not belong to the attached host/Profile scope");
         }
         await this.guardProgress(target);
-        const content = args.content ?? "";
-        const contextualContent = args.turnState ? [...(typeof content === "string" ? [{ type: "text" as const, text: content }] : content),
-          { type: "text" as const, text: composeTurnContext(args.turnState), oxTransientContext: true }] : content;
-        return session.run(target, { type: "input", content: contextualContent, requestId: args.requestID });
+        const turnState = args.turnState;
+        if (turnState) {
+          const conversation = await session.harness.conversation(session.conversations.id(target), context);
+          if (!conversation) throw new Error("Conversation not found");
+          await conversation.commit(async tx => {
+            (await tx.doc(ConversationApplicationMetadata, conversation.id)).fields.turnState = turnState as unknown as JsonObject;
+          }, context);
+        }
+        return session.run(target, { type: "input", content: args.content ?? "", requestId: args.requestID });
       }
       case "resumeExisting": return this.resumeExisting(attached(), args.submissionID, args.requestID);
       case "resume": {
@@ -669,7 +675,7 @@ export class IOSAgentAdapter {
     alias = alias?.startsWith("ox-native:") ? alias : `ox-native:${reference.profileID}:${conversation.id}`;
     const extensions = metadata.agent?.extensions;
     const extensionName = Array.isArray(extensions) ? extensions.find(name => name !== "ox-profile-files") : undefined;
-    const stream = (model: Model<Api>, transcript: Parameters<typeof nativeStream>[2], options?: Parameters<typeof nativeStream>[3]) => nativeStream(reference, model, transcript, options);
+    const stream = (model: Model<Api>, transcript: Parameters<typeof nativeStream>[2], options?: Parameters<typeof nativeStream>[4]) => nativeStream(reference, model, transcript, config.systemUpdates === true, options);
     const previous = this.attachments.get(conversation.id);
     if (previous) this.attachments.set(conversation.id, { status: "attaching" });
     this.providerRoutes.set(alias, conversation.id);
@@ -677,8 +683,14 @@ export class IOSAgentAdapter {
       models: [{ id: config.model, provider: alias, api: "ox-native", name: config.model, baseUrl: "", reasoning: config.reasoning,
         input: ["text"], contextWindow: config.contextWindow, maxTokens: config.maxTokens,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }], api: { stream, streamSimple: stream } }));
-    const sections = Object.entries(prompt.sections).map(([key, text]) => section(key, () => text, { tag: false }));
-    if (session.files.physical) sections.push(section("working_directory", () => `Your working directory is conversations/${conversation.id}/. Relative file paths resolve there. Use / for the Profile root and absolute paths such as /reports/report.md for shared files. Mounted resource paths such as skills/ and services/ remain Profile-relative.`, { tag: false }));
+    const sections = Object.entries(prompt.sections).map(([key, text]) => section(key, () => text, { tag: key !== "preamble" }));
+    for (const key of ["skills", "hosts", "replies", "attached_services", "conversation_files", "storage", "language"] as const) {
+      sections.push(section(key, async ({ conversationId, read }) => {
+        const turnState = (await read.snapshot(ConversationApplicationMetadata, conversationId, context))?.fields.turnState;
+        return turnState ? composeOxTurnSections(turnState as unknown as TurnState, config.promptState)[key] : undefined;
+      }));
+    }
+    if (session.files.physical) sections.push(section("cwd", () => `conversations/${conversation.id}/\nRelative file paths resolve here. Use / for the Profile root and absolute paths such as /reports/report.md for shared files. Mounted resource paths such as skills/ and services/ remain Profile-relative.`));
     const extension = defineExtension({ name: extensionName ?? `ox-conversation:${alias.slice(10)}`, sections,
       tools: config.tools.map(tool => defineTool({ ...tool, replay: "unsafe", executionMode: config.toolExecutionMode === "sequential" ? "sequential" : tool.executionMode ?? config.toolExecutionMode ?? "sequential",
         execute: async (arguments_, api, ctx) => this.executeNativeTool(tool.name, arguments_, api, ctx) })) });

@@ -278,16 +278,27 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
             }
         }
 
+        var pendingSystem: [[String: Any]] = []
+        func flushSystem() {
+            append(role: "system", content: pendingSystem)
+            pendingSystem = []
+        }
+
         for message in messages {
             switch message {
+            case .system(let system):
+                if !system.text.isEmpty { pendingSystem.append(["type": "text", "text": system.text]) }
             case .user(let user):
+                flushSystem()
                 append(role: "user", content: try userContent(user))
             case .assistant(let assistant):
+                flushSystem()
                 append(role: "assistant", content: assistantContent(assistant))
             case .toolResult(let result):
                 append(role: "user", content: [try toolResultContent(result)])
             }
         }
+        flushSystem()
 
         var body: [String: Any] = [
             "model": model.wireID,

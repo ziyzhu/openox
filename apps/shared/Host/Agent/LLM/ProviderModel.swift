@@ -36,6 +36,7 @@ nonisolated public struct ProviderModel: Sendable, Codable {
     public var reasoningEfforts: [String]
     public var reasoningEffort: String?
     public var modalities: ProviderModelModalities
+    public var systemUpdates: Bool
     public var wireID: String { providerModelID ?? id }
     public var lowestReasoningEffort: String? { reasoningEfforts.first }
     public var selectedReasoningEffort: String? {
@@ -53,7 +54,8 @@ nonisolated public struct ProviderModel: Sendable, Codable {
         reasoning: Bool = false,
         reasoningEfforts: [String] = [],
         reasoningEffort: String? = nil,
-        modalities: ProviderModelModalities = .text
+        modalities: ProviderModelModalities = .text,
+        systemUpdates: Bool = false
     ) {
         self.id = id
         self.providerModelID = providerModelID
@@ -66,10 +68,11 @@ nonisolated public struct ProviderModel: Sendable, Codable {
         self.reasoningEfforts = reasoningEfforts
         self.reasoningEffort = reasoningEffort
         self.modalities = modalities
+        self.systemUpdates = systemUpdates
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, providerModelID, variant, displayName, maxTokens, maxContext, supportsTools, reasoning, reasoningEfforts, reasoningEffort, modalities
+        case id, providerModelID, variant, displayName, maxTokens, maxContext, supportsTools, reasoning, reasoningEfforts, reasoningEffort, modalities, systemUpdates
     }
 
     public init(from decoder: Decoder) throws {
@@ -85,5 +88,6 @@ nonisolated public struct ProviderModel: Sendable, Codable {
         reasoningEfforts = try values.decodeIfPresent([String].self, forKey: .reasoningEfforts) ?? []
         reasoningEffort = try values.decodeIfPresent(String.self, forKey: .reasoningEffort)
         modalities = try values.decodeIfPresent(ProviderModelModalities.self, forKey: .modalities) ?? .text
+        systemUpdates = try values.decodeIfPresent(Bool.self, forKey: .systemUpdates) ?? false
     }
 }

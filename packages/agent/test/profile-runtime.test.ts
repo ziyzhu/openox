@@ -411,11 +411,13 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(modelRequests[0]!.systemPrompt).toContain("<profile_files>");
     expect(modelRequests[0]!.systemPrompt).not.toContain("<ox>");
     expect(modelRequests[0]!.messages.every(message => message.role !== "system")).toBe(true);
-    expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("<turn-state>");
-    expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("files/a");
-    expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("Active host/Profile:");
-    expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("ios-host");
-    expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("This is a temporary conversation");
+    expect(JSON.stringify(modelRequests[0]!.messages)).not.toContain("<turn-state>");
+    expect(modelRequests[0]!.systemPrompt).toContain("<attached_services>\n- ios:files");
+    expect(modelRequests[0]!.systemPrompt).toContain("files/a");
+    expect(modelRequests[0]!.systemPrompt).toContain("<hosts>\nActive host/Profile:");
+    expect(modelRequests[0]!.systemPrompt).toContain("ios-host");
+    expect(modelRequests[0]!.systemPrompt).toContain("<storage>\nThis is a temporary conversation");
+    expect(modelRequests[0]!.systemPrompt).toContain("<name>example</name>");
     const updated = { ...config, promptState: { ...config.promptState, memory: "updated frozen memory" } };
     await adapter.command({ action: "fileWrite", path: "MEMORY.md", text: "new live memory" });
     await adapter.command({ action: "attach", config: updated, reference: attached.reference });
@@ -425,7 +427,8 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(modelRequests[1]!.systemPrompt).not.toContain("ox_soul");
     expect(modelRequests[1]!.systemPrompt).toContain("frozen memory");
     expect(modelRequests[1]!.systemPrompt).not.toContain("new live memory");
-    expect(JSON.stringify(modelRequests[1]!.messages.at(-1))).not.toContain("files/a");
+    expect(modelRequests[1]!.systemPrompt).not.toContain("files/a");
+    expect(modelRequests[1]!.systemPrompt).toContain("<attached_services>\nNo services are attached.\n</attached_services>");
     const isolatedCreated = await adapter.command({ action: "conversationCreate" }) as typeof created;
     const isolated = await adapter.command({ action: "attach", config: { ...config, isolatedFiles: true }, conversationID: isolatedCreated.reference.conversationID }) as typeof attached;
     await adapter.command({ action: "run", reference: isolated.reference, content: "files" });

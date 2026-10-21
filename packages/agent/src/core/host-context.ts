@@ -31,7 +31,7 @@ export function activeHost(context: HostContext) {
 export function hostContextText(context: HostContext) {
   const host = activeHost(context);
   const label = (scope: HostScope) => `${JSON.stringify(scope.hostID)} / ${JSON.stringify(scope.profileID)}`;
-  return ["## Hosts", `Active host/Profile: ${label(host)}`, ...context.hosts.map(owner =>
+  return [`Active host/Profile: ${label(host)}`, ...context.hosts.map(owner =>
     `- ${label(owner)}: ${[...new Set(owner.functions)].sort().join(", ") || "no native functions"}`),
     "Capabilities, file paths, permissions, handoffs, and output references are owned by their host and Profile. Use only exposed contracts for the owning scope. Do not substitute another host or Profile when continuing or retrying an operation."].join("\n");
 }

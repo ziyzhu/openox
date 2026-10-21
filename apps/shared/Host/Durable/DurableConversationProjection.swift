@@ -101,6 +101,8 @@ nonisolated enum DurableConversationProjection {
                 appendAssistant(assistant, namespace: namespace, turnID: turnID)
             case .toolResult(let result):
                 try appendResult(result)
+            case .system:
+                break
             }
         }
 

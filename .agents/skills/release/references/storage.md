@@ -516,7 +516,11 @@ frozen invocations, schedules, historical migrations, user copies, and transcrip
 bytes are unchanged. No persisted format or milestone changes for this move.
 Retired workflows are excluded from catalog/root skill listings. Named Pi system
 sections replace the old `ox` section through Pi's normal transcript patching;
-memory remains frozen per conversation and turn-state facts remain per-message.
+memory remains frozen per conversation. Each run stores its turn state in the
+conversation metadata `turnState` field, and named sections render it as Pi system
+patches. Models with `systemUpdates` receive patches in place; others receive the
+collapsed prompt. Legacy `<turn-state>` user blocks stay in transcripts but are
+omitted from model context.
 Unscoped root grep excludes conversation files, while an explicit `conversations` path searches
 JSONL records with a separate bounded byte budget and match-centered excerpts.
 Reads and searches are bounded; writes are atomic; writes and edits to the same

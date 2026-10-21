@@ -509,6 +509,10 @@ public struct OpenAIResponsesTransport: ProviderClient {
         var input: [[String: Any]] = []
         for (messageIndex, m) in messages.enumerated() {
             switch m {
+            case .system(let system):
+                guard !system.text.isEmpty else { continue }
+                input.append(["type": "message", "role": model.reasoning ? "developer" : "system",
+                              "content": [["type": "input_text", "text": system.text]]])
             case .user(let u):
                 let parts = UserMessageParts(u, label: "\(displayName).buildUser")
                 var content: [[String: Any]] = []

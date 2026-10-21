@@ -88,7 +88,7 @@ nonisolated struct VisionImageAdapter: ModelAdapter {
             result.transientAttachments = transient
             return .toolResult(result)
 
-        case .assistant:
+        case .system, .assistant:
             return message
         }
     }

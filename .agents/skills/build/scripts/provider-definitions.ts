@@ -38,6 +38,7 @@ const ModelSchema = object({
     serviceTier: Type.Optional(text()),
     adaptiveThinking: Type.Optional(Type.Boolean()),
     replayReasoning: Type.Optional(Type.Boolean()),
+    systemUpdates: Type.Optional(Type.Boolean()),
   })),
 });
 

@@ -48,7 +48,7 @@ enum ConversationURLServiceContext {
         case .toolResult(var result):
             result.content.append(.text(TextContent("\n\n\(metadata)")))
             transformed[target] = .toolResult(result)
-        case .assistant:
+        case .system, .assistant:
             return messages
         }
         Log.session.debug("ConversationURLServiceContext.transform conversation=\(conversationID) urls=\(relations.count) matches=\(matched)")
@@ -63,7 +63,7 @@ enum ConversationURLServiceContext {
     }
 
     private static func relevantRange(in messages: [Message]) -> ClosedRange<Int>? {
-        guard let last = messages.indices.last else { return nil }
+        guard let last = messages.lastIndex(where: { if case .system = $0 { false } else { true } }) else { return nil }
         switch messages[last] {
         case .user:
             var first = last
@@ -77,7 +77,7 @@ enum ConversationURLServiceContext {
                 if case .assistant = message { true } else { false }
             } ?? last
             return first...last
-        case .assistant:
+        case .system, .assistant:
             return nil
         }
     }
@@ -96,6 +96,8 @@ enum ConversationURLServiceContext {
             for block in result.content {
                 if case .text(let text) = block { collectURLs(from: text.text, into: &urls, seen: &seen) }
             }
+        case .system:
+            break
         }
     }
 

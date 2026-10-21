@@ -265,6 +265,8 @@ public struct GeminiProvider: ProviderClient {
         var contents: [[String: Any]] = []
         for m in messages {
             switch m {
+            case .system:
+                throw GeminiError(message: "Gemini does not accept system messages after the conversation starts")
             case .user(let u): contents.append(try buildUserContent(u))
             case .assistant(let a): contents.append(buildAssistantContent(a))
             case .toolResult(let r):

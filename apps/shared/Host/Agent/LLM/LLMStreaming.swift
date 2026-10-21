@@ -599,7 +599,7 @@ nonisolated func requiredInputModalities(in messages: [Message]) -> Set<Provider
                 if case .attachment(let file) = block { include(file) }
             }
             result.transientAttachments.forEach(include)
-        case .assistant:
+        case .system, .assistant:
             break
         }
     }
@@ -630,6 +630,7 @@ nonisolated extension Array where Element == Message {
     var wireSignature: String {
         enumerated().map { i, m in
             switch m {
+            case .system: return "\(i):system"
             case .user: return "\(i):user"
             case .assistant(let a): return "\(i):assistant[\(a.content.blockKinds)]"
             case .toolResult(let r): return "\(i):result(\(r.toolName)\(r.isError ? "!" : ""))"

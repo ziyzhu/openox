@@ -33,7 +33,8 @@ public struct MockLLMClient: ProviderClient {
             displayName: "Mock",
             maxTokens: 8192,
             maxContext: 1_000_000,
-            modalities: ProviderModelModalities(input: [.text, .image, .pdf], output: [.text])
+            modalities: ProviderModelModalities(input: [.text, .image, .pdf], output: [.text]),
+            systemUpdates: true
         ),
         ProviderModel(
             id: "mock-text-only",
@@ -110,7 +111,7 @@ public struct MockLLMClient: ProviderClient {
                 if let scenario = scenarios[intent.lowercased()] { return (scenario, turn) }
                 if intent.hasPrefix("[system]") { continue }
                 return (fallback, turn)
-            case .toolResult:
+            case .system, .toolResult:
                 continue
             }
         }
@@ -122,6 +123,7 @@ public struct MockLLMClient: ProviderClient {
         for message in messages.reversed() {
             switch message {
             case .toolResult(let r): out.append(r)
+            case .system: continue
             case .assistant, .user: return out.reversed()
             }
         }
@@ -149,6 +151,23 @@ public struct TurnContext: Sendable {
     public var systemPrompt: String
     public var messages: [Message]
     public var toolResults: [ToolResultMessage]
+
+    public var hasSystemUpdates: Bool {
+        messages.contains { if case .system = $0 { true } else { false } }
+    }
+
+    public func section(_ key: String) -> String? {
+        let updates = messages.compactMap { message -> String? in
+            if case .system(let system) = message { return system.text }
+            return nil
+        }
+        for text in ([systemPrompt] + updates).reversed() {
+            guard let open = text.range(of: "<\(key)>\n", options: .backwards),
+                  let close = text.range(of: "\n</\(key)>", range: open.upperBound..<text.endIndex) else { continue }
+            return String(text[open.upperBound..<close.lowerBound])
+        }
+        return nil
+    }
 
     public var serializedUserText: String {
         for message in messages.reversed() {
@@ -188,17 +207,6 @@ public struct TurnContext: Sendable {
             return self.user(user, said: needle)
         }
         return false
-    }
-
-    public func priorUserContext(containing needle: String) -> String? {
-        let users = messages.compactMap { message -> UserMessage? in
-            guard case .user(let user) = message else { return nil }
-            return user
-        }
-        for user in users.dropLast().reversed() {
-            if self.user(user, said: needle) { return user.transientContext }
-        }
-        return nil
     }
 
     public func userSaid(_ needle: String) -> Bool {

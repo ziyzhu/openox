@@ -170,6 +170,8 @@ extension Scenario {
                     guard pending.remove(result.toolCallId) != nil else { return [.say("Compaction orphaned a tool result."), .stop(.stop)] }
                     if result.content.concatenatedText.hasPrefix("EARLY_STEP_") { return [.say("Compaction retained the early tool result."), .stop(.stop)] }
                     skillRestored = skillRestored || result.activatedSkills.contains { $0.path == "skills/visualize/SKILL.md" }
+                case .system:
+                    break
                 }
             }
             guard pending.isEmpty, skillRestored, ctx.resultText("execute")?.contains("RECENT_STEP_") == true else {

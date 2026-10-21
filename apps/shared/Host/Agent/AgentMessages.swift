@@ -260,16 +260,28 @@ nonisolated public struct ToolResultMessage: Sendable, Codable, Equatable {
     }
 }
 
+nonisolated public struct SystemMessage: Sendable, Codable, Equatable {
+    public var text: String
+    public var timestamp: Date
+
+    public init(text: String, timestamp: Date = Date()) {
+        self.text = text
+        self.timestamp = timestamp
+    }
+}
+
 nonisolated public enum Message: Sendable, Codable {
+    case system(SystemMessage)
     case user(UserMessage)
     case assistant(AssistantMessage)
     case toolResult(ToolResultMessage)
 
-    private enum CodingKeys: String, CodingKey { case type, user, assistant, toolResult }
+    private enum CodingKeys: String, CodingKey { case type, system, user, assistant, toolResult }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         switch try c.decode(String.self, forKey: .type) {
+        case "system": self = .system(try c.decode(SystemMessage.self, forKey: .system))
         case "user": self = .user(try c.decode(UserMessage.self, forKey: .user))
         case "assistant": self = .assistant(try c.decode(AssistantMessage.self, forKey: .assistant))
         case "toolResult": self = .toolResult(try c.decode(ToolResultMessage.self, forKey: .toolResult))
@@ -281,6 +293,7 @@ nonisolated public enum Message: Sendable, Codable {
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {
+        case .system(let v): try c.encode("system", forKey: .type); try c.encode(v, forKey: .system)
         case .user(let v): try c.encode("user", forKey: .type); try c.encode(v, forKey: .user)
         case .assistant(let v): try c.encode("assistant", forKey: .type); try c.encode(v, forKey: .assistant)
         case .toolResult(let v): try c.encode("toolResult", forKey: .type); try c.encode(v, forKey: .toolResult)

@@ -69,6 +69,7 @@ nonisolated struct ProviderDefinition: Codable, Equatable, Identifiable, Sendabl
             var serviceTier: String?
             var adaptiveThinking: Bool?
             var replayReasoning: Bool?
+            var systemUpdates: Bool?
         }
 
         init(_ model: ProviderModel, options: Options? = nil) {
@@ -93,7 +94,8 @@ nonisolated struct ProviderDefinition: Codable, Equatable, Identifiable, Sendabl
                 supportsTools: true,
                 reasoning: !(reasoningEfforts ?? []).isEmpty || options?.adaptiveThinking == true,
                 reasoningEfforts: reasoningEfforts ?? [],
-                modalities: ProviderModelModalities(input: Set(input ?? [.text]), output: Set(output ?? [.text]))
+                modalities: ProviderModelModalities(input: Set(input ?? [.text]), output: Set(output ?? [.text])),
+                systemUpdates: options?.systemUpdates == true
             )
         }
     }
@@ -148,6 +150,9 @@ nonisolated struct ProviderDefinition: Codable, Equatable, Identifiable, Sendabl
             }
             if model.options?.replayReasoning != nil, api != .openAIChatCompletions {
                 throw RuntimeError.bridge("Invalid provider: replayReasoning requires openai-conversation-completions")
+            }
+            if model.options?.systemUpdates != nil, api == .geminiGenerateContent {
+                throw RuntimeError.bridge("Invalid provider: systemUpdates is unavailable for gemini-generate-content")
             }
         }
         if auth.kind == .oauth {

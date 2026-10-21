@@ -69,6 +69,7 @@ nonisolated final class ProviderFileInputs: Sendable {
             case .user(let user): content = user.content
             case .assistant(let assistant): content = assistant.content
             case .toolResult(let result): content = result.content
+            case .system: content = []
             }
             for block in content {
                 if case .attachment(let file) = block { _ = try read(file) }

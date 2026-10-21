@@ -40,7 +40,7 @@ nonisolated struct FileReferenceAdapter: ModelAdapter {
                 return false
             }
             return (.toolResult(result), changed)
-        case .assistant:
+        case .system, .assistant:
             return (message, false)
         }
     }

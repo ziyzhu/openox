@@ -7,7 +7,7 @@ import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import { googleProvider } from "@earendil-works/pi-ai/providers/google";
 import { Type } from "typebox";
 import { nativeDatabase } from "../src/sqlite";
-import { openProfileRuntime, canonical, composeOxPrompt, composeTurnContext, bundledSkills, executeGuidance, type ProfileRuntime, type FileOperation, type HostContext, type TurnState } from "../src/index";
+import { openProfileRuntime, canonical, composeOxPrompt, composeOxTurnSections, renderSections, bundledSkills, executeGuidance, type ProfileRuntime, type FileOperation, type HostContext, type TurnState } from "../src/index";
 import { guidanceText } from "../src/core/guidance-texts";
 import { memoryFiles } from "./files";
 import { execute } from "./execute";
@@ -77,15 +77,16 @@ export class EvalRuntime {
     const conversation = await this.session.harness.createConversation({ ownership: { kind: "ownerless" }, agent: { model: { provider: this.provider, modelId: this.model }, extensions: [this.extension] } }, BACKGROUND_CONTEXT);
     const id = String(conversation.id);
     const target = { profileID: "eval", conversationID: Number(id) as ConversationId };
-    const systemPrompt = composeOxPrompt({ hostContext: this.hostContext, memory: String(await this.session.files.read("MEMORY.md")) }).rendered;
+    const input = { hostContext: this.hostContext, memory: String(await this.session.files.read("MEMORY.md")) };
+    const state: TurnState = { skills: [...bundledSkills], skillConflicts: [], attachedServices: this.attached, filePaths: [], storageMode: temporary ? "temporary" : "persisted", responseLanguage: null, hostContext: this.hostContext };
+    const systemPrompt = renderSections({ ...composeOxPrompt(input).sections, ...composeOxTurnSections(state, input) });
     this.prompts.set(id, systemPrompt);
     this.calls.set(id, []);
     if (temporary) this.temporary.add(id);
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; void this.session.abort(target); }, timeoutMs);
     try {
-      const context = composeTurnContext({ skills: [...bundledSkills], skillConflicts: [], attachedServices: this.attached, filePaths: [], storageMode: temporary ? "temporary" : "persisted", responseLanguage: null, hostContext: this.hostContext });
-      const turn = await this.session.run(target, { type: "input", content: `${text}\n\n${context}`, requestId: crypto.randomUUID() });
+      const turn = await this.session.run(target, { type: "input", content: text, requestId: crypto.randomUUID() });
       const last = turn.messages.at(-1);
       const completed = turn.receipt.status === "done" && last?.role === "assistant" && last.stopReason !== "error" && last.stopReason !== "aborted";
       return { status: completed ? "completed" : timedOut ? "timeout" : "failed", ...(completed ? {} : { error: last?.role === "assistant" && last.errorMessage || ("detail" in turn.receipt ? String(turn.receipt.detail) : turn.receipt.status) }), systemPrompt, messages: turn.messages, calls: structuredClone(this.calls.get(id)!) };

@@ -30,24 +30,21 @@ extension Scenario {
     }
 
     static let skillCatalog = Scenario(name: "skill-catalog") { ctx in
-        let userSkill = "- `skills/grocery-planner/SKILL.md` — Plan a weekly grocery list from meals, dietary needs, and pantry items."
         let expectsService = ctx.latestUserSaid("attached")
         let expectsUserSkill = ctx.latestUserSaid("user")
         let verifiesStablePrefix = ctx.latestUserSaid("cache")
         let activatesUserSkill = ctx.latestUserSaid("activate")
-        let bundledPaths = ctx.systemPrompt.components(separatedBy: "`").filter { $0.hasPrefix("skills/") && $0.hasSuffix("/SKILL.md") }
-        let hasBundledSkills = !bundledPaths.isEmpty
+        let skills = ctx.section("skills") ?? ""
+        let services = ctx.section("attached_services") ?? ""
+        let files = ctx.section("conversation_files") ?? ""
         let hasTimestamp = ctx.serializedUserText
             .split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
             .first
             .map { $0.hasPrefix("[") && $0.hasSuffix(" \(TimeZone.autoupdatingCurrent.identifier)]") }
             == true
-        let hasTurnStateAfterTimestamp = ctx.serializedUserText.contains("\n\n<turn-state>\n")
-        let hasServiceSkill = ctx.transientContext.contains("## Attached Services")
-        let retainedServiceState = ctx.priorUserContext(containing: "attached")
-            .map { $0.contains("## Attached Services") } == true
         let filePaths = ctx.messages.flatMap { message -> [String] in
             let content = switch message {
+            case .system: [ContentBlock]()
             case .user(let value): value.content
             case .assistant(let value): value.content
             case .toolResult(let value): value.content
@@ -57,26 +54,18 @@ extension Scenario {
                 return "artifacts/\(file.fileName)"
             }
         }
-        let hasFileState = filePaths.isEmpty
-            || ctx.transientContext.contains("## Conversation Files")
-                && filePaths.allSatisfy { ctx.transientContext.contains("`\($0)`") }
         guard let languageDirective = try? ModelPromptRenderer.shared.render(.responseDirective, input: AppLocale.resolvedResponseLanguage) else {
             return [.say("Response language could not be rendered."), .stop(.stop)]
         }
-        guard ctx.transientContext.contains(userSkill) == expectsUserSkill,
-              !ctx.systemPrompt.contains("## Language"),
-              !ctx.systemPrompt.contains(userSkill),
-              ctx.transientContext.contains("## Language") == !languageDirective.isEmpty,
-              (languageDirective.isEmpty || ctx.transientContext.contains(languageDirective)),
-              !ctx.transientContext.contains("User slash commands:"),
-              !ctx.transientContext.contains("System skills:"),
-              !ctx.transientContext.contains("127.0.0.1:delayedEcho"),
-              hasBundledSkills,
+        guard skills.contains("<name>grocery-planner</name>") == expectsUserSkill,
+              skills.contains("<location>skills/visualize/SKILL.md</location>"),
+              languageDirective.isEmpty || ctx.section("language") == languageDirective,
+              !skills.contains("127.0.0.1:delayedEcho"),
+              !ctx.serializedUserText.contains("<turn-state>"),
               hasTimestamp,
-              hasTurnStateAfterTimestamp,
-              !verifiesStablePrefix || retainedServiceState,
-              hasFileState,
-              hasServiceSkill == expectsService else {
+              !verifiesStablePrefix || ctx.hasSystemUpdates,
+              filePaths.allSatisfy({ files.contains("`\($0)`") }),
+              (services != "No services are attached.") == expectsService else {
             return [.say("Skill catalog context was incorrect."), .stop(.stop)]
         }
         if ctx.latestUserSaid("bundled") {

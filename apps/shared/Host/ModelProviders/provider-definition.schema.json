@@ -388,6 +388,9 @@
                   },
                   "replayReasoning": {
                     "type": "boolean"
+                  },
+                  "systemUpdates": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
@@ -915,6 +918,9 @@
                   },
                   "replayReasoning": {
                     "type": "boolean"
+                  },
+                  "systemUpdates": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
@@ -1387,6 +1393,9 @@
                   },
                   "replayReasoning": {
                     "type": "boolean"
+                  },
+                  "systemUpdates": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
@@ -1826,6 +1835,9 @@
                   },
                   "replayReasoning": {
                     "type": "boolean"
+                  },
+                  "systemUpdates": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
@@ -2249,6 +2261,9 @@
                     "type": "boolean"
                   },
                   "replayReasoning": {
+                    "type": "boolean"
+                  },
+                  "systemUpdates": {
                     "type": "boolean"
                   }
                 },
