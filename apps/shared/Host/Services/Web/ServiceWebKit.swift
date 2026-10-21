@@ -55,43 +55,13 @@ extension Service {
         }
         guard owns(session) else { return .cancel }
         configureScripts(for: url, in: session)
-        if isSameDocumentNavigation(from: session.page.url, to: url) {
-            Log.webView.info("Service.navigation event=route domain=\(domain) session=\(session.logLabel) url=\(LogPrivacy.url(url?.absoluteString ?? "?"))")
-            return .allow
-        }
-        switch session.navigationPhase {
-        case .navigating(let load), .verifying(let load, _):
-            let expected = !load.started && url == load.expectedURL
-            let redirecting = load.started && !load.committed
-                && (url == load.expectedURL || url == session.page.url)
-            if expected || redirecting {
-                return .allow
-            }
-            let coordinated = coordinatePageNavigation(
-                action.request,
-                in: session,
-                superseding: load
-            )
-            Log.webView.info("Service.navigation page-replacement domain=\(domain) session=\(session.logLabel) coordinated=\(coordinated) url=\(LogPrivacy.url(url?.absoluteString ?? "?"))")
-            return .cancel
-        case .settling(let settlement):
-            let coordinated = coordinatePageNavigation(
-                action.request,
-                in: session,
-                superseding: settlement.load
-            )
-            Log.webView.info("Service.navigation settling-replacement domain=\(domain) session=\(session.logLabel) coordinated=\(coordinated) url=\(LogPrivacy.url(url?.absoluteString ?? "?"))")
-            return .cancel
-        case .pending, .reserved:
-            session.interruptEvaluations(with: EvalError.contextInvalidated)
-            Log.webView.info("Service.navigation page-rejected-barrier domain=\(domain) session=\(session.logLabel) phase=\(session.navigationPhase.logLabel) url=\(LogPrivacy.url(url?.absoluteString ?? "?"))")
-            return .cancel
-        case .ready, .unavailable:
-            let coordinated = coordinatePageNavigation(action.request, in: session)
-            let intent = action.target == nil ? "popup" : "page"
-            Log.webView.info("Service.navigation \(intent)-request domain=\(domain) session=\(session.logLabel) coordinated=\(coordinated) url=\(LogPrivacy.url(url?.absoluteString ?? "?"))")
+        if action.target == nil {
+            Log.webView.info("Service.navigation popup-request domain=\(domain) session=\(session.logLabel) url=\(LogPrivacy.url(url?.absoluteString ?? "?"))")
+            session.page.load(action.request)
             return .cancel
         }
+        Log.webView.info("Service.navigation allowed domain=\(domain) session=\(session.logLabel) url=\(LogPrivacy.url(url?.absoluteString ?? "?"))")
+        return .allow
     }
 
     func decidePolicy(for response: WebPage.NavigationResponse, in session: ServiceWebPage) async -> WKNavigationResponsePolicy {

@@ -285,15 +285,13 @@ final class Service: NSObject, Identifiable {
             let id = UUID()
             let label: String
             let timeout: TimeInterval
-            let predecessor: NavigationLease?
             var reservation: CheckedContinuation<Bool, Never>?
             var completion: CheckedContinuation<URL?, Never>?
             var timeoutTask: Task<Void, Never>?
 
-            init(label: String, timeout: TimeInterval, predecessor: NavigationLease? = nil) {
+            init(label: String, timeout: TimeInterval) {
                 self.label = label
                 self.timeout = timeout
-                self.predecessor = predecessor
             }
 
             func settleReservation(_ reserved: Bool) {
@@ -309,25 +307,17 @@ final class Service: NSObject, Identifiable {
                     self.completion = nil
                     completion.resume(returning: url)
                 }
-                predecessor?.settleCompletion(url)
-            }
-
-            func originates(from lease: NavigationLease) -> Bool {
-                self === lease || predecessor?.originates(from: lease) == true
             }
         }
 
         final class NavigationLoad {
             let lease: NavigationLease?
-            var generation: Int
-            var expectedURL: URL?
-            var started = false
+            let generation: Int
             var committed = false
 
-            init(lease: NavigationLease?, generation: Int, expectedURL: URL? = nil) {
+            init(lease: NavigationLease?, generation: Int) {
                 self.lease = lease
                 self.generation = generation
-                self.expectedURL = expectedURL
             }
         }
 

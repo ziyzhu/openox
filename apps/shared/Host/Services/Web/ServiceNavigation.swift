@@ -132,11 +132,10 @@ extension Service {
     func requestNavigation(
         in session: ServiceWebPage,
         label: String,
-        timeout: TimeInterval,
-        predecessor: ServiceWebPage.NavigationLease? = nil
+        timeout: TimeInterval
     ) -> ServiceWebPage.NavigationLease? {
         guard owns(session) else { return nil }
-        let lease = ServiceWebPage.NavigationLease(label: label, timeout: timeout, predecessor: predecessor)
+        let lease = ServiceWebPage.NavigationLease(label: label, timeout: timeout)
         if transitionNavigation(.requested(lease), on: session) {
             session.navigationFailure = nil
             Log.webView.info("Service.navigation requested domain=\(domain) session=\(session.logLabel) id=\(lease.id.uuidString.prefix(8)) label=\(label) active=\(activeInvocationCount(in: session)) queued=\(queuedInvocationCount(in: session))")
@@ -174,16 +173,9 @@ extension Service {
                 return
             }
             lease.completion = continuation
-            let expectedURL: URL? = switch command {
-            case .load(let request): request.url
-            case .reload: session.page.url
-            case .back: session.page.backForwardList.backList.last?.url
-            case .forward: session.page.backForwardList.forwardList.first?.url
-            }
             let load = ServiceWebPage.NavigationLoad(
                 lease: lease,
-                generation: session.navigationGeneration,
-                expectedURL: expectedURL
+                generation: session.navigationGeneration
             )
             guard transitionNavigation(.loadStarted(load), on: session) else {
                 continuation.resume(returning: nil)
@@ -223,10 +215,8 @@ extension Service {
         reason: String
     ) {
         guard owns(session) else { return }
-        let activeLease = session.activeLease(originatingFrom: lease)
-        guard transitionNavigation(.abandoned(lease, reason), on: session),
-              let activeLease else { return }
-        Log.webView.info("Service.navigation abandoned domain=\(domain) session=\(session.logLabel) id=\(activeLease.id.uuidString.prefix(8)) origin=\(lease.id.uuidString.prefix(8)) label=\(activeLease.label) reason=\(reason)")
+        guard transitionNavigation(.abandoned(lease, reason), on: session) else { return }
+        Log.webView.info("Service.navigation abandoned domain=\(domain) session=\(session.logLabel) id=\(lease.id.uuidString.prefix(8)) label=\(lease.label) reason=\(reason)")
     }
 
     func abandonActiveNavigation(in session: ServiceWebPage, reason: String) {
@@ -306,10 +296,6 @@ extension Service {
         guard owns(session) else { return }
         switch event {
         case .started:
-            if let current = session.navigationPhase.load, current.started {
-                Log.webView.info("Service.navigation ignored-duplicate-start domain=\(domain) session=\(session.logLabel) nav=\(current.generation)")
-                return
-            }
             guard transitionNavigation(event, on: session) else { return }
             Log.webView.info("Service.navigation event=start domain=\(domain) session=\(session.logLabel) phase=\(session.navigationPhase.logLabel) active=\(activeInvocationCount(in: session)) queued=\(queuedInvocationCount(in: session))")
 
@@ -368,43 +354,6 @@ extension Service {
         default:
             _ = transitionNavigation(event, on: session)
         }
-    }
-
-    func coordinatePageNavigation(
-        _ request: URLRequest,
-        in session: ServiceWebPage,
-        superseding load: ServiceWebPage.NavigationLoad? = nil
-    ) -> Bool {
-        if let load {
-            guard transitionNavigation(.superseded(load), on: session) else { return false }
-            Log.webView.warning("Service.navigation replaced domain=\(domain) session=\(session.logLabel) old=\(load.generation) intent=page")
-        }
-        let timeout: TimeInterval = auth.isSigningIn ? 300 : 15
-        guard let lease = requestNavigation(
-            in: session,
-            label: "page",
-            timeout: timeout,
-            predecessor: load?.lease
-        ) else {
-            load?.lease?.settleCompletion(nil)
-            return false
-        }
-        session.interruptEvaluations(with: EvalError.contextInvalidated)
-        Task { @MainActor [weak self, weak session, weak lease] in
-            guard let self, let session, let lease,
-                  await self.awaitNavigationReservation(lease, in: session) else { return }
-            _ = await self.startNavigation(.load(request), lease: lease, in: session)
-        }
-        return true
-    }
-
-    func isSameDocumentNavigation(from current: URL?, to requested: URL?) -> Bool {
-        guard let current, let requested, current != requested,
-              var currentParts = URLComponents(url: current, resolvingAgainstBaseURL: false),
-              var requestedParts = URLComponents(url: requested, resolvingAgainstBaseURL: false) else { return false }
-        currentParts.fragment = nil
-        requestedParts.fragment = nil
-        return currentParts == requestedParts
     }
 
     func dispatcherIsReady(in session: ServiceWebPage, generation: Int) async -> Bool {

@@ -25,7 +25,6 @@ extension Service.ServiceWebPage {
         case failed(any Error)
         case becameDownload
         case webContentProcessTerminated
-        case superseded(NavigationLoad)
         case terminated(any Error)
 
         var logLabel: String {
@@ -46,7 +45,6 @@ extension Service.ServiceWebPage {
             case .failed: "failed"
             case .becameDownload: "becameDownload"
             case .webContentProcessTerminated: "webContentProcessTerminated"
-            case .superseded: "superseded"
             case .terminated: "terminated"
             }
         }
@@ -85,38 +83,31 @@ extension Service.ServiceWebPage {
             return true
 
         case .started:
-            if let current = navigationPhase.load, current.started { return false }
             interruptEvaluations(with: Service.EvalError.contextInvalidated)
             navigationGeneration += 1
             navigationStartedAt = .now
-            let load: NavigationLoad
+            let lease: NavigationLease?
             switch navigationPhase {
-            case .navigating(let current), .verifying(let current, _):
-                current.expectedURL = page.url ?? current.expectedURL
-                load = current
+            case .navigating(let load), .verifying(let load, _):
+                lease = load.lease
             case .settling(let settlement):
                 settlement.cancel()
-                settlement.load.expectedURL = page.url ?? settlement.load.expectedURL
-                load = settlement.load
-            case .pending(let lease):
-                lease.settleReservation(false)
-                load = NavigationLoad(lease: nil, generation: navigationGeneration, expectedURL: page.url)
-            case .reserved(let lease):
-                lease.timeoutTask?.cancel()
-                lease.settleCompletion(nil)
-                load = NavigationLoad(lease: nil, generation: navigationGeneration, expectedURL: page.url)
+                lease = settlement.load.lease
+            case .pending(let pending):
+                pending.settleReservation(false)
+                lease = nil
+            case .reserved(let reserved):
+                reserved.timeoutTask?.cancel()
+                reserved.settleCompletion(nil)
+                lease = nil
             case .ready, .unavailable:
-                load = NavigationLoad(lease: nil, generation: navigationGeneration, expectedURL: page.url)
+                lease = nil
             }
-            load.generation = navigationGeneration
-            load.started = true
-            navigationPhase = .navigating(load)
+            navigationPhase = .navigating(NavigationLoad(lease: lease, generation: navigationGeneration))
             return true
 
         case .redirected:
-            guard let load = navigationPhase.load else { return false }
-            load.expectedURL = page.url ?? load.expectedURL
-            return true
+            return navigationPhase.load != nil
 
         case .committed:
             guard case .navigating(let load) = navigationPhase else { return false }
@@ -173,22 +164,22 @@ extension Service.ServiceWebPage {
 
         case .abandoned(let lease, let reason):
             switch navigationPhase {
-            case .pending(let current) where current.originates(from: lease):
+            case .pending(let current) where current === lease:
                 navigationPhase = .unavailable(reason)
                 current.settleReservation(false)
-            case .reserved(let current) where current.originates(from: lease):
+            case .reserved(let current) where current === lease:
                 navigationPhase = .unavailable(reason)
                 current.settleCompletion(nil)
             case .navigating(let load), .verifying(let load, _):
                 guard let current = load.lease,
-                      current.originates(from: lease) else { return false }
+                      current === lease else { return false }
                 page.stopLoading()
                 navigationPhase = .unavailable(reason)
                 current.timeoutTask?.cancel()
                 current.settleCompletion(nil)
             case .settling(let settlement):
                 guard let current = settlement.load.lease,
-                      current.originates(from: lease) else { return false }
+                      current === lease else { return false }
                 settlement.cancel()
                 page.stopLoading()
                 navigationPhase = .unavailable(reason)
@@ -238,13 +229,6 @@ extension Service.ServiceWebPage {
             failPending(Service.EvalError.navigationFailed("web content process terminated"))
             return true
 
-        case .superseded(let load):
-            guard navigationPhase.load === load else { return false }
-            navigationPhase.settlement?.cancel()
-            load.lease?.timeoutTask?.cancel()
-            navigationPhase = .unavailable("superseded")
-            return true
-
         case .terminated(let error):
             settleActiveNavigation()
             navigationPhase = .unavailable("terminated")
@@ -252,17 +236,6 @@ extension Service.ServiceWebPage {
             interruptEvaluations(with: error)
             return true
         }
-    }
-
-    func activeLease(originatingFrom lease: NavigationLease) -> NavigationLease? {
-        let active: NavigationLease? = switch navigationPhase {
-        case .pending(let current), .reserved(let current): current
-        case .navigating(let load), .verifying(let load, _): load.lease
-        case .settling(let settlement): settlement.load.lease
-        case .ready, .unavailable: nil
-        }
-        guard let active, active.originates(from: lease) else { return nil }
-        return active
     }
 
     private func settleActiveNavigation() {
