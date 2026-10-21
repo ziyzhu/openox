@@ -30,6 +30,7 @@ export default {
       { detail: "Searched with the attached Gmail service", passed: succeeded(run, "ox.service.invoke").length > 0 },
       { detail: "Cross-checked the empty result with Browser tools or another query", passed: first >= 0 && later.some(call => call.name.startsWith("ox.web.browser.") || call.name === "ox.service.invoke") },
       mentions(run, "Q3 budget review"),
+      { detail: "Did not hand off to the user while already signed in", passed: !run.calls.some(call => call.name === "ox.web.browser.waitForUserInteraction") },
     ];
   },
 } satisfies EvalCase;
