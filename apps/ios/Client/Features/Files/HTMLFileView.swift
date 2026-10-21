@@ -174,8 +174,8 @@ nonisolated struct HTMLFileDocument: Hashable, Sendable {
         guard source.file.kind == .html else { throw FileError.unsupportedType(source.file.fileName) }
         let baseURL = HTMLFilePage.documentURL(for: source)
         let data = try await source.read()
-        guard data.count <= FileLimits.textBytes else {
-            throw FileError.textTooLarge(bytes: data.count, limit: FileLimits.textBytes)
+        guard data.count <= FileLimits.fileBytes else {
+            throw FileError.fileTooLarge(bytes: data.count, limit: FileLimits.fileBytes)
         }
         guard let text = String(data: data, encoding: .utf8) else { throw FileError.textNotUTF8 }
         let secured = "<!doctype html><html><head><meta http-equiv=\"Content-Security-Policy\" content=\"\(contentSecurityPolicy)\"></head><body>\(text)</body></html>"
