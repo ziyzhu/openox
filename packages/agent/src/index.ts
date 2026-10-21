@@ -3,7 +3,7 @@ export { openProfileRuntime, ProfileRuntime, type ProfileRuntimeOptions, type Co
 export { ProfileFiles, ProfileFile, ProfileIndex, LegacyProfileFile, canonical } from "./profile/files";
 export { profileEnv, profileMounts } from "./profile/filesystem";
 export { mountedFileSystem, type FileBackend, type FileMount, type TextFileMount, type MountedExecutionEnv } from "./core/file-mounts";
-export { composeSystemPrompt, composeTurnContext, responseDirective, defaultSoul,
+export { composeSystemPrompt, composeTurnContext, responseDirective,
   type SystemPromptInput, type PromptScaffold, type TurnState, type ResponseLanguage } from "./core/prompts";
 export { providerIdentity } from "./core/provider-prompts";
 export { composeOxPrompt, oxScaffold } from "./core/ox-prompts";

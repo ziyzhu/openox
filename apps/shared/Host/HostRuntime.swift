@@ -70,7 +70,6 @@ final class HostRuntime: OxHost {
     private func refreshProfile() async throws {
         let startedAt = Date()
         conversations.reset()
-        Soul.shared.reload()
         UserMemory.shared.reload()
         await services.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region), reuseApplicationRepositories: true)
         Skills.shared.refresh()
@@ -194,7 +193,6 @@ final class HostRuntime: OxHost {
                 }
                 #endif
                 await conversations.loadSummariesNow()
-                _ = Soul.shared
                 _ = UserMemory.shared
                 try await UserMemory.shared.waitUntilCurrent()
                 await services.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))

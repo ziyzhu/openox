@@ -5,7 +5,7 @@ struct ConversationSnapshot: Encodable {
     let model: ProviderModel
     let systemPrompt: String
     let renderedSystemPrompt: String
-    let soul: String
+    let soul = ""
     let memory: String
     let tools: [ToolDecl]
     let messages: [Message]
@@ -52,7 +52,6 @@ struct ConversationSnapshot: Encodable {
         let prompt = try await conversation.renderPrompt(configuration: configuration)
         systemPrompt = prompt.scaffold
         renderedSystemPrompt = prompt.rendered
-        soul = prompt.soul
         memory = prompt.memory
         tools = configuration.tools.map(ToolDecl.init)
         blocks = conversation.transcript

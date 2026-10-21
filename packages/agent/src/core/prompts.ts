@@ -1,8 +1,7 @@
 import { hostContextText, activeHost, sameScope, type HostContext, type HostScope } from "./host-context";
 
-export const defaultSoul = "## Voice\nBe warm, quietly competent, and a little dry. Sound like a capable teammate in a live conversation. Lead with the result, default to concise natural replies, and be direct about risks or disagreement. Match the user's tone and use judgment; style never overrides accuracy, safety, or the user's request.";
 export interface ResponseLanguage { identifier: string; name: string }
-export interface SystemPromptInput { soul: string; memory: string; hostContext?: HostContext }
+export interface SystemPromptInput { memory: string; hostContext?: HostContext }
 export interface PromptScaffold { identity: string; operatingRules: string; skills: string }
 export interface TurnState {
   skills: { name: string; description: string }[];
@@ -22,19 +21,19 @@ const signInHints: Record<SignInState, string> = {
   notAuthorized: "not authorized — authorize this service before using it",
   unknown: "sign-in status still being checked — attempt the action; the error will say if sign-in is needed",
 };
-const temporaryStorage = "## Storage\nThis is a temporary conversation. You may read Profile-owned files, but cannot save changes to Profile files, including `MEMORY.md`, `SOUL.md`, or user skills. Selected external files under `files/<folder-id>/` are separate: they may still be changed when Files is attached and runtime approval is granted. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
-const temporaryProfileStorage = "## Storage\nThis is a temporary conversation. You may read Profile-owned files, but cannot save changes to Profile files, including `MEMORY.md`, `SOUL.md`, or user skills. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
+const temporaryStorage = "## Storage\nThis is a temporary conversation. You may read Profile-owned files, but cannot save changes to Profile files, including `MEMORY.md` or user skills. Selected external files under `files/<folder-id>/` are separate: they may still be changed when Files is attached and runtime approval is granted. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
+const temporaryProfileStorage = "## Storage\nThis is a temporary conversation. You may read Profile-owned files, but cannot save changes to Profile files, including `MEMORY.md` or user skills. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
 const join = (sections: string[]) => sections.filter(Boolean).join("\n\n");
 const normalized = (text: string) => text.split(/\s+/u).filter(Boolean).join(" ");
 const ordered = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 
 export function composeSystemPrompt(input: SystemPromptInput, scaffold: PromptScaffold) {
-  if (typeof input?.soul !== "string" || typeof input?.memory !== "string") throw new Error("Prompt state requires soul and memory text");
+  if (typeof input?.memory !== "string") throw new Error("Prompt state requires memory text");
   const { identity, operatingRules, skills } = scaffold;
-  const sections = Object.fromEntries(Object.entries({ ox_identity: identity, ox_soul: input.soul,
+  const sections = Object.fromEntries(Object.entries({ ox_identity: identity,
     ox_rules: operatingRules, ox_skills: skills, ox_memory: `## Memory\n${input.memory}` })
     .filter(([, text]) => text.length > 0));
-  return { scaffold: join([identity, operatingRules, skills]), soul: input.soul, memory: input.memory,
+  return { scaffold: join([identity, operatingRules, skills]), memory: input.memory,
     sections, rendered: join(Object.values(sections)) };
 }
 

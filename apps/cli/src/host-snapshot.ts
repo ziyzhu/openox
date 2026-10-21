@@ -105,7 +105,7 @@ function realUsage(messages: any[]): Usage | undefined {
 export function usageBreakdown(snapshot: ConversationSnapshot): UsageBreakdown {
   const rawToolTokens = (snapshot.tools ?? []).map(tool => estimateTokens(JSON.stringify(tool)));
   const raw = {
-    system: estimateTokens(snapshot.systemPrompt) + estimateTokens(snapshot.soul) + estimateTokens(snapshot.memory),
+    system: estimateTokens(snapshot.systemPrompt) + estimateTokens(snapshot.memory),
     tools: rawToolTokens.reduce((left, right) => left + right, 0),
     messages: (snapshot.messages ?? []).reduce((total: number, message) => total + estimateTokens(JSON.stringify(message)), 0),
   };

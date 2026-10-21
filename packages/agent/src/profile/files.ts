@@ -220,7 +220,7 @@ export class ProfileFiles {
     if (this.store && !this.isStoredDocument(path)) return this.store.write(path, content, expected);
     owned(path);
     const size = typeof content === "string" ? new TextEncoder().encode(content).length : content.length;
-    if (size > (typeof content === "string" ? textLimit : binaryLimit)) throw new FileError("invalid", "File exceeds size limit", path);
+    if (size > (typeof content === "string" ? path === "MEMORY.md" ? 512 * 1024 : textLimit : binaryLimit)) throw new FileError("invalid", "File exceeds size limit", path);
     if (content instanceof Uint8Array) content = content.slice();
     if (this.publicFiles && publicDocument(path)) {
       if (typeof content !== "string") throw new FileError("invalid", "Profile documents require UTF-8 text", path);
@@ -280,7 +280,7 @@ export class ProfileFiles {
       let result = original;
       for (const range of [...ranges].reverse()) result = result.slice(0, range.start) + range.newText + result.slice(range.end);
       const size = new TextEncoder().encode(result).length;
-      if (size > textLimit) throw new Error("Edited file exceeds size limit");
+      if (size > (path === "MEMORY.md" ? 512 * 1024 : textLimit)) throw new Error("Edited file exceeds size limit");
       await this.harness.commit(async tx => {
         (await tx.doc(ProfileFile, path, null)).text = result;
         (await tx.doc(ProfileIndex)).files[path] = { size, mtime: Date.now(), binary: false };
@@ -289,7 +289,7 @@ export class ProfileFiles {
   }
   async remove(path: string, directory = false, recursive = false) {
     path = canonical(path);
-    if (["MEMORY.md", "SOUL.md", "skill-selections.json"].includes(path)) throw new FileError("permission_denied", "Profile documents cannot be removed", path);
+    if (["MEMORY.md", "skill-selections.json"].includes(path)) throw new FileError("permission_denied", "Profile documents cannot be removed", path);
     if (this.store && (this.publicFiles || !this.isStoredDocument(path))) { await this.store.remove(path, directory, recursive); return; }
     owned(path);
     await this.serialize(() => this.harness.commit(async tx => {

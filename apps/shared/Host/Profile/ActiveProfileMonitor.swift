@@ -2,7 +2,6 @@ import Foundation
 
 nonisolated enum ProfileContentArea: String, CaseIterable, Sendable {
     case configuration
-    case soul
     case memory
     case skills
     case conversations = "chats"
@@ -19,7 +18,6 @@ nonisolated enum ProfileContentArea: String, CaseIterable, Sendable {
         }
         switch itemComponents[rootComponents.count] {
         case "MEMORY.md": return [.memory]
-        case "SOUL.md": return [.soul]
         case "skills": return [.skills]
         case "chats": return [.conversations]
         case "profile.json": return [.configuration]

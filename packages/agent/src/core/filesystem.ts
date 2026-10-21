@@ -66,11 +66,11 @@ function validateMutation(operation: FileOperation, args: FileRequest, path: str
     if (args.edits!.some(edit => !edit.oldText)) throw new FileError("invalid", "Each oldText must be non-empty and match exactly once");
   }
   if (operation === "write" && (args.content === undefined) === (args.base64 === undefined)) throw new FileError("invalid", "Pass exactly one of content or base64", path);
-  if (operation === "write" && args.content !== undefined && encoder.encode(args.content).length > 200 * 1024) throw new FileError("invalid", "Text write exceeds 200 KiB", path);
+  if (operation === "write" && args.content !== undefined && encoder.encode(args.content).length > (path === "MEMORY.md" ? 512 : 200) * 1024) throw new FileError("invalid", "Text write exceeds size limit", path);
   if (immutableRoots.has(path.split("/").slice(0, 2).join("/"))) throw new FileError("permission_denied", "Bundled System skills are read-only; copy to a distinct name to customize", path);
 }
 export function resolveFileRequest(args: FileRequest, cwd: string): FileRequest {
-  const roots = new Set(["MEMORY.md", "SOUL.md", "skills", "services", "files", "artifacts", "conversations", "history", "tmp"]);
+  const roots = new Set(["MEMORY.md", "skills", "services", "files", "artifacts", "conversations", "history", "tmp"]);
   const resolve = (path: string) => {
     if (path.startsWith("/") || roots.has(path.split("/")[0]!)) {
       const parts = canonical(path).split("/");
@@ -126,14 +126,14 @@ function toolEnvironment(env: MountedExecutionEnv, args: FileRequest, onRead: (l
     readTextFile: async (...values: Parameters<typeof env.readTextFile>) => {
       const text = await env.readTextFile(...values);
       if (text.ok && args.edits) {
-        if (encoder.encode(text.value).length > 200 * 1024) throw new FileError("invalid", "Text edit exceeds 200 KiB", args.path);
+        if (encoder.encode(text.value).length > (args.path === "MEMORY.md" ? 512 : 200) * 1024) throw new FileError("invalid", "Text edit exceeds size limit", args.path);
         requireExactEdits(text.value, args.edits);
         expected = text.value;
       }
       return text;
     },
     writeFile: async (...values: Parameters<typeof env.writeFile>) => {
-      if (typeof values[1] !== "string" || encoder.encode(values[1]).length > 200 * 1024) throw new FileError("invalid", "Text write exceeds 200 KiB", args.path);
+      if (typeof values[1] !== "string" || encoder.encode(values[1]).length > (args.path === "MEMORY.md" ? 512 : 200) * 1024) throw new FileError("invalid", "Text write exceeds size limit", args.path);
       return expected === undefined ? env.writeFile(...values) : env.writeChecked(values[0], values[1], expected, values[2]);
     },
   };

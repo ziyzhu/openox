@@ -108,17 +108,16 @@ ox --host <ws-url> profile create --name <name> --json
 ox --host <ws-url> profile select <id>
 ox --host <ws-url> profile inspect <id> --json
 ox --host <ws-url> profile rename <id> --name <name>
-ox --host <ws-url> --profile <id> profile update --memory-file <path> --soul-file <path>
+ox --host <ws-url> --profile <id> profile update --memory-file <path>
 ```
 
-Create does not select the new Profile. Selection and updates reject running conversations; stop them explicitly first. Name, memory, and soul updates use existing Host persistence, not replacement of `profile.json`. Inspect after a failed update before retrying, because earlier writes may have succeeded.
+Create does not select the new Profile. Selection and updates reject running conversations; stop them explicitly first. Name and memory updates use existing Host persistence, not replacement of `profile.json`. Inspect after a failed update before retrying, because earlier writes may have succeeded.
 
 For offline inspection, discover iCloud Profiles on macOS and select one by directory:
 
 ```sh
 ox profile list [--json]
 ox --profile <path> profile memory
-ox --profile <path> profile soul
 ox --profile <path> profile skills [name] [--json]
 ox --profile <path> profile files [filename] [--json]
 ox --profile <path> profile conversations [id] [--json]

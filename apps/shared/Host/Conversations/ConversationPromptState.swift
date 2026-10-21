@@ -2,14 +2,13 @@ import Foundation
 
 nonisolated struct RenderedConversationPrompt: Decodable, Sendable {
     let scaffold: String
-    let soul: String
     let memory: String
     let rendered: String
 }
 
 nonisolated enum ConversationPromptState {
-    static func system(soul: String, memory: String, hostID: String, profileID: String) -> JSONValue {
-        .object(["soul": .string(soul), "memory": .string(memory), "hostContext": hostContext(hostID: hostID, profileID: profileID)])
+    static func system(memory: String, hostID: String, profileID: String) -> JSONValue {
+        .object(["memory": .string(memory), "hostContext": hostContext(hostID: hostID, profileID: profileID)])
     }
 
     private static func hostContext(hostID: String, profileID: String) -> JSONValue {

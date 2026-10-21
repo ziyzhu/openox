@@ -1884,9 +1884,7 @@ final class Conversation: Identifiable {
 
     private func freezeMemorySnapshot() async throws {
         guard StorageRoot.currentScope == scope else { throw RuntimeError.bridge("Conversation Profile is no longer active") }
-        Soul.shared.reload()
         UserMemory.shared.reload()
-        try await Soul.shared.waitUntilCurrent()
         try await UserMemory.shared.waitUntilCurrent()
         guard StorageRoot.currentScope == scope else { throw RuntimeError.bridge("Conversation Profile changed while loading documents") }
         guard memorySnapshot == nil else { return }
@@ -1901,7 +1899,7 @@ final class Conversation: Identifiable {
         return AgentConfiguration(
             client: client,
             model: model,
-            promptState: ConversationPromptState.system(soul: Soul.shared.directive, memory: systemPromptMemory, hostID: Device.hostID, profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"),
+            promptState: ConversationPromptState.system(memory: systemPromptMemory, hostID: Device.hostID, profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"),
             tools: [ConversationTool(conversation: self)],
             streamOptions: StreamOptions(sessionID: conversationID.uuidString),
             transformContext: { request in

@@ -147,6 +147,7 @@ nonisolated final class DurableFileDirectory {
                     try visit(fd, path)
                 } else if info.st_mode & S_IFMT == S_IFREG, info.st_nlink == 1, (0...32 * 1024 * 1024).contains(info.st_size) {
                     let stamp = "\(info.st_mtimespec.tv_sec):\(info.st_mtimespec.tv_nsec):\(info.st_ctimespec.tv_sec):\(info.st_ctimespec.tv_nsec):\(info.st_size)"
+                    let textLimit = path == "MEMORY.md" ? 512 * 1024 : 200 * 1024
                     let mtime = Double(info.st_mtimespec.tv_sec) * 1000 + Double(info.st_mtimespec.tv_nsec) / 1_000_000
                     if let cached = known[path], cached["stamp"] as? String == stamp,
                        let digest = cached["sha256"] as? String, let binary = cached["binary"] as? Bool {
@@ -167,7 +168,7 @@ nonisolated final class DurableFileDirectory {
                         guard read > 0 else { throw failure("Profile file changed during inventory", code: EBUSY) }
                         let data = Data(buffer.prefix(read))
                         hash.update(data: data)
-                        if info.st_size <= 200 * 1024 { text.append(data) }
+                        if info.st_size <= textLimit { text.append(data) }
                         offset += read
                     }
                     var after = stat()
@@ -177,7 +178,7 @@ nonisolated final class DurableFileDirectory {
                         throw failure("Profile file changed during inventory", code: EBUSY)
                     }
                     let digest = hash.finalize().map { String(format: "%02x", $0) }.joined()
-                    let binary = info.st_size > 200 * 1024 || text.contains(0) || String(data: text, encoding: .utf8) == nil
+                    let binary = info.st_size > textLimit || text.contains(0) || String(data: text, encoding: .utf8) == nil
                     files.append(["path": path, "size": offset, "sha256": digest, "binary": binary, "mtime": mtime, "stamp": stamp])
                 } else { ignored += 1 }
             }

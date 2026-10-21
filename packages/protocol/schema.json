@@ -99,7 +99,7 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 204800
+              "maxLength": 524288
             },
             {
               "type": "null"

@@ -326,7 +326,7 @@ export class ProfileFileStore {
     if (expected !== undefined && existing?.binary) throw new FileError("not_supported", "Exact edits require a text file", path);
     if (expected !== undefined && (!existing || new TextDecoder("utf-8", { fatal: true }).decode(await this.backend.read(existing)) !== expected)) throw new FileError("invalid", "File changed after reading; read again before editing", path);
     const bytes = typeof content === "string" ? new TextEncoder().encode(content) : content;
-    if (bytes.length > (typeof content === "string" ? 200 * 1024 : 32 * 1024 * 1024)) throw new FileError("invalid", "File exceeds size limit", path);
+    if (bytes.length > (typeof content === "string" ? path === "MEMORY.md" ? 512 * 1024 : 200 * 1024 : 32 * 1024 * 1024)) throw new FileError("invalid", "File exceeds size limit", path);
     const directories = this.parents(state, path, true);
     if (Object.keys(state.files).length + state.directories.length + directories.length + (existing ? 0 : 1) > 10_000) throw new FileError("invalid", "Profile file entry limit reached");
     const id = existing?.id ?? await this.identifier(path);
@@ -390,7 +390,7 @@ export class ProfileFileStore {
       }
       for (const { path, text } of changes) {
         const bytes = new TextEncoder().encode(text);
-        if (bytes.length > 200 * 1024) throw new FileError("invalid", "Profile document exceeds size limit", path);
+        if (bytes.length > (path === "MEMORY.md" ? 512 * 1024 : 200 * 1024)) throw new FileError("invalid", "Profile document exceeds size limit", path);
         const existing = Object.values(files).find(file => file.path === path);
         if (directories.has(path)) throw new FileError("is_directory", "Profile document is a directory", path);
         const added = this.parents({ ...state, files, directories: [...directories] }, path, true);

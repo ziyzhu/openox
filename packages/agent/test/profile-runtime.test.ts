@@ -86,8 +86,8 @@ test("Profile runtimes with colliding numeric conversation IDs isolate models, f
   await first.close();
   await expect(first.run(a.id, { type: "input", content: "closed" })).rejects.toThrow("closed");
   expect(await second.files.read("MEMORY.md")).toBe("second");
-  await second.files.write("SOUL.md", "still open");
-  expect(await second.files.read("SOUL.md")).toBe("still open");
+  await second.files.write("MEMORY.md", "still open");
+  expect(await second.files.read("MEMORY.md")).toBe("still open");
 });
 
 test("completed request IDs deduplicate without waiting for a nonexistent second run_end", async () => {
@@ -369,7 +369,7 @@ test("bounded iOS commands route qualified references and execute structured pro
     await expect(adapter.command({ action: "fileMounts", profileID: "wrong" })).rejects.toThrow("Profile mismatch");
     const scope = { hostID: "ios-host", profileID: "ios-profile" };
     const hostContext = { active: scope, hosts: [{ ...scope, functions: ["ox"], serviceKinds: ["web", "ios", "mcp"] as ("web" | "ios" | "mcp")[], presentation: "conversation-bubbles" as const, externalFiles: true }] };
-    const config = { title: "Native", promptState: { soul: "## Voice\nBe helpful.", memory: "frozen memory", hostContext }, model: "mock", contextWindow: 100000,
+    const config = { title: "Native", promptState: { memory: "frozen memory", hostContext }, model: "mock", contextWindow: 100000,
       maxTokens: 1000, reasoning: false, tools: [] };
     const created = await adapter.command({ action: "conversationCreate", title: config.title,
       entries: [{ kind: "pi.user", model: [{ role: "user", content: "seed", timestamp: 1 }] }] }) as { reference: ConversationReference };
@@ -416,13 +416,13 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("Active host/Profile:");
     expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("ios-host");
     expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("This is a temporary conversation");
-    const updated = { ...config, promptState: { ...config.promptState, soul: "## Voice\nBe direct." } };
+    const updated = { ...config, promptState: { ...config.promptState, memory: "updated frozen memory" } };
     await adapter.command({ action: "fileWrite", path: "MEMORY.md", text: "new live memory" });
     await adapter.command({ action: "attach", config: updated, reference: attached.reference });
     await adapter.command({ action: "run", reference: attached.reference, content: "second",
       turnState: { ...turnState, skills: [], attachedServices: [], filePaths: [], storageMode: "persisted", responseLanguage: null } });
-    expect(modelRequests[1]!.systemPrompt).toContain("Be direct.");
-    expect(modelRequests[1]!.systemPrompt).not.toContain("Be helpful.");
+    expect(modelRequests[1]!.systemPrompt).toContain("updated frozen memory");
+    expect(modelRequests[1]!.systemPrompt).not.toContain("ox_soul");
     expect(modelRequests[1]!.systemPrompt).toContain("frozen memory");
     expect(modelRequests[1]!.systemPrompt).not.toContain("new live memory");
     expect(JSON.stringify(modelRequests[1]!.messages.at(-1))).not.toContain("files/a");

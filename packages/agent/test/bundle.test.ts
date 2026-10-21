@@ -1,6 +1,6 @@
 import { beforeAll, expect, it } from "bun:test";
 import { createContext, runInContext } from "node:vm";
-import { composeTurnContext, defaultSoul, responseDirective, type TurnState } from "../src/core/prompts";
+import { composeTurnContext, responseDirective, type TurnState } from "../src/core/prompts";
 import { providerIdentity } from "../src/core/provider-prompts";
 import { guidanceTexts } from "../src/core/guidance-texts";
 import { nativeGuidanceSource } from "../native-guidance";
@@ -12,7 +12,7 @@ beforeAll(async () => {
   expect(code, stderr).toBe(0);
 });
 
-it("ships a standalone prompt renderer and byte-identical default SOUL without a Profile or native bridge", async () => {
+it("ships a standalone prompt renderer without a Profile, native bridge, or separate voice resource", async () => {
   const directory = new URL("../../../apps/shared/Resources/PiDurable.bundle/", import.meta.url);
   const realm = createContext({ console: undefined });
   runInContext(await Bun.file(new URL("prompts.js", directory)).text(), realm);
@@ -44,21 +44,16 @@ it("ships a standalone prompt renderer and byte-identical default SOUL without a
   }
   const nativeSource = await Bun.file(new URL("../../../apps/shared/Host/Agent/ModelGuidance.generated.swift", import.meta.url)).text();
   expect(nativeSource).toBe(nativeGuidanceSource());
-  const seed = await Bun.file(new URL("default-soul.md", directory)).text();
-  expect(seed).toBe(defaultSoul);
+  expect(await Bun.file(new URL("default-soul.md", directory)).exists()).toBe(false);
   const manifest = await Bun.file(new URL("manifest.json", directory)).json();
-  for (const name of ["default-soul.md"]) {
-    const text = await Bun.file(new URL(name, directory)).text();
-    expect(manifest.resources[name]).toEqual({ bytes: new TextEncoder().encode(text).length,
-      sha256: new Bun.CryptoHasher("sha256").update(text).digest("hex") });
-  }
+  expect(manifest.resources).toEqual({});
 });
 
 it("shares the core across hosts, supplies presentation in turn context, and rejects ambiguous ownership in the shipped renderer", async () => {
   const realm = createContext({ console: undefined });
   runInContext(await Bun.file(new URL("../../../apps/shared/Resources/PiDurable.bundle/prompts.js", import.meta.url)).text(), realm);
   const scope = { hostID: "desktop-host", profileID: "profile-a" };
-  realm.input = { soul: "## Voice\nBe direct.", memory: "frozen", hostContext: { active: scope,
+  realm.input = { memory: "frozen", hostContext: { active: scope,
     hosts: [{ ...scope, functions: ["ox.fs.read", "ox.fs.edit", "ox.fs.write"], serviceKinds: [], presentation: "text", externalFiles: false }] } };
   const prompt = runInContext("OxPrompts.composeOxPrompt(input).rendered", realm) as string;
   expect(prompt).toContain("frozen");

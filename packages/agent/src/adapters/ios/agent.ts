@@ -306,7 +306,7 @@ export class IOSAgentAdapter {
   }
 
   private isDocument(path: string) {
-    return ["MEMORY.md", "SOUL.md", "skill-selections.json"].includes(path) || path.startsWith("skills/");
+    return ["MEMORY.md", "skill-selections.json"].includes(path) || path.startsWith("skills/");
   }
   private async preparePublicFiles(split: boolean) {
     const session = this.current.session;
@@ -565,14 +565,14 @@ export class IOSAgentAdapter {
   }
   private documentPath(path: string) {
     const name = canonical(path);
-    if (!["MEMORY.md", "SOUL.md", "skill-selections.json"].includes(name) && !name.startsWith("skills/")) throw new Error("Operation requires MEMORY.md, SOUL.md, skill-selections.json, or a skill file");
+    if (!["MEMORY.md", "skill-selections.json"].includes(name) && !name.startsWith("skills/")) throw new Error("Operation requires MEMORY.md, skill-selections.json, or a skill file");
     return name;
   }
   private async fileSeed(path: string, text: string) {
     path = this.documentPath(path);
     if (typeof text !== "string") throw new Error("Profile documents require UTF-8 text");
     const size = new TextEncoder().encode(text).length;
-    if (size > 200 * 1024) throw new Error("Profile document exceeds size limit");
+    if (size > (canonical(path) === "MEMORY.md" ? 512 * 1024 : 200 * 1024)) throw new Error("Profile document exceeds size limit");
     if (this.current.publicFiles && publicDocument(path)) return this.current.session.files.seedDocument(path, text);
     return this.current.session.harness.commit(async tx => {
       const index = await tx.doc(ProfileIndex);
@@ -592,7 +592,7 @@ export class IOSAgentAdapter {
     let changes = writes.map(({ path, text }) => {
       if (typeof text !== "string") throw new Error("Profile documents require UTF-8 text");
       const size = new TextEncoder().encode(text).length;
-      if (size > 200 * 1024) throw new Error("Profile document exceeds size limit");
+      if (size > (canonical(path) === "MEMORY.md" ? 512 * 1024 : 200 * 1024)) throw new Error("Profile document exceeds size limit");
       return { path: this.documentPath(path), text, size };
     });
     const names = new Set(changes.map(({ path }) => path));

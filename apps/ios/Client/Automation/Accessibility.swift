@@ -65,10 +65,6 @@ nonisolated enum A11yID {
 
     enum Settings {
         static let close = "settings.close"
-        static let soul = "settings.soul"
-        static let soulEditor = "settings.soulEditor"
-        static let soulSave = "settings.soulSave"
-        static let soulCopy = "settings.soulCopy"
         static let defaultModel = "settings.defaultModel"
         static let customProviderName = "settings.customProviderName"
         static let customProviderURL = "settings.customProviderURL"

@@ -105,7 +105,6 @@ function skillFixture(qaProfile: string, probe: boolean): CaseBinding {
     observations: {
       profile: { kind: "vm", name: "ox.app.profile", args: {} },
       memory: { kind: "vm", name: "ox.fs.read", args: { path: "MEMORY.md" } },
-      soul: { kind: "vm", name: "ox.fs.read", args: { path: "SOUL.md" } },
       providers: { kind: "vm", name: "ox.provider.list", args: {} },
       defaults: { kind: "vm", name: "ox.app.defaultModel", args: {} },
       language: { kind: "vm", name: "ox.app.language", args: {} },
@@ -118,7 +117,7 @@ function skillFixture(qaProfile: string, probe: boolean): CaseBinding {
       { evidence: "qa", phase: "before", observation: "inventory", path: ["paths"], operator: "equals", expected: [] },
       { evidence: "outcome", phase: "after", observation: "inventory", path: ["paths"], operator: "equals", expected: [`skills/${name}/SKILL.md`] },
       { evidence: "outcome", phase: "after", observation: "package", path: [], operator: "equals", expected: { name, description, instructions, services: [], resources: {} } },
-      ...["profile", "memory", "soul", "providers", "defaults", "language", "policies"].flatMap(observation => (["after", "cleanup"] as const).map(phase => ({ evidence: phase === "after" ? "preserved" : "cleanup", phase, observation, path: [], operator: "unchanged" as const }))),
+      ...["profile", "memory", "providers", "defaults", "language", "policies"].flatMap(observation => (["after", "cleanup"] as const).map(phase => ({ evidence: phase === "after" ? "preserved" : "cleanup", phase, observation, path: [], operator: "unchanged" as const }))),
       { evidence: "cleanup", phase: "cleanup", observation: "inventory", path: ["paths"], operator: "unchanged" },
       ...(probe ? [{ evidence: "probe", phase: "probe" as const, observation: "probe", path: ["answer"], operator: "equals" as const, expected: prefix.repeat(count) }] : []),
     ],

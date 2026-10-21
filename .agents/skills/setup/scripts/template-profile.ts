@@ -136,7 +136,6 @@ export async function materializeProfiles(template: PreparedTemplate, parent: st
         await runtime.files.install([], []);
         await runtime.files.bindPhysicalFiles(true);
         if (input.memory !== undefined) await runtime.files.writeDocument("MEMORY.md", input.memory);
-        if (input.soul !== undefined) await runtime.files.writeDocument("SOUL.md", input.soul);
         for (const item of input.files ?? []) await runtime.files.write(item.path, decoded(item.data));
         const presentation = new ApplicationPresentation(runtime);
         for (const conversation of input.conversations ?? []) {

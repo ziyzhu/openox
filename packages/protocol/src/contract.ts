@@ -26,7 +26,7 @@ export const Schemas = {
   CreateProfileRequest: object("CreateProfileRequest", { name: S({ minLength: 1, maxLength: 100 }) }),
   UpdateProfileRequest: object("UpdateProfileRequest", {
     profileId: S({ minLength: 36, maxLength: 36 }), name: nullable(S({ minLength: 1, maxLength: 100 })),
-    memory: nullable(S({ maxLength: 204800 })), soul: nullable(S({ maxLength: 204800 })),
+    memory: nullable(S({ maxLength: 524288 })), soul: nullable(S({ maxLength: 204800 })),
   }),
   FolderProfileRequest: object("FolderProfileRequest", { profileId: nullable(S({ minLength: 36, maxLength: 36 })) }),
   FolderGrantRequest: object("FolderGrantRequest", { grantId: S({ minLength: 1, maxLength: 100 }), profileId: nullable(S({ minLength: 36, maxLength: 36 })) }),

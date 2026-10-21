@@ -51,7 +51,7 @@ enum HostProfileCommands {
             }
             let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
             result["memory"] = .string(try await ProfileRepository.shared.readTextFile(named: "MEMORY.md", in: scope) ?? "")
-            result["soul"] = .string(try await ProfileRepository.shared.readTextFile(named: "SOUL.md", in: scope) ?? "")
+            result["soul"] = .string("")
         }
         return .object(result)
     }
@@ -112,14 +112,15 @@ extension OxHostProtocol {
             guard profile.version == ProfileSchema.current else {
                 throw RuntimeError.bridge("Select a supported local Profile before updating it")
             }
-            guard command.name != nil || command.memory != nil || command.soul != nil else { throw RuntimeError.bridge("No Profile updates supplied") }
+            guard command.soul == nil else { throw RuntimeError.bridge("Voice preferences now live in MEMORY.md. Update memory instead.") }
+            guard command.name != nil || command.memory != nil else { throw RuntimeError.bridge("No Profile updates supplied") }
             if let name = command.name {
                 guard profile.location != .external else { throw RuntimeError.bridge("Rename this Profile folder in Files, then open it again.") }
                 guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                       name.count <= 100, !storage.nameTaken(name, excluding: profile.id) else { throw RuntimeError.bridge("Invalid or duplicate Profile name") }
             }
-            for text in [command.memory, command.soul].compactMap({ $0 }) {
-                guard text.utf8.count <= VirtualFileSystem.maximumReadBytes else { throw RuntimeError.bridge("Profile document is too large") }
+            if let memory = command.memory {
+                guard memory.utf8.count <= 512 * 1024 else { throw RuntimeError.bridge("Profile document is too large") }
             }
             if let name = command.name {
                 try await storage.rename(profile, to: name)
@@ -127,11 +128,8 @@ extension OxHostProtocol {
             }
             let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
             if let memory = command.memory { try await ProfileRepository.shared.writeTextFile(memory, named: "MEMORY.md", in: scope) }
-            if let soul = command.soul { try await ProfileRepository.shared.writeTextFile(soul, named: "SOUL.md", in: scope) }
             if profile.id == storage.activeId {
-                Soul.shared.reload()
                 UserMemory.shared.reload()
-                try await Soul.shared.waitUntilCurrent()
                 try await UserMemory.shared.waitUntilCurrent()
             }
             return try await HostProfileCommands.result(profile, contents: true)

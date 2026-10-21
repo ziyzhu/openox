@@ -346,16 +346,6 @@ private struct ProfileContentsView: View {
                 Divider().settingsContentInset()
 
                 NavigationLink {
-                    destination(.character)
-                } label: {
-                    SettingsDisclosureRow(title: "Voice", value: Text(""))
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier(A11yID.Settings.soul)
-
-                Divider().settingsContentInset()
-
-                NavigationLink {
                     destination(.memory)
                 } label: {
                     SettingsDisclosureRow(title: "Memory", value: Text(""))
@@ -377,13 +367,11 @@ private struct ProfileContentsView: View {
 private struct ProfileContentDestination: View {
     enum Kind {
         case skills
-        case character
         case memory
 
         var title: LocalizedStringKey {
             switch self {
             case .skills: "Skills"
-            case .character: "Voice"
             case .memory: "Memory"
             }
         }
@@ -391,7 +379,6 @@ private struct ProfileContentDestination: View {
 
     private enum Content {
         case skills(Skills)
-        case character(Soul)
         case memory(UserMemory)
         case failed(String)
     }
@@ -407,8 +394,6 @@ private struct ProfileContentDestination: View {
             switch content {
             case .skills(let skills):
                 SkillsListView(skills: skills, editing: $editingSkill, ready: true, profileID: profileID)
-            case .character(let soul):
-                CharacterEditorView(soul: soul)
             case .memory(let memory):
                 MemoryEditorView(memory: memory)
             case .failed(let message):
@@ -439,10 +424,6 @@ private struct ProfileContentDestination: View {
                 await skills.waitUntilCurrent()
                 if let message = skills.errorMessage { throw RuntimeError.bridge(message) }
                 loaded = .skills(skills)
-            case .character:
-                let soul = Soul(scope: scope)
-                try await soul.waitUntilCurrent()
-                loaded = .character(soul)
             case .memory:
                 let memory = UserMemory(scope: scope)
                 try await memory.waitUntilCurrent()

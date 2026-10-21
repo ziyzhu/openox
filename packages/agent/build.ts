@@ -2,7 +2,6 @@ import { build } from "esbuild";
 import ts from "typescript";
 import { copyFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { defaultSoul } from "./src/core/prompts";
 import { nativeGuidanceSource } from "./native-guidance";
 
 function usesNodeRuntime(text: string) {
@@ -50,7 +49,7 @@ const promptResult = await build({
   target: "es2022", minify: true, legalComments: "eof", write: false, metafile: true, outdir: destination,
 });
 await mkdir(destination, { recursive: true });
-await Promise.all(["harness-proof.js", "agent-files.json"].map(name => rm(`${destination}/${name}`, { force: true })));
+await Promise.all(["harness-proof.js", "agent-files.json", "default-soul.md"].map(name => rm(`${destination}/${name}`, { force: true })));
 const bundles: Record<string, { bytes: number; sha256: string }> = {};
 for (const generated of [result, promptResult]) for (const file of generated.outputFiles) {
   const name = file.path.split("/").at(-1)!;
@@ -76,11 +75,6 @@ if (!await Bun.file(guidancePath).exists() || await Bun.file(guidancePath).text(
   await rename(temporary, guidancePath);
 }
 const resources: Record<string, { bytes: number; sha256: string }> = {};
-for (const [name, text] of Object.entries({ "default-soul.md": defaultSoul })) {
-  await writeFile(`${destination}/${name}`, text);
-  resources[name] = { bytes: new TextEncoder().encode(text).length,
-    sha256: new Bun.CryptoHasher("sha256").update(text).digest("hex") };
-}
 await copyFile(`${root}packages/agent/UPSTREAM_LICENSE.txt`, `${destination}/UPSTREAM_LICENSE.txt`);
 await writeFile(`${destination}/manifest.json`, JSON.stringify({
   format: 1, purpose: "isolated-native-rollout", packages, bundles, resources,

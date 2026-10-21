@@ -18,7 +18,7 @@ export function profileMounts(files: ProfileFiles, conversations: OxConversation
   const writable = (path: string) => {
     if (bundled(path)) throw new FileError("permission_denied", "Bundled System skills are read-only; copy to a distinct name to customize", path);
     if (conversationRecordPath(path)) throw new FileError("permission_denied", "Conversation records are read-only", path);
-    if (files.physical && !["MEMORY.md", "SOUL.md"].includes(path) && !path.startsWith("skills/")) workingFilePath(path);
+    if (files.physical && path !== "MEMORY.md" && !path.startsWith("skills/")) workingFilePath(path);
   };
   const backend: FileBackend = {
     id: env.id, assertWritable: writable,
@@ -41,8 +41,8 @@ export function profileMounts(files: ProfileFiles, conversations: OxConversation
     move: async (from, to) => { writable(from); writable(to); await files.move(from, to); },
     copy: async (from, to) => { writable(to); await files.copy(from, to); },
   };
-  const paths = files.physical ? ["MEMORY.md", "SOUL.md", "skill-selections.json", "skills", ""]
-    : ["MEMORY.md", "SOUL.md", "skill-selections.json", "artifacts", "skills", "conversations"];
+  const paths = files.physical ? ["MEMORY.md", "skill-selections.json", "skills", ""]
+    : ["MEMORY.md", "skill-selections.json", "artifacts", "skills", "conversations"];
   return paths.map(path => ({
     path, access: path === "conversations" ? "readOnly" : "readWrite",
     source: { kind: "backend", backend, path },

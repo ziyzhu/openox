@@ -94,12 +94,12 @@
         }
       }
     },
-    "Profiles hold conversations, files, voice, and memory. Export a backup to keep a copy outside this device.": {
+    "Profiles hold conversations, files, and memory. Export a backup to keep a copy outside this device.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "档案包含对话、文件、表达风格和记忆。导出备份即可在此设备以外保留副本。"
+            "value": "档案包含对话、文件和记忆。导出备份即可在此设备以外保留副本。"
           }
         }
       }
@@ -2396,17 +2396,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更改会立即用于新对话。现有对话会保留各自的模型。"
-          }
-        }
-      }
-    },
-    "Voice" : {
-      "comment" : "The title of the screen for editing how Ox talks.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "表达风格"
           }
         }
       }
@@ -7221,17 +7210,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ox 将改用内置密钥。"
-          }
-        }
-      }
-    },
-    "Ox's voice - how it talks and carries itself in every conversation. Edit to reshape its voice. Markdown is fine; clear it to fall back to the default." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ox 的声音-它在每次对话中如何说话、如何举止。编辑即可调整它的表达风格。支持 Markdown；清空则恢复为默认。"
           }
         }
       }

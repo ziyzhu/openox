@@ -47,7 +47,7 @@ struct SettingsSheet: View {
                 VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                     SettingsSection(
                         "Profiles",
-                        footer: "Profiles hold conversations, files, voice, and memory. Export a backup to keep a copy outside this device.",
+                        footer: "Profiles hold conversations, files, and memory. Export a backup to keep a copy outside this device.",
                         layout: .group
                     ) {
                         VStack(spacing: 0) {

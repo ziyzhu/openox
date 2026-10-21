@@ -231,10 +231,6 @@ async function profiles(args: string[]): Promise<void> {
   }
 }
 
-async function soul(args: string[], context: CliContext): Promise<void> {
-  printTextFile("soul", "SOUL.md", args, context);
-}
-
 async function skills(args: string[], context: CliContext): Promise<void> {
   await printSkills(args, "ox --profile <path> profile skills [name] [--json]", async (print) => print(profileRoot(context)));
 }
@@ -339,7 +335,6 @@ async function conversations(args: string[], context: CliContext): Promise<void>
 export const PROFILE_COMMANDS: Record<string, SubCommand> = {
   list: { desc: "List Profiles in iCloud Drive (--json)", fn: profiles },
   memory: { desc: "Print the Profile's MEMORY.md", fn: memory },
-  soul: { desc: "Print the Profile's SOUL.md", fn: soul },
   skills: { desc: "List the Profile's skills, or print one", fn: skills },
   files: { desc: "List the Profile's files, or print one", fn: files },
   conversations: { desc: "List the Profile's saved conversations, or print one transcript", fn: conversations },

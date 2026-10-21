@@ -31,15 +31,6 @@ nonisolated final class ModelPromptRenderer: @unchecked Sendable {
         }
     }
 
-    static func defaultSoul() throws -> String {
-        guard let url = Bundle.main.url(forResource: "default-soul", withExtension: "md", subdirectory: "PiDurable.bundle") else {
-            throw RuntimeError.bridge("Missing default SOUL resource; run bun run build:agent before building")
-        }
-        let text = try String(contentsOf: url, encoding: .utf8)
-        guard !text.isEmpty else { throw RuntimeError.bridge("Default SOUL resource is empty") }
-        return text
-    }
-
     private func acquireContext() throws -> JSContext {
         if let context { return context }
         guard let url = Bundle.main.url(forResource: "prompts", withExtension: "js", subdirectory: "PiDurable.bundle") else {

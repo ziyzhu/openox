@@ -162,7 +162,6 @@ export async function runCli(
 const MOVED_COMMANDS: Record<string, string> = {
   profiles: "ox profile list",
   memory: "ox profile memory",
-  soul: "ox profile soul",
   skills: "ox profile skills, ox repository skills, or ox vm skills",
   artifacts: "ox profile files",
   discover: "ox host list",

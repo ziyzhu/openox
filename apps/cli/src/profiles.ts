@@ -18,7 +18,7 @@ async function profileID(args: ReturnType<typeof adminArgs>, context: CliContext
   return active.id;
 }
 
-async function inspect(raw: string[], context: CliContext, document?: "memory" | "soul") {
+async function inspect(raw: string[], context: CliContext, document?: "memory") {
   const args = adminArgs(raw);
   if (args.values.help) { console.log(`Usage: ox --host <ws-url> [--profile <id>] profile ${document ?? "inspect"} [id] [--json] [--timeout 30000]`); return; }
   const profileId = await profileID(args, context);
@@ -28,19 +28,17 @@ async function inspect(raw: string[], context: CliContext, document?: "memory" |
 }
 
 async function update(raw: string[], context: CliContext, renameOnly = false) {
-  const args = adminArgs(raw, ["name", "memory-file", "soul-file"]);
+  const args = adminArgs(raw, ["name", "memory-file"]);
   if (args.values.help) {
-    console.log(`Usage: ox [--host <ws-url>] profile ${renameOnly ? "rename [id] --name <name>" : "update [id] [--name <name>] [--memory-file <path>] [--soul-file <path>]"} [--json]`);
+    console.log(`Usage: ox [--host <ws-url>] profile ${renameOnly ? "rename [id] --name <name>" : "update [id] [--name <name>] [--memory-file <path>]"} [--json]`);
     return;
   }
-  if (renameOnly && (!args.values.name || args.values["memory-file"] || args.values["soul-file"])) throw new Error("rename requires --name only");
+  if (renameOnly && (!args.values.name || args.values["memory-file"])) throw new Error("rename requires --name only");
   const params: Record<string, unknown> = { profileId: await profileID(args, context) };
   if (args.values.name !== undefined) params.name = args.values.name;
-  for (const field of ["memory", "soul"]) {
-    const path = args.values[`${field}-file`];
-    if (typeof path === "string") params[field] = readFileSync(path, "utf8");
-  }
-  if (Object.keys(params).length === 1) throw new Error("Supply --name, --memory-file, or --soul-file");
+  const memoryFile = args.values["memory-file"];
+  if (typeof memoryFile === "string") params.memory = readFileSync(memoryFile, "utf8");
+  if (Object.keys(params).length === 1) throw new Error("Supply --name or --memory-file");
   printAdminResult(await adminCall("profiles.update", params, args, context), args.values.json);
 }
 
@@ -73,10 +71,10 @@ Object.assign(PROFILE_COMMANDS, {
     printAdminResult(await adminCall("profiles.select", { profileId: await profileID(args, context) }, args, context), args.values.json);
   } },
   rename: { desc: "Rename a Profile owned by the Host (--name)", fn: (raw: string[], context: CliContext) => update(raw, context, true) },
-  update: { desc: "Update Host Profile name, memory, or soul", fn: update },
-  ...Object.fromEntries(["memory", "soul"].map(document => [document, {
+  update: { desc: "Update Host Profile name or memory", fn: update },
+  ...Object.fromEntries(["memory"].map(document => [document, {
     desc: `Read the Profile's ${document} from disk or the selected Host`,
     fn: (raw: string[], context: CliContext) => hostMode(context)
-      ? inspect(raw, context, document as "memory" | "soul") : DISK_COMMANDS[document]!.fn(raw, context),
+      ? inspect(raw, context, document as "memory") : DISK_COMMANDS[document]!.fn(raw, context),
   }])),
 });

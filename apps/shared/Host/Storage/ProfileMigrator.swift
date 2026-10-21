@@ -36,6 +36,7 @@ nonisolated enum ProfileSchema {
         "2026-10-14-internal-profile-state",
         "2026-10-15-lazy-conversations",
         "2026-10-20-schedules",
+        "2026-10-21-response-preferences",
     ]
     static var current: String { versions.last! }
 
@@ -80,6 +81,8 @@ nonisolated enum ProfileMigrator {
     static let internalStateVersion = "2026-10-14-internal-profile-state"
 
     static let schedulesVersion = "2026-10-20-schedules"
+
+    static let responsePreferencesVersion = "2026-10-21-response-preferences"
 
     static let lazyConversationVersion = "2026-10-15-lazy-conversations"
 
@@ -269,13 +272,20 @@ extension ProfileMigrator {
             Log.app.info("StorageMigrator.internalState published id=\(profile.id)")
         }
         var manifest = config
-        manifest.version = schedulesVersion
-        if config.version != schedulesVersion {
+        if config.version != responsePreferencesVersion {
+            guard await materialize(at: profile.url, paths: ["MEMORY.md", "SOUL.md"]) else {
+                throw StorageMigrationError.invalidApplicationStorage("Profile preferences are not available yet")
+            }
+            let root = profile.url
+            try await Task.detached(priority: .userInitiated) { try migrateResponsePreferences(at: root) }.value
+        }
+        manifest.version = responsePreferencesVersion
+        if config.version != responsePreferencesVersion {
             try ProfileIO.writeConfig(manifest, to: profile.url)
             try syncDurableDirectory(profile.url)
         }
         var prepared = profile
-        prepared.version = schedulesVersion
+        prepared.version = responsePreferencesVersion
         return prepared
     }
 
@@ -289,7 +299,7 @@ extension ProfileMigrator {
         }
         var migrated = profile
         migrated.version = config.version
-        if [internalStateVersion, lazyConversationVersion, schedulesVersion].contains(config.version) {
+        if [internalStateVersion, lazyConversationVersion, schedulesVersion, responsePreferencesVersion].contains(config.version) {
             await progress(String(localized: "Preparing Profile files…"))
             return try await prepareInternalState(migrated, config: config)
         }

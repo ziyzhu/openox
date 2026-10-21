@@ -99,7 +99,6 @@ extension Conversation {
         case .root:
             var rootItems = [
                 fileSystemItem(path: "MEMORY.md", type: "file", size: UserMemory.shared.text.utf8.count),
-                fileSystemItem(path: "SOUL.md", type: "file", size: Soul.shared.text.utf8.count),
                 fileSystemItem(path: "artifacts", type: "directory", size: nil),
                 fileSystemItem(path: "skills", type: "directory", size: nil),
                 fileSystemItem(path: "services", type: "directory", size: nil),
@@ -182,7 +181,7 @@ extension Conversation {
             }
         case .deviceFolder, .deviceItem:
             items = try await self.listDeviceFiles(location)
-        case .memory, .soul, .artifact, .skillFile, .conversationMetadata, .conversationTurns:
+        case .memory, .artifact, .skillFile, .conversationMetadata, .conversationTurns:
             throw VirtualFileSystem.Error.notDirectory(location.path)
         }
         let sorted = items.sorted { lhs, rhs in
@@ -211,7 +210,7 @@ extension Conversation {
 
     private func readFileBackend(path: String) async throws -> JSONValue {
         let root = path.split(separator: "/").first.map(String.init) ?? ""
-        if let route = durableRoute, root == "artifacts" || !VirtualFileSystem.hostRoots.contains(root) || (!isTemporary && ["MEMORY.md", "SOUL.md"].contains(root)) {
+        if let route = durableRoute, root == "artifacts" || !VirtualFileSystem.hostRoots.contains(root) || (!isTemporary && root == "MEMORY.md") {
             let record = try await route.session.runtime.command(.object(["action": .string("fileStat"), "path": .string(path), "byPath": .bool(true)]))
             if record.objectValue?["file"] != .null, record.objectValue?["file"] != nil {
                 let media = try await fileSystemMedia(path: path)
@@ -493,7 +492,7 @@ extension Conversation {
             break
         case .deviceFolder(let id):
             _ = try DeviceFolderStore.shared.requireGrant(id, profileId: scope.profileID)
-        case .root, .memory, .soul, .artifacts, .resources, .skills, .services, .conversations:
+        case .root, .memory, .artifacts, .resources, .skills, .services, .conversations:
             return
         }
         try requireFileBackendScope()
@@ -504,7 +503,7 @@ extension Conversation {
         guard [Actions.fsWrite, Actions.fsEdit, Actions.fsRm].contains(action),
               let path = (args as? [String: Any])?["path"] as? String else { return }
         let root = path.split(separator: "/").first.map(String.init) ?? ""
-        if ["MEMORY.md", "SOUL.md", "skills", "services", "files"].contains(root) {
+        if ["MEMORY.md", "skills", "services", "files"].contains(root) {
             try await requireWritableFileContext(fileSystemLocation(path), action: action)
         } else if !isTemporary || durableRoute?.fileScope == nil {
             try requireProfileMutation(action)
@@ -527,7 +526,7 @@ extension Conversation {
         switch location.area {
         case .files, .deviceFolder:
             return
-        case .root, .memory, .soul, .artifacts, .resources, .skills, .services, .conversations:
+        case .root, .memory, .artifacts, .resources, .skills, .services, .conversations:
             try requireProfileMutation(action)
         }
     }
@@ -555,7 +554,7 @@ extension Conversation {
         switch location.area {
         case .files, .deviceFolder:
             return "files:\(path)"
-        case .root, .memory, .soul, .artifacts, .resources, .skills, .services, .conversations:
+        case .root, .memory, .artifacts, .resources, .skills, .services, .conversations:
             return "profile:\(scope.root.standardizedFileURL.path.lowercased()):\(path)"
         }
     }
@@ -620,8 +619,6 @@ extension Conversation {
         switch location {
         case .memory:
             return try fileSystemTextRead(UserMemory.shared.text)
-        case .soul:
-            return try fileSystemTextRead(Soul.shared.text)
         case .artifact(let name):
             let file = try await repository.file(named: name, in: scope)
             return try await Task.detached(priority: .userInitiated) {
@@ -672,8 +669,6 @@ extension Conversation {
         switch location {
         case .memory:
             return UserMemory.shared.text
-        case .soul:
-            return Soul.shared.text
         case .artifact(let name):
             let file = try await repository.file(named: name, in: scope)
             guard file.exists else { throw FileError.missing(name) }
@@ -718,17 +713,15 @@ extension Conversation {
     ) async throws -> JSONValue {
         try requireFileBackendScope()
         let data = Data(content.utf8)
-        guard data.count <= FileLimits.textBytes else {
-            throw FileError.textTooLarge(bytes: data.count, limit: FileLimits.textBytes)
+        let limit = location == .memory ? 512 * 1024 : FileLimits.textBytes
+        guard data.count <= limit else {
+            throw FileError.textTooLarge(bytes: data.count, limit: limit)
         }
         switch location {
         case .resource:
             throw VirtualFileSystem.Error.unsupportedMutation(location.path)
         case .memory:
             UserMemory.shared.text = content
-            return fileSystemItem(path: location.path, type: "file", size: data.count)
-        case .soul:
-            Soul.shared.text = content
             return fileSystemItem(path: location.path, type: "file", size: data.count)
         case .artifact(let name):
             let file = try await repository.writeFile(data: data, named: name, in: scope)

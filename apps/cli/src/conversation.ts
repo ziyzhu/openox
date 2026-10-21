@@ -309,7 +309,6 @@ function projectSnapshot(snapshot: ConversationSnapshot | null, sections: Set<st
     ...(sections.has("system") ? {
       systemPrompt: snapshot.systemPrompt,
       renderedSystemPrompt: snapshot.renderedSystemPrompt,
-      soul: snapshot.soul,
       memory: snapshot.memory,
     } : {}),
     ...(sections.has("tools") ? { tools: snapshot.tools } : {}),
@@ -363,8 +362,6 @@ function printSnapshot(snapshot: ConversationSnapshot, options: ConversationOpti
   if (show("system")) {
     console.log(`\n${terminalText("SYSTEM PROMPT", [C.sky])}`);
     console.log(snapshot.systemPrompt || "(empty)");
-    console.log(`\n${terminalText("SOUL", [C.sky])}`);
-    console.log(snapshot.soul || "(empty)");
     console.log(`\n${terminalText("MEMORY", [C.sky])}`);
     console.log(snapshot.memory || "(empty)");
     if (options.full && snapshot.renderedSystemPrompt && snapshot.renderedSystemPrompt !== snapshot.systemPrompt) {

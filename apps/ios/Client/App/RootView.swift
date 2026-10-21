@@ -1233,9 +1233,6 @@ struct RootView: View {
             await storage.revalidateActive()
             guard storage.scope == scope else { return }
         }
-        if areas.contains(.soul) {
-            Soul.shared.reload()
-        }
         if areas.contains(.memory) {
             UserMemory.shared.reload()
         }
@@ -1250,7 +1247,6 @@ struct RootView: View {
             refreshCompactSidebar()
         }
         do {
-            if areas.contains(.soul) { try await Soul.shared.waitUntilCurrent() }
             if areas.contains(.memory) { try await UserMemory.shared.waitUntilCurrent() }
         } catch { Log.app.error("RootView Profile reconciliation failed: \(error.localizedDescription)"); return }
         if areas.contains(.skills) {

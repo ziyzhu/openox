@@ -1,14 +1,13 @@
 import Foundation
 
 nonisolated public struct VirtualFileSystem: Sendable {
-    static let hostRoots = ["MEMORY.md", "SOUL.md", "artifacts", "skills", "services", "history", "tmp"]
+    static let hostRoots = ["MEMORY.md", "artifacts", "skills", "services", "history", "tmp"]
     static let maximumReadBytes = FileLimits.textBytes
     static let maximumSearchFiles = 1_000
 
     enum Location: Equatable, Sendable {
         case root
         case memory
-        case soul
         case artifacts
         case artifact(String)
         case resource(String)
@@ -33,7 +32,6 @@ nonisolated public struct VirtualFileSystem: Sendable {
             switch self {
             case .root: "."
             case .memory: "MEMORY.md"
-            case .soul: "SOUL.md"
             case .artifacts: "artifacts"
             case .artifact(let name): "artifacts/\(name)"
             case .resource(let path): path
@@ -60,14 +58,13 @@ nonisolated public struct VirtualFileSystem: Sendable {
         var isDirectory: Bool {
             switch self {
             case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .conversations, .conversation, .files, .deviceFolder: true
-            case .resource, .memory, .soul, .artifact, .skillFile, .skillResource, .serviceItem, .conversationMetadata, .conversationTurns, .deviceItem: false
+            case .resource, .memory, .artifact, .skillFile, .skillResource, .serviceItem, .conversationMetadata, .conversationTurns, .deviceItem: false
             }
         }
 
         var area: Area {
             switch self {
             case .memory: .memory
-            case .soul: .soul
             case .artifacts, .artifact: .artifacts
             case .resource: .resources
             case .skills, .skill, .skillFile, .skillDirectory, .skillResource: .skills
@@ -84,7 +81,6 @@ nonisolated public struct VirtualFileSystem: Sendable {
     enum Area: Equatable, Sendable {
         case root
         case memory
-        case soul
         case artifacts
         case resources
         case skills
@@ -132,7 +128,6 @@ nonisolated public struct VirtualFileSystem: Sendable {
         if resources.owns(path) { return .resource(path) }
         switch parts {
         case ["MEMORY.md"]: return .memory
-        case ["SOUL.md"]: return .soul
         case ["artifacts"]: return .artifacts
         case let parts where parts.count == 2 && parts[0] == "artifacts":
             let name = parts[1]

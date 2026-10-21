@@ -58,7 +58,8 @@ types remain authoritative in their `Codable` implementations.
 │       ├── profile.json                 identity and portable storage milestone
 │       ├── .ox/state.sqlite             conversations, settings, indexes; DELETE journal
 │       ├── .ox/payloads/, .ox/staging/ retained payloads, owner lock and file staging
-│       ├── MEMORY.md, SOUL.md               authoritative editable Profile documents
+│       ├── MEMORY.md                        authoritative memory and response preferences
+│       ├── .ox/legacy-soul.md                exact retired voice source, when present
 │       ├── skills/<name>/...                authoritative editable user skill packages
 │       ├── conversations/<Pi-ID>/...        mutable conversation-owned files and directories
 │       ├── <shared folders>/...             mutable Profile-owned files; no required hierarchy
@@ -123,7 +124,7 @@ Choice, approval, and secret-entry prompts are transient `Conversation` interact
 
 ## Profile filesystem
 
-`ProfileFiles` is the Profile file API. Its owned `ProfileFileStore` coordinates file identities, paths, ownership, directories, and a resumable mutation journal. The persisted Pi document retains its historical `ox.workspace` key. File bytes live in the Profile directory, never in SQLite blobs. `DurableFileStore` owns the native lock, staged transfers, pinned reads, verification, and atomic replacement; it composes descriptor-relative `DurableFileDirectory` operations. Normal runtimes inject `ProfileFileBackend` through `fileStorage`, without `FileFiles`, an artifact index, or immutable publication. Memory, soul, and user skills are authoritative physical public files; their predecessor Pi text documents are retired only by trusted preparation. Skill selections remain private Pi documents, and bundled System resources stay app-managed/read-only. Services and granted device folders retain their scoped mounts and permissions.
+`ProfileFiles` is the Profile file API. Its owned `ProfileFileStore` coordinates file identities, paths, ownership, directories, and a resumable mutation journal. The persisted Pi document retains its historical `ox.workspace` key. File bytes live in the Profile directory, never in SQLite blobs. `DurableFileStore` owns the native lock, staged transfers, pinned reads, verification, and atomic replacement; it composes descriptor-relative `DurableFileDirectory` operations. Normal runtimes inject `ProfileFileBackend` through `fileStorage`, without `FileFiles`, an artifact index, or immutable publication. Memory (up to 512 KiB) and user skills are authoritative physical public files; their predecessor Pi text documents are retired only by trusted preparation. Skill selections remain private Pi documents, and bundled System resources stay app-managed/read-only. Services and granted device folders retain their scoped mounts and permissions.
 
 `ox.fs.rm({path, recursive?})` replaces `ox.fs.delete` and `ox.fs.rmdir`. Ordinary Profile files and selected-folder items move through native `FileManager.trashItem`; native failures never fall back to permanent deletion. Files and empty directories are accepted; nonempty directories require explicit recursive removal, including dotfiles. The OS and provider own trash location, recovery, and retention; OpenOx creates no custom trash folder. Local service source items also use native trash through their scoped owner; service roots retain their lifecycle APIs. Conversation deletion, internal cleanup, and replacement are unchanged. Ordinary dotfiles are addressable; `.ox`, retained private staging, and legacy private file metadata remain protected. Profile removal journals one whole-item `trash` operation in `ox.workspace` version 2, with an identity migration from version 1; existing version-1 pending operations retain their original semantics. Native completion precedes index publication; replay accepts an absent source and trash failures reconcile the current disk state without a permanent-delete fallback. Older document readers reject version 2; actual predecessor/changed-build compatibility evidence and approval of this downgrade boundary are required before release. Old filesystem Action Ask/Block policies conservatively constrain `ox.fs.rm`; old Allow policies are not widened into recursive removal, and predecessor keys remain stored.
 
@@ -200,7 +201,7 @@ establish physical-device power-loss durability.
 
 Pi's nine tables own history, documents and execution. `ox.profile` v1 provides
 an index/integrity binding, not a competing manifest. `ox.file` v1 holds UTF-8
-memory/soul/skill documents. `ox.filesystem` v1 binds the backend as
+memory/skill documents. `ox.filesystem` v1 binds the backend as
 `artifact-files-v1` or explicit `fixture-blobs-v1`; implicit transitions are refused.
 `ox.artifact` v1 holds `{path,size,sha256,binary,saved}` without artifact bytes.
 The Profile document kinds checkpoint every 32 ordinary changes.
@@ -350,7 +351,7 @@ moved in Files rather than by Ox.
 `ProfileRepository` is the sole application writer for Profile content. It serializes
 filesystem coordination per immutable scope and rejects stale results after a
 Profile switch. While foregrounded, file presentation reconciles external changes
-to soul, memory, skills, visible artifacts, and conversation summaries. Hydrated conversations
+to memory, skills, visible files, and conversation summaries. Hydrated conversations
 remain authoritative in memory and are not blindly replaced.
 
 Multi-writer conflict preservation for a conversation simultaneously edited on more than
@@ -458,7 +459,7 @@ other PDF artifact imports.
 
 The model accesses files only through `execute` → `ox.fs.*`. Agent-owned mount routing, pagination, exact-edit preflight/diffs, serialized mutations, and bounded traversal/search live in `packages/agent/src/core/filesystem.ts`. iOS supplies operation-scoped backing-store capabilities and retains `StorageMigrator` aliases, native approval, source permissions, Files grants, media conversion, and immutable physical publication. Read/write/edit inputs follow pinned Pi, with optional `purpose`; reads return at most 2,000 lines or 50 KiB with continuation offsets. No persisted path, encoding, milestone, or retention policy changes for this routing consolidation.
 
-The agent sees a virtual filesystem containing `MEMORY.md`, `SOUL.md`,
+The agent sees a virtual filesystem containing `MEMORY.md`,
 `artifacts/<filename>`, persisted conversation history, and source-aware skill and service
 mounts:
 
@@ -562,17 +563,29 @@ The app reads only complete Pending directories on activation, imports each file
 through the normal collision-safe artifact path, and removes a directory only
 after its artifact succeeds. Failed copies remain pending for a later retry.
 
-## Soul, memory, and skills
+## Memory and skills
 
-`SOUL.md` and `MEMORY.md` are plain UTF-8 text. They are seeded when absent,
-cached for presentation, and written atomically. Both reload after Profile switches;
-only `SOUL.md` reloads after relevant external changes. Each conversation snapshots the
-loaded memory into its system prompt so later memory changes do not invalidate the
-conversation's prompt cache. An existing unreadable or cloud-evicted file is not overwritten.
-The default SOUL seed is defined in TypeScript and generated into the signed app's
-`PiDurable.bundle/default-soul.md`. Native loading requests it only after confirming
-that the Profile document is absent; missing resources fail without seeding empty
-content. Existing SOUL/MEMORY documents and their persisted representation are unchanged.
+`MEMORY.md` is plain UTF-8 text, seeded when absent, cached for presentation,
+and written atomically. Each conversation snapshots loaded memory so later edits
+apply to new conversations without invalidating its prompt cache. An unreadable
+or cloud-evicted file is not overwritten. Default voice is part of the shared core
+prompt; there is no separately loaded personality document or Voice editor.
+
+`2026-10-21-response-preferences` is an appended Profile milestone, applied before
+opening the runtime. `ProfileMigrator` preserves original `SOUL.md` bytes privately
+at `.ox/legacy-soul.md`, appends customized text to `MEMORY.md` under Response
+preferences, and removes the old public document. Empty content and the previous
+default voice are archived without adding memory. Existing memory bytes remain a
+prefix; retries recognize the exact migrated section and do not append it again.
+Conflicting backups, invalid text, concurrent changes, or combined text exceeding
+512 KiB fail preparation with originals preserved. Memory alone accepts 512 KiB
+to fit both formerly valid 200 KiB documents and migration framing; other text
+limits remain unchanged. Legacy Profile installation
+retains the old document identifier until public-file conversion and this migration
+finish. No Pi document schema changes. Older builds reject the new milestone
+before database access; this is a downgrade incompatibility requiring approval
+before release. Legacy RPC `soul` read fields are empty; writes are rejected with
+guidance to update memory. Current CLI and template inputs expose only memory.
 
 Each skill package contains `SKILL.md` and optional nested UTF-8 files under
 `references/` and JavaScript helpers under `scripts/`. Names use lowercase kebab-case;

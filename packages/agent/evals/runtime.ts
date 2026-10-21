@@ -7,7 +7,7 @@ import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import { googleProvider } from "@earendil-works/pi-ai/providers/google";
 import { Type } from "typebox";
 import { nativeDatabase } from "../src/sqlite";
-import { openProfileRuntime, canonical, composeOxPrompt, composeTurnContext, bundledSkills, executeGuidance, defaultSoul, type ProfileRuntime, type FileOperation, type HostContext } from "../src/index";
+import { openProfileRuntime, canonical, composeOxPrompt, composeTurnContext, bundledSkills, executeGuidance, type ProfileRuntime, type FileOperation, type HostContext } from "../src/index";
 import { memoryFiles } from "./files";
 import { execute } from "./execute";
 import { catalog, Stubs, StubError, type StubFixture } from "./stubs";
@@ -30,7 +30,7 @@ export class EvalRuntime {
   private temporary = new Set<string>();
   private choices = new Map<string, Array<{prompt: {id:string;prompt:string;options:string[];allowsCustomAnswer:boolean;requiresApp:boolean};answer:string}>>();
   private hostContext: HostContext = { active: { hostID: "eval", profileID: "eval" }, hosts: [{ hostID: "eval", profileID: "eval", functions: Object.keys(catalog), serviceKinds: ["web", "api", "ios", "mcp"], presentation: "conversation-bubbles", externalFiles: true }] };
-  private prompts = new Map<string, {rendered:string;soul:string;memory:string}>();
+  private prompts = new Map<string, {rendered:string;memory:string}>();
   private readonly tools: Array<{ name: string; description: string; parameters: unknown }> = [];
   readonly provider: string;
   readonly model: string;
@@ -49,7 +49,7 @@ export class EvalRuntime {
       return op === "get" ? statement.get(...bindings as never[]) : statement.all(...bindings as never[]);
     }), profileID: "eval", mounts: [{ path: "", access: "readWrite", source: { kind: "backend", backend: memoryFiles(fixture.files) } }], models, registry: createRegistry(), createBlobID: async () => crypto.randomUUID(), settings: { retry: { enabled: false }, compaction: { enabled: false } } });
     try {
-      for (const [path, text] of Object.entries({ "MEMORY.md": "", "SOUL.md": defaultSoul, ...fixture.files })) { if (["MEMORY.md", "SOUL.md"].includes(path) || path.startsWith("skills/")) await runtime.session.files.write(path, text); }
+      for (const [path, text] of Object.entries({ "MEMORY.md": "", ...fixture.files })) { if (["MEMORY.md"].includes(path) || path.startsWith("skills/")) await runtime.session.files.write(path, text); }
       const description = executeGuidance({ catalog: Object.keys(catalog).join("\n"), variant: "ox", timeoutSeconds: 10, maxLines: 1000, maxBytes: 262144, canCancelLoops: true });
       const parameters = Type.Object({ source: Type.String({ minLength: 1, maxLength: 100000 }) });
       runtime.tools.push({ name: "execute", description, parameters });
@@ -93,7 +93,7 @@ export class EvalRuntime {
   }
   private snapshot(id: string): EvalSnapshot | null {
     if (!this.messages.has(id)) return null;
-    return { id, isBusy: this.busy.has(id), messages: structuredClone(this.messages.get(id)!), blocks: [{ kind: { type: "thinking", trace: { entries: this.receipts.get(id)!.map(invocation => ({ invocation: structuredClone(invocation) })) } } }], systemPrompt: this.prompts.get(id)!.rendered, renderedSystemPrompt: this.prompts.get(id)!.rendered, soul: this.prompts.get(id)!.soul, memory: this.prompts.get(id)!.memory, tools: this.tools, model: { id: this.model } } as EvalSnapshot;
+    return { id, isBusy: this.busy.has(id), messages: structuredClone(this.messages.get(id)!), blocks: [{ kind: { type: "thinking", trace: { entries: this.receipts.get(id)!.map(invocation => ({ invocation: structuredClone(invocation) })) } } }], systemPrompt: this.prompts.get(id)!.rendered, renderedSystemPrompt: this.prompts.get(id)!.rendered, soul: "", memory: this.prompts.get(id)!.memory, tools: this.tools, model: { id: this.model } } as EvalSnapshot;
   }
   readonly request = async <T>(args: string[], conversationId?: string, timeoutMs = 30000): Promise<T> => {
     const id = conversationId ?? this.active;
@@ -104,9 +104,8 @@ export class EvalRuntime {
     else if (args[1] === "new") {
       const conversation = await this.session.harness.createConversation({ ownership: { kind: "ownerless" }, agent: { model: { provider: this.provider, modelId: this.model }, extensions: [this.extension] } }, BACKGROUND_CONTEXT);
       this.active = String(conversation.id); this.messages.set(this.active, []); this.receipts.set(this.active, []); this.choices.set(this.active, []); if (args.includes("--temporary")) this.temporary.add(this.active);
-      const soul = String(await this.session.files.read("SOUL.md"));
       const memory = String(await this.session.files.read("MEMORY.md"));
-      this.prompts.set(this.active, {soul,memory,rendered:composeOxPrompt({hostContext:this.hostContext,soul,memory}).rendered});
+      this.prompts.set(this.active, {memory,rendered:composeOxPrompt({hostContext:this.hostContext,memory}).rendered});
       result = { conversationId: this.active, temporary: args.includes("--temporary"), model: `${this.provider}:${this.model}` };
     } else if (args[1] === "inspect" || args[1] === "open") result = this.snapshot(id);
     else if (args[1] === "list") result = [...this.messages.keys()].map(id => ({ id }));

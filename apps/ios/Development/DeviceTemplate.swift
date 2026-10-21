@@ -49,7 +49,6 @@ enum DeviceTemplate {
             let id: String
             let name: String
             let memory: String?
-            let soul: String?
             let files: [File]?
             let conversations: [Conversation]?
         }
@@ -186,7 +185,6 @@ enum DeviceTemplate {
                 profiles[input.id] = profile
                 let scope = ProfileScope(profileID: profile.id, root: profile.url, location: .local)
                 if let memory = input.memory { try await ProfileRepository.shared.writeTextFile(memory, named: "MEMORY.md", in: scope) }
-                if let soul = input.soul { try await ProfileRepository.shared.writeTextFile(soul, named: "SOUL.md", in: scope) }
                 for file in input.files ?? [] {
                     _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
                         "action": .string("fileWriteBinary"), "path": .string("/" + file.path), "base64": .string(file.data.base64EncodedString()),

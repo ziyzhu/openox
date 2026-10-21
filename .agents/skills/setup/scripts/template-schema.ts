@@ -57,7 +57,7 @@ export const DeviceTemplateSchema = object({
   })),
   profiles: Type.Optional(Type.Array(object({
     id, name: Type.String({ minLength: 1, maxLength: 80, pattern: "^[^/:]+$" }),
-    memory: Type.Optional(text), soul: Type.Optional(text),
+    memory: Type.Optional(Type.String({ maxLength: 512 * 1024 })),
     files: Type.Optional(Type.Array(file, { maxItems: 10000 })),
     conversations: Type.Optional(Type.Array(conversation, { maxItems: 1000 })),
   }), { maxItems: 100 })),
@@ -122,10 +122,10 @@ export function parseTemplate(value: unknown): DeviceTemplate {
   unique(profiles.map(profile => profile.name.toLowerCase()), "Profile name");
   for (const profile of profiles) {
     if (profile.name.trim() !== profile.name || [".", ".."].includes(profile.name)) throw new Error("Invalid Profile name");
-    if ([profile.memory, profile.soul].some(text => text !== undefined && new TextEncoder().encode(text).length > 200 * 1024)) throw new Error("Profile document exceeds Ox's text size limit");
+    if (profile.memory !== undefined && new TextEncoder().encode(profile.memory).length > 512 * 1024) throw new Error("Profile document exceeds Ox's text size limit");
     unique((profile.files ?? []).map(file => relativeStoragePath(file.path)), "Profile file path");
     for (const file of profile.files ?? []) {
-      if (/^(conversations|history|chats|MEMORY\.md|SOUL\.md)(\/|$)/.test(file.path)) throw new Error("Use conversation files or memory/soul fields for reserved Profile paths");
+      if (/^(conversations|history|chats|MEMORY\.md|SOUL\.md)(\/|$)/.test(file.path)) throw new Error("Use conversation files or memory fields for reserved Profile paths");
     }
     unique((profile.conversations ?? []).map(conversation => conversation.id), "conversation ID");
     for (const conversation of profile.conversations ?? []) {

@@ -60,11 +60,11 @@ test("empty binary artifacts and missing references do not silently invent conte
 });
 
 test("invalid edits, limits and private paths preserve previous content", async () => {
-  await files.write("SOUL.md", "same same\nend");
-  await expect(files.edit("SOUL.md", [{ oldText: "same", newText: "lost" }])).rejects.toThrow("exactly once");
-  await expect(files.edit("SOUL.md", [{ oldText: "same same", newText: "x" }, { oldText: "same\nend", newText: "y" }])).rejects.toThrow("overlap");
-  await expect(files.write("SOUL.md", "x".repeat(200 * 1024 + 1))).rejects.toThrow("limit");
-  expect(await files.read("SOUL.md")).toBe("same same\nend");
+  await files.write("MEMORY.md", "same same\nend");
+  await expect(files.edit("MEMORY.md", [{ oldText: "same", newText: "lost" }])).rejects.toThrow("exactly once");
+  await expect(files.edit("MEMORY.md", [{ oldText: "same same", newText: "x" }, { oldText: "same\nend", newText: "y" }])).rejects.toThrow("overlap");
+  await expect(files.write("MEMORY.md", "x".repeat(512 * 1024 + 1))).rejects.toThrow("limit");
+  expect(await files.read("MEMORY.md")).toBe("same same\nend");
   for (const path of ["../MEMORY.md", "/../MEMORY.md", "artifacts/.saved.json", "skills/../../secret", "\\private", "a//b", "a\0b"]) {
     expect(() => canonical(path)).toThrow();
   }

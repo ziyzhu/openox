@@ -174,7 +174,7 @@ Real model and production agent loop; isolated stateful ox stubs. No Host or sim
           const checks = response.snapshot ? score(test, binding!, response) : response.observationChecks;
           const status = response.errors.length ? "error" : response.blocked ? "blocked" : checks.length && checks.every(check => check.passed) ? "unverified" : "fail";
           const initial = response.initial;
-          const contextHash = initial ? hash({ systemPrompt: initial.systemPrompt, renderedSystemPrompt: initial.renderedSystemPrompt, soul: initial.soul, memory: initial.memory, tools: initial.tools, model: initial.model, systemSkill: response.systemSkill }) : undefined;
+          const contextHash = initial ? hash({ systemPrompt: initial.systemPrompt, renderedSystemPrompt: initial.renderedSystemPrompt, memory: initial.memory, tools: initial.tools, model: initial.model, systemSkill: response.systemSkill }) : undefined;
           report.results.push({ ...base, status, checks, contextHash, response });
           console.log(`${status.toUpperCase()} ${test.id} ${repetition}/${repetitions}`);
           for (const check of checks.filter(check => !check.passed)) console.log(`  ${check.detail}`);

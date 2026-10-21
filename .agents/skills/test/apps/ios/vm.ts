@@ -45,7 +45,7 @@ try {
       providerSchema.anyOf.length = 0;
       if (!ox.provider.schema().anyOf.length) throw Error('Provider schema mutation escaped');
       const before = await ox.fs.read({path:'MEMORY.md',purpose:'Read QA memory'});
-      const parallel = await Promise.all([ox.app.profile({purpose:'Inspect QA Profile'}),ox.fs.read({path:'SOUL.md',purpose:'Read QA soul'})]);
+      const parallel = await Promise.all([ox.app.profile({purpose:'Inspect QA Profile'}),ox.fs.read({path:'MEMORY.md',purpose:'Read QA memory'})]);
       const invalid = [];
       for (const invoke of [()=>ox.fs.read({path:17,purpose:'Check schema'}),()=>ox.web.browser.navigate({url:17,purpose:'Check nested schema'})]) {
         try {await invoke(); throw Error('Invalid input accepted')} catch(e) {if(e.code!=='invalid_argument') throw e; invalid.push(JSON.parse(JSON.stringify(e)));}
