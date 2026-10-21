@@ -128,8 +128,11 @@ extension OxHostProtocol {
             )
         }
         let model = "\(conversation.modelSelection.providerID):\(conversation.modelSelection.modelID)"
-        Log.agent.info("OxHostRPC.conversations.new id=\(reply.id) conversation=\(conversation.id) temporary=\(conversation.isTemporary) model=\(model)")
-        reply.success(NewConversationResult(conversationId: conversation.id.uuidString, temporary: conversation.isTemporary, model: model))
+        Task { @MainActor in
+            do { try await conversation.durablePreparation?.value } catch { return reply.failure(error.localizedDescription) }
+            Log.agent.info("OxHostRPC.conversations.new id=\(reply.id) conversation=\(conversation.id) temporary=\(conversation.isTemporary) model=\(model)")
+            reply.success(NewConversationResult(conversationId: conversation.id.uuidString, temporary: conversation.isTemporary, model: model))
+        }
     }
 
     @MainActor
