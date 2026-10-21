@@ -23,7 +23,7 @@ export class Stubs {
   readonly state: Record<string, unknown>;
   readonly rules: Record<string, StubRule[]>;
   readonly denied: Set<string>;
-  constructor(fixture: StubFixture, profile: string) {
+  constructor(fixture: StubFixture, profile = "EvalQA") {
     this.state = structuredClone({ profile: { name: profile, storage: "local" }, providers: [{ id: "qa-api", name: "QA API", source: "added", api: "openai-responses", url: "https://provider.example/v1", website: "https://provider.example", regions: ["global"], inferenceLocation: "remote", models: 2, availableModels: 2, authentication: "credential-stored", access: { methods: ["apiKey"], credentialKind: "apiKey", optional: false, notice: null }, capabilities: { supportsTools: true, canLoadModels: false, reasoningPolicy: "none" }, gettingStarted: null }],
       repositories: { status: "ready", repositories: [{ id: "bundled", name: "Built-in", provenance: "bundled", enabled: true, state: "ready", serviceCount: 0, skillCount: 5 }, { id: "local", name: "Local", provenance: "local", enabled: true, state: "ready", serviceCount: 0, skillCount: 0 }], truncated: false }, schedules: [{ id: "qa-weekly", name: "Weekly review", prompt: "Review the synthetic notes", status: "active", enabled: true, recurrence: "Weekly on Monday at 09:00 America/Los_Angeles", nextFireAt: "2026-10-19T16:00:00Z", lastRunAt: "2026-10-12T16:00:00Z", lastOutcome: "failed", lastError: "QA source unavailable" }], ...fixture.state });
     this.rules = structuredClone(fixture.functions ?? {});

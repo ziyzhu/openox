@@ -5,34 +5,44 @@ stateful `ox.*` stubs. They do not connect to a simulator or live Host. VM and n
 bridge behavior is verified independently by integration tests.
 
 ```sh
-bun run evals --list --suite all
-bun run evals --validate --suite all
-bun run evals --template --qa-profile EvalQA --output /tmp/ox-fixture.json
-bun run evals --fixture /tmp/ox-fixture.json --qa-profile EvalQA --provider openai --model <model-id> --output /tmp/ox-report.json
-bun run evals --coverage /tmp/ox-report.json
-bun run evals --review /tmp/ox-report.json --case app-profile-success --decision pass --note "Checked the answer against independent fixture state." --output /tmp/ox-reviewed.json
-bun run evals compare /tmp/ox-baseline.json /tmp/ox-reviewed.json
+bun run evals --list
+bun run evals --validate
+bun run evals --provider anthropic --model <model-id>
+bun run evals --provider openai --model <model-id> --case proceed-without-asking --repeat 5
 ```
 
 Providers are `openai`, `anthropic`, and `google`, using their standard API-key
-environment variables and installed model catalogs. No credentials are stored in
-fixtures. The four smoke cases run once with a 30000 ms limit. Exhaustive suites
-are `functions`, `workflows`, and `safety`; select them explicitly. Reports retain
-real tool calls, receipts, model usage, independent observations and manual review.
-Exit codes are 0 for reviewed passes, 1 for failures/errors, and 2 for unverified,
-blocked or incomplete coverage.
+environment variables and installed model catalogs. Each case runs once by default
+with its own `timeoutMs` or 120000 ms. `--jobs` sets concurrency (default 4).
 
-A version 1 fixture has `qaProfile` and `cases` keyed by scenario ID. Each binding
-contains `context`, read-only `observations`, phased `assertions`, expected `actions`,
-`allowedActions`, and any `cleanup` or independent `probeContext`. Assertions use
-`equals`, `includes`, `unchanged`, or `absent` over observed JSON paths. Outcome and
-preservation evidence must come from observers, not model claims. Function receipts
-must match expected arguments and success/failure counts. Fresh probes see only
-variable inputs, never the expected answer. Generated IDs use existing `$receipt`
-references. The template prepares smoke cases; other scenarios require meaningful
-fixture preparation and never pass merely because they appear in the catalog.
+Each invocation writes a new directory (temporary by default, `--output` must be
+outside the repository) containing `report.json`, `report.txt`, and `runs/*.json`
+with each run's system prompt, messages, `ox.*` calls and checks. The summary lists
+pass counts per case and flags errored and flaky cases. Any errored run withholds
+the headline pass rate and exits 1; failing checks are results and exit 0. One
+repetition cannot establish stability.
 
-Bindings optionally contain `stubs`:
+A case is `cases/<id>.ts` default-exporting an `EvalCase`:
+
+```ts
+import { called, mentions } from "../scripts/checks.ts";
+import type { EvalCase } from "../scripts/types.ts";
+
+export default {
+  task: "Which Profile am I using, and where is it stored?",
+  stubs: { state: { profile: { name: "EvalQA", storage: "local" } } },
+  attached: [],
+  timeoutMs: 120_000,
+  checks: run => [called(run, "ox.app.profile"), mentions(run, "EvalQA")],
+} satisfies EvalCase;
+```
+
+`checks` receives the turn status, system prompt, messages, recorded `calls`
+(name, args, result or error), the final `answer`, the final stub `state`, and
+`read(path)` for resulting file contents. A run passes when it finishes in time and
+every check passes. Provider or runner failures are errors, not failures.
+
+Stubs:
 
 ```json
 {
@@ -52,21 +62,15 @@ Bindings optionally contain `stubs`:
 ```
 
 Rules match argument subsets and current state. `$arg` and `$state` references
-resolve values without executing fixture code. `set` applies atomically after
+resolve values without executing case code. `set` applies atomically after
 validating the result. An `error` contains `code`, `message`, and `recovery` and
-never applies mutations. No matching rule fails explicitly. All built-in functions use
-real input/output contracts; synchronous `ox.provider.schema()` returns the native
-provider-document schema and records an inspection receipt. Fixtures must prepare behavior beyond the default
-Profile/provider/repository/schedule readers and in-memory filesystem. Human choices
-are explicit fixture results for `ox.user.choose`, not real approvals. Browser,
-payment, service, and media results are simulated observations, not evidence of
-platform rendering or external success.
-
-Independent observers read the same state without creating task receipts. Each
-case/repetition starts from a fresh copy; task, probe and cleanup share that copy.
-The real filesystem handles text reads, edits, search and errors; the in-memory
-backend provides working-file state. System skill files come from the actual bundled
-packages. Missing fixture coverage remains an explicit limit.
+never applies mutations. No matching rule fails explicitly. Profile, providers,
+repositories and schedules have default readers; the Profile is `EvalQA`. File
+operations use the production filesystem logic over in-memory storage seeded from
+`files`, and System skill files come from the actual bundled packages. Human choices
+are explicit stub results for `ox.user.choose`. Browser, payment, service, and media
+results are simulated observations, not evidence of platform rendering or external
+success. Each run starts from a fresh runtime and stub copy.
 
 Run `bun run test:vm --device ox-N --host <ws-url>` on a fresh QA build to compare
 `vm functions` with the per-namespace `packages/agent/src/functions/*/contracts.json` files and exercise the real VM.
@@ -74,22 +78,3 @@ Update that snapshot from the native catalog only for reviewed contract changes.
 The runner uses a new QA Profile, exercises temporary and saved conversations,
 restores the previous Profile, and retains evidence outside Git. It requires the
 normal QA simulator preparation and uses Mock without model inference.
-
-Conversation evidence includes `metrics` for the task, probe, and cleanup separately:
-elapsed milliseconds, recorded model responses, model tool calls, underlying Action
-calls, failed Actions, and failed service validations. Elapsed time includes conversation
-setup/inspection and any handoff wait, but excludes independent case observations and
-other conversation phases. These are observed responses, not hidden provider retries.
-Failed validation counts indicate repair overhead, not all repair attempts; inspect the
-trace for implementation edits and retries. Missing metrics mean unavailable, not zero.
-Compare the same successful service fixture and model before/after guidance changes;
-record verification outcomes alongside call counts and timing. Do not call a shorter
-failed or partially verified run an improvement.
-
-`browserCalls` counts attempted calls by exact `ox.web.browser.*` name, including
-failed calls. Compare navigation/reload, page-script, capture-list/read and handoff
-calls separately. Counts do not include clicks, fetches or navigation inside a page
-script, redirects, or implicit reloads; one capture read is not one network request.
-`serviceInvocations` counts attempted `ox.service.invoke` calls by qualified handler
-name. These include fulfillment and verification; use the trace and fixture outcomes
-to distinguish them. Do not infer successful handler coverage from counts alone.

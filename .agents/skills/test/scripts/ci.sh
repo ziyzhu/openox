@@ -44,7 +44,7 @@ bun --no-env-file run typecheck
 bun --no-env-file test ./.agents/skills/test
 bun --no-env-file test packages/agent/test
 bun --no-env-file .agents/skills/test/apps/cli/logs.ts
-bun --no-env-file .agents/skills/evals/scripts/runner.ts --validate --suite all
+bun --no-env-file .agents/skills/evals/scripts/runner.ts --validate
 bun --no-env-file run build:services
 git diff --exit-code -- apps/shared/Resources/OxServices.bundle \
   apps/shared/Resources/ModelServiceActions.json \
