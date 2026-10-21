@@ -112,9 +112,13 @@ nonisolated enum OxFunctionCatalog {
         }))
     }
 
-    static func contracts() -> String {
+    static func descriptions() -> String {
         let namespaces = namespaceDescriptions.map { "ox.\($0.0) — \($0.1)" }
-        return (namespaces + ["", "Contracts (JSON):", buildCompact().jsonString()]).joined(separator: "\n")
+        let functions = catalogEntries.compactMap { name, schema -> String? in
+            guard let description = schema.objectValue?["description"]?.stringValue else { return nil }
+            return "\(name) — \(description.split(whereSeparator: \.isWhitespace).joined(separator: " "))"
+        }.sorted()
+        return (namespaces + [""] + functions).joined(separator: "\n")
     }
 
     private static func compactDescription(_ schema: JSONValue) -> String? {

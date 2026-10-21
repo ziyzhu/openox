@@ -84,7 +84,7 @@ it("shares the core across hosts, supplies presentation in turn context, and rej
   expect(guide).not.toContain("ox.web.fetch");
   expect(guide).not.toContain("does not forcibly stop");
   expect(guide).toContain("supports interrupting JavaScript loops");
-  expect(runInContext("OxPrompts.executeGuidance({...guide,variant:'ox'})", realm)).toContain("full description and input/output schemas");
+  expect(runInContext("OxPrompts.executeGuidance({...guide,variant:'ox'})", realm)).toContain("synchronous .help()");
   expect(() => runInContext("OxPrompts.executeGuidance({...guide,variant:'website'})", realm)).toThrow("Unknown execution guidance variant");
   expect(() => runInContext("OxPrompts.executeGuidance({...guide,variant:'__proto__'})", realm)).toThrow("Unknown execution guidance variant");
 });
