@@ -196,14 +196,14 @@ Add bot control when an action can encounter human verification and resume after
 
 ### Payment
 
-Add payment when an approved action prepares a cart, booking, or order while final review and commitment belong to the user:
+For transaction fulfillment, read `skills/checkout/SKILL.md`. Add missing payment support on the fly without a proposal checkpoint, then resume that workflow. Keep final review and commitment with the user:
 
 1. Keep preparation separate and approval-gated.
 2. Add `getPaymentUrl(args): {url}` for the prepared checkout.
 3. Add `getPaymentState(args)` with required `status` and nullable `reference`. Use `status: "none" | "pending" | "completed"`; return a nonempty reference exactly when completed.
 4. Add optional `total`, `currency`, `expiresAt`, and `completedAt` when useful. Put itemized records in a separate action.
 5. Align episode-identifying inputs. Add optional `since` when completion must be scoped to this checkout; iOS supplies it at handoff start.
-6. Call `await ox.service.pay({ domain, args, purpose })`. iOS opens checkout for the user and resolves only on completed state with a reference.
+6. Validate, attach to reload, and inspect the payment contract. Call `await ox.service.pay({ domain, args, purpose })` for transaction review and payment; the Host opens checkout and resolves only on completed state with a reference.
 7. Verify schemas, URL, and non-completed state by default. Complete a real checkout only when the user's request authorizes that purchase.
 
 ## 6. Author actions.js

@@ -1,4 +1,5 @@
 import { parseSkill, isSkillResourcePath, type Skill } from "@openox/protocol/skills";
+import checkout from "../../skills/checkout/SKILL.md" with { type: "text" };
 import evolve from "../../skills/evolve/SKILL.md" with { type: "text" };
 import apiService from "../../skills/evolve/references/api-service.md" with { type: "text" };
 import helpers from "../../skills/evolve/references/helpers.js" with { type: "text" };
@@ -26,6 +27,7 @@ function skill(name: string, text: string, resources: Record<string, string> = {
     resources: Object.freeze(resources), source: "system", files });
 }
 export const bundledSkills: readonly BundledSkill[] = Object.freeze([
+  skill("checkout", checkout),
   skill("evolve", evolve, { "references/api-service.md": apiService, "references/helpers.js": helpers,
     "references/model-schemas.md": modelSchemas, "references/model-service.md": modelService, "references/web-service.md": webService,
     "references/skills.md": skillGuide, "references/user-skill.md": userSkill, "references/repository-skill.md": repositorySkill }),
