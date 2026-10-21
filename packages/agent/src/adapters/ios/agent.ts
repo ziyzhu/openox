@@ -684,7 +684,7 @@ export class IOSAgentAdapter {
         input: ["text"], contextWindow: config.contextWindow, maxTokens: config.maxTokens,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }], api: { stream, streamSimple: stream } }));
     const sections = Object.entries(prompt.sections).map(([key, text]) => section(key, () => text, { tag: key !== "preamble" }));
-    for (const key of ["skills", "hosts", "replies", "attached_services", "conversation_files", "storage", "language"] as const) {
+    for (const key of ["skills", "hosts", "replies", "attached_services", "conversation_files", "mounted_folders", "storage", "language"] as const) {
       sections.push(section(key, async ({ conversationId, read }) => {
         const turnState = (await read.snapshot(ConversationApplicationMetadata, conversationId, context))?.fields.turnState;
         return turnState ? composeOxTurnSections(turnState as unknown as TurnState, config.promptState)[key] : undefined;

@@ -15,7 +15,7 @@ enum HostFolderPicker {
     static func choose() async throws -> URL {
         let panel = NSOpenPanel()
         panel.title = "Mount folder — Ox Host"
-        panel.message = "Allow Ox to access this folder through the Files service."
+        panel.message = "Allow Ox to access this folder from the current Profile."
         panel.prompt = "Mount Folder"
         panel.canChooseDirectories = true
         panel.canChooseFiles = false

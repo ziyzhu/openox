@@ -363,7 +363,7 @@ extension Conversation {
                 return FileSystemMedia(file: item, data: data)
             }
         default:
-            throw RuntimeError.bridge("Media requires a Profile file or a file inside an attached Files folder: \(location.path)")
+            throw RuntimeError.bridge("Media requires a Profile file or a file inside a folder granted to this Profile: \(location.path)")
         }
         guard media.data.count <= FileLimits.fileBytes else {
             throw FileError.fileTooLarge(bytes: media.data.count, limit: FileLimits.fileBytes)
