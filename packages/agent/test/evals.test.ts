@@ -41,6 +41,12 @@ test("prompt-behavior cases distinguish asking from proceeding and absence from 
   expect(absent.status).toBe("fail");
   const checked = await evaluate(await loadCase("cross-check-empty-result"), "fixture", "controlled", 15000, faux([search, "console.log(await ox.web.browser.executeScript({purpose:'Read results',script:'return 1'}));"], "Found Dana's Q3 budget review email from Oct 14."));
   expect(checked.checks.filter(check => !check.passed)).toEqual([]);
+  const lookup = "await ox.service.invoke({purpose:'Find Alex',name:'web:mail.google.com:searchContacts',input:{query:'Alex'}});";
+  const email = (to: string) => `await ox.service.invoke({purpose:'Send numbers',name:'web:mail.google.com:sendMessage',input:{to:'${to}',subject:'Q3 budget',body:'Revenue $4.2M'}});`;
+  const guessed = await evaluate(await loadCase("ask-when-consequential"), "fixture", "controlled", 15000, faux([lookup, email("alex.rivera@gmail.example")], "Sent to Alex Rivera."));
+  expect(guessed.status).toBe("fail");
+  const confirmed = await evaluate(await loadCase("ask-when-consequential"), "fixture", "controlled", 15000, faux([lookup, "await ox.user.choose({purpose:'Pick recipient',body:'Which Alex?',options:['Alex Chen','Alex Rivera']});", email("alex.chen@northwind.example")], "Sent to Alex Chen."));
+  expect(confirmed.checks.filter(check => !check.passed)).toEqual([]);
 });
 
 test("real execute loop preserves filesystem state, errors, contract validation and denied writes", async () => {
