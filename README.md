@@ -8,7 +8,7 @@ A self-evolving agent that runs on your phone.
 
 <h3>
 
-[Website](https://openox.ai) · [App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) · [Discord](https://discord.gg/55eS3kEEX)
+[Website](https://openox.ai) · [App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) · [Discord](https://discord.gg/Sre9DaKAAg)
 
 </h3>
 
