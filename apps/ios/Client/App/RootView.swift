@@ -133,7 +133,7 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
                 .ignoresSafeArea(.container)
                 .blur(radius: blurRadius)
                 .offset(x: reduceMotion ? 0 : travel * 0.4)
-                .opacity(max(0, 1 - progress * 1.5))
+                .opacity(max(0, 1 - Double(progress) * 1.5))
                 .allowsHitTesting(page == .workspace && !interaction.actionsSuppressed)
                 .accessibilityHidden(page != .workspace)
 
