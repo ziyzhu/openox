@@ -3,6 +3,7 @@ import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readRepository } from "./repositories.ts";
+import { checkServerIdentity } from "./tls.ts";
 import {
   HOST_PATTERN,
   validateServiceManifest,
@@ -227,7 +228,7 @@ function validateManifest(domain: string, manifest: any): string[] {
 async function probeReceivePack(origin: string, result: Verification): Promise<void> {
   const probe = `${origin.replace(/\/+$/u, "")}/info/refs?service=git-receive-pack`;
   try {
-    const response = await fetch(probe, { redirect: "manual" });
+    const response = await fetch(probe, { redirect: "manual", tls: { checkServerIdentity } });
     if (response.status === 200) result.pass("git-receive-pack advertised");
     else if (response.status === 401 || response.status === 403) result.pass(`git-receive-pack advertised and auth-gated (${response.status})`);
     else result.warn("receive-pack", `HTTP ${response.status}; repository appears read-only`);
