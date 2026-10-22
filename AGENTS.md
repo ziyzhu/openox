@@ -47,6 +47,7 @@
 
 1. Reproduce the issue first before attempting to fix it so that you can verify the fix.
 1. Do not add unit tests; prefer E2E tests.
+1. Before committing native source or build-configuration changes, build each affected app target; shared changes require both iOS and macOS builds. Portable checks do not replace native compilation. If a required build cannot run, report the blocker and obtain approval before committing.
 1. For each commit, review lines of code and cyclomatic complexity, prefer low.
 1. For each commit, review the performance implications.
 1. For each change review, show the lines-of-code (LOC) delta, file tree diff, and call stack diff; mark non-applicable diffs explicitly.
