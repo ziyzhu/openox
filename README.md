@@ -15,6 +15,8 @@ A self-evolving agent that runs on your phone.
 [![GitHub Repo stars](https://img.shields.io/github/stars/ziyzhu/openox)](https://github.com/ziyzhu/openox/stargazers)
 [![CI](https://github.com/ziyzhu/openox/actions/workflows/ci.yml/badge.svg)](https://github.com/ziyzhu/openox/actions/workflows/ci.yml)
 
+</div>
+
 ## Features
 
 1. Turns websites into tools.
