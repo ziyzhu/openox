@@ -21,64 +21,21 @@ A self-evolving agent that runs on your phone.
 
 ## Features
 
-1. **Connect anything** — Ox works across AI assistants, apps, and websites to get things done for you.
-2. **Local first** — Ox runs on your device, keeping your conversations, credentials, and memory stored locally.
-3. **Yours** — Open source and malleable, Ox evolves with you and uses the models you choose.
+1. Turns websites into tools.
+2. Feels just like ChatGPT.
+3. Your device, any model.
 
-## Usage
+## Get Ox iOS
 
-- **Clients:** [iOS app](apps/ios) and [CLI](apps/cli) for macOS and Linux.
-- **Hosts:** built-in iOS Host and standalone [macOS Host](apps/macos) (WIP).
+Available to download on App Store: https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502
 
-The iOS app uses its built-in Host. The CLI can connect to either Host.
-
-```mermaid
-flowchart LR
-    iOS["iOS app"] --> iOSHost["iOS Host · on your phone"]
-    CLI["CLI · macOS / Linux"] --> iOSHost
-    CLI --> MacHost["macOS Host · WIP"]
-```
-
-**Use Ox on iPhone**
-
-1. Install [Ox from the App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502).
-2. Follow onboarding to choose your model.
-
-**Install the CLI — macOS or Linux**
+## Get Ox CLI
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ziyzhu/openox/main/apps/cli/install.sh | sh
-ox --help
 ```
 
-**Run a Host on Mac — WIP**
-
-The macOS Host runs in the menu bar. It has no conversation UI; use the CLI to
-interact with it.
-
-Requires macOS 26+, Xcode, [Bun](https://bun.sh/) 1.3+, and XcodeGen
-(`brew install xcodegen`). Run from a source checkout:
-
-```sh
-bun install
-bun run build:services
-bun run build:agent
-bun run build:macos -derivedDataPath /tmp/ox-macos-build
-open /tmp/ox-macos-build/Build/Products/Debug/OxHost.app --args --allow-connections
-```
-
-**Connect the CLI to a Host**
-
-1. Connect your terminal device and Host to the same [Tailscale](https://tailscale.com/) tailnet.
-2. Allow connections on the Host:
-   - **iPhone:** Turn on Settings → Host and keep Ox open.
-   - **Mac:** Keep the Host running; the launch command above enables connections.
-3. Discover available Hosts and check your connection:
-
-```sh
-ox host list
-ox --host ws://<host-tailnet-address>:9876 host describe
-```
+Only tested on MacOS and Linux.
 
 ## Architecture
 

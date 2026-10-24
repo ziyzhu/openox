@@ -172,7 +172,17 @@ nonisolated final class ProviderOAuthAccount: SubscriptionAccount, @unchecked Se
             throw RuntimeError.bridge("OAuth returned an invalid device authorization")
         }
         try ProviderDefinition.validateURL(url, field: "verification_uri", allowHTTP: false)
-        return DeviceGrant(deviceCode: code, userCode: userCode, verificationURL: url,
+        let verificationURL: URL
+        if let complete = response["verification_uri_complete"]?.stringValue {
+            guard let completeURL = URL(string: complete) else {
+                throw RuntimeError.bridge("OAuth returned an invalid complete verification URL")
+            }
+            try ProviderDefinition.validateURL(completeURL, field: "verification_uri_complete", allowHTTP: false)
+            verificationURL = completeURL
+        } else {
+            verificationURL = url
+        }
+        return DeviceGrant(deviceCode: code, userCode: userCode, verificationURL: verificationURL,
                            interval: max(response["interval"]?.doubleValue ?? 5, 1), expiresAt: Date().addingTimeInterval(expires))
     }
 
@@ -213,8 +223,11 @@ nonisolated final class ProviderOAuthAccount: SubscriptionAccount, @unchecked Se
         }
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-        Log.network.info("ProviderOAuth exchange provider=\(definition.id) status=\(status)")
-        guard let object = try? JSONDecoder().decode([String: JSONValue].self, from: data),
+        let object = try? JSONDecoder().decode([String: JSONValue].self, from: data)
+        let errorCode = object?["error"]?.stringValue ?? "none"
+        let loggedError = ["none", "authorization_pending", "slow_down", "access_denied", "expired_token", "invalid_client", "invalid_grant", "invalid_request", "unauthorized_client", "unsupported_grant_type", "invalid_scope"].contains(errorCode) ? errorCode : "unrecognized_error"
+        Log.network.info("ProviderOAuth exchange provider=\(definition.id) status=\(status) error=\(loggedError)")
+        guard let object,
               (200..<300).contains(status) || allowOAuthError && status == 400 && object["error"] != nil else {
             throw RuntimeError.bridge("OAuth endpoint returned HTTP \(status)")
         }
