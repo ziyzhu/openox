@@ -58,8 +58,8 @@ nonisolated enum ProviderClientFactory {
             native = AnthropicMessagesTransport(
                 id: definition.id, displayName: definition.name, models: models,
                 endpoint: definition.url.appendingPathComponent("messages"), regions: presentation.regions,
-                website: presentation.website, usesAPIKey: definition.auth.kind == .apiKey,
-                acceptsAPIKey: definition.auth.kind == .apiKey, subscriptionAccount: account,
+                website: presentation.website, usesAPIKey: definition.auth.kind == .bearer || definition.auth.kind == .apiKey,
+                acceptsAPIKey: definition.auth.kind == .bearer || definition.auth.kind == .apiKey, subscriptionAccount: account,
                 credentialKind: presentation.credentialKind,
                 credentialID: definition.credentialID,
                 adaptiveThinkingModelIDs: Set(definition.models.filter { $0.options?.adaptiveThinking == true }.map { $0.wireID ?? $0.id }),

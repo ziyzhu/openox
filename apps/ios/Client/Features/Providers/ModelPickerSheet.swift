@@ -718,7 +718,7 @@ private struct ProviderPickerView: View {
 
     var body: some View {
         let directClients = clients.filter { $0.inferenceLocation == .onDevice }
-            + clients.filter { $0.subscriptionAccount != nil && !$0.acceptsAPIKey }
+            + clients.filter { $0.inferenceLocation != .onDevice && ($0.credentialKind == .subscriptionKey || $0.subscriptionAccount != nil && !$0.acceptsAPIKey) }
         let directIDs = Set(directClients.map(\.id))
         let apiClients = clients.filter { !directIDs.contains($0.id) }
             .sorted { ($0.gettingStartedOffer?.priority ?? .max) < ($1.gettingStartedOffer?.priority ?? .max) }
