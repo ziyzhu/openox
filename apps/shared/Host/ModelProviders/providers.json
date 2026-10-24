@@ -2255,6 +2255,91 @@
     "definition": {
       "api": "anthropic-messages",
       "auth": {
+        "kind": "bearer"
+      },
+      "id": "kimi-coding:global",
+      "models": [
+        {
+          "contextTokens": 1048576,
+          "id": "kimi-for-coding",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "Kimi For Coding",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        },
+        {
+          "contextTokens": 1048576,
+          "id": "k3",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "Kimi K3",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        },
+        {
+          "contextTokens": 262144,
+          "id": "k3-256k",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "Kimi K3 256K",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        },
+        {
+          "contextTokens": 262144,
+          "id": "kimi-for-coding-highspeed",
+          "input": [
+            "image",
+            "text"
+          ],
+          "name": "Kimi For Coding HighSpeed",
+          "output": [
+            "text"
+          ],
+          "outputTokens": 16384
+        }
+      ],
+      "name": "Kimi For Coding",
+      "options": {
+        "headers": {
+          "User-Agent": "Ox/iOS"
+        }
+      },
+      "url": "https://api.kimi.ai/coding"
+    },
+    "discovery": {
+      "catalog": "kimi-code-plan-global",
+      "format": "openai"
+    },
+    "legacyCredentialID": "kimi-coding:global",
+    "legacyID": "kimi-coding:global",
+    "presentation": {
+      "credentialKind": "subscription-key",
+      "iconURL": "https://openox.ai/assets/services/model-providers/kimi/favicon.png",
+      "inferenceLocation": "remote",
+      "regions": [
+        "global"
+      ],
+      "website": "https://www.kimi.ai/code/console"
+    }
+  },
+  {
+    "definition": {
+      "api": "anthropic-messages",
+      "auth": {
         "clientID": "17e5f671-d194-4dfb-9706-5516cb48c098",
         "deviceAuthorizationURL": "https://auth.kimi.com/api/oauth/device_authorization",
         "flow": "device-code",

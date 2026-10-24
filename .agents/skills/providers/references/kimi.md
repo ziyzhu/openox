@@ -5,12 +5,13 @@
 - Global website: [Kimi International](https://www.kimi.ai/)
 - Global developer platform: [Kimi Open Platform](https://platform.kimi.ai/)
 - China website: [Kimi China](https://www.kimi.com/)
+- Coding Plan protocols and regional endpoints: [Kimi Code model configuration](https://www.kimi.com/code/docs/en/kimi-code/models.html)
 - Regional sign-in guidance: [Kimi account regions](https://www.kimi.com/code/docs/kimi-code-desktop/getting-started.html)
 - Account management: the Kimi global platform or Moonshot China platform, according to the Ox picker region. Current deep links belong in the provider source.
 
 ## Ox account placement
 
-Ox presents the Kimi API in Global and China. These are separate service surfaces with region-specific credentials; never silently reuse one region's credential for the other. Kimi For Coding is a separate subscription choice in China, matching its mainland China service and account endpoints. Keep its discovery catalog in the same region.
+Ox presents the Kimi API in Global and China. These are separate service surfaces with region-specific credentials; never silently reuse one region's credential for the other. Kimi For Coding is a separate subscription choice in both Global and China. Global uses an international Coding Plan API key; the existing China entry retains its mainland China account flow. Keep credentials, endpoints, and discovery catalogs separate by region.
 
 Kimi Website remains an ordinary service using the signed-in browser session for `www.kimi.com`, not a model provider or an Open Platform API credential. Kimi identifies `kimi.com` as mainland China and `kimi.ai` as international; do not move an existing session between domains. Website service Actions receive explicit inputs only.
 
