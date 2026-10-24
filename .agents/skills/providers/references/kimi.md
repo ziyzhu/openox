@@ -10,7 +10,7 @@
 
 ## Ox account placement
 
-Ox presents the Kimi API in Global and China. These are separate service surfaces with region-specific credentials; never silently reuse one region's credential for the other. Kimi For Coding is a separate subscription choice in Global.
+Ox presents the Kimi API in Global and China. These are separate service surfaces with region-specific credentials; never silently reuse one region's credential for the other. Kimi For Coding is a separate subscription choice in China, matching its mainland China service and account endpoints. Keep its discovery catalog in the same region.
 
 Kimi Website remains an ordinary service using the signed-in browser session for `www.kimi.com`, not a model provider or an Open Platform API credential. Kimi identifies `kimi.com` as mainland China and `kimi.ai` as international; do not move an existing session between domains. Website service Actions receive explicit inputs only.
 

@@ -2325,7 +2325,7 @@
       "url": "https://api.kimi.com/coding"
     },
     "discovery": {
-      "catalog": "kimi-code-plan-global",
+      "catalog": "kimi-code-plan-cn",
       "format": "openai"
     },
     "legacyCredentialID": "kimi-coding",
@@ -2335,7 +2335,7 @@
       "iconURL": "https://openox.ai/assets/services/model-providers/kimi/favicon.png",
       "inferenceLocation": "remote",
       "regions": [
-        "global"
+        "china"
       ],
       "website": "https://www.kimi.com/code"
     }
