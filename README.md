@@ -15,21 +15,19 @@ A self-evolving agent that runs on your phone.
 [![GitHub Repo stars](https://img.shields.io/github/stars/ziyzhu/openox)](https://github.com/ziyzhu/openox/stargazers)
 [![CI](https://github.com/ziyzhu/openox/actions/workflows/ci.yml/badge.svg)](https://github.com/ziyzhu/openox/actions/workflows/ci.yml)
 
-</div>
-
----
-
 ## Features
 
 1. Turns websites into tools.
 2. Feels just like ChatGPT.
 3. Your device, any model.
 
-## Get Ox iOS
+## Ox iOS
 
 Available to download on App Store: https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502
 
-## Get Ox CLI
+## Ox CLI Client
+
+Ox CLI allows desktop clients to interact with any Ox Host such as Ox iOS.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ziyzhu/openox/main/apps/cli/install.sh | sh
@@ -39,11 +37,7 @@ Only tested on MacOS and Linux.
 
 ## Architecture
 
-An Ox separates the interface, runtime, model, persistent state, and capabilities into seven components.
-
 ![OpenOx architecture showing the Client, Host, Agent, model provider, Profile, VM, repositories, catalog, and service interfaces](docs/architecture.svg)
-
-*The Client and model remain replaceable around a Host that owns the Agent, Profile, VM, and service lifecycle.*
 
 - **Ox Client** — An interface that connects to an Ox Host. A Client may be a mobile app, desktop app, web app, or command-line tool. The Host binds VM execution to the selected conversation, its permissions, attached services, and virtual filesystem view.
 - **Ox Host** — A process or device that opens an Ox Profile, runs the Ox VM, and supplies platform and service adapters. A Client can use an embedded Host or target a compatible Host elsewhere.
@@ -57,7 +51,7 @@ An Ox separates the interface, runtime, model, persistent state, and capabilitie
   - **Web services** expose actions backed by websites and the user’s browser session.
   - **MCP services** expose actions provided by an MCP server.
 
-  Anyone can publish compatible web and MCP services in a public Git repository containing a `repository.json` manifest. Any compatible Host can install that repository. Device services remain part of the Host implementation.
+Anyone can publish compatible web and MCP services in a public Git repository containing a `repository.json` manifest. Any compatible Host can install that repository. Device services remain part of the Host implementation.
 
 ## Distributed Evolution
 
