@@ -30,7 +30,8 @@ nonisolated final class ProviderFileInputs: Sendable {
                 throw RuntimeError.bridge("Verified provider file inputs exceed their bounded memory budget")
             }
             let directory = URL(string: "ox-model-input://\(id.uuidString)/\(UUID().uuidString)/")!
-            let snapshot = FileItem(fileName: file.fileName, directory: directory, size: data.count)
+            let snapshot = FileItem(fileName: file.fileName, directory: directory, relativePath: file.displayName,
+                                    virtualPath: file.virtualPath, size: data.count)
             group.sources[file.fileURL] = snapshot
             group.bytes[snapshot.fileURL] = data
             group.size += data.count

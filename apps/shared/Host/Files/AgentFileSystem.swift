@@ -1,6 +1,13 @@
 import Foundation
 
 extension Conversation {
+    var fileSystemMounts: [JSONValue] {
+        let roots = VirtualFileSystem.hostRoots + ["files"]
+        return roots.map { root in
+            JSONValue.object(["path": .string(root), "access": .string(["history", "tmp"].contains(root) ? "readOnly" : "readWrite")])
+        } + [JSONValue.object(["path": .string(""), "access": .string("readOnly")])]
+    }
+
     public func fileSystemOperation(name: String, arguments: JSONValue) async throws -> JSONValue? {
         let actions = ["list": Actions.fsList, "read": Actions.fsRead, "write": Actions.fsWrite,
                        "edit": Actions.fsEdit, "rm": Actions.fsRm, "mkdir": Actions.fsMkdir, "move": Actions.fsMove, "copy": Actions.fsCopy,
@@ -38,11 +45,6 @@ extension Conversation {
         }
         args = fields
         let purpose = args.removeValue(forKey: "purpose")?.stringValue ?? "\(name.capitalized) \(path)"
-        var roots = VirtualFileSystem.hostRoots
-        roots.append("files")
-        let mounts = roots.map { root in
-            JSONValue.object(["path": .string(root), "access": .string(["history", "tmp"].contains(root) ? "readOnly" : "readWrite")])
-        } + [JSONValue.object(["path": .string(""), "access": .string("readOnly")])]
         var recorded = args
         if let base64 = recorded.removeValue(forKey: "base64")?.stringValue {
             recorded["bytes"] = .int(base64.utf8.count / 4 * 3)
@@ -57,7 +59,7 @@ extension Conversation {
             }
             let result = try await route.session.host.fileSystem(owner: self, runtime: route.session.runtime,
                 profileID: route.profileID, operation: name,
-                arguments: .object(args.merging(["purpose": .string(purpose)]) { _, value in value }), mounts: mounts)
+                arguments: .object(args.merging(["purpose": .string(purpose)]) { _, value in value }), mounts: fileSystemMounts)
             Log.session.info("bridge.fs.operation name=\(name) path=\(path) profile=\(route.profileID)")
             return result
         }

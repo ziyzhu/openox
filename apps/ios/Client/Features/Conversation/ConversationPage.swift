@@ -1798,8 +1798,11 @@ struct ConversationPage: View {
         }
     }
 
-    private func importAttachment(named name: String, source: String, operation: @escaping @MainActor () async throws -> FileItem) {
-        composer.importAttachment(named: name, operation: operation) { error in
+    private func importAttachment(named name: String, source: String, operation: @escaping @Sendable () async throws -> FileImporter.Draft) {
+        composer.importAttachment(named: name, operation: {
+            let draft = try await Task.detached(priority: .userInitiated) { try await operation() }.value
+            return try await conversation.importAttachment(draft)
+        }) { error in
             Log.ui.error("ConversationPage.attach \(source) error=\(error.localizedDescription)")
             showAttachmentError(error)
         }
@@ -1812,14 +1815,14 @@ struct ConversationPage: View {
                 guard let data = try await item.loadTransferable(type: Data.self) else {
                     throw FileError.imageDecodeFailed
                 }
-                return try await FileImporter.importImageDataAsync(data, suggestedName: suggested)
+                return try FileImporter.imageDataDraft(data, suggestedName: suggested)
             }
         }
     }
 
     private func ingestCameraImage(_ image: UIImage) {
         importAttachment(named: "Camera.jpg", source: "camera") {
-            try await FileImporter.importImageAsync(image, suggestedName: "Camera.jpg")
+            try FileImporter.imageDraft(image, suggestedName: "Camera.jpg")
         }
     }
 
@@ -1828,9 +1831,9 @@ struct ConversationPage: View {
             importAttachment(named: image.suggestedName, source: "pastedImage") {
                 switch image.content {
                 case .data(let data):
-                    try await FileImporter.importImageDataAsync(data, suggestedName: image.suggestedName)
+                    try FileImporter.imageDataDraft(data, suggestedName: image.suggestedName)
                 case .image(let value):
-                    try await FileImporter.importImageAsync(value, suggestedName: image.suggestedName)
+                    try FileImporter.imageDraft(value, suggestedName: image.suggestedName)
                 }
             }
         }
@@ -1841,7 +1844,7 @@ struct ConversationPage: View {
             importAttachment(named: url.lastPathComponent, source: "file") {
                 let scoped = url.startAccessingSecurityScopedResource()
                 defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                return try await FileImporter.importFileAsync(at: url)
+                return try FileImporter.fileDraft(at: url)
             }
         }
     }

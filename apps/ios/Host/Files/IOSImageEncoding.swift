@@ -53,7 +53,7 @@ nonisolated extension FileImporter {
         return try await write(draft, in: scope)
     }
 
-    private static func imageDraft(_ image: UIImage, suggestedName: String?) throws -> Draft {
+    static func imageDraft(_ image: UIImage, suggestedName: String?) throws -> Draft {
         do {
             let prepared = try ImagePreparer.prepare(image, suggestedName: suggestedName)
             return Draft(data: prepared.data, fileName: prepared.filename(from: suggestedName))

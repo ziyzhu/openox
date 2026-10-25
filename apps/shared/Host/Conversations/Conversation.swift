@@ -451,11 +451,7 @@ final class Conversation: Identifiable {
                 let suggestedName = URL(fileURLWithPath: filename).pathExtension.isEmpty
                     ? "\(filename).\(fileExtension)"
                     : filename
-                let file = try await FileImporter.importDataAsync(
-                    attachment.data,
-                    suggestedName: suggestedName,
-                    in: scope
-                )
+                let file = try await importAttachment(data: attachment.data, suggestedName: suggestedName)
                 embedFile(file)
                 Log.session.info("Conversation.importBrowserExport filename=\(file.fileName) bytes=\(attachment.data.count)")
                 return file
@@ -1773,7 +1769,7 @@ final class Conversation: Identifiable {
             skillConflicts: skillConflicts,
             attachedServices: attached,
             fileMountPaths: fileMountPaths,
-            filePaths: referencedFiles.map { "artifacts/\($0.fileName)" },
+            filePaths: referencedFiles.compactMap(\.virtualPath),
             isTemporary: retention == .temporary,
             responseLanguage: AppLocale.shared.responseLanguage,
             hostID: Device.hostID,

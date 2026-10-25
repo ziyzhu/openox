@@ -2,17 +2,46 @@ import Foundation
 import UniformTypeIdentifiers
 
 extension Conversation {
+    func importAttachment(data: Data, suggestedName: String) async throws -> FileItem {
+        let draft = try await Task.detached(priority: .userInitiated) {
+            try FileImporter.dataDraft(data, suggestedName: suggestedName)
+        }.value
+        return try await importAttachment(draft)
+    }
+
+    func importAttachment(_ draft: FileImporter.Draft) async throws -> FileItem {
+        try await durablePreparation?.value
+        guard let route = durableRoute else { throw RuntimeError.bridge("Conversation files are unavailable") }
+        if let reference = route.reference {
+            return try await FileImporter.write(draft, in: scope, conversation: reference)
+        }
+        let folder = "conversations/\(route.conversationID)/"
+        var name = draft.fileName
+        let existing = try await route.session.runtime.command(.object([
+            "action": .string("fileStat"), "path": .string(folder + name), "byPath": .bool(true),
+        ]))
+        if existing.objectValue?["file"] != .null {
+            name = FileStore.sanitizedFilename(UUID().uuidString + "-" + name)
+        }
+        let path = folder + name
+        let file = FileItem(fileName: name, directory: scope.root)
+        if file.kind == .text || file.kind == .html, let text = String(data: draft.data, encoding: .utf8) {
+            _ = try await route.session.runtime.command(.object([
+                "action": .string("fileWrite"), "path": .string(path), "text": .string(text),
+            ]))
+        } else {
+            try await route.session.runtime.writeFile(data: draft.data, path: path)
+        }
+        guard let published = await durableFile(path: path) else { throw RuntimeError.bridge("Imported file is unavailable") }
+        return published.file
+    }
+
     func importRemoteMCPFiles(_ values: [RemoteMCPFile]) async throws {
         guard !values.isEmpty else { return }
         try requireProfileMutation(Actions.fsWrite)
         var files: [FileItem] = []
         for value in values {
-            files.append(try await FileImporter.importDataAsync(
-                value.data,
-                suggestedName: value.suggestedFilename,
-                in: scope,
-                conversation: durableRoute?.reference
-            ))
+            files.append(try await importAttachment(data: value.data, suggestedName: value.suggestedFilename))
         }
         for file in files { embedFile(file) }
         Log.session.info("Conversation.importRemoteMCPFiles count=\(files.count) bytes=\(values.reduce(0) { $0 + $1.data.count })")
@@ -60,7 +89,7 @@ nonisolated public enum FileImporter {
         return try await write(draft, in: scope, conversation: conversation)
     }
 
-    private static func imageDataDraft(_ data: Data, suggestedName: String?) throws -> Draft {
+    static func imageDataDraft(_ data: Data, suggestedName: String?) throws -> Draft {
         do {
             let prepared = try ImagePreparer.prepare(data)
             return Draft(data: prepared.data, fileName: prepared.filename(from: suggestedName))
@@ -71,12 +100,12 @@ nonisolated public enum FileImporter {
         }
     }
 
-    private static func fileDraft(at url: URL) throws -> Draft {
+    static func fileDraft(at url: URL) throws -> Draft {
         let data = try Data(contentsOf: url)
         return try dataDraft(data, suggestedName: url.lastPathComponent)
     }
 
-    private static func dataDraft(_ data: Data, suggestedName: String) throws -> Draft {
+    static func dataDraft(_ data: Data, suggestedName: String) throws -> Draft {
         let fileName = FileStore.sanitizedFilename(suggestedName)
         let type = UTType(filenameExtension: URL(fileURLWithPath: fileName).pathExtension) ?? .data
         if type.conforms(to: .image) {

@@ -165,7 +165,7 @@ are rejected. Snapshot inputs are streamed and hashed; restored bytes are verifi
 before launch. Limits are 512 MiB/100,000 entries per input and 1 GiB total. Predecessor evidence must come from the actual older build; provenance
 labels alone are not proof. Normal startup still runs `StorageMigrator`; never erase
 or uninstall as upgrade setup. Device-bound bookmarks and OS permissions still
-require provisioning. Unknown template fields fail rather than being ignored.
+require provisioning. For a registered Profile, replay each immediate child (including `.ox`) as a separate storage entry, never the Profile root itself: replacing that directory invalidates its bookmark even at the same path. Unknown template fields fail rather than being ignored.
 
 Evidence includes a redacted manifest, original changed preferences, storage backups,
 AX tree, screenshot, and fresh logs outside the repository. Credential-bearing input

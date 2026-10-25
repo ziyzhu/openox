@@ -47,6 +47,7 @@ nonisolated public struct FileItem: Equatable, Sendable, Identifiable, Codable {
 
     public let fileName: String
     public let fileURL: URL
+    public let virtualPath: String?
     public let availability: Availability
     private let listedSize: Int?
     private let listedCreatedAt: Date?
@@ -89,6 +90,7 @@ nonisolated public struct FileItem: Equatable, Sendable, Identifiable, Codable {
             fileName: fileName,
             directory: fileURL.deletingLastPathComponent(),
             relativePath: fileURL.lastPathComponent,
+            virtualPath: virtualPath,
             availability: availability,
             size: listedSize,
             createdAt: listedCreatedAt,
@@ -112,12 +114,14 @@ nonisolated public struct FileItem: Equatable, Sendable, Identifiable, Codable {
         fileName: String,
         directory: URL,
         relativePath: String? = nil,
+        virtualPath: String? = nil,
         availability: Availability = .local,
         size: Int? = nil,
         createdAt: Date? = nil,
         modifiedAt: Date? = nil
     ) {
         self.fileName = fileName
+        self.virtualPath = virtualPath
         fileURL = directory.appendingPathComponent(relativePath ?? fileName, isDirectory: false)
         self.availability = availability
         listedSize = size

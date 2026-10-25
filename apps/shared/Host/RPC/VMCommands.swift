@@ -31,17 +31,20 @@ extension OxHostProtocol {
                 "temporary": .bool($0.isTemporary),
             ])
         } ?? .null
-        var roots = session == nil ? [] : VirtualFileSystem.hostRoots
+        var roots: [String] = []
         if let session {
             do {
-                roots.append(contentsOf: try await session.resourceFiles().entries().map(\.path))
+                try await session.durablePreparation?.value
+                guard let route = session.durableRoute else { throw RuntimeError.bridge("Agent filesystem is unavailable") }
+                let listing = try await route.session.host.fileSystem(owner: session, runtime: route.session.runtime,
+                    profileID: route.profileID, operation: "list",
+                    arguments: .object(["path": .string(""), "purpose": .string("Inspect filesystem"),
+                        "options": .object(["limit": .int(100)])]), mounts: session.fileSystemMounts)
+                roots = listing.objectValue?["items"]?.arrayValue?.compactMap { $0.objectValue?["path"]?.stringValue } ?? []
             } catch {
                 reply.failure(error.localizedDescription)
                 return
             }
-        }
-        if session != nil {
-            roots.append("files")
         }
         let value = JSONValue.object([
             "host": .object([

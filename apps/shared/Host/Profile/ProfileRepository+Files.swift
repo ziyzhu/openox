@@ -24,7 +24,7 @@ extension ProfileRepository {
 
         func file(in scope: ProfileScope) -> FileItem {
             FileItem(fileName: reference ?? path.split(separator: "/").last.map(String.init) ?? path,
-                     directory: scope.root, relativePath: path, size: size)
+                     directory: scope.root, relativePath: path, virtualPath: "/" + path, size: size)
         }
     }
 
@@ -99,7 +99,7 @@ extension ProfileRepository {
         return try files.map { file in
             guard let name = file.reference, try profileFileName(name) == name,
                   file.sha256?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { throw CocoaError(.fileReadCorruptFile) }
-            return FileItem(fileName: name, directory: scope.root, relativePath: file.path, size: file.size,
+            return FileItem(fileName: name, directory: scope.root, relativePath: file.path, virtualPath: "/" + file.path, size: file.size,
                             modifiedAt: Date(timeIntervalSince1970: file.mtime / 1000))
         }.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
     }

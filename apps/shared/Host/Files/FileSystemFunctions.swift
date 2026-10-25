@@ -301,7 +301,7 @@ extension Conversation {
         guard case .deviceItem(let grantID, let components)? = try? await fileSystemLocation(path) else { return nil }
         do {
             let url = try DeviceFolderStore.shared.repositoryRoot(grantID: grantID, relativePath: components, profileId: scope.profileID)
-            return FileItem(fileName: path, directory: url.deletingLastPathComponent(), relativePath: url.lastPathComponent)
+            return FileItem(fileName: path, directory: url.deletingLastPathComponent(), relativePath: url.lastPathComponent, virtualPath: "/" + path)
         } catch {
             Log.session.warning("Conversation.messageFile device grant=\(grantID) error=\(error.localizedDescription)")
             return nil
@@ -333,7 +333,7 @@ extension Conversation {
               let result = try? await route.session.runtime.command(.object(["action": .string("fileStat"), "path": .string(path), "byPath": .bool(true)])),
               let record = result.objectValue?["file"]?.objectValue, record["hidden"]?.boolValue != true,
               let actual = record["path"]?.stringValue, let reference = record["reference"]?.stringValue else { return nil }
-        return (FileItem(fileName: reference, directory: route.fileScope?.root ?? scope.root, relativePath: actual), .object(record))
+        return (FileItem(fileName: reference, directory: route.fileScope?.root ?? scope.root, relativePath: actual, virtualPath: "/" + actual), .object(record))
     }
 
     func fileSystemMedia(path: String) async throws -> FileSystemMedia {

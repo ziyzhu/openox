@@ -17,7 +17,7 @@ nonisolated enum DurableMessageCodec {
                                "thoughtSignature": call.thoughtSignature, "oxProviderItemID": call.providerItemID,
                                "oxProviderCallID": call.providerCallID])
             case .attachment(let file):
-                var reference: [String: JSONValue] = ["type": .string("text"), "text": .string("[Attachment: artifacts/\(file.fileName)]"),
+                var reference: [String: JSONValue] = ["type": .string("text"), "text": .string("[Attachment: \(file.virtualPath ?? file.displayName)]"),
                                                       "oxAttachment": .string(file.fileName)]
                 if let profileID { reference["oxProfileID"] = .string(profileID.uuidString) }
                 return .object(reference)
@@ -125,7 +125,8 @@ nonisolated enum DurableMessageCodec {
             }
             let data = try await runtime.readFile(descriptor: current)
             let file = FileItem(fileName: name, directory: (fileScope ?? scope).root,
-                relativePath: current.objectValue?["path"]?.stringValue ?? "artifacts/\(name)", size: data.count)
+                relativePath: current.objectValue?["path"]?.stringValue ?? "artifacts/\(name)",
+                virtualPath: current.objectValue?["path"]?.stringValue.map { "/" + $0 }, size: data.count)
             _ = try inputs.snapshot(file, data: data)
             let prepared = try WebAttachmentFactory.make(data: data, filename: file.displayName, mimeType: file.mimeType)
             result.transientAttachments.append(TransientAttachment(kind: prepared.kind, mimeType: prepared.mimeType,
@@ -165,7 +166,8 @@ nonisolated enum DurableMessageCodec {
             }
             let data = try await reader.readFile(descriptor: descriptor)
             let resolved = FileItem(fileName: file.fileName, directory: owner.root,
-                relativePath: descriptor.objectValue?["path"]?.stringValue ?? path, size: data.count)
+                relativePath: descriptor.objectValue?["path"]?.stringValue ?? path,
+                virtualPath: descriptor.objectValue?["path"]?.stringValue.map { "/" + $0 }, size: data.count)
             verified.append(.attachment(try inputs.snapshot(resolved, data: data)))
         }
         return verified

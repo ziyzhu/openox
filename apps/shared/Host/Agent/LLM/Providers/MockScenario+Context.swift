@@ -51,7 +51,7 @@ extension Scenario {
             }
             return content.compactMap { block in
                 guard case .attachment(let file) = block else { return nil }
-                return "artifacts/\(file.fileName)"
+                return file.virtualPath ?? "<missing file path>"
             }
         }
         guard let languageDirective = try? ModelPromptRenderer.shared.render(.responseDirective, input: AppLocale.resolvedResponseLanguage) else {
