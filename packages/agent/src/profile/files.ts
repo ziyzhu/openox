@@ -63,6 +63,7 @@ export class ProfileFiles {
   state() { return this.physicalStore().state(); }
   record(path: string, reference = true) { return this.physicalStore().record(path, reference); }
   records(paths: string[]) { return this.physicalStore().records(paths); }
+  discard(reference: string, conversation: number) { return this.physicalStore().discard(reference, conversation); }
   writeStaged(path: string, file: FileRecord) { return this.physicalStore().writeStaged(path, file); }
   listFiles(prefix = "") { return this.physicalStore().listFiles(prefix); }
   info(path: string) { return this.physicalStore().info(path); }

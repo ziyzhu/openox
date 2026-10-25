@@ -312,6 +312,7 @@ struct ConversationComposer: View, Equatable {
 
     var body: some View {
         inputBar
+            .disabled(composer.isPublishing)
             .background(ComposerKeyboardDiagnostics(conversationID: sessionID))
             .excludesCompactPageSwitch(includingAreaBelow: true)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
@@ -346,12 +347,11 @@ struct ConversationComposer: View, Equatable {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(composer.draftAttachments) { item in
-                        switch item {
-                        case .importing(let pending):
+                        if case .importing(let pending) = item {
                             PendingAttachmentChip(pending: pending) {
                                 composer.removeDraftAttachment(item)
                             }
-                        case .ready(let attachment):
+                        } else if let attachment = item.file {
                             let sourceID = "composer:\(sessionID.uuidString):\(composer.draftID.uuidString):\(attachment.id)"
                             DraftAttachmentChip(
                                 attachment: attachment,

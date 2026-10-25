@@ -2,38 +2,44 @@ import Foundation
 
 nonisolated enum SharedNoteInbox {
     struct Outcome: Sendable {
-        let imported: [FileItem]
+        let files: [(staged: FileImporter.StagedFile, directory: URL)]
         let failures: [String]
+
+        var staged: [FileImporter.StagedFile] { files.map(\.staged) }
+
+        func acknowledge() async -> [String] {
+            await Task.detached(priority: .utility) {
+                var failures: [String] = []
+                for file in files {
+                    do { try FileManager.default.removeItem(at: file.directory) }
+                    catch { failures.append(error.localizedDescription) }
+                }
+                return failures
+            }.value
+        }
     }
 
-    static func consume(in scope: ProfileScope) async -> Outcome {
+    static func consume() async -> Outcome {
         let payloads: [(directory: URL, file: URL)]
         do {
             payloads = try await Task.detached(priority: .utility) { try pendingPayloads() }.value
         } catch {
-            return Outcome(imported: [], failures: [error.localizedDescription])
+            return Outcome(files: [], failures: [error.localizedDescription])
         }
-        var imported: [FileItem] = []
+        var files: [(staged: FileImporter.StagedFile, directory: URL)] = []
         var failures: [String] = []
         for payload in payloads {
             do {
-                let data = try await Task.detached(priority: .userInitiated) {
-                    try Data(contentsOf: payload.file)
+                let file = try await Task.detached(priority: .userInitiated) {
+                    let draft = try FileImporter.dataDraft(Data(contentsOf: payload.file), suggestedName: payload.file.lastPathComponent)
+                    return try FileImporter.stage(draft)
                 }.value
-                let file = try await FileImporter.importDataAsync(
-                    data,
-                    suggestedName: payload.file.lastPathComponent,
-                    in: scope
-                )
-                imported.append(file)
-                try await Task.detached(priority: .utility) {
-                    try FileManager.default.removeItem(at: payload.directory)
-                }.value
+                files.append((file, payload.directory))
             } catch {
                 failures.append(error.localizedDescription)
             }
         }
-        return Outcome(imported: imported, failures: failures)
+        return Outcome(files: files, failures: failures)
     }
 
     static func stageForTesting(title: String, text: String) throws {

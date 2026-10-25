@@ -26,6 +26,8 @@ WAL/SHM; they are diagnostics, not Profile exports or power-loss evidence.
 
 For browser navigation changes, reproduce with a simple page before blaming the service. Verify fragment/history routing preserves the running script, document loads invalidate it, chained redirects reach readiness, form POST bodies survive, popup routing works, and Host-requested timeouts recover. Re-run public-web checks to retain destination and subframe restrictions.
 
+For draft attachments, verify temporary bytes disappear on removal and navigation, not just the chip. SwiftUI can retain removed view values after their animations; explicit cleanup must not depend solely on deinitialization.
+
 Verify behavior or independent effects, not just taps, queued sends, or idle status. Test native trash inside the app sandbox and inspect retained bytes: an iOS simulator's global temporary volume can lack trash while app Documents supports it. Also verify unavailable trash leaves sources readable and does not block later filesystem writes.
 After Profile selection, reconnect the Host socket before issuing another request. For persisted conversations, use the conversation ID returned by Send; the initial ID from New can change when the conversation is first saved. For template-seeded flows, retain the mapped conversation ID rather than a current temporary VM ID.
 For native switches that ignore an idb default tap, verify the current hit target, use `idb ui tap --duration 0.15`, and assert the resulting AX value. Refresh frames after CLI mutations change a visible list.

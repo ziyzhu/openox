@@ -506,7 +506,7 @@ struct RootView: View {
     @State private var childNavigationActive = false
     @State private var sharedNoteImporting = false
     @State private var sharedNoteImportError: String?
-    @State private var sharedNoteToast: Toast?
+    @State private var sharedNoteComposer: (conversation: ObjectIdentifier, composer: ConversationComposerModel)?
     @State private var sidebarInteraction = SidebarInteraction()
     @Environment(\.scenePhase) private var scenePhase
 
@@ -534,8 +534,10 @@ struct RootView: View {
 
     var body: some View {
         observedRoot
-            .toast($sharedNoteToast, accessibilityIdentifier: A11yID.ConversationControls.toast)
-            .alert("Couldn't import shared note", isPresented: Binding(
+            .onChange(of: conversations.current.map(ObjectIdentifier.init)) { _, identity in
+                if sharedNoteComposer?.conversation != identity { sharedNoteComposer = nil }
+            }
+            .alert("Couldn't attach shared files", isPresented: Binding(
                 get: { sharedNoteImportError != nil },
                 set: { if !$0 { sharedNoteImportError = nil } }
             )) {
@@ -825,6 +827,7 @@ struct RootView: View {
                !compactConversationTransition.isClosing,
                pendingConversationPresentationId == nil || pendingConversationPresentationId == conversation.id {
                 ConversationPage(conversation: conversation,
+                         isCurrentConversation: { conversations.current === conversation },
                          composerFocusRequestID: composerFocusRequest?.conversationIdentity == ObjectIdentifier(conversation)
                              ? composerFocusRequest?.id
                              : nil,
@@ -845,7 +848,10 @@ struct RootView: View {
                          },
                          onExploreServices: { showServices(for: conversation.id) },
                          onFileNavigationChange: setChildNavigationActive,
-                         onInitialTranscriptPresented: { finishConversationOpening(conversation.id) })
+                         onInitialTranscriptPresented: { finishConversationOpening(conversation.id) },
+                         composer: sharedNoteComposer.flatMap {
+                             $0.conversation == ObjectIdentifier(conversation) ? $0.composer : nil
+                         } ?? ConversationComposerModel())
                     .onAppear {
                         conversation.setTranscriptVisible(scenePhase == .active)
                     }
@@ -1181,17 +1187,25 @@ struct RootView: View {
     private func importSharedNotes() {
         guard startup == .ready, !sharedNoteImporting else { return }
         sharedNoteImporting = true
-        let scope = storage.scope
         Task {
-            let outcome = await SharedNoteInbox.consume(in: scope)
-            sharedNoteImporting = false
-            if !outcome.imported.isEmpty {
-                sharedNoteToast = Toast(message: L10n.string("File added", comment: ""))
-                Log.ui.info("ShareImport.imported count=\(outcome.imported.count) scope=\(scope.generation)")
+            let outcome = await SharedNoteInbox.consume()
+            if !outcome.staged.isEmpty {
+                let conversation = conversations.startNewConversation(reusingEmpty: false)
+                let composer = ConversationComposerModel()
+                composer.attach(outcome.staged)
+                sharedNoteComposer = (ObjectIdentifier(conversation), composer)
+                compactConversationTransition = .idle
+                pendingConversationPresentationId = nil
+                presentation = nil
+                setSidebar(false)
+                requestComposerFocus(for: conversation, reason: "sharedFiles")
+                Log.ui.info("ShareImport.staged conversation=\(conversation.id) count=\(outcome.staged.count)")
             }
-            if !outcome.failures.isEmpty {
-                sharedNoteImportError = outcome.failures.joined(separator: "\n")
-                Log.ui.error("ShareImport.failed count=\(outcome.failures.count) scope=\(scope.generation)")
+            let failures = outcome.failures + (await outcome.acknowledge())
+            sharedNoteImporting = false
+            if !failures.isEmpty {
+                sharedNoteImportError = failures.joined(separator: "\n")
+                Log.ui.error("ShareImport.failed count=\(failures.count)")
             }
         }
     }

@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 nonisolated struct FilePreviewSource: Sendable {
     nonisolated enum Origin: Sendable {
         case profile(ProfileScope)
+        case draft
         case device(grantID: String, path: [String], profileID: UUID)
         case unavailable
     }
@@ -18,12 +19,20 @@ nonisolated struct FilePreviewSource: Sendable {
         return scope
     }
 
+    var canShare: Bool {
+        if case .draft = origin { return true }
+        return scope != nil
+    }
+
     init(file: FileItem, scope: ProfileScope? = StorageRoot.currentScope) {
         self.file = file
         let root = scope?.root.standardizedFileURL.pathComponents
         let path = file.fileURL.standardizedFileURL.pathComponents
+        let draftRoot = FileImporter.stagingDirectory.standardizedFileURL.pathComponents
         let reference = file.fileName.split(separator: "/").map(String.init)
-        if let scope, let root, path.count > root.count, path.starts(with: root) {
+        if path.count > draftRoot.count, path.starts(with: draftRoot) {
+            origin = .draft
+        } else if let scope, let root, path.count > root.count, path.starts(with: root) {
             origin = .profile(scope)
         } else if let profileID = scope?.profileID, reference.count > 2, reference[0] == "files" {
             origin = .device(grantID: reference[1], path: Array(reference.dropFirst(2)), profileID: profileID)
@@ -38,6 +47,12 @@ nonisolated struct FilePreviewSource: Sendable {
         switch origin {
         case .profile(let scope) where scope.profileID != nil:
             data = try await ProfileRepository.shared.readFileData(named: file.fileName, in: scope)
+        case .draft:
+            data = try await Task.detached(priority: .userInitiated) {
+                let size = try file.fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+                guard size <= FileLimits.fileBytes else { throw FileError.fileTooLarge(bytes: size, limit: FileLimits.fileBytes) }
+                return try Data(contentsOf: file.fileURL)
+            }.value
         case .device(let grantID, let path, let profileID):
             data = try await DeviceFolderStore.shared.coordinate(grantID: grantID, relativePath: path, profileId: profileID, mode: .read) { url in
                 let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
@@ -55,7 +70,7 @@ nonisolated struct FilePreviewSource: Sendable {
         switch origin {
         case .profile(let scope):
             return try await ProfileRepository.shared.readMarkdownFile(named: file.fileName, in: scope)
-        case .device:
+        case .device, .draft:
             guard file.isMarkdown else { throw FileError.unsupportedType(file.fileName) }
             let data = try await read()
             return MarkdownFileDocument(source: try Self.text(data), byteCount: data.count)
@@ -77,6 +92,14 @@ nonisolated struct FilePreviewSource: Sendable {
                 try data.write(to: url, options: .atomic)
             }
             return file
+        case .draft:
+            let data = Data(source.utf8)
+            guard data.count <= FileLimits.textBytes else { throw FileError.textTooLarge(bytes: data.count, limit: FileLimits.textBytes) }
+            try await Task.detached(priority: .userInitiated) {
+                guard try Self.text(Data(contentsOf: file.fileURL)) == previous else { throw FileError.changedSinceRead(file.displayName) }
+                try data.write(to: file.fileURL, options: .atomic)
+            }.value
+            return file
         case .unavailable:
             throw CocoaError(.fileWriteNoPermission)
         }
@@ -89,12 +112,19 @@ nonisolated struct FilePreviewSource: Sendable {
     }
 
     func snapshot() async throws -> FilePreviewSnapshot {
-        guard let scope, scope.profileID != nil else { throw CocoaError(.fileReadNoPermission) }
         try Task.checkCancellation()
         let snapshot = try await Task.detached(priority: .userInitiated) {
             try FilePreviewSnapshot(file: file)
         }.value
-        try await ProfileRepository.shared.copyFile(named: file.fileName, to: snapshot.url, in: scope)
+        switch origin {
+        case .profile(let scope) where scope.profileID != nil:
+            try await ProfileRepository.shared.copyFile(named: file.fileName, to: snapshot.url, in: scope)
+        case .draft:
+            let data = try await read()
+            try await Task.detached(priority: .userInitiated) { try data.write(to: snapshot.url, options: .atomic) }.value
+        case .profile, .device, .unavailable:
+            throw CocoaError(.fileReadNoPermission)
+        }
         try Task.checkCancellation()
         try await Task.detached(priority: .userInitiated) {
             try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: snapshot.url.path)
@@ -164,6 +194,6 @@ struct FileShareButton<Label: View>: View {
         ShareLink(item: FileShareContent(source: source), preview: SharePreview(Text(source.file.userFacingName))) {
             label
         }
-        .disabled(source.scope == nil)
+        .disabled(!source.canShare)
     }
 }

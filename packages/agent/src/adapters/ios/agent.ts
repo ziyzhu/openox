@@ -64,7 +64,7 @@ type Command = CommandScope & (
   | { action: "fileBatch"; writes?: { path: string; text: string }[]; removes?: string[] }
   | { action: "fileSeed" | "fileWrite"; path: string; text: string }
   | { action: "fileWriteBinary"; path: string; base64: string }
-  | { action: "fileRead" | "fileReference" | "fileReadBinary" | "fileRemove"; path: string }
+  | { action: "fileRead" | "fileReference" | "fileReadBinary" | "fileRemove" | "fileDiscard"; path: string }
   | { action: "fileStat"; path: string; byPath?: boolean }
   | { action: "fileAdopt"; file: FileRecord & { binary: boolean; saved: boolean } }
   | { action: "fileSaved"; path: string; saved: boolean }
@@ -299,6 +299,9 @@ export class IOSAgentAdapter {
       case "fileSaved": await this.fileSaved(args.path, args.saved); return {};
       case "fileMove":
         await session.files.move(args.path, args.prefix); return this.fileReceipt(args.prefix);
+      case "fileDiscard":
+        await session.files.discard(args.path, session.conversations.id(required()));
+        return {};
       case "fileRemove":
         if (session.files.physical && !this.isDocument(args.path)) {
           const file = await session.files.record(args.path);

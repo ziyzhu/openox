@@ -223,13 +223,7 @@ private struct SharedImportPayload {
     }
 
     var status: String {
-        if files.count == 1 {
-            return String(localized: "It’ll appear in Files the next time you open Ox.")
-        }
-        return String.localizedStringWithFormat(
-            String(localized: "%lld items will appear in Files the next time you open Ox."),
-            files.count
-        )
+        String(localized: "Open Ox to review a new conversation draft. Files are saved when you send.")
     }
 }
 

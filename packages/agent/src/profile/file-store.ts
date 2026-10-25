@@ -448,6 +448,13 @@ export class ProfileFileStore {
       ]);
     }, undefined, [path]);
   }
+  discard(reference: string, conversation: number) {
+    return this.serialize(async () => {
+      const state = await this.state(), file = this.resolve(state, reference);
+      if (!file || file.owner !== conversation || conversationRecordPath(file.path)) throw new FileError("permission_denied", "Cannot discard this conversation upload", reference);
+      await this.removeLocked(state, file.path);
+    }, undefined, [reference], true);
+  }
   private async removeLocked(state: Awaited<ReturnType<ProfileFileStore["state"]>>, path: string, conversation?: number) {
     const removed = Object.values(state.files).filter(file => beneath(file.path, path) || (conversation !== undefined && file.owner === conversation));
     const ids = new Set(removed.map(file => file.id));

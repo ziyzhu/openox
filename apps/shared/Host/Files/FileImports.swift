@@ -2,6 +2,33 @@ import Foundation
 import UniformTypeIdentifiers
 
 extension Conversation {
+    func importAttachments(_ staged: [FileImporter.StagedFile]) async throws -> [FileItem] {
+        try await durablePreparation?.value
+        guard let route = durableRoute else { throw RuntimeError.bridge("Conversation files are unavailable") }
+        var published: [FileItem] = []
+        do {
+            for source in staged {
+                let draft = try await Task.detached(priority: .userInitiated) {
+                    FileImporter.Draft(data: try Data(contentsOf: source.file.fileURL), fileName: source.file.displayName)
+                }.value
+                published.append(try await importAttachment(draft))
+            }
+            Log.session.info("Conversation.importAttachments conversation=\(id) count=\(published.count) temporary=\(isTemporary)")
+            return published
+        } catch {
+            for file in published {
+                do {
+                    _ = try await route.session.runtime.command(.object([
+                        "action": .string("fileDiscard"), "reference": route.runtimeReference, "path": .string(file.fileName),
+                    ]))
+                } catch {
+                    Log.session.error("Conversation.importAttachments rollback conversation=\(id) file=\(file.fileName) error=\(error.localizedDescription)")
+                }
+            }
+            throw error
+        }
+    }
+
     func importAttachment(data: Data, suggestedName: String) async throws -> FileItem {
         let draft = try await Task.detached(priority: .userInitiated) {
             try FileImporter.dataDraft(data, suggestedName: suggestedName)
@@ -49,6 +76,47 @@ extension Conversation {
 }
 
 nonisolated public enum FileImporter {
+    static let stagingDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("DraftFiles", isDirectory: true)
+
+    final class StagedFile: Sendable, Equatable {
+        let file: FileItem
+
+        fileprivate init(file: FileItem) { self.file = file }
+
+        static func == (lhs: StagedFile, rhs: StagedFile) -> Bool { lhs === rhs }
+
+        func discard() { Self.discard(directory: file.fileURL.deletingLastPathComponent()) }
+
+        deinit { Self.discard(directory: file.fileURL.deletingLastPathComponent()) }
+
+        private static func discard(directory: URL) {
+            Task.detached(priority: .utility) {
+                do {
+                    try FileManager.default.removeItem(at: directory)
+                    Log.session.info("FileImporter.stage removed draft=\(directory.lastPathComponent)")
+                } catch let error as CocoaError where error.code == .fileNoSuchFile {
+                    return
+                } catch {
+                    Log.session.error("FileImporter.stage cleanup draft=\(directory.lastPathComponent) error=\(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    static func stage(_ draft: Draft) throws -> StagedFile {
+        let id = UUID().uuidString
+        let directory = stagingDirectory.appendingPathComponent(id, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        do {
+            try draft.data.write(to: directory.appendingPathComponent(draft.fileName), options: .atomic)
+            Log.session.info("FileImporter.stage ready draft=\(id) bytes=\(draft.data.count)")
+            return StagedFile(file: FileItem(fileName: "draft-" + id, directory: directory, relativePath: draft.fileName))
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+            throw error
+        }
+    }
+
     struct Draft: Sendable {
         let data: Data
         let fileName: String

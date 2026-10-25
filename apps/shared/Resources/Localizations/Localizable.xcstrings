@@ -3092,13 +3092,13 @@
         }
       }
     },
-    "Couldn't import shared note" : {
+    "Couldn't attach shared files" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法导入共享笔记"
+            "value" : "无法附加共享文件"
           }
         }
       }

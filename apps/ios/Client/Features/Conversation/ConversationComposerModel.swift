@@ -37,14 +37,32 @@ final class ConversationComposerModel {
 
         case importing(PendingAttachment)
         case ready(FileItem)
+        case staged(FileImporter.StagedFile)
+
+        var file: FileItem? {
+            switch self {
+            case .importing: nil
+            case .ready(let file): file
+            case .staged(let source): source.file
+            }
+        }
 
         var id: ID {
             switch self {
             case .importing(let pending): .operation(pending.id)
             case .ready(let file): .file(file.id)
+            case .staged(let source): .file(source.file.id)
             }
         }
     }
+
+    private enum Submission {
+        case editing
+        case publishing
+    }
+
+    private var submission = Submission.editing
+    var isPublishing: Bool { submission == .publishing }
 
     var attributedDraft = AttributedString()
     private(set) var draftAttachments: [DraftAttachment] = []
@@ -72,12 +90,12 @@ final class ConversationComposerModel {
     }
 
     var canSubmit: Bool {
-        !draftAttachments.contains { if case .ready = $0 { false } else { true } }
+        !isImporting
             && (!draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !draftAttachments.isEmpty)
     }
 
     var isImporting: Bool {
-        draftAttachments.contains { if case .importing = $0 { true } else { false } }
+        isPublishing || draftAttachments.contains { if case .importing = $0 { true } else { false } }
     }
 
     var suppressesStopControl: Bool {
@@ -174,18 +192,43 @@ final class ConversationComposerModel {
         }
     }
 
-    func takeMessage() -> Message? {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    func takeMessage(in conversation: Conversation) async throws -> Message? {
         guard canSubmit else { return nil }
-        let attachments = draftAttachments.compactMap { item -> FileItem? in
-            if case .ready(let file) = item { file } else { nil }
+        submission = .publishing
+        defer { submission = .editing }
+        let staged = draftAttachments.compactMap { item -> FileImporter.StagedFile? in
+            if case .staged(let file) = item { file } else { nil }
         }
+        let published = staged.isEmpty ? [] : try await conversation.importAttachments(staged)
+        var remaining = published.makeIterator()
+        let attachments = draftAttachments.compactMap { item -> FileItem? in
+            switch item {
+            case .importing: nil
+            case .ready(let file): file
+            case .staged: remaining.next()
+            }
+        }
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         let message = Message(id: draftID, text: text, attachments: attachments)
+        clearDraft()
+        return message
+    }
+
+    func discardDraft() {
+        guard !isPublishing else { return }
+        clearDraft()
+    }
+
+    private func clearDraft() {
+        for task in importTasks.values { task.cancel() }
+        importTasks.removeAll()
+        for item in draftAttachments {
+            if case .staged(let source) = item { source.discard() }
+        }
         draft = ""
         draftAttachments = []
         attachmentMenuPresented = false
         draftID = UUID()
-        return message
     }
 
     func setAttachmentMenuPresented(_ presented: Bool) {
@@ -202,9 +245,13 @@ final class ConversationComposerModel {
         return true
     }
 
+    func attach(_ files: [FileImporter.StagedFile]) {
+        draftAttachments.append(contentsOf: files.map(DraftAttachment.staged))
+    }
+
     func importAttachment(
         named displayName: String,
-        operation: @escaping @MainActor () async throws -> FileItem,
+        operation: @escaping @MainActor () async throws -> FileImporter.StagedFile,
         onFailure: @escaping @MainActor (Error) -> Void
     ) {
         let pending = PendingAttachment(id: UUID(), displayName: displayName)
@@ -214,12 +261,12 @@ final class ConversationComposerModel {
         importTasks[pending.id] = Task { [weak self] in
             do {
                 let file = try await operation()
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else { file.discard(); return }
                 self?.finishImport(pending.id, draftID: importingDraftID, file: file)
             } catch is CancellationError {
                 self?.cancelImport(pending.id, draftID: importingDraftID)
             } catch {
-                guard let self else { return }
+                guard !Task.isCancelled, let self else { return }
                 self.failImport(pending.id, draftID: importingDraftID, error: error)
                 onFailure(error)
             }
@@ -227,12 +274,14 @@ final class ConversationComposerModel {
     }
 
     func removeDraftAttachment(_ item: DraftAttachment) {
+        guard !isPublishing else { return }
+        if case .staged(let source) = item { source.discard() }
         draftAttachments.removeAll { $0.id == item.id }
         if case .operation(let id) = item.id { importTasks.removeValue(forKey: id)?.cancel() }
         Log.ui.info("ConversationComposer.attachment remove draft=\(draftID) item=\(item.id)")
     }
 
-    private func finishImport(_ id: UUID, draftID importingDraftID: UUID, file: FileItem) {
+    private func finishImport(_ id: UUID, draftID importingDraftID: UUID, file: FileImporter.StagedFile) {
         importTasks.removeValue(forKey: id)
         guard draftID == importingDraftID else {
             draftAttachments.removeAll { $0.id == .operation(id) }
@@ -240,8 +289,8 @@ final class ConversationComposerModel {
             return
         }
         guard let index = draftAttachments.firstIndex(where: { $0.id == .operation(id) }) else { return }
-        draftAttachments[index] = .ready(file)
-        Log.ui.info("ConversationComposer.import ready draft=\(draftID) import=\(id) file=\(file.id)")
+        draftAttachments[index] = .staged(file)
+        Log.ui.info("ConversationComposer.import ready draft=\(draftID) import=\(id) file=\(file.file.id)")
     }
 
     private func cancelImport(_ id: UUID, draftID importingDraftID: UUID) {

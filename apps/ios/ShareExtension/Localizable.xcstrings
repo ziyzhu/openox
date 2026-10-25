@@ -12,17 +12,6 @@
         }
       }
     },
-    "%lld items will appear in Files the next time you open Ox." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 个项目将在下次打开 Ox 时出现在文件中。"
-          }
-        }
-      }
-    },
     "Add to Ox" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -67,13 +56,13 @@
         }
       }
     },
-    "It’ll appear in Files the next time you open Ox." : {
+    "Open Ox to review a new conversation draft. Files are saved when you send." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "下次打开 Ox 时，它会出现在文件中。"
+            "value" : "打开 Ox 查看新对话草稿。发送后才会保存文件。"
           }
         }
       }

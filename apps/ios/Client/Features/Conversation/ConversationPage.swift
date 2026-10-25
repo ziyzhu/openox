@@ -36,6 +36,7 @@ struct ConversationPage: View {
     }
 
     let conversation: Conversation
+    let isCurrentConversation: () -> Bool
     let composerFocusRequestID: UUID?
     let onComposerFocusRequestHandled: (UUID) -> Void
     let onShowSidebar: () -> Void
@@ -465,6 +466,7 @@ struct ConversationPage: View {
         }
         .onDisappear {
             speechInput.cancel(reason: "pageDisappear")
+            if !isCurrentConversation() { composer.discardDraft() }
             ClientAutomation.setEditDraft = nil
         }
         .task(id: conversation.serviceBootstrapRevision) {
@@ -1631,8 +1633,19 @@ struct ConversationPage: View {
             commitEdit(blockID: editedBlockID)
             return
         }
-        guard let message = composer.takeMessage() else { return }
-        enqueue(message)
+        submitDraft()
+    }
+
+    private func submitDraft(skillInvocation: UserSkillInvocation? = nil) {
+        Task {
+            do {
+                guard let message = try await composer.takeMessage(in: conversation) else { return }
+                enqueue(message, skillInvocation: skillInvocation)
+            } catch {
+                Log.ui.error("ConversationPage.send failed conversation=\(conversation.id) error=\(error.localizedDescription)")
+                showAttachmentError(error)
+            }
+        }
     }
 
     private func beginSpeech(accessible: Bool) {
@@ -1686,8 +1699,7 @@ struct ConversationPage: View {
         let invocation = UserSkillInvocation(skill: skill, argument: argument)
         composer.draft = invocation.expandedIntent
         composer.delayStopControl()
-        guard let message = composer.takeMessage() else { return }
-        enqueue(message, skillInvocation: invocation)
+        submitDraft(skillInvocation: invocation)
     }
 
     private func beginEditing(_ block: Block) {
@@ -1800,8 +1812,9 @@ struct ConversationPage: View {
 
     private func importAttachment(named name: String, source: String, operation: @escaping @Sendable () async throws -> FileImporter.Draft) {
         composer.importAttachment(named: name, operation: {
-            let draft = try await Task.detached(priority: .userInitiated) { try await operation() }.value
-            return try await conversation.importAttachment(draft)
+            try await Task.detached(priority: .userInitiated) {
+                try FileImporter.stage(try await operation())
+            }.value
         }) { error in
             Log.ui.error("ConversationPage.attach \(source) error=\(error.localizedDescription)")
             showAttachmentError(error)
