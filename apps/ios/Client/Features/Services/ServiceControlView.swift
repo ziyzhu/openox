@@ -21,26 +21,36 @@ struct InlineBotControlView: View {
     private var name: String { suppliedName ?? service?.title ?? domain }
 
     var body: some View {
-        LivePageCard(
-            service: service,
-            fallbackSystemImage: "checkmark.shield.fill",
-            title: name,
-            subtitle: String(localized: "Complete the site's human verification to continue"),
-            mount: nil,
-            inlinePageAnchorID: session.flatMap { session in
-                pageMount.isInline(page: session.page, ownerID: session.id) && !isPresentedInSheet
-                    ? session.id
-                    : nil
-            },
-            isPresented: isPresentedInSheet,
-            placeholder: .progress(String(localized: "Complete the site's human verification to continue")),
-            activate: nil,
-            expand: session.map { session in { expand(session) } },
-            cancel: session.map { session in { cancel(session) } },
-            accessibilityIdentifier: A11yID.ConversationControls.Attach.botControl(domain),
-            expandAccessibilityIdentifier: A11yID.ConversationControls.Attach.botControlExpand(domain),
-            cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.botControlCancel(domain)
-        )
+        VStack(spacing: Theme.Spacing.sm) {
+            LivePageCard(
+                service: service,
+                fallbackSystemImage: "checkmark.shield.fill",
+                title: name,
+                subtitle: String(localized: "Complete the site's human verification to continue"),
+                mount: nil,
+                inlinePageAnchorID: session.flatMap { session in
+                    pageMount.isInline(page: session.page, ownerID: session.id) && !isPresentedInSheet
+                        ? session.id
+                        : nil
+                },
+                isPresented: isPresentedInSheet,
+                placeholder: .progress(String(localized: "Complete the site's human verification to continue")),
+                activate: nil,
+                expand: session.map { session in { expand(session) } },
+                cancel: nil,
+                accessibilityIdentifier: A11yID.ConversationControls.Attach.botControl(domain),
+                expandAccessibilityIdentifier: A11yID.ConversationControls.Attach.botControlExpand(domain),
+                cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.botControlCancel(domain)
+            )
+            if let session, !isPresentedInSheet {
+                ServiceHandoffActions(
+                    cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.botControlCancel(domain),
+                    doneAccessibilityIdentifier: A11yID.ConversationControls.Attach.botControlDone(domain),
+                    cancel: { cancel(session) },
+                    done: session.verifyCompletion
+                )
+            }
+        }
     }
 }
 
