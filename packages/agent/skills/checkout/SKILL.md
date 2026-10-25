@@ -15,11 +15,11 @@ Prepare and price the transaction through service actions. Resolve items, quanti
 
 ## Add missing support
 
-If preparation actions or the `payment` contract are missing or broken, read `skills/evolve/SKILL.md` and `skills/evolve/references/web-service.md`. Implement and verify the missing support on the fly within the original request, without a proposal checkpoint. Use Browser to observe actual checkout behavior, inspect existing Local source, and create or copy an editable service through the normal evolve workflow. Preserve unrelated Local changes and existing runtime gates.
+If preparation actions or the `payment` contract are missing or broken, read `skills/evolve/SKILL.md` and `skills/evolve/references/web-service.md`. Implement and verify the missing support on the fly within the original request, without a proposal checkpoint. Use Browser to observe actual checkout behavior and implement or repair missing service actions, not to bypass missing service support. Inspect existing Local source and create or copy an editable service through the normal evolve workflow. Resume transaction preparation through verified service actions. Preserve unrelated Local changes and existing runtime gates.
 
 Use the standard payment pair: `getPaymentUrl(args)` returns `{url}` for the prepared transaction; `getPaymentState(args)` returns `status: "none" | "pending" | "completed"` and nullable `reference`, with a nonempty reference exactly when completed. Correlate the probe to this cart, booking, or order; use an optional `since` input when needed to exclude earlier purchases. A checkout page, successful navigation, HTTP success, or unrelated past order is not payment confirmation. Neither action may submit payment.
 
-Validate the complete service, attach it to reload, inspect its payment contract, and verify the URL and non-completed state before handoff. Never place an order or make a charge to test the implementation. Continue to the original checkout after verification. If reliable payment support cannot be implemented, continue useful authorized browser preparation and report the concrete blocker; do not bypass the user payment handoff or claim verified completion.
+Validate the complete service, attach it to reload, inspect its payment contract, and verify the URL and non-completed state before handoff. Never place an order or make a charge to test the implementation. Continue to the original checkout after verification. If reliable preparation or payment support cannot be implemented, report the concrete blocker and stop before further transaction-changing steps. Do not fall back to browser-only execution, bypass the user payment handoff, or claim verified completion.
 
 ## Review and pay
 
