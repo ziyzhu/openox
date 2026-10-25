@@ -186,7 +186,7 @@ struct SettingsSheet: View {
 
                             Link(destination: OxLinks.discord) {
                                 SettingsDisclosureRow(
-                                    title: "Discord",
+                                    title: "Support / Community",
                                     value: Text("Join"),
                                     indicator: "arrow.up.right"
                                 )
