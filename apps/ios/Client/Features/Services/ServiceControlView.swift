@@ -80,15 +80,70 @@ struct InlineServiceAuthView: View {
                 placeholder: .progress(String(localized: "Sign in to continue")),
                 activate: nil,
                 expand: session.map { session in { expand(session) } },
-                cancel: cancel,
+                cancel: nil,
                 accessibilityIdentifier: A11yID.ConversationControls.Attach.signIn(domain),
                 expandAccessibilityIdentifier: A11yID.ConversationControls.Attach.signIn(domain) + ".expand",
                 cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.signInDismiss(domain)
             )
-            if let session, !isPresentedInSheet {
-                ServiceSignInAcknowledgmentButton(
-                    accessibilityIdentifier: A11yID.ConversationControls.Attach.signInAcknowledge(domain),
-                    action: session.acknowledgeSignIn
+            if !isPresentedInSheet {
+                ServiceHandoffActions(
+                    cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.signInDismiss(domain),
+                    doneAccessibilityIdentifier: A11yID.ConversationControls.Attach.signInAcknowledge(domain),
+                    cancel: cancel,
+                    done: session.map { session in { session.acknowledgeSignIn() } }
+                )
+            }
+        }
+    }
+}
+
+struct InlinePaymentView: View {
+    let control: ServiceControl
+    let session: ServiceHandoffSession?
+    let pageMount: WebPageMountCoordinator
+    let isPresentedInSheet: Bool
+    let expand: (ServiceHandoffSession) -> Void
+    let cancel: () -> Void
+
+    @Environment(ServiceManager.self) private var serviceManager
+
+    private var domain: String { control.domain }
+    private var service: Service? { serviceManager.service(domain: domain) }
+    private var name: String {
+        if case .payment(_, let serviceName, _) = control {
+            return serviceName ?? service?.title ?? domain
+        }
+        return service?.title ?? domain
+    }
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.sm) {
+            LivePageCard(
+                service: service,
+                fallbackSystemImage: "creditcard.fill",
+                title: name,
+                subtitle: String(localized: "Review and complete the payment on the service"),
+                mount: nil,
+                inlinePageAnchorID: session.flatMap { session in
+                    pageMount.isInline(page: session.page, ownerID: session.id) && !isPresentedInSheet
+                        ? session.id
+                        : nil
+                },
+                isPresented: isPresentedInSheet,
+                placeholder: .progress(String(localized: "Loading…")),
+                activate: nil,
+                expand: session.map { session in { expand(session) } },
+                cancel: nil,
+                accessibilityIdentifier: A11yID.ConversationControls.Attach.payment(domain),
+                expandAccessibilityIdentifier: A11yID.ConversationControls.Attach.payment(domain) + ".expand",
+                cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.paymentCancel(domain)
+            )
+            if !isPresentedInSheet {
+                ServiceHandoffActions(
+                    cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.paymentCancel(domain),
+                    doneAccessibilityIdentifier: A11yID.ConversationControls.Attach.paymentDone(domain),
+                    cancel: cancel,
+                    done: session.map { session in { session.verifyCompletion() } }
                 )
             }
         }

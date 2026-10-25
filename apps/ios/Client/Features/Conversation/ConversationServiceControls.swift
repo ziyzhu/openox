@@ -4,25 +4,25 @@ import Observation
 
 @MainActor
 @Observable
-final class ConversationBotControlPresenter: ServiceHandoffPresenting {
+final class ConversationServiceHandoffPresenter: ServiceHandoffPresenting {
     private(set) var session: ServiceHandoffSession?
     let pageMount = WebPageMountCoordinator()
 
     func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
         guard self.session == nil else {
-            Log.ui.warning("ConversationBotControlPresenter rejected domain=\(session.serviceDomain) reason=occupied")
+            Log.ui.warning("ConversationServiceHandoffPresenter rejected domain=\(session.serviceDomain) reason=occupied")
             session.presentationFailed()
             return .failed
         }
         self.session = session
         pageMount.reconcile(page: session.page, ownerIDs: [session.id])
-        Log.ui.info("ConversationBotControlPresenter present domain=\(session.serviceDomain)")
+        Log.ui.info("ConversationServiceHandoffPresenter present domain=\(session.serviceDomain)")
         let outcome = await session.run()
         if self.session === session {
             pageMount.clear()
             self.session = nil
         }
-        Log.ui.info("ConversationBotControlPresenter finish domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
+        Log.ui.info("ConversationServiceHandoffPresenter finish domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
         return outcome
     }
 }
@@ -83,7 +83,8 @@ struct ConversationInlineServicePages: View {
     let browserPage: WebPage?
     let browserPageMount: WebPageMountCoordinator
     let serviceAuthPresenter: ConversationServiceAuthPresenter
-    let botControlPresenter: ConversationBotControlPresenter
+    let botControlPresenter: ConversationServiceHandoffPresenter
+    let paymentPresenter: ConversationServiceHandoffPresenter
 
     var body: some View {
         if let page = browserPage,
@@ -110,6 +111,14 @@ struct ConversationInlineServicePages: View {
                 mount: WebPageMount(page: session.page, ownerID: ownerID, coordinator: botControlPresenter.pageMount)
             )
         }
+        if let session = paymentPresenter.session,
+           let ownerID = paymentPresenter.pageMount.inlineOwnerID(for: session.page),
+           let anchor = anchors[ownerID] {
+            InlineServicePageHost(
+                anchor: anchor,
+                mount: WebPageMount(page: session.page, ownerID: ownerID, coordinator: paymentPresenter.pageMount)
+            )
+        }
     }
 }
 
@@ -117,12 +126,15 @@ struct ConversationServiceControlBlock: View {
     let control: ServiceControl
     let interactionID: UUID?
     let conversation: Conversation
-    let botControlPresenter: ConversationBotControlPresenter
+    let botControlPresenter: ConversationServiceHandoffPresenter
     let serviceAuthPresenter: ConversationServiceAuthPresenter
+    let paymentPresenter: ConversationServiceHandoffPresenter
     let isBotControlPresentedInSheet: Bool
     let isServiceAuthPresentedInSheet: Bool
+    let isPaymentPresentedInSheet: Bool
     let expandBotControl: (ServiceHandoffSession) -> Void
     let expandServiceAuth: (ServiceAuthSession) -> Void
+    let expandPayment: (ServiceHandoffSession) -> Void
     let prepareServiceControl: (ServiceControl) -> Bool
 
     var body: some View {
@@ -146,6 +158,21 @@ struct ConversationServiceControlBlock: View {
                     if let session = serviceAuthPresenter.session {
                         session.cancel()
                     } else if let interactionID {
+                        conversation.resolveServiceControl(id: interactionID, result: nil)
+                    }
+                }
+            )
+        } else if case .payment = control, let interactionID {
+            InlinePaymentView(
+                control: control,
+                session: paymentPresenter.session,
+                pageMount: paymentPresenter.pageMount,
+                isPresentedInSheet: isPaymentPresentedInSheet,
+                expand: expandPayment,
+                cancel: {
+                    if let session = paymentPresenter.session {
+                        session.cancel()
+                    } else {
                         conversation.resolveServiceControl(id: interactionID, result: nil)
                     }
                 }

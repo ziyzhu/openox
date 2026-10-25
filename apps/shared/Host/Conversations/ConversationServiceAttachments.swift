@@ -239,12 +239,12 @@ final class ConversationServiceAttachments {
         return ok
     }
 
-    func completePayment(domain: String, args: JSONValue) async -> JSONValue? {
+    func completePayment(domain: String, args: JSONValue, using presenter: (any ServiceHandoffPresenting)? = nil) async -> JSONValue? {
         guard let service = service(domain: domain) else {
             Log.session.error("Conversation.completePayment no service domain=\(domain)")
             return nil
         }
-        let result = await service.completePayment(args: args, using: conversation.presentations.serviceHandoff)
+        let result = await service.completePayment(args: args, using: presenter ?? conversation.presentations.serviceHandoff)
         Log.session.info("Conversation.completePayment domain=\(domain) completed=\(result != nil)")
         return result
     }

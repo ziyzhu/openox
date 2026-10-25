@@ -95,6 +95,7 @@ struct ConversationPage: View {
         case conversationFiles
         case botControl(ServiceHandoffSession)
         case serviceAuth(ServiceAuthSession)
+        case payment(ServiceHandoffSession)
 
         var id: String {
             switch self {
@@ -107,6 +108,7 @@ struct ConversationPage: View {
             case .conversationFiles: "conversationFiles"
             case .botControl(let session): "botControl:\(session.id)"
             case .serviceAuth(let session): "serviceAuth:\(session.id)"
+            case .payment(let session): "payment:\(session.id)"
             }
         }
     }
@@ -135,11 +137,13 @@ struct ConversationPage: View {
 
     @State private var viewportLayout = ConversationViewportLayout()
     @State private var transcriptWindow = TranscriptWindow()
-    @State private var botControlPresenter = ConversationBotControlPresenter()
+    @State private var botControlPresenter = ConversationServiceHandoffPresenter()
     @State private var serviceAuthPresenter = ConversationServiceAuthPresenter()
+    @State private var paymentPresenter = ConversationServiceHandoffPresenter()
     @State private var browserPageMount = WebPageMountCoordinator()
     @State private var expandedBotControlSessionID: UUID?
     @State private var expandedServiceAuthSessionID: UUID?
+    @State private var expandedPaymentSessionID: UUID?
 
     private var browserPage: WebPage? {
         guard let service = serviceManager.inspectionService(domain: BrowserFunctionCatalog.publicNamespace),
@@ -189,7 +193,7 @@ struct ConversationPage: View {
         Binding(
             get: {
                 switch modalPresentation {
-                case .camera, .botControl, .serviceAuth: modalPresentation
+                case .camera, .botControl, .serviceAuth, .payment: modalPresentation
                 default: nil
                 }
             },
@@ -469,6 +473,7 @@ struct ConversationPage: View {
             if !isCurrentConversation() { composer.discardDraft() }
             ClientAutomation.setEditDraft = nil
         }
+        let serviceObservedTranscript = observedTranscript
         .task(id: conversation.serviceBootstrapRevision) {
             let updated = await conversation.syncToMonoRepository()
             guard !Task.isCancelled else { return }
@@ -485,6 +490,13 @@ struct ConversationPage: View {
         .task(id: botControlProbe?.id) {
             await resolveBotControl(botControlProbe)
         }
+        .task(id: conversation.pendingServiceControl?.id) {
+            await resolvePaymentControl(conversation.pendingServiceControl)
+        }
+        .onChange(of: paymentPresenter.session?.id) { _, sessionID in
+            guard sessionID == nil, case .payment = modalPresentation else { return }
+            modalPresentation = nil
+        }
         .onChange(of: botControlPresenter.session?.id) { _, sessionID in
             guard sessionID == nil, case .botControl = modalPresentation else { return }
             modalPresentation = nil
@@ -500,7 +512,7 @@ struct ConversationPage: View {
         )) {
             await updateDelayedActivity()
         }
-        return observedTranscript
+        return serviceObservedTranscript
         .toolbar(.hidden, for: .navigationBar)
         .sheet(item: sheetModal, onDismiss: sheetDidDismiss) { presented in
             Group {
@@ -529,7 +541,7 @@ struct ConversationPage: View {
                         Log.ui.info("ConversationPage.filePreview select conversation=\(conversation.id) filename=\(file.fileName)")
                     }
                     .presentationDetents([.medium, .large])
-                case .camera, .photos, .files, .attachment, .botControl, .serviceAuth:
+                case .camera, .photos, .files, .attachment, .botControl, .serviceAuth, .payment:
                     EmptyView()
                 }
             }
@@ -547,6 +559,8 @@ struct ConversationPage: View {
                 BotControlSheetView(session: session)
             case .serviceAuth(let session):
                 ServiceSessionSheetView(session: session, mode: .signIn, returnsInline: true)
+            case .payment(let session):
+                ServiceSessionSheetView(session: session, mode: .handoff, returnsInline: true)
             case .modelPicker, .serviceDetail, .photos, .files, .attachment, .conversationFiles:
                 EmptyView()
             }
@@ -652,6 +666,12 @@ struct ConversationPage: View {
             serviceAuthPresenter.pageMount.restore(page: session.page, ownerID: session.id)
         }
         expandedServiceAuthSessionID = nil
+        if let expandedPaymentSessionID,
+           let session = paymentPresenter.session,
+           session.id == expandedPaymentSessionID {
+            paymentPresenter.pageMount.restore(page: session.page, ownerID: session.id)
+        }
+        expandedPaymentSessionID = nil
         presentPendingFilePreview()
     }
 
@@ -893,10 +913,13 @@ struct ConversationPage: View {
                 conversation: conversation,
                 botControlPresenter: botControlPresenter,
                 serviceAuthPresenter: serviceAuthPresenter,
+                paymentPresenter: paymentPresenter,
                 isBotControlPresentedInSheet: expandedBotControlSessionID != nil,
                 isServiceAuthPresentedInSheet: expandedServiceAuthSessionID != nil,
+                isPaymentPresentedInSheet: expandedPaymentSessionID != nil,
                 expandBotControl: expandBotControl,
                 expandServiceAuth: expandServiceAuth,
+                expandPayment: expandPayment,
                 prepareServiceControl: prepareServiceControl
             )
                 .padding(.horizontal, 4)
@@ -921,6 +944,26 @@ struct ConversationPage: View {
             expandedServiceAuthSessionID = session.id
             modalPresentation = .serviceAuth(session)
         }
+    }
+
+    private func expandPayment(_ session: ServiceHandoffSession) {
+        Task { @MainActor in
+            guard await paymentPresenter.pageMount.detach(page: session.page, ownerID: session.id),
+                  paymentPresenter.session === session else { return }
+            expandedPaymentSessionID = session.id
+            modalPresentation = .payment(session)
+        }
+    }
+
+    private func resolvePaymentControl(_ pending: Conversation.PendingServiceControl?) async {
+        guard let pending,
+              case .payment(let domain, _, let args) = pending.control else { return }
+        guard prepareServiceControl(pending.control) else {
+            conversation.resolveServiceControl(id: pending.id, result: nil)
+            return
+        }
+        let result = await conversation.completePayment(domain: domain, args: args, using: paymentPresenter)
+        conversation.resolveServiceControl(id: pending.id, result: result)
     }
 
     private func resolveBotControl(_ pending: Conversation.PendingServiceControl?) async {
@@ -1104,7 +1147,8 @@ struct ConversationPage: View {
                     browserPage: browserPage,
                     browserPageMount: browserPageMount,
                     serviceAuthPresenter: serviceAuthPresenter,
-                    botControlPresenter: botControlPresenter
+                    botControlPresenter: botControlPresenter,
+                    paymentPresenter: paymentPresenter
                 )
             }
             .contentMargins(.bottom, dockClearance, for: .scrollContent)

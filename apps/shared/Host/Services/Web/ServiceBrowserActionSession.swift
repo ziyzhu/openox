@@ -50,6 +50,9 @@ final class ServiceBrowserActionSession {
     private var captureIncludesBodies = false
     private var captureDroppedCount = 0
     private var captureEvictedCount = 0
+    private var userInteraction: (id: UUID, continuation: CheckedContinuation<Void, Error>)?
+
+    var isWaitingForUserInteraction: Bool { userInteraction != nil }
 
     init(id: UUID, service: Service) {
         self.id = id
@@ -394,7 +397,38 @@ final class ServiceBrowserActionSession {
         }
     }
 
+    func waitForUserInteraction() async throws {
+        guard userInteraction == nil else {
+            throw RuntimeError.bridge("Browser is already waiting for user interaction.")
+        }
+        let interactionID = UUID()
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            try await withCheckedThrowingContinuation { continuation in
+                userInteraction = (interactionID, continuation)
+                Log.webView.info("Service.browserSession event=interaction-wait owner=\(id)")
+            }
+        } onCancel: {
+            Task { @MainActor in
+                guard self.userInteraction?.id == interactionID else { return }
+                self.finishUserInteraction(completed: false)
+            }
+        }
+    }
+
+    func finishUserInteraction(completed: Bool) {
+        guard let interaction = userInteraction else { return }
+        userInteraction = nil
+        Log.webView.info("Service.browserSession event=interaction-finish owner=\(id) completed=\(completed)")
+        if completed {
+            interaction.continuation.resume()
+        } else {
+            interaction.continuation.resume(throwing: CancellationError())
+        }
+    }
+
     func close() {
+        finishUserInteraction(completed: false)
         opening?.task.cancel()
         opening = nil
         loadedBaseURL = nil

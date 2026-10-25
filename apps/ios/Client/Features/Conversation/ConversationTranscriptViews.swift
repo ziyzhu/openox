@@ -160,22 +160,17 @@ private struct ServiceInspectorRow: View {
     }
 
     var body: some View {
-        LivePageCard(
-            service: service,
-            fallbackSystemImage: "safari",
-            title: link.serviceName,
-            subtitle: subtitle,
-            mount: nil,
-            inlinePageAnchorID: inlinePage == nil ? nil : rowID,
-            isPresented: false,
-            placeholder: placeholder,
-            activate: activatePage,
-            expand: expandPageAction,
-            cancel: nil,
-            accessibilityIdentifier: A11yID.ConversationControls.Message.serviceInspector(link.domain),
-            expandAccessibilityIdentifier: A11yID.ServiceInspector.open,
-            cancelAccessibilityIdentifier: ""
-        )
+        VStack(spacing: Theme.Spacing.sm) {
+            browserCard
+            if let browserSession, browserSession.isWaitingForUserInteraction, !isPresented, isInline {
+                ServiceHandoffActions(
+                    cancelAccessibilityIdentifier: "conversation.browser.interaction.\(rowID).cancel",
+                    doneAccessibilityIdentifier: "conversation.browser.interaction.\(rowID).done",
+                    cancel: { browserSession.finishUserInteraction(completed: false) },
+                    done: { browserSession.finishUserInteraction(completed: true) }
+                )
+            }
+        }
         .fullScreenCover(isPresented: $isPresented, onDismiss: {
             if let page { pageMount.restore(page: page, ownerID: rowID) }
         }) {
@@ -191,6 +186,25 @@ private struct ServiceInspectorRow: View {
         .onChange(of: isInline) { _, _ in
             logInlineState(reason: "placement")
         }
+    }
+
+    private var browserCard: some View {
+        LivePageCard(
+            service: service,
+            fallbackSystemImage: "safari",
+            title: link.serviceName,
+            subtitle: subtitle,
+            mount: nil,
+            inlinePageAnchorID: inlinePage == nil ? nil : rowID,
+            isPresented: false,
+            placeholder: placeholder,
+            activate: activatePage,
+            expand: expandPageAction,
+            cancel: nil,
+            accessibilityIdentifier: A11yID.ConversationControls.Message.serviceInspector(link.domain),
+            expandAccessibilityIdentifier: A11yID.ServiceInspector.open + ".\(rowID)",
+            cancelAccessibilityIdentifier: ""
+        )
     }
 
     private func expandPage() {

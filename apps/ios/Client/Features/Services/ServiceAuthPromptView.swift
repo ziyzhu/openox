@@ -61,17 +61,22 @@ struct ServiceSignInButton: View {
     }
 }
 
-struct ServiceSignInAcknowledgmentButton: View {
-    let accessibilityIdentifier: String
-    let action: () -> Void
+struct ServiceHandoffActions: View {
+    let cancelAccessibilityIdentifier: String
+    let doneAccessibilityIdentifier: String
+    let cancel: () -> Void
+    let done: (() -> Void)?
 
     var body: some View {
-        Button("I’ve signed in", action: action)
-            .font(Theme.Fonts.labelMd)
-            .foregroundStyle(Theme.Colors.onPrimary)
-            .frame(maxWidth: .infinity, minHeight: Theme.Size.minimumTouchTarget)
-            .background(Theme.Colors.primary, in: Capsule())
-            .buttonStyle(.plain)
-            .accessibilityIdentifier(accessibilityIdentifier)
+        HStack(spacing: Theme.Spacing.sm) {
+            Spacer()
+            RequestPillButton(title: String(localized: "Cancel"), isPrimary: false, action: cancel)
+                .accessibilityIdentifier(cancelAccessibilityIdentifier)
+            RequestPillButton(title: String(localized: "Done"), isPrimary: true) {
+                done?()
+            }
+            .disabled(done == nil)
+            .accessibilityIdentifier(doneAccessibilityIdentifier)
+        }
     }
 }

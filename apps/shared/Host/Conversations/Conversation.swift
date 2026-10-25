@@ -1443,8 +1443,8 @@ final class Conversation: Identifiable {
         await serviceAttachments.completeBotControl(domain: domain, args: args, resumeAgent: resumeAgent, using: presenter)
     }
 
-    func completePayment(domain: String, args: JSONValue) async -> JSONValue? {
-        await serviceAttachments.completePayment(domain: domain, args: args)
+    func completePayment(domain: String, args: JSONValue, using presenter: (any ServiceHandoffPresenting)? = nil) async -> JSONValue? {
+        await serviceAttachments.completePayment(domain: domain, args: args, using: presenter)
     }
 
     func cancelQueued(_ blockId: UUID) {

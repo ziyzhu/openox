@@ -180,6 +180,10 @@ final class ServiceHandoffSession {
         return terminalOutcome
     }
 
+    func verifyCompletion() {
+        requestProbe(reason: "user")
+    }
+
     func complete() {
         finish(.completed)
     }

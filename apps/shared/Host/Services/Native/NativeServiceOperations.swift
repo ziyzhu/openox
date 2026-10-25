@@ -47,12 +47,6 @@ final class NativeServiceOperations {
         else { showBrowser(service, id) }
     }
 
-    private func chooseUser(body: String, options: [String], purpose: String) async throws -> JSONValue? {
-        try Task.checkCancellation()
-        guard let answer = try await choose(Prompt(body: body, options: options, purpose: purpose)) else { throw CancellationError() }
-        return .string(answer)
-    }
-
     func invoke(
         service: Service,
         actionID: String,
@@ -159,14 +153,18 @@ final class NativeServiceOperations {
             let session = serviceManager.browserActionSessions.session(for: browser, ownerID: id)
             try await session.prepareForUserInteraction()
             try await presentBrowser(browser)
-            let done = L10n.string("Done")
-            let answer = try await chooseUser(
-                body: fields["instructions"]?.stringValue
-                    ?? L10n.string("Complete the requested step in Browser, then confirm when finished."),
-                options: [done, L10n.string("Cancel")],
-                purpose: purpose ?? L10n.string("Wait for browser interaction")
-            )?.stringValue
-            guard answer == done else { throw RuntimeError.bridge("ox.web.browser.waitForUserInteraction: the user cancelled.") }
+            if presentations.browser != nil {
+                let done = L10n.string("Done")
+                let answer = try await choose(Prompt(
+                    body: fields["instructions"]?.stringValue
+                        ?? L10n.string("Complete the requested step in Browser, then confirm when finished."),
+                    options: [done, L10n.string("Cancel")],
+                    purpose: purpose ?? L10n.string("Wait for browser interaction")
+                ))
+                guard answer == done else { throw CancellationError() }
+            } else {
+                try await session.waitForUserInteraction()
+            }
             return .object(["completed": .bool(true)])
         case ("ios:browser", "injectScript"):
             guard let source = fields["script"]?.stringValue,
