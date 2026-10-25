@@ -748,37 +748,37 @@ struct ResponseFooterBlockView: View, Equatable {
 
     var body: some View {
         HStack(spacing: 1) {
-            if !text.isEmpty {
-                iconButton(
-                    systemName: controls.isCopied ? "checkmark" : "doc.on.doc",
-                    label: A11yLabel.copyMessage,
-                    id: actionIdentifier(A11yID.ConversationControls.Message.copy),
-                    disabled: controls.isCopied
-                ) {
-                    controls.onCopy(text)
-                }
-                ShareLink(item: text) {
-                    controlIcon(systemName: "square.and.arrow.up")
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(A11yLabel.shareMessage)
-                .accessibilityIdentifier(actionIdentifier(A11yID.ConversationControls.Message.share))
+            iconButton(
+                systemName: controls.isCopied ? "checkmark" : "doc.on.doc",
+                label: A11yLabel.copyMessage,
+                id: actionIdentifier(A11yID.ConversationControls.Message.copy),
+                disabled: text.isEmpty || controls.isCopied
+            ) {
+                controls.onCopy(text)
             }
-            if controls.canMutate {
-                iconButton(
-                    systemName: "arrow.branch",
-                    label: A11yLabel.branchMessage,
-                    id: actionIdentifier(A11yID.ConversationControls.Message.branch)
-                ) {
-                    controls.onBranch()
-                }
-                iconButton(
-                    systemName: "arrow.clockwise",
-                    label: A11yLabel.retryMessage,
-                    id: actionIdentifier(A11yID.ConversationControls.Message.retry)
-                ) {
-                    controls.onRetry()
-                }
+            ShareLink(item: text) {
+                controlIcon(systemName: "square.and.arrow.up")
+            }
+            .buttonStyle(.plain)
+            .disabled(text.isEmpty)
+            .opacity(text.isEmpty ? 0.4 : 1)
+            .accessibilityLabel(A11yLabel.shareMessage)
+            .accessibilityIdentifier(actionIdentifier(A11yID.ConversationControls.Message.share))
+            iconButton(
+                systemName: "arrow.branch",
+                label: A11yLabel.branchMessage,
+                id: actionIdentifier(A11yID.ConversationControls.Message.branch),
+                disabled: !controls.canMutate
+            ) {
+                controls.onBranch()
+            }
+            iconButton(
+                systemName: "arrow.clockwise",
+                label: A11yLabel.retryMessage,
+                id: actionIdentifier(A11yID.ConversationControls.Message.retry),
+                disabled: !controls.canMutate
+            ) {
+                controls.onRetry()
             }
         }
         .padding(.horizontal, 4)
@@ -804,6 +804,7 @@ struct ResponseFooterBlockView: View, Equatable {
         }
         .buttonStyle(.plain)
         .disabled(disabled)
+        .opacity(disabled ? 0.4 : 1)
         .accessibilityLabel(label)
         .accessibilityIdentifier(id)
     }
