@@ -17,7 +17,7 @@ Authentication configurations:
 
 OAuth requires an existing registered public client and its application callback URI. Do not invent a working client ID, use a desktop loopback redirect for an iOS client, or put client secrets in source. Authorization and token URLs must be HTTPS without credentials, query, or fragment. The Host opens the system sign-in flow and refreshes tokens. The user enters API keys, passwords, and bearer tokens through the service sign-in interface; never request them in conversation, action inputs, or files.
 
-Mark authenticated capabilities `requireAuth: true`; public capabilities can use false. For authentication use `ox.service.signIn`. Changing the API base URL or authentication configuration requires setup again. Setting credentials does not prove the API accepts them; verify a small authenticated read.
+Mark authenticated capabilities `requireAuth: true`; public capabilities can use false. An action with `requireAuth: false` never sends the configured credentials, even after sign-in. Reads that must support private resources or account-scoped search therefore need `requireAuth: true`, even when the endpoint also permits anonymous public reads. For authentication use `ox.service.signIn`. Changing the API base URL or authentication configuration requires setup again. Setting credentials does not prove the API accepts them; verify a small authenticated read.
 
 ## Handlers
 
