@@ -164,22 +164,6 @@ extension ConversationBlock {
                     spacingBefore: ConversationTranscriptMetrics.blockSpacing
                 ))
             }
-            if !visibleItems.isEmpty {
-                let text = visibleItems.compactMap { _, item -> String? in
-                    guard case .text(let text) = item, !text.isEmpty else { return nil }
-                    return text
-                }.joined(separator: "\n\n")
-                projectedTurns[turnIndex].blocks.append(ConversationBlock(
-                    id: StableID.uuid("conversation.block.\(block.id.uuidString).footer"),
-                    sourceBlockID: block.id,
-                    createdAt: block.createdAt,
-                    kind: .responseFooter(
-                        text: text,
-                        phase: source.turnID == activeTurnID && block.id == sources.last?.block.id ? .streaming : .settled
-                    ),
-                    spacingBefore: ConversationTranscriptMetrics.responseFooterSpacing
-                ))
-            }
         }
 
         if let activity = thinkingActivity {
@@ -219,6 +203,24 @@ extension ConversationBlock {
             if let lastThinking = turnBlocks.lastIndex(where: \.isThinking) {
                 turnBlocks[lastThinking].sourceInvocations = invocations
                 turnBlocks[lastThinking].isLiveThinking = thinkingActivity?.turnID == turn.id
+            }
+            if let lastResponse = turnBlocks.last(where: { block in
+                switch block.kind {
+                case .agentContent, .thinking, .startedConversation, .serviceControl: true
+                default: false
+                }
+            }) {
+                let text = turnBlocks.compactMap { block -> String? in
+                    guard case .agentContent(.text(let text)) = block.kind else { return nil }
+                    return text
+                }.joined(separator: "\n\n")
+                turnBlocks.append(ConversationBlock(
+                    id: StableID.uuid("conversation.turn.\(turn.id.rawValue.uuidString).footer"),
+                    sourceBlockID: lastResponse.sourceBlockID,
+                    createdAt: lastResponse.createdAt,
+                    kind: .responseFooter(text: text, phase: turn.id == activeTurnID ? .streaming : .settled),
+                    spacingBefore: ConversationTranscriptMetrics.responseFooterSpacing
+                ))
             }
             return turnBlocks
         }
