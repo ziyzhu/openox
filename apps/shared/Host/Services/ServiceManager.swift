@@ -337,7 +337,7 @@ final class ServiceManager {
                 }
                 clearMCPApprovals(replacing)
             }
-            _ = await loadRepositories(locale: monoRepositoryLocale)
+            await refreshServices(locale: monoRepositoryLocale)
             resolvedServices = ResolvedServices(services.filter { $0.domain != id } + [service])
             updateMCPActivation(from: attachedDomains.subtracting([id]))
             monoRepositoryRevision &+= 1
@@ -449,10 +449,6 @@ final class ServiceManager {
 
     @discardableResult
     func refreshServices(locale: String?, reuseApplicationRepositories: Bool = false) async -> [String] {
-        await loadRepositories(locale: locale, reuseApplicationRepositories: reuseApplicationRepositories)
-    }
-
-    private func loadRepositories(locale: String?, reuseApplicationRepositories: Bool = false) async -> [String] {
         await acquireRepositoryLoad()
         defer { releaseRepositoryLoad() }
         let before = monoRepositoryHash
@@ -492,8 +488,9 @@ final class ServiceManager {
             }
             let generation = beginMonoRepositoryUpdate(locale: locale, showLoading: monoRepositoryState != .ready)
             await rebuildMonoRepository(locale: locale, generation: generation, changedServices: changed)
-            Log.service.info("ServiceManager.refreshServices reloaded=\(changed.sorted()) preserved=\(previousVersions.count - changed.count) conflicts=\(monoRepository.conflicts.count)")
-            return changed.sorted()
+            let reloadedDomains = changed.sorted()
+            Log.service.info("ServiceManager.refreshServices reloaded=\(reloadedDomains) preserved=\(previousVersions.count - changed.count) conflicts=\(monoRepository.conflicts.count)")
+            return reloadedDomains
         } catch {
             repositoryState = .failed(error.localizedDescription)
             Log.service.error("ServiceManager.refreshServices failed=\(error.localizedDescription)")
@@ -536,7 +533,7 @@ final class ServiceManager {
             if selected.isEnabled != enabled {
                 repositoryState = .syncing
                 try await repository.setEnabled(repositoryID: repositoryID, enabled: enabled)
-                _ = await loadRepositories(locale: locale)
+                await refreshServices(locale: locale)
             }
             guard let updated = repositories.first(where: { $0.id == repositoryID }),
                   updated.isEnabled == enabled else {
@@ -564,7 +561,7 @@ final class ServiceManager {
                 Log.service.info("ServiceManager.repository resolve service=\(serviceID) repository=\(repositoryID) unchanged=true")
                 return false
             }
-            _ = await loadRepositories(locale: locale)
+            await refreshServices(locale: locale)
             guard case .ready = repositoryState,
                   repositoryConflicts.first(where: { $0.serviceID == serviceID })?.selectedRepositoryID == repositoryID else {
                 throw Repository.Failure(message: "The service source could not be activated. Inspect ox.repository.conflicts before retrying.")
@@ -674,7 +671,7 @@ final class ServiceManager {
 
     func createService(kind: Repository.ServiceKind, id: String, locale: String?) async throws {
         try await repository.createService(kind: kind, id: id)
-        _ = await loadRepositories(locale: locale)
+        await refreshServices(locale: locale)
         guard service(domain: id) != nil else {
             throw Repository.Failure(message: "The Local service could not be activated.")
         }
@@ -682,7 +679,7 @@ final class ServiceManager {
 
     func copyServiceToLocal(domain: String, locale: String?) async throws {
         try await repository.copyServiceToLocal(id: domain)
-        _ = await loadRepositories(locale: locale)
+        await refreshServices(locale: locale)
         guard monoRepository?.repositories.contains(where: { $0.id == Repository.localID }) == true else {
             throw Repository.Failure(message: "The Local repository is unavailable.")
         }
@@ -705,7 +702,7 @@ final class ServiceManager {
             try payload.read(path.joined(separator: "/"))
         }
         try await repository.importLocalService(payload, replacing: replacing)
-        _ = await loadRepositories(locale: locale)
+        await refreshServices(locale: locale)
         guard case .ready = repositoryState else {
             throw Repository.Failure(message: "The service was imported but the repository could not be reloaded.")
         }
@@ -713,7 +710,7 @@ final class ServiceManager {
 
     func deleteLocalService(domain: String, locale: String?) async throws -> Repository.ServiceKind {
         let kind = try await repository.deleteLocalService(id: domain)
-        _ = await loadRepositories(locale: locale)
+        await refreshServices(locale: locale)
         if service(domain: domain) == nil {
             let previous = attachedDomains
             for conversationID in Array(attachedServiceDomainsByConversation.keys) {
@@ -868,8 +865,8 @@ final class ServiceManager {
         repositoryState = .syncing
         do {
             try await operation()
-            let errors = await loadRepositories(locale: locale)
-            return try verify(errors)
+            let reloadedDomains = await refreshServices(locale: locale)
+            return try verify(reloadedDomains)
         } catch {
             repositoryState = .failed(error.localizedDescription)
             Log.service.error("ServiceManager.repository \(failureContext)\(error.localizedDescription)")
@@ -886,7 +883,7 @@ final class ServiceManager {
             Log.service.info("ServiceManager.rebuildMonoRepository superseded generation=\(generation)")
             return
         }
-        let next = definitions.compactMap { resolveService($0, sourceChanged: changedServices.contains($0.domain)) }
+        let next = definitions.map { resolveService($0, sourceChanged: changedServices.contains($0.domain)) }
         let indexedRevision = monoRepositoryRevision
         let semanticBuild = await index.rebuildLexical(from: next.map(\.definition), locale: locale)
         guard monoRepositoryGeneration == generation else {
@@ -907,7 +904,7 @@ final class ServiceManager {
         Log.service.info("ServiceManager.rebuildMonoRepository count=\(next.count) locale=\(locale ?? "en") generation=\(generation)")
     }
 
-    private func resolveService(_ definition: ServiceDefinition, sourceChanged: Bool) -> Service? {
+    private func resolveService(_ definition: ServiceDefinition, sourceChanged: Bool) -> Service {
         if let existing = byDomain[definition.domain],
            existing.isAPIService == definition.isAPI,
            existing.isIOSService == definition.isIOS,
@@ -940,7 +937,7 @@ final class ServiceManager {
 
     func reloadServices(locale: String?) async {
         guard monoRepository != nil else {
-            _ = await loadRepositories(locale: locale)
+            await refreshServices(locale: locale)
             return
         }
         guard services.isEmpty || monoRepositoryLocale != locale else { return }
