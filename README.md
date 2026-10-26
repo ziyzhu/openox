@@ -34,3 +34,9 @@ OpenOx is developed by [@ziyzhu](https://x.com/ziyzhu) and users like you. We we
 - Join the [community Discord](https://discord.gg/Sre9DaKAAg).
 - Check the [development setup and contribution guide](.agents/skills/setup/SKILL.md) for CLI, macOS, and iOS workflows.
 
+## Troubleshooting
+
+| Issue | Fix |
+| --- | --- |
+| ChatGPT sign-in fails with “HTTP URL with HTTPS-Only enabled” in Safari. | Temporarily turn off **Not Secure Connection Warning** in **Settings → Apps → Safari**, retry sign-in, then turn the setting back on. Verified on iOS 27. |
+
