@@ -18,7 +18,7 @@ printf '%s\n' \
 echo "Wrote Xcode Cloud configuration"
 
 cd "$(dirname "$0")/../../.."
-bun_version=1.3.13
+bun_version=1.4.4
 if ! command -v bun >/dev/null 2>&1 || [ "$(bun --version)" != "$bun_version" ]; then
   export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
   installer="$(mktemp)"
