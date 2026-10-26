@@ -14,6 +14,8 @@ struct SettingsSheet: View {
     @State private var openingProfile = false
     @State private var locatingProfileID: UUID?
     @State private var profileOpenErrorMessage: String?
+    private let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+    private let appBuild = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
     private var registry: ProviderRegistry { ProviderRegistry.shared }
     private var appLocale: AppLocale { AppLocale.shared }
     private var storage: StorageRoot { .shared }
@@ -208,6 +210,17 @@ struct SettingsSheet: View {
                         }
                     }
 
+                    VStack(spacing: Theme.Spacing.sm) {
+                        Text(verbatim: "Ox")
+                            .font(Theme.Fonts.bodyMd)
+                        Text("Version \(appVersion) (\(appBuild))")
+                            .font(Theme.Fonts.caption)
+                    }
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("settings.appVersion")
                 }
                 .settingsPagePadding()
             }
