@@ -188,8 +188,7 @@ nonisolated enum Secret {
                   $0.consumerKind == .provider && $0.consumerID == credentialID
               }) else { return nil }
         if credentialID.hasPrefix("custom:") {
-            guard let data = UserDefaults.standard.data(forKey: ProviderRegistry.catalogKey),
-                  let catalog = try? JSONDecoder().decode(ProviderCatalog.self, from: data),
+            guard let catalog = try? ProviderCatalog.load(),
                   let definition = catalog.providers.first(where: { $0.id == credentialID }),
                   binding.configurationFingerprint == providerFingerprint(definition),
                   binding.destination == definition.url.absoluteString else { return nil }

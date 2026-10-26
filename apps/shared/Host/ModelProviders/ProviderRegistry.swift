@@ -4,6 +4,21 @@ import Observation
 nonisolated struct ProviderCatalog: Codable, Equatable, Sendable {
     var format = 2
     var providers: [ProviderDefinition] = []
+    var defaultModel: ModelSelection?
+
+    static func load() throws -> Self {
+        let catalog = try JSONDecoder().decode(Self.self, from: Data(contentsOf: AppStoragePaths.providersConfiguration))
+        try catalog.validate()
+        return catalog
+    }
+
+    func save() throws {
+        try validate()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try FileManager.default.createDirectory(at: AppStoragePaths.applicationSupport, withIntermediateDirectories: true)
+        try encoder.encode(self).write(to: AppStoragePaths.providersConfiguration, options: .atomic)
+    }
 
     func validate() throws {
         guard format == 2, Set(providers.map(\.id)).count == providers.count else {
@@ -44,24 +59,20 @@ final class ProviderRegistry {
     private var modelCatalog: ProviderModelCatalog?
     private var modelCatalogRefresh: Task<Void, Never>?
     private(set) var allClients: [any ProviderClient] = []
-    private(set) var defaultModel: ModelSelection?
+    var defaultModel: ModelSelection? { catalog.defaultModel }
 
     private init() {
         bundled = Self.bundledDefinitions()
-        discovered = UserDefaults.standard.data(forKey: Self.discoveredModelsKey)
+        discovered = (try? Data(contentsOf: AppStoragePaths.discoveredModels))
             .flatMap { try? JSONDecoder().decode([String: DiscoveredModels].self, from: $0) } ?? [:]
         modelCatalog = ProviderModelCatalog.load()
         do {
-            if let data = UserDefaults.standard.data(forKey: Self.catalogKey) {
-                catalog = try JSONDecoder().decode(ProviderCatalog.self, from: data)
-                try catalog.validate()
-            } else { catalog = ProviderCatalog() }
+            catalog = try ProviderCatalog.load()
         } catch {
             catalog = ProviderCatalog()
             catalogAvailable = false
             Log.agent.error("ProviderRegistry catalog unavailable error=\(error.localizedDescription)")
         }
-        defaultModel = UserDefaults.standard.data(forKey: Self.defaultModelKey).flatMap { try? JSONDecoder().decode(ModelSelection.self, from: $0) }
         rebuildClients()
         Log.agent.info("ProviderRegistry ready definitions=\(definitions.count) default=\(defaultModel?.providerID ?? "unconfigured")")
     }
@@ -108,7 +119,8 @@ final class ProviderRegistry {
         let active = catalog.providers.first { $0.id == id } ?? entry.definition
         let models = try await discovery.models(for: active, known: modelCatalog?.models(for: discovery.catalog) ?? [:])
         discovered[id] = DiscoveredModels(fetchedAt: Date(), models: models)
-        UserDefaults.standard.set(try JSONEncoder().encode(discovered), forKey: Self.discoveredModelsKey)
+        try FileManager.default.createDirectory(at: AppStoragePaths.caches, withIntermediateDirectories: true)
+        try JSONEncoder().encode(discovered).write(to: AppStoragePaths.discoveredModels, options: .atomic)
         rebuildClients()
         Log.agent.info("ProviderRegistry.discover provider=\(id) models=\(models.count)")
         return models.count
@@ -242,19 +254,9 @@ final class ProviderRegistry {
     func setDefaultModel(_ selection: ModelSelection?) throws -> Bool {
         let next = try selection.map { try resolveSelection($0).selection }
         guard defaultModel != next else { return false }
-        if let next {
-            let data = try JSONEncoder().encode(next)
-            UserDefaults.standard.set(data, forKey: Self.defaultModelKey)
-            guard UserDefaults.standard.data(forKey: Self.defaultModelKey) == data else {
-                throw RuntimeError.bridge("Default model could not be saved")
-            }
-        } else {
-            UserDefaults.standard.removeObject(forKey: Self.defaultModelKey)
-            guard UserDefaults.standard.object(forKey: Self.defaultModelKey) == nil else {
-                throw RuntimeError.bridge("Default model could not be reset")
-            }
-        }
-        defaultModel = next
+        var updated = catalog
+        updated.defaultModel = next
+        try persist(updated)
         Log.agent.info("ProviderRegistry.defaultModel provider=\(next?.providerID ?? "automatic") model=\(next?.modelID ?? "automatic")")
         return true
     }
@@ -290,12 +292,9 @@ final class ProviderRegistry {
         }
         var next = catalog
         next.providers.removeAll { $0.id == id }
+        if next.defaultModel?.providerID == id { next.defaultModel = nil }
         try persist(next)
         deauthenticate(definition)
-        if defaultModel?.providerID == id {
-            UserDefaults.standard.removeObject(forKey: Self.defaultModelKey)
-            defaultModel = nil
-        }
         rebuildClients()
         Log.agent.info("ProviderRegistry.delete provider=\(id)")
     }
@@ -322,10 +321,7 @@ final class ProviderRegistry {
 
     private func persist(_ next: ProviderCatalog) throws {
         guard catalogAvailable else { throw RuntimeError.bridge("Provider catalog is unavailable. Open a compatible Ox version before making changes.") }
-        try next.validate()
-        let data = try JSONEncoder().encode(next)
-        UserDefaults.standard.set(data, forKey: Self.catalogKey)
-        guard UserDefaults.standard.data(forKey: Self.catalogKey) == data else { throw RuntimeError.bridge("Provider catalog could not be saved") }
+        try next.save()
         catalog = next
     }
 

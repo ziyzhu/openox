@@ -14,8 +14,6 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── savedServices                    attached service domains
 │   │   ├── actionApprovalPolicies           versioned Automatic, Ask, Allow, or Block policies for Actions
 │   │   ├── api.url                          Ox service API override
-│   │   ├── llm.defaultModel                 new-conversation provider/model/thinking selection
-│   │   ├── llm.providerCatalog              added provider definitions and bundled overrides
 │   │   ├── app.region                       last detected network region
 │   │   ├── app.language                     UI and agent language override
 │   │   ├── host.allowConnections             app-wide Host access toggle; absent means off
@@ -24,6 +22,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── storage.activeProfile            active profile UUID
 │   │   └── chatgpt.installationId           per-install Codex client ID
 │   ├── Application Support/
+│   │   ├── providers.json                   format-2 provider overrides and optional defaultModel selection
 │   │   ├── service-repositories.json        built-in, Local, Development, and installed repository enablement; conflict resolutions
 │   │   ├── mounted-repositories.json       version 1 repository bindings to Files grant IDs and relative folders
 │   │   ├── service-repositories/development/ simulator development HEAD snapshot
@@ -48,6 +47,9 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── DeviceTemplates/<run UUID>/input.json Debug Simulator-only transient setup input
 │   │   ├── DeviceTemplates/<run UUID>/result.json redacted application result
 │   │   ├── DeviceTemplates/<run UUID>/preferences-before.plist original changed preferences
+│   │   ├── DeviceTemplates/<run UUID>/providers-before.json original provider configuration before typed default-model changes
+│   │   ├── DiscoveredModels.json            purgeable per-provider model discovery results and fetch times
+│   │   ├── ProviderModelCatalog.json        purgeable upstream model capability metadata
 │   │   └── ServiceSearchVectors.plist       purgeable service-search embeddings
 │   └── ...                                  system-managed framework state
 ├── Documents/                               visible in Apple Files
@@ -98,7 +100,7 @@ Choice, approval, and secret-entry prompts are transient `Conversation` interact
 - UserDefaults Host access toggle — owner: Platform/Models/HostAccess.swift; app-wide, retained across Profile switches, follows device backup policy, removed with app preferences. Additive Boolean key with no predecessor representation or migration; missing state defaults off, including upgrades from builds that listened automatically.
 - UserDefaults import-memory starter count — owner: Client/Features/Conversation/ConversationComposer.swift
 - UserDefaults service state — owner: Services/ServiceManager.swift
-- UserDefaults model state — owner: Host/ModelProviders/ProviderRegistry.swift
+- Provider configuration and model caches — owner: Host/ModelProviders/ProviderRegistry.swift; configuration uses Application Support/providers.json and derived model caches use Caches; preference conversion belongs to ApplicationStorageMigrator
 - Keychain credentials — owner: Host/Credentials/Credentials.swift
 - Retired read-aloud voice preference — retained in UserDefaults and ignored
 - App-group theme — current value owners: Theme.swift and ShareExtension; legacy migration owner: Host/Storage/ApplicationStorageMigrator.swift
@@ -799,13 +801,15 @@ bootstrap therefore leaves target IndexedDB data unchanged.
 
 ## Provider configuration and credentials
 
-New-conversation provider/model defaults, provider additions and overrides, region,
-and language are stored in UserDefaults. Each conversation persists its own
+New-conversation provider/model defaults and provider additions/overrides live together
+in `Library/Application Support/providers.json`, written atomically by `ProviderCatalog`.
+Region and language remain in UserDefaults. Each conversation persists its own
 provider/model selection. Conversation saves write the existing `nativeReasoningEffort`
 metadata field for non-Pi effort values; null defers to Pi thinking. They explicitly
 clear Pi thinking when the selected model has no compatible effort; a switch must not retain
-its predecessor's reasoning choice. `llm.providerCatalog` contains a format-2 JSON envelope
-with saved provider definitions and their declared models. Bundled definitions
+its predecessor's reasoning choice. `providers.json` contains a format-2 JSON envelope
+with saved provider definitions, their declared models, and an optional `defaultModel`
+using the existing `ModelSelection` encoding. Missing `defaultModel` means automatic selection. Bundled definitions
 remain the base; a saved definition replaces the entire bundled definition with
 the same ID or adds a new provider. Deleting an override restores its bundled
 default; deleting an added definition removes it entirely. A saved definition
@@ -822,6 +826,23 @@ saved website provider definitions,
 legacy `llm.customProviders`, and regional selection transforms belong solely
 to `StorageMigrator`. Unknown catalog formats fail closed without overwriting
 their bytes.
+
+`ApplicationStorageMigrator` converts legacy provider preferences before constructing
+consumers, atomically publishes and verifies `providers.json`, then removes
+`llm.providerCatalog`, `llm.defaultModel`, and retired custom-provider preferences.
+Interrupted publication resumes only when legacy and file configurations agree;
+conflicting older-reader writes block preparation with both representations intact.
+Once the file exists, startup does not rerun preference-based provider transforms.
+Malformed or future files are retained and block startup and configuration writes.
+`llm.discoveredModels` moves to `Caches/DiscoveredModels.json`; invalid legacy
+cache bytes may be discarded because discovery can rebuild them. An existing cache
+wins, and cache-copy failures retain the preference for retry without blocking startup.
+Caches follow system eviction and are not authoritative configuration.
+The configuration remains eligible for normal app backup, outside Profiles and exports.
+Older builds ignore the file and can recreate empty or divergent provider preferences.
+Downgrade is not configuration-compatible; actual predecessor/changed-build evidence
+and maintainer approval are required before release. Returning to the changed build
+rejects divergent legacy preferences instead of silently discarding either side.
 
 Reusable credentials use generic-password Keychain accounts `secret:<key>` under
 the bundle-derived `<application bundle identifier>.llm` service. Each item is a
@@ -903,7 +924,8 @@ needed for diagnosis but never credentials or reusable secrets.
 | Temporary conversation | Memory and isolated filesystem cache | None; cache is purgeable | Leave conversation; private cache by eviction, app deletion, or explicit QA cleanup after close |
 | Conversation-owned files | Profile directory | Profile policy | Delete owner conversation or delete file |
 | Shared files | Profile directory | Profile policy | Delete file, folder, or Profile |
-| Active provider catalog | UserDefaults | Device backup policy | Delete provider or app |
+| Provider overrides and default selection | Application Support/providers.json | Device backup policy | Delete provider, reset default, or delete app |
+| Discovered models and model capabilities | Caches | Purgeable local cache | System eviction or refresh |
 | Secret values | Keychain | This device only | Sign out generated entry or delete any entry |
 | Secret metadata and bindings | UserDefaults | Device backup policy | Sign out or delete entry |
 | Managed provider OAuth | Keychain | System policy | Sign out |

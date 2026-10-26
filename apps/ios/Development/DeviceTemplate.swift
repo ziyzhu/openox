@@ -132,8 +132,18 @@ enum DeviceTemplate {
                 if let region = settings.region, let value = LLMRegion(rawValue: region) { AppRegion.shared.setForTesting(value) }
                 if let value = settings.allowHostConnections { UserDefaults.standard.set(value, forKey: HostAccess.preferenceKey) }
                 if let value = settings.defaultModel {
-                    if value == .null { UserDefaults.standard.removeObject(forKey: ProviderRegistry.defaultModelKey) }
-                    else { UserDefaults.standard.set(try JSONEncoder().encode(model(value)), forKey: ProviderRegistry.defaultModelKey) }
+                    let selection = value == .null ? nil : try model(value)
+                    if FileManager.default.fileExists(atPath: AppStoragePaths.providersConfiguration.path) {
+                        let original = try Data(contentsOf: AppStoragePaths.providersConfiguration)
+                        try original.write(to: directory.appendingPathComponent("providers-before.json"), options: .atomic)
+                        var catalog = try ProviderCatalog.load()
+                        catalog.defaultModel = selection
+                        try catalog.save()
+                    } else if let selection {
+                        UserDefaults.standard.set(try JSONEncoder().encode(selection), forKey: ProviderRegistry.defaultModelKey)
+                    } else {
+                        UserDefaults.standard.removeObject(forKey: ProviderRegistry.defaultModelKey)
+                    }
                 }
             }
             Log.app.info("DeviceTemplate.preferences applied run=\(id) appKeys=\(decoded.userDefaults?.app?.set?.count ?? 0) groupKeys=\(decoded.userDefaults?.appGroup?.set?.count ?? 0)")

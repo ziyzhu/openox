@@ -22,21 +22,72 @@ nonisolated enum ApplicationStorageMigrator {
             defaults: .standard,
             currentKey: RepositoryMigrator.legacyRemoteMCPKey
         )
-        migrateCustomLLMProviders(
-            defaults: .standard,
-            key: ProviderRegistry.customProvidersKey
-        )
-        migrateDefaultModel(defaults: .standard, fallbackRegion: AppRegion.shared.region)
-        do { try removeRetiredGemma() }
-        catch { Log.app.error("StorageMigrator.retiredGemma failed error=\(error.localizedDescription)") }
-        do { try migrateProviderCatalog(defaults: .standard) }
-        catch { Log.app.error("StorageMigrator.providerCatalog failed error=\(error.localizedDescription)") }
+        if !FileManager.default.fileExists(atPath: AppStoragePaths.providersConfiguration.path) {
+            migrateCustomLLMProviders(defaults: .standard, key: ProviderRegistry.customProvidersKey)
+            migrateDefaultModel(defaults: .standard, fallbackRegion: AppRegion.shared.region)
+            do { try removeRetiredGemma() }
+            catch { Log.app.error("StorageMigrator.retiredGemma failed error=\(error.localizedDescription)") }
+            do { try migrateProviderCatalog(defaults: .standard) }
+            catch { Log.app.error("StorageMigrator.providerCatalog failed error=\(error.localizedDescription)") }
+        }
+        do { try migrateProviderStorage() }
+        catch { Log.app.error("StorageMigrator.providerStorage failed source=preferences target=providers.json error=\(error.localizedDescription)") }
+        migrateDiscoveredModels()
         migrateActionApprovalPolicies()
         migrateFilesPolicies()
         migrateFolderOwnership()
         migrateSavedServices()
         CredentialMigrator.removeLegacyRepositoryAuthorization()
         Log.app.info("StorageMigrator.application done")
+    }
+
+    private static func migrateProviderStorage(defaults: UserDefaults = .standard) throws {
+        let exists = FileManager.default.fileExists(atPath: AppStoragePaths.providersConfiguration.path)
+        let legacyCatalog = defaults.object(forKey: ProviderRegistry.catalogKey)
+        let legacySelection = defaults.object(forKey: ProviderRegistry.defaultModelKey)
+        guard !exists || legacyCatalog != nil || legacySelection != nil else { return }
+        Log.app.info("StorageMigrator.providerStorage start source=preferences target=providers.json existing=\(exists)")
+        var migrated: ProviderCatalog
+        if let legacyCatalog {
+            guard let data = legacyCatalog as? Data else { throw StorageMigrationError.invalidApplicationStorage("provider catalog") }
+            migrated = try JSONDecoder().decode(ProviderCatalog.self, from: data)
+        } else if exists {
+            migrated = try ProviderCatalog.load()
+        } else {
+            throw StorageMigrationError.invalidApplicationStorage("provider catalog")
+        }
+        if let legacySelection {
+            guard let data = legacySelection as? Data else { throw StorageMigrationError.invalidApplicationStorage("default model") }
+            migrated.defaultModel = try JSONDecoder().decode(ModelSelection.self, from: data)
+        }
+        try migrated.validate()
+        if exists {
+            guard try ProviderCatalog.load() == migrated else { throw StorageMigrationError.collision("provider configuration after downgrade") }
+        } else {
+            try migrated.save()
+            guard try ProviderCatalog.load() == migrated else { throw StorageMigrationError.invalidApplicationStorage("provider configuration") }
+        }
+        defaults.removeObject(forKey: ProviderRegistry.catalogKey)
+        defaults.removeObject(forKey: ProviderRegistry.defaultModelKey)
+        defaults.removeObject(forKey: ProviderRegistry.customProvidersKey)
+        defaults.synchronize()
+        Log.app.info("StorageMigrator.providerStorage done source=preferences target=providers.json format=\(migrated.format) providers=\(migrated.providers.count)")
+    }
+
+    private static func migrateDiscoveredModels(defaults: UserDefaults = .standard) {
+        guard let data = defaults.data(forKey: ProviderRegistry.discoveredModelsKey) else { return }
+        do {
+            if !FileManager.default.fileExists(atPath: AppStoragePaths.discoveredModels.path),
+               (try? JSONDecoder().decode([String: ProviderRegistry.DiscoveredModels].self, from: data)) != nil {
+                try FileManager.default.createDirectory(at: AppStoragePaths.caches, withIntermediateDirectories: true)
+                try data.write(to: AppStoragePaths.discoveredModels, options: .atomic)
+            }
+            defaults.removeObject(forKey: ProviderRegistry.discoveredModelsKey)
+            defaults.synchronize()
+            Log.app.info("StorageMigrator.discoveredModels done source=preferences target=cache")
+        } catch {
+            Log.app.warning("StorageMigrator.discoveredModels deferred source=preferences target=cache error=\(error.localizedDescription)")
+        }
     }
 
     private static func removeRetiredGemma(
@@ -239,16 +290,8 @@ nonisolated enum ApplicationStorageMigrator {
             component: "folder grants"
         )
         let defaults = UserDefaults.standard
-        do {
-            guard let data = defaults.data(forKey: ProviderRegistry.catalogKey) else {
-                throw StorageMigrationError.invalidApplicationStorage("provider catalog")
-            }
-            try JSONDecoder().decode(ProviderCatalog.self, from: data).validate()
-            if let selection = defaults.data(forKey: ProviderRegistry.defaultModelKey),
-               let object = try JSONSerialization.jsonObject(with: selection) as? [String: Any], object["region"] != nil {
-                throw StorageMigrationError.invalidApplicationStorage("provider selection")
-            }
-        } catch { throw StorageMigrationError.invalidApplicationStorage("provider catalog") }
+        try migrateProviderStorage()
+        _ = try ProviderCatalog.load()
         if defaults.object(forKey: RepositoryMigrator.legacyRemoteMCPKey) != nil {
             guard let data = defaults.data(forKey: RepositoryMigrator.legacyRemoteMCPKey),
                   (try? JSONDecoder().decode([RepositoryMigrator.LegacyRemoteMCP].self, from: data)) != nil else {
@@ -259,12 +302,6 @@ nonisolated enum ApplicationStorageMigrator {
             guard let data = defaults.data(forKey: ProviderRegistry.customProvidersKey),
                   (try? JSONDecoder().decode([CustomLLMProvider].self, from: data)) != nil else {
                 throw StorageMigrationError.invalidApplicationStorage("custom provider")
-            }
-        }
-        if defaults.object(forKey: ProviderRegistry.defaultModelKey) != nil {
-            guard let data = defaults.data(forKey: ProviderRegistry.defaultModelKey),
-                  (try? JSONDecoder().decode(ModelSelection.self, from: data)) != nil else {
-                throw StorageMigrationError.invalidApplicationStorage("default model")
             }
         }
     }
