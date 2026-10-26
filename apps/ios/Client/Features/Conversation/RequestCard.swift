@@ -600,6 +600,7 @@ private struct RequestActionButton: View {
             if isSelected {
                 Image(systemName: "checkmark.circle")
                     .font(Theme.Fonts.labelMd)
+                    .fontWeight(.medium)
                     .foregroundStyle(isPrimary ? Theme.Colors.onPrimary : Theme.Colors.onSurface)
                     .padding(.trailing, Theme.Spacing.sm)
                     .accessibilityHidden(true)
@@ -630,6 +631,7 @@ private struct RequestChoiceButton: View {
                 .foregroundStyle(Theme.Colors.onSurface)
             Spacer(minLength: 0)
             Image(systemName: "checkmark.circle")
+                .fontWeight(.medium)
                 .foregroundStyle(Theme.Colors.primary)
                 .opacity(isSelected ? 1 : 0)
                 .accessibilityHidden(true)
