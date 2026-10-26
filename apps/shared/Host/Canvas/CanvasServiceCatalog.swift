@@ -64,6 +64,8 @@ extension ServiceOperations {
             return try await syncRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
         case "ox.repository.disconnect":
             return try await disconnectRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
+        case "ox.service.showPage":
+            return try await showServicePage(name: fields["name"]?.stringValue ?? "", args: fields["input"], purpose: purpose)
         case "ox.service.signIn":
             return try await signInService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.solve":

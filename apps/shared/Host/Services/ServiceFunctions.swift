@@ -145,6 +145,10 @@ extension Conversation {
         }
     }
 
+    public func showServicePage(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.showServicePage(name: name, args: args, purpose: purpose)
+    }
+
     public func signInService(domain: String, purpose: String) async throws -> JSONValue? {
         try await serviceOperations.signInService(domain: domain, purpose: purpose)
     }

@@ -256,6 +256,12 @@ final class ServiceActionScheduler {
         pooledQueues.contains { $0.page === page }
     }
 
+    func reserveForPresentation(_ action: Service.Action) -> BotControlLease? {
+        let key = QueueKey.pooled(ObjectIdentifier(action.service), action.baseURL)
+        guard let queue = queues[key], queue.isIdle, let page = queue.page else { return nil }
+        return reserveForBotControl(page)
+    }
+
     func reserveForBotControl(_ page: Service.ServiceWebPage) -> BotControlLease? {
         guard let queue = queue(for: page), queue.pooled, !queue.invalidated, page.isReady,
               queue.botControlState == .available else { return nil }

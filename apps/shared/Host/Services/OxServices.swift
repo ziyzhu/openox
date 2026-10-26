@@ -254,6 +254,28 @@ nonisolated enum OxServices {
                     ])
                 ),
                 (
+                    "ox.service.showPage",
+                    .object([
+                        "description": .string(ModelGuidance.text("ox.service.showPage")),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "name": .object(["type": .string("string")]),
+                                "input": .object(["type": .string("object")]),
+                                "purpose": .object(["type": .string("string")]),
+                            ]),
+                            "required": .array([.string("name")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object(["shown": .object(["type": .string("boolean")])]),
+                            "required": .array([.string("shown")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                    ])
+                ),
+                (
                     "ox.service.signIn",
                     .object([
                         "description": .string(ModelGuidance.text("ox.service.signIn")),
@@ -406,6 +428,13 @@ nonisolated enum OxServices {
             }
             ctx.setObject(detachBlock as AnyObject, forKeyedSubscript: "__nativeServiceDetach" as NSString)
 
+            let showPageBlock: @convention(block) (String, JSValue, JSValue) -> JSValue = { name, argsValue, purposeValue in
+                let args = argsValue.isNull || argsValue.isUndefined ? nil : jsValueToJSON(argsValue)
+                let purpose = purposeValue.toString()!
+                return env.call(suspendingTimeout: true) { try await $0.showServicePage(name: name, args: args, purpose: purpose) }
+            }
+            ctx.setObject(showPageBlock as AnyObject, forKeyedSubscript: "__nativeServiceShowPage" as NSString)
+
             let signInBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
                 let purpose = purposeValue.toString()!
                 return env.call(suspendingTimeout: true) { try await $0.signInService(domain: domain, purpose: purpose) }
@@ -442,6 +471,7 @@ nonisolated enum OxServices {
           delete: (value) => { const options = __oxOptions(value, 'ox.service.delete'); return __nativeServiceDelete(String(options.domain), String(options.purpose)); },
           attach: (value) => { const options = __oxOptions(value, 'ox.service.attach'); return __nativeServiceAttach(String(options.domain), String(options.purpose)); },
           detach: (value) => { const options = __oxOptions(value, 'ox.service.detach'); return __nativeServiceDetach(String(options.domain), String(options.purpose)); },
+          showPage: (value) => { const options = __oxOptions(value, 'ox.service.showPage'); return __nativeServiceShowPage(String(options.name), options.input ?? null, String(options.purpose)); },
           signIn: (value) => { const options = __oxOptions(value, 'ox.service.signIn'); return __nativeServiceSignIn(String(options.domain), String(options.purpose)); },
           solve: (value) => { const options = __oxOptions(value, 'ox.service.solve'); return __nativeServiceSolve(String(options.domain), options.args, String(options.purpose)); },
           pay: (value) => { const options = __oxOptions(value, 'ox.service.pay'); return __nativeServicePayment(String(options.domain), options.args, String(options.purpose)); }

@@ -1,4 +1,5 @@
 import Foundation
+import WebKit
 
 @MainActor
 final class ServiceOperations {
@@ -589,6 +590,38 @@ final class ServiceOperations {
         }
         Log.session.info("bridge.service.suggestions chars=\(query.count) hits=\(results.count)")
         return try Self.encodeToJSON(results)
+    }
+
+    func showServicePage(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue? {
+        let (service, actionID) = try await resolveAction(name)
+        let input = args ?? .object([:])
+        guard service.isWebService,
+              let action = await service.resolvedAction(actionID, args: input) else {
+            throw RuntimeError.bridge("ox.service.showPage: requires a web service action")
+        }
+        return try await tracked(Actions.serviceShowPage, .object(["name": .string(name), "input": input]), purpose: purpose) {
+            guard let lease = serviceManager.actionScheduler.reserveForPresentation(action) else {
+                throw OxFunctionError(code: "page_unavailable", message: "ox.service.showPage: this action has no idle live page.", recovery: "Wait for active actions to finish. Use the name and input of the action whose page you want to show. This function never opens a replacement page or reruns the action.")
+            }
+            defer { lease.release() }
+            guard let url = lease.page.page.url else { throw Service.EvalError.notReady }
+            let session = ServiceHandoffSession(
+                service: service,
+                servicePage: lease.page,
+                title: service.title,
+                navigationTitle: service.title,
+                initialURL: url
+            )
+            Log.service.info("Service.showPage presenting domain=\(service.domain) action=\(actionID) session=\(lease.page.logLabel)")
+            let outcome = await native.presentations.serviceHandoff.present(session: session)
+            try Task.checkCancellation()
+            guard outcome == .completed else {
+                throw OxFunctionError(code: "handoff_incomplete", message: "ox.service.showPage: the presentation was cancelled or unavailable.", recovery: "Do not reopen automatically. Ask the user whether to continue. The live page is preserved.")
+            }
+            guard lease.isActive else { throw Service.EvalError.contextInvalidated }
+            Log.service.info("Service.showPage dismissed domain=\(service.domain) session=\(lease.page.logLabel)")
+            return .object(["shown": .bool(true)])
+        }
     }
 
     func signInService(domain: String, purpose: String) async throws -> JSONValue? {

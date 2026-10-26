@@ -43,7 +43,7 @@ final class MacAppPresentations: ServiceAuthPresenting, ServiceHandoffPresenting
         let owner = MacInteractionWindow(
             title: "\(session.navigationTitle) — Ox Host",
             view: WebView(session.page).accessibilityIdentifier("mac-host-service-handoff-page")
-        ) { session.cancel() }
+        ) { session.dismissPresentation() }
         defer { owner.dismiss() }
         Log.service.info("MacPresentation.handoff domain=\(session.serviceDomain)")
         return await session.run()

@@ -61,6 +61,7 @@ nonisolated enum Actions {
     static let repositoryEnable = "ox.repository.enable"
     static let repositoryDisconnect = "ox.repository.disconnect"
     static let serviceAttach = "ox.service.attach"
+    static let serviceShowPage = "ox.service.showPage"
     static let serviceSignIn = "ox.service.signIn"
     static let serviceSolve = "ox.service.solve"
     static let servicePayment = "ox.service.pay"
@@ -97,7 +98,7 @@ nonisolated enum Actions {
         serviceFind, serviceList, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryEnable, repositoryDisconnect,
         repositoryConflicts, repositoryResolve,
-        serviceAttach, serviceSignIn, serviceSolve, servicePayment, serviceDetach,
+        serviceAttach, serviceShowPage, serviceSignIn, serviceSolve, servicePayment, serviceDetach,
         skillCreate, skillCopy, skillDelete, skillShare,
         scheduleCreate, scheduleList, scheduleDelete, scheduleEnable, scheduleRun, scheduleComplete,
         memoryRead, memoryWrite, memoryReplaceText,
@@ -175,6 +176,7 @@ nonisolated enum Actions {
         case repositoryEnable: L10n.string("Repositories")
         case repositoryDisconnect: L10n.string("Remove Repository")
         case serviceAttach: L10n.string("Attach a service")
+        case serviceShowPage: L10n.string("Show page")
         case serviceSignIn: L10n.string("Service sign-in")
         case serviceSolve: L10n.string("Service verification")
         case servicePayment: L10n.string("Service checkout")

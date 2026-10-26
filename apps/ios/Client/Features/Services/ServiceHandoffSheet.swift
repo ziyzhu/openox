@@ -9,10 +9,15 @@ protocol ServiceSheetSession: AnyObject {
     var navigationTitle: String { get }
     var page: WebPage { get }
     func cancel()
+    func dismissPresentation()
     func goBack()
     func goForward()
     func reload()
     func navigate(to url: URL) -> Bool
+}
+
+extension ServiceSheetSession {
+    func dismissPresentation() { cancel() }
 }
 
 extension ServiceHandoffSession: ServiceSheetSession {}
@@ -89,7 +94,7 @@ struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceHandoff.done) {
-                            if !returnsInline { session.cancel() }
+                            if !returnsInline { session.dismissPresentation() }
                             dismiss()
                         }
                     }

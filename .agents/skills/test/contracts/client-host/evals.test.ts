@@ -11,7 +11,7 @@ async function command(args: string[]) {
 test("eval CLI validates code-defined cases against the native function catalog", async () => {
   const result = await command(["--validate"]);
   expect(result.code, result.stderr).toBe(0);
-  expect(result.stdout).toContain("stub catalog matches 98 native functions");
+  expect(result.stdout).toContain("stub catalog matches 99 native functions");
   const listed = await command(["--list"]);
   expect(listed.stdout.trim().split("\n")).toContain("app-profile");
   const help = await command(["--help"]);

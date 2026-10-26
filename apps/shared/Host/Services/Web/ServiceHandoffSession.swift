@@ -52,7 +52,7 @@ final class ServiceHandoffSession {
     let page: WebPage
     private(set) var phase: Phase = .ready
 
-    private let completionProbe: @MainActor (URL?) async -> Bool
+    private let completionProbe: (@MainActor (URL?) async -> Bool)?
     private let navigationObserver: @MainActor (WebPage.NavigationEvent, URL?) -> Void
     private let loadInitialPage: @MainActor () -> Void
     private let navigatePage: @MainActor (URL) -> Bool
@@ -119,7 +119,7 @@ final class ServiceHandoffSession {
         title: String,
         navigationTitle: String,
         initialURL: URL,
-        completionProbe: @escaping @MainActor (URL?) async -> Bool
+        completionProbe: (@MainActor (URL?) async -> Bool)? = nil
     ) {
         serviceDomain = service.domain
         self.title = title
@@ -167,6 +167,7 @@ final class ServiceHandoffSession {
     func preflight(for duration: Duration) async -> Outcome? {
         if let outcome = terminalOutcome { return outcome }
         if phase == .ready { start() }
+        guard completionProbe != nil else { return terminalOutcome }
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: duration)
         while clock.now < deadline {
@@ -186,6 +187,10 @@ final class ServiceHandoffSession {
 
     func complete() {
         finish(.completed)
+    }
+
+    func dismissPresentation() {
+        finish(completionProbe == nil ? .completed : .cancelled)
     }
 
     func cancel() {
@@ -228,11 +233,13 @@ final class ServiceHandoffSession {
                 await observeNavigations()
             }
         }
-        periodicProbeTask = Task { @MainActor [weak self] in
-            while let self, !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
-                guard !Task.isCancelled else { return }
-                requestProbe(reason: "periodic")
+        if completionProbe != nil {
+            periodicProbeTask = Task { @MainActor [weak self] in
+                while let self, !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(1))
+                    guard !Task.isCancelled else { return }
+                    requestProbe(reason: "periodic")
+                }
             }
         }
         loadInitialPage()
@@ -304,7 +311,7 @@ final class ServiceHandoffSession {
     }
 
     private func requestProbe(reason: String) {
-        guard phase == .running || phase == .verifying, probeTask == nil else { return }
+        guard let completionProbe, phase == .running || phase == .verifying, probeTask == nil else { return }
         phase = .verifying
         probeStartedAt = ProcessInfo.processInfo.systemUptime
         let attempt = id.uuidString.prefix(8)
@@ -388,7 +395,7 @@ final class ServiceHandoffSession {
         periodicProbeTask = nil
         probeTask?.cancel()
         probeTask = nil
-        page.stopLoading()
+        if completionProbe != nil { page.stopLoading() }
         Log.service.info("ServiceHandoffSession state domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) phase=\(outcome.rawValue)")
         let completion = completion
         self.completion = nil
