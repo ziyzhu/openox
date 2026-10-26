@@ -56,6 +56,67 @@ struct ConversationBlock: Identifiable, Equatable {
 }
 
 extension ConversationBlock {
+    private var responseText: String {
+        switch kind {
+        case .agentContent(let item):
+            switch item {
+            case .text(let text), .progress(let text):
+                return text
+            case .artifact(let file):
+                return "\(L10n.string("File")): \(file.userFacingAccessibilityLabel)"
+            case .image(let image):
+                return "\(L10n.string("Image")): \(Self.mediaText(image.source))"
+            case .video(let video):
+                return "\(L10n.string("Video")): \(Self.mediaText(video.source))"
+            case .shoveler(let shoveler):
+                return shoveler.cards.enumerated().map { index, card in
+                    let details = [card.title, card.badge, card.description, card.artifact?.userFacingAccessibilityLabel]
+                        .compactMap { $0 }
+                        .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                        .joined(separator: "\n")
+                    return "\(index + 1). \(details.isEmpty ? L10n.string("Image") : details)"
+                }.joined(separator: "\n\n")
+            case .serviceInspector(let link):
+                return "\(link.serviceName) (\(link.domain))"
+            case .serviceControl(let control):
+                return Self.serviceControlText(control)
+            case .skill(let skill):
+                guard skill.owner != .system else { return "" }
+                return [skill.displayName, skill.description].filter { !$0.isEmpty }.joined(separator: "\n")
+            }
+        case .serviceControl(let control, _):
+            return Self.serviceControlText(control)
+        case .thinking(let trace):
+            return trace.invocations
+                .filter { $0.name != Actions.conversationStart }
+                .map(\.purpose)
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n")
+        case .startedConversation(_, let title):
+            return "\(L10n.string("New conversation")): \(title)"
+        case .userText, .userSkill, .contextCompaction, .responseFooter:
+            return ""
+        }
+    }
+
+    private static func mediaText(_ source: WidgetMediaSource) -> String {
+        switch source {
+        case .remote(let url): url
+        case .artifact(let file): file.userFacingAccessibilityLabel
+        }
+    }
+
+    private static func serviceControlText(_ control: ServiceControl) -> String {
+        switch control {
+        case .signIn(let domain, let name):
+            "\(L10n.string("Sign in")): \(name ?? domain)"
+        case .botControl(let domain, let name, _):
+            "\(L10n.string("Verification")): \(name ?? domain)"
+        case .payment(let domain, let name, _):
+            "\(L10n.string("Payment")): \(name ?? domain)"
+        }
+    }
+
     private typealias ServiceControlLocation = Conversation.PendingServiceControl.Source
 
     private struct ProjectedTurn {
@@ -210,10 +271,9 @@ extension ConversationBlock {
                 default: false
                 }
             }) {
-                let text = turnBlocks.compactMap { block -> String? in
-                    guard case .agentContent(.text(let text)) = block.kind else { return nil }
-                    return text
-                }.joined(separator: "\n\n")
+                let text = turnBlocks.map(\.responseText)
+                    .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                    .joined(separator: "\n\n")
                 turnBlocks.append(ConversationBlock(
                     id: StableID.uuid("conversation.turn.\(turn.id.rawValue.uuidString).footer"),
                     sourceBlockID: lastResponse.sourceBlockID,

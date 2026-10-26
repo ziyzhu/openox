@@ -751,17 +751,14 @@ struct ResponseFooterBlockView: View, Equatable {
             iconButton(
                 systemName: controls.isCopied ? "checkmark" : "doc.on.doc",
                 label: A11yLabel.copyMessage,
-                id: actionIdentifier(A11yID.ConversationControls.Message.copy),
-                disabled: text.isEmpty || controls.isCopied
+                id: actionIdentifier(A11yID.ConversationControls.Message.copy)
             ) {
-                controls.onCopy(text)
+                controls.onCopy(shareText)
             }
-            ShareLink(item: text) {
+            ShareLink(item: shareText) {
                 controlIcon(systemName: "square.and.arrow.up")
             }
             .buttonStyle(.plain)
-            .disabled(text.isEmpty)
-            .opacity(text.isEmpty ? 0.4 : 1)
             .accessibilityLabel(A11yLabel.shareMessage)
             .accessibilityIdentifier(actionIdentifier(A11yID.ConversationControls.Message.share))
             iconButton(
@@ -786,6 +783,12 @@ struct ResponseFooterBlockView: View, Equatable {
         .opacity(isVisible ? 1 : 0)
         .allowsHitTesting(isVisible)
         .accessibilityHidden(!isVisible)
+    }
+
+    private var shareText: String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? L10n.string("Response has no text content.")
+            : text
     }
 
     private func actionIdentifier(_ action: String) -> String {
