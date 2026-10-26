@@ -881,11 +881,13 @@ struct ConversationPage: View {
         switch block.kind {
         case .responseFooter(let text, let phase):
             VStack(alignment: .leading, spacing: 0) {
-                ResponseFooterBlockView(
-                    id: block.id,
-                    text: text,
-                    controls: messageControls(sourceBlockID: block.sourceBlockID)
-                )
+                if phase == .settled {
+                    ResponseFooterBlockView(
+                        id: block.id,
+                        text: text,
+                        controls: messageControls(sourceBlockID: block.sourceBlockID)
+                    )
+                }
                 if phase == .streaming, showsActivity {
                     ActivityBubble()
                         .padding(
