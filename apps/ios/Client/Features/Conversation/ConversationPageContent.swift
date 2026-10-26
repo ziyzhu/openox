@@ -233,7 +233,20 @@ extension ConversationBlock {
                 projectedTurns.append(ProjectedTurn(id: activity.turnID))
                 turnIndex = projectedTurns.count - 1
             }
-            if projectedTurns[turnIndex].blocks.last?.isThinking != true {
+            let lastActivityBlock = projectedTurns[turnIndex].blocks.last { block in
+                switch block.kind {
+                case .agentContent(let item):
+                    switch item {
+                    case .text(let text):
+                        return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    case .progress: return true
+                    case .serviceControl, .serviceInspector, .shoveler, .video, .image, .artifact, .skill: return false
+                    }
+                case .startedConversation, .serviceControl: return false
+                default: return true
+                }
+            }
+            if lastActivityBlock?.isThinking != true {
                 let index = projectedTurns[turnIndex].thinkingCount
                 let id = thinkingID(turnID: activity.turnID, index: index)
                 projectedTurns[turnIndex].blocks.append(ConversationBlock(

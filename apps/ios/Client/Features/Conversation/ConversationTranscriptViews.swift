@@ -166,8 +166,8 @@ private struct ServiceInspectorRow: View {
                 ServiceHandoffActions(
                     cancelAccessibilityIdentifier: "conversation.browser.interaction.\(rowID).cancel",
                     doneAccessibilityIdentifier: "conversation.browser.interaction.\(rowID).done",
-                    cancel: { browserSession.finishUserInteraction(completed: false) },
-                    done: { browserSession.finishUserInteraction(completed: true) }
+                    cancel: { finishUserInteraction(completed: false) },
+                    done: { finishUserInteraction(completed: true) }
                 )
             }
         }
@@ -205,6 +205,12 @@ private struct ServiceInspectorRow: View {
             expandAccessibilityIdentifier: A11yID.ServiceInspector.open + ".\(rowID)",
             cancelAccessibilityIdentifier: ""
         )
+    }
+
+    private func finishUserInteraction(completed: Bool) {
+        guard let browserSession, let page else { return }
+        pageMount.collapse(page: page, ownerID: rowID)
+        browserSession.finishUserInteraction(completed: completed)
     }
 
     private func expandPage() {

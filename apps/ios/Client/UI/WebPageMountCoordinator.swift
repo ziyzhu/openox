@@ -8,6 +8,7 @@ final class WebPageMountCoordinator {
     enum Placement: Equatable {
         case idle
         case inline(UUID)
+        case collapsed(UUID)
         case detached(UUID)
     }
 
@@ -47,8 +48,13 @@ final class WebPageMountCoordinator {
             return
         }
         if !pageChanged, case .detached(let ownerID) = placement, ownerIDs.contains(ownerID) { return }
-        if !pageChanged, case .inline(let ownerID) = placement,
-           ownerIDs.contains(ownerID), preferred == previousPreferred { return }
+        if !pageChanged, preferred == previousPreferred {
+            switch placement {
+            case .inline(let ownerID), .collapsed(let ownerID):
+                if ownerIDs.contains(ownerID) { return }
+            case .idle, .detached: break
+            }
+        }
         activate(page: page, ownerID: preferred)
     }
 
@@ -66,6 +72,13 @@ final class WebPageMountCoordinator {
             placement = .inline(ownerID)
             Log.webView.info("WebPageMount.inline owner=\(ownerID)")
         }
+    }
+
+    func collapse(page: WebPage, ownerID: UUID) {
+        guard isInline(page: page, ownerID: ownerID) else { return }
+        revision += 1
+        placement = .collapsed(ownerID)
+        Log.webView.info("WebPageMount.collapsed owner=\(ownerID)")
     }
 
     func detach(page: WebPage, ownerID: UUID) async -> Bool {
