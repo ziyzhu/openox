@@ -53,8 +53,13 @@ nonisolated enum A11yID {
         static let addPhotos = "files.add.photos"
         static let addCamera = "files.add.camera"
         static let previewDismiss = "files.preview.dismiss"
+        static let renameName = "files.rename.name"
+        static let renameCancel = "files.rename.cancel"
         static let renameSubmit = "files.rename.submit"
+        static let renameFailureDismiss = "files.rename.failure.dismiss"
+        static let deleteCancel = "files.delete.cancel"
         static let deleteConfirm = "files.delete.confirm"
+        static let deleteFailureDismiss = "files.delete.failure.dismiss"
         static func item(_ id: String) -> String { "files.item.\(id)" }
         static func filter(_ id: String) -> String { "files.filter.\(id)" }
         static func save(_ id: String) -> String { "files.save.\(id)" }
