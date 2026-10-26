@@ -99,10 +99,10 @@ Inspect only the requests, redirects, statuses, and response shapes needed for t
 
 Every newly authored customer-facing service needs a verified product favicon. For API services, discover artwork on the official product website; the API identifier need not be a hostname. Preserve an existing verified icon unless it is broken or the user requests a replacement.
 
-1. **Find.** Inspect official page `icon` and `apple-touch-icon` links and linked web-app manifest icons. Resolve page links against `document.baseURI` and manifest icon `src` against the manifest's final response URL. Prefer a square PNG at least 128×128; JPEG and ICO are supported, SVG is not. Choose a normal product mark usable in both themes, respecting link `media` and manifest `purpose`. Treat declared sizes and types as hints. Verify actual decoded dimensions, including the largest ICO frame; declared sizes, URL parameters, and HTTP success are not resolution evidence. Try the best candidate first and stop when it passes. Smaller official candidates must still supply enough source pixels for the avatar at the display's physical pixel scale; a 20 pt avatar on a 3× display needs at least 60×60 pixels. Reject blurry upscaling even when the mark is recognizable before considering a third-party cache. If advertised candidates fail, try same-site `/apple-touch-icon.png` and `/favicon.ico`; never invent other paths.
-2. **Apply.** Set a stable public HTTPS `faviconUrl` before the service's normal final validation and attachment/reload. Read back `faviconUrl` from the source `service.json` and use `ox.service.inspect` to confirm the intended repository is selected. The native loader fetches anonymously, permits at most five public HTTPS redirects, and limits images to 1 MiB, 4096×4096, and 32 frames. It selects the largest ICO frame and produces a PNG thumbnail up to 256 px. Do not use credential-dependent, signed, or expiring URLs.
-3. **Inspect.** After loading settles, inspect one actual Ox service avatar at approximately 20 pt in light and dark mode at native display resolution. Require a recognizable, sharp mark with adequate contrast, balanced padding, and no clipped essential artwork. Transparency is acceptable when it looks good in both themes. Reject blank images, generic fallbacks, persistent loading placeholders, and blurry enlargements. HTTP success, Browser display, manifest validation, and attachment alone do not verify the icon. If it fails, inspect available diagnostics, choose the next candidate, and repeat Apply and Inspect.
-4. **Record.** Keep the final source/effective URL and observed light/dark appearance internally; keep screenshot evidence outside service source. Evidence must correspond to the final URL after reload. If no candidate works, omit `faviconUrl` and preserve useful service work, but report icon verification as incomplete. If actual avatar inspection is unavailable, report it as pending; never claim full verification.
+1. **Choose and preflight.** Prefer official product artwork from page icon links or a linked web-app manifest. Use a stable public HTTPS URL without credentials, signatures, or expiration. Fetch it anonymously and confirm it decodes as PNG, JPEG, or ICO; SVG is not supported. Prefer a square image at least 128×128. Reject failed responses, blank images, generic placeholders, and unrelated marks. Try the best candidate first and stop when it passes.
+2. **Apply.** Set `faviconUrl`, then complete normal service validation and attachment/reload. No post-apply avatar inspection or screenshot evidence is required.
+
+If no candidate passes preflight, omit `faviconUrl`, preserve useful service work, and report icon verification as incomplete.
 
 When official candidates fail, Google's cache is a last fallback unless the user prohibits third-party icon requests:
 
@@ -110,7 +110,7 @@ When official candidates fail, Google's cache is a last fallback unless the user
 https://www.google.com/s2/favicons?domain_url=<percent-encoded-public-origin>&sz=128&alt=404
 ```
 
-Submit only the public product origin, stripping credentials, path, query, and fragment. This discloses that origin to Google. Apply the same decoded-resolution and actual-avatar checks; `sz=128` does not establish the returned image's dimensions. Reject a placeholder, generic letter, unrelated mark, or failed response.
+Submit only the public product origin, stripping credentials, path, query, and fragment. This discloses that origin to Google. Apply the same preflight checks; `sz=128` does not establish the returned image's dimensions.
 
 ## 3. Explain the plan
 
@@ -256,7 +256,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 10. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
 11. Inspect repository skills that depend on this service when action IDs or contracts changed and revise affected skills through `references/skills.md`.
 12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this conversation.
-13. Complete Choose a favicon, including decoded-resolution checks and actual loaded-avatar inspection in both themes. Distinguish useful service delivery from an unverified or visually inadequate icon; preserve useful service work and report any remaining limitation.
+13. Complete Choose a favicon: preflight the image before applying it. Preserve useful service work and report a missing or unverified icon as a non-blocking limitation.
 14. Stop capture with `discard: true` and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion or ending an abandoned or blocked run.
 
 Evaluate semantic usefulness as well as contract validity. The persisted catalog and search index provide routing in current and future conversations.
