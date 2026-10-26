@@ -1,0 +1,3 @@
+OX_DEVELOPMENT_TEAM = ABCDE12345
+OX_BUNDLE_IDENTIFIER = com.example.openox
+OX_APP_ENTITLEMENTS = LocalOnly.entitlements

@@ -389,7 +389,15 @@ struct ConversationPage: View {
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { _ in
                     scroller.viewportResized()
                 }
+                .onChange(of: dockedPrompt?.id) { _, id in
+                    scroller.promptWillChange(to: id)
+                }
                 .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0), value: dockedPrompt?.id)
+                .transaction(value: dockedPrompt?.id) { transaction in
+                    transaction.addAnimationCompletion(criteria: .logicallyComplete) {
+                        scroller.promptDidChange(to: dockedPrompt?.id)
+                    }
+                }
         }
         .background(Theme.Colors.conversationSurface)
         .background(ConversationWebInputFocus(isFocused: $webInputFocused))

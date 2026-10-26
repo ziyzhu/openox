@@ -44,11 +44,14 @@ final class ConversationViewportController {
     private enum ViewportHold: Equatable {
         case tail(TailHold)
         case reader(top: CGFloat)
+        case promptReader(UUID?, top: CGFloat)
+        case promptBottom(UUID?)
 
         func expectedTop(in frame: Frame) -> CGFloat {
             switch self {
             case .tail(let hold): hold.expectedTop(in: frame)
-            case .reader(let top): min(top, frame.endTop)
+            case .reader(let top), .promptReader(_, let top): min(top, frame.endTop)
+            case .promptBottom: frame.endTop
             }
         }
 
@@ -56,6 +59,7 @@ final class ConversationViewportController {
             switch self {
             case .tail(let hold): hold.rests(in: frame) && abs(frame.visualTop - hold.expectedTop(in: frame)) <= 1
             case .reader(let top): abs(frame.visualTop - top) <= 1
+            case .promptReader, .promptBottom: false
             }
         }
 
@@ -69,6 +73,8 @@ final class ConversationViewportController {
             switch self {
             case .tail(let hold): "tail \(hold.label)"
             case .reader(let top): "reader top=\(Int(top))"
+            case .promptReader(_, let top): "promptReader top=\(Int(top))"
+            case .promptBottom: "promptBottom"
             }
         }
     }
@@ -276,6 +282,26 @@ final class ConversationViewportController {
         anchorContentHeight = height
     }
 
+    func promptWillChange(to id: UUID?) {
+        guard let frame, !isUserScrolling else { return }
+        viewportHold = frame.distanceFromEnd <= Self.jumpThreshold
+            ? .promptBottom(id)
+            : .promptReader(id, top: frame.visualTop)
+        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=promptViewport phase=begin hold=\(viewportHold?.label ?? "none") \(logSnapshot)")
+    }
+
+    func promptDidChange(to id: UUID?) {
+        switch viewportHold {
+        case .promptReader(let target, _), .promptBottom(let target):
+            guard target == id else { return }
+        default: return
+        }
+        commitPendingGeometry()
+        applyViewportHold()
+        viewportHold = nil
+        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=promptViewport phase=end \(logSnapshot)")
+    }
+
     func viewportResized() {
         guard viewportHold != nil else { return }
         applyViewportHold()
@@ -422,6 +448,7 @@ final class ConversationViewportController {
         case .sending, .followingTurn, .reading: break
         }
         if case .tail(let hold) = viewportHold { return hold.pinsEnd }
+        if case .promptBottom = viewportHold { return true }
         return false
     }
 

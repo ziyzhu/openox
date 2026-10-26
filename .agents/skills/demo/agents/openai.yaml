@@ -1,4 +1,4 @@
 interface:
   display_name: "Ox Demo"
-  short_description: "Record Ox demos and App Store visual assets"
-  default_prompt: "Use $demo to prepare the requested Ox demo or App Store visual asset. Choose live capture or native preview explicitly, reuse production UI, preserve feature copy, verify live sign-ins when required, and review exports."
+  short_description: "Drive the live LinkedIn-to-Workday application demo"
+  default_prompt: "Use $demo to prepare and record the live Ox job-application workflow: discover a role on LinkedIn, create or extend a reusable Workday service, read an approved résumé from connected files, fill the application with approval, and stop for review without submitting. Verify actual website and service state, protect personal data, and report blockers honestly."

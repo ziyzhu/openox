@@ -117,8 +117,6 @@ struct PermissionRequestCard: View {
     var resolution: String? = nil
     let onSelect: (String) -> Void
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var submittedSelection: String?
     @State private var showingArguments = false
 
     var body: some View {
@@ -202,36 +200,14 @@ struct PermissionRequestCard: View {
         }
     }
 
-    @ViewBuilder
     private var permissionActions: some View {
-        if let selection = selection ?? submittedSelection {
-            RequestCardOptions(
-                options: request.options,
-                selection: selection,
-                resolution: resolution,
-                kind: .permission,
-                onSelect: onSelect
-            )
-                .transition(.scale(scale: 0.97).combined(with: .opacity))
-        } else {
-            PermissionActionButtons(options: request.options, onSelect: select)
-                .transition(.opacity)
-        }
-    }
-
-    private func select(_ option: String) {
-        guard submittedSelection == nil else { return }
-        Haptics.impact(.requestAnswered)
-        guard !reduceMotion else {
-            submittedSelection = option
-            onSelect(option)
-            return
-        }
-        withAnimation(Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
-            submittedSelection = option
-        } completion: {
-            onSelect(option)
-        }
+        RequestCardOptions(
+            options: request.options,
+            selection: selection,
+            resolution: resolution,
+            kind: .permission,
+            onSelect: onSelect
+        )
     }
 }
 
@@ -385,16 +361,28 @@ struct RequestCardOptions: View {
     }
 
     var body: some View {
-        if let effectiveSelection {
-            resolutionLabel(
-                resolution ?? effectiveSelection,
-                selection: effectiveSelection,
-                isConfirmed: options.contains(effectiveSelection) || resolution == nil
-            )
-            .transition(.scale(scale: 0.97).combined(with: .opacity))
-        } else {
-            optionButtons
-                .transition(.opacity)
+        Group {
+            if let selection {
+                resolutionLabel(
+                    resolution ?? selection,
+                    selection: selection,
+                    isConfirmed: options.contains(selection) || resolution == nil
+                )
+                .transition(.scale(scale: 0.97).combined(with: .opacity))
+            } else {
+                optionButtons
+                    .disabled(submittedSelection != nil)
+                    .transition(.opacity)
+            }
+        }
+        .task(id: submittedSelection) {
+            guard let submittedSelection else { return }
+            do {
+                try await Task.sleep(for: .seconds(1))
+            } catch {
+                return
+            }
+            onSelect(submittedSelection)
         }
     }
 
@@ -418,9 +406,11 @@ struct RequestCardOptions: View {
                 RequestActionButton(
                     title: option,
                     isPrimary: option.lowercased() == "yes",
+                    isSelected: submittedSelection == option,
                     cornerRadius: Theme.Radius.full,
                     action: { select(option) }
                 )
+                .opacity(submittedSelection == nil || submittedSelection == option ? 1 : 0.45)
                 .accessibilityIdentifier(A11yID.ConversationControls.confirm(option))
             }
         }
@@ -450,8 +440,10 @@ struct RequestCardOptions: View {
                 RequestChoiceButton(
                     number: allowsCustomAnswer ? index + 1 : nil,
                     title: option,
+                    isSelected: submittedSelection == option,
                     action: { select(option) }
                 )
+                .opacity(submittedSelection == nil || submittedSelection == option ? 1 : 0.45)
                 .accessibilityIdentifier(A11yID.ConversationControls.confirm(option))
                 if index < options.index(before: options.endIndex) || allowsCustomAnswer {
                     Divider()
@@ -516,27 +508,21 @@ struct RequestCardOptions: View {
     }
 
     private var permissionOptions: some View {
-        PermissionActionButtons(options: options, onSelect: select)
+        PermissionActionButtons(options: options, selection: submittedSelection, onSelect: select)
     }
 
     private func select(_ option: String) {
         guard effectiveSelection == nil else { return }
         Haptics.impact(.requestAnswered)
-        guard !reduceMotion else {
+        withAnimation(reduceMotion ? nil : Theme.Animation.handoff) {
             submittedSelection = option
-            onSelect(option)
-            return
-        }
-        withAnimation(Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
-            submittedSelection = option
-        } completion: {
-            onSelect(option)
         }
     }
 }
 
 struct PermissionActionButtons: View {
     let options: [String]
+    var selection: String? = nil
     let onSelect: (String) -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.colorScheme) private var colorScheme
@@ -568,12 +554,14 @@ struct PermissionActionButtons: View {
         RequestActionButton(
             title: option,
             isPrimary: isPrimary,
+            isSelected: selection == option,
             secondaryFill: colorScheme == .light
                 ? AnyShapeStyle(Theme.Colors.primary.opacity(0.12))
                 : AnyShapeStyle(Theme.Colors.surfaceSunken),
             cornerRadius: Theme.Radius.full,
             action: { onSelect(option) }
         )
+        .opacity(selection == nil || selection == option ? 1 : 0.45)
         .accessibilityIdentifier(A11yID.ConversationControls.confirm(option))
     }
 }
@@ -581,6 +569,7 @@ struct PermissionActionButtons: View {
 private struct RequestActionButton: View {
     let title: String
     let isPrimary: Bool
+    var isSelected = false
     var primaryFill = Theme.Colors.primary
     var secondaryFill = AnyShapeStyle(Theme.Colors.surfaceSunken)
     var cornerRadius = Theme.Radius.md
@@ -591,14 +580,14 @@ private struct RequestActionButton: View {
             label
         }
         .buttonStyle(RequestButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var label: some View {
-        HStack(spacing: 6) {
-            Text(title)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-        }
+        Text(title)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .padding(.horizontal, Theme.Spacing.lg)
         .font(Theme.Fonts.labelMd)
         .foregroundStyle(isPrimary ? Theme.Colors.onPrimary : Theme.Colors.onSurface)
         .frame(maxWidth: .infinity, minHeight: 44)
@@ -607,12 +596,22 @@ private struct RequestActionButton: View {
             isPrimary ? AnyShapeStyle(primaryFill) : secondaryFill,
             in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         )
+        .overlay(alignment: .trailing) {
+            if isSelected {
+                Image(systemName: "checkmark.circle")
+                    .font(Theme.Fonts.labelMd)
+                    .foregroundStyle(isPrimary ? Theme.Colors.onPrimary : Theme.Colors.onSurface)
+                    .padding(.trailing, Theme.Spacing.sm)
+                    .accessibilityHidden(true)
+            }
+        }
     }
 }
 
 private struct RequestChoiceButton: View {
     let number: Int?
     let title: String
+    var isSelected = false
     let action: () -> Void
 
     var body: some View {
@@ -620,6 +619,7 @@ private struct RequestChoiceButton: View {
             label
         }
         .buttonStyle(RequestButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var label: some View {
@@ -629,6 +629,10 @@ private struct RequestChoiceButton: View {
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
             Spacer(minLength: 0)
+            Image(systemName: "checkmark.circle")
+                .foregroundStyle(Theme.Colors.primary)
+                .opacity(isSelected ? 1 : 0)
+                .accessibilityHidden(true)
         }
         .frame(maxWidth: .infinity, minHeight: 44)
         .contentShape(Rectangle())

@@ -1,11 +1,11 @@
 ---
 name: setup
-description: Set up an OpenOx checkout for local development or Pi, including CLI and skill dependencies, simulator provisioning, iOS signing, App Store authentication, bundled services, and first launch. Use when a contributor asks to get OpenOx running, configure a coding agent, or diagnose a setup failure.
+description: Set up an OpenOx checkout for CLI, macOS Host, iOS, or Pi development, including dependencies, simulator provisioning, signing, bundled services, first launch, and contribution preparation. Use when a contributor asks to get OpenOx running, prepare a contribution, configure a coding agent, or diagnose a setup failure.
 ---
 
 # Setup
 
-Help the contributor reach a verified working environment. First determine whether they need the CLI, the iOS app, coding-agent setup, or commit readiness. Inspect existing tools and configuration before changing anything; preserve their chosen simulator, bundle identifier, Apple team, and local data. Read the repository [AGENTS.md](../../../AGENTS.md) and the top-level [README.md](../../../README.md). Keep machine-specific values in ignored local files.
+Help the contributor reach a verified working environment. First determine whether they need the CLI Client, macOS Host, iOS Client + Host, coding-agent setup, or contribution readiness. CLI development needs no Apple membership. For iOS, prefer the simulator without an Apple account, a free Personal Team for local-only device development, or a paid team for iCloud; free-team device installation remains unverified. Inspect existing tools and configuration before changing anything; preserve their chosen simulator, bundle identifier, Apple team, and local data. Read the repository [AGENTS.md](../../../AGENTS.md) and the top-level [README.md](../../../README.md). Keep machine-specific values in ignored local files.
 
 ## Source checkout and Ox CLI
 
@@ -91,7 +91,8 @@ Resolve `BASELINE_UDID` and, after cloning, `OX1_UDID` from the inventory before
 
 ## iOS signing and local configuration
 
-- Copy `apps/ios/Local.xcconfig.example` to the ignored `apps/ios/Local.xcconfig` if it does not exist. Set `OX_BUNDLE_IDENTIFIER` to the contributor's intended identifier and `OX_DEVELOPMENT_TEAM` to their Apple Developer team. Enable `CODE_SIGNING_ALLOWED = YES` for a build that needs Keychain. Do not put a team ID, certificate, profile, or credential in tracked files.
+- Simulator builds can use ad-hoc signing without an Apple account: pass `OX_DEVELOPMENT_TEAM= DEVELOPMENT_TEAM= OX_BUNDLE_IDENTIFIER=org.openox.contributorcheck CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES` to `xcodebuild`. Verified on Xcode 26.2 / iOS 26: build, install, onboarding, main screen, and a checked Keychain write/read/delete through `DeviceTemplate`. Launch with `--disable-icloud` for local-only verification. This does not establish free Personal Team device provisioning; unsigned device compilation is not installation evidence.
+- Copy `apps/ios/Local.xcconfig.example` to the ignored `apps/ios/Local.xcconfig` if it does not exist. For an iCloud-free Personal Team build, use `apps/ios/LocalOnly.xcconfig.example` instead; it selects `LocalOnly.entitlements` through `OX_APP_ENTITLEMENTS`, retaining App Groups and the share extension. Set `OX_BUNDLE_IDENTIFIER` to the contributor's intended identifier and `OX_DEVELOPMENT_TEAM` to their Apple Developer team. Free Personal Team device signing/installation still requires real-account verification; do not infer it from simulator success. Enable `CODE_SIGNING_ALLOWED = YES` for a build that needs Keychain. Do not put a team ID, certificate, profile, or credential in tracked files.
 - Check for a usable local signing identity with `security find-identity -v -p codesigning`. An App Store Connect API key or a certificate listed by `asc` does not supply the certificate's private key to this Mac. If the identity is absent, guide the contributor through Xcode's Apple Account and automatic signing setup, or use an existing private key they control. Do not create, revoke, or replace a certificate as a routine setup step.
 - After building, inspect the actual `.app` with `codesign -dv --verbose=4 <app>` and `codesign -d --entitlements :- <app>`. For a Keychain `errSecMissingEntitlement` startup failure, check the app identifier, access groups, and embedded entitlements before changing simulator data. Apple's [Keychain entitlement diagnosis](https://developer.apple.com/documentation/security/errsecmissingentitlement) explains the failure. A successful build alone does not establish that Keychain works.
 
@@ -204,6 +205,10 @@ Run Pi from the checkout root. Pi loads `AGENTS.md` and discovers repository ski
 Simulator workflows use the agent-independent `ios-simulator` skill maintained in dotfiles at `.agents/skills/ios-simulator/SKILL.md`, exposed through `~/.agents/skills/ios-simulator`. Run dotfiles `./setup check` and `./setup apply` to audit/apply its discovery links. Other contributors can use their own shared skill installation or native CLI help; the test runners require only Bun and the native iOS tools, not a coding-agent runtime or external wrapper checkout. Inspect existing destinations before changing links; never replace another installation blindly. Reload the coding agent's skills after updates where required.
 
 Additional browser/proxy skills are task-specific, not prerequisites for basic Pi use.
+
+## Preparing a contribution
+
+Keep issues and pull requests focused; describe the problem, changes, and verification. Run `bun run typecheck` for source changes and build each affected native app target; shared native changes require both iOS and macOS builds. Include simulator screenshots or recordings for UI changes. Report blocked or unverified paths explicitly, and keep credentials and diagnostic captures outside Git. Contributors use their own signing identities and containers; maintainer credentials are not required.
 
 ## Completion
 
