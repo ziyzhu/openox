@@ -69,10 +69,9 @@ struct ServiceHandoffActions: View {
 
     var body: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            Spacer()
-            RequestPillButton(title: String(localized: "Cancel"), isPrimary: false, action: cancel)
+            RequestPillButton(title: String(localized: "Cancel"), isPrimary: false, fillsWidth: true, action: cancel)
                 .accessibilityIdentifier(cancelAccessibilityIdentifier)
-            RequestPillButton(title: String(localized: "Done"), isPrimary: true) {
+            RequestPillButton(title: String(localized: "Done"), isPrimary: true, fillsWidth: true) {
                 done?()
             }
             .disabled(done == nil)

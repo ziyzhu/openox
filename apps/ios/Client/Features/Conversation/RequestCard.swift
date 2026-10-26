@@ -269,6 +269,7 @@ struct RequestPillButton: View {
     let title: String
     let isPrimary: Bool
     var isLoading = false
+    var fillsWidth = false
     var loadingLabel = String(localized: "Loading…")
     let action: () -> Void
 
@@ -289,7 +290,7 @@ struct RequestPillButton: View {
                 }
             }
                 .padding(.horizontal, Theme.Spacing.lg)
-                .frame(minWidth: 72, minHeight: 36)
+                .frame(minWidth: 72, maxWidth: fillsWidth ? .infinity : nil, minHeight: 36)
                 .background(
                     isPrimary ? AnyShapeStyle(Theme.Colors.primary) : AnyShapeStyle(Theme.Colors.surfaceSunken),
                     in: Capsule(style: .continuous)
