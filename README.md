@@ -23,7 +23,6 @@ A self-evolving agent that runs on your phone.
 2. Feels just like ChatGPT.
 3. Your device, any model.
 
-
 ## Download
 
 Available as **Ox** on [App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502).

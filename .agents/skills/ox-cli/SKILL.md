@@ -11,7 +11,7 @@ command help before guessing flags.
 Commands are grouped by the resource they act on, and each group has one
 selector flag:
 
-- `ox profile` with `--host <ws-url>`: Profiles owned by that Host; `--profile <id>` scopes inspection or updates. Without `--host`, `--profile <path>` selects a directory for read-only disk inspection.
+- `ox profile` with `--host <ws-url>`: Profiles owned by that Host; `--profile <id>` scopes inspection or updates. Without `--host`, `--profile <path>` selects a directory for read-only disk inspection. With neither selector, `OX_HOST_ENDPOINT` selects Host-backed reads; otherwise reads use offline discovery.
 - `ox repository` with `--repository <path-or-url>`: a service repository.
 - `ox host` with `--host <ws-url>`: an Ox Host.
 - `ox conversation` and `ox vm` with `--host` and `--conversation <conversation-id>`: a conversation on that
@@ -61,6 +61,17 @@ ox vm help ox.fs.read
 ox vm skills
 ox vm skills <name>
 ```
+
+Create and drive a conversation through the real agent loop:
+
+```sh
+ox conversation new --provider <provider-id> --model <model-id> --attach <domain,...> --json
+ox --conversation <conversation-id> conversation send 'Your request' --json
+printf '%s' 'Your request' | ox --conversation <conversation-id> conversation send - --json
+ox --conversation <conversation-id> conversation watch --pending --messages
+```
+
+Provider, model, and attachment flags are optional; pass provider and model together when choosing a model. Use the returned conversation ID for subsequent commands. `send` waits for the turn outcome by default; use `--no-wait` to return after submission, then `watch` to follow progress. A pending prompt may require a response before the run can continue.
 
 Use `--conversation <conversation-id>` when the active conversation is not the intended VM:
 
@@ -113,10 +124,10 @@ ox --host <ws-url> --profile <id> profile update --memory-file <path>
 
 Create does not select the new Profile. Selection and updates reject running conversations; stop them explicitly first. Name and memory updates use existing Host persistence, not replacement of `profile.json`. Inspect after a failed update before retrying, because earlier writes may have succeeded.
 
-For offline inspection, discover iCloud Profiles on macOS and select one by directory:
+For offline inspection, discover iCloud Profiles on macOS and select one by directory. Unset `OX_HOST_ENDPOINT` for discovery so `profile list` does not query a Host; an explicit `--profile <path>` selects offline reads without unsetting it:
 
 ```sh
-ox profile list [--json]
+env -u OX_HOST_ENDPOINT ox profile list [--json]
 ox --profile <path> profile memory
 ox --profile <path> profile skills [name] [--json]
 ox --profile <path> profile files [filename] [--json]
