@@ -15,4 +15,4 @@ The general API is a first-run trial option. Free quotas are time-limited, and u
 
 ## Runtime sources
 
-- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
+- Definition, presentation, and model discovery: [providers.json](../providers.json)

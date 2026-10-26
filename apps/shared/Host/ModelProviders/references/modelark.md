@@ -14,4 +14,4 @@ Ox uses one provider identity with different display names and separate credenti
 
 ## Runtime sources
 
-- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
+- Definition, presentation, and model discovery: [providers.json](../providers.json)

@@ -20,5 +20,5 @@ The China general API is a first-run trial option because new Model Studio accou
 
 ## Runtime sources
 
-- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
-- Website adapter: [qwen.ai/actions.js](../../../../apps/shared/Resources/OxServices.bundle/web/qwen.ai/actions.js)
+- Definition, presentation, and model discovery: [providers.json](../providers.json)
+- Website adapter: [qwen.ai/actions.js](../../../Resources/OxServices.bundle/web/qwen.ai/actions.js)

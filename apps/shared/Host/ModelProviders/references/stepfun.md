@@ -12,4 +12,4 @@ Ox currently presents StepFun only in China.
 
 ## Runtime sources
 
-- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
+- Definition, presentation, and model discovery: [providers.json](../providers.json)

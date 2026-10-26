@@ -1,6 +1,6 @@
 # Native Integrations
 
-Read the matching provider reference before changing an integration. Verify unstable metadata against first-party sources. Provider source and catalog own executable behavior.
+Read the matching provider reference in this directory before changing an integration. References preserve official sources and account context, not executable configuration. Verify unstable metadata against first-party sources. Provider source and [providers.json](../providers.json) own executable behavior; keep API URLs, headers, model IDs, limits, reasoning controls, and caching policy there.
 
 ## API and subscription providers
 

@@ -12,4 +12,4 @@ Ox presents ModelScope API Inference only in China. The service is free for deve
 
 ## Runtime sources
 
-- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
+- Definition, presentation, and model discovery: [providers.json](../providers.json)

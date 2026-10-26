@@ -70,6 +70,21 @@ Keep logs, reports, screenshots, recordings, and predecessor snapshots outside G
 Report commands, targets, results, coverage limits, and private evidence paths;
 state when real iOS, models, authentication, or services were not exercised.
 
+## Provider verification
+
+Exercise installation-specific provider changes through an Ox conversation using
+the bundled `manage-providers` skill. Use the `ox-cli` skill for conversation,
+provider-state, and structured-log inspection. Test bundled defaults in an isolated
+setup without saved overrides masking them; never delete a user's override to
+reset a test because provider deletion also clears credentials.
+
+Distinguish schema validation, discovered model availability, authentication, and
+successful inference. Exercise tools or attachments before claiming support;
+upload success alone does not prove a model can read an attachment. Obtain
+permission for billable inference or uploads. Preserve credentials, drafts,
+existing conversations, and the selected model. Report which definitions were
+validated, which models were exercised, and which checks remain unperformed.
+
 ## Local macOS verification
 
 `test:host-macos` launches the actual signed Debug `ai.openox.host.local` app as a

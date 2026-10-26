@@ -13,4 +13,4 @@ Ox exposes the subscription-backed Token Plan in Global and China with separate 
 
 ## Runtime sources
 
-- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
+- Definition, presentation, and model discovery: [providers.json](../providers.json)

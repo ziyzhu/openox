@@ -14,10 +14,10 @@ Ox presents OpenRouter in Global. Users can connect their OpenRouter account wit
 
 ## Runtime sources
 
-- Request authentication: [OpenRouterProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/OpenRouter/OpenRouterProvider.swift)
-- OAuth endpoints and exchange: [OpenRouterOAuth.swift](../../../../apps/shared/Host/Agent/LLM/Providers/OpenRouter/OpenRouterOAuth.swift)
-- OAuth account storage: [OpenRouterSubscriptionAccount.swift](../../../../apps/shared/Host/Agent/LLM/Providers/OpenRouter/OpenRouterSubscriptionAccount.swift)
-- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
+- Request authentication: [OpenRouterProvider.swift](../../Agent/LLM/Providers/OpenRouter/OpenRouterProvider.swift)
+- OAuth endpoints and exchange: [OpenRouterOAuth.swift](../../Agent/LLM/Providers/OpenRouter/OpenRouterOAuth.swift)
+- OAuth account storage: [OpenRouterSubscriptionAccount.swift](../../Agent/LLM/Providers/OpenRouter/OpenRouterSubscriptionAccount.swift)
+- Definition, presentation, and model discovery: [providers.json](../providers.json)
 
 ## Implementation comparison
 

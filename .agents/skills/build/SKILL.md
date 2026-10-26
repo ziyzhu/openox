@@ -38,8 +38,19 @@ includes test, eval, Gym, demo, setup, build, and release code.
 
 Change the owning source, regenerate with its public command, and review the
 focused output diff. Do not change contract schemas merely to make checks pass;
-service manifest changes require maintainer approval. Provider selection changes
-follow the `providers` skill rather than a second catalog-management workflow.
+service manifest changes require maintainer approval.
+
+Provider definitions and discovery settings live in
+`apps/shared/Host/ModelProviders/providers.json`; integration and account references
+live alongside it in `references/`, starting with
+[native integrations](../../../apps/shared/Host/ModelProviders/references/native-integrations.md).
+New models arrive through runtime discovery; do not pin models merely because they
+are new. Preserve existing picker IDs, aliases, variants, intentional token caps,
+and regional/subscription boundaries. Change discovery formats, catalogs, rules,
+and data-expressible options in `providers.json`; Swift owns transports, custom
+adapter authentication, and OAuth. Never promote credentials, personal overrides,
+or account-specific availability into bundled defaults. Run `bun run typecheck`
+after provider changes; shared Swift changes require both native builds.
 
 `apps/shared/Resources/OxServices.bundle/` is the single built-in repository source.
 Both native targets compile `apps/shared` and their own platform sources; neither compiles the other app. `typecheck` enforces this boundary and rejects OS conditionals in native Swift sources. Keep shared/platform Swift filenames distinct: localization extraction writes their `.stringsdata` outputs into the same target directory.

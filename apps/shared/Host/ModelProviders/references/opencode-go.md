@@ -12,4 +12,4 @@ Ox presents OpenCode Go in Global. It is a subscription-key provider, not an API
 
 ## Runtime sources
 
-- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
+- Definition, presentation, and model discovery: [providers.json](../providers.json)

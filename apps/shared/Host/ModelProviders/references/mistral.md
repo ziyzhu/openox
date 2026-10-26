@@ -14,4 +14,4 @@ Ox presents the Mistral API in Global. Mistral enables API access in Free mode w
 
 ## Runtime sources
 
-- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
+- Definition, presentation, and model discovery: [providers.json](../providers.json)

@@ -18,6 +18,6 @@ Gemini Website remains an ordinary service using its signed-in website session, 
 
 ## Runtime sources
 
-- Website service Actions: [Gemini service](../../../../apps/shared/Resources/OxServices.bundle/web/gemini.google.com/actions.js)
-- Provider and Gemini GenerateContent implementation: [GeminiProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/GeminiProvider.swift)
-- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
+- Website service Actions: [Gemini service](../../../Resources/OxServices.bundle/web/gemini.google.com/actions.js)
+- Provider and Gemini GenerateContent implementation: [GeminiProvider.swift](../../Agent/LLM/Providers/GeminiProvider.swift)
+- Definition, presentation, and model discovery: [providers.json](../providers.json)

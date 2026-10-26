@@ -10,8 +10,8 @@ Ox makes a configured custom provider available in Global and China because it i
 
 ## Runtime sources
 
-- Persisted definition and model discovery: [CustomLLMProvider.swift](../../../../apps/shared/Host/ModelProviders/CustomLLMProvider.swift)
-- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
-- Wire protocol: [OpenAIChatTransport.swift](../../../../apps/shared/Host/Agent/LLM/Transports/OpenAIChatTransport.swift)
+- Persisted definition and model discovery: [CustomLLMProvider.swift](../CustomLLMProvider.swift)
+- Definition, presentation, and model discovery: [providers.json](../providers.json)
+- Wire protocol: [OpenAIChatTransport.swift](../../Agent/LLM/Transports/OpenAIChatTransport.swift)
 
 Keep validation, normalization, discovery behavior, inference-location semantics, and credential handling in code rather than documenting assumed server behavior here.

@@ -12,4 +12,4 @@ Ox presents DeepSeek in Global and China under one provider identity. The curren
 
 ## Runtime sources
 
-- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
+- Definition, presentation, and model discovery: [providers.json](../providers.json)

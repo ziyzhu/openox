@@ -18,10 +18,10 @@ The new credential record is isolated from predecessor Codex credentials; existi
 
 ## Runtime sources
 
-- Request authentication: [ChatGPTProvider.swift](../../../../apps/shared/Host/Agent/LLM/Providers/ChatGPT/ChatGPTProvider.swift)
-- OAuth: [ChatGPTOAuth.swift](../../../../apps/shared/Host/Agent/LLM/Providers/ChatGPT/ChatGPTOAuth.swift)
-- Account state: [ChatGPTSubscriptionAccount.swift](../../../../apps/shared/Host/Agent/LLM/Providers/ChatGPT/ChatGPTSubscriptionAccount.swift)
-- Definition, presentation, and model discovery: [providers.json](../../../../apps/shared/Host/ModelProviders/providers.json)
+- Request authentication: [ChatGPTProvider.swift](../../Agent/LLM/Providers/ChatGPT/ChatGPTProvider.swift)
+- OAuth: [ChatGPTOAuth.swift](../../Agent/LLM/Providers/ChatGPT/ChatGPTOAuth.swift)
+- Account state: [ChatGPTSubscriptionAccount.swift](../../Agent/LLM/Providers/ChatGPT/ChatGPTSubscriptionAccount.swift)
+- Definition, presentation, and model discovery: [providers.json](../providers.json)
 
 ## Implementation comparison
 
