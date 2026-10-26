@@ -4,11 +4,11 @@ Deliver a useful Local service from live website evidence and report its verifie
 
 ## Task-driven evolution
 
-Use when the user requests a reusable website service or repair, or when authoring is necessary to complete the task. Ordinary website tasks may use Browser directly without creating a service. If discovery fails, report the failed search accurately instead of claiming a capability is missing. Diagnose sign-in, human verification, rate limiting, missing resources, and temporary website failures before treating an action as broken.
+Use when the user requests a website service or repair, or when a website task lacks a working service action. Browser is for observing websites and building or repairing actions; fulfill the request through service invocation. If discovery fails, report the failed search accurately instead of claiming a capability is missing. Diagnose sign-in, human verification, rate limiting, missing resources, and temporary website failures before treating an action as broken.
 
 1. Discover the product domain's existing web service and use its available actions. Inspect missing capabilities through Browser; the action catalog alone does not establish that the website lacks them.
-2. Use observed evidence to extend that service or create the requested capability. Prefer observation followed by one approved invocation for mutations. If Browser already completed an effect, preserve it and never repeat it for verification.
-3. Validate, attach, and verify the resulting service, then use its actions to complete the request. Continue without a separate proposal checkpoint. If authoring is blocked, continue authorized Browser fulfillment and report the limitation.
+2. Use read-only evidence and non-consequential UI interaction to extend that service or create the requested capability. Do not submit external mutations through Browser to discover or test them; perform them through approval-gated service actions. If exploration unexpectedly causes an effect, preserve it and never repeat it for verification.
+3. Validate, attach, inspect, and invoke the resulting service actions to complete the request and verify the outcome. Continue without a separate proposal checkpoint. If authoring is blocked, report the concrete blocker instead of falling back to Browser fulfillment.
 4. Repair affected skills when changed contracts require it within the task's scope. Read `references/skills.md` for ownership and authoring. Preserve unrelated workflows and keep one-time details out of skills.
 
 Stop when the requested outcome is complete. Never repeat a completed mutation for evidence or testing. Track pending, completed, and uncertain effects; inspect resulting state before retrying uncertain effects, and ask if uncertainty remains. Disclose unexecuted handlers as partially verified at completion.
@@ -25,7 +25,7 @@ services/web/<domain>/
 2. Navigate to the requested URL and wait for the top-level URL to settle.
 3. Identify the coherent product surface and the hosts needed by its actions.
 4. Search with `ox.service.find` for the requested host, final host, and plausible parent-domain candidates.
-5. Choose a bare lowercase service domain that equals or is a parent suffix of every base URL host. Keep distinct products or account surfaces as separate services.
+5. Choose the narrowest bare lowercase domain representing the coherent product and account surface. It must equal or be a parent suffix of every base URL host; do not automatically choose the root domain or current hostname. Reuse an existing service for the same surface. Normalize a main website such as `www.example.com` to `example.com`; use a common parent for subdomains belonging to one product and account surface. Keep distinct products, account surfaces, and customer or tenant subdomains separate: `creator.example.com` can be its own service, and `clinic.vendor.com` must not become the platform-wide `vendor.com`. Service identity and execution URL are separate; a different action hostname alone does not require another service.
 6. When the service already exists, inspect its manifest and source read-only. Do not copy or edit it yet.
 
 Defer creation or copying until evidence supports the established action scope. Discovery alone must not leave a Local draft.
@@ -248,11 +248,11 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 2. Call `ox.service.validate` with the Local service's bare domain, then `ox.service.attach`. Validation checks the whole draft without invoking its actions; attach loads it when missing or reloads this conversation's existing attachment from the current source. Repeat after another coherent set of edits is ready to test.
 3. Inspect the action index and full contract for every exposed action.
 4. Compare manifest and installer parity: every declared ID has one handler, every handler is declared, every input is consumed, defaults validate, and cursor inputs advance results.
-5. Invoke each changed action with a small success case. For already completed bootstrap mutations, inspect resulting state read-only and mark unexecuted handlers partially verified.
+5. Invoke each changed action with a small success case. For any mutation already completed, inspect resulting state read-only and mark unexecuted handlers partially verified. A successful requested mutation verifies the action; never repeat it for testing.
 6. Invoke each page-owned action as the first action on a fresh action page. Do not prime it with a sibling action, a manually opened panel, or state left by Browser exploration.
 7. For every detail action, pass an opaque identifier returned by its corresponding list or search action in the same verified state. Empty ranges, calendar time slots, placeholders, and synthetic identifiers do not count as successful detail verification.
 8. Exercise applicable empty, terminal pagination, missing-resource, stale-state, concurrency, and authentication boundaries. A paginated action must advance a source cursor or another deterministic continuation; never expose a fabricated numeric cursor over only the currently rendered DOM snapshot.
-9. Request separate approval before invoking a live mutation; follow the bootstrap single-execution rule.
+9. Honor runtime Action policies for live mutations without adding a separate approval prompt. Invoke only mutations authorized by the request, never additional effects solely for testing.
 10. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
 11. Inspect repository skills that depend on this service when action IDs or contracts changed and revise affected skills through `references/skills.md`.
 12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this conversation.
