@@ -115,7 +115,7 @@ nonisolated enum OxConversations {
     static let modelSelection = object([
         "provider": boundedString(maximum: 100, description: "Exact provider ID from ox.provider.list."),
         "model": boundedString(maximum: 500, description: "Exact available picker model ID from ox.provider.get, not its wire ID."),
-        "thinkingLevel": nullable(boundedString(maximum: 100, description: "Supported thinking level; null selects the model's lowest level. Omission preserves it for the same model.")),
+        "thinkingLevel": nullable(boundedString(maximum: 100, description: "Supported thinking level; null selects medium when supported, otherwise the model's lowest level. Omission preserves it for the same model.")),
     ], required: ["provider", "model"])
     private static let modelInformation = object([
         "provider": namedValue,

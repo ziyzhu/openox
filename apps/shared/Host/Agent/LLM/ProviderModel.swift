@@ -38,9 +38,9 @@ nonisolated public struct ProviderModel: Sendable, Codable {
     public var modalities: ProviderModelModalities
     public var systemUpdates: Bool
     public var wireID: String { providerModelID ?? id }
-    public var lowestReasoningEffort: String? { reasoningEfforts.first }
+    public var defaultReasoningEffort: String? { reasoningEfforts.contains("medium") ? "medium" : reasoningEfforts.first }
     public var selectedReasoningEffort: String? {
-        reasoningEffort.flatMap { reasoningEfforts.contains($0) ? $0 : nil } ?? lowestReasoningEffort
+        reasoningEffort.flatMap { reasoningEfforts.contains($0) ? $0 : nil } ?? defaultReasoningEffort
     }
 
     public init(

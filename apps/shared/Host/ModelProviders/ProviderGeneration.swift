@@ -76,7 +76,7 @@ nonisolated enum ProviderGeneration {
             }
         }
         guard bytes <= 131_072 else { throw RuntimeError.bridge("Supplied generation text exceeds 128 KiB") }
-        model.reasoningEffort = model.lowestReasoningEffort
+        model.reasoningEffort = model.defaultReasoningEffort
         let selected = model
         let result = try await withThrowingTaskGroup(of: AssistantMessage.self) { group in
             group.addTask {

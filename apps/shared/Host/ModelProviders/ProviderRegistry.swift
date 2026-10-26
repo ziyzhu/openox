@@ -154,7 +154,7 @@ final class ProviderRegistry {
     var sessionModel: ModelSelection {
         if let defaultModel { return defaultModel }
         let client = clients(in: AppRegion.shared.region).first ?? clients.first ?? unavailableClient
-        return ModelSelection(providerID: client.id, modelID: client.models.first!.id, reasoningEffort: client.models.first!.lowestReasoningEffort)
+        return ModelSelection(providerID: client.id, modelID: client.models.first!.id, reasoningEffort: client.models.first!.defaultReasoningEffort)
     }
 
     var newSessionClient: any ProviderClient { client(for: sessionModel) }
@@ -190,7 +190,7 @@ final class ProviderRegistry {
     func model(for selection: ModelSelection?, client: any ProviderClient) -> ProviderModel {
         let selection = selection ?? sessionModel
         if var model = client.models.first(where: { $0.id == selection.modelID }) {
-            model.reasoningEffort = selection.reasoningEffort.flatMap { model.reasoningEfforts.contains($0) ? $0 : nil } ?? model.lowestReasoningEffort
+            model.reasoningEffort = selection.reasoningEffort.flatMap { model.reasoningEfforts.contains($0) ? $0 : nil } ?? model.defaultReasoningEffort
             return model
         }
         return ProviderModel(id: selection.modelID, displayName: selection.modelID, maxTokens: 4_096, maxContext: 32_768, supportsTools: true)
@@ -204,8 +204,8 @@ final class ProviderRegistry {
     }
 
     func reasoningEffort(for model: ProviderModel, in clientID: String, region: LLMRegion) -> String? {
-        guard let selection = defaultModel, selection.providerID == clientID, selection.modelID == model.id else { return model.lowestReasoningEffort }
-        return selection.reasoningEffort.flatMap { model.reasoningEfforts.contains($0) ? $0 : nil } ?? model.lowestReasoningEffort
+        guard let selection = defaultModel, selection.providerID == clientID, selection.modelID == model.id else { return model.defaultReasoningEffort }
+        return selection.reasoningEffort.flatMap { model.reasoningEfforts.contains($0) ? $0 : nil } ?? model.defaultReasoningEffort
     }
 
     struct SelectedModel {
@@ -234,7 +234,7 @@ final class ProviderRegistry {
         guard !needsAuthentication || hasCredential || signedIn else {
             throw RuntimeError.bridge("Authenticate this provider through ox.provider.authenticate before selecting its model")
         }
-        model.reasoningEffort = selection.reasoningEffort ?? model.lowestReasoningEffort
+        model.reasoningEffort = selection.reasoningEffort ?? model.defaultReasoningEffort
         return SelectedModel(client: client, model: model)
     }
 
