@@ -90,7 +90,7 @@ struct ThinkingRow: View {
                     .accessibilityLabel(label)
                     if !sources.isEmpty {
                         SourceChipList(sources: sources) { source in
-                            SourceChipButton(source: source) {
+                            SourceChipButton(source: source, accessibilityIdentifier: "conversation.source.\(source.id)") {
                                 if let url = source.url {
                                     LinkOpener.open(url: url, serviceManager: serviceManager)
                                 } else {
@@ -370,9 +370,9 @@ private struct TraceRow: View {
                     .buttonStyle(.plain)
                     if let sources = InvocationFormat.sources(invocation, serviceManager: serviceManager) {
                         SourceChipList(sources: sources) { source in
-                            if let url = source.url {
-                                SourceChipButton(source: source) {
-                                    open(url)
+                            if source.url != nil || source.skill != nil {
+                                SourceChipButton(source: source, accessibilityIdentifier: "conversation.step.\(invocation.id).source.\(source.id)") {
+                                    if let url = source.url { open(url) }
                                 }
                             } else {
                                 NavigationLink(value: invocation) {
@@ -382,6 +382,7 @@ private struct TraceRow: View {
                                 .frame(minHeight: Theme.Size.minimumTouchTarget)
                                 .contentShape(Rectangle())
                                 .accessibilityLabel(source.accessibilityLabel)
+                                .accessibilityIdentifier("conversation.step.\(invocation.id).source.\(source.id)")
                             }
                         }
                     }
@@ -466,6 +467,14 @@ private struct SourceChip: View {
             switch source.icon {
             case .none:
                 EmptyView()
+            case .skill:
+                Image(systemName: "doc.text")
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .frame(width: 16, height: 20)
+            case .file:
+                Image(systemName: "doc")
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .frame(width: 16, height: 20)
             case .domain(let domain):
                 DomainFavicon(domain: domain, size: 16)
             case .service(let service):
@@ -476,6 +485,7 @@ private struct SourceChip: View {
                 .foregroundStyle(Theme.Colors.conversationSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .frame(maxWidth: 240, alignment: .leading)
         }
         .padding(.leading, 8)
         .padding(.trailing, 10)
@@ -485,16 +495,33 @@ private struct SourceChip: View {
 
 private struct SourceChipButton: View {
     let source: InvocationFormat.Source
+    let accessibilityIdentifier: String
     let action: () -> Void
 
+    @State private var presentedSkill: Skill?
+    @State private var profileID = StorageRoot.shared.activeId
+
     var body: some View {
-        Button(action: action) {
+        Button {
+            if let skill = source.skill {
+                presentedSkill = skill
+            } else {
+                action()
+            }
+        } label: {
             SourceChip(source: source)
         }
         .buttonStyle(.plain)
         .frame(minHeight: Theme.Size.minimumTouchTarget)
         .contentShape(Rectangle())
         .accessibilityLabel(source.accessibilityLabel)
+        .accessibilityIdentifier(accessibilityIdentifier)
+        .sheet(item: $presentedSkill) { skill in
+            NavigationStack {
+                ConversationSkillDetails(skill: skill, skills: Skills.shared, profileID: profileID)
+            }
+            .presentationBackground(Theme.Colors.background)
+        }
     }
 }
 
@@ -651,6 +678,8 @@ private enum InvocationFormat {
             case none
             case domain(String)
             case service(Service)
+            case file(String)
+            case skill(Skill)
         }
 
         let label: String
@@ -658,11 +687,18 @@ private enum InvocationFormat {
         let url: URL?
         let accessibilityLabel: String
 
+        var skill: Skill? {
+            if case .skill(let skill) = icon { return skill }
+            return nil
+        }
+
         var id: String {
             switch icon {
             case .service(let service): "service:\(service.domain)"
             case .domain(let domain): "domain:\(url?.absoluteString ?? domain)"
             case .none: "label:\(label)"
+            case .file(let path): "file:\(path)"
+            case .skill(let skill): "skill:\(skill.id)"
             }
         }
 
@@ -677,6 +713,16 @@ private enum InvocationFormat {
     static func sources(_ invocation: Invocation, serviceManager: ServiceManager) -> [Source]? {
         let args = invocation.preview == nil ? invocation.args.objectValue : nil
         switch invocation.name {
+        case Actions.fsRead, Actions.fsWrite, Actions.fsEdit:
+            guard let path = invocation.args.objectValue?["path"]?.stringValue,
+                  !path.isEmpty else { return nil }
+            let parts = path.split(separator: "/")
+            if invocation.name == Actions.fsRead, parts.count == 3,
+               parts[0] == "skills", parts[2] == "SKILL.md",
+               let skill = Skills.shared.skill(named: String(parts[1])) {
+                return [Source(label: "/\(skill.displayName)", icon: .skill(skill), accessibilityLabel: "/\(skill.displayName), \(skill.description)")]
+            }
+            return [Source(label: (path as NSString).lastPathComponent, icon: .file(path), accessibilityLabel: path)]
         case Actions.webSearch:
             if let sources = searchSources(invocation), !sources.isEmpty {
                 return sources
@@ -704,9 +750,7 @@ private enum InvocationFormat {
         if invocation.preview != nil {
             return (invocation.sources?.links ?? []).compactMap { link in
                 guard let url = URL(string: link.url), let domain = domain(url) else { return nil }
-                let title = link.title?.trimmingCharacters(in: .whitespacesAndNewlines)
-                return Source(label: domain, icon: .domain(domain), url: url,
-                              accessibilityLabel: title.flatMap { $0.isEmpty ? nil : "\(domain), \($0)" })
+                return webSource(url: url, domain: domain, title: link.title)
             }
         }
         guard case .succeeded(let result?) = invocation.outcome,
@@ -715,9 +759,7 @@ private enum InvocationFormat {
             guard let value = item.objectValue?["url"]?.stringValue,
                   let url = URL(string: value),
                   let domain = domain(url) else { return nil }
-            let title = item.objectValue?["title"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let accessibilityLabel = title.flatMap { $0.isEmpty ? nil : "\(domain), \($0)" }
-            return Source(label: domain, icon: .domain(domain), url: url, accessibilityLabel: accessibilityLabel)
+            return webSource(url: url, domain: domain, title: item.objectValue?["title"]?.stringValue)
         }
     }
 
@@ -731,7 +773,14 @@ private enum InvocationFormat {
         guard let value = finalURL ?? argsURL,
               let url = URL(string: value),
               let domain = domain(url) else { return nil }
-        return Source(label: domain, icon: .domain(domain), url: url)
+        return webSource(url: url, domain: domain, title: invocation.sources?.links.first?.title)
+    }
+
+    private static func webSource(url: URL, domain: String, title: String?) -> Source {
+        let title = title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let label = title.flatMap { $0.isEmpty ? nil : $0 } ?? domain
+        return Source(label: label, icon: .domain(domain), url: url,
+                      accessibilityLabel: label == domain ? domain : "\(domain), \(label)")
     }
 
     private static func domain(_ url: URL) -> String? {

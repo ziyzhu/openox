@@ -54,7 +54,7 @@ struct ConversationSkillRow: View {
     }
 }
 
-private struct ConversationSkillDetails: View {
+struct ConversationSkillDetails: View {
     let skill: Skill
     let skills: Skills
     let profileID: UUID?
