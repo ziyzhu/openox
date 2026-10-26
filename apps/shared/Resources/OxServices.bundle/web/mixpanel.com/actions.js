@@ -34,6 +34,24 @@ const retryFetch = async (input, init, options) => {
 
 window.ox.install(({ action }) => {
     const ORIGIN = "https://mixpanel.com";
+
+    const getAccessToken = async () => {
+        const response = await retryFetch("/oauth/access_token/", {
+            credentials: "include",
+        });
+        if (response.status === 401 || response.status === 403 || response.redirected || response.url.includes("/login")) {
+            return null;
+        }
+        if (!response.ok) {
+            throw new Error(`Mixpanel token acquisition failed (HTTP ${response.status})`);
+        }
+        const data = await response.json();
+        if (typeof data?.token !== "string" || !data.token) {
+            throw new Error("Unexpected Mixpanel token response");
+        }
+        return data.token;
+    };
+
     const readJson = async (response, path) => {
         const text = await response.text();
         let json;
@@ -52,33 +70,46 @@ window.ox.install(({ action }) => {
         }
         return json;
     };
+
     const apiGet = async (path) => {
+        const token = await getAccessToken();
+        const headers = { accept: "application/json" };
+        if (token) {
+            headers["authorization"] = `Bearer ${token}`;
+        }
         const response = await retryFetch(path, {
             credentials: "include",
-            headers: { accept: "application/json" },
+            headers,
         });
         return readJson(response, path.split("?")[0]);
     };
+
     const apiPost = async (path, body, projectId, options = {}) => {
         const csrf = cookie("csrftoken");
-        if (!csrf)
-            throw new Error("Not signed in to Mixpanel (no CSRF cookie). Sign in first.");
+        const token = await getAccessToken();
         const requestUrl = options.requestUrl ?? `${ORIGIN}/project/${encodeURIComponent(projectId)}/app/events`;
+        const headers = {
+            accept: "application/json",
+            "content-type": options.contentType ?? "text/plain;charset=UTF-8",
+            "project-id": projectId,
+            "request-url": requestUrl,
+            ...options.headers,
+        };
+        if (csrf) {
+            headers["x-csrftoken"] = csrf;
+        }
+        if (token) {
+            headers["authorization"] = `Bearer ${token}`;
+        }
         const response = await retryFetch(path, {
             method: "POST",
             credentials: "include",
-            headers: {
-                accept: "application/json",
-                "content-type": options.contentType ?? "text/plain;charset=UTF-8",
-                "project-id": projectId,
-                "request-url": requestUrl,
-                "x-csrftoken": csrf,
-                ...options.headers,
-            },
+            headers,
             body: JSON.stringify(body),
         });
         return readJson(response, path);
     };
+
     const asEntries = (value) => value && typeof value === "object" ? Object.entries(value) : [];
     const nullableText = (value) => {
         const text = String(value ?? "").trim();
@@ -116,7 +147,7 @@ window.ox.install(({ action }) => {
         }
     };
     const projectIdForWorkspace = async (workspaceId) => {
-        const user = await apiGet("/api/app/me/");
+        const user = await apiGet("/api/app/me/?include_workspace_users=false");
         const workspace = user?.workspaces?.[workspaceId];
         const projectId = String(workspace?.project_id ?? "");
         if (!projectId)
@@ -143,37 +174,45 @@ window.ox.install(({ action }) => {
         type: "string",
         propertyDefaultType: "string",
     }));
+
     action("getSignInUrl", {
         async invoke() {
             return { url: `${ORIGIN}/login/` };
         },
     });
+
     action("getSignInState", {
         async invoke() {
-            const response = await retryFetch("/api/app/me/", {
+            const token = await getAccessToken();
+            if (!token) {
+                console.log("getSignInState: no token, signedIn=false");
+                return { signedIn: false };
+            }
+            const response = await retryFetch("/api/app/me/?include_workspace_users=false", {
                 credentials: "include",
-                headers: { accept: "application/json" },
+                headers: {
+                    accept: "application/json",
+                    authorization: `Bearer ${token}`,
+                },
             });
             if (response.status === 401 || response.status === 403 || response.redirected || response.url.includes("/login")) {
                 console.log(`getSignInState: status=${response.status} signedIn=false`);
                 return { signedIn: false };
             }
             const contentType = response.headers.get("content-type") ?? "";
-            if (!contentType.includes("json")) {
-                console.log(`getSignInState: status=${response.status} contentType=${contentType} signedIn=false`);
-                return { signedIn: false };
+            if (!response.ok || !contentType.includes("json")) {
+                throw new Error(`Mixpanel sign-in check failed (HTTP ${response.status})`);
             }
             const json = await response.json();
-            if (!response.ok)
-                throw new Error(`Mixpanel sign-in check failed (HTTP ${response.status})`);
-            const signedIn = json?.status === "ok" && Boolean(json?.results?.user_id);
-            console.log(`getSignInState: status=${response.status} signedIn=${signedIn}`);
-            return { signedIn };
+            if (json?.status !== "ok" || !json?.results?.user_id) throw new Error("Unexpected Mixpanel identity response");
+            console.log(`getSignInState: status=${response.status} signedIn=true`);
+            return { signedIn: true };
         },
     });
+
     action("getCurrentUser", {
         async invoke() {
-            const user = await apiGet("/api/app/me/");
+            const user = await apiGet("/api/app/me/?include_workspace_users=false");
             return {
                 id: String(user?.user_id ?? ""),
                 name: String(user?.user_name ?? ""),
@@ -181,9 +220,10 @@ window.ox.install(({ action }) => {
             };
         },
     });
+
     action("listProjects", {
         async invoke() {
-            const user = await apiGet("/api/app/me/");
+            const user = await apiGet("/api/app/me/?include_workspace_users=false");
             const items = asEntries(user?.projects).map(([id, project]) => ({
                 id,
                 name: String(project?.name ?? ""),
@@ -196,9 +236,10 @@ window.ox.install(({ action }) => {
             return { items, nextCursor: null };
         },
     });
+
     action("listWorkspaces", {
         async invoke({ projectId }) {
-            const user = await apiGet("/api/app/me/");
+            const user = await apiGet("/api/app/me/?include_workspace_users=false");
             const items = asEntries(user?.workspaces)
                 .map(([id, workspace]) => ({ id, workspace }))
                 .filter(({ workspace }) => !projectId || String(workspace?.project_id ?? "") === projectId)
@@ -214,6 +255,7 @@ window.ox.install(({ action }) => {
             return { items, nextCursor: null };
         },
     });
+
     action("listDashboards", {
         async invoke({ workspaceId }) {
             const [results, projectId] = await Promise.all([
@@ -225,6 +267,7 @@ window.ox.install(({ action }) => {
             return { items, nextCursor: null };
         },
     });
+
     action("getDashboard", {
         async invoke({ workspaceId, id }) {
             const [dashboard, projectId] = await Promise.all([
@@ -236,6 +279,7 @@ window.ox.install(({ action }) => {
             return { ...dashboardRow(dashboard, workspaceId, projectId), reports };
         },
     });
+
     action("getReportData", {
         async invoke({ projectId, workspaceId, dashboardId, id }) {
             const dashboard = await apiGet(`/api/app/workspaces/${encodeURIComponent(workspaceId)}/dashboards/${encodeURIComponent(dashboardId)}/?`);
@@ -281,6 +325,7 @@ window.ox.install(({ action }) => {
             };
         },
     });
+
     action("listEventDefinitions", {
         async invoke({ projectId, workspaceId }) {
             const query = new URLSearchParams({ project_id: projectId, workspace_id: workspaceId });
@@ -300,6 +345,7 @@ window.ox.install(({ action }) => {
             return { items, nextCursor: null };
         },
     });
+
     action("searchEvents", {
         async invoke({ projectId, workspaceId, query, days, cursor, limit }) {
             const pageSize = Math.min(100, Math.max(1, Math.floor(limit ?? 50)));

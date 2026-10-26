@@ -296,14 +296,61 @@ window.ox.install(({ action }) => {
         .trim();
     const attachmentRows = (scope) => {
         const attachments = new Map();
-        const names = scope.querySelectorAll(".aV3, [download]");
-        for (const element of names) {
-            const name = cleanText(element.getAttribute("download") || element.textContent);
-            if (!name)
-                continue;
-            const container = element.closest(".aQy, .aQH, .aZo") || element.parentElement;
-            const size = cleanText(container?.querySelector(".SaH2Ve, .aV4")?.textContent);
+        const add = (nameValue, sizeValue = "") => {
+            const name = cleanText(nameValue)
+                .replace(/^Download attachment\s*/i, "")
+                .replace(/^Preview attachment\s*/i, "");
+            const size = cleanText(sizeValue);
+            if (!name || name.length > 512)
+                return;
+            // Ignore anonymous inline images and tracking pixels. Named inline images
+            // remain useful attachments and are retained.
+            if (/^(?:image|photo|attachment)$/i.test(name) && !/\.[A-Za-z0-9]{2,8}$/.test(name))
+                return;
             attachments.set(`${name}\n${size}`, { name, size });
+        };
+        const selectors = [
+            ".aV3",
+            "[download]",
+            "[data-tooltip^=\"Download attachment\"]",
+            "[aria-label^=\"Download attachment\"]",
+            "[data-tooltip^=\"Preview attachment\"]",
+            "[aria-label^=\"Preview attachment\"]",
+        ].join(",");
+        for (const element of scope.querySelectorAll(selectors)) {
+            const container = element.closest(".aQy, .aQH, .aZo, [data-attachment-id]") || element.parentElement;
+            const label = element.getAttribute("download")
+                || element.getAttribute("aria-label")
+                || element.getAttribute("data-tooltip")
+                || element.getAttribute("title")
+                || element.textContent;
+            const explicitName = cleanText(container?.querySelector(".aV3, [download]")?.getAttribute("download")
+                || container?.querySelector(".aV3, [download]")?.textContent);
+            const filename = explicitName || cleanText(label)
+                .replace(/^(?:Download|Preview) attachment\s*/i, "")
+                .replace(/,?\s*(?:opens in a new window|scanned for viruses).*$/i, "");
+            const size = cleanText(container?.querySelector(".SaH2Ve, .aV4, [data-size]")?.getAttribute("data-size")
+                || container?.querySelector(".SaH2Ve, .aV4, [data-size]")?.textContent);
+            add(filename, size);
+        }
+        // Printable Gmail often renders attachments as plain text at the end of a
+        // message instead of attachment cards. Recover conservative filename + size
+        // pairs without mistaking prose or signature images for attachments.
+        const text = String(scope.innerText || scope.textContent || "").replace(/\r\n?/g, "\n");
+        const lines = text.split("\n").map(value => value.trim()).filter(Boolean);
+        const filenamePattern = /(?:^|\s)([^\n]{1,512}?\.[A-Za-z0-9]{2,8})(?=\s|$)/g;
+        for (let index = 0; index < lines.length; index++) {
+            const line = lines[index];
+            const matches = [...line.matchAll(filenamePattern)];
+            for (const match of matches) {
+                const name = cleanText(match[1]);
+                const trailing = line.slice((match.index || 0) + match[0].length);
+                const inlineSize = trailing.match(/(?:^|\s)(\d+(?:\.\d+)?\s*(?:B|KB|MB|GB))(?:\s|$)/i)?.[1];
+                const nextSize = /^(?:\d+(?:\.\d+)?\s*(?:B|KB|MB|GB))$/i.test(lines[index + 1] || "")
+                    ? lines[index + 1]
+                    : "";
+                if (inlineSize || nextSize) add(name, inlineSize || nextSize);
+            }
         }
         return [...attachments.values()];
     };

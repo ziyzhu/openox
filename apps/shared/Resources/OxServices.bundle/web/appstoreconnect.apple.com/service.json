@@ -1,7 +1,7 @@
 {
   "domain": "appstoreconnect.apple.com",
   "name": "App Store Connect",
-  "description": "Apple's platform for managing App Store releases. Review apps, versions, builds, TestFlight groups, analytics, and team access. Sign-in required. Read-only.",
+  "description": "Apple's platform for managing App Store releases. Review apps, versions, builds, TestFlight groups, analytics, customer reviews, and team access; manage version drafts with approval. Sign-in required.",
   "baseUrl": "https://appstoreconnect.apple.com/apps",
   "$defs": {
     "version": {
@@ -764,6 +764,931 @@
         "additionalProperties": false
       },
       "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getPortfolioDashboard",
+      "label": "Get portfolio dashboard",
+      "description": "Summarizes each app and the portfolio across App Store analytics for a date range, including previous-period comparisons. Sign-in required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "startDate": {
+            "type": "string",
+            "minLength": 10,
+            "description": "Start date as YYYY-MM-DD or an ISO date-time."
+          },
+          "endDate": {
+            "type": "string",
+            "minLength": 10,
+            "description": "End date as YYYY-MM-DD or an ISO date-time."
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month"
+            ],
+            "default": "day"
+          },
+          "includeRemoved": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "appId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "removed": {
+                  "type": "boolean"
+                },
+                "metrics": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "metric": {
+                        "type": "string"
+                      },
+                      "total": {
+                        "type": "number"
+                      },
+                      "previousTotal": {
+                        "type": "number"
+                      },
+                      "percentChange": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "metric",
+                      "total",
+                      "previousTotal",
+                      "percentChange"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "appId",
+                "name",
+                "removed",
+                "metrics"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "portfolio": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "metric": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                },
+                "previousTotal": {
+                  "type": "number"
+                },
+                "percentChange": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "metric",
+                "total",
+                "previousTotal",
+                "percentChange"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "apps",
+          "portfolio"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listCustomerReviews",
+      "label": "List customer reviews",
+      "description": "Lists customer ratings and reviews for an app, optionally filtered by territory. Sign-in required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "territory": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 3,
+            "description": "Optional App Store territory code."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "newest",
+              "oldest",
+              "highestRating",
+              "lowestRating"
+            ],
+            "default": "newest"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          }
+        },
+        "required": [
+          "appId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "rating": {
+                  "type": "integer"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "reviewerNickname": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "territory": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "rating",
+                "title",
+                "body",
+                "reviewerNickname",
+                "createdAt",
+                "territory"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getVersionDraft",
+      "label": "Get version draft",
+      "description": "Gets a version’s editable metadata and localized draft fields. Sign-in required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "versionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 2
+          }
+        },
+        "required": [
+          "appId",
+          "versionId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "versionId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "releaseType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "earliestReleaseAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "copyright": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "localizations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "locale": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "keywords": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "marketingUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "promotionalText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "whatsNew": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "locale",
+                "description",
+                "keywords",
+                "marketingUrl",
+                "promotionalText",
+                "supportUrl",
+                "whatsNew"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "appId",
+          "versionId",
+          "version",
+          "platform",
+          "state",
+          "releaseType",
+          "earliestReleaseAt",
+          "copyright",
+          "localizations"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getReleaseReadiness",
+      "label": "Get release readiness",
+      "description": "Checks a version’s build, review, localization, and metadata readiness and reports likely blockers. Sign-in required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "versionId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "appId",
+          "versionId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "versionId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "hasBuild": {
+            "type": "boolean"
+          },
+          "hasReviewDetail": {
+            "type": "boolean"
+          },
+          "localizationCount": {
+            "type": "integer"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "versionId",
+          "version",
+          "state",
+          "hasBuild",
+          "hasReviewDetail",
+          "localizationCount",
+          "warnings",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "createAppVersion",
+      "label": "Create app version",
+      "description": "Creates a new App Store version record for an app. This does not upload a build or submit the version for review. Sign-in and approval required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[0-9]+(?:\\.[0-9]+){0,2}$"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "IOS",
+              "MAC_OS",
+              "TV_OS",
+              "VISION_OS"
+            ],
+            "default": "IOS"
+          },
+          "releaseType": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "AFTER_APPROVAL",
+              "SCHEDULED"
+            ],
+            "default": "MANUAL"
+          },
+          "earliestReleaseAt": {
+            "type": "string",
+            "minLength": 10,
+            "description": "Required when releaseType is SCHEDULED."
+          }
+        },
+        "required": [
+          "appId",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "appId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "releaseType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "appId",
+          "version",
+          "platform",
+          "state",
+          "releaseType",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    },
+    {
+      "id": "updateVersionDraft",
+      "label": "Update version draft",
+      "description": "Updates only the supplied editable version and localization fields. It does not submit or release the version. Sign-in and approval required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "versionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 2
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "keywords": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "marketingUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 255
+          },
+          "promotionalText": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 170
+          },
+          "supportUrl": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "whatsNew": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          },
+          "copyright": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "releaseType": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "AFTER_APPROVAL",
+              "SCHEDULED"
+            ]
+          },
+          "earliestReleaseAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 10
+          }
+        },
+        "required": [
+          "appId",
+          "versionId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "versionId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "updatedFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "draft": {
+            "type": "object",
+            "properties": {
+              "appId": {
+                "type": "string"
+              },
+              "versionId": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "releaseType": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "earliestReleaseAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "copyright": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "localizations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "locale": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "keywords": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "marketingUrl": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "promotionalText": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "supportUrl": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "whatsNew": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "locale",
+                    "description",
+                    "keywords",
+                    "marketingUrl",
+                    "promotionalText",
+                    "supportUrl",
+                    "whatsNew"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "appId",
+              "versionId",
+              "version",
+              "platform",
+              "state",
+              "releaseType",
+              "earliestReleaseAt",
+              "copyright",
+              "localizations"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "versionId",
+          "state",
+          "updatedFields",
+          "draft"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    },
+    {
+      "id": "getReviewIssues",
+      "label": "Get App Review issues",
+      "description": "Gets the latest Resolution Center thread, reviewer messages, cited guidelines, and attachments for an app version. Sign-in required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "versionId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "appId",
+          "versionId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "versionId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "submission": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "submittedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lastUpdatedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "state",
+              "submittedAt",
+              "lastUpdatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "actorType": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "guidelines": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "section": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "code": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "section",
+                      "description",
+                      "code"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "attachments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "fileName": {
+                        "type": "string"
+                      },
+                      "downloadUrl": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "state": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "fileName",
+                      "downloadUrl",
+                      "state"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "createdAt",
+                "actorType",
+                "body",
+                "guidelines",
+                "attachments"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "appId",
+          "versionId",
+          "version",
+          "state",
+          "submission",
+          "threadId",
+          "messages",
+          "url"
+        ],
+        "additionalProperties": false
+      },
       "requireApproval": false,
       "requireAuth": true
     }
