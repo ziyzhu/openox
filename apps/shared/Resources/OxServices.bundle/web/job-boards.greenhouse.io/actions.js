@@ -276,6 +276,35 @@ window.ox.install(({ action }) => {
                     }
                     : null,
             };
+            const pageUrl = "https://job-boards.greenhouse.io/" + encodeURIComponent(boardName) + "/jobs/" + encodeURIComponent(normalizedId);
+            let document = null, post = null;
+            try {
+                document = await fetchDocument(pageUrl);
+                const page = loaderData(document)["routes/$url_token_.jobs_.$job_post_id"];
+                if (String(page?.jobPostId) !== normalizedId || !page?.jobPost) throw new Error("Application page identity mismatch");
+                post = page.jobPost;
+            } catch (error) {
+                document = null;
+                console.log("greenhouse attachment page unavailable: " + String(error?.message ?? error));
+            }
+            result.attachments = (post?.questions ?? data.questions ?? []).flatMap(item => (item.fields ?? [])
+                .filter(field => field.type === "input_file" && ["resume", "cover_letter"].includes(field.name))
+                .map(field => {
+                    const input = document?.getElementById(field.name);
+                    const container = input?.closest(".attachment-field") ?? input?.parentElement?.parentElement?.parentElement?.parentElement;
+                    const guidance = cleanText(container?.textContent).match(/.{0,60}(?:\b\d+\s*(?:MB|KB|GB)\b|maximum file size|file size limit).{0,100}/i)?.[0] ?? null;
+                    return { name: field.name, label: cleanText(item.label), required: typeof item.required === "boolean" ? item.required : null,
+                        acceptedFormats: Array.isArray(field.allowed_filetypes) ? field.allowed_filetypes.map(String) : input?.getAttribute("accept")?.split(",").map(value => value.trim()).filter(Boolean) ?? [],
+                        multiple: input ? input.hasAttribute("multiple") : null, manualEntry: (item.fields ?? []).some(candidate => candidate.name === field.name + "_text"),
+                        sizeLimitBytes: null, sizeGuidance: guidance };
+                }));
+            const submit = document ? [...document.querySelectorAll("button, input[type=submit]")].find(element => /submit application/i.test(cleanText(element.textContent || element.getAttribute("value")))) : null;
+            result.applicationFacts = { url: pageUrl, observationStatus: document ? "public-page-observed" : "supplemental-page-unavailable",
+                formPresent: document ? !!document.querySelector("form") : null, submitButtonPresent: document ? !!submit : null,
+                submitButtonDisabled: submit ? submit.hasAttribute("disabled") || submit.getAttribute("aria-disabled") === "true" : null,
+                humanVerificationPresent: document ? !!document.querySelector('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], [data-sitekey]') : null,
+                alerts: document ? [...document.querySelectorAll('[role="alert"]')].filter(element => !element.closest('[hidden], [aria-hidden="true"]')).slice(0,10).map(element => cleanText(element.textContent).slice(0,500)).filter(Boolean) : [],
+                candidateReady: null, limitations: ["Public initial form only; conditional controls and candidate eligibility are not evaluated.", "No upload, validation, verification challenge or submission performed.", "File-size bytes remain unknown unless explicitly supported by public evidence; no default limit inferred."] };
             console.log(`greenhouse getJobQuestions board=${boardName} id=${normalizedId} questions=${result.questions.length}`);
             return result;
         },

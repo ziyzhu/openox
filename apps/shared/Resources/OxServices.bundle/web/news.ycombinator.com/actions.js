@@ -168,6 +168,42 @@ window.ox.install(({ action }) => {
             return { ok: res.ok };
         },
     });
+    action("search", {
+        async invoke({ query, type = "story", author, order = "relevance", startDate, endDate, limit = 20, cursor }) {
+            const day = value => {
+                const time = Date.parse(value + "T00:00:00Z");
+                if (!Number.isFinite(time) || new Date(time).toISOString().slice(0, 10) !== value) throw new Error("Invalid UTC date");
+                return time / 1000;
+            };
+            const start = startDate ? day(startDate) : null;
+            const end = endDate ? day(endDate) + 86400 : null;
+            if (start !== null && end !== null && start >= end) throw new Error("startDate must not exceed endDate");
+            const page = Number(cursor ?? 0);
+            if (!Number.isSafeInteger(page) || page < 0) throw new Error("Invalid source page");
+            const params = new URLSearchParams({ query, tags: type + (author ? ",author_" + author : ""), hitsPerPage: String(limit), page: String(page) });
+            const filters = [];
+            if (start !== null) filters.push("created_at_i>=" + start);
+            if (end !== null) filters.push("created_at_i<" + end);
+            if (filters.length) params.set("numericFilters", filters.join(","));
+            const url = "https://hn.algolia.com/api/v1/" + (order === "date" ? "search_by_date" : "search") + "?" + params;
+            const response = await retryFetch(url, { credentials: "omit" });
+            if (!response.ok) throw new Error("HN search HTTP " + response.status);
+            const data = await response.json();
+            if (!Array.isArray(data.hits) || !Number.isInteger(data.page) || !Number.isInteger(data.nbPages)) throw new Error("HN search returned an unexpected response");
+            const text = html => html == null ? null : new DOMParser().parseFromString(String(html), "text/html").body.textContent;
+            const items = data.hits.map(hit => {
+                const body = text(type === "comment" ? hit.comment_text : hit.story_text);
+                return { id: String(hit.objectID), type, title: hit.title ?? null, text: body?.slice(0, 4000) ?? null,
+                    author: hit.author ?? null, createdAt: hit.created_at ?? null, url: "https://news.ycombinator.com/item?id=" + hit.objectID,
+                    externalUrl: hit.url ?? null, storyId: hit.story_id == null ? null : String(hit.story_id), storyTitle: hit.story_title ?? null,
+                    points: hit.points ?? null, comments: hit.num_comments ?? null, textTruncated: (body?.length ?? 0) > 4000 };
+            });
+            const nextCursor = data.page + 1 < data.nbPages ? String(data.page + 1) : null;
+            const totalHitsExact = data.exhaustiveNbHits === true;
+            const complete = data.page === 0 && data.nbHits === items.length && totalHitsExact && !items.some(item => item.textTruncated);
+            return { items, nextCursor, totalHits: data.nbHits, totalHitsExact, sourcePages: data.nbPages, page: data.page, complete, truncated: nextCursor !== null || !complete, sourceUrl: url };
+        },
+    });
     action("getUser", {
         async invoke({ username }) {
             const doc = await fetchDoc(`/user?id=${encodeURIComponent(username)}`);

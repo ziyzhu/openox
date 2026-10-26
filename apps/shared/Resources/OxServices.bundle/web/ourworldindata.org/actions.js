@@ -119,6 +119,87 @@ window.ox.install(({ action }) => {
             return { items, nextCursor: paginate(result) };
         },
     });
+    action("getChartTimeSeries", {
+        async invoke({ slug, entities, startDate, endDate, limit = 200 }) {
+            if (!Array.isArray(entities) || entities.length < 1 || entities.length > 20) throw new Error("getChartTimeSeries: entities must contain 1..20 entries");
+            const date = value => {
+                const normalized = /^\d{4}$/.test(value) ? value + "-01-01" : value;
+                const time = Date.parse(normalized + "T00:00:00Z");
+                if (!Number.isFinite(time) || new Date(time).toISOString().slice(0, 10) !== normalized) throw new Error("Invalid date");
+                return normalized;
+            };
+            const start = date(startDate);
+            const end = /^\d{4}$/.test(endDate) ? endDate + "-12-31" : date(endDate);
+            if (start > end) throw new Error("startDate must not exceed endDate");
+            const url = ORIGIN + "/grapher/" + encodeURIComponent(slug);
+            const suffix = "?v=1&csvType=full&useColumnShortNames=false";
+            const csvUrl = url + ".csv" + suffix;
+            const metadataUrl = url + ".metadata.json" + suffix;
+            const response = await retryFetch(csvUrl, { credentials: "omit" });
+            if (!response.ok) throw new Error("Historical CSV HTTP " + response.status);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let csv = "", bytes = 0;
+            for (;;) {
+                const chunk = await reader.read();
+                if (chunk.done) break;
+                bytes += chunk.value.byteLength;
+                if (bytes > 8 * 1024 * 1024) { await reader.cancel(); throw new Error("Historical CSV exceeds 8 MiB limit"); }
+                csv += decoder.decode(chunk.value, { stream: true });
+            }
+            csv += decoder.decode();
+            const records = [];
+            let row = [], field = "", quoted = false;
+            for (let index = 0; index < csv.length; index++) {
+                const char = csv[index];
+                if (char === '"') {
+                    if (quoted && csv[index + 1] === '"') { field += '"'; index++; }
+                    else quoted = !quoted;
+                } else if (!quoted && (char === "," || char === "\n")) {
+                    row.push(field.replace(/\r$/, "")); field = "";
+                    if (char === "\n") { records.push(row); row = []; }
+                } else field += char;
+            }
+            if (quoted) throw new Error("Historical CSV contains an unterminated field");
+            if (field || row.length) { row.push(field.replace(/\r$/, "")); records.push(row); }
+            const headers = records.shift();
+            if (headers?.[0] !== "Entity" || headers?.[1] !== "Code" || headers?.[2] !== "Year" || headers.length < 4 || headers.length > 23) throw new Error("Unsupported historical CSV: expected Entity, Code, Year and at most 20 measures");
+            const metaResponse = await retryFetch(metadataUrl, { credentials: "omit" });
+            if (!metaResponse.ok) throw new Error("Historical metadata HTTP " + metaResponse.status);
+            const metaText = await metaResponse.text();
+            if (metaText.length > 1024 * 1024) throw new Error("Historical metadata exceeds 1 MiB limit");
+            const meta = JSON.parse(metaText);
+            const columns = meta.columns ?? {};
+            const metadata = Object.values(columns);
+            const series = headers.slice(3).map(column => {
+                const item = columns[column] ?? (metadata.length === 1 && headers.length === 4 ? metadata[0] : {});
+                return { column, indicatorId: item.owidVariableId ?? null, unit: item.unit ?? null, shortUnit: item.shortUnit ?? null,
+                    source: item.citationShort ?? meta.chart?.citation ?? null, coverage: item.timespan ?? null, updatedAt: item.lastUpdated ?? null };
+            });
+            const wanted = new Set(entities.map(value => value.toLowerCase()));
+            const rows = [];
+            let matchedRows = 0, first = null, last = null;
+            for (const record of records) {
+                if (record.length === 1 && !record[0]) continue;
+                if (record.length !== headers.length || !/^-?\d+$/.test(record[2])) throw new Error("Unexpected historical CSV row");
+                const time = record[2];
+                if (first === null || Number(time) < Number(first)) first = time;
+                if (last === null || Number(time) > Number(last)) last = time;
+                if (!wanted.has(record[0].toLowerCase()) && !wanted.has(record[1].toLowerCase())) continue;
+                const day = time.padStart(4, "0") + "-01-01";
+                if (day < start || day > end) continue;
+                for (let col = 3; col < headers.length; col++) {
+                    const raw = record[col];
+                    const value = raw === "" ? null : Number(raw);
+                    if (value !== null && !Number.isFinite(value)) throw new Error("Non-numeric historical value");
+                    matchedRows++;
+                    if (rows.length < limit) rows.push({ entity: record[0], code: record[1] || null, time, column: headers[col], value });
+                }
+            }
+            return { slug, title: meta.chart?.title ?? slug, url, csvUrl, metadataUrl, timePrecision: "year", coverage: { start: first, end: last },
+                matchedRows, returnedRows: rows.length, truncated: matchedRows > rows.length, complete: matchedRows === rows.length, series, rows };
+        },
+    });
     action("getChartData", {
         async invoke({ slug, entities } = {}) {
             try {

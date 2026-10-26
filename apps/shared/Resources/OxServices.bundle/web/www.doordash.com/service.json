@@ -1,7 +1,7 @@
 {
   "domain": "www.doordash.com",
   "name": "DoorDash",
-  "description": "A local delivery marketplace. Read store and retail product details, inspect the active cart, review checkout on DoorDash, and read order history and receipts.",
+  "description": "A local delivery marketplace. Discover stores by name in the website-selected public directory, read restaurant menus and item options, read store and retail product details, inspect the active cart, review checkout on DoorDash, and read order history and receipts.",
   "baseUrl": "https://www.doordash.com/home",
   "$defs": {
     "money": {
@@ -490,6 +490,500 @@
     }
   },
   "actions": [
+{
+  "id": "searchStores",
+  "label": "Find restaurant stores",
+  "description": "Filters the public restaurants-near-me directory by store name. Location context must be website-selected; no address is applied and results do not establish the user’s location. This is a bounded directory snapshot, not marketplace-wide search.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 150
+      },
+      "locationContext": {
+        "type": "string",
+        "enum": [
+          "website-selected"
+        ]
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50,
+        "default": 20
+      }
+    },
+    "required": [
+      "query",
+      "locationContext"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "storeId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "storeId",
+            "name",
+            "url",
+            "summary"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "locationContext": {
+        "type": "string"
+      },
+      "locationApplied": {
+        "type": "boolean"
+      },
+      "sourceUrl": {
+        "type": "string"
+      },
+      "complete": {
+        "type": "boolean"
+      },
+      "nextCursor": {
+        "type": "null"
+      },
+      "limitations": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "items",
+      "locationContext",
+      "locationApplied",
+      "sourceUrl",
+      "complete",
+      "nextCursor",
+      "limitations"
+    ],
+    "additionalProperties": false
+  },
+  "requireApproval": false,
+  "requireAuth": false
+},
+{
+  "id": "getRestaurantMenu",
+  "label": "Read restaurant menu",
+  "description": "Reads public server-rendered restaurant categories and items with source IDs and displayed prices. Does not select options or change a cart. Missing categories and bounded output are explicitly incomplete; prices are not checkout quotes.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "storeId": {
+        "type": "string",
+        "pattern": "^[0-9]+$"
+      },
+      "categoryId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200,
+        "default": 100
+      }
+    },
+    "required": [
+      "storeId"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "storeId": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "menuId": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "currency": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "deliveryAvailable": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "deliveryStatus": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "categories": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "categoryId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "reportedItemCount": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "itemId": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "object",
+                    "properties": {
+                      "amount": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "currency": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "display": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "amount",
+                      "currency",
+                      "display"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "itemId",
+                  "name",
+                  "description",
+                  "price"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "complete": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "categoryId",
+            "name",
+            "reportedItemCount",
+            "items",
+            "complete"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "sourceUrl": {
+        "type": "string"
+      },
+      "complete": {
+        "type": "boolean"
+      },
+      "nextCursor": {
+        "type": "null"
+      },
+      "limitations": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "storeId",
+      "name",
+      "menuId",
+      "currency",
+      "deliveryAvailable",
+      "deliveryStatus",
+      "categories",
+      "sourceUrl",
+      "complete",
+      "nextCursor",
+      "limitations"
+    ],
+    "additionalProperties": false
+  },
+  "requireApproval": false,
+  "requireAuth": false
+},
+{
+  "id": "getMenuItemOptions",
+  "label": "Read menu item options",
+  "description": "Reads public restaurant item and modifier requirements and price increments from source IDs returned by the menu. Preserves source selection bounds; nested choices are flagged but not traversed. No options selected or cart changes.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "storeId": {
+        "type": "string",
+        "pattern": "^[0-9]+$"
+      },
+      "itemId": {
+        "type": "string",
+        "pattern": "^[0-9]+$"
+      }
+    },
+    "required": [
+      "storeId",
+      "itemId"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "storeId": {
+        "type": "string"
+      },
+      "itemId": {
+        "type": "string"
+      },
+      "menuId": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "name": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "price": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "display": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "amount",
+          "currency",
+          "display"
+        ],
+        "additionalProperties": false
+      },
+      "lockStatus": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "modifierInteractionDisabled": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "groups": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "groupId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "required": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "minSelections": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "maxSelections": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "optionId": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "increment": {
+                    "type": "object",
+                    "properties": {
+                      "amount": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "currency": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "display": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "amount",
+                      "currency",
+                      "display"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "hasNestedOptions": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "optionId",
+                  "name",
+                  "increment",
+                  "hasNestedOptions"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "groupId",
+            "name",
+            "subtitle",
+            "required",
+            "minSelections",
+            "maxSelections",
+            "options"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "sourceUrl": {
+        "type": "string"
+      },
+      "complete": {
+        "type": "boolean"
+      },
+      "nextCursor": {
+        "type": "null"
+      },
+      "limitations": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "storeId",
+      "itemId",
+      "menuId",
+      "name",
+      "description",
+      "price",
+      "lockStatus",
+      "modifierInteractionDisabled",
+      "groups",
+      "sourceUrl",
+      "complete",
+      "nextCursor",
+      "limitations"
+    ],
+    "additionalProperties": false
+  },
+  "requireApproval": false,
+  "requireAuth": false
+},
     {
       "id": "getSignInUrl",
       "label": "Sign in to DoorDash",

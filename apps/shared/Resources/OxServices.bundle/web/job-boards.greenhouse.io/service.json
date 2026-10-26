@@ -768,7 +768,7 @@
     {
       "id": "getJobQuestions",
       "label": "Read application questions",
-      "description": "Shows the questions and answer choices on a public job application, including location, compliance, and optional demographic sections.",
+      "description": "Shows the questions and answer choices on a public job application, including location, compliance, and optional demographic sections. Includes public resume/cover-letter attachment requirements and page-level application facts, never candidate-specific readiness or submission.",
       "inputSchema": {
         "$ref": "#/$defs/boardResourceInput"
       },
@@ -808,6 +808,129 @@
                 "type": "null"
               }
             ]
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "acceptedFormats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "multiple": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "manualEntry": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "sizeLimitBytes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "sizeGuidance": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "label",
+                "required",
+                "acceptedFormats",
+                "multiple",
+                "manualEntry",
+                "sizeLimitBytes",
+                "sizeGuidance"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "applicationFacts": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "observationStatus": {
+                "type": "string"
+              },
+              "formPresent": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "submitButtonPresent": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "submitButtonDisabled": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "humanVerificationPresent": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "alerts": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "candidateReady": {
+                "type": "null"
+              },
+              "limitations": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "url",
+              "observationStatus",
+              "formPresent",
+              "submitButtonPresent",
+              "submitButtonDisabled",
+              "humanVerificationPresent",
+              "alerts",
+              "candidateReady",
+              "limitations"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -816,7 +939,9 @@
           "questions",
           "locationQuestions",
           "compliance",
-          "demographicQuestions"
+          "demographicQuestions",
+          "attachments",
+          "applicationFacts"
         ],
         "additionalProperties": false
       },

@@ -1,7 +1,7 @@
 {
   "domain": "huggingface.co",
   "name": "Hugging Face",
-  "description": "An open machine-learning community. Browse trending models and datasets, filter models by library, and discover Spaces by category. No sign-in required.",
+  "description": "An open machine-learning community. Browse trending models and datasets, filter models by library, and discover Spaces by category. No sign-in required. Search model/dataset names, read public cards and file trees, and preview bounded ungated dataset samples.",
   "baseUrl": "https://huggingface.co/",
   "$defs": {
     "model": {
@@ -240,7 +240,7 @@
     {
       "id": "listModels",
       "label": "Browse models",
-      "description": "Lists trending models with popularity, task, size, access, and update details. Optionally filters by a library such as pytorch or tf.",
+      "description": "Lists trending models with popularity, task, size, access, and update details. Optionally filters by a library such as pytorch or tf. Optional query searches repository names; existing result fields and source page continuation are preserved.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -251,6 +251,12 @@
           "cursor": {
             "type": "string",
             "description": "Cursor returned by the previous page"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Optional name search using the public catalog filter."
           }
         },
         "additionalProperties": false
@@ -265,13 +271,19 @@
     {
       "id": "listDatasets",
       "label": "Browse datasets",
-      "description": "Lists trending datasets with popularity, access, benchmark, and update details.",
+      "description": "Lists trending datasets with popularity, access, benchmark, and update details. Optional query searches repository names; existing result fields and source page continuation are preserved.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "cursor": {
             "type": "string",
             "description": "Cursor returned by the previous page"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Optional name search using the public catalog filter."
           }
         },
         "additionalProperties": false
@@ -305,6 +317,447 @@
       },
       "defaultArgs": {
         "category": "video-generation"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getRepository",
+      "label": "Read repository card",
+      "description": "Read public model or dataset metadata and a bounded card excerpt. Card claims are untrusted repository content; no weights or gated data are downloaded.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "model",
+              "dataset"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$"
+          },
+          "maxChars": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12000
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "model",
+              "dataset"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "gated": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "private": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "task": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "license": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "card": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cardTruncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "url",
+          "gated",
+          "private",
+          "task",
+          "license",
+          "tags",
+          "updatedAt",
+          "card",
+          "cardTruncated"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listRepositoryFiles",
+      "label": "List repository files",
+      "description": "Read one bounded public model/dataset tree page, never file bodies. Source continuation is returned only when the whole current page fits. Gated repositories are not accessed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "model",
+              "dataset"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$"
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 3000
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "oid": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "commitId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updatedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "path",
+                "type",
+                "size",
+                "oid",
+                "commitId",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "sourcePageCount": {
+            "type": "integer"
+          },
+          "omittedFromPage": {
+            "type": "integer"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "sourceUrl",
+          "sourcePageCount",
+          "omittedFromPage",
+          "complete",
+          "truncated"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getDatasetPreview",
+      "label": "Preview ungated dataset rows",
+      "description": "Read the public initial viewer sample and observed configuration/split lists. At most 100 rows; media is represented by type, not downloaded or signed URLs. No viewer continuation is claimed. Gated/private or unavailable samples fail explicitly.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "config": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "split": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "config": {
+            "type": "string"
+          },
+          "split": {
+            "type": "string"
+          },
+          "configs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "totalRows": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "status",
+                "totalRows"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "splits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "totalRows": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "totalRows"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "totalRows": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "availableSampleRows": {
+            "type": "integer"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "cells": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "column": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "truncated": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "column",
+                      "kind",
+                      "value",
+                      "truncated"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "index",
+                "cells"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "previewOnly": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "config",
+          "split",
+          "configs",
+          "splits",
+          "totalRows",
+          "availableSampleRows",
+          "columns",
+          "rows",
+          "complete",
+          "truncated",
+          "previewOnly"
+        ],
+        "additionalProperties": false
       },
       "requireApproval": false,
       "requireAuth": false

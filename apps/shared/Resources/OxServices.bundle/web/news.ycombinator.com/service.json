@@ -397,6 +397,197 @@
       },
       "requireApproval": false,
       "requireAuth": false
+    },
+    {
+      "id": "search",
+      "label": "Search stories and comments",
+      "description": "Search the public HN Algolia index by query, story/comment type, author, inclusive UTC dates and relevance or newest order. Continuation is the source page; the index has a retrieval window and is not a complete archive. complete requires an exhaustive source count and no omitted query hits; empty estimated results are not claimed exhaustive.",
+      "baseUrl": "https://news.ycombinator.com/robots.txt",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "story",
+              "comment"
+            ]
+          },
+          "author": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "date"
+            ]
+          },
+          "startDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "endDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "cursor": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "text": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "author": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                },
+                "externalUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "storyId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "storyTitle": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "points": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "comments": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "textTruncated": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "text",
+                "author",
+                "createdAt",
+                "url",
+                "externalUrl",
+                "storyId",
+                "storyTitle",
+                "points",
+                "comments",
+                "textTruncated"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "totalHits": {
+            "type": "integer"
+          },
+          "sourcePages": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "totalHitsExact": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "totalHits",
+          "sourcePages",
+          "page",
+          "complete",
+          "truncated",
+          "sourceUrl",
+          "totalHitsExact"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
     }
   ],
   "locales": {

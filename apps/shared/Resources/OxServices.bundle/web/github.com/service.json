@@ -1,7 +1,7 @@
 {
   "domain": "github.com",
   "name": "GitHub",
-  "description": "A collaborative software-development platform. Browse and search repositories, code, branches, commits, issues, pull requests, reviews, checks, workflow runs, releases, and tags. Sign in to view your repositories, work items, and notifications, and create pull requests with approval.",
+  "description": "A collaborative software-development platform. Browse and search repositories, code, branches, commits, issues, pull requests, reviews, checks, workflow runs, releases, and tags. Read actual bounded pull-request patch hunks with line anchors and explicit completeness limits. Sign in to view your repositories, work items, and notifications, and create pull requests with approval.",
   "baseUrl": "https://github.com/",
   "$defs": {
     "repo": {
@@ -183,6 +183,206 @@
     }
   },
   "actions": [
+{
+  "id": "getPullRequestDiff",
+  "label": "Read pull request diff",
+  "description": "Reads bounded actual patch hunks from the public PR files HTML with source line numbers and anchors. Marks generated, binary, unloaded and truncated files. Unknown paths/revisions are null; does not expand omitted source or submit reviews.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "repo": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+      },
+      "number": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "maxFiles": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50,
+        "default": 20
+      },
+      "maxLines": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 2000,
+        "default": 400
+      }
+    },
+    "required": [
+      "repo",
+      "number"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "repo": {
+        "type": "string"
+      },
+      "number": {
+        "type": "integer"
+      },
+      "baseRevision": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "headRevision": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "files": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "oldPath": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "newPath": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "anchor": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "headRevision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "binary": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "generated": {
+              "type": "boolean"
+            },
+            "unloaded": {
+              "type": "boolean"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "lines": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "hunk",
+                      "addition",
+                      "deletion",
+                      "context"
+                    ]
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "oldLine": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "newLine": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "anchor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "text",
+                  "oldLine",
+                  "newLine",
+                  "anchor"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "path",
+            "oldPath",
+            "newPath",
+            "anchor",
+            "headRevision",
+            "binary",
+            "generated",
+            "unloaded",
+            "truncated",
+            "lines"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "truncated": {
+        "type": "boolean"
+      },
+      "sourceUrl": {
+        "type": "string"
+      },
+      "complete": {
+        "type": "boolean"
+      },
+      "nextCursor": {
+        "type": "null"
+      },
+      "limitations": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "repo",
+      "number",
+      "baseRevision",
+      "headRevision",
+      "files",
+      "truncated",
+      "sourceUrl",
+      "complete",
+      "nextCursor",
+      "limitations"
+    ],
+    "additionalProperties": false
+  },
+  "requireApproval": false,
+  "requireAuth": false
+},
     {
       "id": "getSignInUrl",
       "label": "Sign in to GitHub",

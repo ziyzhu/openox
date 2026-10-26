@@ -24,7 +24,7 @@ Compare the exported source with any existing built-in service and report behavi
 
 The official source in `apps/shared/Resources/OxServices.bundle/` uses the same plain-JavaScript installer format as Local. Copy the exact verified `actions.js` without translation and preserve every behavioral manifest field. Use the verified Local `faviconUrl` as an artwork source, upload the audited icon to `https://openox.ai/assets/services/<domain>/favicon.png`, and set the built-in manifest's `faviconUrl` to that URL. Verify its anonymous hosted response before delivery. Favicons load through URLs only; do not include PNG assets in the runtime bundle or add an on-device fallback. The build must reject syntax errors, installers that pass a version, multiple installations, and manifest-registration mismatches. Do not hand-rewrite Ox-authored JavaScript as a second implementation.
 
-An installed app's validator can lag behind the repository compiler. If the exported manifest fails current compilation, return the diagnostic to Ox for repair, verification, and newly verified source before re-exporting.
+An installed app's validator or installed CLI's `repository validate` can lag behind the checkout's compiler. Use the checkout's `bun run build:services` as the final compile check. If the exported manifest fails current compilation, return the diagnostic to Ox for repair, verification, and newly verified source before re-exporting.
 
 ## Live verification evidence
 

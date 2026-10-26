@@ -340,6 +340,217 @@
       },
       "requireApproval": false,
       "requireAuth": false
+    },
+    {
+      "id": "getChartTimeSeries",
+      "label": "Read historical chart data",
+      "description": "Read bounded historical CSV observations for selected entity names or ISO codes and inclusive start/end dates. Reports CSV coverage, metadata units and sources. Annual CSVs only; unavailable formats and oversized downloads fail explicitly. Does not change latest-value getChartData.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "entities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 150
+            }
+          },
+          "startDate": {
+            "type": "string",
+            "pattern": "^\\d{4}(-\\d{2}-\\d{2})?$"
+          },
+          "endDate": {
+            "type": "string",
+            "pattern": "^\\d{4}(-\\d{2}-\\d{2})?$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "slug",
+          "entities",
+          "startDate",
+          "endDate"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "csvUrl": {
+            "type": "string"
+          },
+          "metadataUrl": {
+            "type": "string"
+          },
+          "timePrecision": {
+            "type": "string"
+          },
+          "coverage": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "end": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ],
+            "additionalProperties": false
+          },
+          "matchedRows": {
+            "type": "integer"
+          },
+          "returnedRows": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "string"
+                },
+                "indicatorId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "shortUnit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "coverage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updatedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "column",
+                "indicatorId",
+                "unit",
+                "shortUnit",
+                "source",
+                "coverage",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "entity": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "time": {
+                  "type": "string"
+                },
+                "column": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "entity",
+                "code",
+                "time",
+                "column",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "url",
+          "csvUrl",
+          "metadataUrl",
+          "timePrecision",
+          "coverage",
+          "matchedRows",
+          "returnedRows",
+          "truncated",
+          "complete",
+          "series",
+          "rows"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
     }
   ],
   "faviconUrl": "https://openox.ai/assets/services/ourworldindata.org/favicon.png"

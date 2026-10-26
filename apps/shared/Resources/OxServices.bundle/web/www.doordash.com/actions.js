@@ -572,4 +572,89 @@ window.ox.install(({ action }) => {
             return { status: "none", reference: null, total: 0, currency: "USD", completedAt: null };
         },
     });
+
+    action("searchStores", {
+        async invoke({ query, locationContext, limit = 20 }) {
+            if (locationContext !== "website-selected") throw new Error("Only website-selected directory context is supported; no address is applied");
+            const sourceUrl = ORIGIN + "/restaurants-near-me/";
+            const response = await retryFetch(sourceUrl, { credentials: "include" });
+            if (!response.ok) throw new Error("DoorDash directory unavailable: HTTP " + response.status);
+            const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+            const seen = new Set(), items = [];
+            for (const link of doc.querySelectorAll('a[href*="/store/"]')) {
+                const name = clean(link.querySelector('[data-telemetry-id="store.name"]')?.textContent);
+                const url = new URL(link.getAttribute("href"), ORIGIN);
+                const id = url.pathname.match(/(?:-|\/)(\d+)\/?$/)?.[1];
+                if (!name || !id || seen.has(id)) continue;
+                seen.add(id);
+                if (!name.toLowerCase().includes(query.trim().toLowerCase())) continue;
+                const copy = link.cloneNode(true);
+                copy.querySelectorAll("style,svg,script").forEach(x => x.remove());
+                items.push({ storeId: id, name, url: ORIGIN + url.pathname, summary: clean(copy.textContent).replace(/Icon Loading/g, "") });
+            }
+            if (!seen.size) throw new Error("DoorDash public directory did not expose store cards; unavailable or unsupported page");
+            return { items: items.slice(0, limit), locationContext, locationApplied: false, sourceUrl, complete: false, nextCursor: null, limitations: ["Name filter over the returned public directory only, not marketplace-wide search", "Website-selected locality is not the user location; no address was applied", "No verified directory continuation; fees and ETAs are not checkout quotes", ...(items.length > limit ? ["Output item limit reached"] : [])] };
+        }
+    });
+    action("getRestaurantMenu", {
+        async invoke({ storeId, categoryId, limit = 100 }) {
+            const sourceUrl = ORIGIN + "/store/" + storeId;
+            const response = await retryFetch(sourceUrl, { credentials: "include" });
+            if (!response.ok) throw new Error("DoorDash restaurant unavailable: HTTP " + response.status);
+            const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+            let stream = "";
+            for (const el of doc.scripts) {
+                const text = el.textContent, index = text.indexOf(".push([1,");
+                if (index < 0) continue;
+                try { stream += JSON.parse(text.slice(index + 6, text.lastIndexOf(")")))[1]; } catch {}
+            }
+            const marker = '"storepageFeed":';
+            const index = stream.indexOf(marker);
+            if (index < 0) throw new Error("DoorDash public menu unavailable or unsupported server page");
+            const start = stream.indexOf("{", index + marker.length);
+            let depth = 0, quoted = false, escaped = false, end = start;
+            for (; end < stream.length; end++) {
+                const c = stream[end];
+                if (quoted) {
+                    if (escaped) escaped = false;
+                    else if (c === "\\") escaped = true;
+                    else if (c === '"') quoted = false;
+                } else if (c === '"') quoted = true;
+                else if (c === "{") depth++;
+                else if (c === "}" && --depth === 0) { end++; break; }
+            }
+            const feed = JSON.parse(stream.slice(start, end));
+            const header = feed.storeHeader;
+            if (String(header?.id) !== storeId) throw new Error("DoorDash returned a different store");
+            let categories = feed.menuBook?.menuCategories;
+            if (!Array.isArray(categories)) throw new Error("DoorDash did not expose restaurant categories");
+            if (categoryId) {
+                categories = categories.filter(c => c.id === categoryId);
+                if (!categories.length) throw new Error("DoorDash category not present in this menu");
+            }
+            let remaining = limit;
+            const result = categories.map(category => {
+                const list = (feed.itemLists ?? []).find(x => x.id === category.next?.anchor || x.id === category.id);
+                const available = list?.items ?? [];
+                const items = available.slice(0, remaining).map(item => {
+                    const price = item.quickAddContext?.price;
+                    return { itemId: String(item.id), name: clean(item.name), description: clean(item.description), price: { amount: typeof price?.unitAmount === "number" && Number.isInteger(price.decimalPlaces) ? price.unitAmount / 10 ** price.decimalPlaces : null, currency: price?.currency ?? header.currency ?? null, display: clean(item.displayPrice) || null } };
+                });
+                remaining -= items.length;
+                return { categoryId: String(category.id), name: clean(category.name), reportedItemCount: category.numItems ?? null, items, complete: !!list && Number.isInteger(category.numItems) && items.length === category.numItems };
+            });
+            return { storeId, name: clean(header.name), menuId: feed.menuBook?.id ?? null, currency: header.currency ?? null, deliveryAvailable: header.status?.delivery?.isAvailable ?? null, deliveryStatus: header.status?.delivery?.displayUnavailableStatus ?? null, categories: result, sourceUrl, complete: result.every(c => c.complete), nextCursor: null, limitations: ["Public server menu snapshot; availability is website-context dependent, not the user location", "Prices exclude checkout fees, taxes and delivery", "No category/item continuation request verified; incomplete categories are explicit"] };
+        }
+    });
+    action("getMenuItemOptions", {
+        async invoke({ storeId, itemId }) {
+            const query = "query itemPage($storeId: ID!, $itemId: ID!) { itemPage(storeId: $storeId, itemId: $itemId) { itemHeader { id name description unitAmount currency decimalPlaces menuId lockStatus disableModifierInteraction } optionLists { id name subtitle isOptional minNumOptions maxNumOptions options { id name unitAmount currency decimalPlaces displayString nextCursor nestedExtrasList { id } } } } }";
+            const data = await graphql("itemPage", query, { storeId, itemId });
+            const page = data?.itemPage, header = page?.itemHeader;
+            if (!header || String(header.id) !== itemId) throw new Error("DoorDash item unavailable or did not match requested item");
+            const price = value => ({ amount: typeof value?.unitAmount === "number" && Number.isInteger(value.decimalPlaces) ? value.unitAmount / 10 ** value.decimalPlaces : null, currency: value?.currency ?? null, display: value?.displayString ?? null });
+            const groups = (page.optionLists ?? []).map(group => ({ groupId: String(group.id), name: clean(group.name), subtitle: clean(group.subtitle), required: typeof group.isOptional === "boolean" ? !group.isOptional : null, minSelections: group.minNumOptions ?? null, maxSelections: group.maxNumOptions ?? null, options: (group.options ?? []).map(option => ({ optionId: String(option.id), name: clean(option.name), increment: price(option), hasNestedOptions: !!option.nestedExtrasList?.length || !!option.nextCursor })) }));
+            return { storeId, itemId, menuId: header.menuId ?? null, name: clean(header.name), description: clean(header.description), price: price(header), lockStatus: header.lockStatus ?? null, modifierInteractionDisabled: header.disableModifierInteraction ?? null, groups, sourceUrl: ORIGIN + "/store/" + storeId, complete: Array.isArray(page.optionLists) && groups.every(g => g.options.every(o => !o.hasNestedOptions)), nextCursor: null, limitations: ["Source min/max preserved; group subtitle may describe a narrower visible recommendation set", "Nested modifier requests and conditional choices are not traversed", "Prices are item increments, not a checkout quote; no selections or cart changes"] };
+        }
+    });
 });

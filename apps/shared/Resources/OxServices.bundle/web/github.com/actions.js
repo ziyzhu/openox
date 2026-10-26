@@ -865,4 +865,40 @@ window.ox.install(({ action }) => {
         const ids=[...document.querySelectorAll('input[name="file_id"]')].filter(x=>x.value).length;if(ids<1)throw new Error("Manifest upload did not finish");return {bytes:content.length,path:location.pathname};
     }});
 
+
+    action("getPullRequestDiff", {
+        async invoke({ repo, number, maxFiles = 20, maxLines = 400 }) {
+            const { owner, repo: name } = splitNwo(repo);
+            const sourceUrl = ORIGIN + "/" + owner + "/" + name + "/pull/" + number + "/files";
+            const doc = await fetchDoc(sourceUrl);
+            if (doc.querySelector('input[type="password"]')) throw new Error("GitHub diff requires sign-in or repository access");
+            const blocks = [...doc.querySelectorAll(".file")].filter(x => x.querySelector("[data-path]"));
+            if (!blocks.length) throw new Error("GitHub did not return readable PR file blocks; unavailable, empty or unsupported diff");
+            let remaining = maxLines;
+            const files = blocks.slice(0, maxFiles).map(block => {
+                const header = block.querySelector("[data-path]"), path = header.getAttribute("data-path") ?? "", deleted = block.getAttribute("data-file-deleted");
+                const blobLink = [...block.querySelectorAll('a[href*="/blob/"]')].find(x => x.textContent.trim() === "View file");
+                const headRevision = deleted === "false" ? blobLink?.getAttribute("href")?.match(/\/blob\/([a-f0-9]{40})\//)?.[1] ?? null : null;
+                const all = [];
+                for (const row of block.querySelectorAll("tr")) {
+                    const hunk = row.querySelector(".blob-code-hunk");
+                    if (hunk) { if (hunk.textContent.trim().startsWith("@@")) all.push({ kind: "hunk", text: hunk.textContent, oldLine: null, newLine: null, anchor: null }); continue; }
+                    const cell = row.querySelector("[data-code-marker]");
+                    if (!cell) continue;
+                    const marker = cell.getAttribute("data-code-marker"), nums = [...row.querySelectorAll("[data-line-number]")];
+                    const old = nums.find(x => /L\d+$/.test(x.id)), next = nums.find(x => /R\d+$/.test(x.id));
+                    all.push({ kind: marker === "+" ? "addition" : marker === "-" ? "deletion" : "context", text: cell.textContent, oldLine: old ? Number(old.getAttribute("data-line-number")) : null, newLine: next ? Number(next.getAttribute("data-line-number")) : null, anchor: next?.id ?? old?.id ?? null });
+                }
+                const text = block.textContent, generated = /Some generated files are not rendered by default/i.test(text);
+                const unloaded = /Load diff/.test(text) || !all.length;
+                const lines = all.slice(0, remaining).map(line => ({ ...line, text: line.text.slice(0, 2000) }));
+                remaining -= lines.length;
+                const truncated = lines.length < all.length || all.some(line => line.text.length > 2000) || /diff is too large|diff has been truncated/i.test(text);
+                return { path, oldPath: deleted === "true" ? path : header.getAttribute("data-old-path"), newPath: deleted === "false" ? path : null, anchor: header.getAttribute("data-anchor") ?? block.id ?? null, headRevision, binary: /Binary files|Binary file not shown/i.test(text) ? true : all.length ? false : null, generated, unloaded, truncated, lines };
+            });
+            const truncated = blocks.length > maxFiles || files.some(file => file.truncated) || /diff is too large|diff has been truncated/i.test(doc.body.textContent);
+            const heads = [...new Set(files.map(file => file.headRevision).filter(Boolean))];
+            return { repo, number, baseRevision: null, headRevision: heads.length === 1 ? heads[0] : null, files, truncated, sourceUrl, complete: false, nextCursor: null, limitations: ["Rendered public patch hunks only; unchanged context and lazy/generated/binary content are not expanded", "Old paths and base revision are null unless explicitly exposed; head revision comes from observed View file links", "No verified source continuation or total-file completeness signal; null cursor does not assert exhaustiveness", ...(truncated ? ["Output or source diff limit reached"] : [])] };
+        }
+    });
 });
