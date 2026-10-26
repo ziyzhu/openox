@@ -76,7 +76,7 @@ try {
     'const discovered = readSkills(fixtureRoot);',
     'if (!discovered.ok || discovered.skills.length !== 1 || JSON.stringify(discovered.skills[0]) !== JSON.stringify(loaded)) throw new Error("skill discovery failed");',
     'const indexPath = fileURLToPath(import.meta.resolve("@openox/services/repository.json"));',
-    'const manifestPath = fileURLToPath(import.meta.resolve("@openox/services/web/github.com/service.json"));',
+    'const manifestPath = fileURLToPath(import.meta.resolve("@openox/services/web/huggingface.co/service.json"));',
     'if (!(await Bun.file(indexPath).exists())) throw new Error("repository.json export failed");',
     'if (!(await Bun.file(manifestPath).exists())) throw new Error("web service export failed");',
     'process.stdout.write(repositoryRoot);',
