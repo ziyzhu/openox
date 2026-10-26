@@ -15,7 +15,7 @@ When a website sign-in handoff returns `completion: "acknowledged"`, the user sa
 
 Read `references/web-service.md` before Browser exploration, Local web-service authoring, or substantive verification. Source inspection, copying, attachment changes, and straightforward deletion need no authoring reference.
 
-Every newly authored customer-facing service, including API services, requires a high-quality favicon. Follow Choose a favicon in `references/web-service.md` as part of final service verification; repair missing or broken icons when updating services. Report incomplete icon verification explicitly.
+Before attaching or reloading a newly authored customer-facing service, including API services, set a high-quality `faviconUrl` that passes Choose a favicon in `references/web-service.md`. Repair missing or broken icons before attaching updates. If no candidate passes, preserve the draft, do not attach or reload it, and report the favicon blocker. Manifest validation alone does not verify image loading.
 
 For web-service authoring, read `references/helpers.js` only when a helper is needed. It is copyable source for `actions.js`, not an installed library, module, or runtime import.
 
@@ -32,8 +32,8 @@ Read `references/model-service.md` when adding or editing website conversation A
 The workflow steps are checks, not separate model turns. For a simple service, batch predictable work into a few executions and return to reasoning only when evidence, a failure, or a human decision changes the next step. Do not sacrifice verification to meet a turn target.
 
 1. Read the applicable authoring reference, discover existing coverage, and inspect repository enablement and relevant Local source together when their contracts are known. Reuse results within this run unless intervening changes invalidate them.
-2. Gather the smallest sufficient website or official API evidence for the requested actions. Discover the product favicon alongside this work. Batch independent reads and return only the fields needed to implement or decide.
-3. Once evidence supports implementation, create or copy, read the generated files, write the complete manifest and handlers, validate, and attach in one execution when budgets allow. Await each dependent operation and stop on failure; never attach an invalid draft. Runtime approval gates still apply.
+2. Gather the smallest sufficient website or official API evidence for the requested actions. Discover and preflight the product favicon alongside this work, before attachment. Batch independent reads and return only the fields needed to implement or decide.
+3. Once evidence supports implementation, create or copy, read the generated files, write the complete manifest and handlers, validate, and attach in one execution when budgets allow. Await each dependent operation and stop on failure; never attach an invalid draft or one missing a verified product `faviconUrl`. Runtime approval gates still apply.
 4. Inspect all needed action contracts together. Then batch bounded read-only verification, final source reads, and attachment confirmation. Verify each changed handler; exercise pagination, authentication, concurrency, and handoffs only when the service exposes or depends on them. Keep mutations approval-gated and never repeat completed effects.
 5. Review the returned evidence and report completion. Local edits persist immediately; no separate Save step is needed. Repair only evidenced failures and rerun affected checks.
 

@@ -100,9 +100,9 @@ Inspect only the requests, redirects, statuses, and response shapes needed for t
 Every newly authored customer-facing service needs a verified product favicon. For API services, discover artwork on the official product website; the API identifier need not be a hostname. Preserve an existing verified icon unless it is broken or the user requests a replacement.
 
 1. **Choose and preflight.** Prefer official product artwork from page icon links or a linked web-app manifest. Use a stable public HTTPS URL without credentials, signatures, or expiration. Fetch it anonymously and confirm it decodes as PNG, JPEG, or ICO; SVG is not supported. Prefer a square image at least 128×128. Reject failed responses, blank images, generic placeholders, and unrelated marks. Try the best candidate first and stop when it passes.
-2. **Apply.** Set `faviconUrl`, then complete normal service validation and attachment/reload. No post-apply avatar inspection or screenshot evidence is required.
+2. **Apply before attachment.** Set the verified `faviconUrl` in the final manifest before normal service validation and attachment/reload. A successful manifest validation is not image-loading evidence. No post-apply avatar inspection or screenshot evidence is required.
 
-If no candidate passes preflight, omit `faviconUrl`, preserve useful service work, and report icon verification as incomplete.
+If no candidate passes preflight, preserve useful service work as a draft, do not attach or reload it, and report the favicon blocker. Leave any existing attachment unchanged.
 
 When official candidates fail, Google's cache is a last fallback unless the user prohibits third-party icon requests:
 
@@ -134,7 +134,7 @@ Read existing Local source before editing and preserve unrelated work. Local cha
 
 Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. File operations enforce filesystem safety without validating service contents or changing running attachments. Local source is a working draft: files may temporarily be incomplete, missing, or inconsistent while you edit them in any order. Finish the complete set of edits, then call `ox.service.validate({ domain, purpose })` to check the whole service without changing or activating it. Fix any reported error and retry. Attachment uses the same service validator and rejects invalid drafts. A successful file write alone does not mean the service is ready to run.
 
-Author `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl` (include a verified icon whenever one can be obtained), optional local `$defs`, `actions`, and optional locale overlays. Skills belong at the repository root, not in service manifests or directories. Preserve repository skills that depend on this service; author new ones through `references/skills.md` after actions are verified.
+Author `domain`, `name`, optional `description`, required `baseUrl`, `faviconUrl` (schema-optional but required and preflight-verified before attaching a customer-facing service), optional local `$defs`, `actions`, and optional locale overlays. Skills belong at the repository root, not in service manifests or directories. Preserve repository skills that depend on this service; author new ones through `references/skills.md` after actions are verified.
 
 Every action has:
 
@@ -245,7 +245,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 ## 7. Verify in iOS
 
 1. Read every changed file back.
-2. Call `ox.service.validate` with the Local service's bare domain, then `ox.service.attach`. Validation checks the whole draft without invoking its actions; attach loads it when missing or reloads this conversation's existing attachment from the current source. Repeat after another coherent set of edits is ready to test.
+2. Complete Choose a favicon and confirm the final manifest has the verified `faviconUrl` before attachment. If no candidate passes, preserve the draft and stop before attaching or reloading. Call `ox.service.validate` with the Local service's bare domain, then `ox.service.attach`. Validation checks the whole draft without invoking its actions; attach loads it when missing or reloads this conversation's existing attachment from the current source. Repeat after another coherent set of edits is ready to test.
 3. Inspect the action index and full contract for every exposed action.
 4. Compare manifest and installer parity: every declared ID has one handler, every handler is declared, every input is consumed, defaults validate, and cursor inputs advance results.
 5. Invoke each changed action with a small success case. For any mutation already completed, inspect resulting state read-only and mark unexecuted handlers partially verified. A successful requested mutation verifies the action; never repeat it for testing.
@@ -256,7 +256,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 10. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
 11. Inspect repository skills that depend on this service when action IDs or contracts changed and revise affected skills through `references/skills.md`.
 12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this conversation.
-13. Complete Choose a favicon: preflight the image before applying it. Preserve useful service work and report a missing or unverified icon as a non-blocking limitation.
+13. Confirm the final manifest still uses the preflight-verified `faviconUrl`; preflight any replacement before reloading.
 14. Stop capture with `discard: true` and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion or ending an abandoned or blocked run.
 
 Evaluate semantic usefulness as well as contract validity. The persisted catalog and search index provide routing in current and future conversations.
@@ -265,7 +265,7 @@ Evaluate semantic usefulness as well as contract validity. The persisted catalog
 
 1. Re-read the final manifest and actions and correct unintended changes without overwriting unrelated work.
 2. Confirm validation, handler verification, and attachment reflect the final source. Local edits are already persisted; no separate Save operation is needed.
-3. Tell the user what improved, what it can now do, what was tried, what still needs sign-in or human interaction, and any limitations. Distinguish persisted drafts from verified capabilities. Report a missing or unverified avatar as a non-blocking limitation for a customer-facing service. Keep action IDs, files, and implementation details internal unless the user asks for them.
+3. Tell the user what improved, what it can now do, what was tried, what still needs sign-in or human interaction, and any limitations. Distinguish persisted drafts from verified capabilities. Report a missing or unverified favicon as an attachment blocker, not a completed customer-facing service. Keep action IDs, files, and implementation details internal unless the user asks for them.
 
 ## Recovery
 
