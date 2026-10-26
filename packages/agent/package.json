@@ -18,9 +18,9 @@
     "@openox/protocol": "workspace:*",
     "@ungap/structured-clone": "1.4.0",
     "abort-controller": "3.0.0",
-    "re2js": "2.8.8",
+    "re2js": "2.9.0",
     "text-encoding": "0.7.0",
-    "typebox": "1.4.2",
+    "typebox": "1.4.3",
     "whatwg-url": "14.2.0"
   },
   "devDependencies": {

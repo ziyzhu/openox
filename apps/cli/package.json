@@ -42,7 +42,7 @@
     "access": "public"
   },
   "dependencies": {
-    "typebox": "1.3.27"
+    "typebox": "1.4.3"
   },
   "devDependencies": {
     "@openox/protocol": "0.1.0",
