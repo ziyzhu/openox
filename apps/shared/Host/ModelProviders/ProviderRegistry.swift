@@ -119,8 +119,12 @@ final class ProviderRegistry {
         let active = catalog.providers.first { $0.id == id } ?? entry.definition
         let models = try await discovery.models(for: active, known: modelCatalog?.models(for: discovery.catalog) ?? [:])
         discovered[id] = DiscoveredModels(fetchedAt: Date(), models: models)
-        try FileManager.default.createDirectory(at: AppStoragePaths.caches, withIntermediateDirectories: true)
-        try JSONEncoder().encode(discovered).write(to: AppStoragePaths.discoveredModels, options: .atomic)
+        do {
+            try FileManager.default.createDirectory(at: AppStoragePaths.caches, withIntermediateDirectories: true)
+            try JSONEncoder().encode(discovered).write(to: AppStoragePaths.discoveredModels, options: .atomic)
+        } catch {
+            Log.agent.warning("ProviderRegistry.discover cacheWriteFailed provider=\(id) error=\(error.localizedDescription)")
+        }
         rebuildClients()
         Log.agent.info("ProviderRegistry.discover provider=\(id) models=\(models.count)")
         return models.count

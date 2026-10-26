@@ -837,7 +837,8 @@ Malformed or future files are retained and block startup and configuration write
 `llm.discoveredModels` moves to `Caches/DiscoveredModels.json`; invalid legacy
 cache bytes may be discarded because discovery can rebuild them. An existing cache
 wins, and cache-copy failures retain the preference for retry without blocking startup.
-Caches follow system eviction and are not authoritative configuration.
+Caches follow system eviction and are not authoritative configuration; runtime cache-write
+failures are logged without discarding freshly discovered models.
 The configuration remains eligible for normal app backup, outside Profiles and exports.
 Older builds ignore the file and can recreate empty or divergent provider preferences.
 Downgrade is not configuration-compatible; actual predecessor/changed-build evidence
