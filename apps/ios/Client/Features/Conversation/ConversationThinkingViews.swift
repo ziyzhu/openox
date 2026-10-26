@@ -370,7 +370,7 @@ private struct TraceRow: View {
                     .buttonStyle(.plain)
                     if let sources = InvocationFormat.sources(invocation, serviceManager: serviceManager) {
                         SourceChipList(sources: sources) { source in
-                            if source.url != nil || source.skill != nil {
+                            if source.url != nil || source.skill != nil || source.service != nil {
                                 SourceChipButton(source: source, accessibilityIdentifier: "conversation.step.\(invocation.id).source.\(source.id)") {
                                     if let url = source.url { open(url) }
                                 }
@@ -499,11 +499,14 @@ private struct SourceChipButton: View {
     let action: () -> Void
 
     @State private var presentedSkill: Skill?
+    @State private var presentedService: Service?
     @State private var profileID = StorageRoot.shared.activeId
 
     var body: some View {
         Button {
-            if let skill = source.skill {
+            if let service = source.service {
+                presentedService = service
+            } else if let skill = source.skill {
                 presentedSkill = skill
             } else {
                 action()
@@ -520,6 +523,14 @@ private struct SourceChipButton: View {
             NavigationStack {
                 ConversationSkillDetails(skill: skill, skills: Skills.shared, profileID: profileID)
             }
+            .presentationBackground(Theme.Colors.background)
+        }
+        .sheet(item: $presentedService) { service in
+            NavigationStack {
+                ServiceDetailView(initialService: service, primaryAction: nil, isAttached: false, onPrimaryAction: nil)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
             .presentationBackground(Theme.Colors.background)
         }
     }
@@ -687,6 +698,11 @@ private enum InvocationFormat {
         let url: URL?
         let accessibilityLabel: String
 
+        var service: Service? {
+            if case .service(let service) = icon { return service }
+            return nil
+        }
+
         var skill: Skill? {
             if case .skill(let skill) = icon { return skill }
             return nil
@@ -717,10 +733,17 @@ private enum InvocationFormat {
             guard let path = invocation.args.objectValue?["path"]?.stringValue,
                   !path.isEmpty else { return nil }
             let parts = path.split(separator: "/")
-            if invocation.name == Actions.fsRead, parts.count == 3,
-               parts[0] == "skills", parts[2] == "SKILL.md",
+            if parts.count >= 3, parts[0] == "skills",
                let skill = Skills.shared.skill(named: String(parts[1])) {
-                return [Source(label: "/\(skill.displayName)", icon: .skill(skill), accessibilityLabel: "/\(skill.displayName), \(skill.description)")]
+                guard skill.owner != .system else { return nil }
+                if invocation.name == Actions.fsRead, parts.count == 3, parts[2] == "SKILL.md" {
+                    return [Source(label: "/\(skill.displayName)", icon: .skill(skill), accessibilityLabel: "/\(skill.displayName), \(skill.description)")]
+                }
+            }
+            if parts.count >= 4, parts[0] == "services",
+               ServicesMount.Kind(rawValue: String(parts[1])) != nil,
+               let service = serviceManager.service(domain: String(parts[2])) {
+                return [Source(label: service.title, icon: .service(service))]
             }
             return [Source(label: (path as NSString).lastPathComponent, icon: .file(path), accessibilityLabel: path)]
         case Actions.webSearch:
