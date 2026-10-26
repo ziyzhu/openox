@@ -880,13 +880,12 @@ struct ConversationPage: View {
     private func conversationBlockHost(_ block: ConversationBlock, latestCanvasBlockIDs: [URL: UUID]) -> some View {
         switch block.kind {
         case .responseFooter(let text, let phase):
-            ResponseFooterBlockView(
-                id: block.id,
-                text: text,
-                isVisible: phase.isVisible,
-                controls: messageControls(sourceBlockID: block.sourceBlockID)
-            )
-            .overlay(alignment: .topLeading) {
+            VStack(alignment: .leading, spacing: 0) {
+                ResponseFooterBlockView(
+                    id: block.id,
+                    text: text,
+                    controls: messageControls(sourceBlockID: block.sourceBlockID)
+                )
                 if phase == .streaming, showsActivity {
                     ActivityBubble()
                         .padding(

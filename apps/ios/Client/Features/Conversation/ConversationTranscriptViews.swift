@@ -735,15 +735,12 @@ struct BlockView: View, Equatable {
 struct ResponseFooterBlockView: View, Equatable {
     let id: UUID
     let text: String
-    let isVisible: Bool
     let controls: MessageControls
 
     static func == (lhs: ResponseFooterBlockView, rhs: ResponseFooterBlockView) -> Bool {
         lhs.id == rhs.id
             && lhs.text == rhs.text
-            && lhs.isVisible == rhs.isVisible
             && lhs.controls.isCopied == rhs.controls.isCopied
-            && lhs.controls.canMutate == rhs.controls.canMutate
     }
 
     var body: some View {
@@ -764,25 +761,20 @@ struct ResponseFooterBlockView: View, Equatable {
             iconButton(
                 systemName: "arrow.branch",
                 label: A11yLabel.branchMessage,
-                id: actionIdentifier(A11yID.ConversationControls.Message.branch),
-                disabled: !controls.canMutate
+                id: actionIdentifier(A11yID.ConversationControls.Message.branch)
             ) {
                 controls.onBranch()
             }
             iconButton(
                 systemName: "arrow.clockwise",
                 label: A11yLabel.retryMessage,
-                id: actionIdentifier(A11yID.ConversationControls.Message.retry),
-                disabled: !controls.canMutate
+                id: actionIdentifier(A11yID.ConversationControls.Message.retry)
             ) {
                 controls.onRetry()
             }
         }
         .padding(.horizontal, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .opacity(isVisible ? 1 : 0)
-        .allowsHitTesting(isVisible)
-        .accessibilityHidden(!isVisible)
     }
 
     private var shareText: String {
@@ -799,15 +791,12 @@ struct ResponseFooterBlockView: View, Equatable {
         systemName: String,
         label: String,
         id: String,
-        disabled: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             controlIcon(systemName: systemName)
         }
         .buttonStyle(.plain)
-        .disabled(disabled)
-        .opacity(disabled ? 0.4 : 1)
         .accessibilityLabel(label)
         .accessibilityIdentifier(id)
     }

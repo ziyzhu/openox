@@ -110,7 +110,6 @@ struct OxDemoSceneView: View {
                             ResponseFooterBlockView(
                                 id: playback.sessionID,
                                 text: playback.reply,
-                                isVisible: !playback.isStreaming,
                                 controls: MessageControls(
                                     onCopy: { UIPasteboard.general.string = $0 },
                                     isCopied: false,

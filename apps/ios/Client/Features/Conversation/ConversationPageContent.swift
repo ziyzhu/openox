@@ -4,8 +4,6 @@ struct ConversationBlock: Identifiable, Equatable {
     enum ResponseFooterPhase: Equatable {
         case streaming
         case settled
-
-        var isVisible: Bool { self == .settled }
     }
 
     enum Kind: Equatable {
