@@ -23,17 +23,17 @@ A self-evolving agent that runs on your phone.
 2. Feels just like ChatGPT.
 3. Your device, any model.
 
-<a href="https://openox.ai/#demo">
-  <img src="https://openox.ai/assets/media/demos/78dbbd00cd76/github-thumbnail-65s.jpg" alt="Watch Ox create a reusable service and prepare a job application" width="240">
-</a>
+<img src="https://openox.ai/assets/media/slides/openox/img-5332-94c0c8e1b754.jpg" alt="Whiteboard sketch comparing access to the internet through websites and apps with access through Ox or another personal assistant" width="720">
 
 ## Demo
 
 Watch Ox uses LinkedIn to find jobs, builds an integration with Workday on the fly, and drafts a submission using local file system.
 
-[Watch the full demo →](https://openox.ai/#demo)
+<a href="https://openox.ai/#demo">
+  <img src="https://openox.ai/assets/media/demos/78dbbd00cd76/github-thumbnail-65s.jpg" alt="Watch Ox create a reusable service and prepare a job application" width="240">
+</a>
 
-<img src="https://openox.ai/assets/media/slides/openox/img-5332-94c0c8e1b754.jpg" alt="Whiteboard sketch comparing access to the internet through websites and apps with access through Ox or another personal assistant" width="720">
+[Watch the full demo →](https://openox.ai/#demo)
 
 ## Download
 
