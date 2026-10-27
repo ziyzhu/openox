@@ -5,6 +5,7 @@ import UIKit
 struct ConversationFileResolver {
     let revision: Int
     let resolve: (String) async -> FileItem?
+    let read: (String) async throws -> JSONValue
 }
 
 extension EnvironmentValues {

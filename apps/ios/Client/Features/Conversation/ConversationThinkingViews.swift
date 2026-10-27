@@ -93,8 +93,6 @@ struct ThinkingRow: View {
                             SourceChipButton(source: source, accessibilityIdentifier: "conversation.source.\(source.id)") {
                                 if let url = source.url {
                                     LinkOpener.open(url: url, serviceManager: serviceManager)
-                                } else {
-                                    isExpanded = true
                                 }
                             }
                         }
@@ -370,19 +368,8 @@ private struct TraceRow: View {
                     .buttonStyle(.plain)
                     if let sources = InvocationFormat.sources(invocation, serviceManager: serviceManager) {
                         SourceChipList(sources: sources) { source in
-                            if source.url != nil || source.skill != nil || source.service != nil {
-                                SourceChipButton(source: source, accessibilityIdentifier: "conversation.step.\(invocation.id).source.\(source.id)") {
-                                    if let url = source.url { open(url) }
-                                }
-                            } else {
-                                NavigationLink(value: invocation) {
-                                    SourceChip(source: source)
-                                }
-                                .buttonStyle(.plain)
-                                .frame(minHeight: Theme.Size.minimumTouchTarget)
-                                .contentShape(Rectangle())
-                                .accessibilityLabel(source.accessibilityLabel)
-                                .accessibilityIdentifier("conversation.step.\(invocation.id).source.\(source.id)")
+                            SourceChipButton(source: source, accessibilityIdentifier: "conversation.step.\(invocation.id).source.\(source.id)") {
+                                if let url = source.url { open(url) }
                             }
                         }
                     }
@@ -498,16 +485,35 @@ private struct SourceChipButton: View {
     let accessibilityIdentifier: String
     let action: () -> Void
 
-    @State private var presentedSkill: Skill?
-    @State private var presentedService: Service?
+    private enum Destination: Identifiable {
+        case file(String)
+        case results(Invocation)
+        case skill(Skill)
+        case service(Service)
+
+        var id: String {
+            switch self {
+            case .file(let path): "file:\(path)"
+            case .results(let invocation): "results:\(invocation.id)"
+            case .skill(let skill): "skill:\(skill.id)"
+            case .service(let service): "service:\(service.domain)"
+            }
+        }
+    }
+
+    @State private var destination: Destination?
     @State private var profileID = StorageRoot.shared.activeId
 
     var body: some View {
         Button {
-            if let service = source.service {
-                presentedService = service
+            if let path = source.filePath {
+                destination = .file(path)
+            } else if let invocation = source.results {
+                destination = .results(invocation)
+            } else if let service = source.service {
+                destination = .service(service)
             } else if let skill = source.skill {
-                presentedSkill = skill
+                destination = .skill(skill)
             } else {
                 action()
             }
@@ -519,19 +525,100 @@ private struct SourceChipButton: View {
         .contentShape(Rectangle())
         .accessibilityLabel(source.accessibilityLabel)
         .accessibilityIdentifier(accessibilityIdentifier)
-        .sheet(item: $presentedSkill) { skill in
+        .sheet(item: $destination) { destination in
             NavigationStack {
-                ConversationSkillDetails(skill: skill, skills: Skills.shared, profileID: profileID)
+                Group {
+                    switch destination {
+                    case .file(let path):
+                        SourceFileView(path: path)
+                    case .results(let invocation):
+                        InvocationDetailView(invocation: invocation, outputOnly: true)
+                    case .skill(let skill):
+                        ConversationSkillDetails(skill: skill, skills: Skills.shared, profileID: profileID)
+                    case .service(let service):
+                        ServiceDetailView(initialService: service, primaryAction: nil, isAttached: false, onPrimaryAction: nil)
+                            .presentationDetents([.medium, .large])
+                    }
+                }
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        SheetDismissToolbarButton(accessibilityIdentifier: "conversation.source.close") {
+                            self.destination = nil
+                        }
+                    }
+                }
             }
-            .presentationBackground(Theme.Colors.background)
-        }
-        .sheet(item: $presentedService) { service in
-            NavigationStack {
-                ServiceDetailView(initialService: service, primaryAction: nil, isAttached: false, onPrimaryAction: nil)
-            }
-            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
             .presentationBackground(Theme.Colors.background)
+        }
+    }
+}
+
+private struct SourceFileView: View {
+    let path: String
+    @Environment(\.conversationFileResolver) private var resolver
+
+    private enum Content {
+        case loading
+        case file(FileItem)
+        case text(String, truncated: Bool)
+        case failed(String)
+    }
+
+    @State private var content = Content.loading
+
+    var body: some View {
+        Group {
+            switch content {
+            case .loading:
+                ProgressView()
+            case .file(let file):
+                if file.usesDedicatedPreview {
+                    FileNavigationPage(file: file)
+                } else {
+                    FilePreviewPresentation(file: file)
+                }
+            case .text(let text, let truncated):
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                        if truncated {
+                            Text("This file preview was shortened.")
+                                .font(Theme.Fonts.captionMd)
+                                .foregroundStyle(.secondary)
+                        }
+                        CodeBlockView(code: text, accessibilityIdentifier: "conversation.source.file.content")
+                    }
+                    .padding(Theme.Spacing.lg)
+                }
+            case .failed(let message):
+                ContentUnavailableView(message, systemImage: "doc.badge.ellipsis")
+            }
+        }
+        .navigationTitle((path as NSString).lastPathComponent)
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: path) {
+            guard let resolver else {
+                content = .failed(String(localized: "File unavailable."))
+                return
+            }
+            if let file = await resolver.resolve(path) {
+                content = .file(file)
+                return
+            }
+            do {
+                let result = try await resolver.read(path)
+                guard let value = result.objectValue?["value"]?.objectValue,
+                      let text = value["text"]?.stringValue else {
+                    throw CocoaError(.fileReadUnknown)
+                }
+                try Task.checkCancellation()
+                content = .text(text, truncated: value["truncated"]?.boolValue == true)
+                Log.ui.info("SourceFileView.open disposition=text path=\(path)")
+            } catch is CancellationError {
+            } catch {
+                content = .failed(error.localizedDescription)
+                Log.ui.warning("SourceFileView.open disposition=failed path=\(path) error=\(error.localizedDescription)")
+            }
         }
     }
 }
@@ -577,18 +664,21 @@ private enum ThinkingFormat {
 
 private struct InvocationDetailView: View {
     let invocation: Invocation
+    var outputOnly = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                section(invocation.preview?.argumentsTruncated == true ? "Input preview" : "Input") {
-                    Text(verbatim: invocation.name)
-                        .font(Theme.Fonts.captionMd)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .accessibilityIdentifier("conversation.invocation.function")
-                    if invocation.preview?.argumentsTruncated == true { previewNotice }
-                    inputValue
+                if !outputOnly {
+                    section(invocation.preview?.argumentsTruncated == true ? "Input preview" : "Input") {
+                        Text(verbatim: invocation.name)
+                            .font(Theme.Fonts.captionMd)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .accessibilityIdentifier("conversation.invocation.function")
+                        if invocation.preview?.argumentsTruncated == true { previewNotice }
+                        inputValue
+                    }
                 }
                 section(invocation.preview?.resultTruncated == true ? "Output preview" : "Output") {
                     if invocation.preview?.resultTruncated == true { previewNotice }
@@ -697,6 +787,12 @@ private enum InvocationFormat {
         let icon: Icon
         let url: URL?
         let accessibilityLabel: String
+        let results: Invocation?
+
+        var filePath: String? {
+            if case .file(let path) = icon { return path }
+            return nil
+        }
 
         var service: Service? {
             if case .service(let service) = icon { return service }
@@ -712,17 +808,18 @@ private enum InvocationFormat {
             switch icon {
             case .service(let service): "service:\(service.domain)"
             case .domain(let domain): "domain:\(url?.absoluteString ?? domain)"
-            case .none: "label:\(label)"
+            case .none: "results:\(results?.id.uuidString ?? label)"
             case .file(let path): "file:\(path)"
             case .skill(let skill): "skill:\(skill.id)"
             }
         }
 
-        init(label: String, icon: Icon, url: URL? = nil, accessibilityLabel: String? = nil) {
+        init(label: String, icon: Icon, url: URL? = nil, accessibilityLabel: String? = nil, results: Invocation? = nil) {
             self.label = label
             self.icon = icon
             self.url = url
             self.accessibilityLabel = accessibilityLabel ?? label
+            self.results = results
         }
     }
 
@@ -740,32 +837,27 @@ private enum InvocationFormat {
                     return [Source(label: "/\(skill.displayName)", icon: .skill(skill), accessibilityLabel: "/\(skill.displayName), \(skill.description)")]
                 }
             }
-            if parts.count >= 4, parts[0] == "services",
-               ServicesMount.Kind(rawValue: String(parts[1])) != nil,
-               let service = serviceManager.service(domain: String(parts[2])) {
-                return [Source(label: service.title, icon: .service(service))]
-            }
             return [Source(label: (path as NSString).lastPathComponent, icon: .file(path), accessibilityLabel: path)]
         case Actions.webSearch:
             if let sources = searchSources(invocation), !sources.isEmpty {
                 return sources
             }
             let query = invocation.sources?.query ?? args?["query"]?.stringValue ?? ""
-            return query.isEmpty ? nil : [Source(label: query, icon: .none)]
+            return query.isEmpty ? nil : [Source(label: query, icon: .none, results: invocation)]
         case Actions.webFetch:
             guard let source = fetchSource(invocation) else { return nil }
             return [source]
         case Actions.serviceFind:
             let query = invocation.sources?.query ?? args?["query"]?.stringValue ?? ""
-            return query.isEmpty ? nil : [Source(label: query, icon: .none)]
+            return query.isEmpty ? nil : [Source(label: query, icon: .none, results: invocation)]
         case Actions.serviceAttach, Actions.serviceValidate, Actions.serviceSignIn, Actions.serviceSolve, Actions.servicePayment, Actions.serviceDetach:
             guard let domain = invocation.sources?.domain ?? args?["domain"]?.stringValue, !domain.isEmpty else { return nil }
             let service = serviceManager.service(domain: domain)
-            return [Source(label: service?.title ?? domain, icon: service.map(Source.Icon.service) ?? .none)]
+            return [Source(label: service?.title ?? domain, icon: service.map(Source.Icon.service) ?? .none, results: service == nil ? invocation : nil)]
         default:
             guard let domain = invokeDomain(invocation.name) else { return nil }
             let service = serviceManager.service(domain: domain)
-            return [Source(label: service?.title ?? domain, icon: service.map(Source.Icon.service) ?? .none)]
+            return [Source(label: service?.title ?? domain, icon: service.map(Source.Icon.service) ?? .none, results: service == nil ? invocation : nil)]
         }
     }
 
