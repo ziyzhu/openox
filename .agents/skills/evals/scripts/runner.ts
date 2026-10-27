@@ -9,16 +9,21 @@ import { caseIds, loadCase } from "./cases.ts";
 import { validateCatalog } from "./catalog.ts";
 import { summarize } from "./report.ts";
 import type { Outcome, RunRecord } from "./types.ts";
+import { loadKeys, redact } from "./credentials.ts";
 
 type Variant = { name: string; root: string; revision: string; dirty: boolean; ref?: string };
 type Task = { id: string; variant: Variant; repetition: number };
 
 const usage = `Usage: bun run evals --provider <id> --model <id> [options]
   --baseline <ref>       Also run each case against the prompts at this git ref
-  --case <id>            Run only this case; repeatable (default: all cases)
+  --case <id>            Run only this case; repeatable (default: basic prompting cases)
+  --matrix <json>        Run explicit [{provider, model}] rows instead of one provider
+  --keys <json>          API keys (default: secrets/API_KEYS.json; environment wins)
+  --authorize-spend      Required for real model calls
+  --providers           List bundled providers and runner coverage without inference
   --repeat <1..20>       Runs per case and variant (default 1)
   --timeout <ms>         Override each case's limit (default: case timeoutMs or 120000)
-  --jobs <n>             Concurrent runs (default 4)
+  --jobs <n>             Concurrent runs (default 1)
   --output <dir>         New report directory outside the repository (default: temporary)
   --list | --validate
 Providers: openai, anthropic, google (standard API-key environment variables).
@@ -68,8 +73,10 @@ async function arm(task: Task, provider: string, model: string, timeout: string,
   const child = Bun.spawn([process.execPath, join(task.variant.root, ".agents/skills/evals/scripts/arm.ts"), task.id, provider, model, timeout, output], { cwd: task.variant.root, stdout: "ignore", stderr: "pipe" });
   const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
   const base = { case: task.id, variant: task.variant.name, repetition: task.repetition };
-  if (code !== 0 || !await Bun.file(output).exists()) return { ...base, status: "error", checks: [], error: stderr.trim() || `arm exited ${code}` };
-  const { turn: _turn, ...outcome } = await Bun.file(output).json() as Outcome & { turn?: unknown };
+  if (code !== 0 || !await Bun.file(output).exists()) return { ...base, status: "error", checks: [], error: redact(stderr.trim()) || `arm exited ${code}` };
+  const safe = redact(await Bun.file(output).text());
+  await writeFile(output, safe, { mode: 0o600 });
+  const { turn: _turn, ...outcome } = JSON.parse(safe) as Outcome & { turn?: unknown };
   return { ...base, ...outcome, transcript: output };
 }
 
@@ -86,7 +93,8 @@ async function main(): Promise<void> {
   const { values } = parseArgs({ args: Bun.argv.slice(2), options: {
     help: { type: "boolean" }, list: { type: "boolean" }, validate: { type: "boolean" },
     provider: { type: "string" }, model: { type: "string" }, case: { type: "string", multiple: true },
-    baseline: { type: "string" }, repeat: { type: "string", default: "1" }, timeout: { type: "string" }, jobs: { type: "string", default: "4" }, output: { type: "string" },
+    baseline: { type: "string" }, repeat: { type: "string", default: "1" }, timeout: { type: "string" }, jobs: { type: "string", default: "1" }, output: { type: "string" },
+    keys: { type: "string" }, matrix: { type: "string" }, providers: { type: "boolean" }, "authorize-spend": { type: "boolean" },
   }, strict: true });
   if (values.help) return console.log(usage);
   const ids = await caseIds();
@@ -95,15 +103,32 @@ async function main(): Promise<void> {
     for (const id of ids) new Stubs((await loadCase(id)).stubs ?? {});
     return console.log(`Validated ${ids.length} cases; stub catalog matches ${await validateCatalog()} native functions`);
   }
-  if (!values.provider || !values.model) throw new Error(usage);
-  const selected = values.case ?? ids;
+  if (values.providers) {
+    const bundled = await Bun.file(join(ROOT, "apps/shared/Host/ModelProviders/providers.json")).json() as { definition: { id: string; auth: { kind: string } } }[];
+    return console.log(JSON.stringify(bundled.map(({ definition }) => ({ provider: definition.id, auth: definition.auth.kind,
+      runner: ["openai", "anthropic", "gemini"].includes(definition.id) ? (definition.id === "gemini" ? "google" : definition.id) : null,
+      status: ["openai", "anthropic", "gemini"].includes(definition.id) ? "available; inference not verified" : "blocked: native adapter not exercised by portable runner",
+    })), null, 2));
+  }
+  if (values.matrix && (values.provider || values.model)) throw new Error("Choose --matrix or --provider/--model, not both");
+  const rows: unknown = values.matrix ? await Bun.file(values.matrix).json() : [{ provider: values.provider, model: values.model }];
+  if (!Array.isArray(rows) || !rows.length || rows.some(row => !row || typeof row.provider !== "string" || typeof row.model !== "string" || !row.model || !["openai", "anthropic", "google"].includes(row.provider))) throw new Error("Choose explicit supported provider/model rows: openai, anthropic, google. Other bundled adapters are blocked; see --providers.");
+  if (!values["authorize-spend"]) throw new Error("Real inference requires --authorize-spend and an explicitly authorized provider/model matrix");
+  const selected = values.case ?? ["basic-prompt", "app-profile", "basic-files"];
   for (const id of selected) if (!ids.includes(id)) throw new Error(`Unknown case: ${id}`);
   const repetitions = integer(values.repeat!, 1, 20);
   const timeout = values.timeout ? String(integer(values.timeout, 1, 600_000)) : "default";
+  await loadKeys(values.keys);
   const directory = await outputDirectory(values.output);
   const candidate: Variant = { name: "candidate", root: ROOT, revision: git(ROOT, "rev-parse", "HEAD"), dirty: git(ROOT, "status", "--porcelain").length > 0 };
   const variants = values.baseline ? [await baseline(values.baseline), candidate] : [candidate];
-  try { await evaluateVariants(variants, selected, { provider: values.provider, model: values.model, repetitions, timeout, jobs: integer(values.jobs!, 1, 16), directory }); }
+  try {
+    for (const [index, row] of rows.entries()) {
+      const output = rows.length === 1 ? directory : join(directory, String(index + 1));
+      if (rows.length !== 1) await mkdir(output);
+      await evaluateVariants(variants, selected, { provider: row.provider, model: row.model, repetitions, timeout, jobs: integer(values.jobs!, 1, 16), directory: output });
+    }
+  }
   finally { if (values.baseline) git(ROOT, "worktree", "remove", "--force", variants[0]!.root); }
 }
 
@@ -125,7 +150,7 @@ async function evaluateVariants(variants: Variant[], selected: string[], { provi
   await writeFile(join(directory, "report.json"), JSON.stringify(report, null, 2), { mode: 0o600 });
   await writeFile(join(directory, "report.txt"), summary + "\n", { mode: 0o600 });
   console.log(`\n${summary}\nReport: ${directory}`);
-  process.exitCode = runs.some(run => run.status === "error") ? 1 : 0;
+  if (runs.some(run => run.status !== "pass")) process.exitCode = 1;
 }
 
-if (import.meta.main) await main().catch(error => { console.error(error.message); process.exitCode = 1; });
+if (import.meta.main) await main().catch(error => { console.error(redact(error.message)); process.exitCode = 1; });

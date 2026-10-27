@@ -1,6 +1,6 @@
 ---
 name: build
-description: Build bundled OpenOx services, regenerate protocol/provider schemas, and run repository static checks and TypeScript validation. Use for generated-artifact maintenance or build/check failures; verification belongs to test and publication to release.
+description: Build native apps and bundled services, regenerate schemas, and run static, type, packaging, generated-artifact and build-tool checks. Runtime protocol, storage-upgrade and provider behavior belong to the three test suites; publication belongs to release.
 ---
 
 # Build
@@ -13,6 +13,8 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 
 | Command | Purpose |
 | --- | --- |
+| `bun run build:check` | Static/type validation and offline build-tool, packaging and CLI-input checks in `checks/`. |
+| `bun run ci` | Build checks, portable protocol validation, generated resources and package consumers; see [portable checks](portable.md). |
 | `bun run typecheck` | Static checks and five TypeScript projects, including all desktop skill code. |
 | `bun run build:host-schema` | Regenerate Host RPC JSON/Swift artifacts. |
 | `bun run build:repository-schema` | Regenerate repository JSON/Swift artifacts. |
@@ -64,7 +66,9 @@ Do not overwrite unrelated repository or generated changes.
 The same build generates native filesystem contracts from `packages/agent/src/core/filesystem-contract.ts`, using pinned Pi read/write/edit schemas. Edit agent contracts and logic, not the generated Swift. `execute` → `ox.fs.*` is the sole model filesystem surface; native backends retain source permissions, platform effects, and storage safety.
 All hosts share one core prompt. Put presentation facts in current turn context and detailed capability guidance in function help or matching skills; avoid capability-driven prose parsing or rendered-text patching.
 
-Run `bun run ci` through the `test` skill after maintenance. Simulator provisioning
+Run `bun run ci` after maintenance. `scripts/ci.sh` owns credential-free orchestration;
+static eval-definition validation does not load API keys or invoke models. Build-only
+checks live in `checks/`, not the protocol suite. Do not add general agent unit tests. Simulator provisioning
 belongs to `setup`; real-model behavior belongs to `evals`; publication belongs
 to `release`. Individual check implementations may be invoked directly for debugging.
 Keep screenshots, traces, credentials, and diagnostics outside the repository.

@@ -1,7 +1,7 @@
 # Portable verification
 
 CI installs with the frozen lockfile and runs build/static checks, controlled CLI/Host
-fixtures, agent package tests, offline runner safety checks, eval-definition validation,
+fixtures, offline build-tool safety checks, eval-definition validation,
 service generation, and package consumer checks. It clears live-target variables and
 disables `.env` loading. No simulator, credentials, model calls, or publication are required.
 
@@ -15,7 +15,7 @@ Node on PATH. See the CI workflow for platform coverage and pinned tool versions
 Checkout fixtures must include untracked files and skip working-tree deletions;
 `git ls-files --cached` includes deleted files until staged. Package-owned
 `package-check.ts` files verify release consumers; never publish as a test.
-Device-template checks live in this skill's `apps/ios/template-*.test.ts`; `setup`
+Device-template checks live in this skill's `checks/ios/template-*.test.ts`; `setup`
 owns the schema and launcher. Predecessor storage and website-session evidence remain
 private external files. Portable checks do not establish live upgrade, auth, or service coverage.
 

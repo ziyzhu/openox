@@ -7,7 +7,7 @@ import { qaCommand } from "../../../setup/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulator.ts";
 
 const config = qaCommand({
-  usage: "Usage: bun .agents/skills/test/apps/ios/ox-errors.ts --device ox-N --host <ws-url> --conversation <idle-QA-conversation>\nRequires an installed build and enabled Host. Verifies structured ox errors without changing files, settings, or policies.",
+  usage: "Usage: bun .agents/skills/test/protocol/native/ox-errors.ts --device ox-N --host <ws-url> --conversation <idle-QA-conversation>\nRequires an installed build and enabled Host. Verifies structured ox errors without changing files, settings, or policies.",
   options: { host: { type: "string" }, conversation: { type: "string" } },
 });
 if (!config.values.device || !config.values.host || !config.values.conversation) throw new Error("Pass --device, --host, and --conversation explicitly");

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { EvalRuntime, evalModels, type Turn } from "../../../../packages/agent/evals/runtime";
 import { loadCase } from "./cases.ts";
+import { loadKeys, redact } from "./credentials.ts";
 import type { Check, EvalCase, Metrics, Outcome } from "./types.ts";
 
 function metrics(turn: Turn, elapsedMs: number): Metrics {
@@ -44,7 +45,8 @@ export async function evaluate(test: EvalCase, provider: string, model: string, 
 if (import.meta.main) {
   const [id, provider, model, timeout, output] = Bun.argv.slice(2);
   if (!id || !provider || !model || !output) throw new Error("Usage: arm.ts <case> <provider> <model> <timeout-ms|default> <output.json>");
+  await loadKeys();
   const test = await loadCase(id);
   const timeoutMs = timeout && timeout !== "default" ? Number(timeout) : test.timeoutMs ?? 120_000;
-  await writeFile(output, JSON.stringify(await evaluate(test, provider, model, timeoutMs)), { mode: 0o600 });
+  await writeFile(output, redact(JSON.stringify(await evaluate(test, provider, model, timeoutMs))), { mode: 0o600 });
 }

@@ -18,8 +18,9 @@ Website and infrastructure deployment remain in `openox-dev`.
 ## Storage compatibility
 
 For every persisted-storage change, including development work outside a release,
-follow [references/storage-compatibility.md](references/storage-compatibility.md)
-and update the canonical [storage map](references/storage.md) when affected.
+follow the test-owned [storage compatibility procedure](../test/references/storage-compatibility.md)
+and update its canonical [storage map](../test/references/storage.md) when affected.
+The test skill owns upgrade cases and evidence; release consumes their results.
 Require before/after device templates backed by actual build-written snapshots;
 verify newer readers with older data and second-launch stability. Downgrade
 compatibility, older-reader testing, and downgrade approval are not release gates.

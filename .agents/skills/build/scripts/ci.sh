@@ -12,7 +12,7 @@ while [ "$#" -gt 0 ]; do
       output="$2"; shift 2 ;;
     -h|--help)
       echo 'Usage: bun run ci [--standalone-only [--out <directory>]]'
-      echo 'Default: portable checks, offline contracts/app regressions, packages, generated artifacts, eval definitions.'
+      echo 'Default: build checks, protocol validation, packages, generated artifacts, eval definitions.'
       echo 'No iOS, live Hosts, model calls, credentials, or publication. Standalone mode tests only the current platform.'
       exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -24,7 +24,6 @@ fi
 for tool in bun git; do
   command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
 done
-# Keep fixture-backed checks independent of the developer's live Host selection.
 unset OX_HOST_ENDPOINT OX_DEBUG_ENDPOINT OX_SERVER_ROOT OX_QA_DEVICE
 bun --no-env-file install --frozen-lockfile
 
@@ -40,10 +39,8 @@ if [ "$standalone" = true ]; then
   exit 0
 fi
 command -v npm >/dev/null || { echo 'Missing prerequisite: npm' >&2; exit 1; }
-bun --no-env-file run typecheck
-bun --no-env-file test ./.agents/skills/test
-bun --no-env-file test packages/agent/test
-bun --no-env-file .agents/skills/test/apps/cli/logs.ts
+bun --no-env-file run build:check
+bun --no-env-file run test:protocol
 bun --no-env-file .agents/skills/evals/scripts/runner.ts --validate
 bun --no-env-file run build:services
 git diff --exit-code -- apps/shared/Resources/OxServices.bundle \
@@ -53,4 +50,4 @@ for package in protocol services; do
   bun --no-env-file run --cwd "packages/$package" package:check
 done
 bun --no-env-file run --cwd apps/cli package:check
-echo 'PASS portable CI (iOS smoke and real-model evals are local-only)'
+echo 'PASS build checks and portable protocol validation (storage upgrades and real-provider evals not run)'

@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { strict as assert } from "node:assert";
 import { createHash } from "node:crypto";
 import { RPC_VERSION, validateParams, validateResult } from "../../../../../packages/protocol/src/index.ts";
@@ -11,6 +12,7 @@ const rows = Array.from({ length: 2_807 }, (_, seq) => ({
 let rpcV1WithoutPagination = false;
 let repeatingCursor = false;
 const levels = ["debug", "info", "warning", "error"];
+test("CLI log pagination preserves versioned response and cursor contracts", async () => {
 const server = Bun.serve({
   port: 0,
   fetch(request, server) {
@@ -118,3 +120,4 @@ try {
   console.log("PASS CLI process E2E: older pages, appends, all/tail, sparse server filters, summary, conversation scope, cursor errors, validation, old Hosts");
 
 } finally { server.stop(true); }
+}, 30_000);

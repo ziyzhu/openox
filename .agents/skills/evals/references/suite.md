@@ -7,9 +7,11 @@ bridge behavior is verified independently by integration tests.
 ```sh
 bun run evals --list
 bun run evals --validate
-bun run evals --provider anthropic --model <model-id>
-bun run evals --provider openai --model <model-id> --case proceed-without-asking --repeat 5
-bun run evals --provider anthropic --model <model-id> --baseline HEAD --repeat 5
+bun run evals --providers
+bun run evals --provider anthropic --model <model-id> --authorize-spend
+bun run evals --provider openai --model <model-id> --case proceed-without-asking --repeat 5 --authorize-spend
+bun run evals --provider anthropic --model <model-id> --baseline HEAD --repeat 5 --authorize-spend
+bun run evals --matrix /private/path/providers.json --authorize-spend
 ```
 
 `--baseline <ref>` compares prompts: it checks out the ref in a temporary git
@@ -20,9 +22,19 @@ differ between variants; the baseline must keep the runtime API the current
 harness uses, otherwise its runs error. Commit or keep the prompt change in the
 working tree and pass the ref to compare against.
 
-Providers are `openai`, `anthropic`, and `google`, using their standard API-key
-environment variables and installed model catalogs. Each case runs once by default
-with its own `timeoutMs` or 120000 ms. `--jobs` sets concurrency (default 4).
+Direct providers are `openai`, `anthropic`, and `google`, using installed model
+catalogs. `--providers` lists every bundled Ox provider and identifies native adapter
+gaps; direct inference does not verify native transports or OAuth. Keys come from the
+existing ignored `secrets/API_KEYS.json` (override with `--keys`), with `openai`,
+`anthropic`, and `gemini` mapped to their standard environment variables. Environment
+values take precedence. Nested entries such as `ark.china` remain valid but that
+provider is currently blocked by the portable runtime. Never print key values.
+
+A matrix is a nonempty JSON array of explicit `{ "provider": "openai", "model":
+"<model-id>" }` rows. Unsupported rows fail preflight rather than disappearing.
+Without `--case`, run only `basic-prompt`, `app-profile`, and `basic-files`.
+Each case runs once with its own `timeoutMs` or 120000 ms. `--jobs` sets concurrency
+(default 1). Real calls require `--authorize-spend` and prior user authorization.
 
 Each invocation writes a new directory (temporary by default, `--output` must be
 outside the repository) containing `report.json`, `report.txt`, and `runs/*.json`
@@ -30,7 +42,8 @@ with each run's system prompt, messages, `ox.*` calls and checks. The summary li
 pass counts per case and variant, and flags errored and flaky cases; with a
 baseline it also flags regressions, improvements, saturated cases that pass
 everywhere and cases that fail everywhere. Any errored run withholds
-the headline pass rate and exits 1; failing checks are results and exit 0. One
+the headline pass rate and exits 1; failing checks also exit 1. A later passing
+matrix row never clears an earlier failure. One
 repetition cannot establish stability.
 
 The 20 `trigger-*` cases measure skill consultation, not task completion: five positive and five near-miss queries in each fixed `trigger-dev-*` and `trigger-heldout-*` set. External operations may stop at unconfigured stubs; that is not evidence the full workflow works. Score consultation from successful `ox.fs.read` receipts, not answer text. Provider cases accept the former standalone route for a fair pre-merge baseline. Revise descriptions using development results only, freeze them before held-out runs, then check fresh unseen prompts. Use repeated `--case <id>` options to select a set and start with `--repeat 3`; keep repetitions and model identical across variants. Do not interpret these routing scores as authoring, payment, or provider-configuration success rates.
@@ -85,7 +98,7 @@ are explicit stub results for `ox.user.choose`. Browser, payment, service, and m
 results are simulated observations, not evidence of platform rendering or external
 success. Each run starts from a fresh runtime and stub copy.
 
-Run `bun run test:vm --device ox-N --host <ws-url>` on a fresh QA build to compare
+Run `bun .agents/skills/test/protocol/native/vm.ts --device ox-N --host <ws-url>` on a fresh QA build to compare
 `vm functions` with the per-namespace `packages/agent/src/functions/*/contracts.json` files and exercise the real VM.
 Update that snapshot from the native catalog only for reviewed contract changes.
 The runner uses a new QA Profile, exercises temporary and saved conversations,

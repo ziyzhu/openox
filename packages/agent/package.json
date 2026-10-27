@@ -8,8 +8,7 @@
     "./storage-diagnostics": "./src/adapters/ios/storage-diagnostics.ts"
   },
   "scripts": {
-    "build": "bun build.ts",
-    "test": "bun test test"
+    "build": "bun build.ts"
   },
   "dependencies": {
     "@earendil-works/chord": "1.3.0",

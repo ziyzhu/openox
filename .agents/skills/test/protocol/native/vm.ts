@@ -7,7 +7,7 @@ import { qaCommand } from "../../../setup/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulator.ts";
 import { contracts } from "../../../../../packages/agent/src/functions/contracts";
 
-const config = qaCommand({ usage: "Usage: bun .agents/skills/test/apps/ios/vm.ts --device ox-N --host <ws-url>\nRequires a fresh installed build. Uses a new QA Profile and Mock without inference. Restores the previous Profile.", options: { host: {type:"string"} } });
+const config = qaCommand({ usage: "Usage: bun .agents/skills/test/protocol/native/vm.ts --device ox-N --host <ws-url>\nRequires a fresh installed build. Uses a new QA Profile and Mock without inference. Restores the previous Profile.", options: { host: {type:"string"} } });
 if (!config.values.host) throw new Error("Pass --host explicitly");
 const endpoint = new URL(config.values.host);
 if (!["ws:","wss:"].includes(endpoint.protocol) || Number(endpoint.port) !== config.debugPort) throw new Error("Use the assigned simulator port");
