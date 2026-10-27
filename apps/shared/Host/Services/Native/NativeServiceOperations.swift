@@ -111,10 +111,10 @@ final class NativeServiceOperations {
             return try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
                 .navigationHistory()
-        case ("ios:browser", "getPageInfo"):
+        case ("ios:browser", "getPageState"):
             return try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
-                .pageInfo()
+                .pageState(selector: fields["selector"]?.stringValue, authorizeSite: authorizeSite)
         case ("ios:browser", "waitForNavigation"):
             let landed = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)

@@ -8,7 +8,20 @@ export default {
   stubs: { functions: {
     "ox.service.find": [{ result: [] }],
     "ox.web.browser.navigate": [{ result: { url: { $arg: "url" } } }],
-    "ox.web.browser.getPageInfo": [{ result: { url: portal, title: "Patient Portal - Sign In", estimatedProgress: 1, isLoading: false, hasOnlySecureContent: true, isBlockedByScreenTime: false, fullscreenState: "notInFullscreen" } }],
+    "ox.web.browser.getPageState": [{ result: {
+      pageID: "portal-page", navigationGeneration: 1, url: portal, title: "Patient Portal - Sign In",
+      estimatedProgress: 1, isLoading: false, hasOnlySecureContent: true, isBlockedByScreenTime: false, fullscreenState: "notInFullscreen",
+      document: {
+        scope: null, scopeFound: true, readyState: "complete", busy: false,
+        headings: ["Ballard Optometry Patient Portal"], dialogs: [], messages: [],
+        controls: [
+          { id: "username", name: "username", role: "input", label: "Username", type: "text", disabled: false, required: true, invalid: false, hasValue: false },
+          { id: "password", name: "password", role: "input", label: "Password", type: "password", disabled: false, required: true, invalid: false },
+          { id: null, name: null, role: "button", label: "Sign In", type: "submit", disabled: false, required: false, invalid: false },
+        ],
+        truncated: false, coverage: "Visible light-DOM elements; frames and shadow roots are not inspected.",
+      },
+    } }],
     "ox.web.browser.executeScript": [{ result: { url: portal, title: "Patient Portal - Sign In", text: "Ballard Optometry Patient Portal\nUsername\nPassword\nSign In\nForgot password?" } }],
     "ox.web.browser.stopCapture": [{ result: { stopped: true } }],
     "ox.web.browser.clearScripts": [{ result: { url: portal } }],

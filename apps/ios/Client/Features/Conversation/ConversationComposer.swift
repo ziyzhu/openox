@@ -265,7 +265,8 @@ struct ConversationComposer: View, Equatable {
             && lhs.speech === rhs.speech
             && lhs.isEditingMessage == rhs.isEditingMessage
             && lhs.editDraft == rhs.editDraft
-            && lhs.attachedServices.map(\.domain) == rhs.attachedServices.map(\.domain)
+            && lhs.attachedServices.count == rhs.attachedServices.count
+            && zip(lhs.attachedServices, rhs.attachedServices).allSatisfy { $0 === $1 }
             && lhs.conversationFiles == rhs.conversationFiles
             && lhs.isFieldFocused == rhs.isFieldFocused
             && lhs.sessionID == rhs.sessionID

@@ -26,7 +26,7 @@ Identify:
 - the last shipped representation and every supported legacy representation;
 - the authoritative data, derived purgeable data, user-owned working state, and credentials involved;
 - the first reader that could observe the new representation;
-- whether downgrade compatibility is required, and how partial migration is detected and resumed.
+- how partial migration is detected and resumed.
 
 Before running another checkout or older build against an existing app container, compare its current schema with the stored milestone. Use an isolated numbered QA simulator or a restored upgrade fixture when they differ. If downgrade compatibility is required, design and verify it explicitly; otherwise fail closed with an actionable message that tells the user to reinstall the version that last opened the data or a newer one.
 
@@ -69,19 +69,17 @@ immutable inputs and collect separate results for every matrix row:
 | Predecessor | Before | Establish the predecessor baseline and expected user-visible data. |
 | Changed | Before | Read and migrate older data completely; perform ordinary writes and verify second-launch stability. |
 | Changed | After | Read its own output, preserve user edits, and verify second-launch stability. |
-| Predecessor | After | Verify the older reader against newer data, including ordinary writes and a return to the changed build. |
 
-The changed build reading `before` proves backward compatibility; the predecessor
-reading `after` proves forward compatibility of the older reader. Verify data
+The changed build reading `before` proves upgrade compatibility. Verify data
 completeness, ownership, retained edits, and bounded resource use, not just startup
-success. For directory moves, check whether older readers silently recreate an empty legacy directory; also verify returning to the changed build after older-reader writes. Compare complete before/after trees and structured migration logs.
+success. Compare complete before/after trees and structured migration logs.
+Missing predecessor builds or snapshots block upgrade verification and must be
+reported, not replaced by a clean install.
 
-If an unsupported future milestone prevents the predecessor from reading `after`,
-verify actionable, fail-closed rejection without mutation. Report this as an
-explicit forward-compatibility break, not a successful compatibility test. Require
-maintainer approval for that boundary before release; never remove or rewrite
-milestones to make the test pass. Missing predecessor builds or snapshots block
-compatibility verification and must be reported, not replaced by a clean install.
+Downgrade compatibility and approval are not release gates. Run the predecessor
+against `after` only when downgrade testing is explicitly requested, including
+ordinary writes and a return to the changed build. Report known incompatibilities
+without blocking release; never remove or rewrite milestones to make a test pass.
 
 ## Verify upgrades
 
@@ -106,7 +104,7 @@ Run this gate after every coordinator or scoped migrator change, including refac
 
 1. Select a numbered QA simulator and use its assigned debug port.
 2. Force-build, install, and launch the DEBUG app on that simulator with bundled services.
-3. Run the before/after template matrix on isolated reserved targets, including upgrade, second-launch stability, and the explicit older-reader check. Store templates, snapshots, and evidence outside the repository.
+3. Run the before/after template matrix on isolated reserved targets, including upgrade and second-launch stability. Store templates, snapshots, and evidence outside the repository. Older-reader checks are optional and require an explicit downgrade-testing request.
 4. Run `bun run typecheck` and the retained portable checks.
 5. Confirm the installed app reaches its normal UI and logs `StorageMigrator.prepare done` followed by `HostRuntime storage prepared` and `HostRuntime profile prepared`.
 

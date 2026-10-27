@@ -100,32 +100,11 @@ nonisolated enum BrowserFunctionCatalog {
             ], required: ["back", "current", "forward"])
         ),
         Action(
-            id: "getPageInfo",
-            label: "Get Page Info",
-            description: "Read Browser's current URL, title, loading progress, security state, Screen Time state, and fullscreen state.",
-            inputSchema: object(),
-            outputSchema: object([
-                "url": nullableString,
-                "title": string(),
-                "estimatedProgress": .object([
-                    "type": .string("number"),
-                    "minimum": .int(0),
-                    "maximum": .int(1),
-                ]),
-                "isLoading": boolean,
-                "hasOnlySecureContent": boolean,
-                "isBlockedByScreenTime": boolean,
-                "fullscreenState": .object([
-                    "type": .string("string"),
-                    "enum": .array([
-                        "enteringFullscreen", "exitingFullscreen", "inFullscreen",
-                        "notInFullscreen", "unknown",
-                    ].map(JSONValue.string)),
-                ]),
-            ], required: [
-                "url", "title", "estimatedProgress", "isLoading", "hasOnlySecureContent",
-                "isBlockedByScreenTime", "fullscreenState",
-            ])
+            id: "getPageState",
+            label: "Get Page State",
+            description: "Observe a bounded, read-only snapshot of Browser's visible headings, dialogs, status messages, and controls without returning input values. Control id and name attributes are separate, unnormalized strings capped at 256 characters, or null when absent; clipping sets truncated. Optionally scope with a CSS selector. Includes page identity, navigation generation, loading progress, security, Screen Time, fullscreen state, and coverage limits; does not infer application readiness or authentication. Uses the same site authorization as executeScript.",
+            inputSchema: observationOptions,
+            outputSchema: pageState
         ),
         Action(
             id: "waitForNavigation",
@@ -317,6 +296,46 @@ nonisolated enum BrowserFunctionCatalog {
     private static let nullableString: JSONValue = .object([
         "type": .array([.string("string"), .string("null")]),
     ])
+    private static let observationOptions = object([
+        "selector": string(description: "Optional CSS selector limiting observation to one light-DOM subtree. Defaults to document.body. Missing scope is reported, not treated as an empty page.", minimum: 1, maximum: 2_000),
+    ])
+    private static let pageState = object([
+        "pageID": string(),
+        "navigationGeneration": integer(minimum: 0),
+        "url": nullableString,
+        "title": string(),
+        "estimatedProgress": .object([
+            "type": .string("number"), "minimum": .int(0), "maximum": .int(1),
+        ]),
+        "isLoading": boolean,
+        "hasOnlySecureContent": boolean,
+        "isBlockedByScreenTime": boolean,
+        "fullscreenState": .object([
+            "type": .string("string"),
+            "enum": .array([
+                "enteringFullscreen", "exitingFullscreen", "inFullscreen",
+                "notInFullscreen", "unknown",
+            ].map(JSONValue.string)),
+        ]),
+        "document": object([
+            "scope": nullableString,
+            "scopeFound": boolean,
+            "readyState": string(),
+            "busy": boolean,
+            "headings": stringArray,
+            "dialogs": .object(["type": .string("array"), "items": object(["label": string()], required: ["label"])]),
+            "messages": stringArray,
+            "controls": .object(["type": .string("array"), "items": object([
+                "id": nullableString, "name": nullableString,
+                "role": string(), "label": string(), "type": string(),
+                "disabled": boolean, "required": boolean, "invalid": boolean,
+                "checked": boolean, "expanded": boolean, "selected": boolean, "hasValue": boolean,
+            ], required: ["id", "name", "role", "label", "type", "disabled", "required", "invalid"])]),
+            "truncated": boolean,
+            "coverage": string(),
+        ], required: ["scope", "scopeFound", "readyState", "busy", "headings", "dialogs", "messages", "controls", "truncated", "coverage"]),
+    ], required: ["pageID", "navigationGeneration", "url", "title", "estimatedProgress", "isLoading", "hasOnlySecureContent", "isBlockedByScreenTime", "fullscreenState", "document"])
+    private static let stringArray: JSONValue = .object(["type": .string("array"), "items": string()])
     private static let historyItem = object([
         "initialUrl": string(),
         "title": nullableString,

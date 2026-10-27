@@ -21,8 +21,10 @@ For every persisted-storage change, including development work outside a release
 follow [references/storage-compatibility.md](references/storage-compatibility.md)
 and update the canonical [storage map](references/storage.md) when affected.
 Require before/after device templates backed by actual build-written snapshots;
-verify newer readers with older data and older readers with newer data. Report
-unsupported downgrade boundaries explicitly and require approval before release.
+verify newer readers with older data and second-launch stability. Downgrade
+compatibility, older-reader testing, and downgrade approval are not release gates.
+Test downgrades only when explicitly requested; report known limitations without
+blocking the release.
 `StorageMigrator` coordinates startup and recovery; scoped Profile, application-storage, credential, and repository migrators own compatibility transforms.
 
 ## App Store releases

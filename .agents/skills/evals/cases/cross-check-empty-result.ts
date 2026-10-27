@@ -19,7 +19,16 @@ export default {
     } }],
     "ox.service.invoke": [{ args: { name: search }, result: { messages: [] } }],
     "ox.web.browser.navigate": [{ result: { url: { $arg: "url" } } }],
-    "ox.web.browser.getPageInfo": [{ result: { url: "https://mail.google.com/mail/u/0/#search/dana+q3+budget", title: "Search results - Gmail", estimatedProgress: 1, isLoading: false, hasOnlySecureContent: true, isBlockedByScreenTime: false, fullscreenState: "notInFullscreen" } }],
+    "ox.web.browser.getPageState": [{ result: {
+      pageID: "gmail-page", navigationGeneration: 1, url: "https://mail.google.com/mail/u/0/#search/dana+q3+budget", title: "Search results - Gmail",
+      estimatedProgress: 1, isLoading: false, hasOnlySecureContent: true, isBlockedByScreenTime: false, fullscreenState: "notInFullscreen",
+      document: {
+        scope: null, scopeFound: true, readyState: "complete", busy: false,
+        headings: ["Search results"], dialogs: [], messages: [],
+        controls: [{ id: null, name: null, role: "a", label: "Dana Kim — Q3 budget review: final numbers — Oct 14", type: "a", disabled: false, required: false, invalid: false }],
+        truncated: false, coverage: "Visible light-DOM elements; frames and shadow roots are not inspected.",
+      },
+    } }],
     "ox.web.browser.executeScript": [{ result: { text: "Dana Kim — Q3 budget review: final numbers — Oct 14\nDana Kim — Re: Q3 budget review: final numbers — Oct 15" } }],
   } },
   timeoutMs: 180_000,

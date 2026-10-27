@@ -178,7 +178,7 @@ nonisolated enum OxWeb {
             goBack: (value) => __nativeWebBrowser('goBack', __oxOptions(value, 'ox.web.browser.goBack')),
             goForward: (value) => __nativeWebBrowser('goForward', __oxOptions(value, 'ox.web.browser.goForward')),
             getNavigationHistory: (value) => __nativeWebBrowser('getNavigationHistory', __oxOptions(value, 'ox.web.browser.getNavigationHistory')),
-            getPageInfo: (value) => __nativeWebBrowser('getPageInfo', __oxOptions(value, 'ox.web.browser.getPageInfo')),
+            getPageState: (value) => __nativeWebBrowser('getPageState', __oxOptions(value, 'ox.web.browser.getPageState')),
             waitForNavigation: (value) => __nativeWebBrowser('waitForNavigation', __oxOptions(value, 'ox.web.browser.waitForNavigation')),
             showPage: (value) => __nativeWebBrowser('showPage', __oxOptions(value, 'ox.web.browser.showPage')),
             executeScript: (value) => __nativeWebBrowser('executeScript', __oxOptions(value, 'ox.web.browser.executeScript')),

@@ -114,27 +114,6 @@ final class ServiceBrowserActionSession {
         ])
     }
 
-    func pageInfo() async throws -> JSONValue {
-        let page = try await inspectionPage()
-        let webPage = page.page
-        let fullscreenState: String = switch webPage.fullscreenState {
-        case .enteringFullscreen: "enteringFullscreen"
-        case .exitingFullscreen: "exitingFullscreen"
-        case .inFullscreen: "inFullscreen"
-        case .notInFullscreen: "notInFullscreen"
-        @unknown default: "unknown"
-        }
-        return .object([
-            "url": webPage.url.map { .string($0.absoluteString) } ?? .null,
-            "title": .string(webPage.title),
-            "estimatedProgress": .double(webPage.estimatedProgress),
-            "isLoading": .bool(webPage.isLoading),
-            "hasOnlySecureContent": .bool(webPage.hasOnlySecureContent),
-            "isBlockedByScreenTime": .bool(webPage.isBlockedByScreenTime),
-            "fullscreenState": .string(fullscreenState),
-        ])
-    }
-
     func waitForNavigation(timeoutMilliseconds: Int) async throws -> URL? {
         let page = try await inspectionPage()
         let webPage = page.page
@@ -157,6 +136,13 @@ final class ServiceBrowserActionSession {
         }
     }
 
+    func pageState(selector: String?, authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
+        try await service.awaitAuthenticationAvailability(name: "ox.web.browser.getPageState")
+        guard let page, service.owns(page) else { throw Service.EvalError.notReady }
+        let approval = try await authorize(page, authorizeSite)
+        return try await readState(page, selector: selector, site: approval.site)
+    }
+
     func executeScript(_ script: String, authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
         let name = "ox.web.browser.executeScript"
         try await service.awaitAuthenticationAvailability(name: name)
@@ -168,6 +154,42 @@ final class ServiceBrowserActionSession {
         return try await service.executeBrowserJavaScript(script, action: action, in: page) { page in
             try Self.requireUnchanged(page, since: approval)
         }
+    }
+
+    private func readState(_ page: Service.ServiceWebPage, selector: String?, site: String?) async throws -> JSONValue {
+        try Task.checkCancellation()
+        try await service.manager.requireInvocationAccess(for: service)
+        guard service.owns(page), Self.site(of: page) == site else { throw Service.EvalError.contextInvalidated }
+        let generation = page.navigationGeneration
+        let raw = try await service.evalAsync(page, BrowserPageState.script(selector: selector), context: "browser-state", timeout: 3)
+        guard service.owns(page), page.navigationGeneration == generation, Self.site(of: page) == site else {
+            throw Service.EvalError.contextInvalidated
+        }
+        Log.webView.info("Browser.state owner=\(id) page=\(page.logLabel) generation=\(generation)")
+        return stateResult(raw.map(JSONValue.from) ?? .null, page: page)
+    }
+
+    private func stateResult(_ result: JSONValue, page: Service.ServiceWebPage) -> JSONValue {
+        let webPage = page.page
+        let fullscreenState: String = switch webPage.fullscreenState {
+        case .enteringFullscreen: "enteringFullscreen"
+        case .exitingFullscreen: "exitingFullscreen"
+        case .inFullscreen: "inFullscreen"
+        case .notInFullscreen: "notInFullscreen"
+        @unknown default: "unknown"
+        }
+        return .object([
+            "pageID": .string(page.id.uuidString),
+            "navigationGeneration": .int(page.navigationGeneration),
+            "url": webPage.url.map { .string($0.absoluteString) } ?? .null,
+            "title": .string(webPage.title),
+            "estimatedProgress": .double(webPage.estimatedProgress),
+            "isLoading": .bool(webPage.isLoading),
+            "hasOnlySecureContent": .bool(webPage.hasOnlySecureContent),
+            "isBlockedByScreenTime": .bool(webPage.isBlockedByScreenTime),
+            "fullscreenState": .string(fullscreenState),
+            "document": result,
+        ])
     }
 
     func exportPDF(authorizeSite: (String) async throws -> Void) async throws -> ExportedPDF {

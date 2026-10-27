@@ -65,8 +65,8 @@ try {
   otherSite.prompts.forEach(title("example.org"));
   assert.ok(otherSite.isError && otherSite.text.includes("permission_denied"), otherSite.text);
 
-  const ungated = await execute("await ox.web.browser.navigate({ purpose: 'Open site', url: 'https://example.com/' }); return await ox.web.browser.getPageInfo({ purpose: 'Inspect page' });", []);
-  assert.ok(!ungated.isError && ungated.text.includes("example.com"), ungated.text);
+  const observed = await execute("await ox.web.browser.navigate({ purpose: 'Open site', url: 'https://example.com/' }); return await ox.web.browser.getPageState({ purpose: 'Inspect page' });", []);
+  assert.ok(!observed.isError && observed.text.includes("example.com"), observed.text);
 
   const suffix = await execute("return await ox.web.browser.injectScript({ purpose: 'Inject script', domains: ['com'], script: 'void 0' });", []);
   assert.ok(suffix.isError && suffix.text.includes("registrable domains"), suffix.text);
@@ -89,7 +89,7 @@ try {
   capture.prompts.forEach(title("example.com"));
   assert.deepEqual(JSON.parse(capture.text), { listedSite: "example.com", listedBody: false, site: "example.com", body: "string" });
 
-  console.log(`PASS Browser site approval: deny and approve per site, exported pages, ungated page info, public-suffix rejection, per-domain script injection, captured bodies. Evidence: ${evidence}`);
+  console.log(`PASS Browser site approval: deny and approve per site, exported pages, page state, public-suffix rejection, per-domain script injection, captured bodies. Evidence: ${evidence}`);
 } finally {
   release();
 }

@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 import { ROOT } from "../../../../lib.ts";
+import { contracts } from "../../../../../packages/agent/src/functions/contracts.ts";
 
 async function command(args: string[]) {
   const child = Bun.spawn([process.execPath, "--no-env-file", join(ROOT, ".agents/skills/evals/scripts/runner.ts"), ...args], { cwd: ROOT, stdout: "pipe", stderr: "pipe", stdin: "ignore" });
@@ -11,7 +12,7 @@ async function command(args: string[]) {
 test("eval CLI validates code-defined cases against the native function catalog", async () => {
   const result = await command(["--validate"]);
   expect(result.code, result.stderr).toBe(0);
-  expect(result.stdout).toContain("stub catalog matches 99 native functions");
+  expect(result.stdout).toContain(`stub catalog matches ${Object.keys(contracts).length} native functions`);
   const listed = await command(["--list"]);
   expect(listed.stdout.trim().split("\n")).toContain("app-profile");
   const help = await command(["--help"]);
