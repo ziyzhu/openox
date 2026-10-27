@@ -3,7 +3,7 @@ import { defineDoc, defineDocFamily, type Harness, type ConversationId, type Ent
 import { FileError } from "@earendil-works/pi-durable/env";
 import type { SqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite";
 import { legacyFilePath, validateFileRecord, type FilePayloadStore } from "./file-payloads";
-import { SYSTEM_SKILL_NAMES } from "@openox/protocol/skills";
+import { RESERVED_SKILL_NAMES } from "@openox/protocol/skills";
 import { canonical } from "../core/file-paths";
 import { publicDocument, ProfileFileStore, type ProfileFileBackend, type ProfileFileRecord } from "./file-store";
 import type { FileRecord } from "./file-record";
@@ -33,7 +33,7 @@ const FilesystemBinding = defineDoc<{ backend: string }>({
 });
 
 function owned(path: string) {
-  if (path.startsWith("skills/") && (SYSTEM_SKILL_NAMES as readonly string[]).includes(path.split("/")[1]!)) throw new FileError("permission_denied", "Bundled System skill names are reserved", path);
+  if (path.startsWith("skills/") && (RESERVED_SKILL_NAMES as readonly string[]).includes(path.split("/")[1]!)) throw new FileError("permission_denied", "Bundled System skill names are reserved", path);
   if (!["MEMORY.md", "SOUL.md", "skill-selections.json"].includes(path) && !/^(artifacts|skills)\//.test(path)) {
     throw new FileError("permission_denied", "Path is not writable Profile content", path);
   }

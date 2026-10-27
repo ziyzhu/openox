@@ -39,7 +39,7 @@ test("prompt-behavior cases distinguish asking from proceeding and absence from 
   const search = "await ox.service.invoke({purpose:'Search mail',name:'web:mail.google.com:searchMessages',input:{query:'from:dana Q3 budget'}});";
   const absent = await evaluate(await loadCase("cross-check-empty-result"), "fixture", "controlled", 15000, faux([search], "No emails from Dana about the Q3 budget."));
   expect(absent.status).toBe("fail");
-  const checked = await evaluate(await loadCase("cross-check-empty-result"), "fixture", "controlled", 15000, faux([search, "console.log(await ox.web.browser.executeScript({purpose:'Read results',script:'return 1'}));"], "Found Dana's Q3 budget review email from Oct 14."));
+  const checked = await evaluate(await loadCase("cross-check-empty-result"), "fixture", "controlled", 15000, faux([search, "console.log(await ox.service.invoke({purpose:'Broaden search',name:'web:mail.google.com:searchMessages',input:{query:'Q3 budget'}}));"], "Found Dana's Q3 budget review email from Oct 14."));
   expect(checked.checks.filter(check => !check.passed)).toEqual([]);
   const lookup = "await ox.service.invoke({purpose:'Find Alex',name:'web:mail.google.com:searchContacts',input:{query:'Alex'}});";
   const email = (to: string) => `await ox.service.invoke({purpose:'Send numbers',name:'web:mail.google.com:sendMessage',input:{to:'${to}',subject:'Q3 budget',body:'Revenue $4.2M'}});`;
@@ -90,11 +90,12 @@ test("invalid stub output cannot mutate state and failed calls remain observable
 });
 
 test("model loop reads actual bundled System skills and temporary conversations cannot write Profile documents", async () => {
-  const runtime = await open(["console.log(await ox.fs.read({path:'skills/manage-providers/SKILL.md',purpose:'Read provider guidance'})); try {await ox.fs.write({path:'MEMORY.md',content:'Forbidden',purpose:'Remember'})} catch(e) {console.log(e.code)}"]);
+  const runtime = await open(["console.log(await ox.fs.read({path:'skills/evolve/SKILL.md',purpose:'Read workflow'})); console.log(await ox.fs.read({path:'skills/evolve/references/providers.md',purpose:'Read provider guidance'})); try {await ox.fs.write({path:'MEMORY.md',content:'Forbidden',purpose:'Remember'})} catch(e) {console.log(e.code)}"]);
   try {
     const turn = await runtime.run("Read provider setup instructions", 15000, true);
-    expect((turn.calls[0]?.result as { text: string }).text.trim()).toBe((await Bun.file(new URL("../skills/manage-providers/SKILL.md", import.meta.url)).text()).trim());
-    expect(turn.calls[1]?.error).toMatchObject({ code: "permission_denied" });
+    expect((turn.calls[0]?.result as { text: string }).text.trim()).toBe((await Bun.file(new URL("../skills/evolve/SKILL.md", import.meta.url)).text()).trim());
+    expect((turn.calls[1]?.result as { text: string }).text.trim()).toBe((await Bun.file(new URL("../skills/evolve/references/providers.md", import.meta.url)).text()).trim());
+    expect(turn.calls[2]?.error).toMatchObject({ code: "permission_denied" });
   } finally { await runtime.close(); }
 });
 

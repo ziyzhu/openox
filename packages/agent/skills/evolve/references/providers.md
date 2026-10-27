@@ -1,9 +1,4 @@
----
-name: manage-providers
-description: "Inspect, add, connect, customize, refresh, or restore model providers and their model lists in this Ox installation."
----
-
-# Manage Providers
+# Model Providers
 
 Manage provider and model data through the Ox VM's `ox.provider.*` APIs. Do not assume a terminal, Node.js, a host filesystem, or access to the app's source code. Read the current function contracts before unfamiliar operations; operational calls include a meaningful `purpose`. `ox.provider.schema()` is synchronous, requires no arguments or `purpose`, and returns the complete provider-document JSON Schema.
 
@@ -45,7 +40,7 @@ Use `ox.provider.authenticate({ purpose, id })` for all provider credential setu
 
 For requested live verification, explain any billable inference or attachment upload and stay within the authorized scope. Use `ox.provider.models` to inspect configured model availability and `ox.provider.generate` for bounded text inference with explicit supplied messages, an output-token limit, and no tools or automatic conversation context. Generation follows Action policies and never changes the selected model. Use a supported Ox conversation/model selection path when verifying tools or attachments. Verify tools or attachments only when claimed: upload success alone does not prove the model can read a file. Authentication status and schema validation are not successful inference. Preserve drafts, existing conversations, and the user's working provider.
 
-Model providers use API transports, including API-backed subscription and OAuth accounts. Websites are services, never model providers. An AI website may be consulted through an explicit service Action; it receives only that Action's supplied inputs, not automatic Ox history, system instructions, or tool declarations. Read `skills/evolve/SKILL.md` when website behavior needs repair.
+Model providers use API transports, including API-backed subscription and OAuth accounts. Websites are services, never model providers. An AI website may be consulted through an explicit service Action; it receives only that Action's supplied inputs, not automatic Ox history, system instructions, or tool declarations. Read `references/web-service.md` when website behavior needs repair.
 
 ## Restore, disable, or remove
 

@@ -74,7 +74,7 @@ state when real iOS, models, authentication, or services were not exercised.
 ## Provider verification
 
 Exercise installation-specific provider changes through an Ox conversation using
-the bundled `manage-providers` skill. Use the `ox-cli` skill for conversation,
+the bundled `evolve` skill's provider workflow. Use the `ox-cli` skill for conversation,
 provider-state, and structured-log inspection. Test bundled defaults in an isolated
 setup without saved overrides masking them; never delete a user's override to
 reset a test because provider deletion also clears credentials.

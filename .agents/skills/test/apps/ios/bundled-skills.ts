@@ -167,12 +167,12 @@ try {
   await rejected("ox.fs.write", { path: `conversations/${qa.values.conversation}/conversation.json`, content: "changed" }, /isn't supported|read-only/);
   await rejected("ox.fs.read", { path: "state.sqlite" }, /Invalid Profile file path/);
   await rejected("ox.fs.read", { path: `conversations/${qa.values.conversation}/context.json` }, /Invalid Profile file path/);
-  await call("ox.fs.grep", { path: "skills/manage-providers", pattern: "Manage" }, qa.values["temporary-conversation"]);
+  await call("ox.fs.grep", { path: "skills/evolve", pattern: "Model Providers" }, qa.values["temporary-conversation"]);
   await providerProbe("Temporary conversations can't save changes");
   await call("ox.fs.read", { path: copyPath }, qa.values["temporary-conversation"]);
   await rejected("ox.fs.write", { path: pagePath, content: "Temporary mutation must fail" }, /Temporary conversations can't save changes/, qa.values["temporary-conversation"]);
   await providerProbe("Temporary conversations can't save changes");
-  await call("ox.fs.read", { path: "skills/manage-providers/SKILL.md" }, qa.values["temporary-conversation"]);
+  await call("ox.fs.read", { path: "skills/evolve/references/providers.md" }, qa.values["temporary-conversation"]);
   await providerProbe("Temporary conversations can't save changes");
 } finally {
   try {

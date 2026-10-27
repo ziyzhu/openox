@@ -33,6 +33,8 @@ everywhere and cases that fail everywhere. Any errored run withholds
 the headline pass rate and exits 1; failing checks are results and exit 0. One
 repetition cannot establish stability.
 
+The 20 `trigger-*` cases measure skill consultation, not task completion: five positive and five near-miss queries in each fixed `trigger-dev-*` and `trigger-heldout-*` set. External operations may stop at unconfigured stubs; that is not evidence the full workflow works. Score consultation from successful `ox.fs.read` receipts, not answer text. Provider cases accept the former standalone route for a fair pre-merge baseline. Revise descriptions using development results only, freeze them before held-out runs, then check fresh unseen prompts. Use repeated `--case <id>` options to select a set and start with `--repeat 3`; keep repetitions and model identical across variants. Do not interpret these routing scores as authoring, payment, or provider-configuration success rates.
+
 A case is `cases/<id>.ts` default-exporting an `EvalCase`:
 
 ```ts

@@ -1,6 +1,6 @@
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
-import { SYSTEM_SKILL_NAMES } from "./skills.ts";
+import { RESERVED_SKILL_NAMES } from "./skills.ts";
 
 export const REPOSITORY_VERSIONS = [3] as const;
 
@@ -51,6 +51,6 @@ export function validateRepositoryPackage(raw: unknown): RepositoryPackage | { e
     identities.add(identity);
   }
   if (new Set(repository.skills).size !== repository.skills.length) return { error: "duplicate skill name" };
-  if (repository.skills.some(name => SYSTEM_SKILL_NAMES.some(reserved => reserved === name))) return { error: "reserved system skill name" };
+  if (repository.skills.some(name => RESERVED_SKILL_NAMES.some(reserved => reserved === name))) return { error: "reserved system skill name" };
   return repository;
 }

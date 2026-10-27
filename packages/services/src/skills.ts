@@ -2,7 +2,7 @@ import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
-  SYSTEM_SKILL_NAMES, SKILL_NAME_RE, MAXIMUM_SKILL_BYTES, MAXIMUM_SKILL_FILES,
+  RESERVED_SKILL_NAMES, SKILL_NAME_RE, MAXIMUM_SKILL_BYTES, MAXIMUM_SKILL_FILES,
   parseSkill, isSkillResourcePath, type Skill, type SkillResult,
 } from "@openox/protocol/skills";
 
@@ -42,7 +42,7 @@ export function readSkills(repositoryDir: string, declared?: readonly string[]):
     const names = declared ?? (existsSync(root) ? readdirSync(root) : []);
     if (new Set(names).size !== names.length) throw new Error("duplicate skill names");
     const skills = names.map(name => {
-      if (!SKILL_NAME_RE.test(name) || SYSTEM_SKILL_NAMES.some(reserved => reserved === name)) throw new Error(`invalid or reserved skill name: ${name}`);
+      if (!SKILL_NAME_RE.test(name) || RESERVED_SKILL_NAMES.some(reserved => reserved === name)) throw new Error(`invalid or reserved skill name: ${name}`);
       return readSkill(join(root, name), name);
     });
     return { ok: true, skills: skills.sort((a, b) => a.name.localeCompare(b.name)) };

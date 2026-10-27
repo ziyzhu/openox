@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ROOT, runCheck } from "../../../lib.ts";
-import { parseSkill, isSkillResourcePath, SYSTEM_SKILL_NAMES } from "../../../../packages/protocol/src/skills.ts";
+import { parseSkill, isSkillResourcePath, SYSTEM_SKILL_NAMES, RESERVED_SKILL_NAMES } from "../../../../packages/protocol/src/skills.ts";
 import { composeOxTurnSections } from "../../../../packages/agent/src/core/ox-prompts.ts";
 import { bundledSkills } from "../../../../packages/agent/src/core/bundled-skills.ts";
 
@@ -20,20 +20,23 @@ export async function check(): Promise<string> {
   await collect(root);
   const exported = new Map<string, string>(bundledSkills.flatMap(skill => Object.entries(skill.files).map(([path, text]) => [`${skill.name}/${path}`, text] as const)));
   if (JSON.stringify([...files.keys()].sort()) !== JSON.stringify([...exported.keys()].sort())) throw new Error("Bundled skill package inventory differs from source");
-  if (JSON.stringify(bundledSkills.map(skill => skill.name).sort()) !== JSON.stringify([...SYSTEM_SKILL_NAMES].sort())) throw new Error("Bundled skill names differ from reserved names");
+  if (JSON.stringify(bundledSkills.map(skill => skill.name).sort()) !== JSON.stringify([...SYSTEM_SKILL_NAMES].sort())) throw new Error("Bundled skill names differ from active System names");
   let bytes = 0;
   for (const [path, text] of files) {
     const size = Buffer.byteLength(text); bytes += size;
     if (!text.trim() || size > 200 * 1024 || exported.get(path) !== text) throw new Error(`Invalid or stale skill resource: ${path}`);
     const [name, ...parts] = path.split("/"); const resource = parts.join("/");
-    if (resource === "SKILL.md") parseSkill(text, name!);
+    if (resource === "SKILL.md") {
+      const skill = parseSkill(text, name!);
+      if (skill.description.length > 1024) throw new Error(`Skill description exceeds 1024 characters: ${name}`);
+    }
     else if (!isSkillResourcePath(resource)) throw new Error(`Invalid package resource: ${path}`);
-    if (resource === "SKILL.md") for (const match of text.matchAll(/`((?:references|scripts)\/[a-zA-Z0-9._/-]+)`/g)) {
+    for (const match of text.matchAll(/`((?:references|scripts)\/[a-zA-Z0-9._/-]+)`/g)) {
       if (!files.has(`${name}/${match[1]}`)) throw new Error(`Broken relative resource in ${path}: ${match[0]}`);
     }
     if (text.includes("guidance/")) throw new Error(`Retired guidance path in ${path}`);
     for (const match of text.matchAll(/`skills\/([a-z0-9-]+)\/([a-zA-Z0-9._/-]+)`/g)) {
-      if ((SYSTEM_SKILL_NAMES as readonly string[]).includes(match[1]!) && !files.has(`${match[1]}/${match[2]}`)) throw new Error(`Broken skill resource link in ${path}: ${match[0]}`);
+      if ((RESERVED_SKILL_NAMES as readonly string[]).includes(match[1]!) && !files.has(`${match[1]}/${match[2]}`)) throw new Error(`Broken skill resource link in ${path}: ${match[0]}`);
     }
   }
   if (files.size > 64 || bytes > 512 * 1024) throw new Error("Bundled skills exceed native resource limits");

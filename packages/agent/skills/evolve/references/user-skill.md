@@ -43,7 +43,7 @@ Review completed work...
 
 Omit `services` when the set is empty. Store verified service domains only in frontmatter.
 
-Write the body as an execution prompt. Use imperative steps, decision rules, the required output shape, checkpoints, and stopping conditions. Keep one-time task details and attachment mechanics outside the skill.
+Write a concise, intent-based description stating when to use the skill and any important near-miss boundary. Write the body as an execution prompt: imperative steps, decision rules, output shape, checkpoints, and observable stopping conditions. Keep domain-specific gotchas, omit generic advice, and move conditional detail into references with explicit loading triggers. Prefer a default approach over a menu. Keep one-time task details and attachment mechanics outside the skill.
 
 The skill may use available `ox.*` functions and packaged resources under `skills/<name>/references/` and `skills/<name>/scripts/`. Read references with `ox.fs.read`; run JavaScript helpers with `ox.skill.run` under normal Action policies. Its runtime has no shell, filesystem outside Ox's virtual layout, package installation, browser globals, or ambient network access.
 

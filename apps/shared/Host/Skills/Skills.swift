@@ -51,7 +51,7 @@ nonisolated enum SkillFiles {
     static let fileName = "SKILL.md"
     static let maximumBytes = 524_288
     static let maximumFiles = 64
-    static let reservedNames = ModelGuidance.bundledSkillNames
+    static let reservedNames = ModelGuidance.reservedSkillNames
 
     static func displayName(_ name: String) -> String {
         name

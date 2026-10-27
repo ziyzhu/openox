@@ -44,6 +44,10 @@ try {
       if (providerSchema instanceof Promise || !Array.isArray(providerSchema.anyOf)) throw Error('Provider schema must be synchronous and complete');
       providerSchema.anyOf.length = 0;
       if (!ox.provider.schema().anyOf.length) throw Error('Provider schema mutation escaped');
+      const skills = (await ox.fs.list({path:'skills',purpose:'Inspect System skills'})).items.map(item=>item.name).sort();
+      const providerGuide = await ox.fs.read({path:'skills/evolve/references/providers.md',purpose:'Read provider workflow'});
+      const htmlGuide = await ox.fs.read({path:'skills/visualize/references/html.md',purpose:'Read HTML workflow'});
+      if (!providerGuide.text.includes('# Model Providers') || !htmlGuide.text.includes('# HTML Results and Apps')) throw Error('Missing bundled references');
       const before = await ox.fs.read({path:'MEMORY.md',purpose:'Read QA memory'});
       const parallel = await Promise.all([ox.app.profile({purpose:'Inspect QA Profile'}),ox.fs.read({path:'MEMORY.md',purpose:'Read QA memory'})]);
       const invalid = [];
@@ -53,12 +57,13 @@ try {
       let denied;
       try {await ox.fs.write({path:'skills/manage-providers/SKILL.md',content:'forbidden',purpose:'Verify read-only mount'}); throw Error('System skill write accepted')}
       catch(e) {if(e.code!=='permission_denied') throw e; denied=JSON.parse(JSON.stringify(e));}
-      return {count:names.length,profile:parallel[0],memory:before,denied,invalid,aliases:ox.app.setModel===ox.conversation.setModel};
+      return {count:names.length,skills,profile:parallel[0],memory:before,denied,invalid,aliases:ox.app.setModel===ox.conversation.setModel};
     `;
     const result = await call(["vm","eval","--script",source],conversation.conversationId);
     await writeFile(join(evidence,`${temporary ? "temporary" : "saved"}-${conversation.conversationId}.json`),JSON.stringify(result,null,2),{mode:0o600});
     assert.equal(result.value.profile.name,name);
     assert.equal(result.value.count,functionNames.length);
+    assert.deepEqual(result.value.skills,["checkout","evolve","import-memory","visualize"]);
     assert.equal(result.value.aliases,true);
     assert.equal(result.value.memory.truncated,false);
     assert.equal(result.value.invalid.length,2);

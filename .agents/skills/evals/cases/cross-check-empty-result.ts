@@ -6,7 +6,7 @@ const search = "web:mail.google.com:searchMessages";
 export default {
   task: "Find the email from Dana about the Q3 budget in my Gmail.",
   attached: [{ domain: "mail.google.com", description: "Gmail", signIn: "signedIn" }],
-  stubs: { functions: {
+  stubs: { state: { searched: false }, functions: {
     "ox.service.listAttached": [{ result: [{ domain: "mail.google.com", kind: "web", name: "Gmail", attached: true }] }],
     "ox.service.inspect": [{ result: {
       service: { domain: "mail.google.com", kind: "web", name: "Gmail", attached: true, signIn: "signedIn" },
@@ -17,29 +17,18 @@ export default {
         outputSchema: { type: "object", properties: { messages: { type: "array", items: { type: "object", properties: { from: { type: "string" }, subject: { type: "string" }, date: { type: "string" } } } } } },
       } },
     } }],
-    "ox.service.invoke": [{ args: { name: search }, result: { messages: [] } }],
-    "ox.web.browser.navigate": [{ result: { url: { $arg: "url" } } }],
-    "ox.web.browser.getPageState": [{ result: {
-      pageID: "gmail-page", navigationGeneration: 1, url: "https://mail.google.com/mail/u/0/#search/dana+q3+budget", title: "Search results - Gmail",
-      estimatedProgress: 1, isLoading: false, hasOnlySecureContent: true, isBlockedByScreenTime: false, fullscreenState: "notInFullscreen",
-      document: {
-        scope: null, scopeFound: true, readyState: "complete", busy: false,
-        headings: ["Search results"], dialogs: [], messages: [],
-        controls: [{ id: null, name: null, role: "a", label: "Dana Kim — Q3 budget review: final numbers — Oct 14", type: "a", disabled: false, required: false, invalid: false }],
-        truncated: false, coverage: "Visible light-DOM elements; frames and shadow roots are not inspected.",
-      },
-    } }],
-    "ox.web.browser.executeScript": [{ result: { text: "Dana Kim — Q3 budget review: final numbers — Oct 14\nDana Kim — Re: Q3 budget review: final numbers — Oct 15" } }],
+    "ox.service.invoke": [
+      { args: { name: search }, when: { searched: false }, result: { messages: [] }, set: { searched: true } },
+      { args: { name: search }, when: { searched: true }, result: { messages: [{ from: "Dana Kim", subject: "Q3 budget review", date: "2026-10-14" }] } },
+    ],
   } },
   timeoutMs: 180_000,
   checks: run => {
-    const first = run.calls.findIndex(call => call.name === "ox.service.invoke" && !call.error);
-    const later = run.calls.slice(first + 1);
+    const calls = succeeded(run, "ox.service.invoke").filter(call => call.args.name === search);
     return [
-      { detail: "Searched with the attached Gmail service", passed: succeeded(run, "ox.service.invoke").length > 0 },
-      { detail: "Cross-checked the empty result with Browser tools or another query", passed: first >= 0 && later.some(call => call.name.startsWith("ox.web.browser.") || call.name === "ox.service.invoke") },
+      { detail: "Cross-checked the empty result with a different service query", passed: calls.length >= 2 && calls.slice(1).some(call => JSON.stringify(call.args.input) !== JSON.stringify(calls[0]!.args.input)) },
       mentions(run, "Q3 budget review"),
-      { detail: "Did not hand off to the user while already signed in", passed: !run.calls.some(call => call.name === "ox.web.browser.waitForUserInteraction") },
+      { detail: "Did not use Browser as a fulfillment fallback", passed: !run.calls.some(call => call.name.startsWith("ox.web.browser.")) },
     ];
   },
 } satisfies EvalCase;

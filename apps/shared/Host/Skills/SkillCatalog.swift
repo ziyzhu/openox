@@ -94,8 +94,8 @@ nonisolated struct BundledSkillPackages: Sendable {
         guard data.count <= 1024 * 1024 else { throw SkillError.invalidPackage }
         let snapshot = try JSONDecoder().decode(Snapshot.self, from: data)
         guard snapshot.scope == scope, snapshot.skills.count <= 64,
-              Set(snapshot.skills.map(\.name)) == SkillFiles.reservedNames,
-              snapshot.skills.count == SkillFiles.reservedNames.count else { throw SkillError.invalidPackage }
+              Set(snapshot.skills.map(\.name)) == ModelGuidance.bundledSkillNames,
+              snapshot.skills.count == ModelGuidance.bundledSkillNames.count else { throw SkillError.invalidPackage }
         skills = try snapshot.skills.map { package in
             guard package.source == "system", let text = package.files[SkillFiles.fileName],
                   var skill = SkillFiles.parse(text, directoryName: package.name),

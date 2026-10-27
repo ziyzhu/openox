@@ -1,6 +1,6 @@
 ---
 name: checkout
-description: "Prepare a purchase, booking, or payable order, add missing payment support on the fly, and hand final transaction review and payment to the user."
+description: "Use when preparing a purchase, booking, or payable order and carrying it through user review, payment, and verified confirmation, including when missing service support must be added. Product research or price comparison without a transaction does not require this skill."
 ---
 
 # Checkout

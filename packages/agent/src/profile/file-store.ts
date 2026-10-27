@@ -3,7 +3,7 @@ import { defineDoc, type Harness, type ConversationId, type EntryDraft } from "@
 import { FileError, type FileInfo } from "@earendil-works/pi-durable/env";
 import { canonical } from "../core/file-paths";
 import type { FileRecord } from "./file-record";
-import { SYSTEM_SKILL_NAMES } from "@openox/protocol/skills";
+import { RESERVED_SKILL_NAMES } from "@openox/protocol/skills";
 import { ConversationReadState } from "./conversations";
 
 export type FileMutation =
@@ -61,7 +61,7 @@ const reserved = new Set(["payloads", "staging", "profile.json", "state.sqlite",
 export const publicDocument = (path: string) => ["MEMORY.md", "SOUL.md"].includes(path) || path.startsWith("skills/");
 export function documentPath(input: string) {
   const path = canonical(input);
-  if (!publicDocument(path) || (path.startsWith("skills/") && (SYSTEM_SKILL_NAMES as readonly string[]).includes(path.split("/")[1]!))) {
+  if (!publicDocument(path) || (path.startsWith("skills/") && (RESERVED_SKILL_NAMES as readonly string[]).includes(path.split("/")[1]!))) {
     throw new FileError("permission_denied", "Expected a writable Profile document", input);
   }
   if (path.split("/").some(part => new TextEncoder().encode(part).length > 240) || new TextEncoder().encode(path).length > 4096 || path.split("/").length > 64) throw new FileError("invalid", "Profile document path exceeds limits", input);
