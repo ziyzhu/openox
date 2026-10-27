@@ -1810,14 +1810,19 @@ struct ConversationPage: View {
 
     private func openLink(_ url: URL) {
         switch ConversationLinkDestination(url) {
-        case .web(let url):
-            LinkOpener.open(url: url, serviceManager: serviceManager)
+        case .web(let url), .external(let url):
+            if !LinkOpener.open(url: url, serviceManager: serviceManager, onFailure: {
+                toast = Toast(message: String(localized: "This link could not be opened."))
+            }) {
+                toast = Toast(message: String(localized: "This link could not be opened."))
+            }
         case .conversationFile(let filename):
             guard let file = conversationFiles.first(where: {
                 $0.fileName.caseInsensitiveCompare(filename) == .orderedSame
                     || $0.displayName.caseInsensitiveCompare(filename) == .orderedSame
             }) else {
                 Log.ui.warning("ConversationPage.openLink disposition=missing-file filename=\(filename)")
+                toast = Toast(message: String(localized: "This file was removed."))
                 return
             }
             Log.ui.info("ConversationPage.openLink disposition=file filename=\(file.fileName)")
@@ -1834,6 +1839,7 @@ struct ConversationPage: View {
             }
         case .unsupported(let url):
             Log.ui.warning("ConversationPage.openLink disposition=unsupported url=\(LogPrivacy.url(url.absoluteString))")
+            toast = Toast(message: String(localized: "This link is not supported."))
         }
     }
 

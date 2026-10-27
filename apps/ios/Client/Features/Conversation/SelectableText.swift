@@ -409,7 +409,7 @@ struct SelectableText: UIViewRepresentable {
                 return UITextItem.MenuConfiguration(menu: defaultMenu)
             }
             switch ConversationLinkDestination(url) {
-            case .web:
+            case .web, .external:
                 return UITextItem.MenuConfiguration(menu: defaultMenu)
             case .conversationFile, .file:
                 let open = UIAction(title: L10n.string("Open", comment: "Opens a file linked from an assistant message."),

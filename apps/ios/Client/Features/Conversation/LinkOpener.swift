@@ -15,6 +15,7 @@ extension EnvironmentValues {
 
 enum ConversationLinkDestination: Equatable {
     case web(URL)
+    case external(URL)
     case conversationFile(String)
     case file(String)
     case unsupported(URL)
@@ -23,6 +24,8 @@ enum ConversationLinkDestination: Equatable {
         switch url.scheme?.lowercased() {
         case "http", "https":
             self = .web(url)
+        case "tel", "mailto", "sms", "facetime", "facetime-audio":
+            self = .external(url)
         case nil:
             let path = url.relativeString.removingPercentEncoding ?? url.relativeString
             self = path.isEmpty ? .unsupported(url) : .file(path)
@@ -38,7 +41,14 @@ enum ConversationLinkDestination: Equatable {
 @MainActor
 enum LinkOpener {
     @discardableResult
-    static func open(url: URL, serviceManager: ServiceManager) -> Bool {
+    static func open(url: URL, serviceManager: ServiceManager, onFailure: (() -> Void)? = nil) -> Bool {
+        if case .external = ConversationLinkDestination(url) {
+            UIApplication.shared.open(url, options: [:]) { opened in
+                Log.ui.info("LinkOpener.open disposition=external scheme=\(url.scheme ?? "?") opened=\(opened)")
+                if !opened { onFailure?() }
+            }
+            return true
+        }
         guard case .web = ConversationLinkDestination(url) else {
             Log.ui.warning("LinkOpener.rejected url=\(LogPrivacy.url(url.absoluteString))")
             return false
