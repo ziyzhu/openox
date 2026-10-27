@@ -28,12 +28,13 @@ extension Repository {
         Log.service.info("Repository.enabled id=\(repositoryID) enabled=\(enabled)")
     }
 
-    func setResolution(serviceID: String, repositoryID: String) async throws {
+    func setResolution(serviceID: String, repositoryID: String) async throws -> Bool {
         let catalog = try await monoRepository()
         guard let conflict = catalog.conflicts.first(where: { $0.serviceID == serviceID }),
               conflict.candidates.contains(where: { $0.repositoryID == repositoryID }) else {
             throw Failure(message: "Choose an available service source from ox.repository.conflicts.")
         }
+        guard conflict.selectedRepositoryID != repositoryID else { return false }
         let previous = configuration.resolutions[serviceID]
         configuration.resolutions[serviceID] = repositoryID
         do {
@@ -43,6 +44,7 @@ extension Repository {
             throw error
         }
         Log.service.info("Repository.resolution service=\(serviceID) repository=\(repositoryID)")
+        return true
     }
 
     func install(from origin: URL) async throws {

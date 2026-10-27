@@ -11,6 +11,7 @@ final class Service: NSObject, Identifiable {
     nonisolated let url: String
     nonisolated let tintHex: UInt32
     private(set) var definition: ServiceDefinition
+    @ObservationIgnored var sourceVersion: String?
     let webService: WebService?
     let iOSService: IOSService?
     let remoteMCPService: RemoteMCPService?
@@ -801,6 +802,7 @@ final class Service: NSObject, Identifiable {
     }
 
     func invalidateResolved() {
+        sourceVersion = nil
         if let apiService {
             apiService.source = nil
             return
@@ -942,7 +944,7 @@ extension Service {
         capabilityState = .ready
     }
 
-    func relocalize(from definition: ServiceDefinition) {
+    func relocalize(from definition: ServiceDefinition, sourceChanged: Bool) {
         guard definition.domain == domain else {
             Log.service.error("Service.relocalize domain-mismatch actual=\(definition.domain) expected=\(domain)")
             return
@@ -958,7 +960,10 @@ extension Service {
         } else {
             definition
         }
-        if localized.isAPI { apiService = try! APIService(definition: localized) }
+        if localized.isAPI {
+            if sourceChanged { apiService = try! APIService(definition: localized) }
+            else { apiService?.definition = localized }
+        }
         self.definition = localized
         title = localized.name
         summary = localized.description

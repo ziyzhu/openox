@@ -8,7 +8,7 @@ A self-evolving agent that runs on your phone.
 
 <h3>
 
-[Website](https://openox.ai) · [App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) · [Discord](https://discord.gg/Sre9DaKAAg)
+[Website](https://openox.ai) · [Demo](https://openox.ai/#demo) · [App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) · [Discord](https://discord.gg/Sre9DaKAAg)
 
 </h3>
 
@@ -22,6 +22,14 @@ A self-evolving agent that runs on your phone.
 1. Turns websites into tools.
 2. Feels just like ChatGPT.
 3. Your device, any model.
+
+## Demo
+
+<a href="https://openox.ai/#demo">
+  <img src="https://openox.ai/assets/media/demos/78dbbd00cd76/github-thumbnail-65s.jpg" alt="Watch Ox create a reusable service and prepare a job application" width="240">
+</a>
+
+[Watch the full demo →](https://openox.ai/#demo)
 
 ## Download
 

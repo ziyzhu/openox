@@ -2,8 +2,8 @@
 
 Every newly authored customer-facing web or API service needs a verified product `faviconUrl` before attachment or reload. For API services, discover artwork on the official product website; the API identifier need not be a hostname. Preserve an existing verified icon unless broken or the user requests replacement. This requirement does not apply to model-provider configuration.
 
-1. Prefer official artwork from page icon links or a linked web-app manifest. Use a stable public HTTPS URL without credentials, signatures, or expiration.
-2. Fetch anonymously and confirm it decodes as PNG, JPEG, or ICO; SVG is unsupported. Prefer a square image at least 128×128. Reject failed responses, blank images, generic placeholders, and unrelated marks. Try the best candidate first and stop when it passes.
+1. Match artwork to the service's product identity, not merely the page's host or tenant. A reusable platform service needs the platform mark, not an employer's or customer's logo shown on its hosted page. Prefer official artwork from the product's page icon links or a linked web-app manifest. Use a stable public HTTPS URL without credentials, signatures, or expiration.
+2. Fetch anonymously and confirm it decodes as PNG, JPEG, or ICO; SVG is unsupported. Prefer a square image at least 128×128. Inspect the decoded image to confirm the intended product mark; successful decoding and dimensions alone do not verify identity. Reject failed responses, blank images, generic placeholders, tenant marks for a platform service, and unrelated marks. Try the best candidate first and stop when it passes.
 3. Set the verified URL in the final manifest before normal service validation and attachment. Manifest validation is not image-loading evidence; no post-apply avatar inspection or screenshot is required. Preflight any replacement before reloading.
 
 If none passes, preserve the draft and existing attachment, do not attach or reload, and report the favicon blocker.

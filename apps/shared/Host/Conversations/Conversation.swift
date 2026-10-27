@@ -205,6 +205,7 @@ final class Conversation: Identifiable {
     }
 
     private(set) var monoRepositoryHash: String?
+    @ObservationIgnored private var serviceSourceVersions: [String: String]?
 
     private(set) var isSelected = false
     private(set) var isTranscriptVisible = false
@@ -852,20 +853,23 @@ final class Conversation: Identifiable {
     func syncToMonoRepository() async -> [String] {
         serviceAttachments.resolve()
         let manager = serviceManager
-        guard let currentHash = manager.monoRepositoryHash, currentHash != monoRepositoryHash else { return [] }
-        defer {
+        guard let currentHash = manager.monoRepositoryHash else { return [] }
+        let currentVersions = manager.serviceSourceVersions.filter { serviceAttachments.domains.contains($0.key) }
+        let previousVersions = serviceSourceVersions
+        serviceSourceVersions = currentVersions
+        if currentHash != monoRepositoryHash {
             monoRepositoryHash = currentHash
             onPersistableChange?()
         }
-        guard let previousHash = monoRepositoryHash else { return [] }
-        let servicesToReload = attachedServices
-        guard !servicesToReload.isEmpty else { return [] }
-        for service in servicesToReload {
-            service.invalidateResolved()
-            _ = await service.loadManifest()
+        guard let previousVersions else { return [] }
+        let updated = attachedServices.filter { service in
+            previousVersions[service.domain] != nil && previousVersions[service.domain] != currentVersions[service.domain]
         }
-        Log.session.info("Conversation.syncToMonoRepository id=\(id) \(previousHash.prefix(7))->\(currentHash.prefix(7)) reloaded=\(servicesToReload.map(\.domain).joined(separator: ","))")
-        return servicesToReload.map(\.title)
+        for service in updated { _ = await service.loadManifest() }
+        if !updated.isEmpty {
+            Log.session.info("Conversation.syncToMonoRepository id=\(id) updated=\(updated.map(\.domain).joined(separator: ",")) invalidated=false")
+        }
+        return updated.map(\.title)
     }
 
     private func markActivity(_ date: Date = Date(), persist: Bool = true) {

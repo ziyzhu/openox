@@ -149,6 +149,8 @@ ox --repository <path-or-url> repository actions <domain> [--json]
 ox --repository <path-or-url> repository skills [name] [--json]
 ```
 
+For live candidate comparison, use `ox vm call ox.repository.conflicts --args '{"purpose":"Compare service sources","service":"<domain>","compare":true}'`. It returns complete per-candidate file hashes and sizes without changing active sources or reloading services. Never use `ox.repository.resolve` merely to compare copies; comparison errors do not establish equality.
+
 Inspect an action's input schema, authentication requirement, and approval
 requirement before invoking it.
 

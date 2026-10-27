@@ -48,6 +48,7 @@ nonisolated enum OxRepositories {
                             "type": .string("object"),
                             "properties": .object([
                                 "service": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(500)]),
+                                "compare": .object(["type": .string("boolean")]),
                             ]),
                             "additionalProperties": .bool(false),
                         ]),
@@ -149,9 +150,9 @@ nonisolated enum OxRepositories {
                 env.call { try await $0.appRepositories(purpose: purpose) }
             }
             ctx.setObject(list, forKeyedSubscript: "__nativeRepositoryList" as NSString)
-            let conflictsBlock: @convention(block) (JSValue, JSValue) -> JSValue = { serviceValue, purposeValue in
+            let conflictsBlock: @convention(block) (JSValue, Bool, JSValue) -> JSValue = { serviceValue, compare, purposeValue in
                 let service = serviceValue.isString ? serviceValue.toString() : nil
-                return env.call { try await $0.repositoryConflicts(service: service, purpose: purposeValue.toString()!) }
+                return env.call { try await $0.repositoryConflicts(service: service, compare: compare, purpose: purposeValue.toString()!) }
             }
             ctx.setObject(conflictsBlock as AnyObject, forKeyedSubscript: "__nativeRepositoryConflicts" as NSString)
 
@@ -187,7 +188,7 @@ nonisolated enum OxRepositories {
         },
         jsFragment: """
           list: value => { const options = __oxOptions(value, 'ox.repository.list'); return __nativeRepositoryList(String(options.purpose)); },
-            conflicts: (value) => { const options = __oxOptions(value, 'ox.repository.conflicts'); return __nativeRepositoryConflicts(options.service ?? null, String(options.purpose)); },
+            conflicts: (value) => { const options = __oxOptions(value, 'ox.repository.conflicts'); return __nativeRepositoryConflicts(options.service ?? null, options.compare ?? false, String(options.purpose)); },
             resolve: (value) => { const options = __oxOptions(value, 'ox.repository.resolve'); return __nativeRepositoryResolve(String(options.service), String(options.repository), String(options.purpose)); },
             connect: (value) => { const options = __oxOptions(value, 'ox.repository.connect'); return __nativeRepositoryConnect(String(options.origin), String(options.purpose)); },
             sync: (value) => { const options = __oxOptions(value, 'ox.repository.sync'); return __nativeRepositorySync(String(options.repository), String(options.purpose)); },

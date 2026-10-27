@@ -22,15 +22,26 @@ extension Repository {
         return hash
     }
 
+    static func serviceContentHash(at root: URL, service: Package.Service, provenance: Descriptor.Provenance) throws -> String {
+        let cacheKey = root.appendingPathComponent(service.id.path)
+        if provenance == .bundled, let hash = bundledContentHashes.withLock({ $0[cacheKey] }) { return hash }
+        let hash = try contentHash(at: root, paths: [service.id.path], options: [])
+        if provenance == .bundled { bundledContentHashes.withLock { $0[cacheKey] = hash } }
+        return hash
+    }
+
     static func contentHash(at root: URL, package: Package) throws -> String {
+        try contentHash(at: root, paths: package.services.map { $0.id.path } + package.skills.map { "skills/\($0)" })
+    }
+
+    private static func contentHash(at root: URL, paths: [String], options: FileManager.DirectoryEnumerationOptions = [.skipsHiddenFiles]) throws -> String {
         var digest = SHA256()
-        let paths = package.services.map { $0.id.path } + package.skills.map { "skills/\($0)" }
         for path in paths.sorted() {
             var files: [(path: String, url: URL)] = []
-            try forEachFile(in: root.appendingPathComponent(path, isDirectory: true)) { url, values, relative in
+            guard try forEachFile(in: root.appendingPathComponent(path, isDirectory: true), options: options, { url, values, relative in
                 if values.isSymbolicLink != true, values.isRegularFile == true { files.append((path + "/" + relative, url)) }
                 return true
-            }
+            }) else { throw Failure(message: "Source directory is unavailable: \(path)") }
             for file in files.sorted(by: { $0.path < $1.path }) {
                 digest.update(data: Data(file.path.utf8))
                 digest.update(data: try Data(contentsOf: file.url))
@@ -72,11 +83,16 @@ extension Repository {
         _ visit: (_ url: URL, _ values: URLResourceValues, _ relativePath: String) throws -> Bool
     ) throws -> Bool {
         let keys: [URLResourceKey] = [.isSymbolicLinkKey, .isRegularFileKey, .fileSizeKey]
-        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: options) else { return false }
+        var failure: Error?
+        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: options, errorHandler: { _, error in
+            failure = error
+            return false
+        }) else { return false }
         while let url = enumerator.nextObject() as? URL {
             let values = try url.resourceValues(forKeys: Set(keys))
             guard try visit(url, values, url.pathComponents.suffix(enumerator.level).joined(separator: "/")) else { break }
         }
+        if let failure { throw failure }
         return true
     }
 

@@ -1,6 +1,39 @@
+import CryptoKit
 import Foundation
 
 extension Repository {
+    func compareSources(service: String) async throws -> JSONValue {
+        guard let sources = candidateSources[service], sources.count > 1 else {
+            throw Failure(message: "Service source conflict is no longer available; inspect conflicts again.")
+        }
+        var candidates: [JSONValue] = []
+        var fileSets: [[String: String]] = []
+        for source in sources {
+            if source.provenance == .mounted { try await requireMountedAccess(source.repositoryID) }
+            _ = try readSource(source, path: ["service.json"])
+            var files: [JSONValue] = []
+            var hashes: [String: String] = [:]
+            guard try Self.forEachFile(in: source.root, options: [], { _, values, path in
+                guard values.isSymbolicLink != true else { throw Failure(message: "Symbolic links are not supported") }
+                guard values.isRegularFile == true else { return true }
+                let data = try readSource(source, path: path.split(separator: "/").map(String.init))
+                let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                hashes[path] = hash
+                files.append(.object(["path": .string(path), "bytes": .int(data.count), "sha256": .string(hash)]))
+                return true
+            }) else { throw Failure(message: "Service source directory is unavailable.") }
+            fileSets.append(hashes)
+            candidates.append(.object([
+                "repository": .string(source.repositoryID),
+                "files": .array(files.sorted { ($0.objectValue?["path"]?.stringValue ?? "") < ($1.objectValue?["path"]?.stringValue ?? "") }),
+            ]))
+        }
+        return .object([
+            "identical": .bool(fileSets.dropFirst().allSatisfy { $0 == fileSets.first }),
+            "candidates": .array(candidates),
+        ])
+    }
+
     func source(domain: String) async -> Source? {
         guard let source = activeSources[domain] else { return nil }
         if source.provenance == .mounted {
@@ -10,14 +43,24 @@ extension Repository {
                     grantID: record.grantID,
                     relativePath: record.relativePath + [source.kind.rawValue, domain, "actions.js"],
                     profileId: await StorageRoot.shared.activeId, mode: .read
-                ) { url in Source(actions: try String(contentsOf: url, encoding: .utf8)) }
+                ) { url in
+                    Source(actions: try String(contentsOf: url, encoding: .utf8), version: try Self.sourceVersion(domain: domain, source: source))
+                }
             } catch {
                 Log.service.error("Repository.mounted source unavailable domain=\(domain) error=\(error.localizedDescription)")
                 return nil
             }
         }
-        guard let actions = try? String(contentsOf: source.root.appendingPathComponent("actions.js"), encoding: .utf8) else { return nil }
-        return Source(actions: actions)
+        guard let actions = try? String(contentsOf: source.root.appendingPathComponent("actions.js"), encoding: .utf8),
+              let version = try? Self.sourceVersion(domain: domain, source: source) else { return nil }
+        return Source(actions: actions, version: version)
+    }
+
+    private static func sourceVersion(domain: String, source: ActiveSource) throws -> String {
+        let service = Package.Service(id: try ServiceID(kind: source.kind, runtimeID: domain))
+        let root = source.root.deletingLastPathComponent().deletingLastPathComponent()
+        let hash = try serviceContentHash(at: root, service: service, provenance: source.provenance)
+        return "\(service.id.rawValue):\(source.repositoryID):\(hash)"
     }
 
     func listSource(kind: ServiceKind, id: String, path: [String]) async throws -> [Entry] {

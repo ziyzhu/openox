@@ -57,7 +57,7 @@ extension ServiceOperations {
         case "ox.repository.connect":
             return try await connectRepository(origin: fields["origin"]?.stringValue ?? "", purpose: purpose)
         case "ox.repository.conflicts":
-            return try await repositoryConflicts(service: fields["service"]?.stringValue, purpose: purpose)
+            return try await repositoryConflicts(service: fields["service"]?.stringValue, compare: fields["compare"]?.boolValue ?? false, purpose: purpose)
         case "ox.repository.resolve":
             return try await resolveRepositoryConflict(service: fields["service"]?.stringValue ?? "", repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
         case "ox.repository.sync":

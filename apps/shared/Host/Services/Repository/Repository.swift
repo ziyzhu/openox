@@ -33,6 +33,7 @@ actor Repository {
 
     struct Source: Sendable {
         let actions: String
+        let version: String
     }
 
     struct ServiceReference: Identifiable, Equatable, Sendable {
@@ -105,6 +106,7 @@ actor Repository {
         let iOSManifests: [RepositoryManifestFile]
         let mcpManifests: [RepositoryManifestFile]
         let hash: String
+        let serviceVersions: [String: String]
         let skills: [Skill]
     }
 
@@ -251,6 +253,7 @@ actor Repository {
     let configurationURL: URL
     var configuration: Configuration
     var activeSources: [String: ActiveSource] = [:]
+    var candidateSources: [String: [ActiveSource]] = [:]
     var localPreparation: StoragePreparation?
     var mountedRepositories = MountedRepositoryStore()
     private var applicationRepositories: [LoadedRepository]?
@@ -320,8 +323,24 @@ actor Repository {
         }
         let skills = loadSkills(from: loaded)
         let (selected, conflicts) = selectCandidates(from: loaded)
+        let serviceVersions = try Dictionary(uniqueKeysWithValues: selected.map { candidate in
+            let source = candidate.repository
+            let hash = try Self.serviceContentHash(at: source.root, service: candidate.service, provenance: source.descriptor.provenance)
+            return (candidate.service.id.runtimeID, "\(candidate.service.id.rawValue):\(source.descriptor.id):\(hash)")
+        })
+        candidateSources = [:]
+        for source in loaded where source.descriptor.isEnabled {
+            for service in source.package.services {
+                candidateSources[service.id.runtimeID, default: []].append(ActiveSource(
+                    kind: service.id.kind,
+                    root: source.root.appendingPathComponent(service.id.path),
+                    repositoryID: source.descriptor.id,
+                    provenance: source.descriptor.provenance
+                ))
+            }
+        }
         let manifests = activateManifests(selected)
-        let hash = Self.catalogHash(selected: selected, skills: skills)
+        let hash = Self.catalogHash(serviceVersions: serviceVersions, skills: skills)
         Log.service.info("Repository.monoRepository repositories=\(descriptors.count) enabled=\(descriptors.count(where: \.isEnabled)) services=\(selected.count) conflicts=\(conflicts.count) hash=\(hash.prefix(12))")
         let catalog = MonoRepository(
             repositories: descriptors,
@@ -330,6 +349,7 @@ actor Repository {
             iOSManifests: manifests.byKind[.iOS] ?? [],
             mcpManifests: manifests.byKind[.mcp] ?? [],
             hash: hash,
+            serviceVersions: serviceVersions,
             skills: skills
         )
         if mountedRecords.isEmpty { unmountedCatalog = catalog }
@@ -450,21 +470,8 @@ actor Repository {
         return (web, byKind)
     }
 
-    private static func catalogHash(selected: [Candidate], skills: [Skill]) -> String {
-        let input = selected.map {
-            let repository = $0.repository
-            let version: String?
-            switch repository.descriptor.provenance {
-            case .local, .mounted, .remote:
-                version = try? contentHash(at: repository.root, package: repository.package)
-            case .bundled:
-                version = try? bundledContentHash(at: repository.root, package: repository.package)
-            case .development:
-                version = repository.package.contentHash
-                    ?? (try? contentHash(at: repository.root, package: repository.package))
-            }
-            return "\($0.service.id.rawValue):\(repository.descriptor.id):\(version ?? "unknown")"
-        }.sorted().joined(separator: "\n")
+    private static func catalogHash(serviceVersions: [String: String], skills: [Skill]) -> String {
+        let input = serviceVersions.values.sorted().joined(separator: "\n")
         let skillInput = skills.map { "\($0.id):\(SkillFiles.serialize($0)):\(($0.resources ?? [:]).sorted { $0.key < $1.key }.map { $0.key + $0.value }.joined())" }.sorted().joined(separator: "\n")
         return SHA256.hash(data: Data((input + skillInput).utf8)).map { String(format: "%02x", $0) }.joined()
     }

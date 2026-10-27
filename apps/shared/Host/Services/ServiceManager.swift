@@ -77,6 +77,7 @@ final class ServiceManager {
     private(set) var repositoryState: RepositoryState = .idle
     private(set) var monoRepositoryState: MonoRepositoryState = .idle
     private(set) var monoRepositoryHash: String?
+    var serviceSourceVersions: [String: String] { monoRepository?.serviceVersions ?? [:] }
     private(set) var repositories: [Repository.Descriptor] = []
     var repositorySkills: [Skill] { Skills.shared.repositorySkills }
     private(set) var repositoryConflicts: [Repository.Conflict] = []
@@ -343,10 +344,11 @@ final class ServiceManager {
                 }
                 clearMCPApprovals(replacing)
             }
+            _ = await loadRepositories(locale: monoRepositoryLocale)
             resolvedServices = ResolvedServices(services.filter { $0.domain != id } + [service])
+            updateMCPActivation(from: attachedDomains.subtracting([id]))
             monoRepositoryRevision &+= 1
             reindexMonoRepository()
-            _ = await loadRepositories(locale: monoRepositoryLocale)
         }
         Log.service.info("RemoteMCP.save id=\(service.domain) updated=\(replacing != nil) reused=\(existing != nil)")
         setSaved(service, true)
@@ -411,7 +413,9 @@ final class ServiceManager {
             guard let service = service(domain: domain), let mcp = service.remoteMCPService else { continue }
             Task {
                 do {
-                    guard await service.loadManifest(reason: .attach) != nil else { return }
+                    guard self.service(domain: domain) === service, self.attachedDomains.contains(domain),
+                          await service.loadManifest(reason: .attach) != nil,
+                          self.service(domain: domain) === service, self.attachedDomains.contains(domain) else { return }
                     try await mcp.activate()
                 } catch {
                     Log.service.error("RemoteMCP.attach failed id=\(domain) error=\(error.localizedDescription)")
@@ -472,6 +476,7 @@ final class ServiceManager {
         await acquireRepositoryLoad()
         defer { releaseRepositoryLoad() }
         let before = monoRepositoryHash
+        let previousVersions = serviceSourceVersions
         repositoryState = .syncing
         do {
             let monoRepository = try await repository.monoRepository(reuseApplicationRepositories: reuseApplicationRepositories)
@@ -492,18 +497,23 @@ final class ServiceManager {
             }
             monoRepositoryHash = monoRepository.hash
             repositoryState = .ready
-            guard before != monoRepository.hash || monoRepositoryState != .ready || monoRepositoryLocale != locale else {
-                Log.service.info("ServiceManager.refreshServices unchanged monoRepository=\(monoRepository.hash.prefix(12))")
+            guard previousVersions != monoRepository.serviceVersions || monoRepositoryState != .ready || monoRepositoryLocale != locale else {
+                Log.service.info("ServiceManager.refreshServices unchanged serviceSources=true catalogChanged=\(before != monoRepository.hash) monoRepository=\(monoRepository.hash.prefix(12))")
                 return []
             }
-            let stale = byDomain.values.filter { $0.webService != nil || $0.apiService != nil }
-            for service in stale {
+            let changed = Set(previousVersions.keys.filter {
+                (byDomain[$0]?.sourceVersion ?? previousVersions[$0]) != monoRepository.serviceVersions[$0]
+            })
+            for domain in changed {
+                guard let service = byDomain[domain] else { continue }
                 service.invalidateResolved()
+                await service.remoteMCPService?.deactivate()
+                Log.service.info("Service.invalidate domain=\(domain) reason=sourceChanged removed=\(monoRepository.serviceVersions[domain] == nil)")
             }
             let generation = beginMonoRepositoryUpdate(locale: locale, showLoading: monoRepositoryState != .ready)
-            await rebuildMonoRepository(locale: locale, generation: generation)
-            Log.service.info("ServiceManager.refreshServices reloaded=\(stale.map(\.domain).sorted()) conflicts=\(monoRepository.conflicts.count)")
-            return stale.map(\.domain).sorted()
+            await rebuildMonoRepository(locale: locale, generation: generation, changedServices: changed)
+            Log.service.info("ServiceManager.refreshServices reloaded=\(changed.sorted()) preserved=\(previousVersions.count - changed.count) conflicts=\(monoRepository.conflicts.count)")
+            return changed.sorted()
         } catch {
             repositoryState = .failed(error.localizedDescription)
             Log.service.error("ServiceManager.refreshServices failed=\(error.localizedDescription)")
@@ -567,14 +577,19 @@ final class ServiceManager {
         }
     }
 
-    func resolveConflict(serviceID: String, repositoryID: String, locale: String?) async throws {
+    @discardableResult
+    func resolveConflict(serviceID: String, repositoryID: String, locale: String?) async throws -> Bool {
         do {
-            try await repository.setResolution(serviceID: serviceID, repositoryID: repositoryID)
+            guard try await repository.setResolution(serviceID: serviceID, repositoryID: repositoryID) else {
+                Log.service.info("ServiceManager.repository resolve service=\(serviceID) repository=\(repositoryID) unchanged=true")
+                return false
+            }
             _ = await loadRepositories(locale: locale)
             guard case .ready = repositoryState,
                   repositoryConflicts.first(where: { $0.serviceID == serviceID })?.selectedRepositoryID == repositoryID else {
                 throw Repository.Failure(message: "The service source could not be activated. Inspect ox.repository.conflicts before retrying.")
             }
+            return true
         } catch {
             repositoryState = .failed(error.localizedDescription)
             Log.service.error("ServiceManager.repository resolve service=\(serviceID) repository=\(repositoryID) failed=\(error.localizedDescription)")
@@ -738,6 +753,10 @@ final class ServiceManager {
         try await repository.sourceIsDirectory(kind: kind.repositoryKind, id: domain, path: path)
     }
 
+    func compareServiceSources(_ service: String) async throws -> JSONValue {
+        try await repository.compareSources(service: service)
+    }
+
     func readServiceSource(kind: ServicesMount.Kind, domain: String, path: [String]) async throws -> Data {
         try await repository.readSource(kind: kind.repositoryKind, id: domain, path: path)
     }
@@ -802,11 +821,9 @@ final class ServiceManager {
         guard let source = await repository.source(domain: domain) else {
             throw Repository.Failure(message: "Service files are unavailable")
         }
-        return Service(
-            definition: definition,
-            actions: source.actions,
-            manager: self
-        )
+        let loaded = Service(definition: definition, actions: source.actions, manager: self)
+        loaded.sourceVersion = source.version
+        return loaded
     }
 
     func selectServiceForAttachment(_ service: Service) {
@@ -850,7 +867,7 @@ final class ServiceManager {
         }
     }
 
-    private func rebuildMonoRepository(locale: String?, generation: UInt64) async {
+    private func rebuildMonoRepository(locale: String?, generation: UInt64, changedServices: Set<String> = []) async {
         let listings = await listServices(locale: locale) ?? []
         let iOSDefinitions = await listIOSServiceDefinitions(locale: locale)
         let mcpDefinitions = await listMCPServiceDefinitions(locale: locale)
@@ -859,7 +876,7 @@ final class ServiceManager {
             Log.service.info("ServiceManager.rebuildMonoRepository superseded generation=\(generation)")
             return
         }
-        let next = definitions.compactMap(resolveService)
+        let next = definitions.compactMap { resolveService($0, sourceChanged: changedServices.contains($0.domain)) }
         let indexedRevision = monoRepositoryRevision
         let semanticBuild = await index.rebuildLexical(from: next.map(\.definition), locale: locale)
         guard monoRepositoryGeneration == generation else {
@@ -868,6 +885,7 @@ final class ServiceManager {
         }
         let capabilitiesChangedWhileIndexing = monoRepositoryRevision != indexedRevision
         resolvedServices = ResolvedServices(next)
+        updateMCPActivation(from: attachedDomains.subtracting(changedServices))
         monoRepositoryRevision &+= 1
         if capabilitiesChangedWhileIndexing {
             semanticState = .unavailable
@@ -879,9 +897,13 @@ final class ServiceManager {
         Log.service.info("ServiceManager.rebuildMonoRepository count=\(next.count) locale=\(locale ?? "en") generation=\(generation)")
     }
 
-    private func resolveService(_ definition: ServiceDefinition) -> Service? {
-        if let existing = byDomain[definition.domain] {
-            existing.relocalize(from: definition)
+    private func resolveService(_ definition: ServiceDefinition, sourceChanged: Bool) -> Service? {
+        if let existing = byDomain[definition.domain],
+           existing.isAPIService == definition.isAPI,
+           existing.isIOSService == definition.isIOS,
+           existing.isMCPService == definition.isMCP,
+           !(sourceChanged && definition.isMCP) {
+            existing.relocalize(from: definition, sourceChanged: sourceChanged)
             return existing
         }
         return Service(definition: definition, manager: self)
@@ -913,8 +935,7 @@ final class ServiceManager {
         }
         guard services.isEmpty || monoRepositoryLocale != locale else { return }
         let generation = beginMonoRepositoryUpdate(locale: locale, showLoading: true)
-        for service in byDomain.values { service.invalidateResolved() }
-        Log.service.info("ServiceManager.reloadServices count=\(self.byDomain.count) locale=\(locale ?? "en") generation=\(generation)")
+        Log.service.info("ServiceManager.reloadServices count=\(self.byDomain.count) locale=\(locale ?? "en") generation=\(generation) reason=locale")
         await rebuildMonoRepository(locale: locale, generation: generation)
     }
 

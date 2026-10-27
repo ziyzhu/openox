@@ -45,7 +45,7 @@ nonisolated final class APIServiceHTTP: NSObject, URLSessionTaskDelegate, Sendab
 @MainActor
 final class APIService {
     let authorization: APIServiceAuthorization
-    private let definition: ServiceDefinition
+    var definition: ServiceDefinition
     private let runtime = VirtualMachine()
     var source: Service.Resolved?
 

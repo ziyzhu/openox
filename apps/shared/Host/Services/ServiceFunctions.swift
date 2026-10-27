@@ -54,8 +54,8 @@ extension Conversation: OxFunctionBridge {
         try await serviceOperations.connectRepository(origin: origin, purpose: purpose)
     }
 
-    public func repositoryConflicts(service: String?, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.repositoryConflicts(service: service, purpose: purpose)
+    public func repositoryConflicts(service: String?, compare: Bool, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.repositoryConflicts(service: service, compare: compare, purpose: purpose)
     }
 
     public func resolveRepositoryConflict(service: String, repository: String, purpose: String) async throws -> JSONValue? {

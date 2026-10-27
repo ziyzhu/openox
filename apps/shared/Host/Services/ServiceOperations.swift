@@ -352,11 +352,15 @@ final class ServiceOperations {
         }
     }
 
-    func repositoryConflicts(service: String?, purpose: String) async throws -> JSONValue? {
-        let args: JSONValue = .object(service.map { ["service": .string($0)] } ?? [:])
-        return try await tracked(Actions.repositoryConflicts, args, purpose: purpose) {
+    func repositoryConflicts(service: String?, compare: Bool, purpose: String) async throws -> JSONValue? {
+        guard !compare || service != nil else {
+            throw RuntimeError.bridge("Source comparison requires an exact service from ox.repository.conflicts.")
+        }
+        var fields = service.map { ["service": JSONValue.string($0)] } ?? [:]
+        fields["compare"] = .bool(compare)
+        return try await tracked(Actions.repositoryConflicts, .object(fields), purpose: purpose) {
             let conflicts = self.serviceManager.repositoryConflicts.filter { service == nil || $0.serviceID == service }
-            return .object([
+            var result: [String: JSONValue] = [
                 "conflicts": .array(conflicts.prefix(100).map { conflict in
                     .object([
                         "service": .string(conflict.serviceID),
@@ -367,14 +371,18 @@ final class ServiceOperations {
                     ])
                 }),
                 "truncated": .bool(conflicts.count > 100),
-            ])
+            ]
+            if compare, let service {
+                result["comparison"] = try await self.serviceManager.compareServiceSources(service)
+            }
+            return .object(result)
         }
     }
 
     func resolveRepositoryConflict(service: String, repository: String, purpose: String) async throws -> JSONValue? {
         let args: JSONValue = .object(["service": .string(service), "repository": .string(repository)])
         return try await tracked(Actions.repositoryResolve, args, purpose: purpose) {
-            try await self.serviceManager.resolveConflict(
+            let changed = try await self.serviceManager.resolveConflict(
                 serviceID: service,
                 repositoryID: repository,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
@@ -382,7 +390,7 @@ final class ServiceOperations {
             return .object([
                 "service": .string(service),
                 "selectedRepository": .string(repository),
-                "reloadRequired": .bool(self.attachedDomains().contains(service)),
+                "reloadRequired": .bool(changed && self.attachedDomains().contains(service)),
             ])
         }
     }
