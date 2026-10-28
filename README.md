@@ -48,6 +48,8 @@ Watch Ox use LinkedIn to find jobs, build an integration with Workday on the fly
 
 Run Ox on your iPhone with **Ox for iOS**, available on the [App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502).
 
+To build and run your own Ox from this repository, follow the [setup guide](.agents/skills/setup/SKILL.md).
+
 ## A random sketch
 
 <img src="https://openox.ai/assets/media/slides/openox/img-5332-94c0c8e1b754.jpg" alt="Whiteboard sketch comparing access to the internet through websites and apps with access through Ox or another personal assistant" width="720">
