@@ -49,6 +49,8 @@ To build and run your own Ox from this repository, follow the [setup guide](.age
 
 <img src="https://openox.ai/assets/media/slides/openox/img-5332-94c0c8e1b754.jpg" alt="Whiteboard sketch comparing access to the internet through websites and apps with access through Ox or another personal assistant" width="720">
 
+The internet started small and open. Google became the organizing layer. Then came walled platforms built to feed on our attention. Many user interfaces were never designed for the people using them, but for the businesses behind them. The internet should be open, but for most of us, using it has meant working through whatever websites and apps we were given. That’s starting to change. We can now use agents to move beyond those interfaces and interact with the internet more freely and much faster.
+
 ## Contributing
 
 OpenOx is developed by [@ziyzhu](https://x.com/ziyzhu) and users like you. We welcome both pull requests and issues on GitHub.
