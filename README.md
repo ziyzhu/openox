@@ -6,18 +6,19 @@
 
 OpenOx is an open-source project for building and running Ox.
 
-An Ox is a self-evolving agent that runs on your phone 📱 and turns any website into tools.
-
-[![App Store](https://img.shields.io/badge/Download_on_the_App_Store-000000?style=for-the-badge&logo=apple&logoColor=white)](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502)
 [![Discord](https://img.shields.io/badge/Join_Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/Sre9DaKAAg)
 
 </div>
 
-## The experience
+## What is an Ox?
 
-1. The ease and polish of ChatGPT.
-1. Runs on your device.
-1. Works with your choice of model.
+Each Ox is a self-evolving agent that runs on your phone and builds new tools on demand.
+
+1. **Connect to anything** by turning any website into tools, using your device’s capabilities, and mounting directories.
+1. **Stay yours** by running on your device and keeping conversation data in a portable folder.
+1. **Pick any model** without changing how you use Ox.
+
+How it looks and feels is just as important. [The first Ox](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) is made to have the same ease and polish as ChatGPT.
 
 ## Demo
 
@@ -29,6 +30,12 @@ Watch Ox use LinkedIn to find jobs, build an integration with Workday on the fly
 
 [Full demo →](https://openox.ai/#demo)
 
+## Download
+
+Run Ox on your iPhone with **Ox for iOS**, available on the [App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502).
+
+To build and run your own Ox from this repository, follow the [setup guide](.agents/skills/setup/SKILL.md).
+
 ## How it works
 
 - **Ox** is malleable. Change settings by chatting with it.
@@ -38,12 +45,6 @@ Watch Ox use LinkedIn to find jobs, build an integration with Workday on the fly
 - **Ox Agent** builds on [Pi Durable](https://earendil.com/posts/pi-durable/) and uses Code Mode to interact with the Ox VM.
 - **Ox Profile** keeps your memory and conversations in a plain folder that you can move between devices.
 - **Ox Repository** packages services and skills in Git, so you can share capabilities with other Ox users.
-
-## Download
-
-Run Ox on your iPhone with **Ox for iOS**, available on the [App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502).
-
-To build and run your own Ox from this repository, follow the [setup guide](.agents/skills/setup/SKILL.md).
 
 ## A random sketch
 
