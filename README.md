@@ -4,7 +4,9 @@
 
 <h1>OpenOx</h1>
 
-A self-evolving agent that runs on your phone.
+OpenOx is an open-source project for building and running your own self-evolving agent, Ox.
+
+Ox runs on your phone and turns any website into reusable tools. Yes, any website.
 
 <h3>
 
@@ -17,17 +19,15 @@ A self-evolving agent that runs on your phone.
 
 </div>
 
-## Features
+## The experience
 
-1. Turns websites into tools.
-2. Feels just like ChatGPT.
-3. Your device, any model.
-
-<img src="https://openox.ai/assets/media/slides/openox/img-5332-94c0c8e1b754.jpg" alt="Whiteboard sketch comparing access to the internet through websites and apps with access through Ox or another personal assistant" width="720">
+- The ease and polish of ChatGPT.
+- Runs on your device.
+- Works with your choice of model.
 
 ## Demo
 
-Watch Ox uses LinkedIn to find jobs, builds an integration with Workday on the fly, and drafts a submission using local file system.
+Watch Ox use LinkedIn to find jobs, build an integration with Workday on the fly, and draft a submission using the local file system.
 
 <a href="https://openox.ai/#demo">
   <img src="https://openox.ai/assets/media/demos/78dbbd00cd76/github-thumbnail-65s.jpg" alt="Watch Ox create a reusable service and prepare a job application" width="240">
@@ -35,9 +35,22 @@ Watch Ox uses LinkedIn to find jobs, builds an integration with Workday on the f
 
 [Watch the full demo →](https://openox.ai/#demo)
 
+## How it works
+
+- **Ox** is malleable. Change settings by chatting with it.
+- **Ox Client** and **Ox Host** work across devices. Use an iOS Client to connect to a macOS Host for long-running tasks.
+- **Ox VM** provides a persistent execution environment with a common interface across supported devices.
+- **Ox Agent** builds on [Pi Durable](https://earendil.com/posts/pi-durable/) and writes code to interact with the VM.
+- **Ox Profile** keeps your memory and conversations in a plain folder that you can move between devices.
+- **Ox Repository** packages services and skills in Git, so you can share capabilities with other Ox users.
+
 ## Download
 
-Available as **Ox** on [App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502).
+Run Ox on your iPhone with **Ox for iOS**, available on the [App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502).
+
+## A Random Sketch
+
+<img src="https://openox.ai/assets/media/slides/openox/img-5332-94c0c8e1b754.jpg" alt="Whiteboard sketch comparing access to the internet through websites and apps with access through Ox or another personal assistant" width="720">
 
 ## Contributing
 
