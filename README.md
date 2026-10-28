@@ -4,9 +4,9 @@
 
 <h1>OpenOx</h1>
 
-OpenOx is an open-source project for building and running your own self-evolving agent, Ox.
+OpenOx is an open-source project for building and running Ox.
 
-Ox runs on your phone and turns any website into reusable tools. Yes, any website.
+An Ox is a self-evolving agent that runs on your phone 📱 and turns any website into tools.
 
 [![App Store](https://img.shields.io/badge/Download_on_the_App_Store-000000?style=for-the-badge&logo=apple&logoColor=white)](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502)
 [![Discord](https://img.shields.io/badge/Join_Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/Sre9DaKAAg)
