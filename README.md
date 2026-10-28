@@ -8,11 +8,8 @@ OpenOx is an open-source project for building and running your own self-evolving
 
 Ox runs on your phone and turns any website into reusable tools. Yes, any website.
 
-<h3>
-
-[App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) · [Discord](https://discord.gg/Sre9DaKAAg)
-
-</h3>
+[![App Store](https://img.shields.io/badge/Download_on_the_App_Store-000000?style=for-the-badge&logo=apple&logoColor=white)](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502)
+[![Discord](https://img.shields.io/badge/Join_Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/Sre9DaKAAg)
 
 </div>
 
