@@ -837,7 +837,6 @@ struct RootView: View {
                          onDeleteConversation: { conversations.delete(conversation.id) },
                          onBranch: { blockId in conversations.branch(from: conversation, atBlock: blockId) },
                          onOpenConversation: { id in
-                             guard conversations.contains(id) else { return }
                              openConversation(id)
                          },
                          onRenameFile: { file, newFilename in

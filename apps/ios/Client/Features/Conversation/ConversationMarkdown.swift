@@ -445,6 +445,7 @@ nonisolated private enum MarkdownRenderBlock: Equatable, Sendable {
 }
 
 private struct MarkdownRenderBlockView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let block: MarkdownRenderBlock
     let textColor: DynamicColor
     let subtleColor: DynamicColor
@@ -488,10 +489,11 @@ private struct MarkdownRenderBlockView: View {
     }
 
     private func attributedProse(_ blocks: [MarkdownBlock]) -> NSAttributedString {
+        let color = UIColor(hex: textColor.hex(for: colorScheme))
         if isStreaming, let streamingProse {
-            return streamingProse.render(blocks, color: textColor.uiColor)
+            return streamingProse.render(blocks, color: color)
         }
-        return SelectableText.attributedMarkdownProse(blocks, color: textColor.uiColor)
+        return SelectableText.attributedMarkdownProse(blocks, color: color)
     }
 
     @ViewBuilder
@@ -505,6 +507,7 @@ private struct MarkdownRenderBlockView: View {
 }
 
 private struct MarkdownBlockView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let block: MarkdownBlock
     let textColor: DynamicColor
     let subtleColor: DynamicColor
@@ -519,7 +522,7 @@ private struct MarkdownBlockView: View {
     var body: some View {
         switch block {
         case .paragraph, .heading, .lists:
-            SelectableText(SelectableText.attributedMarkdownProse([block], color: textColor.uiColor))
+            SelectableText(SelectableText.attributedMarkdownProse([block], color: UIColor(hex: textColor.hex(for: colorScheme))))
                 .padding(.top, SelectableText.proseTopInset(block))
         case .code(let language, let body):
             if language == "mermaid", !isStreaming {

@@ -797,8 +797,12 @@ final class ConversationManager {
               conversation.scope.root == storage.scope.root, conversation.scope.location == storage.scope.location,
               id != conversation.id else { throw unavailable }
         if records[ConversationID(id)] == nil, !(await locate(ConversationID(id))) { throw unavailable }
-        guard conversation.scope == repositoryScope, let meta = summaries.first(where: { $0.id == id }) else { throw unavailable }
-        return meta
+        guard conversation.scope == repositoryScope, let record = records[ConversationID(id)],
+              record.hydration.conversation?.isTemporary != true else { throw unavailable }
+        switch record.persistence {
+        case .deleting, .deleted: throw unavailable
+        case .clean, .debouncing, .saving: return record.hydration.meta
+        }
     }
 
     func notifyPendingInteractions() {

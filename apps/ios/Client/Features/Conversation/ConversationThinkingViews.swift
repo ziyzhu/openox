@@ -8,6 +8,7 @@ struct ThinkingRow: View {
     let isLive: Bool
     var allowsLoader = true
     @Environment(ServiceManager.self) private var serviceManager
+    @Environment(\.openConversation) private var openConversation
 
     private struct LiveAnimation {
         var label: String
@@ -91,7 +92,9 @@ struct ThinkingRow: View {
                     if !sources.isEmpty {
                         SourceChipList(sources: sources) { source in
                             SourceChipButton(source: source, accessibilityIdentifier: "conversation.source.\(source.id)") {
-                                if let url = source.url {
+                                if case .conversation(let id) = source.icon {
+                                    openConversation?(id)
+                                } else if let url = source.url {
                                     LinkOpener.open(url: url, serviceManager: serviceManager)
                                 }
                             }
@@ -329,6 +332,7 @@ private struct TraceRow: View {
     let isLast: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceManager.self) private var serviceManager
+    @Environment(\.openConversation) private var openConversation
 
     var body: some View {
         switch entry {
@@ -369,7 +373,7 @@ private struct TraceRow: View {
                     if let sources = InvocationFormat.sources(invocation, serviceManager: serviceManager) {
                         SourceChipList(sources: sources) { source in
                             SourceChipButton(source: source, accessibilityIdentifier: "conversation.step.\(invocation.id).source.\(source.id)") {
-                                if let url = source.url { open(url) }
+                                open(source)
                             }
                         }
                     }
@@ -385,11 +389,15 @@ private struct TraceRow: View {
         }
     }
 
-    private func open(_ url: URL) {
+    private func open(_ source: InvocationFormat.Source) {
         dismiss()
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(350))
-            LinkOpener.open(url: url, serviceManager: serviceManager)
+            if case .conversation(let id) = source.icon {
+                openConversation?(id)
+            } else if let url = source.url {
+                LinkOpener.open(url: url, serviceManager: serviceManager)
+            }
         }
     }
 
@@ -448,6 +456,7 @@ private struct InvocationNode: View {
 
 private struct SourceChip: View {
     let source: InvocationFormat.Source
+    let label: String
 
     var body: some View {
         HStack(spacing: 6) {
@@ -462,12 +471,16 @@ private struct SourceChip: View {
                 Image(systemName: "doc")
                     .foregroundStyle(Theme.Colors.conversationSecondary)
                     .frame(width: 16, height: 20)
+            case .conversation:
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .frame(width: 16, height: 20)
             case .domain(let domain):
                 DomainFavicon(domain: domain, size: 16)
             case .service(let service):
                 ServiceAvatar(service: service, size: 20, shape: .roundedRect(4))
             }
-            Text(source.label)
+            Text(label)
                 .font(Theme.Fonts.caption)
                 .foregroundStyle(Theme.Colors.conversationSecondary)
                 .lineLimit(1)
@@ -503,6 +516,7 @@ private struct SourceChipButton: View {
 
     @State private var destination: Destination?
     @State private var profileID = StorageRoot.shared.activeId
+    @State private var conversationTitle: String?
 
     var body: some View {
         Button {
@@ -518,13 +532,21 @@ private struct SourceChipButton: View {
                 action()
             }
         } label: {
-            SourceChip(source: source)
+            SourceChip(source: source, label: conversationTitle ?? source.label)
         }
         .buttonStyle(.plain)
         .frame(minHeight: Theme.Size.minimumTouchTarget)
         .contentShape(Rectangle())
-        .accessibilityLabel(source.accessibilityLabel)
+        .accessibilityLabel(conversationTitle ?? source.accessibilityLabel)
         .accessibilityIdentifier(accessibilityIdentifier)
+        .task(id: source.id) {
+            conversationTitle = nil
+            guard case .conversation(let id) = source.icon,
+                  !OxClient.shared.conversations.summaries.contains(where: { $0.id == id }) else { return }
+            let meta = await ProfileRepository.shared.conversationSummary(ConversationID(id), in: StorageRoot.shared.scope)
+            guard !Task.isCancelled else { return }
+            conversationTitle = meta?.displayTitle
+        }
         .sheet(item: $destination) { destination in
             NavigationStack {
                 Group {
@@ -780,6 +802,7 @@ private enum InvocationFormat {
             case domain(String)
             case service(Service)
             case file(String)
+            case conversation(UUID)
             case skill(Skill)
         }
 
@@ -810,6 +833,7 @@ private enum InvocationFormat {
             case .domain(let domain): "domain:\(url?.absoluteString ?? domain)"
             case .none: "results:\(results?.id.uuidString ?? label)"
             case .file(let path): "file:\(path)"
+            case .conversation(let id): "conversation:\(id.uuidString)"
             case .skill(let skill): "skill:\(skill.id)"
             }
         }
@@ -830,6 +854,20 @@ private enum InvocationFormat {
             guard let path = invocation.args.objectValue?["path"]?.stringValue,
                   !path.isEmpty else { return nil }
             let parts = path.split(separator: "/")
+            if parts.count >= 2, ["history", "conversations"].contains(parts[0]) {
+                let id: UUID? = if let uuid = UUID(uuidString: String(parts[1])) {
+                    uuid
+                } else if let number = Int(parts[1]), number >= 0, let profileID = StorageRoot.shared.scope.profileID {
+                    DurableConversationReference(profileID: profileID, conversationID: number).compatibilityID.rawValue
+                } else {
+                    nil
+                }
+                if let id {
+                    let title = OxClient.shared.conversations.summaries.first { $0.id == id }?.displayTitle
+                        ?? String(localized: "Conversation")
+                    return [Source(label: title, icon: .conversation(id))]
+                }
+            }
             if parts.count >= 3, parts[0] == "skills",
                let skill = Skills.shared.skill(named: String(parts[1])) {
                 guard skill.owner != .system else { return nil }

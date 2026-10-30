@@ -9,6 +9,7 @@ struct ConversationFileResolver {
 }
 
 extension EnvironmentValues {
+    @Entry var openConversation: ((UUID) -> Void)? = nil
     @Entry var conversationLinkHandler: ((URL) -> Void)? = nil
     @Entry var conversationFileResolver: ConversationFileResolver? = nil
 }

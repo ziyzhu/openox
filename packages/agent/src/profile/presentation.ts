@@ -80,7 +80,7 @@ export class ApplicationPresentation {
       try {
         const { item, favorite } = await this.summary(id, fields => index.checkedAt(id, row, fields));
         if (favorite !== row.pinned) index.refresh(id);
-        return item ? [item] : [];
+        return item.lastMessageAt === undefined ? [] : [item];
       } catch {
         index.refresh(id);
         return [];
@@ -100,7 +100,7 @@ export class ApplicationPresentation {
       harness.snapshot(ConversationApplicationMetadata, id, context),
     ]);
     const at = await lastMessageAt(metadata?.fields);
-    const item = at === undefined ? undefined : { reference: state.reference, presentation: state.presentation, favorite: state.favorite, unread: state.unread,
+    const item = { reference: state.reference, presentation: state.presentation, favorite: state.favorite, unread: state.unread,
       agent: { model: state.agent?.model, thinkingLevel: state.agent?.thinkingLevel }, metadata: metadata?.fields ?? {}, lastMessageAt: at };
     return { item, favorite: state.favorite, visible: state.presentation?.visible === true };
   }

@@ -528,7 +528,7 @@ struct SelectableText: UIViewRepresentable {
         private let result = NSMutableAttributedString()
 
         func render(_ next: [MarkdownBlock], color: UIColor) -> NSAttributedString {
-            if self.color !== color {
+            if self.color?.isEqual(color) != true {
                 self.color = color
                 blocks = []
                 ends = []
@@ -650,27 +650,20 @@ struct SelectableText: UIViewRepresentable {
     private static var bullets: [String: NSTextAttachment] = [:]
 
     private static func bullet(color: UIColor) -> NSTextAttachment {
-        let styles: [UIUserInterfaceStyle] = [.light, .dark]
-        let key = styles.map { colorKey(color.resolvedColor(with: UITraitCollection(userInterfaceStyle: $0))) }.joined(separator: "|")
+        let key = colorKey(color)
         if let cached = bullets[key] { return cached }
         let inkTop = CTLineGetImageBounds(
             CTLineCreateWithAttributedString(NSAttributedString(string: "•", attributes: [.font: bulletFont])), nil
         ).maxY
         let size = CGSize(width: ("•" as NSString).size(withAttributes: [.font: bulletFont]).width, height: ceil(inkTop))
-        let asset = UIImageAsset()
-        for style in styles {
-            let traits = UITraitCollection(userInterfaceStyle: style)
-            let glyph = NSAttributedString(string: "•", attributes: [
-                .font: bulletFont,
-                .foregroundColor: color.resolvedColor(with: traits),
-            ])
-            let format = UIGraphicsImageRendererFormat(for: traits)
-            let image = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-                glyph.draw(at: CGPoint(x: 0, y: size.height - bulletFont.ascender))
-            }
-            asset.register(image, with: traits)
+        let glyph = NSAttributedString(string: "•", attributes: [
+            .font: bulletFont,
+            .foregroundColor: color,
+        ])
+        let image = UIGraphicsImageRenderer(size: size).image { _ in
+            glyph.draw(at: CGPoint(x: 0, y: size.height - bulletFont.ascender))
         }
-        let attachment = NSTextAttachment(image: asset.image(with: UITraitCollection.current))
+        let attachment = NSTextAttachment(image: image)
         attachment.bounds = CGRect(origin: .zero, size: size)
         bullets[key] = attachment
         return attachment

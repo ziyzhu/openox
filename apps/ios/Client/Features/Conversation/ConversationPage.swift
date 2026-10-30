@@ -330,6 +330,7 @@ struct ConversationPage: View {
                 browserPageMount.reconcile(page: browserPage, ownerIDs: servicePageOwnerIDs)
             }
             .toast($toast, accessibilityIdentifier: A11yID.ConversationControls.toast)
+            .environment(\.openConversation, onOpenConversation)
             .environment(\.conversationFileResolver, ConversationFileResolver(
                 revision: conversation.filesRevision,
                 resolve: { [conversation] path in await conversation.messageFile(path: path) },
