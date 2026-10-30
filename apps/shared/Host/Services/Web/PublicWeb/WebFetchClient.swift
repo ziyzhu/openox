@@ -109,9 +109,14 @@ nonisolated enum WebFetchURLPolicy {
         return hasPublicHost(url)
     }
 
-    static func allowsResolved(_ url: URL) async -> Bool {
+    static func allowsResolved(_ url: URL, allowsTailscale: Bool = false) async -> Bool {
         guard allows(url) else { return false }
         if isServicesEndpoint(url) { return true }
+        if allowsTailscale, url.scheme?.lowercased() == "https",
+           let host = host(of: url), host.hasSuffix(".ts.net") {
+            let addresses = await resolve(host)
+            return !addresses.isEmpty && addresses.allSatisfy(isTailscale)
+        }
         return await resolvesPublicHost(url)
     }
 
@@ -191,6 +196,14 @@ nonisolated enum WebFetchURLPolicy {
 
     private static func bytes<Value>(of value: Value) -> [UInt8] {
         withUnsafeBytes(of: value) { Array($0) }
+    }
+
+    private static func isTailscale(_ bytes: [UInt8]) -> Bool {
+        if Array(bytes.prefix(12)) == ipv4Mapped {
+            let ipv4 = Array(bytes.suffix(4))
+            return ipv4[0] == 100 && (64...127).contains(ipv4[1])
+        }
+        return Array(bytes.prefix(6)) == [0xfd, 0x7a, 0x11, 0x5c, 0xa1, 0xe0]
     }
 
     private static func isPublic(_ bytes: [UInt8]) -> Bool {
