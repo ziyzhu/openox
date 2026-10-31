@@ -210,7 +210,7 @@ final class ServiceOperations {
         let identifier = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let matches = serviceManager.services.filter { service in
             guard let endpoint = service.definition.mcpEndpoint else { return false }
-            return service.definition.name.lowercased() == identifier || endpoint.host?.lowercased() == identifier
+            return service.title.lowercased() == identifier || endpoint.host?.lowercased() == identifier
         }
         let exact = serviceManager.service(domain: identifier)
         guard exact != nil || matches.count <= 1 else {
@@ -219,17 +219,35 @@ final class ServiceOperations {
         guard let service = exact ?? matches.first else {
             throw RuntimeError.bridge("ox.service.update: service '\(identifier)' does not exist; use ox.service.create for a new service.")
         }
+        let name: String?
+        if let value = fields["name"] {
+            guard let text = value.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+                throw RuntimeError.bridge("ox.service.update: name must be a nonempty string.")
+            }
+            name = text
+        } else {
+            name = nil
+        }
+        var fields = fields
+        fields.removeValue(forKey: "name")
+        if fields.isEmpty, let name {
+            let args: JSONValue = .object(["domain": .string(service.domain), "name": .string(name)])
+            return try await tracked(Actions.serviceUpdate, args, purpose: purpose) {
+                self.serviceManager.renameService(service, to: name)
+                return try self.serviceSnapshot(service)
+            }
+        }
         let kind = Self.serviceKind(service)
         let allowed: Set<String>
         switch kind {
-        case "web": allowed = ["name", "description", "baseUrl", "faviconUrl", "actions", "$defs"]
-        case "api": allowed = ["name", "description", "baseUrl", "faviconUrl", "actions", "$defs", "auth"]
+        case "web": allowed = ["description", "baseUrl", "faviconUrl", "actions", "$defs"]
+        case "api": allowed = ["description", "baseUrl", "faviconUrl", "actions", "$defs", "auth"]
         case "mcp": allowed = ["endpoint", "transport", "faviconUrl"]
-        default: throw RuntimeError.bridge("ox.service.update: native services are read-only.")
+        default: throw RuntimeError.bridge("ox.service.update: native services support only name.")
         }
         let unsupported = Set(fields.keys).subtracting(allowed).sorted()
         guard unsupported.isEmpty else {
-            throw RuntimeError.bridge("ox.service.update: unsupported fields for \(kind): \(unsupported.joined(separator: ", ")); supported fields: \(allowed.sorted().joined(separator: ", ")).")
+            throw RuntimeError.bridge("ox.service.update: unsupported fields for \(kind): \(unsupported.joined(separator: ", ")); supported fields: \(allowed.union(["name"]).sorted().joined(separator: ", ")).")
         }
         if let currentEndpoint = service.definition.mcpEndpoint {
             guard service.isLocalService else {
@@ -240,6 +258,7 @@ final class ServiceOperations {
                 transport: fields["transport"]?.stringValue ?? service.definition.mcpTransport?.rawValue,
                 faviconURL: fields["faviconUrl"],
                 replacing: service,
+                name: name,
                 purpose: purpose
             )
         }
@@ -249,8 +268,10 @@ final class ServiceOperations {
         let sourceKind: ServicesMount.Kind = kind == "api" ? .api : .web
         var args = fields
         args["domain"] = .string(service.domain)
+        if let name { args["name"] = .string(name) }
         return try await tracked(Actions.serviceUpdate, .object(args), purpose: purpose) {
             try await self.serviceManager.updateServiceManifest(kind: sourceKind, domain: service.domain, fields: fields)
+            if let name { self.serviceManager.renameService(service, to: name) }
             return .object([
                 "domain": .string(service.domain),
                 "kind": .string(kind),
@@ -261,7 +282,7 @@ final class ServiceOperations {
         }
     }
 
-    private func saveMCP(endpoint: String, transport: String?, faviconURL: JSONValue?, replacing: Service?, purpose: String) async throws -> JSONValue? {
+    private func saveMCP(endpoint: String, transport: String?, faviconURL: JSONValue?, replacing: Service?, name: String? = nil, purpose: String) async throws -> JSONValue? {
         let endpoint = try RemoteMCPService.endpoint(endpoint)
         guard transport == nil || transport == "auto" || RemoteMCPTransport(rawValue: transport!) != nil else {
             throw RuntimeError.bridge("MCP transport must be 'auto', 'streamable-http', or 'sse'.")
@@ -282,6 +303,7 @@ final class ServiceOperations {
             "endpoint": .string(endpoint.absoluteString),
             "transport": .string(transport ?? "auto"),
         ]
+        if let name { fields["name"] = .string(name) }
         if let faviconURL { fields["faviconUrl"] = faviconURL }
         if let replacing { fields["domain"] = .string(replacing.domain) }
         let args: JSONValue = .object(fields)
@@ -292,6 +314,7 @@ final class ServiceOperations {
                 faviconURL: resolvedFaviconURL,
                 replacing: replacing
             )
+            if let name { self.serviceManager.renameService(service, to: name) }
             if let replacing { serviceChanged(replacing.domain) }
             return try serviceSnapshot(service)
         }

@@ -94,6 +94,15 @@ final class ServiceManager {
         var id: String { rawValue }
     }
 
+    private(set) var serviceNames: [String: String] {
+        didSet { UserDefaults.standard.set(serviceNames, forKey: Self.serviceNamesKey) }
+    }
+
+    func renameService(_ service: Service, to name: String) {
+        serviceNames[service.domain] = name
+        Log.service.info("ServiceManager.rename domain=\(service.domain)")
+    }
+
     private(set) var savedDomains: Set<String> {
         didSet { UserDefaults.standard.set(savedDomains.sorted(), forKey: Self.savedKey) }
     }
@@ -112,6 +121,7 @@ final class ServiceManager {
     @ObservationIgnored var webConversations: [UUID: WebConversation] = [:]
     @ObservationIgnored var openingWebConversations: [UUID: WebConversation.Opening] = [:]
 
+    nonisolated static let serviceNamesKey = "serviceDisplayNames"
     nonisolated static let savedKey = "savedServices"
     nonisolated static let actionPoliciesKey = "actionApprovalPolicies"
     nonisolated static let legacyAutoApproveActionsKey = "autoApproveActions"
@@ -162,6 +172,7 @@ final class ServiceManager {
     init(nativeServices: any NativeServiceCatalog, memoryWarningNotification: Notification.Name? = nil) {
         self.nativeServices = nativeServices
         repository = Repository(developmentRemote: Self.launchServerURL)
+        serviceNames = UserDefaults.standard.dictionary(forKey: Self.serviceNamesKey) as? [String: String] ?? [:]
         savedDomains = Set(UserDefaults.standard.stringArray(forKey: Self.savedKey) ?? [])
         actionPolicies = Self.loadActionPolicies()
         folderGrantObserver = NotificationCenter.default.addObserver(forName: DeviceFolderStore.didChange, object: nil, queue: .main) { [weak self] _ in
@@ -222,6 +233,7 @@ final class ServiceManager {
     }
 
     func reloadPersistedStorage() {
+        serviceNames = UserDefaults.standard.dictionary(forKey: Self.serviceNamesKey) as? [String: String] ?? [:]
         savedDomains = Set(UserDefaults.standard.stringArray(forKey: Self.savedKey) ?? [])
         actionPolicies = Self.loadActionPolicies()
     }
@@ -956,7 +968,9 @@ final class ServiceManager {
         } else {
             let hits = await index.search(q)
             startSemanticIndexing()
-            base = hits.compactMap { hit in
+            let named = services.filter { serviceNames[$0.domain]?.localizedStandardContains(q) == true }
+            let namedDomains = Set(named.map(\.domain))
+            base = named.map { ServiceMatch(service: $0, matchedActionID: nil, matchedAction: nil) } + hits.filter { !namedDomains.contains($0.domain) }.compactMap { hit in
                 byDomain[hit.domain].map {
                     ServiceMatch(service: $0, matchedActionID: hit.matchedActionID, matchedAction: hit.matchedAction)
                 }

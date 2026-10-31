@@ -17,7 +17,7 @@ final class Service: NSObject, Identifiable {
     let remoteMCPService: RemoteMCPService?
     private(set) var apiService: APIService?
 
-    private(set) var title: String
+    var title: String { manager.serviceNames[domain] ?? definition.name }
     private(set) var summary: String
 
     var isWebService: Bool { webService != nil }
@@ -543,7 +543,6 @@ final class Service: NSObject, Identifiable {
         manager: ServiceManager
     ) {
         self.id = definition.domain
-        self.title = definition.name
         self.domain = definition.domain
         self.url = definition.baseURL?.absoluteString ?? ""
         self.tintHex = tint
@@ -678,7 +677,6 @@ final class Service: NSObject, Identifiable {
 
     func applyResolvedDefinition(_ resolved: ServiceDefinition, reason: CapabilityReason) {
         definition = resolved
-        title = resolved.name
         summary = resolved.description
         if let mcp = remoteMCPService {
             setAuth(mcp.auth)
@@ -965,7 +963,6 @@ extension Service {
             else { apiService?.definition = localized }
         }
         self.definition = localized
-        title = localized.name
         summary = localized.description
         Log.service.info("Service.relocalize domain=\(domain) title=\(localized.name)")
     }

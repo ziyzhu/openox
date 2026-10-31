@@ -153,7 +153,7 @@ nonisolated enum OxServices {
                             "type": .string("object"),
                             "properties": .object([
                                 "domain": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(253), "description": .string("Existing service domain. Direct MCP also accepts a saved connection name or unique endpoint host.")]),
-                                "name": .object(["type": .string("string"), "minLength": .int(1), "description": .string("Local web/API display name.")]),
+                                "name": .object(["type": .string("string"), "minLength": .int(1), "description": .string("Local display name for any service kind.")]),
                                 "description": .object(["type": .array([.string("string"), .string("null")]), "description": .string("Local web/API description; null removes it.")]),
                                 "baseUrl": .object(["type": .string("string"), "format": .string("uri"), "description": .string("Local web execution URL or API HTTPS base URL. Web URLs must remain on the service domain or its subdomains.")]),
                                 "actions": .object(["type": .string("array"), "items": .object(["type": .string("object")]), "description": .string("Replace the complete Local web/API action declarations. Handlers remain in actions.js; edit them with ox.fs and validate before attaching.")]),

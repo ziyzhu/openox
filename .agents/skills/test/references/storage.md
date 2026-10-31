@@ -11,6 +11,7 @@ types remain authoritative in their `Codable` implementations.
 ├── Library/
 │   ├── Preferences/                         UserDefaults
 │   │   ├── app.hasCompletedOnboarding       onboarding completion
+│   │   ├── serviceDisplayNames              app-wide service domain → local display name; retained across refresh/removal
 │   │   ├── savedServices                    attached service domains
 │   │   ├── actionApprovalPolicies           versioned Automatic, Ask, Allow, or Block policies for Actions
 │   │   ├── api.url                          Ox service API override
