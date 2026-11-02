@@ -125,7 +125,6 @@ final class ConversationViewportController {
 
     private enum Presentation {
         case opening(() -> Void)
-        case followingBottom
         case sending(UUID)
         case followingTurn(UUID)
         case reading
@@ -222,7 +221,7 @@ final class ConversationViewportController {
         switch presentation {
         case .sending(let targetID), .followingTurn(let targetID):
             guard targetID == id else { return }
-        case .opening, .followingBottom, .reading: return
+        case .opening, .reading: return
         }
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
@@ -311,7 +310,7 @@ final class ConversationViewportController {
         guard old != new else { return }
         if new.isUserDriven {
             switch presentation {
-            case .followingBottom, .followingTurn, .sending: presentation = .reading
+            case .followingTurn, .sending: presentation = .reading
             case .opening, .reading: break
             }
             viewportHold = nil
@@ -342,15 +341,14 @@ final class ConversationViewportController {
         stageLayoutLog(from: old, to: new)
         if case .opening(let completion) = presentation {
             guard new.container > 0 else { return }
-            if followBottom(new) { return }
-            presentation = .followingBottom
+            if placeOpeningAtBottom(new) { return }
+            presentation = .reading
             motion = .stationary
             showsJumpButton = false
             completion()
             Log.ui.info("ConversationUX.lifecycle conversation=\(conversationID) phase=viewportSettled \(logSnapshot)")
             return
         }
-        if case .followingBottom = presentation, followBottom(new) { return }
         updateJumpButton(new)
         let keyboardMoved = old.map { abs($0.insetBottom - new.insetBottom) > 0.5 } ?? false
         viewportHold?.observe(new)
@@ -366,7 +364,7 @@ final class ConversationViewportController {
         }
     }
 
-    private func followBottom(_ frame: Frame) -> Bool {
+    private func placeOpeningAtBottom(_ frame: Frame) -> Bool {
         guard frame.container > 0, frame.distanceFromEnd > 1 else { return false }
         move(to: .bottom)
         position.scrollTo(edge: .bottom)
@@ -444,7 +442,7 @@ final class ConversationViewportController {
 
     private var pinsEnd: Bool {
         switch presentation {
-        case .opening, .followingBottom: return true
+        case .opening: return true
         case .sending, .followingTurn, .reading: break
         }
         if case .tail(let hold) = viewportHold { return hold.pinsEnd }
