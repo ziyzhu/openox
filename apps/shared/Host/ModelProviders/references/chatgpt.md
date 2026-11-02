@@ -2,8 +2,8 @@
 
 ## Official destinations
 
-- Website: [Sign in with ChatGPT](https://learn.chatgpt.com/docs/sign-in-with-chatgpt)
-- Developer contract: [Open-source registration and sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference), [preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations)
+- Website: [Log in with ChatGPT](https://learn.chatgpt.com/docs/sign-in-with-chatgpt)
+- Developer contract: [Open-source registration and login](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference), [preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations)
 - Product information: [OpenAI Codex](https://openai.com/codex/)
 - Help: [Codex collection in the OpenAI Help Center](https://help.openai.com/en/collections/14937370-codex)
 - Account management: ChatGPT subscription and account settings. This integration does not use an OpenAI Platform API key.
@@ -14,7 +14,7 @@ Ox presents ChatGPT in Global. Treat it as a subscription-backed provider identi
 
 Ox uses OpenOx-named dynamic registration for the open-source, locally hosted ChatGPT plan flow. Identity and plan-use consent are separate; only validated identity and granted inference scopes establish a connection. Keep the issued registration tied to its user/workspace and use the public Responses API, never borrowed Codex client IDs or ChatGPT backend endpoints. Paid or remotely hosted offerings require separate eligibility review.
 
-The new credential record is isolated from predecessor Codex credentials; existing users sign in again. Retain old credentials without forwarding them to the public API. Verify actual predecessor/changed-build storage compatibility before release.
+The new credential record is isolated from predecessor Codex credentials; existing users log in again. Retain old credentials without forwarding them to the public API. Verify actual predecessor/changed-build storage compatibility before release.
 
 ## Runtime sources
 

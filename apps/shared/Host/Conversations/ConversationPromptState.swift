@@ -36,7 +36,7 @@ nonisolated enum ConversationPromptState {
             "skills": .array(skills.map { .object(["name": .string($0.name), "description": .string($0.description)]) }),
             "skillConflicts": .array(skillConflicts.map(JSONValue.string)),
             "attachedServices": .array(attachedServices.map { service in
-                var fields: [String: JSONValue] = ["domain": .string(service.domain), "signIn": .string(signIn(service.signIn))]
+                var fields: [String: JSONValue] = ["domain": .string(service.domain), "login": .string(login(service.login))]
                 if let description = service.description { fields["description"] = .string(description) }
                 return .object(fields)
             }),
@@ -48,7 +48,7 @@ nonisolated enum ConversationPromptState {
         ])
     }
 
-    private static func signIn(_ state: Service.SignInState) -> String {
+    private static func login(_ state: Service.LoginState) -> String {
         switch state {
         case .notRequired: "notRequired"
         case .signedIn: "signedIn"

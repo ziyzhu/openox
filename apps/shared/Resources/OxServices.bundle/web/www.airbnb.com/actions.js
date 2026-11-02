@@ -98,21 +98,6 @@ const numberFromItems = (items, label) => {
     const value = Number(match?.[1]);
     return Number.isFinite(value) ? value : null;
 };
-const localDateTime = (date) => {
-    const pad = (value) => String(value).padStart(2, "0");
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-};
-const transactionKey = (args) => [
-    stayId(args.listingId),
-    dateValue(args.checkIn, "checkIn"),
-    dateValue(args.checkOut, "checkOut"),
-    Number(args.adults ?? 1),
-    Number(args.children ?? 0),
-    Number(args.infants ?? 0),
-    Number(args.pets ?? 0),
-].join(":");
-const COMPLETED_RESERVATIONS_KEY = "ox.airbnb.completedReservations.v1";
-const ACTIVE_RESERVATION_KEY = "ox.airbnb.activeReservation.v1";
 window.ox.install(({ action }) => {
     const requestGet = async (operationName, hash, variables) => {
         const params = new URLSearchParams({
@@ -436,7 +421,7 @@ window.ox.install(({ action }) => {
             return { items, nextCursor };
         },
     });
-    action("getPaymentUrl", {
+    action("prepareCheckout", {
         async invoke(args = {}) {
             const listingId = stayId(args.listingId);
             const checkIn = dateValue(args.checkIn, "checkIn");
@@ -454,43 +439,10 @@ window.ox.install(({ action }) => {
                 numberOfPets: String(args.pets ?? 0),
                 productId: listingId,
             });
-            localStorage.setItem(ACTIVE_RESERVATION_KEY, transactionKey(args));
-            return { url: `${ORIGIN}/book/stays/${encodeURIComponent(listingId)}?${params}` };
-        },
-    });
-    action("getPaymentState", {
-        async invoke(args = {}) {
-            const key = transactionKey(args);
-            const liveConfirmation = location.pathname.match(/^\/book\/confirmation\/stays\/([^/]+)/);
-            if (liveConfirmation && localStorage.getItem(ACTIVE_RESERVATION_KEY) === key) {
-                const completedAt = localDateTime(new Date());
-                const reference = decodeURIComponent(liveConfirmation[1]);
-                let completed = {};
-                try {
-                    completed = JSON.parse(localStorage.getItem(COMPLETED_RESERVATIONS_KEY) ?? "{}");
-                }
-                catch { }
-                completed[key] = { reference, completedAt };
-                localStorage.setItem(COMPLETED_RESERVATIONS_KEY, JSON.stringify(completed));
-                localStorage.removeItem(ACTIVE_RESERVATION_KEY);
-                console.log(`getPaymentState: confirmed reservation ${reference}`);
-                return { status: "completed", reference };
-            }
-            let completed = {};
-            try {
-                completed = JSON.parse(localStorage.getItem(COMPLETED_RESERVATIONS_KEY) ?? "{}");
-            }
-            catch { }
-            const stored = completed[key];
-            const since = args.since ? new Date(String(args.since).replace(" ", "T")) : null;
-            const storedAt = stored ? new Date(stored.completedAt.replace(" ", "T")) : null;
-            if (stored && storedAt && (!since || Number.isNaN(since.getTime()) || storedAt >= since)) {
-                return { status: "completed", reference: stored.reference };
-            }
-            const listingId = stayId(args.listingId);
-            if (location.pathname === `/book/stays/${listingId}`)
-                return { status: "pending", reference: null };
-            return { status: "none", reference: null };
+            const url = new URL(`${ORIGIN}/book/stays/${encodeURIComponent(listingId)}?${params}`);
+            if (location.href !== url.href)
+                location.assign(url.href);
+            return null;
         },
     });
     action("searchServices", {

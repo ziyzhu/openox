@@ -107,7 +107,7 @@ nonisolated enum ChatGPTOAuth {
             let expired = form["grant_type"] == "refresh_token" && [400, 401].contains(status)
                 && ["invalid_grant", "invalid_refresh_token", "token_expired", "refresh_token_expired", "refresh_token_revoked", "refresh_token_invalidated", "refresh_token_reused"].contains(code)
             Log.network.error("ChatGPTOAuth.token grant=\(form["grant_type"] ?? "?") status=\(status) sessionExpired=\(expired)")
-            throw ChatGPTAuthError(message: expired ? "ChatGPT session expired. Sign in again." : "ChatGPT token endpoint HTTP \(status)", sessionExpired: expired)
+            throw ChatGPTAuthError(message: expired ? "ChatGPT session expired. Log in again." : "ChatGPT token endpoint HTTP \(status)", sessionExpired: expired)
         }
         guard let body else { throw ChatGPTAuthError(message: "Malformed ChatGPT token response") }
         return body

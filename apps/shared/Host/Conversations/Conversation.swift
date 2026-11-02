@@ -169,7 +169,6 @@ final class Conversation: Identifiable {
 
     @ObservationIgnored private lazy var serviceAttachments = ConversationServiceAttachments(
         conversation: self,
-        botControlSource: botControlSource,
         cancelInteractions: { [unowned self] domains in interactions.cancelServiceInteractions(domains: domains) },
         resumeAgent: { [unowned self] event, source in enqueueSystemEvent(event, source: source) }
     )
@@ -334,7 +333,7 @@ final class Conversation: Identifiable {
                     return .running(.awaiting(prompt.kind == .permission ? .approval : .reply))
                 case .serviceControl(let pending):
                     switch pending.control {
-                    case .signIn: return .running(.awaiting(.signIn))
+                    case .login: return .running(.awaiting(.login))
                     case .botControl: return .running(.awaiting(.verification))
                     case .payment: return .running(.awaiting(.payment))
                     }
@@ -363,8 +362,6 @@ final class Conversation: Identifiable {
     }
 
     @ObservationIgnored private var standaloneServiceInvocations: Set<UUID> = []
-    @ObservationIgnored private let botControlSource = ServiceBotControlSourceStore()
-    @ObservationIgnored private let authenticationRecovery = ServiceAuthenticationRecoveryStore()
 
     var serviceOperations: ServiceOperations {
         ServiceOperations(
@@ -392,16 +389,15 @@ final class Conversation: Identifiable {
             },
             presentControl: { [unowned self] control, _ in
                 let pending = embedServiceControl(control)
+                if let present = presentations.serviceControl {
+                    return await present(self, control)
+                }
                 return await interactions.waitForServiceControl(pending)
             },
             receiveFiles: { [unowned self] in try await importRemoteMCPFiles($0) },
             serviceChanged: { [unowned self] domain in
                 let replacement = serviceManager.service(domain: domain)
                 setAttachedServices(attachedServices.compactMap { $0.domain == domain ? replacement : $0 })
-            },
-            botControlRequired: { [unowned self] service, args, page in
-                guard isBusy else { return }
-                botControlSource.retain(service: service, args: args, page: page)
             },
             begin: { [unowned self] name, args, purpose in
                 let standalone = ensureExecutionContext()
@@ -421,8 +417,7 @@ final class Conversation: Identifiable {
                     }
                 }
             },
-            native: nativeServiceOperations,
-            authenticationRecovery: authenticationRecovery
+            native: nativeServiceOperations
         )
     }
 
@@ -970,7 +965,7 @@ final class Conversation: Identifiable {
             id: UUID(),
             control: control,
             source: source,
-            accessPreflight: attachedService(domain: control.domain)?.access.signInPreflight
+            accessPreflight: attachedService(domain: control.domain)?.access.loginPreflight
         )
         if standalone { finishStandaloneExecution() }
         Log.session.info("Conversation.embedServiceControl id=\(pending.id.uuidString) domain=\(control.domain)")
@@ -1048,7 +1043,6 @@ final class Conversation: Identifiable {
     private func finishStandaloneExecution(output: String = "", isError: Bool = false) {
         document.apply(.finishExecution(output: output, isError: isError))
         guard !isBusy else { return }
-        botControlSource.release()
         let outcome: TurnOutcome = isError
             ? .failed(at: Date(), message: output)
             : .completed(at: Date())
@@ -1430,25 +1424,11 @@ final class Conversation: Identifiable {
         if !isBusy { startWorker() }
     }
 
-    func signInService(
+    func loginService(
         domain: String,
-        resumeAgent: Bool = true,
-        using presenter: (any ServiceAuthPresenting)? = nil
+        resumeAgent: Bool = true
     ) async -> JSONValue? {
-        await serviceAttachments.signIn(domain: domain, resumeAgent: resumeAgent, using: presenter)
-    }
-
-    func completeBotControl(
-        domain: String,
-        args: JSONValue,
-        resumeAgent: Bool = true,
-        using presenter: (any ServiceHandoffPresenting)? = nil
-    ) async -> Bool {
-        await serviceAttachments.completeBotControl(domain: domain, args: args, resumeAgent: resumeAgent, using: presenter)
-    }
-
-    func completePayment(domain: String, args: JSONValue, using presenter: (any ServiceHandoffPresenting)? = nil) async -> JSONValue? {
-        await serviceAttachments.completePayment(domain: domain, args: args, using: presenter)
+        await serviceAttachments.login(domain: domain, resumeAgent: resumeAgent)
     }
 
     func cancelQueued(_ blockId: UUID) {
@@ -1463,7 +1443,6 @@ final class Conversation: Identifiable {
 
     func cancelAll() {
         cancelModelSelectionChange()
-        botControlSource.release()
         for submission in submissions.drain() {
             submission.latency.finish(outcome: "cancelledQueued", client: client.id, model: model.id)
         }
@@ -1478,12 +1457,10 @@ final class Conversation: Identifiable {
     }
 
     func stopCurrentTurn() {
-        authenticationRecovery.clear()
         guard isBusy else {
             Log.session.info("Conversation.stopCurrentTurn ignored id=\(id) reason=idle")
             return
         }
-        botControlSource.release()
         Log.session.info("Conversation.stopCurrentTurn id=\(id) queueDepth=\(submissions.count)")
         cancelModelSelectionChange()
         notice = .none
@@ -1503,7 +1480,6 @@ final class Conversation: Identifiable {
     }
 
     private func finishAgentTurnFromEvents(error: String?) {
-        botControlSource.release()
         let at = Date()
         let outcome: TurnOutcome
         if submissionPresentation.isCancelled || activeRun?.task.isCancelled == true || error == "aborted" {
@@ -1625,7 +1601,6 @@ final class Conversation: Identifiable {
 
     private func finishWorker(_ runID: RunID) {
         guard let run = activeRun, run.id == runID else { return }
-        authenticationRecovery.clear()
         defer { if !submissions.isEmpty { startWorker() } }
         let backgroundExecutionExpired = run.backgroundExecutionExpired
         let conversationFailed = notice.errorMessage != nil

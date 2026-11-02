@@ -16,14 +16,14 @@ nonisolated final class GitHubCopilotSubscriptionAccount: SubscriptionAccount, @
 
     func accessToken() throws -> String {
         guard let token = store.current()?.accessToken, !token.isEmpty else {
-            throw GitHubCopilotError(message: "Not signed in to GitHub Copilot")
+            throw GitHubCopilotError(message: "Not logged in to GitHub Copilot")
         }
         return token
     }
 
     func availableModelIDs() async throws -> Set<String> {
         guard let tokens = store.current() else {
-            throw GitHubCopilotError(message: "Not signed in to GitHub Copilot")
+            throw GitHubCopilotError(message: "Not logged in to GitHub Copilot")
         }
         if let ids = tokens.availableModelIDs, !ids.isEmpty { return Set(ids) }
         let refresh = store.refreshTask(source: tokens.accessToken) {
@@ -37,7 +37,7 @@ nonisolated final class GitHubCopilotSubscriptionAccount: SubscriptionAccount, @
             try Task.checkCancellation()
             if installed { return Set(refreshed.availableModelIDs ?? []) }
             guard let latest = store.current() else {
-                throw GitHubCopilotError(message: "Not signed in to GitHub Copilot")
+                throw GitHubCopilotError(message: "Not logged in to GitHub Copilot")
             }
             return Set(latest.availableModelIDs ?? [])
         } catch is CancellationError {
@@ -49,8 +49,8 @@ nonisolated final class GitHubCopilotSubscriptionAccount: SubscriptionAccount, @
         }
     }
 
-    @MainActor func signIn(using presenter: SubscriptionAuthorizationPresenter) async throws -> Bool {
-        let generation = store.beginSignIn()
+    @MainActor func login(using presenter: SubscriptionAuthorizationPresenter) async throws -> Bool {
+        let generation = store.beginLogin()
         do {
             let grant = try await GitHubCopilotOAuth.requestDeviceGrant()
             let accepted = await presenter.device(
@@ -60,10 +60,10 @@ nonisolated final class GitHubCopilotSubscriptionAccount: SubscriptionAccount, @
                 let tokens = try await GitHubCopilotOAuth.poll(grant)
                 return self.store.persist(tokens, expectedGeneration: generation)
             }
-            Log.network.info("GitHubCopilotAccount.signIn \(accepted ? "success" : "cancelled")")
+            Log.network.info("GitHubCopilotAccount.login \(accepted ? "success" : "cancelled")")
             return accepted && isSignedIn
         } catch {
-            Log.network.error("GitHubCopilotAccount.signIn failed: \(LogPrivacy.text(error.localizedDescription, limit: 2_048))")
+            Log.network.error("GitHubCopilotAccount.login failed: \(LogPrivacy.text(error.localizedDescription, limit: 2_048))")
             throw error
         }
     }

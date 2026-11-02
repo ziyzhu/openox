@@ -535,44 +535,11 @@ window.ox.install(({ action }) => {
             return { order: await fetchReceipt(clean(orderCartId)) };
         },
     });
-    action("getPaymentUrl", {
+    action("prepareCheckout", {
         async invoke() {
-            return { url: `${ORIGIN}/consumer/checkout/` };
+            return null;
         },
     });
-    action("getPaymentState", {
-        async invoke({ previousOrderId } = {}) {
-            const cart = await fetchCart();
-            if (cart?.items.length) {
-                return {
-                    status: "pending",
-                    reference: cart.id,
-                    total: cart.total.amount ?? 0,
-                    currency: cart.total.currency,
-                    completedAt: null,
-                };
-            }
-            try {
-                const orders = await fetchOrders(1);
-                const newest = orders[0];
-                if (newest && previousOrderId && newest.id !== clean(previousOrderId)) {
-                    const receipt = await fetchReceipt(newest.id);
-                    return {
-                        status: "completed",
-                        reference: newest.id,
-                        total: receipt.total?.amount ?? 0,
-                        currency: receipt.total?.currency ?? "USD",
-                        completedAt: null,
-                    };
-                }
-            }
-            catch (error) {
-                console.log(`getPaymentState order verification unavailable: ${error instanceof Error ? error.message : String(error)}`);
-            }
-            return { status: "none", reference: null, total: 0, currency: "USD", completedAt: null };
-        },
-    });
-
     action("searchStores", {
         async invoke({ query, locationContext, limit = 20 }) {
             if (locationContext !== "website-selected") throw new Error("Only website-selected directory context is supported; no address is applied");

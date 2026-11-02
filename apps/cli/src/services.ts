@@ -100,11 +100,11 @@ export async function serviceStatus(args: string[], context: CliContext): Promis
   for (const service of services) {
     const domain = String(service.domain ?? "");
     const phase = String(service.phase ?? "unknown");
-    const signIn = String(service.signIn ?? "unknown");
+    const login = String(service.signIn ?? "unknown");
     const pages = Number(service.pageCount ?? 0);
     const active = Number(service.activeInvocations ?? 0);
     const queued = Number(service.queuedInvocations ?? 0);
-    console.log(`${domain.padEnd(width + 2)}${phase} · auth ${signIn} · pages ${pages} · actions ${active} active/${queued} queued`);
+    console.log(`${domain.padEnd(width + 2)}${phase} · auth ${login} · pages ${pages} · actions ${active} active/${queued} queued`);
   }
 }
 

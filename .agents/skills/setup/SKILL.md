@@ -52,7 +52,7 @@ The signed app uses a separate sandbox and credential namespace; do not replay
 an iOS container into it. The menu bar shows Host status, controls connections,
 and opens existing service pages in native windows. Closing a window detaches
 presentation without closing its runtime page or stopping the Host. There is no
-conversation UI. Authentication, secure credential entry, service sign-in/handoffs,
+conversation UI. Authentication, secure credential entry, service login/handoffs,
 and browser presentation use Host-owned macOS windows. Calendar, reminders,
 contacts, notifications, and location/Maps use native macOS providers and OS
 permissions. Message composition is unavailable. Scheduled skills execute while

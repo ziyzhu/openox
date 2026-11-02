@@ -93,9 +93,6 @@ struct ConversationPage: View {
         case files
         case attachment(URL)
         case conversationFiles
-        case botControl(ServiceHandoffSession)
-        case serviceAuth(ServiceAuthSession)
-        case payment(ServiceHandoffSession)
 
         var id: String {
             switch self {
@@ -106,9 +103,6 @@ struct ConversationPage: View {
             case .files: "files"
             case .attachment(let url): "attachment:\(url.absoluteString)"
             case .conversationFiles: "conversationFiles"
-            case .botControl(let session): "botControl:\(session.id)"
-            case .serviceAuth(let session): "serviceAuth:\(session.id)"
-            case .payment(let session): "payment:\(session.id)"
             }
         }
     }
@@ -137,13 +131,7 @@ struct ConversationPage: View {
 
     @State private var viewportLayout = ConversationViewportLayout()
     @State private var transcriptWindow = TranscriptWindow()
-    @State private var botControlPresenter = ConversationServiceHandoffPresenter()
-    @State private var serviceAuthPresenter = ConversationServiceAuthPresenter()
-    @State private var paymentPresenter = ConversationServiceHandoffPresenter()
     @State private var browserPageMount = WebPageMountCoordinator()
-    @State private var expandedBotControlSessionID: UUID?
-    @State private var expandedServiceAuthSessionID: UUID?
-    @State private var expandedPaymentSessionID: UUID?
 
     private var browserPage: WebPage? {
         guard let service = serviceManager.inspectionService(domain: BrowserFunctionCatalog.publicNamespace),
@@ -193,7 +181,7 @@ struct ConversationPage: View {
         Binding(
             get: {
                 switch modalPresentation {
-                case .camera, .botControl, .serviceAuth, .payment: modalPresentation
+                case .camera: modalPresentation
                 default: nil
                 }
             },
@@ -272,14 +260,10 @@ struct ConversationPage: View {
 
     private var page: some View {
         let interaction = activeInteraction
-        let isSignIn = if case .serviceControl(let item) = interaction, case .signIn = item.control { true } else { false }
-        let showsComposer = (interaction == nil || isSignIn) && isModelConfigured && !webInputFocused
+        let isLogin = if case .serviceControl(let item) = interaction, case .login = item.control { true } else { false }
+        let showsComposer = (interaction == nil || isLogin) && isModelConfigured && !webInputFocused
         let authProbe = conversation.pendingServiceControl.flatMap { item -> Conversation.PendingServiceControl? in
-            guard isAttached(item.control), case .signIn = item.control else { return nil }
-            return item
-        }
-        let botControlProbe = conversation.pendingServiceControl.flatMap { item -> Conversation.PendingServiceControl? in
-            guard case .botControl = item.control else { return nil }
+            guard isAttached(item.control), case .login = item.control else { return nil }
             return item
         }
         return ConversationTranscriptProjection(
@@ -290,8 +274,7 @@ struct ConversationPage: View {
             projectedPage(
                 projection,
                 showsComposer: showsComposer,
-                authProbe: authProbe,
-                botControlProbe: botControlProbe
+                authProbe: authProbe
             )
         }
     }
@@ -299,8 +282,7 @@ struct ConversationPage: View {
     private func projectedPage(
         _ projection: ConversationTranscriptProjectionSnapshot,
         showsComposer: Bool,
-        authProbe: Conversation.PendingServiceControl?,
-        botControlProbe: Conversation.PendingServiceControl?
+        authProbe: Conversation.PendingServiceControl?
     ) -> some View {
         let floatsTopStrip = floatsTopStrip(showsComposer: showsComposer)
         let dockClearance = ConversationViewportLayout.responseComposerSpacing
@@ -498,25 +480,7 @@ struct ConversationPage: View {
             }
         }
         .task(id: authProbe?.id) {
-            await resolveSignInControl(authProbe)
-        }
-        .task(id: botControlProbe?.id) {
-            await resolveBotControl(botControlProbe)
-        }
-        .task(id: conversation.pendingServiceControl?.id) {
-            await resolvePaymentControl(conversation.pendingServiceControl)
-        }
-        .onChange(of: paymentPresenter.session?.id) { _, sessionID in
-            guard sessionID == nil, case .payment = modalPresentation else { return }
-            modalPresentation = nil
-        }
-        .onChange(of: botControlPresenter.session?.id) { _, sessionID in
-            guard sessionID == nil, case .botControl = modalPresentation else { return }
-            modalPresentation = nil
-        }
-        .onChange(of: serviceAuthPresenter.session?.id) { _, sessionID in
-            guard sessionID == nil, case .serviceAuth = modalPresentation else { return }
-            modalPresentation = nil
+            await resolveLoginControl(authProbe)
         }
         .task(id: DelayedActivityKey(
             conversationID: conversation.id,
@@ -554,7 +518,7 @@ struct ConversationPage: View {
                         Log.ui.info("ConversationPage.filePreview select conversation=\(conversation.id) filename=\(file.fileName)")
                     }
                     .presentationDetents([.medium, .large])
-                case .camera, .photos, .files, .attachment, .botControl, .serviceAuth, .payment:
+                case .camera, .photos, .files, .attachment:
                     EmptyView()
                 }
             }
@@ -568,12 +532,6 @@ struct ConversationPage: View {
                     if let image { ingestCameraImage(image) }
                 }
                 .ignoresSafeArea()
-            case .botControl(let session):
-                BotControlSheetView(session: session)
-            case .serviceAuth(let session):
-                ServiceSessionSheetView(session: session, mode: .signIn, returnsInline: true)
-            case .payment(let session):
-                ServiceSessionSheetView(session: session, mode: .handoff, returnsInline: true)
             case .modelPicker, .serviceDetail, .photos, .files, .attachment, .conversationFiles:
                 EmptyView()
             }
@@ -667,24 +625,6 @@ struct ConversationPage: View {
     }
 
     private func sheetDidDismiss() {
-        if let expandedBotControlSessionID,
-           let session = botControlPresenter.session,
-           session.id == expandedBotControlSessionID {
-            botControlPresenter.pageMount.restore(page: session.page, ownerID: session.id)
-        }
-        expandedBotControlSessionID = nil
-        if let expandedServiceAuthSessionID,
-           let session = serviceAuthPresenter.session,
-           session.id == expandedServiceAuthSessionID {
-            serviceAuthPresenter.pageMount.restore(page: session.page, ownerID: session.id)
-        }
-        expandedServiceAuthSessionID = nil
-        if let expandedPaymentSessionID,
-           let session = paymentPresenter.session,
-           session.id == expandedPaymentSessionID {
-            paymentPresenter.pageMount.restore(page: session.page, ownerID: session.id)
-        }
-        expandedPaymentSessionID = nil
         presentPendingFilePreview()
     }
 
@@ -925,75 +865,12 @@ struct ConversationPage: View {
                 control: control,
                 interactionID: interactionID,
                 conversation: conversation,
-                botControlPresenter: botControlPresenter,
-                serviceAuthPresenter: serviceAuthPresenter,
-                paymentPresenter: paymentPresenter,
-                isBotControlPresentedInSheet: expandedBotControlSessionID != nil,
-                isServiceAuthPresentedInSheet: expandedServiceAuthSessionID != nil,
-                isPaymentPresentedInSheet: expandedPaymentSessionID != nil,
-                expandBotControl: expandBotControl,
-                expandServiceAuth: expandServiceAuth,
-                expandPayment: expandPayment,
                 prepareServiceControl: prepareServiceControl
             )
                 .padding(.horizontal, 4)
         case .userText, .userSkill, .agentContent, .thinking, .contextCompaction:
             transcriptContentBlock(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
         }
-    }
-
-    private func expandBotControl(_ session: ServiceHandoffSession) {
-        Task { @MainActor in
-            guard await botControlPresenter.pageMount.detach(page: session.page, ownerID: session.id),
-                  botControlPresenter.session === session else { return }
-            expandedBotControlSessionID = session.id
-            modalPresentation = .botControl(session)
-        }
-    }
-
-    private func expandServiceAuth(_ session: ServiceAuthSession) {
-        Task { @MainActor in
-            guard await serviceAuthPresenter.pageMount.detach(page: session.page, ownerID: session.id),
-                  serviceAuthPresenter.session === session else { return }
-            expandedServiceAuthSessionID = session.id
-            modalPresentation = .serviceAuth(session)
-        }
-    }
-
-    private func expandPayment(_ session: ServiceHandoffSession) {
-        Task { @MainActor in
-            guard await paymentPresenter.pageMount.detach(page: session.page, ownerID: session.id),
-                  paymentPresenter.session === session else { return }
-            expandedPaymentSessionID = session.id
-            modalPresentation = .payment(session)
-        }
-    }
-
-    private func resolvePaymentControl(_ pending: Conversation.PendingServiceControl?) async {
-        guard let pending,
-              case .payment(let domain, _, let args) = pending.control else { return }
-        guard prepareServiceControl(pending.control) else {
-            conversation.resolveServiceControl(id: pending.id, result: nil)
-            return
-        }
-        let result = await conversation.completePayment(domain: domain, args: args, using: paymentPresenter)
-        conversation.resolveServiceControl(id: pending.id, result: result)
-    }
-
-    private func resolveBotControl(_ pending: Conversation.PendingServiceControl?) async {
-        guard let pending,
-              case .botControl(let domain, _, let args) = pending.control else { return }
-        guard prepareServiceControl(pending.control) else {
-            conversation.resolveServiceControl(id: pending.id, result: nil)
-            return
-        }
-        let completed = await conversation.completeBotControl(
-            domain: domain,
-            args: args,
-            resumeAgent: false,
-            using: botControlPresenter
-        )
-        conversation.resolveServiceControl(id: pending.id, result: completed ? .null : nil)
     }
 
     private func prepareServiceControl(_ control: ServiceControl) -> Bool {
@@ -1159,10 +1036,7 @@ struct ConversationPage: View {
                 ConversationInlineServicePages(
                     anchors: anchors,
                     browserPage: browserPage,
-                    browserPageMount: browserPageMount,
-                    serviceAuthPresenter: serviceAuthPresenter,
-                    botControlPresenter: botControlPresenter,
-                    paymentPresenter: paymentPresenter
+                    browserPageMount: browserPageMount
                 )
             }
             .contentMargins(.bottom, dockClearance, for: .scrollContent)
@@ -1636,24 +1510,23 @@ struct ConversationPage: View {
         conversation.attachedServices.contains { $0.domain == control.domain }
     }
 
-    private func resolveSignInControl(_ item: Conversation.PendingServiceControl?) async {
+    private func resolveLoginControl(_ item: Conversation.PendingServiceControl?) async {
         guard let item,
-              case .signIn(let domain, _) = item.control,
+              case .login(let domain, _) = item.control,
               let service = conversation.attachedService(domain: domain) else { return }
-        Log.ui.info("ConversationPage.authProbe start conversation=\(conversation.id) domain=\(domain) state=\(service.signInState.rawValue)")
-        await service.checkAccess(policy: .current, reason: .pendingSignIn, preflight: item.accessPreflight)
+        Log.ui.info("ConversationPage.authProbe start conversation=\(conversation.id) domain=\(domain) state=\(service.loginState.rawValue)")
+        await service.checkAccess(policy: .current, reason: .pendingLogin, preflight: item.accessPreflight)
         guard !Task.isCancelled else {
             Log.ui.info("ConversationPage.authProbe canceled conversation=\(conversation.id) domain=\(domain)")
             return
         }
-        Log.ui.info("ConversationPage.authProbe done conversation=\(conversation.id) domain=\(domain) state=\(service.signInState.rawValue)")
-        if service.signInState.isAuthenticated {
+        Log.ui.info("ConversationPage.authProbe done conversation=\(conversation.id) domain=\(domain) state=\(service.loginState.rawValue)")
+        if service.loginState.isAuthenticated {
             conversation.resolveServiceControl(id: item.id, result: service.accessResult())
         } else {
-            let result = await conversation.signInService(
+            let result = await conversation.loginService(
                 domain: domain,
-                resumeAgent: false,
-                using: service.supportsWebAuthentication ? serviceAuthPresenter : nil
+                resumeAgent: false
             )
             conversation.resolveServiceControl(id: item.id, result: result)
         }

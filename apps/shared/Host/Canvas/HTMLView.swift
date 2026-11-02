@@ -42,9 +42,7 @@ final class HTMLView {
     @ObservationIgnored private var tail: Task<Void, Never>?
     @ObservationIgnored private var answer: CheckedContinuation<JSONValue?, Never>?
     @ObservationIgnored private var requestTimes: [Date] = []
-    @ObservationIgnored private var activeAuth: ServiceAuthSession?
     @ObservationIgnored private var activeHandoff: ServiceHandoffSession?
-    @ObservationIgnored private let botControlSource = ServiceBotControlSourceStore()
     @ObservationIgnored private var messagePresentationID: UUID?
     @ObservationIgnored private var outputBytes = 0
     @ObservationIgnored private var repositoryRevision: UInt64
@@ -116,13 +114,10 @@ final class HTMLView {
     }
 
     private func cancelWork() {
-        authenticationRecovery.clear()
-        botControlSource.release()
         pending.values.forEach { $0.cancel() }
         loading.values.forEach { $0.cancel() }
         resolveInteraction(id: interaction?.id, value: nil)
         browser = nil
-        activeAuth?.cancel()
         activeHandoff?.cancel()
         serviceManager.browserActionSessions.closeSession(for: id)
         serviceManager.closeWebConversations(owner: .canvas(id))
@@ -164,8 +159,6 @@ final class HTMLView {
         return (service, parts[2])
     }
 
-    private let authenticationRecovery = ServiceAuthenticationRecoveryStore()
-
     private var operations: ServiceOperations {
         ServiceOperations(
             serviceManager: serviceManager,
@@ -192,10 +185,6 @@ final class HTMLView {
             serviceChanged: { [unowned self] domain in
                 if let service = services.removeValue(forKey: domain), service.isWebService { service.discardPages() }
             },
-            botControlRequired: { [unowned self] service, args, page in
-                guard state == .running else { return }
-                botControlSource.retain(service: service, args: args, page: page)
-            },
             begin: { [unowned self] function, _, purpose in
                 let invocation = UUID()
                 Log.service.info("Canvas.invoke caller=\(id) request=\(invocation) function=\(function) purpose=\(purpose)")
@@ -212,7 +201,6 @@ final class HTMLView {
                 id: id,
                 serviceManager: serviceManager,
                 presentations: AppPresentations(
-                    serviceSignIn: CanvasAuthPresenter(canvas: self),
                     serviceHandoff: CanvasHandoffPresenter(canvas: self),
                     messages: CanvasMessagePresenter(canvas: self)
                 ),
@@ -230,8 +218,7 @@ final class HTMLView {
                 authorizeBrowserSite: { _, _ in
                     throw RuntimeError.bridge("Browser page access is available only to conversation agents.")
                 }
-            ),
-            authenticationRecovery: authenticationRecovery
+            )
         )
     }
 
@@ -259,37 +246,12 @@ final class HTMLView {
     func performControl(_ control: ServiceControl, service: Service) async -> JSONValue? {
         guard state == .running else { return nil }
         switch control {
-        case .signIn:
-            let outcome = try? await service.requestAccess(using: CanvasAuthPresenter(canvas: self), source: .canvas)
-            let acknowledged = outcome == .acknowledged
-            return acknowledged || service.signInState.isAuthenticated ? service.accessResult(acknowledged: acknowledged) : nil
-        case .botControl(_, _, let args):
-            let source: ServiceActionScheduler.BotControlLease?
-            switch botControlSource.claim(service: service, args: args) {
-            case .none:
-                source = nil
-            case .mismatch:
-                Log.service.warning("Canvas.botControl source-args-mismatch caller=\(id) domain=\(service.domain)")
-                return nil
-            case .matched(let lease):
-                source = lease
-            }
-            defer { source?.release(discardPage: true) }
-            return await service.completeBotControl(
-                args: args,
-                using: CanvasHandoffPresenter(canvas: self),
-                source: source
-            ) ? .null : nil
-        case .payment(_, _, let args):
-            return await service.completePayment(args: args, using: CanvasHandoffPresenter(canvas: self))
+        case .login:
+            _ = try? await service.requestAccess(source: .canvas)
+            return service.loginState.isAuthenticated ? service.accessResult() : nil
+        case .botControl, .payment:
+            return nil
         }
-    }
-
-    fileprivate func presentAuth(_ auth: ServiceAuthSession) async -> ServiceAuthSession.Outcome {
-        guard state == .running else { auth.cancel(); return .cancelled }
-        activeAuth = auth
-        defer { if activeAuth === auth { activeAuth = nil } }
-        return await presentations.presentServiceAuth(auth)
     }
 
     fileprivate func presentHandoff(_ handoff: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
@@ -322,14 +284,6 @@ final class HTMLView {
             outputBytes += output.data.count
             outputs.append(FileItem(fileName: filename, directory: outputDirectory))
         }
-    }
-}
-
-@MainActor
-private struct CanvasAuthPresenter: ServiceAuthPresenting {
-    let canvas: HTMLView
-    func present(session: ServiceAuthSession) async -> ServiceAuthSession.Outcome {
-        await canvas.presentAuth(session)
     }
 }
 

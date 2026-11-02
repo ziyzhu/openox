@@ -53,7 +53,7 @@ nonisolated final class SubscriptionTokenStore<Tokens: Codable & Sendable>: @unc
         return result.0
     }
 
-    func beginSignIn() -> UInt64 {
+    func beginLogin() -> UInt64 {
         let result = state.withLock { state -> (UInt64, Task<Tokens, Error>?) in
             let task = state.refresh?.task
             state.refresh = nil
@@ -64,7 +64,7 @@ nonisolated final class SubscriptionTokenStore<Tokens: Codable & Sendable>: @unc
         return result.0
     }
 
-    func cancelSignIn(expectedGeneration: UInt64) {
+    func cancelLogin(expectedGeneration: UInt64) {
         state.withLock { state in
             guard state.generation == expectedGeneration else { return }
             state.generation &+= 1

@@ -6,13 +6,13 @@ nonisolated struct ServiceInspectorLink: Codable, Equatable, Sendable {
 }
 
 nonisolated enum ServiceControl: Equatable, Sendable {
-    case signIn(domain: String, serviceName: String?)
+    case login(domain: String, serviceName: String?)
     case botControl(domain: String, serviceName: String?, args: JSONValue)
     case payment(domain: String, serviceName: String?, args: JSONValue)
 
     var domain: String {
         switch self {
-        case .signIn(let domain, _), .botControl(let domain, _, _), .payment(let domain, _, _): domain
+        case .login(let domain, _), .botControl(let domain, _, _), .payment(let domain, _, _): domain
         }
     }
 }
@@ -31,7 +31,7 @@ nonisolated extension ServiceControl: Codable {
         let serviceName = try values.decodeIfPresent(String.self, forKey: .serviceName)
         switch try values.decode(String.self, forKey: .type) {
         case "signIn":
-            self = .signIn(domain: domain, serviceName: serviceName)
+            self = .login(domain: domain, serviceName: serviceName)
         case "botControl":
             self = .botControl(
                 domain: domain,
@@ -52,7 +52,7 @@ nonisolated extension ServiceControl: Codable {
     func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case let .signIn(domain, serviceName):
+        case let .login(domain, serviceName):
             try values.encode("signIn", forKey: .type)
             try values.encode(domain, forKey: .domain)
             try values.encodeIfPresent(serviceName, forKey: .serviceName)

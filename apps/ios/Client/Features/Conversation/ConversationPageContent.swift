@@ -106,8 +106,8 @@ extension ConversationBlock {
 
     private static func serviceControlText(_ control: ServiceControl) -> String {
         switch control {
-        case .signIn(let domain, let name):
-            "\(L10n.string("Sign in")): \(name ?? domain)"
+        case .login(let domain, let name):
+            "\(L10n.string("Log in")): \(name ?? domain)"
         case .botControl(let domain, let name, _):
             "\(L10n.string("Verification")): \(name ?? domain)"
         case .payment(let domain, let name, _):
@@ -198,7 +198,7 @@ extension ConversationBlock {
                 case .text(let text), .progress(let text):
                     return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 case .serviceControl(let control):
-                    if case .signIn = control {
+                    if case .login = control {
                         return serviceControlLocation == ServiceControlLocation(blockID: block.id, itemIndex: index)
                     }
                     return true

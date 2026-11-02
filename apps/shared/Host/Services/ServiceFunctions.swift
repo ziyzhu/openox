@@ -97,8 +97,8 @@ extension Conversation: OxFunctionBridge {
         try await serviceOperations.inspectService(domain: domain, actions: actions, purpose: purpose)
     }
 
-    public func invokeAction(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.invokeAction(name: name, args: args ?? .object([:]), purpose: purpose) ?? .null
+    public func invokeAction(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.invokeAction(name: name, args: args ?? .object([:]), session: session, pageURL: pageURL, purpose: purpose) ?? .null
     }
 }
 
@@ -140,25 +140,17 @@ extension Conversation {
                 result["repositoryProvenance"] = .string(provenance.rawValue)
             }
             let snapshot = service.snapshot(attached: true)
-            Log.session.info("bridge.service.attach domain=\(domain) reloaded=\(existing != nil) signIn=\(snapshot.signIn.rawValue)")
+            Log.session.info("bridge.service.attach domain=\(domain) reloaded=\(existing != nil) login=\(snapshot.login.rawValue)")
             return .object(result)
         }
     }
 
-    public func showServicePage(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.showServicePage(name: name, args: args, purpose: purpose)
+    public func showServicePage(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.showServicePage(name: name, args: args, session: session, pageURL: pageURL, purpose: purpose)
     }
 
-    public func signInService(domain: String, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.signInService(domain: domain, purpose: purpose)
-    }
-
-    public func solveService(domain: String, args: JSONValue, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.solveService(domain: domain, args: args, purpose: purpose)
-    }
-
-    public func payService(domain: String, args: JSONValue, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.payService(domain: domain, args: args, purpose: purpose)
+    public func loginService(domain: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.loginService(domain: domain, purpose: purpose)
     }
 
     public func detachService(domain: String, purpose: String) async throws -> JSONValue? {

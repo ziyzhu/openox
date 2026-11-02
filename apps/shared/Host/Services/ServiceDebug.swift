@@ -52,7 +52,7 @@ extension Service {
         let queuedInvocations: Int
         let pendingEvaluations: Int
         let pageCount: Int
-        let signIn: String
+        let login: String
         let page: Page?
         let manifest: JSONValue
     }
@@ -66,7 +66,7 @@ extension Service {
                 queuedInvocations: 0,
                 pendingEvaluations: 0,
                 pageCount: 0,
-                signIn: auth.logLabel,
+                login: auth.logLabel,
                 page: nil,
                 manifest: definition.manifest
             )
@@ -81,7 +81,7 @@ extension Service {
             queuedInvocations: servicePages.reduce(0) { $0 + queuedInvocationCount(in: $1) },
             pendingEvaluations: servicePages.reduce(0) { $0 + $1.pendingEvaluations.count },
             pageCount: pageCount,
-            signIn: auth.logLabel,
+            login: auth.logLabel,
             page: page.map {
                 DebugSnapshot.Page(
                     url: $0.url?.absoluteString,

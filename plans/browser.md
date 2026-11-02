@@ -50,7 +50,7 @@ Questions to submit to Apple after maintainer review:
 
 No inquiry has been submitted. Photos and Bluetooth removals are approved and implemented. Do not represent the remaining compliance plan as implemented or Apple-approved.
 
-Apple's public guidance does not specify whether entitlement assessment uses the published version or the latest uploaded build; the request form requires sign-in and its evidence fields have not been inspected. Identify the intended candidate version/build and any available TestFlight access, distinguish it from the published version, and ask Apple which build to assess. Do not assume the latest upload is automatically assessed or that the changes must be published first. Managed-capability approval does not replace App Review of the submitted entitled build.
+Apple's public guidance does not specify whether entitlement assessment uses the published version or the latest uploaded build; the request form requires login and its evidence fields have not been inspected. Identify the intended candidate version/build and any available TestFlight access, distinguish it from the published version, and ask Apple which build to assess. Do not assume the latest upload is automatically assessed or that the changes must be published first. Managed-capability approval does not replace App Review of the submitted entitled build.
 
 ## 2. Complete the minimum browser experience
 
@@ -120,7 +120,7 @@ Review `apps/shared/Host/Services/Web/ServiceWebKit.swift` and its navigation co
 - [ ] Distinguish Profile-local website sessions from system-managed passkeys; passkeys are not Ox Profile secrets.
 - [ ] Avoid persisted-storage changes unless needed. If needed, use scoped migration owners and obtain actual predecessor/changed-build compatibility evidence before release.
 
-Audit: `ServiceWebsiteDataCoordinator.dataStoreID` hashes only the app's website-data namespace. Manual browsing, sign-in/handoff, and service actions use that same app-wide store. A cookie and local-storage marker written in Default were visible after switching to a newly created QA Profile; that Profile and the markers were removed afterward. Cache isolation is not established either. Existing service website-data deletion clears the shared site's data, not one Profile's data; arbitrary Browser-site deletion and active-page quiescence remain unfinished. System passkeys must not be described as Profile-owned secrets.
+Audit: `ServiceWebsiteDataCoordinator.dataStoreID` hashes only the app's website-data namespace. Manual browsing, login/handoff, and service actions use that same app-wide store. A cookie and local-storage marker written in Default were visible after switching to a newly created QA Profile; that Profile and the markers were removed afterward. Cache isolation is not established either. Existing service website-data deletion clears the shared site's data, not one Profile's data; arbitrary Browser-site deletion and active-page quiescence remain unfinished. System passkeys must not be described as Profile-owned secrets.
 
 Gate: agree which Profile, if any, inherits existing shared website sessions before implementing the storage transition. Do not copy authenticated sessions into every Profile. Preserve older data until scoped migration and actual predecessor/changed-build evidence establish the intended behavior; report downgrade incompatibilities before release.
 
@@ -140,7 +140,7 @@ Adding an entitlement locally without approval and matching provisioning is insu
 
 - [ ] Start with websites' normal WebAuthn requests and WebKit's built-in handling.
 - [ ] Determine whether browser credential-manager authorization APIs are needed for the selected flow; do not assume custom credential enumeration is required.
-- [ ] Verify passkey registration and sign-in on a controlled test site and real third-party websites.
+- [ ] Verify passkey registration and login on a controlled test site and real third-party websites.
 - [ ] Verify system Passwords and supported third-party credential providers.
 - [ ] Verify cancellation, denied access, no matching credential, and supported cross-device authentication.
 - [ ] Verify passkeys with Ox selected and not selected as the default browser.
@@ -150,7 +150,7 @@ Gate: reproduce the current failure and demonstrate the same flow succeeding in 
 
 Apple documents automatic WebAuthn handling in WebKit browser apps. Its separate `com.apple.developer.web-browser.public-key-credential` entitlement explicitly allows passkey registration and assertion for "any relying party identifier", but is documented for macOS and Mac Catalyst, not iOS/iPadOS. Do not add that desktop entitlement to the iPhone app or treat its wording alone as proof of the iOS configuration. WebKit's iOS test-runner change adding `com.apple.developer.web-browser`, with reported WebAuthn availability-test results, corroborates the iOS entitlement's relevance but does not establish successful passkey ceremonies in Ox.
 
-The retrieved sources support the browser route for third-party domains without individual website associations, but do not explicitly establish the entire iOS entitlement-to-associated-domain-exemption chain or passkey behavior when Ox is not selected as default. Ask Apple to confirm both. Verify registration and sign-in on unrelated domains absent from Ox's associated domains, with Ox selected and not selected as default. Normal origin/relying-party protections, user consent, website policies, and compatibility limitations remain; browser-wide support is not a guarantee that every website works.
+The retrieved sources support the browser route for third-party domains without individual website associations, but do not explicitly establish the entire iOS entitlement-to-associated-domain-exemption chain or passkey behavior when Ox is not selected as default. Ask Apple to confirm both. Verify registration and login on unrelated domains absent from Ox's associated domains, with Ox selected and not selected as default. Normal origin/relying-party protections, user consent, website policies, and compatibility limitations remain; browser-wide support is not a guarantee that every website works.
 
 ## 8. Prepare verification and Apple review
 

@@ -91,7 +91,7 @@ struct ActionApproval {
         if override == nil, action == Actions.appLogs {
             disclosure = L10n.string("Logs may include private data from other conversations and Profiles and become available to the current model. Always allow applies to all app logs.")
         } else if override == nil, Actions.browserSite(of: action) != nil {
-            disclosure = L10n.string("Browser can read and act on this site, including signed-in data, and share it with the model. Approve trusts it for this conversation.")
+            disclosure = L10n.string("Browser can read and act on this site, including logged-in data, and share it with the model. Approve trusts it for this conversation.")
         }
         if let callerName {
             disclosure = [disclosure, callerName].compactMap { $0 }.joined(separator: "\n")

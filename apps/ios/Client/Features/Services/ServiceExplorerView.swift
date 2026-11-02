@@ -196,7 +196,7 @@ struct ServiceExplorerView: View {
                 onConnectMCP(request)
             }
         } message: {
-            Text("Ox connects directly to the server and opens its sign-in page when needed. Credentials stay on this device.")
+            Text("Ox connects directly to the server and opens its login page when needed. Credentials stay on this device.")
         }
         .task(id: searchKey) { await runSearch() }
     }

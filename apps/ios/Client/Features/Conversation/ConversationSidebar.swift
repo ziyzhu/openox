@@ -408,7 +408,7 @@ private extension Conversation.Activity.AwaitingAction {
         switch self {
         case .approval: L10n.string("Approve")
         case .reply: L10n.string("Reply")
-        case .signIn: L10n.string("Sign in")
+        case .login: L10n.string("Log in")
         case .verification: L10n.string("Verify")
         case .payment: L10n.string("Pay")
         }
@@ -418,7 +418,7 @@ private extension Conversation.Activity.AwaitingAction {
         switch self {
         case .approval: L10n.string("Awaiting approval")
         case .reply: L10n.string("Awaiting reply")
-        case .signIn: L10n.string("Awaiting sign in")
+        case .login: L10n.string("Awaiting log in")
         case .verification: L10n.string("Awaiting verification")
         case .payment: L10n.string("Awaiting payment")
         }

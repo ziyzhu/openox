@@ -34,7 +34,7 @@ struct ServiceImportView: View {
                         }
                     }
 
-                    Text("Service permissions and sign-in are set up on this device.")
+                    Text("Service permissions and login are set up on this device.")
                         .font(Theme.Fonts.bodySm)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
 

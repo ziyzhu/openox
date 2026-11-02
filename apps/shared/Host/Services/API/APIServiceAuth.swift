@@ -92,7 +92,7 @@ nonisolated enum APIServiceError: LocalizedError {
         case .mutationDenied: "This capability must require approval before sending a mutation."
         case .responseTooLarge: "The API response exceeded the size limit."
         case .http(let status): "The API returned HTTP \(status)."
-        case .authorizationFailed: "Authorization failed. Sign in again and grant the required permissions."
+        case .authorizationFailed: "Authorization failed. Log in again and grant the required permissions."
         case .invalidResponse: "The API returned an invalid response."
         }
     }

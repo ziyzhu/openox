@@ -1,29 +1,5 @@
 import Foundation
 
-nonisolated enum GetSignInStateOutcome: Equatable {
-    case signedIn
-    case signedOut
-    case error(String)
-
-    var logLabel: String {
-        switch self {
-        case .signedIn: "signedIn"
-        case .signedOut: "signedOut"
-        case .error: "error"
-        }
-    }
-}
-
-nonisolated struct GetSignInStateResult: Equatable {
-    let outcome: GetSignInStateOutcome
-    let at: Date
-
-    init(_ outcome: GetSignInStateOutcome, at: Date = Date()) {
-        self.outcome = outcome
-        self.at = at
-    }
-}
-
 nonisolated enum ServiceIcon: Equatable, Sendable {
     case asset(String)
     case system(String)
@@ -111,7 +87,7 @@ nonisolated struct ServiceDefinition: Sendable {
             if api {
                 guard action.raw["baseUrl"] == nil, action.raw["blocking"] == nil,
                       action.raw["requireAuth"]?.boolValue != nil, action.raw["requireApproval"]?.boolValue != nil,
-                      !["getSignInUrl", "getSignInState", "getBotControlUrl", "getBotControlState", "getPaymentUrl", "getPaymentState"].contains(action.id),
+                      !["getSignInUrl", "getSignInState"].contains(action.id),
                       !action.requireAuth || object["auth"]?.objectValue?["type"]?.stringValue != "none" else {
                     throw ValidationError.invalid("API action")
                 }
@@ -122,6 +98,7 @@ nonisolated struct ServiceDefinition: Sendable {
             actionIndex[action.id] = action
         }
         guard object["skills"] == nil else { throw ValidationError.invalid("skills belong in the repository") }
+        try WebSessionContract.validate(actions, isWeb: !api)
         try ModelServiceContract.validate(actions, definitions: object["$defs"]?.objectValue ?? [:], isWeb: !api)
         try WebConversationContract.validate(actions, definitions: object["$defs"]?.objectValue ?? [:], isWeb: !api)
         self.manifest = manifest
@@ -308,11 +285,6 @@ nonisolated struct ServiceDefinition: Sendable {
         if case .mcp(_, let transport, _) = source { transport } else { nil }
     }
 
-    var supportsBotControl: Bool {
-        actionIndex[Manifest.BOT_CONTROL_URL_ACTION_ID] != nil
-            && actionIndex[Manifest.BOT_CONTROL_STATE_ACTION_ID] != nil
-    }
-
     func action(_ id: String, includingStandard: Bool = false) -> Manifest.Action? {
         guard let action = actionIndex[id] else { return nil }
         return includingStandard || !isStandardAction(id) ? action : nil
@@ -323,8 +295,7 @@ nonisolated struct ServiceDefinition: Sendable {
     }
 
     func isStandardAction(_ id: String) -> Bool {
-        Manifest.STANDARD_ACTION_IDS.contains(id)
-            || (!isAPI && !isIOS && !isMCP && ModelServiceContract.generationIDs.contains(id))
+        !isAPI && !isIOS && !isMCP && ModelServiceContract.generationIDs.contains(id)
     }
 }
 
@@ -416,29 +387,6 @@ nonisolated enum Manifest {
             }
             return true
         }
-    }
-
-    static let SIGN_IN_URL_ACTION_ID = "getSignInUrl"
-    static let SIGN_IN_STATE_ACTION_ID = "getSignInState"
-    static let BOT_CONTROL_URL_ACTION_ID = "getBotControlUrl"
-    static let BOT_CONTROL_STATE_ACTION_ID = "getBotControlState"
-    static let PAYMENT_URL_ACTION_ID = "getPaymentUrl"
-    static let PAYMENT_STATE_ACTION_ID = "getPaymentState"
-    static let STANDARD_ACTION_IDS: Set<String> = [
-        SIGN_IN_URL_ACTION_ID, SIGN_IN_STATE_ACTION_ID,
-        BOT_CONTROL_URL_ACTION_ID, BOT_CONTROL_STATE_ACTION_ID,
-        PAYMENT_URL_ACTION_ID, PAYMENT_STATE_ACTION_ID,
-    ]
-
-    static func authURL(_ v: JSONValue?) -> String? {
-        v?.objectValue?["url"]?.stringValue
-    }
-
-    static func getSignInStateOutcome(_ v: JSONValue?) -> GetSignInStateOutcome {
-        guard let signedIn = v?.objectValue?["signedIn"]?.boolValue else {
-            return .error("getSignInState returned invalid output")
-        }
-        return signedIn ? .signedIn : .signedOut
     }
 
     // Overlay the locale's strings (name/description/action label+description) onto

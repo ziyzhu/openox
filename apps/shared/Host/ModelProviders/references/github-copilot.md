@@ -21,4 +21,4 @@ The provider picker uses the official GitHub Copilot extension mark, hosted on O
 
 ## Implementation comparison
 
-- [Pi's GitHub Copilot OAuth flow](https://github.com/earendil-works/pi/blob/main/packages/ai/src/auth/oauth/github-copilot.ts) is a reference for reviewing Ox's device sign-in.
+- [Pi's GitHub Copilot OAuth flow](https://github.com/earendil-works/pi/blob/main/packages/ai/src/auth/oauth/github-copilot.ts) is a reference for reviewing Ox's device login.

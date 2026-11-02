@@ -2,7 +2,7 @@ import AuthenticationServices
 import UIKit
 
 @MainActor
-final class APIServiceSignIn: NSObject, ASWebAuthenticationPresentationContextProviding {
+final class APIServiceLogin: NSObject, ASWebAuthenticationPresentationContextProviding {
     private let window: UIWindow
     private var session: ASWebAuthenticationSession?
 
@@ -17,7 +17,7 @@ final class APIServiceSignIn: NSObject, ASWebAuthenticationPresentationContextPr
               let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
                 .first(where: { $0.activationState == .foregroundActive }),
               let window = scene.keyWindow else { throw APIServiceError.authorizationFailed }
-        let presenter = APIServiceSignIn(window: window)
+        let presenter = APIServiceLogin(window: window)
         let authorization = api.authorization
         switch authorization.auth {
         case .none: return

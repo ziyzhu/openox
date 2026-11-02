@@ -55,9 +55,9 @@ private final class MacOAuthSession: NSObject, ASWebAuthenticationPresentationCo
         return await withCheckedContinuation { continuation in
             self.continuation = continuation
             owner = MacInteractionWindow(
-                title: "Sign in — Ox Host",
+                title: "Log in — Ox Host",
                 size: NSSize(width: 540, height: 220),
-                view: Text("Complete sign-in in your browser. Close this window to cancel.").padding(24)
+                view: Text("Complete login in your browser. Close this window to cancel.").padding(24)
             ) { [weak self] in self?.finish(nil) }
             timeout = Task {
                 do { try await Task.sleep(for: .seconds(300)); finish(nil) }

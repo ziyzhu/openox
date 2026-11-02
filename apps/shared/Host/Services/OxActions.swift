@@ -26,6 +26,11 @@ nonisolated enum OxActions {
                                 "type": .string("object"),
                                 "description": .string("Input matching the action's inputSchema returned by `ox.service.inspect`."),
                             ]),
+                            "session": WebSessionContract.sessionSchema,
+                            "pageUrl": .object([
+                                "type": .string("string"),
+                                "description": .string("Initial target URL for session discovery, login, or public actions; cannot be combined with session."),
+                            ]),
                             "purpose": .object([
                                 "type": .string("string"),
                                 "minLength": .int(1),
@@ -42,15 +47,17 @@ nonisolated enum OxActions {
             )]
         },
         installNatives: { ctx, env in
-            let invokeBlock: @convention(block) (String, JSValue, JSValue) -> JSValue = { name, argsValue, purposeValue in
+            let invokeBlock: @convention(block) (String, JSValue, JSValue, JSValue, JSValue) -> JSValue = { name, argsValue, sessionValue, pageURLValue, purposeValue in
                 let args = jsValueToJSON(argsValue)
                 let purpose = purposeValue.toString()!
-                return env.call(suspendingTimeout: true) { try await $0.invokeAction(name: name, args: args, purpose: purpose) }
+                let session = sessionValue.isNull || sessionValue.isUndefined ? nil : jsValueToJSON(sessionValue)
+                let pageURL = pageURLValue.isNull || pageURLValue.isUndefined ? nil : pageURLValue.toString()
+                return env.call(suspendingTimeout: true) { try await $0.invokeAction(name: name, args: args, session: session, pageURL: pageURL, purpose: purpose) }
             }
             ctx.setObject(invokeBlock as AnyObject, forKeyedSubscript: "__nativeAction" as NSString)
         },
         jsFragment: """
-          invoke: (value) => { const options = __oxOptions(value, 'ox.service.invoke'); return __nativeAction(String(options.name), options.input ?? {}, String(options.purpose)); }
+          invoke: (value) => { const options = __oxOptions(value, 'ox.service.invoke'); return __nativeAction(String(options.name), options.input ?? {}, options.session ?? null, options.pageUrl ?? null, String(options.purpose)); }
         """
     )
 
@@ -71,10 +78,10 @@ nonisolated enum OxActions {
         return .object(entry)
     }
 
-    static var signInDetail: JSONValue {
+    static var loginDetail: JSONValue {
         .object([
-            "function": .string("ox.service.signIn"),
-            "description": .string("Call `await ox.service.signIn({ purpose, domain })` to ask the user to sign in or authorize access. No service-specific input is required."),
+            "function": .string("ox.service.login"),
+            "description": .string("Call `await ox.service.login({ purpose, domain })` to ask the user to log in or authorize access. No service-specific input is required."),
             "inputSchema": .object([
                 "type": .string("object"),
                 "properties": .object([:]),
@@ -92,29 +99,6 @@ nonisolated enum OxActions {
                 "required": .array(["domain", "completed", "signedIn", "state", "completion"].map(JSONValue.string)),
                 "additionalProperties": .bool(false),
             ]),
-        ])
-    }
-
-    static func botControlDetail(definition: ServiceDefinition) -> JSONValue? {
-        guard definition.supportsBotControl,
-              let url = definition.action(Manifest.BOT_CONTROL_URL_ACTION_ID, includingStandard: true) else { return nil }
-        return .object([
-            "function": .string("ox.service.solve"),
-            "description": .string("Call `await ox.service.solve({ purpose, domain, args })` to ask the user to complete human verification. Pass args matching inputSchema; Ox supplies pageUrl to the completion probe. Resolves to null after success; throws on cancellation or failure."),
-            "inputSchema": attachDefs(url.inputSchema ?? .object([:]), defs: .object(definition.definitions)),
-            "outputSchema": .object(["type": .string("null")]),
-        ])
-    }
-
-    static func paymentDetail(definition: ServiceDefinition) -> JSONValue? {
-        guard let url = definition.action(Manifest.PAYMENT_URL_ACTION_ID, includingStandard: true),
-              let state = definition.action(Manifest.PAYMENT_STATE_ACTION_ID, includingStandard: true) else { return nil }
-        let definitions = JSONValue.object(definition.definitions)
-        return .object([
-            "function": .string("ox.service.pay"),
-            "description": .string("Call `await ox.service.pay({ purpose, domain, args })` with args matching inputSchema. Hands the prepared payment to the user for final review and commitment."),
-            "inputSchema": attachDefs(url.inputSchema ?? .object([:]), defs: definitions),
-            "outputSchema": attachDefs(state.outputSchema ?? .null, defs: definitions),
         ])
     }
 

@@ -8,7 +8,7 @@ enum ConversationBackgroundPhase: String {
     case finishing
     case inputNeeded
     case permissionNeeded
-    case signInNeeded
+    case loginNeeded
     case verificationNeeded
     case paymentNeeded
     case stopped
@@ -23,7 +23,7 @@ enum ConversationBackgroundPhase: String {
         case .finishing: String(localized: "Ox is wrapping up")
         case .inputNeeded: String(localized: "Ox needs your input")
         case .permissionNeeded: String(localized: "Ox needs your approval")
-        case .signInNeeded: String(localized: "Sign in to continue")
+        case .loginNeeded: String(localized: "Log in to continue")
         case .verificationNeeded: String(localized: "Verify to continue")
         case .paymentNeeded: String(localized: "Payment needed to continue")
         case .stopped: String(localized: "Ox stopped")
@@ -40,7 +40,7 @@ enum ConversationBackgroundPhase: String {
         case .finishing: String(localized: "Finishing up…")
         case .inputNeeded: String(localized: "Input needed")
         case .permissionNeeded: String(localized: "Permission needed")
-        case .signInNeeded: String(localized: "Sign-in needed")
+        case .loginNeeded: String(localized: "Login needed")
         case .verificationNeeded: String(localized: "Verification needed")
         case .paymentNeeded: String(localized: "Payment needed")
         case .stopped: String(localized: "Stopped")

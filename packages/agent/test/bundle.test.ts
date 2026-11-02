@@ -30,7 +30,7 @@ it("ships a standalone prompt renderer without a Profile, native bridge, or sepa
   }
   expect(runInContext("OxPrompts.providerIdentity('claude-subscription')", realm)).toBe(providerIdentity("claude-subscription"));
   expect(() => runInContext("OxPrompts.guidanceText('__proto__')", realm)).toThrow("Unknown model guidance");
-  realm.event = { type: "serviceSignIn", domain: "example.com", authorized: true };
+  realm.event = { type: "serviceLogin", domain: "example.com", authorized: true };
   expect(runInContext("OxPrompts.runtimeEvent(event)", realm)).toBe("[system] The user just authorized example.com. Continue the task that needed it.");
   realm.receipt = { invocations: Array.from({ length: 21 }, (_, index) => ({ id: String(index), name: "药💊".repeat(200), state: "running" })) };
   const receipt = runInContext("OxPrompts.failureReceipt(receipt)", realm) as string;

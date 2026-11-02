@@ -111,7 +111,8 @@ window.ox.install(({ action }) => {
         async invoke({ url }) {
             const response = await fetch(submitUrl(url), { credentials: "include" });
             if (response.status === 429) {
-                throw new Error("BOT_CONTROL_REQUIRED: Archive.ph needs human verification. Use request_bot_control with the same url, then continue from the completed capture.");
+                location.assign(submitUrl(url));
+                throw new Error("Archive.ph needs human verification. Use ox.service.showPage for createCapture with the same input; inspect the resulting capture before retrying.");
             }
             const document = await documentFrom(response, "createCapture");
             const capture = captureFromDocument(document);
@@ -119,23 +120,6 @@ window.ox.install(({ action }) => {
                 throw new Error("createCapture: Archive.ph returned a capture for a different URL");
             }
             return capture;
-        },
-    });
-    action("getBotControlUrl", {
-        async invoke({ url }) {
-            return { url: submitUrl(url) };
-        },
-    });
-    action("getBotControlState", {
-        async invoke({ url, pageUrl }) {
-            const page = new URL(pageUrl);
-            if (page.origin !== ORIGIN)
-                return { ok: false };
-            const id = captureIdFromUrl(page.href);
-            if (!id)
-                return { ok: false };
-            const document = await fetchDocument(`${ORIGIN}/${id}`, "getBotControlState");
-            return { ok: normalizedUrl(originalUrlFromDocument(document)) === normalizedUrl(url) };
         },
     });
 });

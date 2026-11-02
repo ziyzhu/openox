@@ -24,7 +24,7 @@ nonisolated public protocol SubscriptionAccount: Sendable {
     var planLabel: String? { get }
     var accountLabel: String? { get }
     var policyNotice: String? { get }
-    @MainActor func signIn(using presenter: SubscriptionAuthorizationPresenter) async throws -> Bool
+    @MainActor func login(using presenter: SubscriptionAuthorizationPresenter) async throws -> Bool
     @MainActor func signOut()
 }
 

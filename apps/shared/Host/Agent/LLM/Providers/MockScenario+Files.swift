@@ -66,7 +66,7 @@ extension Scenario {
         .say("The video is ready to play.\n\n![Video](widget-video.mp4)"), .stop(.stop),
     ])
 
-    static let signin = Scenario(name: "signin") { ctx in
+    static let login = Scenario(name: "login") { ctx in
         if let result = ctx.toolResults.last(where: { $0.toolName == "execute" }) {
             guard !result.isError else { return [.stop(.stop)] }
             return [
@@ -76,36 +76,32 @@ extension Scenario {
         }
         let domain = "github.com"
         return [
-            .say("You'll need to sign in first — use the sign-in card in this conversation.\n"),
-            execute("console.log(await ox.service.signIn({ domain: \"\(domain)\", purpose: \"Sign in to service\" }));"),
+            .say("You'll need to log in first — use the login card in this conversation.\n"),
+            execute("console.log(await ox.service.login({ domain: \"\(domain)\", purpose: \"Log in to service\" }));"),
         ]
     }
 
     static let botControl = Scenario(name: "bot-control") { ctx in
         if let result = ctx.toolResults.last(where: { $0.toolName == "execute" }) {
             guard !result.isError else { return [.stop(.stop)] }
-            return [.say("Verification completed."), .stop(.stop)]
+            return [.say("The verification page was dismissed. Check the resulting capture before retrying."), .stop(.stop)]
         }
         let domain = "archive.ph"
         return [
-            .say("Complete the human-verification card in this conversation.\n"),
-            execute("await ox.service.solve({ domain: \"\(domain)\", args: { url: \"https://example.com/\" }, purpose: \"Complete verification\" }); console.log({ verified: true });"),
+            .say("Complete human verification on the existing capture page.\n"),
+            execute("console.log(await ox.service.showPage({ name: \"web:\(domain):createCapture\", input: { url: \"https://example.com/\" }, purpose: \"Complete verification\" }));"),
         ]
     }
 
     static let payment = Scenario(name: "payment") { ctx in
         if let result = ctx.toolResults.last(where: { $0.toolName == "execute" }) {
             guard !result.isError else { return [.stop(.stop)] }
-            return [.say("Checkout completed with reference **fixture-order-42**."), .stop(.stop)]
+            return [.say("The checkout page was dismissed. Payment is not verified by dismissal."), .stop(.stop)]
         }
-        #if targetEnvironment(simulator)
-        let domain = SimEnv.servicesEndpoint == nil ? "oftendining.com" : "127.0.0.1"
-        #else
-        let domain = "oftendining.com"
-        #endif
+        let domain = "www.doordash.com"
         return [
-            .say("Review and complete checkout using the payment card in this conversation.\n"),
-            execute("console.log(await ox.service.pay({ domain: \"\(domain)\", args: {}, purpose: \"Review checkout\" }));"),
+            .say("Review the prepared checkout page and complete payment yourself.\n"),
+            execute("await ox.service.invoke({ name: \"web:\(domain):prepareCheckout\", input: {}, purpose: \"Prepare checkout\" }); console.log(await ox.service.showPage({ name: \"web:\(domain):prepareCheckout\", input: {}, purpose: \"Review checkout\" }));"),
         ]
     }
 

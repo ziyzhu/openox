@@ -181,8 +181,8 @@ nonisolated enum A11yID {
         static func modelOption(_ modelId: String) -> String { "conversation.modelOption.\(modelId)" }
         static func modelThinkingLevelOption(_ effort: String) -> String { "conversation.modelThinkingLevelOption.\(effort)" }
         static func modelKey(_ clientId: String) -> String { "conversation.modelKey.\(clientId)" }
-        static func modelKeySignIn(_ clientId: String) -> String { "conversation.modelKeySignIn.\(clientId)" }
-        static let modelKeySignInError = "conversation.modelKeySignInError"
+        static func modelKeyLogin(_ clientId: String) -> String { "conversation.modelKeyLogin.\(clientId)" }
+        static let modelKeyLoginError = "conversation.modelKeyLoginError"
         static let modelKeyNotice = "conversation.modelKeyNotice"
         static let modelWebsiteAuthStatus = "conversation.modelWebsiteAuthStatus"
         static let modelKeyField = "conversation.modelKeyField"
@@ -252,10 +252,10 @@ nonisolated enum A11yID {
             static func save(_ domain: String) -> String { "conversation.attach.save.\(domain)" }
             static func service(_ domain: String) -> String { "conversation.attach.service.\(domain)" }
             static func domain(_ domain: String) -> String { "conversation.attach.domain.\(domain)" }
-            static func signIn(_ domain: String) -> String { "conversation.attach.signIn.\(domain)" }
-            static func signInProgress(_ domain: String) -> String { "conversation.attach.signInProgress.\(domain)" }
-            static func signInAcknowledge(_ domain: String) -> String { "conversation.attach.signInAcknowledge.\(domain)" }
-            static func signInDismiss(_ domain: String) -> String { "conversation.attach.signInDismiss.\(domain)" }
+            static func login(_ domain: String) -> String { "conversation.attach.login.\(domain)" }
+            static func loginProgress(_ domain: String) -> String { "conversation.attach.loginProgress.\(domain)" }
+            static func loginAcknowledge(_ domain: String) -> String { "conversation.attach.loginAcknowledge.\(domain)" }
+            static func loginDismiss(_ domain: String) -> String { "conversation.attach.loginDismiss.\(domain)" }
             static func botControl(_ domain: String) -> String { "conversation.attach.botControl.\(domain)" }
             static func botControlExpand(_ domain: String) -> String { "conversation.attach.botControlExpand.\(domain)" }
             static func botControlCancel(_ domain: String) -> String { "conversation.attach.botControlCancel.\(domain)" }

@@ -27,11 +27,6 @@ protocol ServiceHandoffPresenting {
 }
 
 @MainActor
-protocol ServiceAuthPresenting {
-    func present(session: ServiceAuthSession) async -> ServiceAuthSession.Outcome
-}
-
-@MainActor
 protocol MessageComposing {
     var canSend: Bool { get }
     func present(recipients: [String], body: String?) async throws -> MessageDisposition
@@ -44,15 +39,14 @@ protocol ProviderAuthenticating {
 
 @MainActor
 struct AppPresentations {
-    let serviceSignIn: any ServiceAuthPresenting
     let serviceHandoff: any ServiceHandoffPresenting
     let messages: any MessageComposing
     var providerAuthentication: (any ProviderAuthenticating)? = nil
     var browser: (@MainActor (Service, Service.ServiceWebPage) -> Void)? = nil
     var secretEntry: (@MainActor (String) async throws -> Bool)? = nil
+    var serviceControl: (@MainActor (Conversation, ServiceControl) async -> JSONValue?)? = nil
 
     static let unavailable = AppPresentations(
-        serviceSignIn: UnavailableServiceAuthPresenter(),
         serviceHandoff: UnavailableServiceHandoffPresenter(),
         messages: UnavailableMessageComposer()
     )
@@ -63,7 +57,6 @@ struct AppPresentations {
 final class AppPresentationCoordinator {
     enum Content {
         case browser(ServiceBrowserSession)
-        case serviceSignIn(ServiceAuthSession)
         case serviceHandoff(ServiceHandoffSession)
         case providerAuthentication(ProviderAuthenticationSession)
     }
@@ -108,26 +101,7 @@ final class AppPresentationCoordinator {
         present(.browser(session), label: "browser") != nil
     }
 
-    func presentServiceAuth(_ session: ServiceAuthSession) async -> ServiceAuthSession.Outcome {
-        if let outcome = await session.preflight(for: .seconds(1)) {
-            Log.ui.info("ServiceAuthSheet preflight domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
-            return outcome
-        }
-        guard let id = present(.serviceSignIn(session), label: "service-auth") else {
-            session.presentationFailed()
-            return .failed
-        }
-        Log.ui.info("ServiceAuthSheet present domain=\(session.serviceDomain)")
-        let outcome = await session.run()
-        dismiss(id: id)
-        return outcome
-    }
-
     func presentServiceHandoff(_ session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
-        if let outcome = await session.preflight(for: .seconds(1)) {
-            Log.ui.info("ServiceHandoffSheet preflight domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
-            return outcome
-        }
         guard let id = present(.serviceHandoff(session), label: "service-handoff") else {
             session.presentationFailed()
             return .failed
@@ -142,7 +116,6 @@ final class AppPresentationCoordinator {
         guard let presented else { return }
         switch presented.content {
         case .browser(let session): session.stop()
-        case .serviceSignIn(let session): session.cancel()
         case .serviceHandoff(let session): session.cancel()
         case .providerAuthentication(let session): session.complete(.cancelled)
         }
@@ -177,23 +150,9 @@ extension AppPresentationCoordinator: ProviderAuthenticating {
     }
 }
 
-extension AppPresentationCoordinator: ServiceAuthPresenting {
-    func present(session: ServiceAuthSession) async -> ServiceAuthSession.Outcome {
-        await presentServiceAuth(session)
-    }
-}
-
 extension AppPresentationCoordinator: ServiceHandoffPresenting {
     func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
         await presentServiceHandoff(session)
-    }
-}
-
-@MainActor
-private struct UnavailableServiceAuthPresenter: ServiceAuthPresenting {
-    func present(session: ServiceAuthSession) async -> ServiceAuthSession.Outcome {
-        session.presentationFailed()
-        return .failed
     }
 }
 

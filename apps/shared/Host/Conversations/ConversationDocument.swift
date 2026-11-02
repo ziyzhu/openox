@@ -991,7 +991,7 @@ nonisolated struct ConversationDocument: Sendable {
                     return Materialization(completesExecution: completed)
                 case let .serviceControl(control):
                     guard let domain else { continue }
-                    if invocation.name == Actions.serviceSignIn, case .signIn(let controlDomain, _) = control, controlDomain == domain {
+                    if invocation.name == Actions.serviceLogin, case .login(let controlDomain, _) = control, controlDomain == domain {
                         return Materialization(completesExecution: true)
                     }
                     if invocation.name == Actions.serviceSolve, case .botControl(let controlDomain, _, _) = control, controlDomain == domain {

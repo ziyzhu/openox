@@ -3,12 +3,11 @@ import SwiftUI
 import WebKit
 
 @MainActor
-final class MacAppPresentations: ServiceAuthPresenting, ServiceHandoffPresenting, ProviderAuthenticating {
+final class MacAppPresentations: ServiceHandoffPresenting, ProviderAuthenticating {
     private let windows = MacServiceWindows()
 
     var presentations: AppPresentations {
         AppPresentations(
-            serviceSignIn: self,
             serviceHandoff: self,
             messages: AppPresentations.unavailable.messages,
             providerAuthentication: self,
@@ -23,23 +22,20 @@ final class MacAppPresentations: ServiceAuthPresenting, ServiceHandoffPresenting
                     try Secret.set(key: key, displayName: key, value: entry.secret)
                     return true
                 } catch is CancellationError { return false }
+            },
+            serviceControl: { conversation, control in
+                Log.service.info("MacPresentation.control conversation=\(conversation.id) domain=\(control.domain)")
+                switch control {
+                case .login(let domain, _):
+                    return await conversation.loginService(domain: domain, resumeAgent: false)
+                case .botControl, .payment:
+                    return nil
+                }
             }
         )
     }
 
-    func present(session: ServiceAuthSession) async -> ServiceAuthSession.Outcome {
-        if let result = await session.preflight(for: .seconds(1)) { return result }
-        let owner = MacInteractionWindow(
-            title: "Sign in — Ox Host",
-            view: WebView(session.page).accessibilityIdentifier("mac-host-service-auth-page")
-        ) { session.cancel() }
-        defer { owner.dismiss() }
-        Log.service.info("MacPresentation.auth domain=\(session.serviceDomain)")
-        return await session.run()
-    }
-
     func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
-        if let result = await session.preflight(for: .seconds(1)) { return result }
         let owner = MacInteractionWindow(
             title: "\(session.navigationTitle) — Ox Host",
             view: WebView(session.page).accessibilityIdentifier("mac-host-service-handoff-page")
@@ -56,13 +52,13 @@ final class MacAppPresentations: ServiceAuthPresenting, ServiceHandoffPresenting
             if useAccount && client.acceptsAPIKey {
                 let choice = try await MacCredentialPrompt.choose(
                     title: client.displayName, message: "Choose how to authenticate on this Host.",
-                    buttons: ["Sign in", "Enter credential", "Cancel"]
+                    buttons: ["Log in", "Enter credential", "Cancel"]
                 )
                 guard choice != 2 else { throw CancellationError() }
                 useAccount = choice == 0
             }
             if useAccount, let account = client.subscriptionAccount {
-                let authorized = try await account.signIn(using: SubscriptionAuthorizationPresenter(
+                let authorized = try await account.login(using: SubscriptionAuthorizationPresenter(
                     oauth: { await OAuthWebLogin.present(authorizeURL: $0, redirectPrefix: $1) },
                     device: { await OAuthWebLogin.presentDevice(authorizeURL: $0, userCode: $1, poll: $2) }
                 ))

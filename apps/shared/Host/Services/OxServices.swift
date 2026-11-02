@@ -44,7 +44,7 @@ nonisolated enum OxServices {
                             "additionalProperties": .bool(false),
                         ]),
                         "outputSchema": .object([
-                            "description": .string("Array of available service snapshots with domain, name, description when present, kind, signIn, saved, attached, and repository or MCP connection metadata when applicable."),
+                            "description": .string("Array of available service snapshots with domain, name, description when present, kind, login, saved, attached, and repository or MCP connection metadata when applicable."),
                         ]),
                     ])
                 ),
@@ -95,7 +95,7 @@ nonisolated enum OxServices {
                             "additionalProperties": .bool(false),
                         ]),
                         "outputSchema": .object([
-                            "description": .string("The attached service snapshot, an action-keyed map of summaries or complete schemas, and supported signIn, botControl, and payment helper contracts. Unsupported helpers are omitted."),
+                            "description": .string("The attached service snapshot, an action-keyed map of summaries or complete schemas, and a login helper contract when supported."),
                         ]),
                     ])
                 ),
@@ -260,8 +260,10 @@ nonisolated enum OxServices {
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
-                                "name": .object(["type": .string("string")]),
-                                "input": .object(["type": .string("object")]),
+                                "name": .object(["type": .string("string"), "description": .string("The same qualified web action name used for the page's invocation.")]),
+                                "input": .object(["type": .string("object"), "description": .string("The same action input, used only to select its execution page.")]),
+                                "session": WebSessionContract.sessionSchema,
+                                "pageUrl": .object(["type": .string("string")]),
                                 "purpose": .object(["type": .string("string")]),
                             ]),
                             "required": .array([.string("name")]),
@@ -276,9 +278,9 @@ nonisolated enum OxServices {
                     ])
                 ),
                 (
-                    "ox.service.signIn",
+                    "ox.service.login",
                     .object([
-                        "description": .string(ModelGuidance.text("ox.service.signIn")),
+                        "description": .string(ModelGuidance.text("ox.service.login")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -303,59 +305,6 @@ nonisolated enum OxServices {
                             ]),
                             "required": .array([.string("domain"), .string("signedIn")]),
                             "additionalProperties": .bool(false),
-                        ]),
-                    ])
-                ),
-                (
-                    "ox.service.solve",
-                    .object([
-                        "description": .string(ModelGuidance.text("ox.service.solve")),
-                        "inputSchema": .object([
-                            "type": .string("object"),
-                            "properties": .object([
-                                "domain": .object([
-                                    "type": .string("string"),
-                                    "minLength": .int(1),
-                                    "maxLength": .int(500),
-                                ]),
-                                "args": .object(["type": .string("object")]),
-                                "purpose": .object([
-                                    "type": .string("string"),
-                                    "maxLength": .int(200),
-                                ]),
-                            ]),
-                            "required": .array([.string("domain"), .string("args")]),
-                            "additionalProperties": .bool(false),
-                        ]),
-                        "outputSchema": .object(["type": .string("null")]),
-                    ])
-                ),
-                (
-                    "ox.service.pay",
-                    .object([
-                        "description": .string(ModelGuidance.text("ox.service.pay")),
-                        "inputSchema": .object([
-                            "type": .string("object"),
-                            "properties": .object([
-                                "domain": .object([
-                                    "type": .string("string"),
-                                    "minLength": .int(1),
-                                    "maxLength": .int(500),
-                                ]),
-                                "args": .object([
-                                    "type": .string("object"),
-                                    "description": .string("Arguments shared by the service's payment URL and state actions."),
-                                ]),
-                                "purpose": .object([
-                                    "type": .string("string"),
-                                    "maxLength": .int(200),
-                                ]),
-                            ]),
-                            "required": .array([.string("domain"), .string("args")]),
-                            "additionalProperties": .bool(false),
-                        ]),
-                        "outputSchema": .object([
-                            "description": .string("The service's completed payment state, including its reference."),
                         ]),
                     ])
                 ),
@@ -428,36 +377,20 @@ nonisolated enum OxServices {
             }
             ctx.setObject(detachBlock as AnyObject, forKeyedSubscript: "__nativeServiceDetach" as NSString)
 
-            let showPageBlock: @convention(block) (String, JSValue, JSValue) -> JSValue = { name, argsValue, purposeValue in
+            let showPageBlock: @convention(block) (String, JSValue, JSValue, JSValue, JSValue) -> JSValue = { name, argsValue, sessionValue, pageURLValue, purposeValue in
                 let args = argsValue.isNull || argsValue.isUndefined ? nil : jsValueToJSON(argsValue)
                 let purpose = purposeValue.toString()!
-                return env.call(suspendingTimeout: true) { try await $0.showServicePage(name: name, args: args, purpose: purpose) }
+                let session = sessionValue.isNull || sessionValue.isUndefined ? nil : jsValueToJSON(sessionValue)
+                let pageURL = pageURLValue.isNull || pageURLValue.isUndefined ? nil : pageURLValue.toString()
+                return env.call(suspendingTimeout: true) { try await $0.showServicePage(name: name, args: args, session: session, pageURL: pageURL, purpose: purpose) }
             }
             ctx.setObject(showPageBlock as AnyObject, forKeyedSubscript: "__nativeServiceShowPage" as NSString)
 
-            let signInBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
+            let loginBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
                 let purpose = purposeValue.toString()!
-                return env.call(suspendingTimeout: true) { try await $0.signInService(domain: domain, purpose: purpose) }
+                return env.call(suspendingTimeout: true) { try await $0.loginService(domain: domain, purpose: purpose) }
             }
-            ctx.setObject(signInBlock as AnyObject, forKeyedSubscript: "__nativeServiceSignIn" as NSString)
-
-            let solveBlock: @convention(block) (String, JSValue, JSValue) -> JSValue = { domain, argsValue, purposeValue in
-                let args = jsValueToJSON(argsValue) ?? .object([:])
-                let purpose = purposeValue.toString()!
-                return env.call(suspendingTimeout: true) {
-                    try await $0.solveService(domain: domain, args: args, purpose: purpose)
-                }
-            }
-            ctx.setObject(solveBlock as AnyObject, forKeyedSubscript: "__nativeServiceSolve" as NSString)
-
-            let paymentBlock: @convention(block) (String, JSValue, JSValue) -> JSValue = { domain, argsValue, purposeValue in
-                let args = jsValueToJSON(argsValue) ?? .object([:])
-                let purpose = purposeValue.toString()!
-                return env.call(suspendingTimeout: true) {
-                    try await $0.payService(domain: domain, args: args, purpose: purpose)
-                }
-            }
-            ctx.setObject(paymentBlock as AnyObject, forKeyedSubscript: "__nativeServicePayment" as NSString)
+            ctx.setObject(loginBlock as AnyObject, forKeyedSubscript: "__nativeServiceLogin" as NSString)
         },
         jsFragment: """
           find: (value) => { const options = __oxOptions(value, 'ox.service.find'); return __nativeServiceFind(String(options.query), String(options.purpose)); },
@@ -471,10 +404,8 @@ nonisolated enum OxServices {
           delete: (value) => { const options = __oxOptions(value, 'ox.service.delete'); return __nativeServiceDelete(String(options.domain), String(options.purpose)); },
           attach: (value) => { const options = __oxOptions(value, 'ox.service.attach'); return __nativeServiceAttach(String(options.domain), String(options.purpose)); },
           detach: (value) => { const options = __oxOptions(value, 'ox.service.detach'); return __nativeServiceDetach(String(options.domain), String(options.purpose)); },
-          showPage: (value) => { const options = __oxOptions(value, 'ox.service.showPage'); return __nativeServiceShowPage(String(options.name), options.input ?? null, String(options.purpose)); },
-          signIn: (value) => { const options = __oxOptions(value, 'ox.service.signIn'); return __nativeServiceSignIn(String(options.domain), String(options.purpose)); },
-          solve: (value) => { const options = __oxOptions(value, 'ox.service.solve'); return __nativeServiceSolve(String(options.domain), options.args, String(options.purpose)); },
-          pay: (value) => { const options = __oxOptions(value, 'ox.service.pay'); return __nativeServicePayment(String(options.domain), options.args, String(options.purpose)); }
+          showPage: (value) => { const options = __oxOptions(value, 'ox.service.showPage'); return __nativeServiceShowPage(String(options.name), options.input ?? null, options.session ?? null, options.pageUrl ?? null, String(options.purpose)); },
+          login: (value) => { const options = __oxOptions(value, 'ox.service.login'); return __nativeServiceLogin(String(options.domain), String(options.purpose)); }
         """
     )
 }

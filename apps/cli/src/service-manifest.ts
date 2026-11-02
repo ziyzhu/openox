@@ -1,23 +1,13 @@
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import {
-  BOT_CONTROL_STATE_ACTION_ID,
-  BOT_CONTROL_URL_ACTION_ID,
-  SIGN_IN_STATE_ACTION_ID,
-  SIGN_IN_URL_ACTION_ID,
   validateAgainstSchema,
   type Action,
   type JSONSchema,
   type Manifest,
 } from "@openox/protocol/manifest";
 
-export {
-  BOT_CONTROL_STATE_ACTION_ID,
-  BOT_CONTROL_URL_ACTION_ID,
-  SIGN_IN_STATE_ACTION_ID,
-  SIGN_IN_URL_ACTION_ID,
-  validateAgainstSchema,
-};
+export { validateAgainstSchema };
 
 export type ServiceAction = Action;
 export type ServiceManifest = Manifest;

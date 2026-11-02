@@ -35,7 +35,7 @@ final class ConversationInteractionGate {
             case .prompt: .inputNeeded
             case .serviceControl(let control):
                 switch control.control {
-                case .signIn: .signInNeeded
+                case .login: .loginNeeded
                 case .botControl: .verificationNeeded
                 case .payment: .paymentNeeded
                 }
@@ -280,7 +280,7 @@ final class ConversationInteractionGate {
         } else if service.isMCPService {
             L10n.string("Its remote Actions can receive arguments from this conversation and return data to Ox.")
         } else {
-            L10n.string("Its actions and your signed-in data become available to this conversation.")
+            L10n.string("Its actions and your logged-in data become available to this conversation.")
         }
         switch await requestApproval(
             action: Conversation.attachApproveKey(service.domain),

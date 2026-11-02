@@ -87,18 +87,6 @@
         "url"
       ],
       "additionalProperties": false
-    },
-    "urlOutput": {
-      "type": "object",
-      "properties": {
-        "url": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "url"
-      ],
-      "additionalProperties": false
     }
   },
   "actions": [
@@ -194,7 +182,7 @@
     {
       "id": "createCapture",
       "label": "Save webpage snapshot",
-      "description": "Creates a permanent public snapshot of the webpage. Approval required. If Archive.ph requests human verification, continue through its verification card.",
+      "description": "Creates a permanent public snapshot of the webpage. Approval required. If Archive.ph requests human verification, show this action's live page with ox.service.showPage. Inspect the resulting capture before retrying.",
       "inputSchema": {
         "$ref": "#/$defs/urlInput"
       },
@@ -205,64 +193,6 @@
         "url": "https://example.com/"
       },
       "requireApproval": true,
-      "requireAuth": false
-    },
-    {
-      "id": "getBotControlUrl",
-      "label": "Verify on Archive.ph",
-      "description": "Opens Archive.ph so you can complete any human verification required to save the webpage.",
-      "inputSchema": {
-        "$ref": "#/$defs/urlInput"
-      },
-      "outputSchema": {
-        "$ref": "#/$defs/urlOutput"
-      },
-      "defaultArgs": {
-        "url": "https://example.com/"
-      },
-      "requireApproval": false,
-      "requireAuth": false
-    },
-    {
-      "id": "getBotControlState",
-      "label": "Check Archive.ph verification",
-      "description": "Checks whether human verification finished and produced the requested snapshot.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string",
-            "pattern": "^https?://",
-            "description": "The live webpage URL being saved."
-          },
-          "pageUrl": {
-            "type": "string",
-            "description": "The current Archive.ph verification page supplied by the client."
-          }
-        },
-        "required": [
-          "url",
-          "pageUrl"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ok"
-        ],
-        "additionalProperties": false
-      },
-      "defaultArgs": {
-        "url": "https://example.com/",
-        "pageUrl": "https://archive.ph/"
-      },
-      "requireApproval": false,
       "requireAuth": false
     }
   ],

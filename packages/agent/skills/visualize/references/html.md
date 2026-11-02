@@ -48,7 +48,7 @@ The Host injects `window.ox.service` before scripts. Only this namespace is avai
 
 HTML runs independently of its creating conversation. Services initialize on demand; do not call conversation-only `attach`, `detach`, or `listAttached`. Use `find`/`inspect` and qualified `web:<domain>:<action>`, `ios:<app>:<action>`, or `mcp:<server>:<action>` names. Discovery reports `attached: false` because the page has no conversation attachments.
 
-Invoke with `await ox.service.invoke({ name, input, purpose })`. Authentication, Action policies, sign-in, verification, payment, and Always allow settings remain authoritative. Do not add a second approval form or claim success before resolution. Disable pending mutation controls, show loading/failure/success, never automatically retry mutations, and render returned text with `textContent`, not interpolated HTML. Verify effects from actual returned or re-read state.
+Invoke with `await ox.service.invoke({ name, input, purpose })`. Authentication, Action policies, login, verification, payment, and Always allow settings remain authoritative. Do not add a second approval form or claim success before resolution. Disable pending mutation controls, show loading/failure/success, never automatically retry mutations, and render returned text with `textContent`, not interpolated HTML. Verify effects from actual returned or re-read state.
 
 Closing/replacing a page cancels pending calls and releases resources, not effects already sent or OS permission alerts. Keep state in the page, not the conversation or Profile filesystem. Service outputs are temporary and removed at close.
 

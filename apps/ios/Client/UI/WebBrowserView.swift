@@ -6,7 +6,7 @@ struct WebBrowserView: View {
     enum Mode {
         case browse
         case inspection
-        case signIn
+        case login
         case handoff
 
         var allowsAddressEditing: Bool { self != .handoff }
@@ -16,7 +16,7 @@ struct WebBrowserView: View {
             switch self {
             case .browse: "serviceBrowser"
             case .inspection: "serviceInspector"
-            case .signIn, .handoff: "serviceHandoff"
+            case .login, .handoff: "serviceHandoff"
             }
         }
     }

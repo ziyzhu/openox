@@ -45,7 +45,7 @@ extension ServiceOperations {
         case "ox.service.validate":
             return try await validateService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.invoke":
-            return try await invokeAction(name: fields["name"]?.stringValue ?? "", args: fields["input"], purpose: purpose)
+            return try await invokeAction(name: fields["name"]?.stringValue ?? "", args: fields["input"], session: fields["session"], pageURL: fields["pageUrl"]?.stringValue, purpose: purpose)
         case "ox.service.create":
             return try await createService(kind: fields["kind"]?.stringValue ?? "", domain: fields["domain"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, faviconURL: fields["faviconUrl"], purpose: purpose)
         case "ox.service.update":
@@ -65,13 +65,9 @@ extension ServiceOperations {
         case "ox.repository.disconnect":
             return try await disconnectRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.showPage":
-            return try await showServicePage(name: fields["name"]?.stringValue ?? "", args: fields["input"], purpose: purpose)
-        case "ox.service.signIn":
-            return try await signInService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
-        case "ox.service.solve":
-            return try await solveService(domain: fields["domain"]?.stringValue ?? "", args: fields["args"] ?? .object([:]), purpose: purpose)
-        case "ox.service.pay":
-            return try await payService(domain: fields["domain"]?.stringValue ?? "", args: fields["args"] ?? .object([:]), purpose: purpose)
+            return try await showServicePage(name: fields["name"]?.stringValue ?? "", args: fields["input"], session: fields["session"], pageURL: fields["pageUrl"]?.stringValue, purpose: purpose)
+        case "ox.service.login":
+            return try await loginService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
         default: throw RuntimeError.bridge("Function unavailable in HTML: \(function)")
         }
     }

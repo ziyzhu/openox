@@ -19,4 +19,4 @@ Read `references/model-schemas.md` for the exact `conversation` schema. It suppo
 
 Verify through actual service Actions, not Browser inspection alone. Exercise fresh submissions, continuation, attachments, generated-file references, read/cancel concurrency, and concurrent same-account callers on separate pages. Check both fetch and XHR on fresh pages. Confirm the complete explicit prompt and matching remote conversation/reply identities.
 
-Test signed-out and expired-session behavior only with synthetic fixtures or isolated sessions. Removing authentication from a live website request can trigger its unauthorized handler and clear the user's session. Sign-in probes must read fresh shared state without credential-clearing handlers; verify a separate sign-in handoff page.
+Test signed-out and expired-session behavior only with synthetic fixtures or isolated sessions. Removing authentication from a live website request can trigger its unauthorized handler and clear the user's session. Login probes must read fresh shared state without credential-clearing handlers; verify a separate login handoff page.

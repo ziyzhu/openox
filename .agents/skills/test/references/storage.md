@@ -769,7 +769,7 @@ then removes only entries mapped to that website's Public Suffix List-aware
 registrable domain. The list is shipped in `PublicSuffixList.bundle` and looked
 up by [WebsitePublicSuffixList](../../../../apps/shared/Host/Services/Web/WebsitePublicSuffixList.swift)
 using [the bundled rules](../../../../apps/shared/Resources/PublicSuffixList.bundle/public_suffix_list.dat).
-Interactive sign-in and throwaway browsing use separate
+Interactive login and throwaway browsing use separate
 pages with the same persistent store but separate DOM, history, and
 `sessionStorage`.
 

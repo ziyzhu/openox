@@ -175,13 +175,8 @@ const ActionSchema = Type.Object({
   requireAuth: Type.Boolean(),
 }, { additionalProperties: false });
 
-export const SIGN_IN_URL_ACTION_ID = "getSignInUrl";
-export const SIGN_IN_STATE_ACTION_ID = "getSignInState";
-export const BOT_CONTROL_URL_ACTION_ID = "getBotControlUrl";
-export const BOT_CONTROL_STATE_ACTION_ID = "getBotControlState";
-export const PAYMENT_URL_ACTION_ID = "getPaymentUrl";
-export const PAYMENT_STATE_ACTION_ID = "getPaymentState";
-export const PAYMENT_STATUSES = ["none", "pending", "completed"] as const;
+export const LIST_SESSIONS_ACTION_ID = "listSessions";
+export const LOGIN_ACTION_ID = "login";
 
 const LocaleOverlaySchema = Type.Object({
   name: Type.Optional(Type.String({ minLength: 1 })),
@@ -233,66 +228,32 @@ export function validateStandardActions(actions: StandardAction[]): string[] {
   const at = (path: string, msg: string) => errors.push(`${path}: ${msg}`);
   const idx = (id: string) => actions.findIndex((a) => a.id === id);
 
-  const pairRules = (urlId: string, stateId: string, banApproval: boolean) => {
-    const urlIdx = idx(urlId);
-    const stateIdx = idx(stateId);
-    if (urlIdx >= 0 && stateIdx < 0) at("actions", `"${urlId}" action requires a paired "${stateId}" action`);
-    if (stateIdx >= 0 && urlIdx < 0) at("actions", `"${stateId}" action requires a paired "${urlId}" action`);
-    for (const i of [urlIdx, stateIdx]) {
-      if (i < 0) continue;
-      const a = actions[i]!;
-      if (requiresAuth(a)) at(`actions[${i}].requireAuth`, `"${a.id}" cannot itself require auth`);
-      if (banApproval && a.requireApproval) at(`actions[${i}].requireApproval`, `"${a.id}" cannot require approval`);
-    }
-    return { urlIdx, stateIdx };
-  };
-
-  const auth = pairRules(SIGN_IN_URL_ACTION_ID, SIGN_IN_STATE_ACTION_ID, true);
-  if (auth.urlIdx < 0 && actions.some(requiresAuth)) {
-    at("actions", `manifest declares requireAuth actions but no "${SIGN_IN_URL_ACTION_ID}" action`);
+  if (actions.some(a => ["getSignInUrl", "getSignInState"].includes(a.id))) {
+    at("actions", "unsupported web authentication actions: use the latest Evolve skill to implement listSessions and login");
   }
-  for (const i of [auth.urlIdx, auth.stateIdx]) {
-    if (i >= 0 && !hasExactClosedObjectShape(actions[i]!.inputSchema, {})) {
-      at(`actions[${i}].inputSchema`, "must be a closed object with no properties");
-    }
+  const sessionsIdx = idx(LIST_SESSIONS_ACTION_ID);
+  if (sessionsIdx < 0 && (idx(LOGIN_ACTION_ID) >= 0 || actions.some(requiresAuth))) {
+    at("actions", 'authenticated web actions require "listSessions" and "login"');
   }
-  if (auth.urlIdx >= 0 && !hasExactClosedObjectShape(actions[auth.urlIdx]!.outputSchema, { url: "string" })) {
-    at(`actions[${auth.urlIdx}].outputSchema`, 'must be a closed object requiring only string "url"');
-  }
-  if (auth.stateIdx >= 0 && !hasExactClosedObjectShape(actions[auth.stateIdx]!.outputSchema, { signedIn: "boolean" })) {
-    at(`actions[${auth.stateIdx}].outputSchema`, 'must be a closed object requiring only boolean "signedIn"');
-  }
-
-  const botControl = pairRules(BOT_CONTROL_URL_ACTION_ID, BOT_CONTROL_STATE_ACTION_ID, true);
-  if (botControl.stateIdx >= 0) {
-    const action = actions[botControl.stateIdx]!;
-    const input = action.inputSchema as Record<string, unknown>;
-    const inputProperties = (input.properties ?? {}) as Record<string, unknown>;
-    const inputRequired = new Set(Array.isArray(input.required) ? input.required as string[] : []);
-    if ((inputProperties.pageUrl as Record<string, unknown> | undefined)?.type !== "string") {
-      at(`actions[${botControl.stateIdx}]`, "inputSchema.properties.pageUrl must be a string");
+  if (sessionsIdx >= 0) {
+    const loginIdx = idx(LOGIN_ACTION_ID);
+    if (loginIdx < 0) at("actions", '"listSessions" requires a "login" action');
+    for (const i of [sessionsIdx, loginIdx]) {
+      if (i >= 0 && actions[i]!.requireAuth) at(`actions[${i}]`, "session discovery and login cannot require authentication");
+      if (i >= 0 && actions[i]!.requireApproval) at(`actions[${i}]`, "session discovery and login cannot require approval");
     }
-    if (!inputRequired.has("pageUrl")) {
-      at(`actions[${botControl.stateIdx}]`, 'inputSchema.required must include "pageUrl"');
+    if (!hasExactClosedObjectShape(actions[sessionsIdx]!.inputSchema, {})) {
+      at(`actions[${sessionsIdx}].inputSchema`, "must be a closed empty object; target routing belongs in pageUrl or session");
     }
-    const output = action.outputSchema as Record<string, unknown>;
-    const outputProperties = (output.properties ?? {}) as Record<string, unknown>;
-    const outputRequired = new Set(Array.isArray(output.required) ? output.required as string[] : []);
-    if ((outputProperties.ok as Record<string, unknown> | undefined)?.type !== "boolean") {
-      at(`actions[${botControl.stateIdx}]`, "outputSchema.properties.ok must be a boolean");
+    const output = actions[sessionsIdx]!.outputSchema;
+    const item = output.items as JSONSchema | undefined;
+    if (output.type !== "array" || !item || !hasExactClosedObjectShape(item, { id: "string", label: "string", url: "string" })) {
+      at(`actions[${sessionsIdx}].outputSchema`, "must return an array of closed session descriptors requiring id, label and url strings");
     }
-    if (!outputRequired.has("ok")) {
-      at(`actions[${botControl.stateIdx}]`, 'outputSchema.required must include "ok"');
+    if (loginIdx >= 0 && actions[loginIdx]!.outputSchema.type !== "null") {
+      at(`actions[${loginIdx}].outputSchema`, "login preparation must return null; user completion does not verify authentication");
     }
   }
-
-  const payment = pairRules(PAYMENT_URL_ACTION_ID, PAYMENT_STATE_ACTION_ID, true);
-  if (payment.stateIdx >= 0) {
-    for (const msg of paymentStateShapeErrors(actions[payment.stateIdx]!.outputSchema)) {
-      at(`actions[${payment.stateIdx}]`, msg);
-    }
-  }
-
   return errors;
 }
 
@@ -319,52 +280,6 @@ function hasExactClosedObjectShape(schema: JSONSchema, expected: Record<string, 
       && !Array.isArray(property)
       && (property as Record<string, unknown>).type === expected[key];
   });
-}
-
-function paymentStateShapeErrors(schema: JSONSchema): string[] {
-  const errors: string[] = [];
-  const s = schema as Record<string, unknown>;
-  const props = (s.properties ?? {}) as Record<string, unknown>;
-  const required = new Set(Array.isArray(s.required) ? (s.required as string[]) : []);
-  const statusEnum = (props.status as Record<string, unknown> | undefined)?.enum;
-  const statusOk = Array.isArray(statusEnum)
-    && statusEnum.length === PAYMENT_STATUSES.length
-    && PAYMENT_STATUSES.every((v) => statusEnum.includes(v));
-  if (!statusOk) {
-    errors.push(`outputSchema.properties.status must be an enum of ${JSON.stringify(PAYMENT_STATUSES)}`);
-  }
-  if (!isStringOrNullSchema(props.reference)) {
-    errors.push(`outputSchema.properties.reference must allow exactly string or null`);
-  }
-  for (const key of ["status", "reference"]) {
-    if (!required.has(key)) errors.push(`outputSchema.required must include "${key}"`);
-  }
-  return errors;
-}
-
-function isStringOrNullSchema(schema: unknown): boolean {
-  const collect = (node: unknown): string[] | null => {
-    if (!node || typeof node !== "object") return null;
-    const s = node as Record<string, unknown>;
-    if (typeof s.type === "string") return [s.type];
-    if (Array.isArray(s.type)) return s.type as string[];
-    const variants = s.oneOf ?? s.anyOf;
-    if (Array.isArray(variants)) {
-      const types: string[] = [];
-      for (const variant of variants) {
-        const t = collect(variant);
-        if (!t) return null;
-        types.push(...t);
-      }
-      return types;
-    }
-    return null;
-  };
-  const types = collect(schema);
-  return !!types
-    && new Set(types).size === 2
-    && types.includes("string")
-    && types.includes("null");
 }
 
 export type ManifestProfile = "builtin" | "repository";
@@ -419,7 +334,7 @@ export function validateServiceManifest(input: unknown, profile: ManifestProfile
     for (const action of m.actions) {
       if (action.baseUrl || action.blocking !== undefined) at("actions", "API actions cannot declare page configuration");
       if (action.requireAuth && m.auth?.type === "none") at("actions", "authenticated actions need service authentication");
-      if ([SIGN_IN_URL_ACTION_ID, SIGN_IN_STATE_ACTION_ID, BOT_CONTROL_URL_ACTION_ID, BOT_CONTROL_STATE_ACTION_ID, PAYMENT_URL_ACTION_ID, PAYMENT_STATE_ACTION_ID].includes(action.id)) at("actions", "API authentication is managed by the host");
+      if (["getSignInUrl", "getSignInState"].includes(action.id)) at("actions", "API authentication is managed by the host");
     }
   }
 

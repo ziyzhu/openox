@@ -6,7 +6,7 @@ final class ChatGPTSubscriptionAccount: SubscriptionAccount, @unchecked Sendable
     let providerName = "ChatGPT"
 
     private let store = SubscriptionTokenStore<ChatGPTTokens>(key: ManagedOAuthAccount.modelProvider("chatgpt:siwc"))
-    @MainActor private var signingIn = false
+    @MainActor private var loggingIn = false
 
     private init() {}
 
@@ -15,9 +15,9 @@ final class ChatGPTSubscriptionAccount: SubscriptionAccount, @unchecked Sendable
     var accountLabel: String? { store.current()?.email }
 
     func validToken(forceRefresh: Bool = false) async throws -> String {
-        guard let tokens = store.current(), tokens.canInvoke else { throw ChatGPTAuthError(message: "Sign in to ChatGPT and allow OpenOx to use your plan.") }
+        guard let tokens = store.current(), tokens.canInvoke else { throw ChatGPTAuthError(message: "Log in to ChatGPT and allow OpenOx to use your plan.") }
         guard forceRefresh || tokens.expiresAt <= Date().addingTimeInterval(300) else { return tokens.accessToken }
-        guard !tokens.refreshToken.isEmpty else { throw ChatGPTAuthError(message: "ChatGPT session expired. Sign in again.", sessionExpired: true) }
+        guard !tokens.refreshToken.isEmpty else { throw ChatGPTAuthError(message: "ChatGPT session expired. Log in again.", sessionExpired: true) }
         let refresh = store.refreshTask(source: tokens.refreshToken) { try await ChatGPTOAuth.refresh(tokens) }
         Log.network.info("ChatGPTAccount.refresh started force=\(forceRefresh)")
         do {
@@ -25,10 +25,10 @@ final class ChatGPTSubscriptionAccount: SubscriptionAccount, @unchecked Sendable
             let installed = store.install(refreshed, from: refresh)
             try Task.checkCancellation()
             if installed {
-                guard refreshed.canInvoke else { throw ChatGPTAuthError(message: "Allow OpenOx to use your ChatGPT plan, then sign in again.") }
+                guard refreshed.canInvoke else { throw ChatGPTAuthError(message: "Allow OpenOx to use your ChatGPT plan, then log in again.") }
                 return refreshed.accessToken
             }
-            guard let latest = store.current(), latest.canInvoke else { throw ChatGPTAuthError(message: "Not signed in to ChatGPT") }
+            guard let latest = store.current(), latest.canInvoke else { throw ChatGPTAuthError(message: "Not logged in to ChatGPT") }
             return latest.accessToken
         } catch is CancellationError {
             throw CancellationError()
@@ -43,12 +43,12 @@ final class ChatGPTSubscriptionAccount: SubscriptionAccount, @unchecked Sendable
         }
     }
 
-    @MainActor func signIn(using presenter: SubscriptionAuthorizationPresenter) async throws -> Bool {
-        guard !signingIn else { return false }
-        signingIn = true
-        defer { signingIn = false }
-        let generation = store.beginSignIn()
-        defer { store.cancelSignIn(expectedGeneration: generation) }
+    @MainActor func login(using presenter: SubscriptionAuthorizationPresenter) async throws -> Bool {
+        guard !loggingIn else { return false }
+        loggingIn = true
+        defer { loggingIn = false }
+        let generation = store.beginLogin()
+        defer { store.cancelLogin(expectedGeneration: generation) }
         let registration = store.current()
         let pkce = OAuthSupport.makePKCE()
         let state = UUID().uuidString
@@ -57,17 +57,17 @@ final class ChatGPTSubscriptionAccount: SubscriptionAccount, @unchecked Sendable
         let hostID = UserDefaults.standard.string(forKey: hostKey) ?? "urn:uuid:\(UUID().uuidString.lowercased())"
         UserDefaults.standard.set(hostID, forKey: hostKey)
         let url = ChatGPTOAuth.authorizeURL(pkce: pkce, state: state, nonce: nonce, hostID: hostID, registration: registration)
-        Log.network.info("ChatGPTAccount.signIn started registration=\(registration == nil ? "new" : "existing")")
+        Log.network.info("ChatGPTAccount.login started registration=\(registration == nil ? "new" : "existing")")
         guard let callback = await presenter.oauth(url, ChatGPTOAuth.redirectURI) else {
-            Log.network.info("ChatGPTAccount.signIn cancelled")
+            Log.network.info("ChatGPTAccount.login cancelled")
             return false
         }
         guard callback.scheme == "http", callback.host == "127.0.0.1", callback.port == 1455,
               callback.path == "/auth/callback", OAuthSupport.queryValue("state", in: callback) == state else {
-            throw ChatGPTAuthError(message: "ChatGPT returned an invalid sign-in callback")
+            throw ChatGPTAuthError(message: "ChatGPT returned an invalid login callback")
         }
         if OAuthSupport.queryValue("error", in: callback) != nil {
-            throw ChatGPTAuthError(message: "ChatGPT sign-in was declined. Allow OpenOx to use your ChatGPT plan to connect.")
+            throw ChatGPTAuthError(message: "ChatGPT login was declined. Allow OpenOx to use your ChatGPT plan to connect.")
         }
         let returnedClient = OAuthSupport.queryValue("client_id", in: callback)
         guard let code = OAuthSupport.queryValue("code", in: callback), !code.isEmpty,
@@ -80,10 +80,10 @@ final class ChatGPTSubscriptionAccount: SubscriptionAccount, @unchecked Sendable
             try Task.checkCancellation()
             guard store.persist(tokens, expectedGeneration: generation) else { return false }
             guard tokens.canInvoke else { throw ChatGPTAuthError(message: "Allow OpenOx to use your ChatGPT plan, then continue with ChatGPT again, or choose another provider.") }
-            Log.network.info("ChatGPTAccount.signIn success")
+            Log.network.info("ChatGPTAccount.login success")
             return true
         } catch {
-            Log.network.error("ChatGPTAccount.signIn failed: \(LogPrivacy.text(error.localizedDescription, limit: 2_048))")
+            Log.network.error("ChatGPTAccount.login failed: \(LogPrivacy.text(error.localizedDescription, limit: 2_048))")
             throw error
         }
     }

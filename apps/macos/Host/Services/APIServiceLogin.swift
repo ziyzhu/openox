@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-enum APIServiceSignIn {
+enum APIServiceLogin {
     static func present(_ service: Service) async throws {
         guard let api = service.apiService else { throw APIServiceError.authorizationFailed }
         let authorization = api.authorization

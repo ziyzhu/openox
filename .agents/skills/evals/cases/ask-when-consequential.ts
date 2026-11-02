@@ -6,14 +6,14 @@ const text = { type: "string" };
 
 export default {
   task: "Email Alex the Q3 budget numbers: revenue $4.2M, costs $3.1M, margin 26%.",
-  attached: [{ domain: "mail.google.com", description: "Gmail", signIn: "signedIn" }],
+  attached: [{ domain: "mail.google.com", description: "Gmail", login: "signedIn" }],
   stubs: { functions: {
     "ox.service.listAttached": [{ result: [{ domain: "mail.google.com", kind: "web", name: "Gmail", attached: true }] }],
     "ox.service.inspect": [{ result: {
-      service: { domain: "mail.google.com", kind: "web", name: "Gmail", attached: true, signIn: "signedIn" },
+      service: { domain: "mail.google.com", kind: "web", name: "Gmail", attached: true, login: "signedIn" },
       actions: {
-        searchContacts: { name: search, description: "Search the signed-in account's contacts by name or email.", inputSchema: { type: "object", properties: { query: text }, required: ["query"] }, outputSchema: { type: "object", properties: { contacts: { type: "array", items: { type: "object", properties: { name: text, email: text, note: text } } } } } },
-        sendMessage: { name: send, description: "Send an email immediately from the signed-in account.", inputSchema: { type: "object", properties: { to: text, subject: text, body: text }, required: ["to", "subject", "body"] }, outputSchema: { type: "object", properties: { id: text, sent: { type: "boolean" } } } },
+        searchContacts: { name: search, description: "Search the logged-in account's contacts by name or email.", inputSchema: { type: "object", properties: { query: text }, required: ["query"] }, outputSchema: { type: "object", properties: { contacts: { type: "array", items: { type: "object", properties: { name: text, email: text, note: text } } } } } },
+        sendMessage: { name: send, description: "Send an email immediately from the logged-in account.", inputSchema: { type: "object", properties: { to: text, subject: text, body: text }, required: ["to", "subject", "body"] }, outputSchema: { type: "object", properties: { id: text, sent: { type: "boolean" } } } },
       },
     } }],
     "ox.service.invoke": [

@@ -21,4 +21,4 @@ Ox presents OpenRouter in Global. Users can connect their OpenRouter account wit
 
 ## Implementation comparison
 
-- [Pi's OpenRouter OAuth flow](https://github.com/earendil-works/pi/blob/main/packages/ai/src/auth/oauth/openrouter.ts) is a reference for reviewing Ox's PKCE sign-in and key exchange.
+- [Pi's OpenRouter OAuth flow](https://github.com/earendil-works/pi/blob/main/packages/ai/src/auth/oauth/openrouter.ts) is a reference for reviewing Ox's PKCE login and key exchange.

@@ -62,7 +62,7 @@ nonisolated enum Actions {
     static let repositoryDisconnect = "ox.repository.disconnect"
     static let serviceAttach = "ox.service.attach"
     static let serviceShowPage = "ox.service.showPage"
-    static let serviceSignIn = "ox.service.signIn"
+    static let serviceLogin = "ox.service.signIn"
     static let serviceSolve = "ox.service.solve"
     static let servicePayment = "ox.service.pay"
     static let serviceDetach = "ox.service.detach"
@@ -98,7 +98,7 @@ nonisolated enum Actions {
         serviceFind, serviceList, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryEnable, repositoryDisconnect,
         repositoryConflicts, repositoryResolve,
-        serviceAttach, serviceShowPage, serviceSignIn, serviceSolve, servicePayment, serviceDetach,
+        serviceAttach, serviceShowPage, serviceLogin, serviceDetach,
         skillCreate, skillCopy, skillDelete, skillShare,
         scheduleCreate, scheduleList, scheduleDelete, scheduleEnable, scheduleRun, scheduleComplete,
         memoryRead, memoryWrite, memoryReplaceText,
@@ -133,7 +133,7 @@ nonisolated enum Actions {
         case providerValidate: L10n.string("Validate a model provider")
         case providerSave: L10n.string("Save a model provider")
         case providerDelete: L10n.string("Delete a model provider")
-        case providerAuthenticate: L10n.string("Sign in to a model provider")
+        case providerAuthenticate: L10n.string("Log in to a model provider")
         case providerDeauthenticate: L10n.string("Sign out of a model provider")
         case secretList: L10n.string("List secrets")
         case secretAdd: L10n.string("Add a secret")
@@ -177,7 +177,7 @@ nonisolated enum Actions {
         case repositoryDisconnect: L10n.string("Remove Repository")
         case serviceAttach: L10n.string("Attach a service")
         case serviceShowPage: L10n.string("Show page")
-        case serviceSignIn: L10n.string("Service sign-in")
+        case serviceLogin: L10n.string("Service login")
         case serviceSolve: L10n.string("Service verification")
         case servicePayment: L10n.string("Service checkout")
         case serviceDetach: L10n.string("Detach a service")

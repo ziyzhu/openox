@@ -20,7 +20,7 @@ public protocol OxFunctionBridge: AnyObject {
     func appRepositories(purpose: String) async throws -> JSONValue?
     func appLogs(options: JSONValue?, purpose: String) async throws -> JSONValue?
     func renameConversation(title: String, purpose: String) async throws -> JSONValue?
-    func invokeAction(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue?
+    func invokeAction(name: String, args: JSONValue?, session: JSONValue?, pageURL: String?, purpose: String) async throws -> JSONValue?
     func searchWeb(query: String, purpose: String) async throws -> JSONValue?
     func fetchWeb(url: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
     func browserOperation(action: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?
@@ -43,10 +43,8 @@ public protocol OxFunctionBridge: AnyObject {
     func disconnectRepository(repository: String, purpose: String) async throws -> JSONValue?
     func attachService(domain: String, purpose: String) async throws -> JSONValue?
     func detachService(domain: String, purpose: String) async throws -> JSONValue?
-    func showServicePage(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue?
-    func signInService(domain: String, purpose: String) async throws -> JSONValue?
-    func solveService(domain: String, args: JSONValue, purpose: String) async throws -> JSONValue?
-    func payService(domain: String, args: JSONValue, purpose: String) async throws -> JSONValue?
+    func showServicePage(name: String, args: JSONValue?, session: JSONValue?, pageURL: String?, purpose: String) async throws -> JSONValue?
+    func loginService(domain: String, purpose: String) async throws -> JSONValue?
     func createSkill(name: String, description: String, instructions: String, services: [String], purpose: String) async throws -> JSONValue?
     func copySkill(source: String, name: String, purpose: String) async throws -> JSONValue?
     func shareSkill(name: String, purpose: String) async throws -> JSONValue?

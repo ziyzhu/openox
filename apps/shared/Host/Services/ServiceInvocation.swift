@@ -32,9 +32,9 @@ extension Service {
         _ actionId: String,
         args: JSONValue,
         role: InvocationRole = .standard,
+        session selectedSession: JSONValue? = nil,
+        pageURL: String? = nil,
         in ownedPage: ServiceWebPage? = nil,
-        reservation: UUID? = nil,
-        onBotControlRequired: (@MainActor (ServiceWebPage) -> Void)? = nil,
         approve: (@MainActor (_ action: String, _ args: Any?) async -> Bool)? = nil
     ) async -> Result<JSONValue, Error> {
         let name = "\(domain):\(actionId)"
@@ -49,6 +49,9 @@ extension Service {
         guard let action = definition.action(actionId, includingStandard: true) else {
             return .failure(InvokeError.unknown(name))
         }
+        if WebSessionContract.isEnabled(definition), action.requireAuth, selectedSession == nil {
+            return .failure(RuntimeError.bridge("This action requires a logged-in session. Invoke listSessions and pass the selected descriptor as session; use login if no suitable session is available."))
+        }
         guard let inputSchema = action.inputSchema, let outputSchema = action.outputSchema else {
             return .failure(InvokeError.invalidContract(name))
         }
@@ -62,43 +65,27 @@ extension Service {
               let scripts = resolutionState.resolved?.actions else {
             return .failure(InvokeError.invalidContract(name))
         }
+        let destination: URL
+        do {
+            destination = try executionURL(defaultURL: actionBaseURL, session: selectedSession, pageURL: pageURL)
+        } catch { return .failure(error) }
         let pageAction = Action(
             service: self,
             definition: action,
-            baseURL: actionBaseURL,
-            role: role,
-            scripts: scripts
+            baseURL: destination,
+            role: WebSessionContract.isEnabled(definition) && role == .standard ? .blockingAction : role,
+            scripts: scripts,
+            session: selectedSession
         )
         if let approve, actionId != WebConversationContract.actionID || WebConversationContract.requiresApproval(args) {
             let allow = await approve(name, args.toAny())
             Log.service.info("Service.invoke approval name=\(name) allow=\(allow)")
             if !allow { return .failure(InvokeError.denied(name)) }
         }
-        if !role.isAuthenticationProbe {
-            do {
-                try await awaitAuthenticationAvailability(name: name)
-            } catch {
-                return .failure(error)
-            }
-        }
-        if action.requireAuth, action.requireApproval || ServiceAuthenticationRecovery.serviceID != ObjectIdentifier(self) {
-            let initialAuth = auth.logLabel
-            let previousObservation = auth.observation
-            await checkAccess(reason: .requireAuth)
-            if auth.isSignedOut { await attemptSilentSignIn(reason: .requireAuth) }
-            let decision = auth.isSignedIn
-                ? (auth.observation == previousObservation ? "cachedSignedIn" : "probePassed")
-                : (auth.isUnavailable
-                    ? "probeUnavailable"
-                    : auth.observation == previousObservation ? "cachedSignedOut" : "probeDenied")
-            Log.service.info("Service.authGate name=\(name) id=\(invocation) decision=\(decision) initial=\(initialAuth) final=\(auth.logLabel)")
-            if auth.isUnavailable {
-                return .failure(InvokeError.authUnavailable(name))
-            }
-            guard auth.isSignedIn else {
-                Log.service.info("Service.invoke requiresAuth name=\(name) auth=\(auth.logLabel)")
-                return .failure(InvokeError.requiresAuth(name))
-            }
+        do {
+            try await awaitAuthenticationAvailability(name: name)
+        } catch {
+            return .failure(error)
         }
         do { try await manager.requireInvocationAccess(for: self) }
         catch { return .failure(error) }
@@ -110,7 +97,9 @@ extension Service {
             .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
         let idJSON = (try? JSONEncoder().encode(actionId))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
-        let source = "return await window.ox.callServiceAction(\(idJSON), \(argsJSON));"
+        let sessionJSON = selectedSession.flatMap { try? JSONEncoder().encode($0) }
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "null"
+        let source = "return await window.ox.callServiceAction(\(idJSON), \(argsJSON), { session: \(sessionJSON) });"
 
         func evaluate(in session: ServiceWebPage, startingNavigation: Int) async -> Result<JSONValue, Error> {
             guard owns(session), session.navigationGeneration == startingNavigation else {
@@ -119,8 +108,8 @@ extension Service {
             }
             guard let host = session.page.url?.host, isServiceHost(host) else {
                 let offHost = session.page.url?.host ?? "?"
-                if auth.isSigningIn {
-                    Log.service.info("Service.invoke off-domain during sign-in name=\(name) host=\(offHost)")
+                if auth.isLoggingIn {
+                    Log.service.info("Service.invoke off-domain during login name=\(name) host=\(offHost)")
                 } else {
                     Log.service.error("Service.invoke off-domain name=\(name) host=\(offHost)")
                 }
@@ -129,8 +118,23 @@ extension Service {
             Log.service.info("Service.invoke start id=\(invocation) name=\(name) page=\(pageKind(for: session)) session=\(session.logLabel) nav=\(startingNavigation)/\(session.finishedNavigationGeneration) host=\(host) args=\(args.logShape)")
             do {
                 try await manager.requireInvocationAccess(for: self)
+                if let selectedSession, WebSessionContract.isEnabled(definition),
+                   actionId != WebSessionContract.loginAction, actionId != WebSessionContract.listAction {
+                    let probe = "return await window.ox.callServiceAction('listSessions', {}, { session: \(sessionJSON) });"
+                    let rawSessions = try await evalAsync(session, probe, context: "sessions:\(invocation)")
+                    let sessions = rawSessions.map(JSONValue.from) ?? .null
+                    try WebSessionContract.validateSessions(sessions, domain: domain)
+                    guard sessions.arrayValue?.contains(selectedSession) == true else {
+                        Log.service.warning("Service.session unavailable domain=\(domain) page=\(session.logLabel)")
+                        throw RuntimeError.bridge("The selected logged-in session is no longer available; listSessions again or ask the user to log in. No action was executed.")
+                    }
+                    guard session.navigationGeneration == startingNavigation else { throw EvalError.contextInvalidated }
+                }
                 let raw = try await evalAsync(session, source, context: "invoke:\(invocation)")
                 let value = raw.map(JSONValue.from) ?? .null
+                if WebSessionContract.isEnabled(definition), actionId == WebSessionContract.listAction {
+                    try WebSessionContract.validateSessions(value, domain: domain)
+                }
                 let outputViolations = JSONSchemaValidator.validate(value, against: outputSchema, definitions: definitions)
                 if !outputViolations.isEmpty {
                     Log.service.error("Service.invoke invalid-output id=\(invocation) name=\(name) session=\(session.logLabel) ms=\(elapsedMs()) violations=\(InvokeError.describe(outputViolations))")
@@ -139,15 +143,14 @@ extension Service {
                 Log.service.info("Service.invoke result id=\(invocation) name=\(name) session=\(session.logLabel) nav=\(startingNavigation)->\(session.navigationGeneration)/\(session.finishedNavigationGeneration) ms=\(elapsedMs()) value=\(value.logShape)")
                 return .success(value)
             } catch EvalError.contextInvalidated {
+                if WebSessionContract.isEnabled(definition), actionId == WebSessionContract.loginAction,
+                   session.navigationGeneration != startingNavigation {
+                    Log.service.info("Service.login navigation-prepared domain=\(domain) page=\(session.logLabel)")
+                    return .success(.null)
+                }
                 Log.service.warning("Service.invoke interrupted-navigation id=\(invocation) name=\(name) session=\(session.logLabel) nav=\(startingNavigation)->\(session.navigationGeneration)/\(session.finishedNavigationGeneration) state=\(resolutionState.logLabel) ms=\(elapsedMs())")
                 return .failure(EvalError.contextInvalidated)
             } catch {
-                if ownedPage == nil,
-                   supportsBotControl,
-                   case EvalError.js(let message) = error,
-                   message.contains("BOT_CONTROL_REQUIRED:") {
-                    onBotControlRequired?(session)
-                }
                 Log.service.error("Service.invoke error id=\(invocation) name=\(name) session=\(session.logLabel) nav=\(startingNavigation)->\(session.navigationGeneration)/\(session.finishedNavigationGeneration) state=\(resolutionState.logLabel) ms=\(elapsedMs()) error=\(LogPrivacy.text(error.localizedDescription))")
                 return .failure(error)
             }
@@ -155,7 +158,7 @@ extension Service {
 
         do {
             if let ownedPage {
-                return try await manager.actionScheduler.schedule(pageAction, on: ownedPage, reservation: reservation) { page in
+                return try await manager.actionScheduler.schedule(pageAction, on: ownedPage) { page in
                     await evaluate(in: page, startingNavigation: page.navigationGeneration)
                 }
             }

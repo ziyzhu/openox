@@ -1,18 +1,13 @@
-export type RuntimeEvent =
-  | { type: "serviceSignIn"; domain: string; authorized: boolean }
-  | { type: "botControl"; domain: string; argsJSON: string };
+export type RuntimeEvent = { type: "serviceLogin"; domain: string; authorized: boolean };
 export interface ReceiptInvocation { id: string; name: string; state: "succeeded" | "failed" | "running" }
 export interface OutputTruncation { path: string; maxLines: number; maxBytes: number }
 
 export function runtimeEvent(event: RuntimeEvent) {
   if (typeof event?.domain !== "string") throw new Error("Runtime event requires a service domain");
   switch (event.type) {
-    case "serviceSignIn":
-      if (typeof event.authorized !== "boolean") throw new Error("Sign-in event requires authorization state");
-      return `[system] The user just ${event.authorized ? "authorized" : "signed in to"} ${event.domain}. Continue the task that needed it.`;
-    case "botControl":
-      if (typeof event.argsJSON !== "string") throw new Error("Verification event requires serialized arguments");
-      return `[system] The user just completed bot control for ${event.domain} with args ${event.argsJSON}. Continue the task. The verification page may already have completed the operation, so inspect its resulting state before retrying a write.`;
+    case "serviceLogin":
+      if (typeof event.authorized !== "boolean") throw new Error("Login event requires authorization state");
+      return `[system] The user just ${event.authorized ? "authorized" : "logged in to"} ${event.domain}. Continue the task that needed it.`;
     default: throw new Error("Unknown runtime event");
   }
 }

@@ -187,7 +187,7 @@ enum RemoteMCPOAuth {
             redirectPrefix: redirectURI,
             prefersEphemeralSession: true
         ) else {
-            throw RemoteMCPError.oauth("Sign-in was cancelled.")
+            throw RemoteMCPError.oauth("Login was cancelled.")
         }
         if let message = OAuthSupport.queryValue("error_description", in: callback)
             ?? OAuthSupport.queryValue("error", in: callback) {

@@ -182,7 +182,7 @@ struct ServiceChip: View {
     var body: some View {
         chipContent
             .task(id: "\(service?.id ?? "none"):\(scenePhase)") {
-                guard showsAuthStatus, authSource == .live, scenePhase == .active, let service else { return }
+                guard showsAuthStatus, authSource == .live, scenePhase == .active, let service, !service.isWebService else { return }
                 await service.checkAccess(reason: .conversationOpen)
             }
     }
@@ -206,7 +206,7 @@ struct ServiceChip: View {
     private var statusChip: some View {
         HStack(spacing: 6) {
             label
-            signInStatusIcon
+            loginStatusIcon
         }
         .padding(.leading, 8)
         .padding(.trailing, 10)
@@ -231,7 +231,7 @@ struct ServiceChip: View {
             }
 
             if showsAuthStatus {
-                signInStatusIcon
+                loginStatusIcon
             } else if let onRemove {
                 Button(action: onRemove) {
                     Image(systemName: "xmark")
@@ -259,10 +259,11 @@ struct ServiceChip: View {
         }
     }
 
-    private var signInStatus: AuthStatus? {
+    private var loginStatus: AuthStatus? {
         guard let service else { return .signedOut }
+        guard !service.isWebService else { return nil }
         switch service.auth {
-        case .checking, .signingIn:
+        case .checking, .loggingIn:
             return .loading
         case .observed(let observation) where observation.value == .signedIn:
             return .signedIn
@@ -276,10 +277,10 @@ struct ServiceChip: View {
     }
 
     @ViewBuilder
-    private var signInStatusIcon: some View {
-        if let signInStatus {
+    private var loginStatusIcon: some View {
+        if let loginStatus {
             Group {
-                switch signInStatus {
+                switch loginStatus {
                 case .signedIn:
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 11, weight: .semibold))
@@ -298,16 +299,16 @@ struct ServiceChip: View {
     }
 
     private var accessibilityValue: String {
-        guard let service else { return String(localized: "Sign-in unavailable") }
+        guard let service else { return String(localized: "Login unavailable") }
         switch service.auth {
         case .unknown:
-            return String(localized: "Sign-in status unknown")
+            return String(localized: "Login status unknown")
         case .checking:
-            return String(localized: "Checking sign-in…")
-        case .signingIn:
-            return String(localized: "Signing in…")
+            return String(localized: "Checking login…")
+        case .loggingIn:
+            return String(localized: "Logging in…")
         case .notRequired:
-            return String(localized: "Sign-in not required")
+            return String(localized: "Login not required")
         case .authorized:
             return service.detailCapabilities.authentication == .systemPermission
                 ? String(localized: "Permission granted")
@@ -319,12 +320,12 @@ struct ServiceChip: View {
         case .observed(let observation):
             switch observation.value {
             case .signedIn:
-                return String(localized: "Signed in")
+                return String(localized: "Logged in")
             case .signedOut:
                 return String(localized: "Signed out")
             }
         case .unavailable:
-            return String(localized: "Sign-in unavailable")
+            return String(localized: "Login unavailable")
         }
     }
 }

@@ -15,11 +15,9 @@ final class ServiceOperations {
     let presentControl: (ServiceControl, Service) async -> JSONValue?
     let receiveFiles: @MainActor ([RemoteMCPFile]) async throws -> Void
     let serviceChanged: (String) -> Void
-    let botControlRequired: (Service, JSONValue, Service.ServiceWebPage) -> Void
     let begin: (String, JSONValue, String) -> UUID
     let finish: (UUID, Result<JSONValue?, Error>) -> Void
     let native: NativeServiceOperations
-    let authenticationRecovery: ServiceAuthenticationRecoveryStore
 
     init(
         serviceManager: ServiceManager,
@@ -35,11 +33,9 @@ final class ServiceOperations {
         presentControl: @escaping (ServiceControl, Service) async -> JSONValue?,
         receiveFiles: @escaping @MainActor ([RemoteMCPFile]) async throws -> Void,
         serviceChanged: @escaping (String) -> Void,
-        botControlRequired: @escaping (Service, JSONValue, Service.ServiceWebPage) -> Void = { _, _, _ in },
         begin: @escaping (String, JSONValue, String) -> UUID,
         finish: @escaping (UUID, Result<JSONValue?, Error>) -> Void,
-        native: NativeServiceOperations,
-        authenticationRecovery: ServiceAuthenticationRecoveryStore
+        native: NativeServiceOperations
     ) {
         self.serviceManager = serviceManager
         self.conversationOwner = conversationOwner
@@ -51,11 +47,9 @@ final class ServiceOperations {
         self.presentControl = presentControl
         self.receiveFiles = receiveFiles
         self.serviceChanged = serviceChanged
-        self.botControlRequired = botControlRequired
         self.begin = begin
         self.finish = finish
         self.native = native
-        self.authenticationRecovery = authenticationRecovery
     }
 
     static func encodeToJSON<T: Encodable>(_ value: T) throws -> JSONValue {
@@ -98,15 +92,29 @@ final class ServiceOperations {
         try await requireApproval(action, defaultPolicy, args, purpose, prompt)
     }
 
-    func invokeAction(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue? {
+    func invokeAction(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
         let (service, actionID) = try await resolveAction(name)
         guard !service.isMCPService || serviceManager.service(domain: service.domain) === service else {
             throw RuntimeError.bridge("This MCP connection changed or was removed. Attach the current service before invoking it.")
         }
         let input = args ?? .object([:])
+        if session != nil || pageURL != nil {
+            guard service.isWebService, let baseURL = service.definition.baseURL else {
+                throw RuntimeError.bridge("Session routing is supported only for web services")
+            }
+            _ = try service.executionURL(defaultURL: baseURL, session: session, pageURL: pageURL)
+        }
+        let recordedInput: JSONValue = session == nil && pageURL == nil ? input : .object([
+            "input": input,
+            "session": session ?? .null,
+            "pageUrl": pageURL.map(JSONValue.string) ?? .null,
+        ])
         let qualifiedName = service.definition.qualifiedActionName(actionID)
         guard let action = service.definition.action(actionID), let inputSchema = action.inputSchema else {
             throw Service.InvokeError.unknown(qualifiedName)
+        }
+        if WebSessionContract.isEnabled(service.definition), action.requireAuth, session == nil {
+            throw RuntimeError.bridge("Select a logged-in session from listSessions before invoking this action")
         }
         let inputViolations = JSONSchemaValidator.validate(
             input,
@@ -116,12 +124,12 @@ final class ServiceOperations {
         guard inputViolations.isEmpty else {
             throw Service.InvokeError.invalidInput(qualifiedName, inputViolations)
         }
-        return try await recorded("ox.service.invoke(\(service.definition.qualifiedActionName(actionID)))", input, purpose: purpose) {
+        return try await recorded("ox.service.invoke(\(service.definition.qualifiedActionName(actionID)))", recordedInput, purpose: purpose) {
             if actionID != WebConversationContract.actionID || WebConversationContract.requiresApproval(input) {
                 try await self.requireApproval(
                     action: qualifiedName,
                     defaultPolicy: action.requireApproval ? .ask : .allow,
-                    args: input.toAny(),
+                    args: recordedInput.toAny(),
                     purpose: purpose
                 )
             }
@@ -147,23 +155,54 @@ final class ServiceOperations {
                     approve: approve, receiveFiles: receiveFiles
                 )
             } else {
-                let serviceID = authenticationRecovery.consume(service, action: action)
-                if serviceID != nil {
-                    Log.service.info("Service.auth recovery domain=\(service.domain) action=\(actionID) scope=single-read")
-                }
-                result = await ServiceAuthenticationRecovery.$serviceID.withValue(serviceID) {
-                    await service.invokeAction(
-                        actionID,
-                        args: input,
-                        onBotControlRequired: { page in
-                            self.botControlRequired(service, input, page)
-                        },
-                        approve: approve
-                    )
-                }
+                result = await service.invokeAction(
+                    actionID,
+                    args: input,
+                    session: session,
+                    pageURL: pageURL,
+                    approve: approve
+                )
             }
-            return try result.get()
+            let value = try result.get()
+            if WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction {
+                try await self.presentLogin(service: service, actionID: actionID, input: input, session: session, pageURL: pageURL)
+            }
+            return value
         }
+    }
+
+    private func presentLogin(service: Service, actionID: String, input: JSONValue, session: JSONValue?, pageURL: String?) async throws {
+        guard let action = await service.resolvedAction(actionID, args: input, session: session, pageURL: pageURL),
+              let lease = serviceManager.actionScheduler.reserveForPresentation(action, allowUnready: true) else {
+            throw OxFunctionError(code: "page_unavailable", message: "Login preparation has no idle live page.", recovery: "Inspect the page and preparation failure before retrying login.")
+        }
+        defer { lease.release() }
+        guard lease.page.page.url != nil else { throw Service.EvalError.notReady }
+        let handoff = ServiceHandoffSession(
+            service: service,
+            servicePage: lease.page,
+            title: service.title,
+            navigationTitle: String(localized: "Log in")
+        )
+        Log.service.info("Service.login presenting domain=\(service.domain) page=\(lease.page.logLabel)")
+        let outcome = await native.presentations.serviceHandoff.present(session: handoff)
+        try Task.checkCancellation()
+        guard outcome == .completed, lease.isActive else {
+            throw OxFunctionError(code: "handoff_incomplete", message: "Login interaction was cancelled or unavailable.", recovery: "Do not reopen automatically. Ask the user whether to continue; the page is preserved.")
+        }
+        if lease.page.page.url?.host.map(service.isServiceHost) != true {
+            let clock = ContinuousClock()
+            let deadline = clock.now.advanced(by: .seconds(15))
+            while lease.isActive, lease.page.navigationPhase.load != nil, clock.now < deadline {
+                try await Task.sleep(for: .milliseconds(50))
+            }
+            try Task.checkCancellation()
+            guard lease.isActive,
+                  await service.navigate(action.baseURL, in: lease.page) != nil else {
+                throw OxFunctionError(code: "page_unavailable", message: "The login interaction finished, but its target page could not be resumed.", recovery: "Inspect the preserved page. Do not assume authentication succeeded or repeat a mutation.")
+            }
+        }
+        Log.service.info("Service.login acknowledged domain=\(service.domain) page=\(lease.page.logLabel) verified=false")
     }
 
     func validateService(domain: String, purpose: String) async throws -> JSONValue? {
@@ -565,13 +604,7 @@ final class ServiceOperations {
                 "actions": .object(details),
             ]
             if service.supportsAuthentication {
-                result["signIn"] = OxActions.signInDetail
-            }
-            if let botControl = OxActions.botControlDetail(definition: definition) {
-                result["botControl"] = botControl
-            }
-            if let payment = OxActions.paymentDetail(definition: definition) {
-                result["payment"] = payment
+                result["login"] = OxActions.loginDetail
             }
             return .object(result)
         }
@@ -623,25 +656,24 @@ final class ServiceOperations {
         return try Self.encodeToJSON(results)
     }
 
-    func showServicePage(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue? {
+    func showServicePage(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
         let (service, actionID) = try await resolveAction(name)
         let input = args ?? .object([:])
         guard service.isWebService,
-              let action = await service.resolvedAction(actionID, args: input) else {
+              let action = await service.resolvedAction(actionID, args: input, session: session, pageURL: pageURL) else {
             throw RuntimeError.bridge("ox.service.showPage: requires a web service action")
         }
-        return try await tracked(Actions.serviceShowPage, .object(["name": .string(name), "input": input]), purpose: purpose) {
-            guard let lease = serviceManager.actionScheduler.reserveForPresentation(action) else {
+        return try await tracked(Actions.serviceShowPage, .object(["name": .string(name), "input": input, "session": session ?? .null, "pageUrl": pageURL.map(JSONValue.string) ?? .null]), purpose: purpose) {
+            guard let lease = serviceManager.actionScheduler.reserveForPresentation(action, allowUnready: true) else {
                 throw OxFunctionError(code: "page_unavailable", message: "ox.service.showPage: this action has no idle live page.", recovery: "Wait for active actions to finish. Use the name and input of the action whose page you want to show. This function never opens a replacement page or reruns the action.")
             }
             defer { lease.release() }
-            guard let url = lease.page.page.url else { throw Service.EvalError.notReady }
+            guard lease.page.page.url != nil else { throw Service.EvalError.notReady }
             let session = ServiceHandoffSession(
                 service: service,
                 servicePage: lease.page,
                 title: service.title,
-                navigationTitle: service.title,
-                initialURL: url
+                navigationTitle: service.title
             )
             Log.service.info("Service.showPage presenting domain=\(service.domain) action=\(actionID) session=\(lease.page.logLabel)")
             let outcome = await native.presentations.serviceHandoff.present(session: session)
@@ -655,75 +687,27 @@ final class ServiceOperations {
         }
     }
 
-    func signInService(domain: String, purpose: String) async throws -> JSONValue? {
+    func loginService(domain: String, purpose: String) async throws -> JSONValue? {
         guard !domain.isEmpty else {
-            throw RuntimeError.bridge("ox.service.signIn: requires a non-empty domain")
+            throw RuntimeError.bridge("ox.service.login: requires a non-empty domain")
         }
         let service = try await resolveService(domain)
         guard service.supportsAuthentication else {
-            throw RuntimeError.bridge("ox.service.signIn: \(domain) declares no sign-in handoff")
+            throw RuntimeError.bridge("ox.service.login: \(domain) declares no login handoff")
         }
-        return try await tracked(Actions.serviceSignIn, .object(["domain": .string(domain)]), purpose: purpose) {
-            authenticationRecovery.clear()
-            await service.checkAccess(policy: .current, reason: .modelSignIn)
-            if service.signInState.isAuthenticated {
-                Log.session.info("bridge.service.signIn already authenticated domain=\(domain) auth=\(service.signInState.rawValue)")
+        return try await tracked(Actions.serviceLogin, .object(["domain": .string(domain)]), purpose: purpose) {
+            await service.checkAccess(policy: .current, reason: .modelLogin)
+            if service.loginState.isAuthenticated {
+                Log.session.info("bridge.service.login already authenticated domain=\(domain) auth=\(service.loginState.rawValue)")
                 return service.accessResult()
             }
-            let control = ServiceControl.signIn(domain: domain, serviceName: service.title)
-            Log.session.info("bridge.service.signIn handoff domain=\(domain) auth=\(service.signInState.rawValue)")
-            guard let result = await presentControl(control, service) else {
-                throw OxFunctionError(code: "handoff_incomplete", message: "ox.service.signIn: the user cancelled or sign-in failed.", recovery: "Do not reopen sign-in automatically. Ask the user whether to continue, then inspect the service's sign-in state before trying again.")
+            let control = ServiceControl.login(domain: domain, serviceName: service.title)
+            Log.session.info("bridge.service.login handoff domain=\(domain) auth=\(service.loginState.rawValue)")
+            guard await presentControl(control, service) != nil else {
+                throw OxFunctionError(code: "handoff_incomplete", message: "ox.service.login: the user cancelled or login failed.", recovery: "Do not reopen login automatically. Ask the user whether to continue, then inspect the service's login state before trying again.")
             }
             try Task.checkCancellation()
-            if result.objectValue?["completion"]?.stringValue == "acknowledged", service.isWebService {
-                authenticationRecovery.acknowledge(service)
-                return result
-            }
             return service.accessResult()
-        }
-    }
-
-    func solveService(domain: String, args: JSONValue, purpose: String) async throws -> JSONValue? {
-        guard !domain.isEmpty else {
-            throw RuntimeError.bridge("ox.service.solve: requires a non-empty domain")
-        }
-        guard args.objectValue != nil else {
-            throw RuntimeError.bridge("ox.service.solve: args must be an object")
-        }
-        let service = try await resolveService(domain)
-        guard service.supportsBotControl else {
-            throw RuntimeError.bridge("ox.service.solve: \(domain) does not support human verification")
-        }
-        return try await tracked(Actions.serviceSolve, .object(["domain": .string(domain), "args": args]), purpose: purpose) {
-            let control = ServiceControl.botControl(domain: domain, serviceName: service.title, args: args)
-            Log.session.info("bridge.service.solve handoff domain=\(domain)")
-            guard await presentControl(control, service) != nil else {
-                throw OxFunctionError(code: "handoff_incomplete", message: "ox.service.solve: the user cancelled or verification failed.", recovery: "Do not reopen verification automatically. Ask the user whether to continue and inspect the service state before trying again.")
-            }
-            return .null
-        }
-    }
-
-    func payService(domain: String, args: JSONValue, purpose: String) async throws -> JSONValue? {
-        guard !domain.isEmpty else {
-            throw RuntimeError.bridge("ox.service.pay: requires a non-empty domain")
-        }
-        guard args.objectValue != nil else {
-            throw RuntimeError.bridge("ox.service.pay: args must be an object")
-        }
-        let service = try await resolveService(domain)
-        guard service.definition.action(Manifest.PAYMENT_URL_ACTION_ID, includingStandard: true) != nil,
-              service.definition.action(Manifest.PAYMENT_STATE_ACTION_ID, includingStandard: true) != nil else {
-            throw RuntimeError.bridge("ox.service.pay: \(domain) declares no payment handoff")
-        }
-        return try await tracked(Actions.servicePayment, .object(["domain": .string(domain), "args": args]), purpose: purpose) {
-            let control = ServiceControl.payment(domain: domain, serviceName: service.title, args: args)
-            Log.session.info("bridge.service.payment handoff domain=\(domain)")
-            guard let result = await presentControl(control, service) else {
-                throw OxFunctionError(code: "handoff_incomplete", message: "ox.service.pay: the user cancelled or checkout did not complete.", recovery: "Do not reopen checkout automatically. Inspect the transaction status to avoid duplicate payment, and ask the user whether to continue.")
-            }
-            return result
         }
     }
 
@@ -771,7 +755,7 @@ final class ServiceOperations {
         let repositoryProvenance: String?
         let name: String
         let description: String?
-        let signIn: Service.SignInState
+        let login: Service.LoginState
         let saved: Bool
         let attached: Bool
         let matchedAction: MatchedAction?
@@ -790,7 +774,7 @@ final class ServiceOperations {
             }
             name = snapshot.name
             description = snapshot.description
-            signIn = snapshot.signIn
+            login = snapshot.login
             saved = snapshot.saved
             self.attached = snapshot.attached
             matchedAction = match.matchedActionID.flatMap { id in

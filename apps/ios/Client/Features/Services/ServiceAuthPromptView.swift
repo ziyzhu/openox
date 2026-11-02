@@ -1,12 +1,12 @@
 import SwiftUI
 
-struct ServiceSignInButton: View {
+struct ServiceLoginButton: View {
     enum Layout {
         case compact
         case prompt
     }
 
-    let signingIn: Bool
+    let loggingIn: Bool
     let isDisabled: Bool
     let layout: Layout
     let action: () -> Void
@@ -49,11 +49,11 @@ struct ServiceSignInButton: View {
 
     @ViewBuilder
     private var content: some View {
-        if signingIn {
+        if loggingIn {
             CellularAutomatonLoader(size: 16, tint: Theme.Colors.onPrimary.dynamic)
-                .accessibilityLabel(String(localized: "Signing in…"))
+                .accessibilityLabel(String(localized: "Logging in…"))
         } else {
-            Text("Sign in")
+            Text("Log in")
                 .font(Theme.Fonts.labelMd)
                 .foregroundStyle(Theme.Colors.onPrimary)
                 .lineLimit(1)

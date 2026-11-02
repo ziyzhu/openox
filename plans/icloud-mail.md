@@ -4,7 +4,7 @@ Status: proposed implementation plan; no runtime changes. Start with on-demand, 
 
 ## Scope
 
-Connect directly to iCloud Mail from the active Ox Host without a hosted backend. Do not access Apple Mail's local database, automate iCloud.com, or use Sign in with Apple as mailbox authorization.
+Connect directly to iCloud Mail from the active Ox Host without a hosted backend. Do not access Apple Mail's local database, automate iCloud.com, or use Log in with Apple as mailbox authorization.
 
 First milestone: connect one account per Profile, list mailboxes, search messages, read bodies without marking them read, and download selected attachments. Credentials stay device-local; account availability must respect the active Profile even if secrets use the existing app-wide store.
 

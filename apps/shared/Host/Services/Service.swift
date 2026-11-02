@@ -63,7 +63,7 @@ final class Service: NSObject, Identifiable {
             self.evidence = evidence
         }
 
-        var state: SignInState {
+        var state: LoginState {
             switch value {
             case .signedIn: .signedIn
             case .signedOut: .signedOut
@@ -74,7 +74,7 @@ final class Service: NSObject, Identifiable {
     enum Auth: Equatable {
         case unknown
         case checking(previous: AuthObservation?)
-        case signingIn(previous: AuthObservation?)
+        case loggingIn(previous: AuthObservation?)
         case notRequired
         case authorized
         case authorizationRequired
@@ -84,7 +84,7 @@ final class Service: NSObject, Identifiable {
 
         var observation: AuthObservation? {
             switch self {
-            case .checking(let previous), .signingIn(let previous), .unavailable(let previous, _): previous
+            case .checking(let previous), .loggingIn(let previous), .unavailable(let previous, _): previous
             case .observed(let observation): observation
             case .unknown, .notRequired, .authorized, .authorizationRequired, .notAuthorized: nil
             }
@@ -93,14 +93,14 @@ final class Service: NSObject, Identifiable {
         var isSignedIn: Bool { observation?.value == .signedIn }
         var isSignedOut: Bool { observation?.value == .signedOut }
         var isChecking: Bool { if case .checking = self { true } else { false } }
-        var isSigningIn: Bool { if case .signingIn = self { true } else { false } }
+        var isLoggingIn: Bool { if case .loggingIn = self { true } else { false } }
         var isUnavailable: Bool { if case .unavailable = self { true } else { false } }
 
         var logLabel: String {
             switch self {
             case .unknown: return "unknown"
             case .checking(let previous): return "checking:\(previous?.value.rawValue ?? "unknown")"
-            case .signingIn(let previous): return "signingIn:\(previous?.value.rawValue ?? "unknown")"
+            case .loggingIn(let previous): return "loggingIn:\(previous?.value.rawValue ?? "unknown")"
             case .notRequired: return "notRequired"
             case .authorized: return "authorized"
             case .authorizationRequired: return "authorizationRequired"
@@ -111,7 +111,7 @@ final class Service: NSObject, Identifiable {
         }
     }
 
-    enum SignInState: String, Encodable {
+    enum LoginState: String, Encodable {
         case notRequired, signedIn, signedOut, authorized, notAuthorized, unknown
 
         var isAuthenticated: Bool { self == .signedIn || self == .authorized }
@@ -123,11 +123,11 @@ final class Service: NSObject, Identifiable {
         case current
     }
 
-    enum SignInProbeReason: String {
+    enum LoginProbeReason: String {
         case attach
         case conversationOpen
-        case modelSignIn
-        case pendingSignIn
+        case modelLogin
+        case pendingLogin
         case serviceDetail
         case requireAuth
         case clearWebsiteData
@@ -161,11 +161,9 @@ final class Service: NSObject, Identifiable {
     enum InvocationRole: Equatable {
         case standard
         case blockingAction
-        case authenticationProbe
         case dangerousBrowserControl
         case conversation
 
-        var isAuthenticationProbe: Bool { self == .authenticationProbe }
         var requiresExclusiveAccess: Bool { self != .standard && self != .conversation }
     }
 
@@ -176,13 +174,15 @@ final class Service: NSObject, Identifiable {
         let blocking: Bool
         let role: InvocationRole
         let scripts: String
+        let session: JSONValue?
 
         init(
             service: Service,
             definition: Manifest.Action,
             baseURL: URL,
             role: InvocationRole,
-            scripts: String
+            scripts: String,
+            session: JSONValue? = nil
         ) {
             self.service = service
             self.definition = definition
@@ -190,6 +190,7 @@ final class Service: NSObject, Identifiable {
             self.blocking = definition.blocking || role.requiresExclusiveAccess
             self.role = self.blocking && role == .standard ? .blockingAction : role
             self.scripts = scripts
+            self.session = session
         }
     }
 
@@ -215,7 +216,7 @@ final class Service: NSObject, Identifiable {
         case memoryWarning = "memory-warning"
     }
 
-    enum AuthSignInSource: String {
+    enum AuthLoginSource: String {
         case conversationCard
         case canvas
         case conversationChip
@@ -226,13 +227,12 @@ final class Service: NSObject, Identifiable {
         let domain: String
         let name: String
         let description: String?
-        let signIn: SignInState
+        let login: LoginState
         let saved: Bool
         let attached: Bool
     }
 
     enum OwnedPageOwner: Equatable {
-        case flow(ServiceFlowKind, UUID)
         case inspector(UUID)
         case debug(UUID)
         case browser(UUID)
@@ -241,7 +241,6 @@ final class Service: NSObject, Identifiable {
 
         var logLabel: String {
             switch self {
-            case .flow(let kind, _): "flow:\(kind.rawValue)"
             case .inspector: "inspector"
             case .debug: "debug"
             case .browser: "browser"
@@ -434,9 +433,7 @@ final class Service: NSObject, Identifiable {
     private(set) var capabilityState: CapabilityState = .unloaded
     @ObservationIgnored var authenticationWaiters: [AuthenticationWaiter] = []
     @ObservationIgnored let access = ServiceAccess()
-    @ObservationIgnored var silentSignInTask: Task<Void, Never>?
     @ObservationIgnored var ownedPages: [ObjectIdentifier: OwnedPage] = [:]
-    @ObservationIgnored var attemptedSilentSignIn = false
     @ObservationIgnored private var capabilityTask: Task<Void, Never>?
     @ObservationIgnored var debugSession: ServiceDebugSession?
     @ObservationIgnored unowned let manager: ServiceManager
@@ -479,7 +476,6 @@ final class Service: NSObject, Identifiable {
 
     var manifest: JSONValue? { definition.manifest }
 
-    var supportsBotControl: Bool { definition.supportsBotControl }
 
     func actionLabel(for id: String) -> String? {
         definition.action(id, includingStandard: true)?.label
@@ -488,13 +484,19 @@ final class Service: NSObject, Identifiable {
     func resolvedAction(
         _ id: String,
         args: JSONValue = .object([:]),
-        role: InvocationRole = .standard
+        role: InvocationRole = .standard,
+        session: JSONValue? = nil,
+        pageURL: String? = nil
     ) async -> Action? {
         await loadManifest()
         guard let definition = definition.action(id, includingStandard: true),
               let baseURL = definition.resolvedBaseURL(for: args),
               let scripts = resolutionState.resolved?.actions else { return nil }
-        return Action(service: self, definition: definition, baseURL: baseURL, role: role, scripts: scripts)
+        let destination: URL
+        do {
+            destination = try executionURL(defaultURL: baseURL, session: session, pageURL: pageURL)
+        } catch { return nil }
+        return Action(service: self, definition: definition, baseURL: destination, role: role, scripts: scripts, session: session)
     }
 
     func inspectionAction() async -> Action? {
@@ -515,13 +517,13 @@ final class Service: NSObject, Identifiable {
     }
 
     var page: WebPage? { pages.first }
-    var signInState: SignInState {
+    var loginState: LoginState {
         switch auth {
         case .notRequired: .notRequired
         case .authorized: .authorized
         case .authorizationRequired, .notAuthorized: .notAuthorized
         case .observed(let observation): observation.state
-        case .signingIn(let previous): previous?.state ?? .unknown
+        case .loggingIn(let previous): previous?.state ?? .unknown
         case .unknown, .checking, .unavailable: .unknown
         }
     }
@@ -531,7 +533,7 @@ final class Service: NSObject, Identifiable {
             domain: domain,
             name: title,
             description: summary.isEmpty ? nil : summary,
-            signIn: signInState,
+            login: loginState,
             saved: manager.isSaved(self),
             attached: attached
         )
@@ -598,7 +600,7 @@ final class Service: NSObject, Identifiable {
         auth = next
         access.didUpdate(next)
         Log.service.info("Service.auth domain=\(domain) -> \(next.logLabel) from=\(previous.logLabel) pages=\(pageCount)")
-        if !next.isSigningIn { releaseAuthenticationWaiters() }
+        if !next.isLoggingIn { releaseAuthenticationWaiters() }
         for page in servicePages { advancePage(page) }
     }
 
@@ -806,7 +808,6 @@ final class Service: NSObject, Identifiable {
             return
         }
         guard webService != nil else { return }
-        manager.sessionCoordinator.cancel(for: self)
         debugSession?.close()
         debugSession = nil
         closeOwnedPages(error: EvalError.contextInvalidated)
@@ -823,7 +824,6 @@ final class Service: NSObject, Identifiable {
 
     func discardPages() {
         manager.closeWebConversations(service: self)
-        manager.sessionCoordinator.cancel(for: self)
         debugSession?.close()
         debugSession = nil
         closeOwnedPages(error: CancellationError())
@@ -885,8 +885,8 @@ final class Service: NSObject, Identifiable {
             switch self {
             case .denied(let name): return "action \"\(name)\" denied by user"
             case .unknown(let name): return "unknown action \"\(name)\""
-            case .requiresAuth(let name): return "action \"\(name)\" requires sign-in — the user is not signed in to this service. Ask them to sign in, then retry."
-            case .authUnavailable(let name): return "action \"\(name)\" could not verify the service sign-in state. Retry after the service is available."
+            case .requiresAuth(let name): return "action \"\(name)\" requires login — the user is not logged in to this service. Ask them to log in, then retry."
+            case .authUnavailable(let name): return "action \"\(name)\" could not verify the service login state. Retry after the service is available."
             case .invalidContract(let name): return "action \"\(name)\" has an invalid manifest contract"
             case .invalidInput(let name, let violations): return "action \"\(name)\" input is invalid: \(Self.describe(violations))"
             case .invalidOutput(let name, let violations): return "action \"\(name)\" returned invalid output: \(Self.describe(violations))"

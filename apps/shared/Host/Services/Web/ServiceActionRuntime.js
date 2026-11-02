@@ -37,12 +37,12 @@
         throw error;
       }
     };
-    const callServiceAction = async (name, args = {}) => {
+    const callServiceAction = async (name, args = {}, context = {}) => {
       if (installation.state !== "ready") throw new Error("service installer has not completed");
       const handler = actions.get(name);
       if (!handler) throw new Error(`unknown action: ${name}`);
       try {
-        return await handler(args ?? {});
+        return await handler(args ?? {}, Object.freeze({ session: context.session ?? null }));
       } catch (error) {
         log(`action ${JSON.stringify(name)} threw: ${String(error?.stack ?? error?.message ?? error)}`);
         throw new Error(`action ${JSON.stringify(name)} failed: ${String(error?.message ?? error)}`);

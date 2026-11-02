@@ -14,35 +14,9 @@ final class ServiceHandoffSession {
     enum Phase: String {
         case ready
         case running
-        case verifying
         case completed
         case cancelled
         case failed
-    }
-
-    private final class Router {
-        var openPopup: @MainActor (URLRequest) -> Void = { _ in }
-        var recordDecision: @MainActor (String, Bool) -> Void = { _, _ in }
-    }
-
-    private struct NavigationDecider: WebPage.NavigationDeciding {
-        let router: Router
-
-        mutating func decidePolicy(
-            for action: WebPage.NavigationAction,
-            preferences: inout WebPage.NavigationPreferences
-        ) async -> WKNavigationActionPolicy {
-            guard action.target?.isMainFrame != false else { return .allow }
-            guard let url = action.request.url else { return .cancel }
-            let allowed = BrowserNavigation.allowsServiceNavigation(url)
-            router.recordDecision(url.host?.lowercased() ?? "?", allowed)
-            guard allowed else { return .cancel }
-            if action.target == nil {
-                router.openPopup(action.request)
-                return .cancel
-            }
-            return .allow
-        }
     }
 
     let id = UUID()
@@ -52,109 +26,30 @@ final class ServiceHandoffSession {
     let page: WebPage
     private(set) var phase: Phase = .ready
 
-    private let completionProbe: (@MainActor (URL?) async -> Bool)?
-    private let navigationObserver: @MainActor (WebPage.NavigationEvent, URL?) -> Void
-    private let loadInitialPage: @MainActor () -> Void
-    private let navigatePage: @MainActor (URL) -> Bool
-    private let goBackPage: @MainActor () -> Void
-    private let goForwardPage: @MainActor () -> Void
-    private let reloadPage: @MainActor () -> Void
-    private let observesNavigations: Bool
-    private var recoveryURL: URL
-    private var hasRecoveredWebContent = false
+    private weak var service: Service?
+    private let servicePage: Service.ServiceWebPage
     private var startedAt = ProcessInfo.processInfo.systemUptime
-    private var navigationCount = 0
-    private var lastNavigationEvent = "none"
-    private var lastNavigationAt: TimeInterval?
-    private var probeStartedAt: TimeInterval?
-    private var lastProbeOutcome = "none"
     private var completion: CheckedContinuation<Outcome, Never>?
-    private var navigationTask: Task<Void, Never>?
-    private var periodicProbeTask: Task<Void, Never>?
-    private var probeTask: Task<Void, Never>?
-
-    init(
-        serviceDomain: String,
-        title: String,
-        navigationTitle: String,
-        initialURL: URL,
-        configuration: WebPage.Configuration,
-        completionProbe: @escaping @MainActor (URL?) async -> Bool,
-        navigationObserver: @escaping @MainActor (WebPage.NavigationEvent, URL?) -> Void = { _, _ in }
-    ) {
-        let router = Router()
-        self.serviceDomain = serviceDomain
-        self.title = title
-        self.navigationTitle = navigationTitle
-        self.completionProbe = completionProbe
-        self.navigationObserver = navigationObserver
-        recoveryURL = initialURL
-        let page = WebPage(configuration: configuration, navigationDecider: NavigationDecider(router: router))
-        self.page = page
-        loadInitialPage = { page.load(initialURL) }
-        navigatePage = { url in
-            page.load(url)
-            return true
-        }
-        goBackPage = {
-            guard let item = page.backForwardList.backList.last else { return }
-            page.load(item)
-        }
-        goForwardPage = {
-            guard let item = page.backForwardList.forwardList.first else { return }
-            page.load(item)
-        }
-        reloadPage = { page.reload() }
-        observesNavigations = true
-        router.openPopup = { [weak self] request in self?.loadPopup(request) }
-        router.recordDecision = { [weak self] host, allowed in self?.recordDecision(host: host, allowed: allowed) }
-        #if targetEnvironment(simulator)
-        page.isInspectable = true
-        #endif
-    }
 
     init(
         service: Service,
         servicePage: Service.ServiceWebPage,
         title: String,
-        navigationTitle: String,
-        initialURL: URL,
-        completionProbe: (@MainActor (URL?) async -> Bool)? = nil
+        navigationTitle: String
     ) {
+        self.service = service
+        self.servicePage = servicePage
         serviceDomain = service.domain
         self.title = title
         self.navigationTitle = navigationTitle
-        self.completionProbe = completionProbe
-        navigationObserver = { _, _ in }
-        recoveryURL = initialURL
         page = servicePage.page
-        loadInitialPage = { [weak service, weak servicePage] in
-            guard let service, let servicePage, servicePage.page.url != initialURL else { return }
-            Task { await service.navigate(initialURL, in: servicePage) }
-        }
-        navigatePage = { [weak service, weak servicePage] url in
-            guard let service, let servicePage else { return false }
-            Task { await service.navigate(url, in: servicePage) }
-            return true
-        }
-        goBackPage = { [weak service, weak servicePage] in
-            guard let service, let servicePage else { return }
-            Task { await service.goBack(servicePage) }
-        }
-        goForwardPage = { [weak service, weak servicePage] in
-            guard let service, let servicePage else { return }
-            Task { await service.goForward(servicePage) }
-        }
-        reloadPage = { [weak service, weak servicePage] in
-            guard let service, let servicePage else { return }
-            Task { await service.reload(servicePage) }
-        }
-        observesNavigations = false
     }
 
     func run() async -> Outcome {
         if let outcome = terminalOutcome { return outcome }
-        if phase == .ready { start() }
+        phase = .running
+        startedAt = ProcessInfo.processInfo.systemUptime
+        Log.service.info("ServiceHandoffSession state domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) phase=running \(diagnosticContext)")
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 completion = continuation
@@ -164,33 +59,8 @@ final class ServiceHandoffSession {
         }
     }
 
-    func preflight(for duration: Duration) async -> Outcome? {
-        if let outcome = terminalOutcome { return outcome }
-        if phase == .ready { start() }
-        guard completionProbe != nil else { return terminalOutcome }
-        let clock = ContinuousClock()
-        let deadline = clock.now.advanced(by: duration)
-        while clock.now < deadline {
-            if let outcome = terminalOutcome { return outcome }
-            if Task.isCancelled {
-                cancel()
-                return .cancelled
-            }
-            try? await Task.sleep(for: .milliseconds(50))
-        }
-        return terminalOutcome
-    }
-
-    func verifyCompletion() {
-        requestProbe(reason: "user")
-    }
-
-    func complete() {
-        finish(.completed)
-    }
-
     func dismissPresentation() {
-        finish(completionProbe == nil ? .completed : .cancelled)
+        finish(.completed)
     }
 
     func cancel() {
@@ -202,201 +72,43 @@ final class ServiceHandoffSession {
     }
 
     func goBack() {
-        goBackPage()
+        guard let service else { return }
+        Task { await service.goBack(servicePage) }
     }
 
     func goForward() {
-        goForwardPage()
+        guard let service else { return }
+        Task { await service.goForward(servicePage) }
     }
 
     func reload() {
-        reloadPage()
+        guard let service else { return }
+        Task { await service.reload(servicePage) }
     }
 
     func navigate(to url: URL) -> Bool {
-        guard phase == .running || phase == .verifying,
+        guard phase == .running, let service,
               BrowserNavigation.allowsServiceNavigation(url) else {
             Log.service.warning("ServiceHandoffSession address rejected domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) host=\(url.host ?? "?") phase=\(phase.rawValue)")
             return false
         }
-        return navigatePage(url)
-    }
-
-    private func start() {
-        phase = .running
-        startedAt = ProcessInfo.processInfo.systemUptime
-        let attempt = id.uuidString.prefix(8)
-        Log.service.info("ServiceHandoffSession state domain=\(serviceDomain) attempt=\(attempt) phase=running uptime=\(startedAt) os=\(ProcessInfo.processInfo.operatingSystemVersionString) observesNavigations=\(observesNavigations)")
-        if observesNavigations {
-            navigationTask = Task { @MainActor [weak self] in
-                guard let self else { return }
-                await observeNavigations()
-            }
-        }
-        if completionProbe != nil {
-            periodicProbeTask = Task { @MainActor [weak self] in
-                while let self, !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(1))
-                    guard !Task.isCancelled else { return }
-                    requestProbe(reason: "periodic")
-                }
-            }
-        }
-        loadInitialPage()
-    }
-
-    private func observeNavigations() async {
-        while !Task.isCancelled, phase == .running || phase == .verifying {
-            do {
-                for try await event in page.navigations {
-                    guard !Task.isCancelled else { return }
-                    receive(event)
-                }
-                return
-            } catch is CancellationError {
-                return
-            } catch {
-                guard !Task.isCancelled else { return }
-                if WebPage.NavigationError.isCancellation(error) {
-                    Log.service.info("ServiceHandoffSession navigation cancelled domain=\(serviceDomain)")
-                    continue
-                }
-                if case WebPage.NavigationError.webContentProcessTerminated = error {
-                    recoverWebContent()
-                    continue
-                }
-                let currentURL = LogPrivacy.url(page.url?.absoluteString ?? "?")
-                let details = LogPrivacy.text(Self.failureDetails(error), limit: 1_024)
-                Log.service.warning("ServiceHandoffSession navigation error domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) current=\(currentURL) disposition=continue \(details)")
-            }
-        }
-    }
-
-    private func receive(_ event: WebPage.NavigationEvent) {
-        let attempt = id.uuidString.prefix(8)
-        let host = page.url?.host?.lowercased() ?? "?"
-        if event == .startedProvisionalNavigation { navigationCount += 1 }
-        lastNavigationEvent = String(describing: event)
-        lastNavigationAt = ProcessInfo.processInfo.systemUptime
-        if event == .committed, let url = page.url { recoveryURL = url }
-        Log.service.info("ServiceHandoffSession navigation domain=\(serviceDomain) attempt=\(attempt) event=\(lastNavigationEvent) host=\(host) \(diagnosticContext)")
-        navigationObserver(event, page.url)
-        if event == .finished, isServiceHost(host) {
-            requestProbe(reason: "service-return")
-        }
-    }
-
-    private func loadPopup(_ request: URLRequest) {
-        guard phase == .running || phase == .verifying else { return }
-        let host = request.url?.host?.lowercased() ?? "?"
-        Log.service.info("ServiceHandoffSession popup domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) host=\(host) disposition=same-page")
-        page.load(request)
-    }
-
-    private func recordDecision(host: String, allowed: Bool) {
-        Log.service.info("ServiceHandoffSession policy domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) host=\(host) allowed=\(allowed)")
-    }
-
-    private func recoverWebContent() {
-        guard phase == .running || phase == .verifying else { return }
-        let attempt = id.uuidString.prefix(8)
-        guard !hasRecoveredWebContent else {
-            Log.service.error("ServiceHandoffSession web-content-terminated domain=\(serviceDomain) attempt=\(attempt) recovery=failed \(diagnosticContext)")
-            finish(.failed)
-            return
-        }
-        hasRecoveredWebContent = true
-        Log.service.warning("ServiceHandoffSession web-content-terminated domain=\(serviceDomain) attempt=\(attempt) recovery=reload target=\(LogPrivacy.url(recoveryURL.absoluteString)) \(diagnosticContext)")
-        page.load(recoveryURL)
-    }
-
-    private func requestProbe(reason: String) {
-        guard let completionProbe, phase == .running || phase == .verifying, probeTask == nil else { return }
-        phase = .verifying
-        probeStartedAt = ProcessInfo.processInfo.systemUptime
-        let attempt = id.uuidString.prefix(8)
-        Log.service.info("ServiceHandoffSession probe domain=\(serviceDomain) attempt=\(attempt) reason=\(reason) phase=start elapsedMs=\(elapsedMilliseconds(since: startedAt)) nav=\(navigationCount)")
-        probeTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            let completed = await completionProbe(page.url)
-            guard !Task.isCancelled, phase == .verifying else { return }
-            probeTask = nil
-            lastProbeOutcome = completed ? "completed" : "pending"
-            Log.service.info("ServiceHandoffSession probe domain=\(serviceDomain) attempt=\(attempt) reason=\(reason) outcome=\(lastProbeOutcome) ms=\(elapsedMilliseconds(since: probeStartedAt)) elapsedMs=\(elapsedMilliseconds(since: startedAt))")
-            probeStartedAt = nil
-            if completed {
-                finish(.completed)
-            } else {
-                phase = .running
-            }
-        }
+        Task { await service.navigate(url, in: servicePage) }
+        return true
     }
 
     private var diagnosticContext: String {
-        "elapsedMs=\(elapsedMilliseconds(since: startedAt)) phase=\(phase.rawValue) nav=\(navigationCount) lastEvent=\(lastNavigationEvent) eventAgeMs=\(elapsedMilliseconds(since: lastNavigationAt)) loading=\(page.isLoading) progress=\(page.estimatedProgress) current=\(LogPrivacy.url(page.url?.absoluteString ?? "?")) probeActive=\(probeTask != nil) probeAgeMs=\(elapsedMilliseconds(since: probeStartedAt)) lastProbe=\(lastProbeOutcome)"
-    }
-
-    private func elapsedMilliseconds(since start: TimeInterval?) -> Int {
-        guard let start else { return -1 }
-        return Int((ProcessInfo.processInfo.systemUptime - start) * 1_000)
-    }
-
-    private static func failureDetails(_ error: any Error) -> String {
-        guard let navigationError = error as? WebPage.NavigationError else {
-            return errorDetails(kind: "other", error: error)
-        }
-        switch navigationError {
-        case .failedProvisionalNavigation(let cause):
-            return errorDetails(kind: "failedProvisionalNavigation", error: cause)
-        case .pageClosed:
-            return "kind=pageClosed"
-        case .webContentProcessTerminated:
-            return "kind=webContentProcessTerminated"
-        case .invalidURL:
-            return "kind=invalidURL"
-        @unknown default:
-            return errorDetails(kind: "unknownNavigationError", error: navigationError)
-        }
-    }
-
-    private static func errorDetails(kind: String, error: any Error) -> String {
-        let failure = error as NSError
-        var values = [
-            "kind=\(kind)",
-            "domain=\(failure.domain)",
-            "code=\(failure.code)",
-            "description=\(failure.localizedDescription)"
-        ]
-        if let reason = failure.localizedFailureReason {
-            values.append("reason=\(reason)")
-        }
-        if let failingURL = (failure.userInfo[NSURLErrorFailingURLErrorKey] as? NSURL)?.absoluteString {
-            values.append("url=\(LogPrivacy.url(failingURL))")
-        }
-        if let underlying = failure.userInfo[NSUnderlyingErrorKey] as? NSError {
-            values.append("underlyingDomain=\(underlying.domain)")
-            values.append("underlyingCode=\(underlying.code)")
-            values.append("underlyingDescription=\(underlying.localizedDescription)")
-        }
-        return values.joined(separator: " ")
+        let elapsed = Int((ProcessInfo.processInfo.systemUptime - startedAt) * 1_000)
+        return "elapsedMs=\(elapsed) session=\(servicePage.logLabel) nav=\(servicePage.navigationGeneration)/\(servicePage.finishedNavigationGeneration) loading=\(page.isLoading) progress=\(page.estimatedProgress) current=\(LogPrivacy.url(page.url?.absoluteString ?? "?"))"
     }
 
     private func finish(_ outcome: Outcome) {
-        guard phase != .completed, phase != .cancelled, phase != .failed else { return }
-        Log.service.info("ServiceHandoffSession finishing domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) outcome=\(outcome.rawValue) \(diagnosticContext)")
+        guard terminalOutcome == nil else { return }
         switch outcome {
         case .completed: phase = .completed
         case .cancelled: phase = .cancelled
         case .failed: phase = .failed
         }
-        navigationTask?.cancel()
-        navigationTask = nil
-        periodicProbeTask?.cancel()
-        periodicProbeTask = nil
-        probeTask?.cancel()
-        probeTask = nil
-        if completionProbe != nil { page.stopLoading() }
-        Log.service.info("ServiceHandoffSession state domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) phase=\(outcome.rawValue)")
+        Log.service.info("ServiceHandoffSession state domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) phase=\(outcome.rawValue) \(diagnosticContext)")
         let completion = completion
         self.completion = nil
         completion?.resume(returning: outcome)
@@ -407,11 +119,7 @@ final class ServiceHandoffSession {
         case .completed: .completed
         case .cancelled: .cancelled
         case .failed: .failed
-        case .ready, .running, .verifying: nil
+        case .ready, .running: nil
         }
-    }
-
-    private func isServiceHost(_ host: String) -> Bool {
-        host == serviceDomain || host.hasSuffix("." + serviceDomain)
     }
 }

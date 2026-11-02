@@ -64,7 +64,7 @@ extension Conversation {
         guard outcome == .authenticated || outcome == .credentialStored else {
             throw outcome == .cancelled
                 ? OxFunctionError(code: "cancelled", message: "Provider authentication was cancelled.", recovery: "Stop. Do not reopen authentication unless the user asks.")
-                : OxFunctionError(code: "authentication_unavailable", message: "Provider authentication could not be presented.", recovery: "Ask the user to open provider settings and sign in there; do not repeatedly reopen authentication.")
+                : OxFunctionError(code: "authentication_unavailable", message: "Provider authentication could not be presented.", recovery: "Ask the user to open provider settings and log in there; do not repeatedly reopen authentication.")
         }
         return .object(["id": .string(definition.id), "status": .string(outcome.rawValue)])
     }

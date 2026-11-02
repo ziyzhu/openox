@@ -2,7 +2,7 @@
 
 ## Official destinations
 
-- Website and account sign-in: [Claude](https://claude.ai/)
+- Website and account login: [Claude](https://claude.ai/)
 - API product: [Anthropic API](https://www.anthropic.com/api)
 
 ## Ox account placement

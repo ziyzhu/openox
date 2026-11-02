@@ -102,8 +102,8 @@ nonisolated final class ProviderOAuthAccount: SubscriptionAccount, @unchecked Se
         }
     }
 
-    @MainActor func signIn(using presenter: SubscriptionAuthorizationPresenter) async throws -> Bool {
-        let generation = store.beginSignIn()
+    @MainActor func login(using presenter: SubscriptionAuthorizationPresenter) async throws -> Bool {
+        let generation = store.beginLogin()
         let tokens: Tokens?
         switch definition.auth.flow {
         case .authorizationCode:
@@ -113,7 +113,7 @@ nonisolated final class ProviderOAuthAccount: SubscriptionAccount, @unchecked Se
             let poll = Task { try await self.pollDeviceGrant(result, generation: generation) }
             let completed = await presenter.device(result.verificationURL, result.userCode) { try await poll.value }
             poll.cancel()
-            if !completed { store.cancelSignIn(expectedGeneration: generation) }
+            if !completed { store.cancelLogin(expectedGeneration: generation) }
             return completed && isSignedIn
         case nil:
             throw RuntimeError.bridge("Missing OAuth flow")

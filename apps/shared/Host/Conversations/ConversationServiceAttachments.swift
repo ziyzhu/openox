@@ -5,13 +5,11 @@ import Observation
 @Observable
 final class ConversationServiceAttachments {
     enum SystemEvent {
-        case serviceSignIn(String)
-        case botControl(String)
+        case serviceLogin(String)
 
         var logLabel: String {
             switch self {
-            case .serviceSignIn(let domain): "serviceSignIn:\(domain)"
-            case .botControl(let domain): "botControl:\(domain)"
+            case .serviceLogin(let domain): "serviceLogin:\(domain)"
             }
         }
     }
@@ -19,18 +17,15 @@ final class ConversationServiceAttachments {
     private(set) var services: [Service] = []
     @ObservationIgnored private(set) var domains: [String] = []
     @ObservationIgnored private unowned let conversation: Conversation
-    @ObservationIgnored private let botControlSource: ServiceBotControlSourceStore
     @ObservationIgnored private let cancelInteractions: (Set<String>) -> Void
     @ObservationIgnored private let resumeAgent: (JSONValue, SystemEvent) -> Void
 
     init(
         conversation: Conversation,
-        botControlSource: ServiceBotControlSourceStore,
         cancelInteractions: @escaping (Set<String>) -> Void,
         resumeAgent: @escaping (JSONValue, SystemEvent) -> Void
     ) {
         self.conversation = conversation
-        self.botControlSource = botControlSource
         self.cancelInteractions = cancelInteractions
         self.resumeAgent = resumeAgent
     }
@@ -177,75 +172,25 @@ final class ConversationServiceAttachments {
         }
     }
 
-    func signIn(
+    func login(
         domain: String,
-        resumeAgent resumes: Bool,
-        using presenter: (any ServiceAuthPresenting)?
+        resumeAgent resumes: Bool
     ) async -> JSONValue? {
         guard let service = service(domain: domain) else {
-            Log.session.error("Conversation.signInService no service domain=\(domain)")
+            Log.session.error("Conversation.loginService no service domain=\(domain)")
             return nil
         }
-        Log.session.info("Conversation.signInService start id=\(id) domain=\(domain) auth=\(service.signInState.rawValue) resumeAgent=\(resumes)")
-        let outcome = try? await service.requestAccess(using: presenter ?? conversation.presentations.serviceSignIn, source: .conversationCard)
-        let acknowledged = outcome == .acknowledged
-        let ok = acknowledged || service.signInState.isAuthenticated
-        let result = ok ? service.accessResult(acknowledged: acknowledged) : nil
-        Log.session.info("Conversation.signInService done id=\(id) domain=\(domain) ok=\(ok) auth=\(service.signInState.rawValue)")
+        Log.session.info("Conversation.loginService start id=\(id) domain=\(domain) auth=\(service.loginState.rawValue) resumeAgent=\(resumes)")
+        _ = try? await service.requestAccess(source: .conversationCard)
+        let ok = service.loginState.isAuthenticated
+        let result = ok ? service.accessResult() : nil
+        Log.session.info("Conversation.loginService done id=\(id) domain=\(domain) ok=\(ok) auth=\(service.loginState.rawValue)")
         if ok, resumes {
             resumeAgent(
                 .object(["type": .string("serviceSignIn"), "domain": .string(domain), "access": result ?? .null]),
-                .serviceSignIn(domain)
+                .serviceLogin(domain)
             )
         }
-        return result
-    }
-
-    func completeBotControl(
-        domain: String,
-        args: JSONValue,
-        resumeAgent resumes: Bool,
-        using presenter: (any ServiceHandoffPresenting)?
-    ) async -> Bool {
-        guard let service = service(domain: domain) else {
-            Log.session.error("Conversation.completeBotControl no service domain=\(domain)")
-            return false
-        }
-        let source: ServiceActionScheduler.BotControlLease?
-        switch botControlSource.claim(service: service, args: args) {
-        case .none:
-            source = nil
-        case .mismatch:
-            Log.session.warning("Conversation.completeBotControl source-args-mismatch id=\(id) domain=\(domain)")
-            return false
-        case .matched(let lease):
-            source = lease
-        }
-        defer { source?.release(discardPage: true) }
-        let ok = await service.completeBotControl(
-            args: args,
-            using: presenter ?? conversation.presentations.serviceHandoff,
-            source: source
-        )
-        Log.session.info("Conversation.completeBotControl domain=\(domain) ok=\(ok)")
-        if ok, resumes {
-            let data = try? JSONEncoder().encode(args)
-            let argsText = data.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-            resumeAgent(
-                .object(["type": .string("botControl"), "domain": .string(domain), "argsJSON": .string(argsText)]),
-                .botControl(domain)
-            )
-        }
-        return ok
-    }
-
-    func completePayment(domain: String, args: JSONValue, using presenter: (any ServiceHandoffPresenting)? = nil) async -> JSONValue? {
-        guard let service = service(domain: domain) else {
-            Log.session.error("Conversation.completePayment no service domain=\(domain)")
-            return nil
-        }
-        let result = await service.completePayment(args: args, using: presenter ?? conversation.presentations.serviceHandoff)
-        Log.session.info("Conversation.completePayment domain=\(domain) completed=\(result != nil)")
         return result
     }
 }

@@ -84,10 +84,7 @@ final class WebConversation {
         let name = service.definition.qualifiedActionName(action.id)
         try await service.awaitAuthenticationAvailability(name: name)
         guard action.requireAuth else { return }
-        await service.checkAccess(reason: .requireAuth)
-        if service.auth.isSignedOut { await service.attemptSilentSignIn(reason: .requireAuth) }
-        if service.auth.isUnavailable { throw Service.InvokeError.authUnavailable(name) }
-        guard service.auth.isSignedIn else { throw Service.InvokeError.requiresAuth(name) }
+        throw WebsiteProviderError("This website conversation requires an explicitly selected logged-in session", kind: .unsupportedInput)
     }
 
     func isExpired(at now: Date = Date()) -> Bool {

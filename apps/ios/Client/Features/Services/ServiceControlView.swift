@@ -1,172 +1,10 @@
 import SwiftUI
 
-struct InlineBotControlView: View {
-    let control: ServiceControl
-    let session: ServiceHandoffSession?
-    let pageMount: WebPageMountCoordinator
-    let isPresentedInSheet: Bool
-    let expand: (ServiceHandoffSession) -> Void
-    let cancel: (ServiceHandoffSession) -> Void
-
-    @Environment(ServiceManager.self) private var serviceManager
-
-    private var domain: String { control.domain }
-
-    private var suppliedName: String? {
-        guard case .botControl(_, let serviceName, _) = control else { return nil }
-        return serviceName
-    }
-
-    private var service: Service? { serviceManager.service(domain: domain) }
-    private var name: String { suppliedName ?? service?.title ?? domain }
-
-    var body: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            LivePageCard(
-                service: service,
-                fallbackSystemImage: "checkmark.shield.fill",
-                title: name,
-                subtitle: String(localized: "Complete the site's human verification to continue"),
-                mount: nil,
-                inlinePageAnchorID: session.flatMap { session in
-                    pageMount.isInline(page: session.page, ownerID: session.id) && !isPresentedInSheet
-                        ? session.id
-                        : nil
-                },
-                isPresented: isPresentedInSheet,
-                placeholder: .progress(String(localized: "Complete the site's human verification to continue")),
-                activate: nil,
-                expand: session.map { session in { expand(session) } },
-                cancel: nil,
-                accessibilityIdentifier: A11yID.ConversationControls.Attach.botControl(domain),
-                expandAccessibilityIdentifier: A11yID.ConversationControls.Attach.botControlExpand(domain),
-                cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.botControlCancel(domain)
-            )
-            if let session, !isPresentedInSheet {
-                ServiceHandoffActions(
-                    cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.botControlCancel(domain),
-                    doneAccessibilityIdentifier: A11yID.ConversationControls.Attach.botControlDone(domain),
-                    cancel: { cancel(session) },
-                    done: session.verifyCompletion
-                )
-            }
-        }
-    }
-}
-
-struct InlineServiceAuthView: View {
-    let control: ServiceControl
-    let session: ServiceAuthSession?
-    let pageMount: WebPageMountCoordinator
-    let isPresentedInSheet: Bool
-    let expand: (ServiceAuthSession) -> Void
-    let cancel: () -> Void
-
-    @Environment(ServiceManager.self) private var serviceManager
-
-    private var domain: String { control.domain }
-    private var service: Service? { serviceManager.service(domain: domain) }
-    private var name: String {
-        if case .signIn(_, let serviceName) = control {
-            return serviceName ?? service?.title ?? domain
-        }
-        return service?.title ?? domain
-    }
-
-    var body: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            LivePageCard(
-                service: service,
-                fallbackSystemImage: "person.badge.key.fill",
-                title: name,
-                subtitle: String(localized: "Sign in to continue"),
-                mount: nil,
-                inlinePageAnchorID: session.flatMap { session in
-                    pageMount.isInline(page: session.page, ownerID: session.id) && !isPresentedInSheet
-                        ? session.id
-                        : nil
-                },
-                isPresented: isPresentedInSheet,
-                placeholder: .progress(String(localized: "Sign in to continue")),
-                activate: nil,
-                expand: session.map { session in { expand(session) } },
-                cancel: nil,
-                accessibilityIdentifier: A11yID.ConversationControls.Attach.signIn(domain),
-                expandAccessibilityIdentifier: A11yID.ConversationControls.Attach.signIn(domain) + ".expand",
-                cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.signInDismiss(domain)
-            )
-            if !isPresentedInSheet {
-                ServiceHandoffActions(
-                    cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.signInDismiss(domain),
-                    doneAccessibilityIdentifier: A11yID.ConversationControls.Attach.signInAcknowledge(domain),
-                    cancel: cancel,
-                    done: session.map { session in { session.acknowledgeSignIn() } }
-                )
-            }
-        }
-    }
-}
-
-struct InlinePaymentView: View {
-    let control: ServiceControl
-    let session: ServiceHandoffSession?
-    let pageMount: WebPageMountCoordinator
-    let isPresentedInSheet: Bool
-    let expand: (ServiceHandoffSession) -> Void
-    let cancel: () -> Void
-
-    @Environment(ServiceManager.self) private var serviceManager
-
-    private var domain: String { control.domain }
-    private var service: Service? { serviceManager.service(domain: domain) }
-    private var name: String {
-        if case .payment(_, let serviceName, _) = control {
-            return serviceName ?? service?.title ?? domain
-        }
-        return service?.title ?? domain
-    }
-
-    var body: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            LivePageCard(
-                service: service,
-                fallbackSystemImage: "creditcard.fill",
-                title: name,
-                subtitle: String(localized: "Review and complete the payment on the service"),
-                mount: nil,
-                inlinePageAnchorID: session.flatMap { session in
-                    pageMount.isInline(page: session.page, ownerID: session.id) && !isPresentedInSheet
-                        ? session.id
-                        : nil
-                },
-                isPresented: isPresentedInSheet,
-                placeholder: .progress(String(localized: "Loading…")),
-                activate: nil,
-                expand: session.map { session in { expand(session) } },
-                cancel: nil,
-                accessibilityIdentifier: A11yID.ConversationControls.Attach.payment(domain),
-                expandAccessibilityIdentifier: A11yID.ConversationControls.Attach.payment(domain) + ".expand",
-                cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.paymentCancel(domain)
-            )
-            if !isPresentedInSheet {
-                ServiceHandoffActions(
-                    cancelAccessibilityIdentifier: A11yID.ConversationControls.Attach.paymentCancel(domain),
-                    doneAccessibilityIdentifier: A11yID.ConversationControls.Attach.paymentDone(domain),
-                    cancel: cancel,
-                    done: session.map { session in { session.verifyCompletion() } }
-                )
-            }
-        }
-    }
-}
-
 struct ServiceControlView: View {
     let control: ServiceControl
     var isActive: Bool = true
     var reflectsAuthentication: Bool = true
-    let signIn: @MainActor (String) async -> Bool
-    let completeBotControl: @MainActor (String, JSONValue) async -> Bool
-    let completePayment: @MainActor (String, JSONValue) async -> JSONValue?
+    let login: @MainActor (String) async -> Bool
     let onResolved: (JSONValue?) -> Void
 
     @Environment(ServiceManager.self) private var serviceManager
@@ -179,45 +17,48 @@ struct ServiceControlView: View {
     }
 
     private var domain: String { control.domain }
-
-    private var suppliedName: String? {
-        switch control {
-        case .signIn(_, let serviceName), .botControl(_, let serviceName, _), .payment(_, let serviceName, _): serviceName
-        }
-    }
-
     private var service: Service? { serviceManager.service(domain: domain) }
-
-    private var name: String { suppliedName ?? service?.title ?? domain }
-
-    private var authenticated: Bool {
-        if case .signIn = control {
-            return service?.signInState.isAuthenticated == true
+    private var name: String {
+        let suppliedName: String? = switch control {
+        case .login(_, let name), .botControl(_, let name, _), .payment(_, let name, _): name
         }
+        return suppliedName ?? service?.title ?? domain
+    }
+    private var isLogin: Bool {
+        if case .login = control { return true }
         return false
     }
-
-    private var completed: Bool { phase == .completed || reflectsAuthentication && authenticated }
+    private var completed: Bool {
+        phase == .completed || reflectsAuthentication && service?.loginState.isAuthenticated == true
+    }
     private var isMCP: Bool { service?.isMCPService == true }
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
             identity
             Spacer(minLength: Theme.Spacing.sm)
-            HStack(spacing: Theme.Spacing.sm) {
-                if isActive, !completed, phase == .ready, case .signIn = control {
-                    RequestPillButton(title: String(localized: "Dismiss"), isPrimary: false) {
-                        onResolved(nil)
+            if isLogin, isActive, !completed {
+                HStack(spacing: Theme.Spacing.sm) {
+                    if phase == .ready {
+                        RequestPillButton(title: String(localized: "Dismiss"), isPrimary: false) {
+                            onResolved(nil)
+                        }
+                        .accessibilityIdentifier(A11yID.ConversationControls.Attach.loginDismiss(domain))
                     }
-                    .accessibilityIdentifier(A11yID.ConversationControls.Attach.signInDismiss(domain))
+                    ServiceLoginButton(
+                        loggingIn: phase == .working,
+                        isDisabled: phase == .working,
+                        layout: .prompt,
+                        action: run
+                    )
+                    .accessibilityIdentifier(
+                        phase == .working
+                            ? A11yID.ConversationControls.Attach.loginProgress(domain)
+                            : A11yID.ConversationControls.Attach.login(domain)
+                    )
                 }
-                if case .signIn = control {
-                    action
-                } else {
-                    action.frame(width: 108, alignment: .trailing)
-                }
+                .fixedSize(horizontal: true, vertical: false)
             }
-            .fixedSize(horizontal: true, vertical: false)
         }
         .frame(minHeight: Theme.Size.minimumTouchTarget)
         .padding(Theme.Spacing.md)
@@ -233,11 +74,7 @@ struct ServiceControlView: View {
     private var identity: some View {
         HStack(spacing: Theme.Spacing.sm) {
             if let service {
-                ServiceAvatar(
-                    service: service,
-                    size: 34,
-                    shape: .roundedRect(Theme.Radius.sm)
-                )
+                ServiceAvatar(service: service, size: 34, shape: .roundedRect(Theme.Radius.sm))
             } else {
                 Image(systemName: fallbackIconName)
                     .font(.system(size: 16, weight: .semibold))
@@ -263,116 +100,30 @@ struct ServiceControlView: View {
 
     private var fallbackIconName: String {
         switch control {
-        case .signIn: "person.badge.key.fill"
+        case .login: "person.badge.key.fill"
         case .botControl: "checkmark.shield.fill"
         case .payment: "creditcard.fill"
         }
     }
 
     private var message: String {
-        if !isActive {
-            actionLabel
-        } else if completed {
-            switch control {
-            case .signIn: isMCP ? String(localized: "Authorized") : String(localized: "You're signed in")
-            case .botControl: String(localized: "Verification completed")
-            case .payment: String(localized: "Payment completed")
-            }
-        } else {
-            switch control {
-            case .signIn: isMCP ? String(localized: "Authorize to continue") : String(localized: "Sign in to continue")
-            case .botControl: String(localized: "Complete the site's human verification to continue")
-            case .payment: String(localized: "Review and complete the payment on the service")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var action: some View {
-        if !isActive {
-            EmptyView()
-        } else if completed {
-            switch control {
-            case .signIn:
-                EmptyView()
-            case .botControl:
-                Label(String(localized: "Verified"), systemImage: "checkmark")
-                    .font(Theme.Fonts.labelMd)
-                    .foregroundStyle(Theme.Colors.primary.dynamic)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .accessibilityValue(String(localized: "Selected"))
-                    .accessibilityAddTraits(.isSelected)
-            case .payment:
-                Label(String(localized: "Completed"), systemImage: "checkmark")
-                    .font(Theme.Fonts.labelMd)
-                    .foregroundStyle(Theme.Colors.primary.dynamic)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .accessibilityValue(String(localized: "Selected"))
-                    .accessibilityAddTraits(.isSelected)
-            }
-        } else if case .signIn = control {
-            ServiceSignInButton(
-                signingIn: phase == .working,
-                isDisabled: phase == .working,
-                layout: .prompt,
-                action: run
-            )
-            .accessibilityIdentifier(
-                phase == .working
-                    ? A11yID.ConversationControls.Attach.signInProgress(domain)
-                    : accessibilityIdentifier
-            )
-        } else {
-            RequestPillButton(
-                title: actionLabel,
-                isPrimary: true,
-                isLoading: phase == .working,
-                loadingLabel: control.isPayment ? String(localized: "Checking out…") : String(localized: "Verifying…"),
-                action: run
-            )
-                .disabled(phase == .working)
-                .accessibilityIdentifier(accessibilityIdentifier)
-        }
-    }
-
-    private var actionLabel: String {
         switch control {
-        case .signIn: isMCP ? String(localized: "Authorize") : String(localized: "Sign in")
-        case .botControl: String(localized: "Verify")
-        case .payment: String(localized: "Pay")
-        }
-    }
-
-    private var accessibilityIdentifier: String {
-        switch control {
-        case .signIn: A11yID.ConversationControls.Attach.signIn(domain)
-        case .botControl: A11yID.ConversationControls.Attach.botControl(domain)
-        case .payment: A11yID.ConversationControls.Attach.payment(domain)
+        case .login:
+            if !isActive { return isMCP ? String(localized: "Authorize") : String(localized: "Log in") }
+            if completed { return isMCP ? String(localized: "Authorized") : String(localized: "You're logged in") }
+            return isMCP ? String(localized: "Authorize to continue") : String(localized: "Log in to continue")
+        case .botControl: return String(localized: "Verify")
+        case .payment: return String(localized: "Pay")
         }
     }
 
     private func run() {
-        guard isActive, phase == .ready else { return }
+        guard isLogin, isActive, phase == .ready else { return }
         phase = .working
         Task {
-            let result: JSONValue?
-            switch control {
-            case .signIn(let domain, _):
-                result = await signIn(domain) ? .null : nil
-            case .botControl(let domain, _, let args):
-                result = await completeBotControl(domain, args) ? .null : nil
-            case .payment(let domain, _, let args):
-                result = await completePayment(domain, args)
-            }
+            let result: JSONValue? = await login(domain) ? .null : nil
             phase = result != nil ? .completed : .ready
             onResolved(result)
         }
-    }
-}
-
-private extension ServiceControl {
-    var isPayment: Bool {
-        if case .payment = self { return true }
-        return false
     }
 }

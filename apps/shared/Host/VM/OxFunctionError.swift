@@ -33,8 +33,8 @@ nonisolated struct OxFunctionError: LocalizedError, Sendable {
             let guidance: (String, String) = switch error {
             case .denied: ("permission_denied", "Stop. Do not repeat an action the user denied.")
             case .unknown: ("unknown_action", "Use ox.service.inspect to discover the service's exposed actions and copy an exact qualified action name.")
-            case .requiresAuth: ("authentication_required", "Ask the user to sign in through ox.service.signIn before trying the action again.")
-            case .authUnavailable: ("authentication_unavailable", "Wait until the service is available, then inspect its sign-in state before retrying.")
+            case .requiresAuth: ("authentication_required", "Ask the user to log in through ox.service.login before trying the action again.")
+            case .authUnavailable: ("authentication_unavailable", "Wait until the service is available, then inspect its login state before retrying.")
             case .invalidContract: ("invalid_contract", "Use ox.service.validate to inspect the contract. Do not invoke the action until it is repaired.")
             case .invalidInput: ("invalid_argument", "Inspect the action's input schema with ox.service.inspect and correct the reported fields.")
             case .invalidOutput: ("invalid_output", "Inspect the service and any possible effects. Do not repeat a write merely because its output was invalid.")

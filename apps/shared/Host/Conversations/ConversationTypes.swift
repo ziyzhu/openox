@@ -318,7 +318,7 @@ extension Conversation {
         enum AwaitingAction: Equatable {
             case approval
             case reply
-            case signIn
+            case login
             case verification
             case payment
         }

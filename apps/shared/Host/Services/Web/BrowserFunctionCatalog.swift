@@ -130,7 +130,7 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "executeScript",
             label: "Execute JavaScript",
-            description: "Execute arbitrary JavaScript in Browser's page, including signed-in website data and network access.",
+            description: "Execute arbitrary JavaScript in Browser's page, including logged-in website data and network access.",
             inputSchema: object(
                 ["script": string(
                     description: "Async JavaScript function body that returns a JSON-compatible value.",

@@ -2,7 +2,6 @@ import Foundation
 
 extension AppPresentations {
     static let live = AppPresentations(
-        serviceSignIn: AppPresentationCoordinator.shared,
         serviceHandoff: AppPresentationCoordinator.shared,
         messages: MessageSheetComposer(),
         providerAuthentication: AppPresentationCoordinator.shared

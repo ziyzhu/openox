@@ -21,54 +21,10 @@ extension ServiceSheetSession {
 }
 
 extension ServiceHandoffSession: ServiceSheetSession {}
-extension ServiceAuthSession: ServiceSheetSession {}
-
-struct BotControlSheetView: View {
-    let session: ServiceHandoffSession
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            WebBrowserView(
-                page: session.page,
-                mode: .handoff,
-                fallbackHost: session.serviceDomain,
-                navigate: { session.navigate(to: $0) },
-                goBack: { session.goBack() },
-                goForward: { session.goForward() },
-                reloadOrStop: {
-                    if session.page.isLoading {
-                        session.page.stopLoading()
-                    } else {
-                        session.reload()
-                    }
-                }
-            )
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ConversationControls.Attach.botControlCancel(session.serviceDomain)) {
-                        session.cancel()
-                        dismiss()
-                    }
-                }
-            }
-        }
-        .interactiveDismissDisabled()
-        .onAppear {
-            Log.ui.info("BotControlSheet visible domain=\(session.serviceDomain) title=\(session.navigationTitle)")
-        }
-        .onDisappear {
-            Log.ui.info("BotControlSheet hidden domain=\(session.serviceDomain) title=\(session.navigationTitle)")
-        }
-    }
-}
 
 struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
     let session: Session
     let mode: WebBrowserView.Mode
-    var returnsInline = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
@@ -94,19 +50,18 @@ struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceHandoff.done) {
-                            if !returnsInline { session.dismissPresentation() }
+                            session.dismissPresentation()
                             dismiss()
                         }
                     }
                 }
         }
-        .interactiveDismissDisabled(returnsInline)
         .onAppear {
             Log.ui.info("ServiceSessionSheet visible domain=\(session.serviceDomain) attempt=\(session.id.uuidString.prefix(8)) title=\(session.navigationTitle) uptime=\(ProcessInfo.processInfo.systemUptime)")
         }
         .onDisappear {
             Log.ui.info("ServiceSessionSheet hidden domain=\(session.serviceDomain) attempt=\(session.id.uuidString.prefix(8)) title=\(session.navigationTitle) uptime=\(ProcessInfo.processInfo.systemUptime)")
-            if !returnsInline { session.cancel() }
+            session.cancel()
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
             Log.ui.info("ServiceSessionSheet scene domain=\(session.serviceDomain) attempt=\(session.id.uuidString.prefix(8)) phase=\(String(describing: phase)) uptime=\(ProcessInfo.processInfo.systemUptime)")
@@ -152,8 +107,6 @@ private struct AppFullScreenPresentationModifier: ViewModifier {
             switch presented.content {
             case .browser(let session):
                 ServiceBrowserView(session: session)
-            case .serviceSignIn(let session):
-                ServiceSessionSheetView(session: session, mode: .signIn)
             case .serviceHandoff(let session):
                 ServiceSessionSheetView(session: session, mode: .handoff)
             case .providerAuthentication:

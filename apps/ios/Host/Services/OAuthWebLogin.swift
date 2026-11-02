@@ -344,7 +344,7 @@ private final class LoopbackRedirectListener {
     }
 
     private static var page: String {
-        let title = L10n.string("Sign in")
+        let title = L10n.string("Log in")
         let body = L10n.string("Return to Ox to continue.")
         return """
         <!doctype html><html><head><meta charset="utf-8">\

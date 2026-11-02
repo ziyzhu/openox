@@ -190,7 +190,7 @@ Services picker or the authorized conversation workflow before invoking
 `ios:<service>:<action>`; an unattached native service may report an unknown
 action even when it appears in the catalog.
 
-Sign-in, human verification, page creation, and page lifecycle happen through
+Login, human verification, page creation, and page lifecycle happen through
 the Host's interface. Do not attempt to choose a page engine, tab, or another
 implementation from the Client.
 

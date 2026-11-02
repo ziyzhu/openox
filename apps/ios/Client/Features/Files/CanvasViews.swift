@@ -23,9 +23,7 @@ struct CanvasInteractionView: View {
                 case .control(let id, let control, let service):
                     ServiceControlView(
                         control: control,
-                        signIn: { _ in await canvas.performControl(control, service: service) != nil },
-                        completeBotControl: { _, _ in await canvas.performControl(control, service: service) != nil },
-                        completePayment: { _, _ in await canvas.performControl(control, service: service) },
+                        login: { _ in await canvas.performControl(control, service: service) != nil },
                         onResolved: { canvas.resolveInteraction(id: id, value: $0) }
                     )
                 }

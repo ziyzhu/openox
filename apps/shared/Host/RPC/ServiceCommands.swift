@@ -53,10 +53,15 @@ extension OxHostProtocol {
         let queuedInvocations: Int
         let pendingEvaluations: Int
         let pageCount: Int
-        let signIn: String
+        let login: String
         let page: PageRow?
         let manifest: JSONValue?
         let favicon: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case domain, title, phase, navigation, activeInvocations, queuedInvocations, pendingEvaluations, pageCount, page, manifest, favicon
+            case login = "signIn"
+        }
     }
 
     struct ListServicesResult: Encodable {
@@ -122,6 +127,9 @@ extension OxHostProtocol {
                     approve: approve
                 )
             }
+            if WebSessionContract.isEnabled(svc.definition), action == WebSessionContract.loginAction {
+                return .failure(RuntimeError.bridge("Login requires a user interaction. Invoke the service login action through a conversation VM so the Host can present and await its live page."))
+            }
             return await svc.invokeAction(action, args: args, approve: approve)
         }
     }
@@ -178,7 +186,7 @@ extension OxHostProtocol {
         Log.agent.debug("OxHostRPC.services.refreshAuth id=\(reply.id) domain=\(command.domain)")
         withService(domain: command.domain, serviceManager: serviceManager, reply: reply) { service in
             await service.checkAccess(policy: .current, reason: .debug)
-            return .success(.string(service.signInState.rawValue))
+            return .success(.string(service.loginState.rawValue))
         }
     }
 
@@ -247,7 +255,7 @@ extension OxHostProtocol {
                     queuedInvocations: snapshot.queuedInvocations,
                     pendingEvaluations: snapshot.pendingEvaluations,
                     pageCount: snapshot.pageCount,
-                    signIn: snapshot.signIn,
+                    login: snapshot.login,
                     page: page,
                     manifest: snapshot.manifest,
                     favicon: favicon

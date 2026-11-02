@@ -246,7 +246,7 @@ nonisolated func llmFailureKind(statusCode: Int? = nil, message: String) -> LLMF
     if statusCode == 401 || statusCode == 403 { return .authentication }
     if statusCode == 429 { return .rateLimited }
     let value = message.lowercased()
-    let authentication = ["missing api key", "not signed in", "authorization", "authentication", "unauthorized", "forbidden"]
+    let authentication = ["missing api key", "not logged in", "authorization", "authentication", "unauthorized", "forbidden"]
     if authentication.contains(where: value.contains) { return .authentication }
     let rateLimited = ["resource_exhausted", "rate limit", "too many requests", "exceeded your current quota", "quota is exhausted"]
     if rateLimited.contains(where: value.contains) { return .rateLimited }

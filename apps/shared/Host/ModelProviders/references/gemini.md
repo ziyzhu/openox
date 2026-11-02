@@ -14,7 +14,7 @@ Ox presents the Gemini API in Global. New accounts begin on Google's free tier, 
 
 ## Website account
 
-Gemini Website remains an ordinary service using its signed-in website session, separate from Google AI Studio API credentials. It receives explicit service inputs and cannot supply the Ox agent model.
+Gemini Website remains an ordinary service using its logged-in website session, separate from Google AI Studio API credentials. It receives explicit service inputs and cannot supply the Ox agent model.
 
 ## Runtime sources
 

@@ -399,7 +399,7 @@ test("bounded iOS commands route qualified references and execute structured pro
     const prompt = composeIOSPrompt(config.promptState);
     expect(await adapter.command({ action: "composePrompt", promptState: config.promptState })).toEqual(prompt);
     const turnState = { skills: [{ name: "example", description: "Example skill" }], skillConflicts: [],
-      attachedServices: [{ domain: "ios:files", signIn: "authorized" as const }], fileMounts: ["files/a"],
+      attachedServices: [{ domain: "ios:files", login: "authorized" as const }], fileMounts: ["files/a"],
       filePaths: ["artifacts/note.md"], storageMode: "temporary" as const, responseLanguage: { identifier: "zh-Hans", name: "Chinese (Simplified)" }, hostContext };
     const foreignScope = { ...scope, hostID: "another-host" };
     await expect(adapter.command({ action: "run", reference: attached.reference, content: "wrong owner", turnState: { ...turnState,

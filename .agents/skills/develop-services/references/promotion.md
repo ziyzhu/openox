@@ -30,7 +30,7 @@ An installed app's validator or installed CLI's `repository validate` can lag be
 
 Verify the promoted service through Ox on a reserved simulator. Verification may exercise already declared actions, but must not become endpoint exploration or service redesign.
 
-- Ask the user to perform sign-in, challenges, and account selection.
+- Ask the user to perform login, challenges, and account selection.
 - Require explicit approval before any live mutation.
 - Exercise success, empty, terminal pagination, safe error, and authentication behavior where available without inventing data or success.
 - Keep screenshots, logs, and authenticated diagnostics in a private temporary directory outside the repository.

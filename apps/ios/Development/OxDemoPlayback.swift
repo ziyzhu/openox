@@ -113,7 +113,7 @@ nonisolated enum OxDemoScene: String, CaseIterable, Identifiable {
             """
             Created **Reddit** in Local with **publish post** and **reply to comment** actions.
 
-            Both write actions require your approval and a signed-in Reddit session.
+            Both write actions require your approval and a logged-in Reddit session.
 
             The service passed validation and is attached, ready to publish your morning routine.
             """

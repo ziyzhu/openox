@@ -1228,81 +1228,18 @@
       "requireAuth": true
     },
     {
-      "id": "getPaymentUrl",
+      "id": "prepareCheckout",
       "label": "Review DoorDash checkout",
-      "description": "Opens DoorDash checkout so you can review the active cart. Only you can place the order.",
+      "description": "Prepares the live DoorDash checkout page for the active cart without placing an order. Show it with ox.service.showPage using this action and the same input; the user reviews and submits payment.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "url"
-        ],
-        "additionalProperties": false
+        "type": "null"
       },
-      "defaultArgs": {},
-      "requireApproval": false,
-      "requireAuth": false
-    },
-    {
-      "id": "getPaymentState",
-      "label": "Check DoorDash checkout status",
-      "description": "Checks whether a cart is pending or a newly completed order appeared. It never places an order.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "previousOrderId": {
-            "type": "string",
-            "description": "The newest order-cart ID observed before checkout."
-          }
-        },
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "enum": [
-              "none",
-              "pending",
-              "completed"
-            ]
-          },
-          "reference": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "total": {
-            "type": "number"
-          },
-          "currency": {
-            "type": "string"
-          },
-          "completedAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "status",
-          "reference",
-          "total",
-          "currency",
-          "completedAt"
-        ],
-        "additionalProperties": false
-      },
+      "baseUrl": "https://www.doordash.com/consumer/checkout/",
+      "blocking": true,
       "defaultArgs": {},
       "requireApproval": false,
       "requireAuth": false

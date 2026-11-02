@@ -518,7 +518,7 @@ struct RepositoryDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This disconnects the repository from Ox. Its files, website sign-ins, and data are kept. Delete the folder in Files only when you no longer need it.")
+            Text("This disconnects the repository from Ox. Its files, website logins, and data are kept. Delete the folder in Files only when you no longer need it.")
         }
         .alert("Export Local Repository", isPresented: Binding(
             get: { localExportError != nil },

@@ -379,7 +379,7 @@ struct RequestCardOptions: View {
         .task(id: submittedSelection) {
             guard let submittedSelection else { return }
             do {
-                try await Task.sleep(for: .seconds(1))
+                try await Task.sleep(for: .milliseconds(200))
             } catch {
                 return
             }

@@ -947,9 +947,9 @@
       "requireAuth": false
     },
     {
-      "id": "getPaymentUrl",
+      "id": "prepareCheckout",
       "label": "Review stay checkout",
-      "description": "Opens Airbnb checkout for the selected home, dates, and guests so you can review the price and policies, then personally submit and pay for the reservation.",
+      "description": "Prepares the live Airbnb checkout page for the selected home, dates, and guests without submitting a reservation or payment. Show it with ox.service.showPage using this action and the same input, even if navigation interrupted preparation; do not rerun it.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1012,119 +1012,9 @@
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "url"
-        ],
-        "additionalProperties": false
+        "type": "null"
       },
-      "requireApproval": false,
-      "requireAuth": false,
-      "baseUrl": "https://www.airbnb.com/"
-    },
-    {
-      "id": "getPaymentState",
-      "label": "Check stay checkout",
-      "description": "Checks whether the selected Airbnb reservation is awaiting your review, has been submitted, or is no longer active. A submitted reservation includes its confirmation code.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "listingId": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Listing id or Airbnb room URL returned by stay search."
-          },
-          "checkIn": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-            "description": "Check-in date in YYYY-MM-DD format."
-          },
-          "checkOut": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-            "description": "Check-out date in YYYY-MM-DD format."
-          },
-          "adults": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 16,
-            "default": 1
-          },
-          "children": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 15,
-            "default": 0
-          },
-          "infants": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 5,
-            "default": 0
-          },
-          "pets": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 5,
-            "default": 0
-          },
-          "currency": {
-            "type": "string",
-            "pattern": "^[A-Z]{3}$",
-            "default": "USD",
-            "description": "Three-letter currency code used at checkout."
-          },
-          "isWorkTrip": {
-            "type": "boolean",
-            "default": false,
-            "description": "Whether the reservation is marked as a work trip."
-          },
-          "since": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$",
-            "description": "Checkout episode start in YYYY-MM-DD HH:MM:SS local time."
-          }
-        },
-        "required": [
-          "listingId",
-          "checkIn",
-          "checkOut"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "none",
-              "pending",
-              "completed"
-            ]
-          },
-          "reference": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "status",
-          "reference"
-        ],
-        "additionalProperties": false
-      },
+      "blocking": true,
       "requireApproval": false,
       "requireAuth": false,
       "baseUrl": "https://www.airbnb.com/"
@@ -1351,13 +1241,9 @@
           "label": "房源评价列表",
           "description": "列出单个爱彼迎房源的住客评价，包括评分、日期、评价者信息、正文和房东回复。"
         },
-        "getPaymentUrl": {
+        "prepareCheckout": {
           "label": "核对住宿结算",
           "description": "打开所选房源、日期和住客对应的爱彼迎结算页，供你核对价格与政策，并亲自提交和支付预订。"
-        },
-        "getPaymentState": {
-          "label": "检查住宿结算状态",
-          "description": "检查所选爱彼迎预订是等待你核对、已经提交，还是已不再有效。已提交的预订会包含确认码。"
         },
         "searchServices": {
           "label": "搜索服务",

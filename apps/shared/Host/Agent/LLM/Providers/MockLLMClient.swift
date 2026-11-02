@@ -319,10 +319,10 @@ extension Scenario {
         ("Files & handoffs", [
             Entry("30", "chart — inline JavaScript", .htmlChart),
             Entry("31", "diagrams — Mermaid block and SVG file", .diagrams),
-            Entry("50", "signin — auth card → resume after sign-in", .signin),
+            Entry("50", "login — auth card → resume after login", .login),
             Entry("53", "recover — tool error, then fall back", .recover),
             Entry("58", "files — write, edit, rename, and display", .fileWorkflow),
-            Entry("69", "solve — human-verification handoff", .botControl),
+            Entry("69", "showPage — human verification", .botControl),
             Entry("74", "progress — report, continue thinking, then answer", .progressReport),
             Entry("75", "embeds — file and remote image", .embeds),
             Entry("76", "video — embed inline file video", .video),

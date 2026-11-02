@@ -48,7 +48,7 @@ struct ServiceDetailView: View {
 
     private var actions: [Manifest.Action] { service.definition.actions }
     private var loadingManifest: Bool { service.capabilityState == .unloaded || service.capabilityState == .loading }
-    @State private var signInRequestActive = false
+    @State private var loginRequestActive = false
     @State private var signingOut = false
     @State private var descriptionExpanded = false
     @State private var descriptionFullHeight: CGFloat = 0
@@ -61,7 +61,6 @@ struct ServiceDetailView: View {
     @State private var confirmRemoveMCP = false
     @State private var confirmDeleteLocalService = false
     @State private var localServiceDeleteError: String?
-    @State private var presentations = AppPresentationCoordinator()
 
     var body: some View {
         content
@@ -71,7 +70,7 @@ struct ServiceDetailView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Permanently deletes this service's editable source from Local. Website sign-ins and data are kept.")
+                Text("Permanently deletes this service's editable source from Local. Website logins and data are kept.")
             }
             .alert("Couldn't delete Local service", isPresented: Binding(
                 get: { localServiceDeleteError != nil },
@@ -138,7 +137,7 @@ struct ServiceDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Removes cookies, cache, and stored data for \(service.title). You may need to sign in again.")
+            Text("Removes cookies, cache, and stored data for \(service.title). You may need to log in again.")
         }
         .alert("Remove MCP server?", isPresented: $confirmRemoveMCP) {
             Button("Remove", role: .destructive) {
@@ -174,10 +173,9 @@ struct ServiceDetailView: View {
         }
         .task(id: service.id) {
             _ = await service.loadManifest(reason: .serviceDetail)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, service.supportsAuthentication else { return }
             await service.checkAccess(reason: .serviceDetail)
         }
-        .appPresentations(presentations)
     }
 
     private func deleteLocalService() async {
@@ -200,23 +198,23 @@ struct ServiceDetailView: View {
         case .systemPermission:
             permissionButton
         case .service:
-            if signInRequestActive || service.auth == .unknown || service.auth.isChecking {
-                signInButton(signingIn: true)
-                    .accessibilityIdentifier(A11yID.ConversationControls.Attach.signInProgress(service.domain))
+            if loginRequestActive || service.auth == .unknown || service.auth.isChecking {
+                loginButton(loggingIn: true)
+                    .accessibilityIdentifier(A11yID.ConversationControls.Attach.loginProgress(service.domain))
             } else {
-                switch service.signInState {
+                switch service.loginState {
                 case .signedOut, .notAuthorized, .unknown:
-                    let signingIn = service.auth.isSigningIn
-                    signInButton(signingIn: signingIn)
+                    let loggingIn = service.auth.isLoggingIn
+                    loginButton(loggingIn: loggingIn)
                         .accessibilityIdentifier(
-                            signingIn
-                                ? A11yID.ConversationControls.Attach.signInProgress(service.domain)
-                                : A11yID.ConversationControls.Attach.signIn(service.domain)
+                            loggingIn
+                                ? A11yID.ConversationControls.Attach.loginProgress(service.domain)
+                                : A11yID.ConversationControls.Attach.login(service.domain)
                         )
                 case .signedIn, .authorized:
                     if signingOut {
-                        ServiceSignInButton(
-                            signingIn: true,
+                        ServiceLoginButton(
+                            loggingIn: true,
                             isDisabled: true,
                             layout: .compact,
                             action: {}
@@ -252,24 +250,24 @@ struct ServiceDetailView: View {
                 }
                 .buttonStyle(OxChipButton(filled: true))
                 .disabled(authorizingMCP)
-                .accessibilityIdentifier(A11yID.ConversationControls.Attach.signIn(service.domain))
+                .accessibilityIdentifier(A11yID.ConversationControls.Attach.login(service.domain))
             }
         case .none:
             EmptyView()
         }
     }
 
-    private func signInButton(signingIn: Bool) -> some View {
-        ServiceSignInButton(
-            signingIn: signingIn,
-            isDisabled: signingIn,
+    private func loginButton(loggingIn: Bool) -> some View {
+        ServiceLoginButton(
+            loggingIn: loggingIn,
+            isDisabled: loggingIn,
             layout: .compact
         ) {
-            guard !signInRequestActive else { return }
-            signInRequestActive = true
+            guard !loginRequestActive else { return }
+            loginRequestActive = true
             Task { @MainActor in
-                defer { signInRequestActive = false }
-                try? await service.requestAccess(using: presentations, source: .serviceDetail)
+                defer { loginRequestActive = false }
+                try? await service.requestAccess(source: .serviceDetail)
             }
         }
     }
@@ -498,7 +496,7 @@ struct ServiceDetailView: View {
 
     private var attachPermissionDescription: LocalizedStringKey {
         switch capabilities.attachmentData {
-        case .signedIn: "Adds this service to a conversation, giving Ox its actions and your signed-in data."
+        case .signedIn: "Adds this service to a conversation, giving Ox its actions and your logged-in data."
         case .onDevice: "Its actions and permitted device data become available to this conversation."
         case .remote: "Its remote Actions can receive arguments from this conversation and return data to Ox."
         }

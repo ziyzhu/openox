@@ -17,7 +17,7 @@ struct ProviderAuthenticationView: View {
     @State private var accountLabel: String?
     @State private var busy = false
     @State private var showSignOutConfirm = false
-    @State private var signInError: String?
+    @State private var loginError: String?
     @State private var presentations = AppPresentationCoordinator()
 
     init(
@@ -42,9 +42,9 @@ struct ProviderAuthenticationView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            if let signInError {
-                SettingsErrorMessage(message: signInError, systemImage: "exclamationmark.circle.fill")
-                    .accessibilityIdentifier(A11yID.ConversationControls.modelKeySignInError)
+            if let loginError {
+                SettingsErrorMessage(message: loginError, systemImage: "exclamationmark.circle.fill")
+                    .accessibilityIdentifier(A11yID.ConversationControls.modelKeyLoginError)
             }
 
             if let notice = client.authNotice {
@@ -88,7 +88,7 @@ struct ProviderAuthenticationView: View {
                 if let account = client.subscriptionAccount { signOut(account) }
             }
         } message: {
-            Text("You'll need to sign in again to use \(client.displayName).")
+            Text("You'll need to log in again to use \(client.displayName).")
         }
         .onAppear {
             if let account = client.subscriptionAccount { refreshSubscription(account) }
@@ -144,18 +144,18 @@ struct ProviderAuthenticationView: View {
             membershipCard(account)
         } else {
             Button {
-                signIn(account)
+                login(account)
             } label: {
                 SettingsActionButtonLabel {
                     if busy {
                         CellularAutomatonLoader.small
                     }
-                    Text(busy ? "Signing in…" : client.id == "chatgpt" ? "Continue with ChatGPT" : "Sign in with \(account.providerName)")
+                    Text(busy ? "Logging in…" : client.id == "chatgpt" ? "Continue with ChatGPT" : "Log in with \(account.providerName)")
                 }
             }
             .buttonStyle(.plain)
             .disabled(busy)
-            .accessibilityIdentifier(A11yID.ConversationControls.modelKeySignIn(client.id))
+            .accessibilityIdentifier(A11yID.ConversationControls.modelKeyLogin(client.id))
 
         }
     }
@@ -166,7 +166,7 @@ struct ProviderAuthenticationView: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Theme.Colors.primary)
             VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: client.id == "chatgpt" ? String(localized: "Using ChatGPT plan") : plan.map { "\(account.providerName) \($0)" } ?? "Signed in to \(account.providerName)")
+                Text(verbatim: client.id == "chatgpt" ? String(localized: "Using ChatGPT plan") : plan.map { "\(account.providerName) \($0)" } ?? "Logged in to \(account.providerName)")
                     .font(Theme.Fonts.labelMd)
                     .foregroundStyle(Theme.Colors.onSurface)
                 if let accountLabel {
@@ -224,24 +224,24 @@ struct ProviderAuthenticationView: View {
                 )
                 try ProviderCredentialEntry.save(values[0], for: client)
                 apiKey = values[0].trimmingCharacters(in: .whitespacesAndNewlines)
-                signInError = nil
+                loginError = nil
                 onChange()
                 onAuthenticated?()
             } catch is CancellationError {
             } catch {
-                signInError = error.localizedDescription
+                loginError = error.localizedDescription
             }
         }
     }
 
-    private func signIn(_ account: any SubscriptionAccount) {
+    private func login(_ account: any SubscriptionAccount) {
         guard !busy else { return }
         busy = true
         Task {
-            signInError = nil
+            loginError = nil
             let signedInSuccessfully: Bool
             do {
-                signedInSuccessfully = try await account.signIn(using: SubscriptionAuthorizationPresenter(
+                signedInSuccessfully = try await account.login(using: SubscriptionAuthorizationPresenter(
                     oauth: { authorizeURL, redirectPrefix in
                         await OAuthWebLogin.present(authorizeURL: authorizeURL, redirectPrefix: redirectPrefix)
                     },
@@ -255,8 +255,8 @@ struct ProviderAuthenticationView: View {
                 ))
             } catch {
                 signedInSuccessfully = false
-                signInError = (error as? ProviderClientError)?.message ?? error.localizedDescription
-                Log.ui.error("ProviderAuthentication.signIn client=\(client.id) error=\(signInError ?? "unknown")")
+                loginError = (error as? ProviderClientError)?.message ?? error.localizedDescription
+                Log.ui.error("ProviderAuthentication.login client=\(client.id) error=\(loginError ?? "unknown")")
             }
             busy = false
             refreshSubscription(account)
@@ -275,7 +275,7 @@ struct ProviderAuthenticationView: View {
 
     private func signOut(_ account: any SubscriptionAccount) {
         Log.ui.info("ProviderAuthentication.signOut client=\(client.id)")
-        signInError = nil
+        loginError = nil
         account.signOut()
         refreshSubscription(account)
         onChange()
