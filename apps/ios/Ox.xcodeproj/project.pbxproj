@@ -47,60 +47,100 @@
 		6399B94936E65C8FA39D8570 /* Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Local.xcconfig; sourceTree = "<group>"; };
 		844942CC6FDCEC85B2863F2F /* ModelServiceActions.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ModelServiceActions.json; sourceTree = "<group>"; };
 		A68B2CB976BE2F8F9C28EA98 /* PublicSuffixList.bundle */ = {isa = PBXFileReference; lastKnownFileType = wrapper.cfbundle; path = PublicSuffixList.bundle; sourceTree = "<group>"; };
-		D4001F235FA20410130AD18D /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D4001F235FA20410130AD18D /* ShareExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D6A88E7FB5AFF9039519B8AC /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		D8417D6288F91A6AA8780A6A /* PiDurable.bundle */ = {isa = PBXFileReference; lastKnownFileType = wrapper.cfbundle; path = PiDurable.bundle; sourceTree = "<group>"; };
-		F57D7D6B9555B975E9CAE41B /* Ox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ox.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F57D7D6B9555B975E9CAE41B /* ios.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ios.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		0D4980CAB76E94AE0EFE6803 /* Development */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
 			path = Development;
 			sourceTree = "<group>";
 		};
 		39DBEEFD2349B6AAC23AFDB3 /* Diagnostics */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
 			path = Diagnostics;
 			sourceTree = "<group>";
 		};
 		5416672512B3549E9F7E8ECC /* ../shared/Host */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
 			path = ../shared/Host;
 			sourceTree = "<group>";
 		};
 		626C2A111EE83A2D056DE6E7 /* Platform */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
 			path = Platform;
 			sourceTree = "<group>";
 		};
 		649115753B6A2203F91A83AB /* ShareExtension */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
 			path = ShareExtension;
 			sourceTree = "<group>";
 		};
 		69FA8C14E36963500A64EE00 /* ../shared/Diagnostics */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
 			path = ../shared/Diagnostics;
 			sourceTree = "<group>";
 		};
 		79A805EB43F2D699556D1EB1 /* Client */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
 			path = Client;
 			sourceTree = "<group>";
 		};
 		80752B2680E160944FA95240 /* ../shared/Platform */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
 			path = ../shared/Platform;
 			sourceTree = "<group>";
 		};
 		A5E9A614D39485A6A62C3825 /* Resources */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
 			path = Resources;
 			sourceTree = "<group>";
 		};
 		B79605572124478EB42BA943 /* Host */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
 			path = Host;
 			sourceTree = "<group>";
 		};
@@ -121,7 +161,7 @@
 		160CD5DA4A0C0BB297EB68FC /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F57D7D6B9555B975E9CAE41B /* Ox.app */,
+				F57D7D6B9555B975E9CAE41B /* ios.app */,
 				D4001F235FA20410130AD18D /* ShareExtension.appex */,
 			);
 			name = Products;
@@ -218,22 +258,22 @@
 				C3C8D2954F02F211ED51DB3A /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
+				79A805EB43F2D699556D1EB1 /* Client */,
 				0D4980CAB76E94AE0EFE6803 /* Development */,
 				39DBEEFD2349B6AAC23AFDB3 /* Diagnostics */,
+				69FA8C14E36963500A64EE00 /* ../shared/Diagnostics */,
+				B79605572124478EB42BA943 /* Host */,
 				5416672512B3549E9F7E8ECC /* ../shared/Host */,
 				626C2A111EE83A2D056DE6E7 /* Platform */,
-				69FA8C14E36963500A64EE00 /* ../shared/Diagnostics */,
-				79A805EB43F2D699556D1EB1 /* Client */,
 				80752B2680E160944FA95240 /* ../shared/Platform */,
 				A5E9A614D39485A6A62C3825 /* Resources */,
-				B79605572124478EB42BA943 /* Host */,
 			);
 			name = ios;
 			packageProductDependencies = (
 				5561C9B9D06BCFC5C92474B0 /* SwiftGitX */,
 			);
 			productName = ios;
-			productReference = F57D7D6B9555B975E9CAE41B /* Ox.app */;
+			productReference = F57D7D6B9555B975E9CAE41B /* ios.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
