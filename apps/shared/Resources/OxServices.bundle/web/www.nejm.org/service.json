@@ -2,7 +2,7 @@
   "domain": "www.nejm.org",
   "name": "NEJM",
   "description": "A leading peer-reviewed medical journal. Search articles, browse specialties, and read available abstracts and full-text sections. Public and read-only; no sign-in required.",
-  "baseUrl": "https://www.nejm.org/action/autoCompleteSearchService?partialQuery=zzzzunlikelyqueryzzzz",
+  "baseUrl": "https://www.nejm.org/",
   "$defs": {
     "articleSummary": {
       "type": "object",

@@ -2,7 +2,7 @@
   "domain": "outlook.live.com",
   "name": "Outlook",
   "description": "Read signed-in Outlook.com mail and calendar data.",
-  "baseUrl": "https://outlook.live.com/owa/favicon.ico",
+  "baseUrl": "https://outlook.live.com/mail/",
   "actions": [
     {
       "id": "getSignInUrl",
