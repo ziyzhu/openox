@@ -14,14 +14,6 @@ export interface TurnState {
   responseLanguage: ResponseLanguage | null;
 }
 type LoginState = "notRequired" | "signedIn" | "signedOut" | "authorized" | "notAuthorized" | "unknown";
-const loginHints: Record<LoginState, string> = {
-  notRequired: "no login needed",
-  signedIn: "logged in",
-  signedOut: "signed out — public actions still work; only `requireAuth` actions need the user to log in first",
-  authorized: "authorized",
-  notAuthorized: "not authorized — authorize this service before using it",
-  unknown: "login status still being checked — attempt the action; the error will say if login is needed",
-};
 const persistedStorage = "This conversation is saved to the Profile.";
 const temporaryStorage = "This is a temporary conversation. You may read Profile-owned files, but cannot save changes to Profile files, including `MEMORY.md` or user skills. Selected external files under `files/<folder-id>/` are separate: they may still be changed with runtime approval. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
 const temporaryProfileStorage = "This is a temporary conversation. You may read Profile-owned files, but cannot save changes to Profile files, including `MEMORY.md` or user skills. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
@@ -59,7 +51,7 @@ export function composeTurnSections(state: TurnState, scaffold: PromptScaffold, 
     const description = normalized(service.description ?? "");
     if (service.scope && (!hostContext || !hostContext.hosts.some(owner => sameScope(owner, service.scope!)))) throw new Error("Service owner is unavailable");
     const owner = service.scope && host && !sameScope(service.scope, host) ? ` [host=${JSON.stringify(service.scope.hostID)} profile=${JSON.stringify(service.scope.profileID)}]` : "";
-    return `- ${service.domain}${description ? ` — ${description}` : ""} [${loginHints[service.login]}]${owner}`;
+    return `- ${service.domain}${description ? ` — ${description}` : ""}${owner}`;
   }).join("\n");
   const folders = state.fileMounts?.length ? [...state.fileMounts].sort().map(path => `- \`${path}/\``).join("\n")
     : "No folders are granted to this Profile. The user can add folders on the Profile's Files page.";

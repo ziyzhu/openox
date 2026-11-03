@@ -240,7 +240,11 @@ nonisolated struct ServiceDefinition: Sendable {
     }
 
     var exposedActions: [Manifest.Action] {
-        actions.filter { !isStandardAction($0.id) }
+        let sessions = WebSessionContract.isEnabled(self)
+        return actions.filter {
+            !isStandardAction($0.id)
+                && !(sessions && [WebSessionContract.listAction, WebSessionContract.loginAction].contains($0.id))
+        }
     }
 
     var isAPI: Bool { manifest.objectValue?["kind"]?.stringValue == "api" }

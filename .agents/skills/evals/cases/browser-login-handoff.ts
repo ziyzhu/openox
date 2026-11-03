@@ -10,8 +10,14 @@ const descriptor = {
   required: ["id", "label", "url"],
   additionalProperties: false,
 };
-const login = `web:${domain}:login`;
-const list = `web:${domain}:listSessions`;
+const accessInput = {
+  type: "object",
+  properties: { domain: { type: "string", const: domain }, purpose: { type: "string" }, pageUrl: { type: "string" } },
+  required: ["purpose", "domain"],
+  additionalProperties: false,
+};
+const acknowledged = { domain, kind: "web", completed: true, completion: "acknowledged" };
+const evidence = (sessions: object[]) => ({ domain, kind: "web", evidence: "listSessions", sessions });
 
 export default {
   task: `Open my eye doctor's patient portal at https://${domain}/login so I can log in.`,
@@ -19,19 +25,26 @@ export default {
     "ox.service.find": [{ result: [service] }],
     "ox.service.attach": [{ result: service }],
     "ox.service.listAttached": [{ result: [service] }],
-    "ox.service.inspect": [{ result: { service, actions: {
-      login: { name: login, inputSchema: empty, outputSchema: { type: "null" }, requireAuth: false, requireApproval: false },
-      listSessions: { name: list, inputSchema: empty, outputSchema: { type: "array", items: descriptor }, requireAuth: false, requireApproval: false },
-    } } }],
-    "ox.service.invoke": [
-      { args: { name: login }, result: null, set: { loginAcknowledged: true } },
-      { args: { name: list }, when: { loginAcknowledged: false }, result: [] },
-      { args: { name: list }, when: { loginAcknowledged: true }, result: [{ id: "patient-account", label: "Patient account", url: `https://${domain}/` }] },
+    "ox.service.inspect": [{ result: { service, capabilitiesAvailable: true, access: {
+      kind: "web",
+      checkAccess: { function: "ox.service.checkAccess", inputSchema: accessInput, outputSchema: {
+        type: "object", properties: { domain: { type: "string" }, kind: { const: "web" }, evidence: { const: "listSessions" }, sessions: { type: "array", items: descriptor } },
+        required: ["domain", "kind", "evidence", "sessions"], additionalProperties: false,
+      } },
+      requestAccess: { function: "ox.service.requestAccess", inputSchema: { ...accessInput, properties: { ...accessInput.properties, input: empty } }, outputSchema: {
+        type: "object", properties: { domain: { type: "string" }, kind: { const: "web" }, completed: { const: true }, completion: { const: "acknowledged" } },
+        required: ["domain", "kind", "completed", "completion"], additionalProperties: false,
+      } },
+    }, actions: {} } }],
+    "ox.service.requestAccess": [{ args: { domain }, result: acknowledged, set: { loginAcknowledged: true } }],
+    "ox.service.checkAccess": [
+      { args: { domain }, when: { loginAcknowledged: false }, result: evidence([]) },
+      { args: { domain }, when: { loginAcknowledged: true }, result: evidence([{ id: "patient-account", label: "Patient account", url: `https://${domain}/` }]) },
     ],
   } },
   checks: run => [
-    { detail: "Used the service login action", passed: succeeded(run, "ox.service.invoke").some(call => call.args.name === login) },
-    { detail: "Discovered accounts after login acknowledgment", passed: run.calls.some((call, index) => call.name === "ox.service.invoke" && call.args.name === list && run.calls.slice(0, index).some(previous => previous.name === "ox.service.invoke" && previous.args.name === login)) },
+    { detail: "Used the canonical access request", passed: succeeded(run, "ox.service.requestAccess").some(call => call.args.domain === domain) },
+    { detail: "Discovered accounts after interaction acknowledgment", passed: run.calls.some((call, index) => call.name === "ox.service.checkAccess" && run.calls.slice(0, index).some(previous => previous.name === "ox.service.requestAccess")) },
     { detail: "Did not substitute generic Browser interaction for authentication", passed: !run.calls.some(call => call.name === "ox.web.browser.waitForUserInteraction") },
     { detail: "Did not request credential entry in chat", passed: !/send me (?:your )?(?:password|api key)|tell me (?:your )?password/i.test(run.answer) },
   ],

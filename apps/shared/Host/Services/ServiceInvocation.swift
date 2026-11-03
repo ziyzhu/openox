@@ -143,7 +143,7 @@ extension Service {
                     try WebSessionContract.validateSessions(sessions, domain: domain)
                     guard sessions.arrayValue?.contains(selectedSession) == true else {
                         Log.service.warning("Service.session unavailable domain=\(domain) page=\(session.logLabel)")
-                        throw RuntimeError.bridge("The selected logged-in session is no longer available; listSessions again or ask the user to log in. No action was executed.")
+                        throw OxFunctionError(code: "authentication_required", message: "The selected logged-in session is no longer available. No action was executed.", recovery: "Use checkAccess to rediscover sessions and select the intended account/tenant, or requestAccess if login is needed. Do not silently switch accounts or automatically replay writes.")
                     }
                     guard session.navigationGeneration == startingNavigation else { throw EvalError.contextInvalidated }
                 }

@@ -148,8 +148,12 @@ extension Conversation {
         try await serviceOperations.showServicePage(name: name, args: args, session: session, pageURL: pageURL, purpose: purpose)
     }
 
-    public func checkServiceAccess(domain: String, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.checkServiceAccess(domain: domain, purpose: purpose)
+    public func checkServiceAccess(domain: String, pageURL: String?, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.checkServiceAccess(domain: domain, pageURL: pageURL, purpose: purpose)
+    }
+
+    public func requestServiceAccess(domain: String, input: JSONValue?, pageURL: String?, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.requestServiceAccess(domain: domain, input: input, pageURL: pageURL, purpose: purpose)
     }
 
     public func loginService(domain: String, purpose: String) async throws -> JSONValue? {

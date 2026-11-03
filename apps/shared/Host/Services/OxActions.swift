@@ -78,28 +78,88 @@ nonisolated enum OxActions {
         return .object(entry)
     }
 
-    static var loginDetail: JSONValue {
-        .object([
-            "function": .string("ox.service.login"),
-            "description": .string("Call `await ox.service.login({ purpose, domain })` to ask the user to log in or authorize access. No service-specific input is required."),
-            "inputSchema": .object([
-                "type": .string("object"),
-                "properties": .object([:]),
-                "additionalProperties": .bool(false),
-            ]),
-            "outputSchema": .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "domain": .object(["type": .string("string")]),
-                    "signedIn": .object(["type": .string("boolean")]),
-                    "completed": .object(["type": .string("boolean"), "const": .bool(true)]),
-                    "state": .object(["type": .string("string")]),
-                    "completion": .object(["type": .string("string"), "enum": .array(["verified", "configured", "authorized", "acknowledged"].map(JSONValue.string))]),
-                ]),
-                "required": .array(["domain", "completed", "signedIn", "state", "completion"].map(JSONValue.string)),
-                "additionalProperties": .bool(false),
-            ]),
+    static func checkAccessOutput(kind: String) -> JSONValue {
+        let evidence: String
+        switch kind {
+        case "web": evidence = "listSessions"
+        case "api": evidence = "credentialConfiguration"
+        case "mcp": evidence = "mcpConnection"
+        default: evidence = "devicePermission"
+        }
+        var properties: [String: JSONValue] = [
+            "domain": .object(["type": .string("string")]),
+            "kind": .object(["const": .string(kind)]),
+            "evidence": .object(["const": .string(evidence)]),
+        ]
+        if kind == "web" {
+            properties["sessions"] = .object(["type": .string("array"), "items": WebSessionContract.sessionSchema])
+        } else {
+            let states: [String]
+            switch kind {
+            case "api": states = ["configured", "notConfigured", "notRequired"]
+            case "mcp": states = ["authorized", "authorizationRequired", "notRequired"]
+            default: states = ["authorized", "authorizationRequired", "denied", "notRequired"]
+            }
+            properties["state"] = .object(["type": .string("string"), "enum": .array(states.map(JSONValue.string))])
+        }
+        return .object([
+            "type": .string("object"), "properties": .object(properties),
+            "required": .array(properties.keys.sorted().map(JSONValue.string)), "additionalProperties": .bool(false),
         ])
+    }
+
+    static func requestAccessOutput(kind: String) -> JSONValue {
+        var properties: [String: JSONValue] = [
+            "domain": .object(["type": .string("string")]),
+            "kind": .object(["const": .string(kind)]),
+            "completed": .object(["type": .string("boolean"), "const": .bool(true)]),
+            "completion": .object(["type": .string("string"), "enum": .array((kind == "web" ? ["acknowledged"] : ["verified", "configured", "authorized"]).map(JSONValue.string))]),
+        ]
+        if kind != "web" { properties["state"] = .object(["type": .string("string")]) }
+        return .object([
+            "type": .string("object"), "properties": .object(properties),
+            "required": .array(properties.keys.sorted().map(JSONValue.string)), "additionalProperties": .bool(false),
+        ])
+    }
+
+    @MainActor
+    static func accessDetail(service: Service) -> JSONValue {
+        let kind = ServiceOperations.serviceKind(service)
+        let web = service.isWebService && WebSessionContract.isEnabled(service.definition)
+        let supported = web || service.isMCPService || service.apiService?.authorization.auth.requiresCredentials == true || service.iOSService?.requiresPermission == true
+        var access: [String: JSONValue] = ["kind": .string(kind)]
+        guard supported else { return .object(access) }
+        var properties: [String: JSONValue] = [
+            "domain": .object(["type": .string("string"), "const": .string(service.domain)]),
+            "purpose": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(80)]),
+        ]
+        if web { properties["pageUrl"] = .object(["type": .string("string")]) }
+        access["checkAccess"] = .object([
+            "function": .string("ox.service.checkAccess"),
+            "description": .string("Read typed evidence without prompting; errors are not absence. API configuration is not server acceptance; MCP connectivity is not tool authorization. Website discovery respects Action policies. Reuse selected sessions; invocations revalidate them."),
+            "inputSchema": .object([
+                "type": .string("object"), "properties": .object(properties),
+                "required": .array(["purpose", "domain"].map(JSONValue.string)), "additionalProperties": .bool(false),
+            ]),
+            "outputSchema": checkAccessOutput(kind: kind),
+        ])
+        var required = ["purpose", "domain"]
+        if web, let schema = service.definition.action(WebSessionContract.loginAction)?.inputSchema {
+            properties["input"] = attachDefs(schema, defs: .object(service.definition.definitions))
+            if !JSONSchemaValidator.validate(.object([:]), against: schema, definitions: service.definition.definitions).isEmpty {
+                required.append("input")
+            }
+        }
+        access["requestAccess"] = .object([
+            "function": .string("ox.service.requestAccess"),
+            "description": .string("Request user setup or interaction. Website completion is acknowledgment only: discover sessions afterward. API setup is configuration, not server acceptance. Never reopen cancellation or automatically replay writes."),
+            "inputSchema": .object([
+                "type": .string("object"), "properties": .object(properties),
+                "required": .array(required.map(JSONValue.string)), "additionalProperties": .bool(false),
+            ]),
+            "outputSchema": requestAccessOutput(kind: kind),
+        ])
+        return .object(access)
     }
 
     private static func metaFields(_ action: [String: JSONValue]) -> [String: JSONValue] {

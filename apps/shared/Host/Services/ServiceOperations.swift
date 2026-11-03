@@ -98,7 +98,7 @@ final class ServiceOperations {
             throw RuntimeError.bridge("This MCP connection changed or was removed. Attach the current service before invoking it.")
         }
         if service.isMCPService, await service.loadManifest(reason: .invoke) == nil {
-            throw RuntimeError.bridge("Service capabilities are unavailable; invoke ox.service.login if authorization is required")
+            throw RuntimeError.bridge("Service capabilities are unavailable; use ox.service.requestAccess if authorization is required")
         }
         let input = args ?? .object([:])
         if session != nil || pageURL != nil {
@@ -117,7 +117,7 @@ final class ServiceOperations {
             throw Service.InvokeError.unknown(qualifiedName)
         }
         if WebSessionContract.isEnabled(service.definition), action.requireAuth, session == nil {
-            throw RuntimeError.bridge("Select a logged-in session from listSessions before invoking this action")
+            throw OxFunctionError(code: "authentication_required", message: "Select a logged-in session before invoking this action. No action was executed.", recovery: "Use the service's checkAccess contract to discover sessions and select the intended account/tenant. Request access only if needed; never invent a descriptor.")
         }
         let inputViolations = JSONSchemaValidator.validate(
             input,
@@ -593,12 +593,15 @@ final class ServiceOperations {
         var fields: [String: JSONValue] = ["domain": .string(cleanDomain)]
         if let actions { fields["actions"] = .array(actions.map(JSONValue.string)) }
         return try await tracked(Actions.serviceInspect, .object(fields), purpose: purpose) {
-            guard await service.loadManifest(reason: .inspect) != nil else {
-                throw RuntimeError.bridge("ox.service.inspect: service '\(cleanDomain)' capabilities are unavailable; invoke ox.service.login if authorization is required.")
+            let available = await service.loadManifest(reason: .inspect) != nil
+            guard available || (service.isMCPService && actions == nil) else {
+                throw RuntimeError.bridge("ox.service.inspect: service '\(cleanDomain)' capabilities are unavailable; use requestAccess if authorization is required, otherwise inspect the source or connection error.")
             }
             let definition = service.definition
             let details: [String: JSONValue]
-            if let actions {
+            if !available {
+                details = [:]
+            } else if let actions {
                 details = try Dictionary(uniqueKeysWithValues: actions.map { id in
                     guard let detail = OxActions.detail(definition: definition, id: id) else {
                         throw RuntimeError.bridge("ox.service.inspect: unknown exposed action '\(cleanDomain):\(id)'.")
@@ -615,9 +618,11 @@ final class ServiceOperations {
             var result: [String: JSONValue] = [
                 "service": try self.serviceSnapshot(service),
                 "actions": .object(details),
+                "access": OxActions.accessDetail(service: service),
+                "capabilitiesAvailable": .bool(available),
             ]
-            if service.supportsAuthentication {
-                result["login"] = OxActions.loginDetail
+            if !available, case .unavailable(let error) = service.capabilityState {
+                result["capabilityError"] = .string(error)
             }
             return .object(result)
         }
@@ -700,22 +705,25 @@ final class ServiceOperations {
         }
     }
 
-    func checkServiceAccess(domain: String, purpose: String) async throws -> JSONValue? {
+    func checkServiceAccess(domain: String, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
         let service = try await resolveService(domain)
+        guard pageURL == nil || service.isWebService else {
+            throw OxFunctionError(code: "invalid_argument", message: "pageUrl is supported only for website access checks.", recovery: "Use the applicable input schema from inspect.access.checkAccess.")
+        }
         guard serviceManager.actionPolicy(for: Actions.serviceCheckAccess, default: .allow) == .allow else {
-            throw RuntimeError.bridge("checkAccess is not allowed by Action policy; no access check was performed")
+            throw OxFunctionError(code: "permission_denied", message: "checkAccess is not allowed by Action policy; no access check was performed.", recovery: "Stop. Do not bypass Ask or Block through another discovery path.")
         }
         if service.isWebService {
             guard WebSessionContract.isEnabled(service.definition) else {
-                throw RuntimeError.bridge("checkAccess requires a web service with listSessions; missing support does not establish signed-out state")
+                throw OxFunctionError(code: "not_supported", message: "This website declares no session discovery; missing support does not establish signed-out state.", recovery: "Inspect its actions. If authenticated work is required, use Evolve to implement discovery from real website evidence.")
             }
             let name = service.definition.qualifiedActionName(WebSessionContract.listAction)
             let defaultPolicy: ActionPolicy = service.definition.action(WebSessionContract.listAction)?.requireApproval == true ? .ask : .allow
             guard serviceManager.actionPolicy(for: name, default: defaultPolicy) == .allow else {
-                throw RuntimeError.bridge("listSessions requires approval or is blocked; checkAccess never prompts or bypasses that policy")
+                throw OxFunctionError(code: "permission_denied", message: "listSessions requires approval or is blocked; no discovery was performed.", recovery: "Stop. checkAccess never prompts or bypasses the discovery Action policy.")
             }
             return try await recorded(Actions.serviceCheckAccess, .object(["domain": .string(domain)]), purpose: purpose) {
-                let result = await service.invokeAction(WebSessionContract.listAction, args: .object([:]), approve: { name, _ in
+                let result = await service.invokeAction(WebSessionContract.listAction, args: .object([:]), pageURL: pageURL, approve: { name, _ in
                     self.serviceManager.actionPolicy(for: name, default: defaultPolicy) == .allow
                 })
                 return .object(["domain": .string(domain), "kind": .string("web"), "evidence": .string("listSessions"), "sessions": try result.get()])
@@ -745,17 +753,50 @@ final class ServiceOperations {
             case .observed(let observation): state = observation.value == .signedIn ? "configured" : "notConfigured"
             default: throw RuntimeError.bridge("Access could not be determined")
             }
-            return .object(["domain": .string(domain), "kind": .string(Self.serviceKind(service)), "state": .string(state), "evidence": .string(evidence), "verified": .bool(!service.isAPIService)])
+            return .object(["domain": .string(domain), "kind": .string(Self.serviceKind(service)), "state": .string(state), "evidence": .string(evidence)])
         }
+    }
+
+    func requestServiceAccess(domain: String, input: JSONValue?, pageURL: String?, purpose: String) async throws -> JSONValue? {
+        let service = try await resolveService(domain)
+        if service.isWebService {
+            guard WebSessionContract.isEnabled(service.definition) else {
+                throw OxFunctionError(code: "not_supported", message: "This website declares no access request.", recovery: "Inspect its actions. If authenticated work is required, use Evolve to implement login and session discovery from real website evidence.")
+            }
+            _ = try await invokeAction(
+                name: service.definition.qualifiedActionName(WebSessionContract.loginAction),
+                args: input, pageURL: pageURL, purpose: purpose
+            )
+            return .object([
+                "domain": .string(service.domain), "kind": .string("web"),
+                "completed": .bool(true), "completion": .string("acknowledged"),
+            ])
+        }
+        guard input == nil, pageURL == nil else {
+            throw OxFunctionError(code: "invalid_argument", message: "input and pageUrl are supported only for website access requests.", recovery: "Use the applicable input schema from inspect.access.requestAccess.")
+        }
+        guard let value = try await loginService(domain: domain, purpose: purpose), case .object(var result) = value else {
+            throw RuntimeError.bridge("Access request returned no completion evidence")
+        }
+        result.removeValue(forKey: "signedIn")
+        if service.isAPIService {
+            switch result["state"]?.stringValue {
+            case "signedIn": result["state"] = .string("configured")
+            case "signedOut": result["state"] = .string("notConfigured")
+            default: break
+            }
+        }
+        result["kind"] = .string(Self.serviceKind(service))
+        return .object(result)
     }
 
     func loginService(domain: String, purpose: String) async throws -> JSONValue? {
         guard !domain.isEmpty else {
-            throw RuntimeError.bridge("ox.service.login: requires a non-empty domain")
+            throw RuntimeError.bridge("Access requests require a non-empty domain")
         }
         let service = try await resolveService(domain)
         guard service.supportsAuthentication else {
-            throw RuntimeError.bridge("ox.service.login: \(domain) declares no login handoff")
+            throw RuntimeError.bridge("\(domain) declares no access handoff")
         }
         return try await tracked(Actions.serviceLogin, .object(["domain": .string(domain)]), purpose: purpose) {
             await service.checkAccess(policy: .current, reason: .modelLogin)
@@ -766,7 +807,7 @@ final class ServiceOperations {
             let control = ServiceControl.login(domain: domain, serviceName: service.title)
             Log.session.info("bridge.service.login handoff domain=\(domain) auth=\(service.loginState.rawValue)")
             guard await presentControl(control, service) != nil else {
-                throw OxFunctionError(code: "handoff_incomplete", message: "ox.service.login: the user cancelled or login failed.", recovery: "Do not reopen login automatically. Ask the user whether to continue, then inspect the service's login state before trying again.")
+                throw OxFunctionError(code: "handoff_incomplete", message: "The user cancelled or access setup failed.", recovery: "Do not reopen login automatically. Ask the user whether to continue, then inspect the service's login state before trying again.")
             }
             try Task.checkCancellation()
             return service.accessResult()

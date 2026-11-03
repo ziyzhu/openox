@@ -67,8 +67,10 @@ extension ServiceOperations {
         case "ox.service.showPage":
             return try await showServicePage(name: fields["name"]?.stringValue ?? "", args: fields["input"], session: fields["session"], pageURL: fields["pageUrl"]?.stringValue, purpose: purpose)
         case "ox.service.checkAccess":
-            return try await checkServiceAccess(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
-        case "ox.service.login", "ox.service.requestAccess":
+            return try await checkServiceAccess(domain: fields["domain"]?.stringValue ?? "", pageURL: fields["pageUrl"]?.stringValue, purpose: purpose)
+        case "ox.service.requestAccess":
+            return try await requestServiceAccess(domain: fields["domain"]?.stringValue ?? "", input: fields["input"], pageURL: fields["pageUrl"]?.stringValue, purpose: purpose)
+        case "ox.service.login":
             return try await loginService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
         default: throw RuntimeError.bridge("Function unavailable in HTML: \(function)")
         }
