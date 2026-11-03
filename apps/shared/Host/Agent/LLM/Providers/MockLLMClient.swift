@@ -49,7 +49,8 @@ public struct MockLLMClient: ProviderClient {
     public func prepare(
         model: ProviderModel,
         systemPrompt: String?,
-        tools: [any AgentTool]
+        tools: [any AgentTool],
+        sessionID: String
     ) async -> LLMPreparationOutcome {
         .ready
     }

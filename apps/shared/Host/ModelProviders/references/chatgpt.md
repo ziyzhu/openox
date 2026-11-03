@@ -16,6 +16,8 @@ Ox uses OpenOx-named dynamic registration for the open-source, locally hosted Ch
 
 The new credential record is isolated from predecessor Codex credentials; existing users log in again. Retain old credentials without forwarding them to the public API. Verify actual predecessor/changed-build storage compatibility before release.
 
+Use WebSocket continuation only on the same authenticated connection, with full-context recovery after connection loss and SSE fallback before stream events. OAuth bearer authentication does not require a legacy ChatGPT account header. HTTP requests must send full history with `store: false`, `stream: true`, and no `previous_response_id`; WebSocket `response.create` payloads omit HTTP streaming fields. Diagnose latency using the selected model reasoning effort, not the transport's default reasoning policy. Selecting a conversation starts authentication immediately and warms the connection once its durable conversation ID is ready, without a debounce or rendering or sending its prompt, tools, or draft. Bound the warmup ping to five seconds and the first WebSocket response event to fifteen seconds; do not apply that first-event deadline to ongoing reasoning or output. Send must not wait for unfinished preparation. Request-state warmup with `generate: false` reports input-token usage; require measured benefit before enabling it.
+
 ## Runtime sources
 
 - Request authentication: [ChatGPTProvider.swift](../../Agent/LLM/Providers/ChatGPT/ChatGPTProvider.swift)

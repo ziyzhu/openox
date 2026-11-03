@@ -39,6 +39,9 @@ nonisolated struct OpenAIResponsesWebSocketEvents: AsyncSequence, @unchecked Sen
             guard let event = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 throw OpenAIClientError(message: "Invalid ChatGPT WebSocket event")
             }
+            if let error = event["error"] as? [String: Any], error["code"] as? String == "previous_response_not_found" {
+                throw OpenAIClientError(message: "WebSocket continuation unavailable: previous_response_not_found")
+            }
             return event
         }
     }
@@ -77,10 +80,11 @@ actor OpenAIResponsesWebSocketPool {
     private let idleDuration: Duration = .seconds(5 * 60)
     private let maximumAge: Duration = .seconds(55 * 60)
     private var entries: [Key: Entry] = [:]
-    private var fallbackSessions = Set<String>()
+    private var fallbackSessions: [String: ContinuousClock.Instant] = [:]
 
     func fallbackActive(sessionID: String?) -> Bool {
-        sessionID.map(fallbackSessions.contains) ?? false
+        fallbackSessions = fallbackSessions.filter { $0.value > clock.now }
+        return sessionID.flatMap { fallbackSessions[$0] } != nil
     }
 
     func acquire(request: URLRequest, sessionID: String?, accountID: String) -> Lease {
@@ -145,14 +149,14 @@ actor OpenAIResponsesWebSocketPool {
 
     func recordFailure(sessionID: String?, message: String) {
         guard let sessionID else { return }
-        fallbackSessions.insert(sessionID)
+        fallbackSessions[sessionID] = clock.now.advanced(by: .seconds(60))
         let matching = entries.filter { $0.key.sessionID == sessionID }
         for (key, entry) in matching {
             entry.expiration?.cancel()
             entry.task.cancel(with: .normalClosure, reason: Data("transport_failure".utf8))
             entries.removeValue(forKey: key)
         }
-        Log.network.warning("ChatGPT WebSocket disabled for session=\(sessionID) error=\(LogPrivacy.text(message, limit: 2_048))")
+        Log.network.warning("ChatGPT WebSocket cooldown session=\(sessionID) retryAfterSeconds=60 error=\(LogPrivacy.text(message, limit: 2_048))")
     }
 
     private func makeTask(_ request: URLRequest) -> URLSessionWebSocketTask {
@@ -177,6 +181,8 @@ nonisolated enum OpenAIResponsesWebSocketBody {
             object["previous_response_id"] = continuation.responseID
             object["input"] = delta
         }
+        object.removeValue(forKey: "stream")
+        object.removeValue(forKey: "background")
         object["type"] = "response.create"
         return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }

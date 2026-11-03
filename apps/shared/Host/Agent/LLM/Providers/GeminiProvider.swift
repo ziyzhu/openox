@@ -76,7 +76,8 @@ public struct GeminiProvider: ProviderClient {
     public func prepare(
         model: ProviderModel,
         systemPrompt: String?,
-        tools: [any AgentTool]
+        tools: [any AgentTool],
+        sessionID: String
     ) async -> LLMPreparationOutcome {
         let fingerprint = cacheFingerprint(model: model, systemPrompt: systemPrompt, tools: tools)
         let name = await resolveCachedContent(

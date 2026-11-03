@@ -116,8 +116,9 @@ final class Conversation: Identifiable {
     }
 
     func setModelPreparationIntent(_ active: Bool) {
+        guard modelPreparationIntent != active else { return }
         modelPreparationIntent = active
-        scheduleModelPreparation()
+        if client.preparationRequiresPrompt { scheduleModelPreparation() }
     }
 
     private func scheduleModelPreparation() {
@@ -125,13 +126,7 @@ final class Conversation: Identifiable {
         modelPreparationTask = nil
         guard isSelected else { return }
         modelPreparationTask = Task { @MainActor [weak self] in
-            do {
-                try await Task.sleep(for: .milliseconds(300))
-                try Task.checkCancellation()
-            } catch {
-                return
-            }
-            guard let self, self.isSelected else { return }
+            guard !Task.isCancelled, let self, self.isSelected else { return }
             let client = self.client
             let model = self.model
             let authenticationStarted = ContinuousClock.now
@@ -139,31 +134,35 @@ final class Conversation: Identifiable {
             guard !Task.isCancelled else { return }
             let authenticationMs = TurnLatencyTrace.milliseconds(authenticationStarted.duration(to: .now))
             Log.perf.info("LLM.auth.prepare conversation=\(self.id) client=\(client.id) model=\(model.id) outcome=\(authenticationOutcome.rawValue) durationMs=\(authenticationMs)")
-            guard self.modelPreparationIntent else { return }
-            let configuration = self.agentConfiguration(client: client, model: model)
-            let prompt: RenderedConversationPrompt
+            guard !client.preparationRequiresPrompt || self.modelPreparationIntent else { return }
+            let systemPrompt: String?
+            let tools: [any AgentTool]
             do {
-                prompt = try await self.renderPrompt(configuration: configuration)
+                if client.preparationRequiresPrompt {
+                    let configuration = self.agentConfiguration(client: client, model: model)
+                    systemPrompt = try await self.renderPrompt(configuration: configuration).rendered
+                    tools = configuration.tools
+                } else {
+                    try await self.durablePreparation?.value
+                    systemPrompt = nil
+                    tools = []
+                }
                 try Task.checkCancellation()
             } catch {
-                if !Task.isCancelled { Log.agent.warning("LLM.prepare prompt unavailable conversation=\(self.id) error=\(error.localizedDescription)") }
+                if !Task.isCancelled { Log.agent.warning("LLM.prepare context unavailable conversation=\(self.id) error=\(error.localizedDescription)") }
                 return
             }
-            let systemPrompt = prompt.rendered
-            let fingerprint = promptCacheKey(
-                model: model,
-                systemPrompt: systemPrompt,
-                tools: configuration.tools
-            )
+            let fingerprint = promptCacheKey(model: model, systemPrompt: systemPrompt, tools: tools)
             let started = Date()
             let outcome = await client.prepare(
                 model: model,
                 systemPrompt: systemPrompt,
-                tools: configuration.tools
+                tools: tools,
+                sessionID: self.id.uuidString
             )
             guard !Task.isCancelled else { return }
             let elapsed = Int(Date().timeIntervalSince(started) * 1_000)
-            Log.perf.info("LLM.prepare conversation=\(self.id) client=\(client.id) model=\(model.id) outcome=\(outcome.rawValue) ms=\(elapsed) fingerprint=\(fingerprint)")
+            Log.perf.info("LLM.prepare conversation=\(self.id) client=\(client.id) model=\(model.id) outcome=\(outcome.rawValue) ms=\(elapsed) prompt=\(client.preparationRequiresPrompt ? "required" : "skipped") fingerprint=\(fingerprint)")
         }
     }
 

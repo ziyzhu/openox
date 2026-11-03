@@ -153,12 +153,14 @@ nonisolated private struct DefinedProviderClient: ProviderClient {
 
     func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { definition.api }
 
+    var preparationRequiresPrompt: Bool { native.preparationRequiresPrompt }
+
     func prepareAuthentication() async -> LLMPreparationOutcome {
         await native.prepareAuthentication()
     }
 
-    func prepare(model: ProviderModel, systemPrompt: String?, tools: [any AgentTool]) async -> LLMPreparationOutcome {
-        await native.prepare(model: model, systemPrompt: systemPrompt, tools: tools)
+    func prepare(model: ProviderModel, systemPrompt: String?, tools: [any AgentTool], sessionID: String) async -> LLMPreparationOutcome {
+        await native.prepare(model: model, systemPrompt: systemPrompt, tools: tools, sessionID: sessionID)
     }
 
     func stream(model: ProviderModel, systemPrompt: String?, messages: [Message], tools: [any AgentTool], options: StreamOptions) -> AsyncThrowingStream<AssistantEvent, Error> {

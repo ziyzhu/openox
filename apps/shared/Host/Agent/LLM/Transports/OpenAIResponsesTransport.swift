@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 public struct OpenAIResponsesTransport: ProviderClient {
     public let id: String
@@ -67,6 +68,49 @@ public struct OpenAIResponsesTransport: ProviderClient {
         }
     }
 
+    public var preparationRequiresPrompt: Bool { false }
+
+    public func prepare(model: ProviderModel, systemPrompt: String?, tools: [any AgentTool], sessionID: String) async -> LLMPreparationOutcome {
+        guard case .webSocketWithServerSentEventsFallback(let accountHeader) = streamingTransport else { return .unsupported }
+        guard !(await OpenAIResponsesWebSocketPool.shared.fallbackActive(sessionID: sessionID)) else { return .unavailable }
+        do {
+            let endpoint = try await auth.resolve(forceRefresh: false)
+            let request = try webSocketRequest(endpoint: endpoint, cacheKey: sessionID)
+            let lease = await OpenAIResponsesWebSocketPool.shared.acquire(request: request, sessionID: sessionID,
+                accountID: webSocketAccountID(endpoint: endpoint, accountHeader: accountHeader))
+            let pingTimeout = Task {
+                do { try await Task.sleep(for: .seconds(5)) } catch { return }
+                Log.network.warning("\(displayName).warmup timeout stage=ping seconds=5 session=\(sessionID)")
+                lease.task.cancel(with: .goingAway, reason: nil)
+            }
+            defer { pingTimeout.cancel() }
+            do {
+                try await withTaskCancellationHandler {
+                    try Task.checkCancellation()
+                    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                        lease.task.sendPing { error in
+                            if let error { continuation.resume(throwing: error) }
+                            else { continuation.resume() }
+                        }
+                    }
+                } onCancel: {
+                    lease.task.cancel(with: .goingAway, reason: nil)
+                }
+                pingTimeout.cancel()
+                try Task.checkCancellation()
+                await OpenAIResponsesWebSocketPool.shared.release(lease, keep: true, continuation: lease.continuation)
+                Log.network.info("\(displayName).warmup connection=\(lease.reused ? "reused" : "new") session=\(sessionID) outcome=ready")
+                return .ready
+            } catch {
+                await OpenAIResponsesWebSocketPool.shared.release(lease, keep: false, continuation: nil)
+                throw error
+            }
+        } catch {
+            if !Task.isCancelled { Log.network.warning("\(displayName).warmup outcome=unavailable session=\(sessionID) error=\(LogPrivacy.text(error.localizedDescription, limit: 2_048))") }
+            return .unavailable
+        }
+    }
+
     public func stream(
         model: ProviderModel,
         systemPrompt: String?,
@@ -106,8 +150,8 @@ public struct OpenAIResponsesTransport: ProviderClient {
             let endpoint = try await auth.resolve(forceRefresh: forceRefresh)
             LogContext.latency?.mark(.authReady)
 
-            if case .webSocketWithServerSentEventsFallback(let accountHeader) = streamingTransport,
-               let accountID = endpoint.headers.first(where: { $0.key.caseInsensitiveCompare(accountHeader) == .orderedSame })?.value {
+            if case .webSocketWithServerSentEventsFallback(let accountHeader) = streamingTransport {
+                let accountID = webSocketAccountID(endpoint: endpoint, accountHeader: accountHeader)
                 let sessionID = options.promptCachePolicy == .standard ? options.sessionID : nil
                 if !(await OpenAIResponsesWebSocketPool.shared.fallbackActive(sessionID: sessionID)) {
                     var reconnectAvailable = true
@@ -130,6 +174,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
                                 Log.network.warning("\(label) reused WebSocket failed before stream start; reconnecting error=\(LogPrivacy.text(failure.underlying.localizedDescription, limit: 2_048))")
                                 continue
                             }
+                            try Task.checkCancellation()
                             await OpenAIResponsesWebSocketPool.shared.recordFailure(
                                 sessionID: sessionID,
                                 message: failure.underlying.localizedDescription
@@ -193,22 +238,13 @@ public struct OpenAIResponsesTransport: ProviderClient {
         request.httpBody = body
 
         let toolNames = tools.map(\.name).joined(separator: ",")
-        Log.network.info("\(label) SSE POST attempt=\(attempt) model=\(model.id) msgs=\(messages.count) tools=\(tools.count) [\(toolNames)] reasoning=\(reasoningPolicy.rawValue) tier=\(serviceTier ?? "standard") cache=\(options.promptCachePolicy == .standard ? "standard" : "disabled") session=\(cacheKey) bodyBytes=\(body.count)")
+        Log.network.info("\(label) SSE POST attempt=\(attempt) model=\(model.id) msgs=\(messages.count) tools=\(tools.count) [\(toolNames)] reasoning=\(model.selectedReasoningEffort ?? reasoningEffort.rawValue) tier=\(serviceTier ?? "standard") cache=\(options.promptCachePolicy == .standard ? "standard" : "disabled") session=\(cacheKey) bodyBytes=\(body.count)")
         return try await StreamingHTTP.open(request, label: label) {
             OpenAIClientError(message: "No HTTP response from \(displayName)")
         }
     }
 
-    private func runWebSocket(
-        endpoint: OpenAIEndpoint,
-        body: Data,
-        model: ProviderModel,
-        cacheKey: String,
-        sessionID: String?,
-        accountID: String,
-        label: String,
-        continuation: AsyncThrowingStream<AssistantEvent, Error>.Continuation
-    ) async throws {
+    private func webSocketRequest(endpoint: OpenAIEndpoint, cacheKey: String) throws -> URLRequest {
         guard var components = URLComponents(url: endpoint.url, resolvingAgainstBaseURL: false) else {
             throw OpenAIResponsesWebSocketFailure(
                 underlying: OpenAIClientError(message: "Invalid ChatGPT Responses URL"),
@@ -225,7 +261,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
             )
         }
 
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url, timeoutInterval: 15)
         for (key, value) in endpoint.headers where
             key.caseInsensitiveCompare("Accept") != .orderedSame
                 && key.caseInsensitiveCompare("Content-Type") != .orderedSame
@@ -234,13 +270,39 @@ public struct OpenAIResponsesTransport: ProviderClient {
         }
         request.setValue(cacheKey, forHTTPHeaderField: sessionHeaderName)
         request.setValue(cacheKey, forHTTPHeaderField: "x-client-request-id")
+        return request
+    }
 
+    private func webSocketAccountID(endpoint: OpenAIEndpoint, accountHeader: String) -> String {
+        let identity = endpoint.headers.first(where: { $0.key.caseInsensitiveCompare(accountHeader) == .orderedSame })?.value
+            ?? endpoint.headers.first(where: { $0.key.caseInsensitiveCompare("Authorization") == .orderedSame })?.value
+            ?? ""
+        return SHA256.hash(data: Data((endpoint.url.absoluteString + "\n" + identity).utf8)).description
+    }
+
+    private func runWebSocket(
+        endpoint: OpenAIEndpoint,
+        body: Data,
+        model: ProviderModel,
+        cacheKey: String,
+        sessionID: String?,
+        accountID: String,
+        label: String,
+        continuation: AsyncThrowingStream<AssistantEvent, Error>.Continuation
+    ) async throws {
+        let request = try webSocketRequest(endpoint: endpoint, cacheKey: cacheKey)
         LogContext.latency?.mark(.httpStarted)
         let lease = await OpenAIResponsesWebSocketPool.shared.acquire(
             request: request,
             sessionID: sessionID,
             accountID: accountID
         )
+        let firstEventTimeout = Task {
+            do { try await Task.sleep(for: .seconds(15)) } catch { return }
+            Log.network.warning("\(label) WebSocket timeout stage=firstEvent seconds=15 session=\(cacheKey)")
+            lease.task.cancel(with: .goingAway, reason: nil)
+        }
+        defer { firstEventTimeout.cancel() }
         var eventsReceived = false
         do {
             let requestBody = try OpenAIResponsesWebSocketBody.request(body, continuing: lease.continuation)
@@ -248,20 +310,26 @@ public struct OpenAIResponsesTransport: ProviderClient {
                 throw OpenAIClientError(message: "Invalid ChatGPT WebSocket request encoding")
             }
             let continued = (try? JSONSerialization.jsonObject(with: requestBody) as? [String: Any])?["previous_response_id"] != nil
-            Log.network.info("\(label) WebSocket send connection=\(lease.reused ? "reused" : "new") continuation=\(continued ? "delta" : "full") session=\(cacheKey) bodyBytes=\(requestBody.count)")
-            try await lease.task.send(.string(message))
-            let completed = try await consume(
-                events: OpenAIResponsesWebSocketEvents(task: lease.task),
-                model: model,
-                label: label,
-                continuation: continuation,
-                onEvent: {
-                    if !eventsReceived {
-                        eventsReceived = true
-                        LogContext.latency?.mark(.responseHeaders)
+            Log.network.info("\(label) WebSocket send connection=\(lease.reused ? "reused" : "new") continuation=\(continued ? "delta" : "full") model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? reasoningEffort.rawValue) tier=\(serviceTier(model) ?? "standard") session=\(cacheKey) bodyBytes=\(requestBody.count)")
+            let completed = try await withTaskCancellationHandler {
+                try Task.checkCancellation()
+                try await lease.task.send(.string(message))
+                return try await consume(
+                    events: OpenAIResponsesWebSocketEvents(task: lease.task),
+                    model: model,
+                    label: label,
+                    continuation: continuation,
+                    onEvent: {
+                        if !eventsReceived {
+                            firstEventTimeout.cancel()
+                            eventsReceived = true
+                            LogContext.latency?.mark(.responseHeaders)
+                        }
                     }
-                }
-            )
+                )
+            } onCancel: {
+                lease.task.cancel(with: .goingAway, reason: nil)
+            }
             let next = completed.map {
                 OpenAIResponsesWebSocketContinuation(
                     requestBody: body,
@@ -271,7 +339,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
             }
             await OpenAIResponsesWebSocketPool.shared.release(
                 lease,
-                keep: true,
+                keep: completed != nil,
                 continuation: next
             )
         } catch {

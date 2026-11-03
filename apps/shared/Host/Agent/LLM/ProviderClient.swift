@@ -175,6 +175,7 @@ nonisolated public protocol ProviderClient: Sendable {
     var inferenceLocation: LLMInferenceLocation { get }
     var reasoningPolicy: LLMReasoningPolicy { get }
     var protocolDiagnostics: LLMProtocolDiagnostics { get }
+    var preparationRequiresPrompt: Bool { get }
 
     func wireProtocol(for model: ProviderModel) -> LLMWireProtocol?
 
@@ -183,7 +184,8 @@ nonisolated public protocol ProviderClient: Sendable {
     func prepare(
         model: ProviderModel,
         systemPrompt: String?,
-        tools: [any AgentTool]
+        tools: [any AgentTool],
+        sessionID: String
     ) async -> LLMPreparationOutcome
 
     func stream(
@@ -212,6 +214,7 @@ nonisolated extension ProviderClient {
     public var inferenceLocation: LLMInferenceLocation { presentation.inferenceLocation }
     public var reasoningPolicy: LLMReasoningPolicy { .unavailable }
     public var protocolDiagnostics: LLMProtocolDiagnostics { LLMProtocolDiagnostics() }
+    public var preparationRequiresPrompt: Bool { true }
 
     public func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { nil }
 
@@ -222,7 +225,8 @@ nonisolated extension ProviderClient {
     public func prepare(
         model: ProviderModel,
         systemPrompt: String?,
-        tools: [any AgentTool]
+        tools: [any AgentTool],
+        sessionID: String
     ) async -> LLMPreparationOutcome {
         .unsupported
     }
@@ -310,7 +314,9 @@ nonisolated extension ProviderClient {
                     continuation.finish()
                 }
             }
-            continuation.onTermination = { _ in task.cancel() }
+            continuation.onTermination = { termination in
+                if case .cancelled = termination { task.cancel() }
+            }
         }
     }
 }
