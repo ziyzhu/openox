@@ -4,6 +4,7 @@
   "description": "The free online encyclopedia. Search articles by full text, fetch article summaries or full section-by-section text, and find related articles. No sign-in required.",
   "baseUrl": "https://en.wikipedia.org/",
   "$defs": {
+    "standardSearchPage": {"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string","minLength":1},"url":{"type":["string","null"]},"snippet":{"type":["string","null"]},"id":{"type":"string"},"data":{"$ref":"#/$defs/searchResult"}},"required":["title","url","snippet","data"],"additionalProperties":false}},"nextCursor":{"type":["string","null"]},"scope":{"type":"string","minLength":1},"coverage":{"type":"string","enum":["complete","partial","unknown"]}},"required":["items","nextCursor","scope","coverage"],"additionalProperties":false},
     "searchResult": {
       "type": "object",
       "properties": {
@@ -155,15 +156,17 @@
   },
   "actions": [
     {
-      "id": "searchArticles",
+      "id": "search",
       "label": "Search articles",
-      "description": "Full-text search over English Wikipedia. Returns matching articles with excerpts.",
+      "description": "Search English Wikipedia articles with excerpts. Returns a bounded result window without continuation or exhaustive-coverage guarantees.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "query": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
+          "cursor": {"type":"string","minLength":1},
           "limit": {
             "type": "integer",
             "default": 10,
@@ -177,7 +180,7 @@
         "additionalProperties": false
       },
       "outputSchema": {
-        "$ref": "#/$defs/searchResults"
+        "$ref": "#/$defs/standardSearchPage"
       },
       "defaultArgs": {
         "query": "skill"
@@ -272,7 +275,7 @@
       "name": "维基百科",
       "description": "英文维基百科，只读。按全文搜索条目，获取条目摘要或逐节全文，并查找相关条目。无需登录。",
       "actions": {
-        "searchArticles": {
+        "search": {
           "label": "搜索条目",
           "description": "对英文维基百科进行全文搜索。返回匹配的条目及摘录。"
         },

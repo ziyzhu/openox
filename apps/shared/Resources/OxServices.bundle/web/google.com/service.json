@@ -174,6 +174,16 @@
   },
   "actions": [
     {
+      "id": "search",
+      "label": "Search",
+      "description": "Search the public web. Returns a bounded result window, not exhaustive coverage. Consent and human verification are reported as failures.",
+      "baseUrl": "https://www.google.com/search?q={query}&hl=en&num=10",
+      "inputSchema": {"type":"object","properties":{"query":{"type":"string","minLength":1,"maxLength":1000},"limit":{"type":"integer","minimum":1,"maximum":50,"default":10},"cursor":{"type":"string","minLength":1}},"required":["query"],"additionalProperties":false},
+      "outputSchema": {"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string","minLength":1},"url":{"type":["string","null"]},"snippet":{"type":["string","null"]}},"required":["title","url","snippet"],"additionalProperties":false}},"nextCursor":{"type":["string","null"]},"scope":{"type":"string","minLength":1},"coverage":{"type":"string","enum":["complete","partial","unknown"]}},"required":["items","nextCursor","scope","coverage"],"additionalProperties":false},
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
       "id": "listSuggestions",
       "label": "Autocomplete suggestions",
       "description": "Suggests searches that complete a partial query.",
@@ -334,6 +344,7 @@
       "name": "谷歌",
       "description": "网页搜索引擎。查找新闻、图片、视频和查询建议。无需登录。",
       "actions": {
+        "search": {"label": "搜索", "description": "搜索公开网页。仅返回有限结果；同意请求或人机验证将报告为失败。"},
         "listSuggestions": {
           "label": "自动补全建议",
           "description": "为未输入完整的查询提供搜索建议。"

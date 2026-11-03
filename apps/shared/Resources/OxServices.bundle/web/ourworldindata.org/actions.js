@@ -55,7 +55,9 @@ window.ox.install(({ action }) => {
     };
     const paginate = (result) => result.page + 1 < result.nbPages ? String(result.page + 1) : null;
     action("search", {
-        async invoke({ query, cursor, limit = 20 } = {}) {
+        async invoke({ query, cursor, limit = 10 } = {}) {
+            if (!query?.trim()) throw new Error("Search query must not be blank");
+            if (cursor && !/^[0-9]+$/.test(cursor)) throw new Error("Invalid search cursor");
             const result = await algolia({
                 indexName: "pages",
                 query: query ?? "",
@@ -72,7 +74,13 @@ window.ox.install(({ action }) => {
                 excerpt: h.excerpt ?? null,
                 authors: Array.isArray(h.authors) ? h.authors : [],
             }));
-            return { items, nextCursor: paginate(result) };
+            const nextCursor = paginate(result);
+            return {
+                items: items.map(item => ({ title: item.title, url: item.url, snippet: item.excerpt, data: item })),
+                nextCursor,
+                scope: "Articles, topics, and data insights",
+                coverage: nextCursor ? "partial" : "unknown",
+            };
         },
     });
     action("searchCharts", {

@@ -181,6 +181,37 @@ window.ox.install(({ action }) => {
             return typeof candidate === "string" && /^https:\/\//.test(candidate) ? candidate : null;
         };
     };
+    action("search", {
+        async invoke({ query, limit = 10, cursor } = {}) {
+            if (!query?.trim()) throw new Error("Search query must not be blank");
+            if (cursor) throw new Error("Google web search does not expose continuation");
+            const deadline = Date.now() + 12000;
+            while (Date.now() < deadline) {
+                const doc = ensureSearchPage(document, location.href);
+                const items = [], seen = new Set();
+                for (const heading of doc.querySelectorAll("h3")) {
+                    const link = heading.closest("a[href]");
+                    if (!link) continue;
+                    const url = normalizedUrl(link.getAttribute("href"));
+                    const title = cleanText(heading.textContent);
+                    if (!url || !title || seen.has(url)) continue;
+                    const host = new URL(url).hostname;
+                    if (host === "google.com" || host.endsWith(".google.com")) continue;
+                    const root = link.closest("div[data-hveid]") ?? link.closest(".MjjYud") ?? link.parentElement?.parentElement;
+                    const snippet = cleanText(root?.querySelector(".VwiC3b, .s3v9rd, [data-sncf]")?.textContent) || null;
+                    seen.add(url);
+                    items.push({ title, url, snippet });
+                    if (items.length === limit) break;
+                }
+                if (items.length) return { items, nextCursor: null, scope: "Public web", coverage: "unknown" };
+                if (/did not match any documents|no results found/i.test(cleanText(doc.querySelector("#topstuff")?.textContent))) {
+                    return { items: [], nextCursor: null, scope: "Public web", coverage: "complete" };
+                }
+                await new Promise(resolve => setTimeout(resolve, 150));
+            }
+            throw new Error("Google search results did not become recognizable; absence of results is unverified");
+        },
+    });
     action("listSuggestions", {
         async invoke({ query } = {}) {
             if (!query)

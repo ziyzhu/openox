@@ -21,7 +21,7 @@ public protocol OxFunctionBridge: AnyObject {
     func appLogs(options: JSONValue?, purpose: String) async throws -> JSONValue?
     func renameConversation(title: String, purpose: String) async throws -> JSONValue?
     func invokeAction(name: String, args: JSONValue?, session: JSONValue?, pageURL: String?, purpose: String) async throws -> JSONValue?
-    func searchWeb(query: String, purpose: String) async throws -> JSONValue?
+    func authorizeSearch(arguments: JSONValue, purpose: String) async throws -> JSONValue?
     func fetchWeb(url: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
     func browserOperation(action: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?
     func analyzeVision(filename: String, purpose: String) async throws -> JSONValue?

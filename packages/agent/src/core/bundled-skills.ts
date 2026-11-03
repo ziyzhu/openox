@@ -6,6 +6,7 @@ import helpers from "../../skills/evolve/references/helpers.js" with { type: "te
 import modelSchemas from "../../skills/evolve/references/model-schemas.md" with { type: "text" };
 import modelService from "../../skills/evolve/references/model-service.md" with { type: "text" };
 import webService from "../../skills/evolve/references/web-service.md" with { type: "text" };
+import search from "../../skills/evolve/references/search.md" with { type: "text" };
 import importMemory from "../../skills/import-memory/SKILL.md" with { type: "text" };
 import providers from "../../skills/evolve/references/providers.md" with { type: "text" };
 import webAuthentication from "../../skills/evolve/references/web-authentication.md" with { type: "text" };
@@ -37,7 +38,7 @@ export const bundledSkills: readonly BundledSkill[] = Object.freeze([
   skill("evolve", evolve, { "references/api-service.md": apiService, "references/helpers.js": helpers,
     "references/model-schemas.md": modelSchemas, "references/model-service.md": modelService, "references/web-service.md": webService,
     "references/providers.md": providers, "references/web-authentication.md": webAuthentication, "references/web-handoffs.md": webHandoffs,
-    "references/web-capture.md": webCapture, "references/service-icon.md": serviceIcon,
+    "references/web-capture.md": webCapture, "references/service-icon.md": serviceIcon, "references/search.md": search,
     "references/skills.md": skillGuide, "references/user-skill.md": userSkill, "references/repository-skill.md": repositorySkill }),
   skill("import-memory", importMemory),
   skill("visualize", visualize, { "references/html.md": html, "references/reactive-example.md": reactiveExample }),

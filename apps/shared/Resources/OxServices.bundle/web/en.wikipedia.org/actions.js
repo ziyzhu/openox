@@ -47,9 +47,17 @@ window.ox.install(({ action }) => {
         const data = await fetchJson(`/w/rest.php/v1/search/page?q=${encodeURIComponent(query)}&limit=${limit}`);
         return { items: (data.pages ?? []).map(searchItem), nextCursor: null };
     };
-    action("searchArticles", {
-        async invoke({ query, limit = 10 }) {
-            return await searchPage(query, limit);
+    action("search", {
+        async invoke({ query, limit = 10, cursor }) {
+            if (!query.trim()) throw new Error("Search query must not be blank");
+            if (cursor) throw new Error("Wikipedia search does not expose continuation");
+            const page = await searchPage(query, limit);
+            return {
+                items: page.items.map(item => ({ title: item.title, url: item.url, snippet: item.excerpt ?? item.description ?? null, id: item.key, data: item })),
+                nextCursor: null,
+                scope: "English Wikipedia articles",
+                coverage: "unknown",
+            };
         },
     });
     action("listRelatedArticles", {

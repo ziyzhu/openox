@@ -4,6 +4,7 @@
   "description": "The real-time public conversation network. Read accounts, posts, replies, media and video, timelines, Lists, Communities, Spaces, Highlights, Articles, search, trends, bookmarks, likes, followers, mentions, notifications, and private post/account analytics. All actions are read-only; private account feeds require sign-in.",
   "baseUrl": "https://x.com/home",
   "$defs": {
+    "standardSearchPage": {"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string","minLength":1},"url":{"type":["string","null"]},"snippet":{"type":["string","null"]},"id":{"type":"string"},"data":{"$ref":"#/$defs/tweet"}},"required":["title","url","snippet","id","data"],"additionalProperties":false}},"nextCursor":{"type":["string","null"]},"scope":{"type":"string","minLength":1},"coverage":{"type":"string","enum":["complete","partial","unknown"]}},"required":["items","nextCursor","scope","coverage"],"additionalProperties":false},
     "quotedTweet": {
       "type": "object",
       "properties": {
@@ -996,6 +997,15 @@
       },
       "requireApproval": false,
       "requireAuth": true
+    },
+    {
+      "id": "search",
+      "label": "Search posts",
+      "description": "Search top X posts using website query syntax. Preserves post identifiers and source cursors. Results are not guaranteed exhaustive.",
+      "inputSchema": {"type":"object","properties":{"query":{"type":"string","minLength":1},"limit":{"type":"integer","minimum":1,"maximum":50,"default":10},"cursor":{"type":"string","minLength":1}},"required":["query"],"additionalProperties":false},
+      "outputSchema": {"$ref":"#/$defs/standardSearchPage"},
+      "requireAuth": true,
+      "requireApproval": false
     },
     {
       "id": "searchTweets",
@@ -1991,6 +2001,7 @@
           "label": "用户推文列表",
           "description": "用户的最新推文（不含置顶）。默认为已登录用户。"
         },
+        "search": {"label":"搜索帖子","description":"使用网站查询语法搜索热门 X 帖子，保留帖子标识与分页游标；不保证覆盖全部匹配结果。"},
         "searchTweets": {
           "label": "搜索推文",
           "description": "搜索 X 帖子，并支持精确短语、指定账号和起始日期等常用筛选条件。"

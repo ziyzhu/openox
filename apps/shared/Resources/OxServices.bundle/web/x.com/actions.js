@@ -633,8 +633,7 @@ window.ox.install(({ action }) => {
             return await listUserTimeline("UserVideoTimeline", username, startCursor, limit);
         },
     });
-    action("searchTweets", {
-        async invoke({ query, product = "top", from, has, exclude, cursor: startCursor, limit = 15 }) {
+    const searchPosts = async ({ query, product = "top", from, has, exclude, cursor: startCursor, limit = 15 }) => {
             const ct0 = requireCt0();
             const parts = [String(query || "").trim()];
             if (from)
@@ -669,7 +668,19 @@ window.ox.install(({ action }) => {
                 if (cursor)
                     vars.cursor = cursor;
                 return graphqlPost(op, "SearchTimeline", vars, ct0);
-            }, (d) => d?.data?.search_by_raw_query?.search_timeline?.timeline?.instructions || [], `searchTweets ${JSON.stringify(rawQuery)}`);
+            }, (d) => d?.data?.search_by_raw_query?.search_timeline?.timeline?.instructions || [], "searchPosts");
+    };
+    action("searchTweets", { invoke: searchPosts });
+    action("search", {
+        async invoke({ query, limit = 10, cursor }) {
+            if (!query.trim()) throw new Error("Search query must not be blank");
+            const page = await searchPosts({ query, limit, cursor });
+            return {
+                items: page.items.map(item => ({ title: item.text.trim().slice(0, 160) || item.author, url: item.url, snippet: item.text || null, id: item.id, data: item })),
+                nextCursor: page.nextCursor,
+                scope: "Top posts",
+                coverage: page.nextCursor ? "partial" : "unknown",
+            };
         },
     });
     action("listTimeline", {

@@ -1,5 +1,7 @@
 # API Service
 
+`ox.web.search` orchestrates opted-in web services only. API search actions remain ordinary `ox.service.invoke` actions; naming an API action `search` does not add it to public search defaults.
+
 Build Local API services inside Ox from published API documentation and verified responses. The Host executes handlers in an isolated JavaScript runtime and owns HTTP authentication. No website page, cookies, DOM, browser globals, or shell is available.
 
 ## Contract

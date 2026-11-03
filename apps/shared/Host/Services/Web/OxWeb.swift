@@ -6,72 +6,6 @@ nonisolated enum OxWeb {
         namespace: "web",
         schema: {
             [(
-                "ox.web.search",
-                .object([
-                    "description": .string(ModelGuidance.text("ox.web.search")),
-                    "inputSchema": .object([
-                        "type": .string("object"),
-                        "properties": .object([
-                            "query": .object([
-                                "type": .string("string"),
-                                "minLength": .int(1),
-                                "maxLength": .int(500),
-                                "description": .string("Web search query sent as written to each provider. Common operators include quoted phrases, `site:`, exclusions, and `OR`."),
-                            ]),
-                            "purpose": .object([
-                                "type": .string("string"),
-                                "minLength": .int(1),
-                                "description": .string("Short (<10 words) description of why you're searching, shown to the user as the step label."),
-                            ]),
-                        ]),
-                        "required": .array([.string("query"), .string("purpose")]),
-                    ]),
-                    "outputSchema": .object([
-                        "type": .string("object"),
-                        "properties": .object([
-                            "query": .object(["type": .string("string")]),
-                            "items": .object([
-                                "type": .string("array"),
-                                "items": .object([
-                                    "type": .string("object"),
-                                    "properties": .object([
-                                        "id": .object(["type": .string("string")]),
-                                        "title": .object(["type": .string("string")]),
-                                        "url": .object(["type": .string("string")]),
-                                        "snippet": .object(["type": .string("string")]),
-                                        "site": .object(["type": .string("string")]),
-                                        "publishedAt": .object(["type": .array([.string("string"), .string("null")])]),
-                                        "providers": .object([
-                                            "type": .string("array"),
-                                            "items": .object(["type": .string("string")]),
-                                        ]),
-                                    ]),
-                                    "required": .array([
-                                        .string("id"), .string("title"), .string("url"),
-                                        .string("snippet"), .string("site"), .string("publishedAt"),
-                                        .string("providers"),
-                                    ]),
-                                    "additionalProperties": .bool(false),
-                                ]),
-                            ]),
-                            "serviceSuggestions": .object([
-                                "type": .array([.string("array"), .string("null")]),
-                                "items": .object(["type": .string("object")]),
-                                "description": .string("Relevant service snapshots in ox.service.find format, best match first. Null when the service catalog is unavailable; an empty array means no matches. Suggestions do not attach or invoke services."),
-                            ]),
-                            "provider": .object(["type": .string("string")]),
-                            "providers": .object([
-                                "type": .string("array"),
-                                "items": .object(["type": .string("string")]),
-                            ]),
-                        ]),
-                        "required": .array([
-                            .string("query"), .string("items"), .string("provider"), .string("providers"), .string("serviceSuggestions"),
-                        ]),
-                        "additionalProperties": .bool(false),
-                    ]),
-                ])
-            ), (
                 "ox.web.fetch",
                 .object([
                     "description": .string(ModelGuidance.text("ox.web.fetch")),
@@ -145,13 +79,6 @@ nonisolated enum OxWeb {
             )] + BrowserFunctionCatalog.actions.map { ($0.name, $0.functionSchema) }
         },
         installNatives: { ctx, env in
-            let block: @convention(block) (String, JSValue) -> JSValue = { query, purpose in
-                let purpose = purpose.toString()!
-                return env.call {
-                    try await $0.searchWeb(query: query, purpose: purpose)
-                }
-            }
-            ctx.setObject(block as AnyObject, forKeyedSubscript: "__nativeWebSearch" as NSString)
             let fetch: @convention(block) (String, JSValue, JSValue) -> JSValue = { url, options, purpose in
                 let purpose = purpose.toString()!
                 return env.call {
@@ -169,7 +96,6 @@ nonisolated enum OxWeb {
             ctx.setObject(browser as AnyObject, forKeyedSubscript: "__nativeWebBrowser" as NSString)
         },
         jsFragment: """
-          search: (value) => { const options = __oxOptions(value, 'ox.web.search'); return __nativeWebSearch(String(options.query), String(options.purpose)); },
           fetch: (value) => { const options = __oxOptions(value, 'ox.web.fetch'); return __nativeWebFetch(String(options.url), options.options ?? null, String(options.purpose)); },
           browser: {
             navigate: (value) => __nativeWebBrowser('navigate', __oxOptions(value, 'ox.web.browser.navigate')),

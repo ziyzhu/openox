@@ -4,6 +4,7 @@
   "description": "Research on the world's largest problems. Covers global development, health, energy, population, and more. Search articles and topic pages, search the chart catalog, browse the latest publications, and read the data behind any chart (latest values across countries, units, and sources).",
   "baseUrl": "https://ourworldindata.org/",
   "$defs": {
+    "standardSearchPage": {"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string","minLength":1},"url":{"type":["string","null"]},"snippet":{"type":["string","null"]},"data":{"$ref":"#/$defs/page"}},"required":["title","url","snippet","data"],"additionalProperties":false}},"nextCursor":{"type":["string","null"]},"scope":{"type":"string","minLength":1},"coverage":{"type":"string","enum":["complete","partial","unknown"]}},"required":["items","nextCursor","scope","coverage"],"additionalProperties":false},
     "page": {
       "type": "object",
       "properties": {
@@ -93,49 +94,9 @@
     {
       "id": "search",
       "label": "Search articles & topics",
-      "description": "Full-text search across articles, topic pages, and data insights.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string"
-          },
-          "cursor": {
-            "type": "string"
-          },
-          "limit": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 50
-          }
-        },
-        "required": [
-          "query"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/$defs/page"
-            }
-          },
-          "nextCursor": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "items",
-          "nextCursor"
-        ],
-        "additionalProperties": false
-      },
+      "description": "Search articles, topic pages, and data insights. Preserves source pagination without claiming exhaustive index coverage.",
+      "inputSchema": {"type":"object","properties":{"query":{"type":"string","minLength":1},"limit":{"type":"integer","minimum":1,"maximum":50,"default":10},"cursor":{"type":"string","minLength":1}},"required":["query"],"additionalProperties":false},
+      "outputSchema": {"$ref":"#/$defs/standardSearchPage"},
       "requireApproval": false,
       "requireAuth": false
     },

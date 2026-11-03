@@ -360,7 +360,6 @@ nonisolated enum Log {
     static let network  = Logger(category: "Network")
     static let service  = Logger(category: "Service")
     static let webView  = Logger(category: "WebView")
-    static let webSearch = Logger(category: "WebSearch")
     static let webFetch = Logger(category: "WebFetch")
     static let session  = Logger(category: "Session")
     static let perf     = Logger(category: "Perf")

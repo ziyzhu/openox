@@ -323,20 +323,25 @@ window.ox.install(({ action }) => {
         if (!rendered)
             throw new Error(`search results never rendered: ${pageContext()}`);
     };
-    action("searchNotes", {
-        invoke({ query, limit = 20 } = {}) {
+    action("search", {
+        invoke({ query, limit = 10, cursor } = {}) {
             return serializeSearch(async () => {
                 try {
-                    if (!query)
-                        throw new Error("searchNotes requires a query");
+                    if (!query?.trim()) throw new Error("Search query must not be blank");
+                    if (cursor) throw new Error("Xiaohongshu note search does not expose continuation");
                     await openNoteSearch(String(query));
                     if (visibleSearchCount() < limit) {
                         await scrollUntil({ container: null, countRows: visibleSearchCount, target: limit });
                     }
-                    return { items: collectNoteCards(limit), nextCursor: null };
+                    return {
+                        items: collectNoteCards(limit).map(item => ({ title: item.title || item.author || "笔记", url: item.url, snippet: null, data: item })),
+                        nextCursor: null,
+                        scope: "Notes",
+                        coverage: "unknown",
+                    };
                 }
                 catch (e) {
-                    console.log("searchNotes: " + (e?.message ?? String(e)));
+                    console.log("search failed");
                     throw e;
                 }
             });

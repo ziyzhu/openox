@@ -4,6 +4,7 @@
   "description": "A Chinese lifestyle and shopping community. Search notes by keyword, browse the home feed (personalized to the signed-in user), read a note's body and engagement counts, browse its comment thread, and extract a note's image and video URLs.",
   "baseUrl": "https://www.xiaohongshu.com/explore",
   "$defs": {
+    "standardSearchPage": {"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string","minLength":1},"url":{"type":["string","null"]},"snippet":{"type":["string","null"]},"data":{"$ref":"#/$defs/searchResult"}},"required":["title","url","snippet","data"],"additionalProperties":false}},"nextCursor":{"type":["string","null"]},"scope":{"type":"string","minLength":1},"coverage":{"type":"string","enum":["complete","partial","unknown"]}},"required":["items","nextCursor","scope","coverage"],"additionalProperties":false},
     "note": {
       "type": "object",
       "properties": {
@@ -354,52 +355,11 @@
       "requireAuth": false
     },
     {
-      "id": "searchNotes",
+      "id": "search",
       "label": "Search notes",
-      "description": "Search Xiaohongshu notes by keyword. Search one keyword at a time, invoking multiple searches sequentially.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string"
-          },
-          "cursor": {
-            "type": "string"
-          },
-          "limit": {
-            "type": "integer",
-            "default": 20,
-            "minimum": 1,
-            "maximum": 60
-          }
-        },
-        "required": [
-          "query"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/$defs/searchResult"
-            }
-          },
-          "nextCursor": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "items",
-          "nextCursor"
-        ],
-        "additionalProperties": false
-      },
+      "description": "Search Xiaohongshu notes by keyword. Returns a bounded visible result window, not exhaustive coverage. Searches execute sequentially.",
+      "inputSchema": {"type":"object","properties":{"query":{"type":"string","minLength":1},"limit":{"type":"integer","minimum":1,"maximum":50,"default":10},"cursor":{"type":"string","minLength":1}},"required":["query"],"additionalProperties":false},
+      "outputSchema": {"$ref":"#/$defs/standardSearchPage"},
       "defaultArgs": {
         "query": "美食"
       },
@@ -737,7 +697,7 @@
           "label": "检查小红书登录状态",
           "description": "检查你是否已登录小红书。"
         },
-        "searchNotes": {
+        "search": {
           "label": "搜索笔记",
           "description": "按关键词搜索小红书笔记。一次搜索一个关键词，多个搜索请依次调用。"
         },

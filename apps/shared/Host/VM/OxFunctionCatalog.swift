@@ -24,6 +24,7 @@ nonisolated enum OxFunctionCatalog {
         OxConversations.function,
         OxActions.function,
         OxWeb.function,
+        OxSearch.function,
         OxServices.function,
         OxRepositories.function,
         OxUser.function,

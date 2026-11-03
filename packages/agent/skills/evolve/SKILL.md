@@ -20,6 +20,7 @@ Load only the references needed for this task. Paths are relative to this skill 
 | Connect a direct HTTP API with Host-managed authentication | `references/api-service.md` |
 | Create, improve, copy, share, or verify a reusable skill | `references/skills.md` |
 | Add or repair website conversation Actions | Web service reference, then `references/model-service.md` |
+| Add or standardize a website's default search action | Web service reference, then `references/search.md` |
 | Set or repair a customer-facing web or API service favicon | `references/service-icon.md` |
 
 Source inspection, copying, attachment changes, and straightforward deletion need no service-authoring reference. Compare repository candidates read-only with `ox.repository.conflicts({ purpose, service, compare: true })`; complete file hashes establish exact copies without activating either source. Never use `ox.repository.resolve` to preview or compare files. Source resolution activates a candidate, `ox.service.attach` loads current source, and page reload refreshes a website document; these are distinct operations. Provider configuration does not require Browser exploration, a service favicon, or service attachment. An AI website is a service, never a model-provider transport; do not build a browser bridge for the agent loop.
