@@ -78,8 +78,10 @@ extension Service {
         operation: @escaping @MainActor @Sendable (ServiceWebPage) async throws -> T
     ) async throws -> T {
         guard domain != "ios:browser" else { throw EvalError.notActive }
+        let page = try await openSessionPage(for: action)
         return try await manager.actionScheduler.schedule(
             action,
+            on: page,
             kind: .navigation,
             operation: operation
         )

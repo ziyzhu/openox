@@ -197,6 +197,7 @@ nonisolated struct Invocation: Identifiable, Equatable, Hashable, Codable, Senda
         var query: String?
         var domain: String?
         var links: [Link] = []
+        var services: [String]?
 
         nonisolated struct Link: Equatable, Codable, Sendable {
             var url: String

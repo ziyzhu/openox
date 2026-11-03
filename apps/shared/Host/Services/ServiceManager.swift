@@ -69,7 +69,7 @@ final class ServiceManager {
     @ObservationIgnored private let nativeServices: any NativeServiceCatalog
     @ObservationIgnored private var memoryWarningObserver: NSObjectProtocol?
     @ObservationIgnored private var folderGrantObserver: NSObjectProtocol?
-    @ObservationIgnored let actionScheduler = ServiceActionScheduler(capacity: 5)
+    @ObservationIgnored let actionScheduler = ServiceActionScheduler()
     @ObservationIgnored let browserActionSessions = ServiceBrowserActionSessionCoordinator()
     @ObservationIgnored private var intrinsicBrowserService: Service?
     @ObservationIgnored private let websiteData = ServiceWebsiteDataCoordinator()
@@ -187,7 +187,7 @@ final class ServiceManager {
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
-                    self.actionScheduler.releaseIdle(reason: .memoryWarning)
+                    for service in self.services { service.releaseIdleSessionPages(reason: .memoryWarning) }
                     self.closeWebConversations()
                 }
             }
@@ -495,7 +495,7 @@ final class ServiceManager {
             })
             for domain in changed {
                 guard let service = byDomain[domain] else { continue }
-                service.invalidateResolved()
+                await service.invalidateResolved()
                 await service.remoteMCPService?.deactivate()
                 Log.service.info("Service.invalidate domain=\(domain) reason=sourceChanged removed=\(monoRepository.serviceVersions[domain] == nil)")
             }
@@ -815,8 +815,16 @@ final class ServiceManager {
         return loaded
     }
 
-    func selectServiceForAttachment(_ service: Service) {
-        guard byDomain[service.domain] !== service else { return }
+    func selectServiceForAttachment(_ candidate: Service) async throws -> Service {
+        var service = candidate
+        while let current = byDomain[service.domain] {
+            if current === service || (current.sourceVersion != nil && current.sourceVersion == service.sourceVersion) {
+                return current
+            }
+            await current.invalidateResolved()
+            service = try await serviceForCaller(domain: service.domain, reason: .attach)
+            if byDomain[service.domain] === current { break }
+        }
         let previous = byDomain[service.domain]
         let next = services.contains(where: { $0.domain == service.domain })
             ? services.map { $0.domain == service.domain ? service : $0 }
@@ -825,6 +833,7 @@ final class ServiceManager {
         monoRepositoryRevision &+= 1
         reindexMonoRepository()
         Log.service.info("ServiceManager.selectServiceForAttachment domain=\(service.domain) from=\(previous?.definition.repositoryID ?? "none") to=\(service.definition.repositoryID ?? "none")")
+        return service
     }
 
     private func mutateRepositories(

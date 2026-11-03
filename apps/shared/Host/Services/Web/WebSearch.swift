@@ -27,17 +27,30 @@ extension Conversation {
         var recorded = options
         recorded["services"] = .array(services.map(JSONValue.string))
         return try await tracked(Actions.webSearch, .object(recorded), purpose: purpose, groupsCalls: true) {
+            let outcomes = try await withThrowingTaskGroup(of: (Int, Result<JSONValue, OxFunctionError>).self) { group in
+                for (index, service) in services.enumerated() {
+                    group.addTask {
+                        do {
+                            return (index, .success(try await self.searchPage(service: service, options: options, purpose: purpose)))
+                        } catch {
+                            let failure = OxFunctionError.from(error)
+                            if ["cancelled", "permission_denied", "handoff_incomplete"].contains(failure.code) { throw error }
+                            Log.session.warning("bridge.web.search service=\(service) code=\(failure.code) error=\(LogPrivacy.text(error.localizedDescription))")
+                            return (index, .failure(failure))
+                        }
+                    }
+                }
+                var outcomes = [Result<JSONValue, OxFunctionError>?](repeating: nil, count: services.count)
+                for try await (index, outcome) in group { outcomes[index] = outcome }
+                return outcomes
+            }
             var results: [JSONValue] = []
             var errors: [JSONValue] = []
-            for service in services {
-                try Task.checkCancellation()
-                do {
-                    results.append(try await self.searchPage(service: service, options: options, purpose: purpose))
-                } catch {
-                    let failure = OxFunctionError.from(error)
-                    if ["cancelled", "permission_denied", "handoff_incomplete"].contains(failure.code) { throw error }
-                    Log.session.warning("bridge.web.search service=\(service) code=\(failure.code) error=\(LogPrivacy.text(error.localizedDescription))")
-                    errors.append(.object(["service": .string(service), "code": .string(failure.code), "message": .string(failure.message)]))
+            for (service, outcome) in zip(services, outcomes) {
+                switch outcome {
+                case .success(let page): results.append(page)
+                case .failure(let failure): errors.append(.object(["service": .string(service), "code": .string(failure.code), "message": .string(failure.message)]))
+                case nil: break
                 }
             }
             guard !results.isEmpty else {
@@ -57,13 +70,13 @@ extension Conversation {
             throw OxSearch.failure("search_unsupported", "\(service) is not an available web service.")
         }
         try await serviceManager.requireRepositoryAccess(for: target)
-        let operations = serviceOperations
-        let index = try await operations.inspectService(service: target, actions: nil, purpose: purpose)
-        guard index?.objectValue?["actions"]?.objectValue?["search"] != nil else {
+        guard await target.loadManifest(reason: .inspect) != nil else {
+            throw OxSearch.failure("operation_failed", "\(service) capabilities are unavailable.")
+        }
+        guard target.definition.exposedActions.contains(where: { $0.id == "search" }),
+              let action = OxActions.detail(definition: target.definition, id: "search")?.objectValue else {
             throw OxSearch.failure("search_unsupported", "\(service) does not expose standard search.")
         }
-        let detail = try await operations.inspectService(service: target, actions: ["search"], purpose: purpose)
-        let action = detail?.objectValue?["actions"]?.objectValue?["search"]?.objectValue ?? [:]
         let input = try OxSearch.searchInput(action: action, service: service)
         guard action["requireApproval"]?.boolValue != true else {
             throw OxSearch.failure("invalid_contract", "Standard search must be read-only and requireApproval must be false.")
@@ -82,7 +95,7 @@ extension Conversation {
         args["cursor"] = cursor
         let issues = JSONSchemaValidator.validate(.object(args), against: input, definitions: [:])
         guard issues.isEmpty else { throw OxSearch.failure("invalid_argument", "\(issues)") }
-        let page = try await operations.invokeAction(service: target, actionID: "search", args: .object(args), session: session, purpose: purpose)
+        let page = try await serviceOperations.invokeAction(service: target, actionID: "search", args: .object(args), session: session, purpose: purpose)
         var result = page?.objectValue ?? [:]
         result["service"] = .string(service)
         let invalid = JSONSchemaValidator.validate(.object(result), against: OxSearch.resultSchema, definitions: [:])

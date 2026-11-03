@@ -3,6 +3,7 @@ import JavaScriptCore
 
 nonisolated enum OxProviders {
     private static let nullableString = JSONValue.object(["type": .array([.string("string"), .string("null")])])
+    private static let authenticationStatuses = ["authenticated", "credential-stored", "required", "optional", "not-required", "browser-session", "unavailable"]
     private static let providerSummarySchema = JSONValue.object([
         "type": .string("object"),
         "additionalProperties": .bool(false),
@@ -21,7 +22,7 @@ nonisolated enum OxProviders {
             "inferenceLocation": .object(["type": .string("string"), "enum": .array(["remote", "user-hosted", "on-device"].map(JSONValue.string))]),
             "models": .object(["type": .string("integer"), "minimum": .int(0)]),
             "availableModels": .object(["type": .string("integer"), "minimum": .int(0)]),
-            "authentication": .object(["type": .string("string"), "enum": .array(["authenticated", "credential-stored", "required", "optional", "not-required", "browser-session", "unavailable"].map(JSONValue.string))]),
+            "authentication": .object(["type": .string("string"), "enum": .array(authenticationStatuses.map(JSONValue.string))]),
             "access": .object([
                 "type": .string("object"),
                 "additionalProperties": .bool(false),
@@ -81,7 +82,7 @@ nonisolated enum OxProviders {
                 else { fields = ["id": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(200)])] }
                 let resultField = ["save": "saved", "validate": "valid", "delete": "deleted"][operation] ?? "status"
                 let resultValue: JSONValue = resultField == "status"
-                    ? .object(["type": .string("string"), "enum": .array((operation == "authenticate" ? ["authenticated", "credential-stored", "not-required"] : ["authenticated", "credential-stored", "required", "optional", "not-required", "browser-session", "unavailable"]).map(JSONValue.string))])
+                    ? .object(["type": .string("string"), "enum": .array((operation == "authenticate" ? ["authenticated", "credential-stored", "not-required"] : authenticationStatuses).map(JSONValue.string))])
                     : .object(["type": .string("boolean"), "const": .bool(true)])
                 let receipt: JSONValue = .object([
                     "type": .string("object"), "properties": .object(["id": .object(["type": .string("string")]), resultField: resultValue]),

@@ -23,568 +23,295 @@ final class ServiceActionScheduler {
     enum WorkKind {
         case invocation
         case navigation
+        case presentation
 
         var isInvocation: Bool { self == .invocation }
     }
 
-    private enum QueueKey: Hashable {
-        case pooled(ObjectIdentifier, String)
-        case owned(ObjectIdentifier)
-    }
-
-    private final class Resolution<Value> {
-        private var continuation: CheckedContinuation<Value, any Error>?
-
-        init(_ continuation: CheckedContinuation<Value, any Error>) {
-            self.continuation = continuation
-        }
-
-        func perform(
-            on page: Service.ServiceWebPage,
-            operation: @MainActor @Sendable (Service.ServiceWebPage) async throws -> Value
-        ) async {
-            guard continuation != nil else { return }
-            do {
-                settle(.success(try await operation(page)))
-            } catch {
-                settle(.failure(error))
-            }
-        }
-
-        func fail(_ error: any Error) {
-            settle(.failure(error))
-        }
-
-        private func settle(_ result: Result<Value, any Error>) {
-            guard let continuation else { return }
-            self.continuation = nil
-            continuation.resume(with: result)
-        }
-    }
-
     private final class ScheduledAction {
-        let id: UUID
+        let id = UUID()
         let name: String
-        let role: Service.InvocationRole
-        let kind: WorkKind
-        let exclusive: Bool
+        let blocking: Bool
+        let destination: URL?
         let submittedAt = Date()
-        let perform: @MainActor (Service.ServiceWebPage) async -> Void
-        let fail: @MainActor (any Error) -> Void
+        var kind: WorkKind
         var task: Task<Void, Never>?
+        var perform: (@MainActor (Service.ServiceWebPage) async -> Void)?
+        var fail: (@MainActor (any Error) -> Void)?
 
-        init<Value>(
-            id: UUID,
-            name: String,
-            role: Service.InvocationRole,
-            kind: WorkKind,
-            continuation: CheckedContinuation<Value, any Error>,
-            operation: @escaping @MainActor @Sendable (Service.ServiceWebPage) async throws -> Value
-        ) {
-            let resolution = Resolution(continuation)
-            self.id = id
+        init(name: String, blocking: Bool, destination: URL?, kind: WorkKind) {
             self.name = name
-            self.role = role
+            self.blocking = blocking || kind != .invocation
+            self.destination = destination
             self.kind = kind
-            self.exclusive = role.requiresExclusiveAccess
-            self.perform = { page in
-                await resolution.perform(on: page, operation: operation)
-            }
-            self.fail = { error in
-                resolution.fail(error)
-            }
+        }
+
+        func needsNavigation(on page: Service.ServiceWebPage) -> Bool {
+            destination.map { $0 != page.executionURL } ?? false
+        }
+
+        func blocks(_ page: Service.ServiceWebPage) -> Bool {
+            blocking || needsNavigation(on: page)
         }
     }
 
-    private enum PageOccupancy {
+    private enum Occupancy {
         case idle
         case shared([UUID: ScheduledAction])
-        case exclusive(ScheduledAction)
+        case blocking(ScheduledAction)
 
         var actions: [ScheduledAction] {
             switch self {
             case .idle: []
             case .shared(let actions): Array(actions.values)
-            case .exclusive(let action): [action]
+            case .blocking(let action): [action]
             }
         }
 
-        var count: Int { actions.count }
         var isIdle: Bool { if case .idle = self { true } else { false } }
-        var allowsShared: Bool { if case .exclusive = self { false } else { true } }
+        var allowsShared: Bool { if case .blocking = self { false } else { true } }
 
-        func action(id: UUID) -> ScheduledAction? {
-            switch self {
-            case .idle: nil
-            case .shared(let actions): actions[id]
-            case .exclusive(let action): action.id == id ? action : nil
-            }
-        }
-
-        mutating func start(_ action: ScheduledAction) {
-            switch (self, action.exclusive) {
-            case (.idle, true):
-                self = .exclusive(action)
-            case (.idle, false):
-                self = .shared([action.id: action])
+        mutating func start(_ action: ScheduledAction, blocking: Bool) {
+            switch (self, blocking) {
+            case (.idle, true): self = .blocking(action)
+            case (.idle, false): self = .shared([action.id: action])
             case (.shared(var actions), false):
                 actions[action.id] = action
                 self = .shared(actions)
-            case (.shared, true), (.exclusive, _):
+            case (.shared, true), (.blocking, _):
                 preconditionFailure("invalid service action occupancy transition")
             }
         }
 
         mutating func finish(_ id: UUID) -> Bool {
             switch self {
-            case .idle:
-                return false
-            case .exclusive(let action):
+            case .idle: return false
+            case .blocking(let action):
                 guard action.id == id else { return false }
                 self = .idle
-                return true
             case .shared(var actions):
                 guard actions.removeValue(forKey: id) != nil else { return false }
                 self = actions.isEmpty ? .idle : .shared(actions)
-                return true
             }
+            return true
         }
     }
 
-    private enum PresentationState: Equatable {
-        case available
-        case reserved(UUID)
-    }
+    private final class PageQueue {
+        enum State {
+            case open
+            case closing(@MainActor () -> Void)
+        }
 
-    private final class ActionQueue {
-        let key: QueueKey
         let service: Service
-        let baseURL: URL
-        let scripts: String
-        let pooled: Bool
-        var page: Service.ServiceWebPage?
+        let page: Service.ServiceWebPage
         var pending: [ScheduledAction] = []
-        var occupancy = PageOccupancy.idle
-        var loadingTask: Task<Void, Never>?
-        var invalidated = false
-        var presentationState = PresentationState.available
-        var lastUsed: UInt64 = 0
+        var occupancy = Occupancy.idle
+        var reservation: UUID?
+        var state = State.open
 
-        init(
-            key: QueueKey,
-            service: Service,
-            baseURL: URL,
-            scripts: String,
-            pooled: Bool,
-            page: Service.ServiceWebPage? = nil
-        ) {
-            self.key = key
+        init(service: Service, page: Service.ServiceWebPage) {
             self.service = service
-            self.baseURL = baseURL
-            self.scripts = scripts
-            self.pooled = pooled
             self.page = page
         }
 
-        var isLoading: Bool { loadingTask != nil }
-        var isIdle: Bool { pending.isEmpty && occupancy.isIdle && !isLoading && presentationState == .available }
+        var isOpen: Bool { if case .open = state { true } else { false } }
+        var isIdle: Bool { pending.isEmpty && occupancy.isIdle && reservation == nil }
     }
 
-    private let capacity: Int
-    private var queues: [QueueKey: ActionQueue] = [:]
-    private var retiredQueues: [ActionQueue] = []
-    private var waitingQueues: [QueueKey] = []
-    private var accessOrdinal: UInt64 = 0
-
-    init(capacity: Int) {
-        self.capacity = capacity
-    }
-
-    func schedule<Value>(
-        _ action: Service.Action,
-        kind: WorkKind = .invocation,
-        name: String? = nil,
-        operation: @escaping @MainActor @Sendable (Service.ServiceWebPage) async throws -> Value
-    ) async throws -> Value {
-        let key = executionKey(action)
-        return try await enqueue(
-            action,
-            key: key,
-            page: nil,
-            kind: kind,
-            name: name,
-            operation: operation
-        )
-    }
+    private var queues: [ObjectIdentifier: PageQueue] = [:]
 
     func schedule<Value>(
         _ action: Service.Action,
         on page: Service.ServiceWebPage,
+        destination: URL? = nil,
         kind: WorkKind = .invocation,
         name: String? = nil,
         operation: @escaping @MainActor @Sendable (Service.ServiceWebPage) async throws -> Value
     ) async throws -> Value {
-        guard action.service.owns(page), page.isReady else { throw Service.EvalError.notReady }
-        guard queue(for: page)?.pooled != true else { throw Service.EvalError.contextInvalidated }
-        let key = QueueKey.owned(ObjectIdentifier(page))
-        return try await enqueue(
-            action,
-            key: key,
-            page: page,
-            kind: kind,
-            name: name,
-            operation: operation
+        guard action.service.owns(page),
+              page.isReady || kind != .invocation || destination.map({ $0 != page.executionURL }) == true else {
+            throw Service.EvalError.notReady
+        }
+        let scheduled = ScheduledAction(
+            name: name ?? "\(action.service.domain):\(action.definition.id)",
+            blocking: action.blocking,
+            destination: destination,
+            kind: kind
         )
-    }
-
-    func owns(_ page: Service.ServiceWebPage) -> Bool {
-        pooledQueues.contains { $0.page === page }
-    }
-
-    func reserveForPresentation(_ action: Service.Action, allowUnready: Bool = false) -> PresentationLease? {
-        let key = executionKey(action)
-        guard let queue = queues[key], queue.isIdle, !queue.invalidated,
-              let page = queue.page, page.isReady || allowUnready else { return nil }
-        let id = UUID()
-        queue.presentationState = .reserved(id)
-        Log.service.info("ServiceActionScheduler presentation-reserved domain=\(queue.service.domain) session=\(page.logLabel) id=\(id.uuidString.prefix(8))")
-        return PresentationLease(page: page, id: id, scheduler: self)
-    }
-
-    private func isReserved(_ page: Service.ServiceWebPage, for id: UUID) -> Bool {
-        guard let queue = queue(for: page) else { return false }
-        return !queue.invalidated && queue.presentationState == .reserved(id)
-    }
-
-    private func release(_ page: Service.ServiceWebPage, reservation id: UUID) {
-        guard let queue = queue(for: page), queue.presentationState == .reserved(id) else { return }
-        queue.presentationState = .available
-        Log.service.info("ServiceActionScheduler presentation-released domain=\(queue.service.domain) session=\(page.logLabel) id=\(id.uuidString.prefix(8))")
-        pump(queue)
-        assignPages()
-    }
-
-    func pages(for service: Service) -> [Service.ServiceWebPage] {
-        pooledQueues.compactMap { $0.service === service ? $0.page : nil }
-    }
-
-    func activeInvocationCount(on page: Service.ServiceWebPage) -> Int {
-        queue(for: page)?.occupancy.actions.count(where: { $0.kind.isInvocation }) ?? 0
-    }
-
-    func queuedInvocationCount(on page: Service.ServiceWebPage) -> Int {
-        queue(for: page)?.pending.count(where: { $0.kind.isInvocation }) ?? 0
-    }
-
-    func advance(_ page: Service.ServiceWebPage) {
-        guard let queue = queue(for: page), !queue.invalidated else { return }
-        pump(queue)
-        assignPages()
-    }
-
-    func failPending(on page: Service.ServiceWebPage, error: any Error) {
-        guard let queue = queue(for: page) else { return }
-        failPending(in: queue, error: error)
-        if queue.pooled {
-            retire(queue)
-        }
-    }
-
-    func discard(_ page: Service.ServiceWebPage, error: any Error) {
-        guard let queue = queue(for: page) else { return }
-        discard(queue, error: error, closePage: false)
-    }
-
-    func invalidate(_ service: Service) {
-        let matching = queues.values.filter { $0.pooled && $0.service === service }
-        for queue in matching {
-            failPending(in: queue, error: Service.EvalError.contextInvalidated)
-            retire(queue)
-        }
-        assignPages()
-    }
-
-    func discardPages(for service: Service) {
-        let matching = allQueues.filter { $0.pooled && $0.service === service }
-        for queue in matching {
-            discard(queue, error: CancellationError(), closePage: true)
-        }
-        assignPages()
-    }
-
-    func releaseIdle(reason: Service.PageReleaseReason) {
-        let matching = pooledQueues.filter(\.isIdle)
-        for queue in matching {
-            discard(queue, error: CancellationError(), closePage: true)
-        }
-        if !matching.isEmpty {
-            Log.webView.info("ServiceActionScheduler release reason=\(reason.rawValue) count=\(matching.count) resident=\(residentPageCount)")
-        }
-        assignPages()
-    }
-
-    private var allQueues: [ActionQueue] {
-        Array(queues.values) + retiredQueues
-    }
-
-    private var pooledQueues: [ActionQueue] {
-        allQueues.filter(\.pooled)
-    }
-
-    private var residentPageCount: Int {
-        pooledQueues.count(where: { $0.page != nil })
-    }
-
-    private func enqueue<Value>(
-        _ action: Service.Action,
-        key: QueueKey,
-        page: Service.ServiceWebPage?,
-        kind: WorkKind,
-        name: String?,
-        operation: @escaping @MainActor @Sendable (Service.ServiceWebPage) async throws -> Value
-    ) async throws -> Value {
-        let id = UUID()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 guard !Task.isCancelled else {
                     continuation.resume(throwing: CancellationError())
                     return
                 }
-                let queue = queue(
-                    for: key,
-                    action: action,
-                    page: page
-                )
-                let scheduled = ScheduledAction(
-                    id: id,
-                    name: name ?? "\(action.service.domain):\(action.definition.id)",
-                    role: action.role,
-                    kind: kind,
-                    continuation: continuation,
-                    operation: operation
-                )
-                if let page = queue.page, case .unavailable = page.navigationPhase,
-                   queue.presentationState == .available, !queue.isLoading {
-                    scheduled.fail(Service.EvalError.notReady)
+                let key = ObjectIdentifier(page)
+                let queue = queues[key] ?? PageQueue(service: action.service, page: page)
+                guard queue.isOpen else {
+                    continuation.resume(throwing: Service.EvalError.contextInvalidated)
                     return
                 }
-                queue.pending.append(scheduled)
-                let wait = queue.page == nil ? "page" : "execution"
-                Log.service.info("ServiceActionScheduler queued id=\(id.uuidString.prefix(8)) name=\(scheduled.name) queue=\(queueLabel(queue)) wait=\(wait) active=\(queue.occupancy.count) pending=\(queue.pending.count)")
-                if queue.pooled, queue.page == nil, !waitingQueues.contains(key) {
-                    waitingQueues.append(key)
+                queues[key] = queue
+                var unresolved: CheckedContinuation<Value, any Error>? = continuation
+                let settle: (Result<Value, any Error>) -> Void = { result in
+                    guard let pending = unresolved else { return }
+                    unresolved = nil
+                    pending.resume(with: result)
                 }
-                assignPages()
+                scheduled.fail = { settle(.failure($0)) }
+                scheduled.perform = { page in
+                    do { settle(.success(try await operation(page))) }
+                    catch { settle(.failure(error)) }
+                }
+                queue.pending.append(scheduled)
+                Log.service.info("ServiceActionScheduler queued id=\(scheduled.id.uuidString.prefix(8)) name=\(scheduled.name) page=\(page.logLabel) active=\(queue.occupancy.actions.count) pending=\(queue.pending.count)")
                 pump(queue)
             }
         } onCancel: {
-            Task { @MainActor [weak self] in
-                self?.cancel(id)
+            Task { @MainActor [weak self] in self?.cancel(scheduled.id, on: page) }
+        }
+    }
+
+    func reserveForPresentation(_ action: Service.Action, allowUnready: Bool = false) async throws -> PresentationLease? {
+        guard let page = action.service.sessionPage(for: action) else { return nil }
+        _ = await page.openingTask?.value
+        guard page.isReady || allowUnready else { return nil }
+        return try await schedule(action, on: page, kind: .presentation) { page in
+            guard let queue = self.queues[ObjectIdentifier(page)], queue.isOpen else {
+                throw Service.EvalError.contextInvalidated
             }
+            let id = UUID()
+            queue.reservation = id
+            Log.service.info("ServiceActionScheduler presentation-reserved domain=\(queue.service.domain) page=\(page.logLabel)")
+            return PresentationLease(page: page, id: id, scheduler: self)
         }
     }
 
-    private func queue(
-        for key: QueueKey,
-        action: Service.Action,
-        page: Service.ServiceWebPage?
-    ) -> ActionQueue {
-        if let existing = queues[key] { return existing }
-        let queue = ActionQueue(
-            key: key,
-            service: action.service,
-            baseURL: action.baseURL,
-            scripts: action.scripts,
-            pooled: page == nil,
-            page: page
-        )
-        queues[key] = queue
-        touch(queue)
-        return queue
+    private func isReserved(_ page: Service.ServiceWebPage, for id: UUID) -> Bool {
+        guard let queue = queues[ObjectIdentifier(page)] else { return false }
+        return queue.isOpen && queue.reservation == id
     }
 
-    private func queue(for page: Service.ServiceWebPage) -> ActionQueue? {
-        allQueues.first { $0.page === page }
+    private func release(_ page: Service.ServiceWebPage, reservation: UUID) {
+        guard let queue = queues[ObjectIdentifier(page)], queue.reservation == reservation else { return }
+        queue.reservation = nil
+        Log.service.info("ServiceActionScheduler presentation-released domain=\(queue.service.domain) page=\(page.logLabel)")
+        advance(page)
     }
 
-    private func assignPages() {
-        while let key = waitingQueues.first {
-            guard let queue = queues[key], queue.pooled, queue.page == nil, !queue.pending.isEmpty else {
-                waitingQueues.removeFirst()
-                continue
-            }
-            if residentPageCount >= capacity {
-                guard let victim = evictionVictim() else { return }
-                discard(victim, error: CancellationError(), closePage: true)
-            }
-            waitingQueues.removeFirst()
-            createPage(for: queue)
-        }
+    func isIdle(_ page: Service.ServiceWebPage) -> Bool {
+        queues[ObjectIdentifier(page)]?.isIdle ?? true
     }
 
-    private func createPage(for queue: ActionQueue) {
-        let page = queue.service.makeServiceWebPage(actions: queue.scripts)
-        queue.page = page
-        touch(queue)
-        let actionID = queue.pending.first?.name ?? "unknown"
-        queue.loadingTask = Task { @MainActor [weak self, weak queue, weak page] in
-            guard let self, let queue, let page else { return }
-            let loaded = await queue.service.loadServiceWebPage(
-                page,
-                at: queue.baseURL,
-                label: "scheduler:\(actionID)"
-            )
-            guard queue.page === page else { return }
-            queue.loadingTask = nil
-            guard loaded, !queue.invalidated else {
-                self.failPending(in: queue, error: Service.EvalError.notReady)
-                self.discard(queue, error: Service.EvalError.notReady, closePage: true)
-                self.assignPages()
-                return
-            }
-            Log.webView.info("ServiceActionScheduler page-ready queue=\(self.queueLabel(queue)) domain=\(queue.service.domain) session=\(page.logLabel) resident=\(self.residentPageCount)")
-            self.pump(queue)
-        }
+    func activeInvocationCount(on page: Service.ServiceWebPage) -> Int {
+        queues[ObjectIdentifier(page)]?.occupancy.actions.count(where: { $0.kind.isInvocation }) ?? 0
     }
 
-    private func pump(_ queue: ActionQueue) {
-        guard !queue.invalidated,
-              !queue.isLoading,
-              let page = queue.page,
-              page.isReady else { return }
-        guard queue.presentationState == .available,
-              let first = queue.pending.first else { return }
-        if first.exclusive {
-            guard queue.occupancy.isIdle else { return }
-            start(queue.pending.removeFirst(), in: queue, on: page)
-            return
-        }
-        while queue.occupancy.allowsShared,
-              queue.occupancy.count < Service.ServiceWebPage.maxConcurrentInvocations,
-              queue.pending.first?.exclusive == false {
-            start(queue.pending.removeFirst(), in: queue, on: page)
-        }
+    func queuedInvocationCount(on page: Service.ServiceWebPage) -> Int {
+        queues[ObjectIdentifier(page)]?.pending.count(where: { $0.kind.isInvocation }) ?? 0
     }
 
-    private func start(_ action: ScheduledAction, in queue: ActionQueue, on page: Service.ServiceWebPage) {
-        queue.occupancy.start(action)
-        touch(queue)
-        let waitMS = Int(Date().timeIntervalSince(action.submittedAt) * 1_000)
-        let mode = action.exclusive ? "exclusive" : "shared"
-        Log.service.info("ServiceActionScheduler admitted id=\(action.id.uuidString.prefix(8)) name=\(action.name) queue=\(queueLabel(queue)) session=\(page.logLabel) mode=\(mode) waitMs=\(waitMS) active=\(queue.occupancy.count) pending=\(queue.pending.count)")
-        action.task = Task { @MainActor [weak self, weak queue, weak page] in
-            guard let self, let queue, let page else { return }
-            await action.perform(page)
-            self.finish(action, in: queue, on: page)
-        }
-    }
-
-    private func finish(_ action: ScheduledAction, in queue: ActionQueue, on page: Service.ServiceWebPage) {
-        guard queue.occupancy.finish(action.id) else { return }
-        action.task = nil
-        touch(queue)
-        Log.service.info("ServiceActionScheduler released id=\(action.id.uuidString.prefix(8)) name=\(action.name) queue=\(queueLabel(queue)) session=\(page.logLabel) active=\(queue.occupancy.count) pending=\(queue.pending.count)")
-        if queue.invalidated, queue.occupancy.isIdle {
-            discard(queue, error: Service.EvalError.contextInvalidated, closePage: true)
+    func advance(_ page: Service.ServiceWebPage) {
+        guard let queue = queues[ObjectIdentifier(page)] else { return }
+        if case .closing(let close) = queue.state, queue.occupancy.isIdle, queue.reservation == nil {
+            queues[ObjectIdentifier(page)] = nil
+            close()
         } else {
-            queue.service.advancePage(page)
-        }
-        assignPages()
-    }
-
-    private func cancel(_ id: UUID) {
-        for queue in allQueues {
-            if let index = queue.pending.firstIndex(where: { $0.id == id }) {
-                let action = queue.pending.remove(at: index)
-                action.fail(CancellationError())
-                Log.service.info("ServiceActionScheduler cancelled id=\(id.uuidString.prefix(8)) name=\(action.name) queue=\(queueLabel(queue)) state=pending active=\(queue.occupancy.count) pending=\(queue.pending.count)")
-                if queue.pooled, queue.page == nil, queue.pending.isEmpty {
-                    waitingQueues.removeAll { $0 == queue.key }
-                    queues[queue.key] = nil
-                }
-                if let page = queue.page { queue.service.advancePage(page) }
-                assignPages()
-                return
-            }
-            if let action = queue.occupancy.action(id: id) {
-                action.fail(CancellationError())
-                action.task?.cancel()
-                Log.service.info("ServiceActionScheduler cancelled id=\(id.uuidString.prefix(8)) name=\(action.name) queue=\(queueLabel(queue)) state=active active=\(queue.occupancy.count) pending=\(queue.pending.count)")
-                return
-            }
+            pump(queue)
         }
     }
 
-    private func failPending(in queue: ActionQueue, error: any Error) {
+    func failPending(on page: Service.ServiceWebPage, error: any Error) {
+        guard let queue = queues[ObjectIdentifier(page)] else { return }
         let pending = queue.pending
         queue.pending.removeAll()
-        pending.forEach { $0.fail(error) }
+        pending.forEach { $0.fail?(error) }
         if !pending.isEmpty {
-            Log.service.info("ServiceActionScheduler queue-failed queue=\(queueLabel(queue)) domain=\(queue.service.domain) count=\(pending.count) error=\(LogPrivacy.text(error.localizedDescription))")
+            Log.service.info("ServiceActionScheduler queue-failed domain=\(queue.service.domain) page=\(page.logLabel) count=\(pending.count) error=\(LogPrivacy.text(error.localizedDescription))")
         }
     }
 
-    private func retire(_ queue: ActionQueue) {
-        guard !queue.invalidated else { return }
-        queue.invalidated = true
-        waitingQueues.removeAll { $0 == queue.key }
-        if queues[queue.key] === queue { queues[queue.key] = nil }
-        queue.loadingTask?.cancel()
-        queue.loadingTask = nil
-        if queue.occupancy.isIdle {
-            discard(queue, error: Service.EvalError.contextInvalidated, closePage: true)
-        } else if !retiredQueues.contains(where: { $0 === queue }) {
-            retiredQueues.append(queue)
-        }
+    func closeWhenIdle(_ page: Service.ServiceWebPage, error: any Error, close: @escaping @MainActor () -> Void) {
+        guard let queue = queues[ObjectIdentifier(page)] else { close(); return }
+        guard queue.isOpen else { return }
+        queue.state = .closing(close)
+        failPending(on: page, error: error)
+        advance(page)
     }
 
-    private func discard(_ queue: ActionQueue, error: any Error, closePage: Bool) {
-        waitingQueues.removeAll { $0 == queue.key }
-        if queues[queue.key] === queue { queues[queue.key] = nil }
-        retiredQueues.removeAll { $0 === queue }
-        queue.invalidated = true
-        queue.loadingTask?.cancel()
-        queue.loadingTask = nil
-        failPending(in: queue, error: error)
+    func discard(_ page: Service.ServiceWebPage, error: any Error) {
+        guard let queue = queues[ObjectIdentifier(page)] else { return }
+        failPending(on: page, error: error)
+        queues[ObjectIdentifier(page)] = nil
         for action in queue.occupancy.actions {
-            action.fail(error)
+            action.fail?(error)
             action.task?.cancel()
         }
         queue.occupancy = .idle
-        guard let page = queue.page else { return }
-        queue.page = nil
-        if closePage { queue.service.closeServiceWebPage(page, error: error) }
+        if case .closing(let close) = queue.state { close() }
     }
 
-    private func evictionVictim() -> ActionQueue? {
-        pooledQueues
-            .filter(\.isIdle)
-            .min { $0.lastUsed < $1.lastUsed }
-    }
-
-    private func touch(_ queue: ActionQueue) {
-        accessOrdinal &+= 1
-        queue.lastUsed = accessOrdinal
-    }
-
-    private func executionKey(_ action: Service.Action) -> QueueKey {
-        let key: String
-        if let id = action.session?.objectValue?["id"]?.stringValue {
-            key = "session:" + JSONValue.array([.string(id), .string(action.baseURL.absoluteString)]).jsonString()
-        } else if WebSessionContract.isEnabled(action.service.definition) {
-            key = "discovery:\(action.baseURL.absoluteString)"
-        } else {
-            key = "page:\(action.baseURL.absoluteString)"
+    private func pump(_ queue: PageQueue) {
+        guard queue.isOpen, queue.reservation == nil, let first = queue.pending.first,
+              queue.page.isReady || first.kind != .invocation || first.needsNavigation(on: queue.page) else { return }
+        if first.blocks(queue.page) {
+            guard queue.occupancy.isIdle else { return }
+            start(queue.pending.removeFirst(), in: queue, blocking: true)
+            return
         }
-        return .pooled(ObjectIdentifier(action.service), key)
+        while queue.occupancy.allowsShared,
+              let next = queue.pending.first, !next.blocks(queue.page) {
+            start(queue.pending.removeFirst(), in: queue, blocking: false)
+        }
     }
 
-    private func queueLabel(_ queue: ActionQueue) -> String {
-        switch queue.key {
-        case .pooled:
-            LogPrivacy.url(queue.baseURL.absoluteString)
-        case .owned:
-            "owned:\(queue.page?.logLabel ?? "released")"
+    private func start(_ action: ScheduledAction, in queue: PageQueue, blocking: Bool) {
+        queue.occupancy.start(action, blocking: blocking)
+        let kind = action.kind
+        if action.needsNavigation(on: queue.page) { action.kind = .navigation }
+        let waitMS = Int(Date().timeIntervalSince(action.submittedAt) * 1_000)
+        Log.service.info("ServiceActionScheduler admitted id=\(action.id.uuidString.prefix(8)) name=\(action.name) page=\(queue.page.logLabel) blocking=\(blocking) waitMs=\(waitMS) active=\(queue.occupancy.actions.count) pending=\(queue.pending.count)")
+        action.task = Task { @MainActor [weak self, weak queue] in
+            guard let self, let queue else { return }
+            guard !Task.isCancelled else {
+                action.fail?(CancellationError())
+                self.finish(action, in: queue)
+                return
+            }
+            if let destination = action.destination, action.needsNavigation(on: queue.page) {
+                guard await queue.service.navigate(destination, in: queue.page) != nil else {
+                    action.fail?(Service.EvalError.notReady)
+                    self.finish(action, in: queue)
+                    return
+                }
+                queue.page.executionURL = destination
+            }
+            action.kind = kind
+            if Task.isCancelled { action.fail?(CancellationError()) }
+            else { await action.perform?(queue.page) }
+            self.finish(action, in: queue)
+        }
+    }
+
+    private func finish(_ action: ScheduledAction, in queue: PageQueue) {
+        guard queue.occupancy.finish(action.id) else { return }
+        action.task = nil
+        Log.service.info("ServiceActionScheduler released id=\(action.id.uuidString.prefix(8)) name=\(action.name) page=\(queue.page.logLabel) active=\(queue.occupancy.actions.count) pending=\(queue.pending.count)")
+        if queue.isOpen { queue.service.advancePage(queue.page) }
+        advance(queue.page)
+    }
+
+    private func cancel(_ id: UUID, on page: Service.ServiceWebPage) {
+        guard let queue = queues[ObjectIdentifier(page)] else { return }
+        if let index = queue.pending.firstIndex(where: { $0.id == id }) {
+            queue.pending.remove(at: index).fail?(CancellationError())
+            Log.service.info("ServiceActionScheduler cancelled id=\(id.uuidString.prefix(8)) page=\(page.logLabel) state=pending")
+            queue.service.advancePage(page)
+            advance(page)
+        } else if let action = queue.occupancy.actions.first(where: { $0.id == id }) {
+            action.fail?(CancellationError())
+            action.task?.cancel()
+            Log.service.info("ServiceActionScheduler cancelled id=\(id.uuidString.prefix(8)) page=\(page.logLabel) state=active")
         }
     }
 }

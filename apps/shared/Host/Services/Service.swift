@@ -233,6 +233,7 @@ final class Service: NSObject, Identifiable {
     }
 
     enum OwnedPageOwner: Equatable {
+        case session(String?)
         case inspector(UUID)
         case debug(UUID)
         case browser(UUID)
@@ -241,6 +242,7 @@ final class Service: NSObject, Identifiable {
 
         var logLabel: String {
             switch self {
+            case .session: "session"
             case .inspector: "inspector"
             case .debug: "debug"
             case .browser: "browser"
@@ -268,8 +270,6 @@ final class Service: NSObject, Identifiable {
 
     @MainActor
     final class ServiceWebPage {
-        static let maxConcurrentInvocations = 4
-
         enum ScriptMode: String {
             case service
             case browser
@@ -378,6 +378,8 @@ final class Service: NSObject, Identifiable {
         let userContentController: WKUserContentController
         let actions: String
         var additionalUserScripts: [WKUserScript] = []
+        var openingTask: Task<Bool, Never>?
+        var executionURL: URL?
         var navigationTask: Task<Void, Never>?
         var navigationGeneration = 0
         var finishedNavigationGeneration = 0
@@ -434,6 +436,7 @@ final class Service: NSObject, Identifiable {
     @ObservationIgnored var authenticationWaiters: [AuthenticationWaiter] = []
     @ObservationIgnored let access = ServiceAccess()
     @ObservationIgnored var ownedPages: [ObjectIdentifier: OwnedPage] = [:]
+    @ObservationIgnored private var invalidationTask: Task<Void, Never>?
     @ObservationIgnored private var capabilityTask: Task<Void, Never>?
     @ObservationIgnored var debugSession: ServiceDebugSession?
     @ObservationIgnored unowned let manager: ServiceManager
@@ -459,7 +462,7 @@ final class Service: NSObject, Identifiable {
     }
 
     var servicePages: [ServiceWebPage] {
-        manager.actionScheduler.pages(for: self) + ownedPages.values.map(\.page)
+        ownedPages.values.map(\.page)
     }
 
     var pages: [WebPage] { servicePages.map(\.page) }
@@ -469,7 +472,7 @@ final class Service: NSObject, Identifiable {
     }
 
     func pageKind(for page: ServiceWebPage) -> String {
-        ownedPages[ObjectIdentifier(page)]?.owner.logLabel ?? "pooled"
+        ownedPages[ObjectIdentifier(page)]?.owner.logLabel ?? "closed"
     }
 
     var pageCount: Int { pages.count }
@@ -727,22 +730,47 @@ final class Service: NSObject, Identifiable {
             timeout: 15
         )
         guard landed != nil, owns(servicePage), servicePage.isReady else { return false }
+        servicePage.executionURL = baseURL
         return true
     }
 
+    func sessionPage(for action: Action) -> ServiceWebPage? {
+        let owner = OwnedPageOwner.session(action.session?.objectValue?["id"]?.stringValue)
+        return ownedPages.values.first { $0.owner == owner }?.page
+    }
+
+    func openSessionPage(for action: Action) async throws -> ServiceWebPage {
+        try await openOwnedPage(for: action, owner: .session(action.session?.objectValue?["id"]?.stringValue))
+    }
+
     func openOwnedPage(for action: Action, owner: OwnedPageOwner) async throws -> ServiceWebPage {
-        let page = makeServiceWebPage(actions: action.scripts)
-        ownedPages[ObjectIdentifier(page)] = OwnedPage(page: page, owner: owner)
-        let loaded = await loadServiceWebPage(
-            page,
-            at: action.baseURL,
-            label: "owned:\(owner.logLabel):\(domain):\(action.definition.id)"
-        )
-        guard loaded else {
+        let page: ServiceWebPage
+        if case .session = owner, let existing = sessionPage(for: action) {
+            if existing.openingTask == nil {
+                try Task.checkCancellation()
+                return existing
+            }
+            page = existing
+        } else {
+            page = makeServiceWebPage(actions: action.scripts)
+            ownedPages[ObjectIdentifier(page)] = OwnedPage(page: page, owner: owner)
+            page.openingTask = Task { @MainActor [weak self, weak page] in
+                guard let self, let page else { return false }
+                return await self.loadServiceWebPage(
+                    page,
+                    at: action.baseURL,
+                    label: "owned:\(owner.logLabel):\(self.domain):\(action.definition.id)"
+                )
+            }
+            Log.webView.info("Service.ownedPage event=open owner=\(owner.logLabel) domain=\(domain) session=\(page.logLabel) resident=\(ownedPages.count)")
+        }
+        let loaded = await page.openingTask?.value ?? page.isReady
+        page.openingTask = nil
+        guard loaded, owns(page), page.isReady else {
             closeOwnedPage(page, error: EvalError.notReady)
             throw EvalError.notReady
         }
-        Log.webView.info("Service.ownedPage event=open owner=\(owner.logLabel) domain=\(domain) session=\(page.logLabel) resident=\(ownedPages.count)")
+        try Task.checkCancellation()
         return page
     }
 
@@ -772,8 +800,36 @@ final class Service: NSObject, Identifiable {
     }
 
     private func closeOwnedPages(error: any Error) {
+        for page in ownedPages.values.map(\.page) { closeOwnedPage(page, error: error) }
+    }
+
+    private func closeOwnedPagesAfterRunning(error: any Error) async {
         let pages = ownedPages.values.map(\.page)
-        for page in pages { closeOwnedPage(page, error: error) }
+        guard !pages.isEmpty else { return }
+        await withCheckedContinuation { continuation in
+            var remaining = pages.count
+            for page in pages {
+                manager.actionScheduler.closeWhenIdle(page, error: error) {
+                    self.closeOwnedPage(page, error: error)
+                    remaining -= 1
+                    if remaining == 0 { continuation.resume() }
+                }
+            }
+        }
+    }
+
+    func releaseIdleSessionPages(reason: PageReleaseReason) {
+        let pages = ownedPages.values.filter {
+            if case .session = $0.owner {
+                return $0.page.openingTask == nil && $0.page.navigationPhase.load == nil
+                    && manager.actionScheduler.isIdle($0.page)
+            }
+            return false
+        }.map(\.page)
+        for page in pages { closeOwnedPage(page) }
+        if !pages.isEmpty {
+            Log.webView.info("Service.sessions release reason=\(reason.rawValue) domain=\(domain) count=\(pages.count)")
+        }
     }
 
     func configureScripts(for url: URL?, in servicePage: ServiceWebPage) {
@@ -802,25 +858,30 @@ final class Service: NSObject, Identifiable {
         Log.webView.info("Service.scripts domain=\(domain) session=\(servicePage.logLabel) mode=\(mode.rawValue) repository=\(definition.repositoryID ?? "native") actionsBytes=\(servicePage.actions.utf8.count) actionsHash=\(digest)")
     }
 
-    func invalidateResolved() {
-        sourceVersion = nil
-        if let apiService {
-            apiService.source = nil
-            return
+    func invalidateResolved() async {
+        if let invalidationTask { await invalidationTask.value; return }
+        let task = Task { @MainActor in
+            self.sourceVersion = nil
+            if let apiService = self.apiService {
+                apiService.source = nil
+                return
+            }
+            guard self.webService != nil else { return }
+            self.debugSession?.close()
+            self.debugSession = nil
+            await self.closeOwnedPagesAfterRunning(error: EvalError.contextInvalidated)
+            switch self.resolutionState {
+            case .idle:
+                break
+            case .resolving(_, let task):
+                task.cancel()
+            }
+            self.resolutionState = .idle(nil)
+            self.capabilityState = .unloaded
         }
-        guard webService != nil else { return }
-        debugSession?.close()
-        debugSession = nil
-        closeOwnedPages(error: EvalError.contextInvalidated)
-        manager.actionScheduler.invalidate(self)
-        switch resolutionState {
-        case .idle:
-            break
-        case .resolving(_, let task):
-            task.cancel()
-        }
-        resolutionState = .idle(nil)
-        capabilityState = .unloaded
+        invalidationTask = task
+        await task.value
+        invalidationTask = nil
     }
 
     func discardPages() {
@@ -828,7 +889,6 @@ final class Service: NSObject, Identifiable {
         debugSession?.close()
         debugSession = nil
         closeOwnedPages(error: CancellationError())
-        manager.actionScheduler.discardPages(for: self)
     }
 
     func resetMCPCapabilities() {
@@ -850,6 +910,8 @@ final class Service: NSObject, Identifiable {
     }
 
     private func closePage(_ page: ServiceWebPage, error: any Error) {
+        page.openingTask?.cancel()
+        page.openingTask = nil
         page.navigationTask?.cancel()
         page.navigationTask = nil
         page.page.stopLoading()

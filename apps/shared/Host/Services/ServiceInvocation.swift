@@ -73,7 +73,7 @@ extension Service {
             service: self,
             definition: action,
             baseURL: destination,
-            role: WebSessionContract.isEnabled(definition) && role == .standard ? .blockingAction : role,
+            role: actionId == WebSessionContract.loginAction && role == .standard ? .blockingAction : role,
             scripts: scripts,
             session: selectedSession
         )
@@ -179,7 +179,8 @@ extension Service {
                     await evaluate(in: page, startingNavigation: page.navigationGeneration)
                 }
             }
-            return try await manager.actionScheduler.schedule(pageAction) { page in
+            let page = try await openSessionPage(for: pageAction)
+            return try await manager.actionScheduler.schedule(pageAction, on: page, destination: pageAction.baseURL) { page in
                 await evaluate(in: page, startingNavigation: page.navigationGeneration)
             }
         } catch {

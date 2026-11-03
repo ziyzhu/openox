@@ -43,7 +43,8 @@ nonisolated enum LogPrivacy {
         let range = NSRange(raw.startIndex..<raw.endIndex, in: raw)
         let matches = detector.matches(in: raw, range: range)
         return matches.reversed().reduce(raw) { value, match in
-            guard let swiftRange = Range(match.range, in: value), let link = match.url?.absoluteString else { return value }
+            guard let swiftRange = Range(match.range, in: value) else { return value }
+            let link = String(value[swiftRange])
             var next = value
             next.replaceSubrange(swiftRange, with: url(link))
             return next

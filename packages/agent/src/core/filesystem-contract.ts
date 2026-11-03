@@ -33,7 +33,7 @@ const schemas = {
     ["path", "text", "truncated", "unsupported", "nextOffset", "diagnostics"]) },
   write: { inputSchema: { ...filesystemInputs.write,
     properties: { ...filesystemInputs.write.properties, base64: string("Standard Base64 bytes for a binary file, up to 32 MiB decoded; use instead of content.") },
-    required: ["purpose", "path"], oneOf: [{ required: ["content"], not: { required: ["base64"] } }, { required: ["base64"], not: { required: ["content"] } }] }, outputSchema: item },
+    required: ["purpose", "path"] }, outputSchema: item },
   edit: { inputSchema: { ...filesystemInputs.edit, properties: { ...filesystemInputs.edit.properties,
     edits: { type: "array", minItems: 1, maxItems: 128, items: object({ oldText: { ...string("Unique, non-empty text from the original file."), minLength: 1 }, newText: string("Replacement text.") }, ["oldText", "newText"]) },
   } },

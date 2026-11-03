@@ -190,7 +190,7 @@ final class ServiceOperations {
 
     private func presentLogin(service: Service, actionID: String, input: JSONValue, session: JSONValue?, pageURL: String?) async throws {
         guard let action = await service.resolvedAction(actionID, args: input, session: session, pageURL: pageURL),
-              let lease = serviceManager.actionScheduler.reserveForPresentation(action, allowUnready: true) else {
+              let lease = try await serviceManager.actionScheduler.reserveForPresentation(action, allowUnready: true) else {
             throw OxFunctionError(code: "page_unavailable", message: "Login preparation has no idle live page.", recovery: "Inspect the page and preparation failure before retrying login.")
         }
         defer { lease.release() }
@@ -691,7 +691,7 @@ final class ServiceOperations {
             throw RuntimeError.bridge("ox.service.showPage: requires a web service action")
         }
         return try await tracked(Actions.serviceShowPage, .object(["name": .string(name), "input": input, "session": session ?? .null, "pageUrl": pageURL.map(JSONValue.string) ?? .null]), purpose: purpose) {
-            guard let lease = serviceManager.actionScheduler.reserveForPresentation(action, allowUnready: true) else {
+            guard let lease = try await serviceManager.actionScheduler.reserveForPresentation(action, allowUnready: true) else {
                 throw OxFunctionError(code: "page_unavailable", message: "ox.service.showPage: this action has no idle live page.", recovery: "Wait for active actions to finish. Use the name and input of the action whose page you want to show. This function never opens a replacement page or reruns the action.")
             }
             defer { lease.release() }

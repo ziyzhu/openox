@@ -157,6 +157,8 @@ nonisolated private enum InvocationSources {
         var result = sources ?? Invocation.Sources()
         if name == Actions.webFetch, let url = complete(value?.objectValue?["url"]?.stringValue) {
             result.links = [Invocation.Sources.Link(url: url)]
+        } else if name == Actions.webSearch {
+            result.services = (value?.objectValue?["results"]?.arrayValue ?? []).compactMap { $0.objectValue?["service"]?.stringValue }
         }
         return result
     }
@@ -166,7 +168,7 @@ nonisolated private enum InvocationSources {
         while bytes(result) > limit, !result.links.isEmpty { result.links.removeLast() }
         if bytes(result) > limit { result.query = nil }
         if bytes(result) > limit { result.domain = nil }
-        guard result.query != nil || result.domain != nil || !result.links.isEmpty, bytes(result) <= limit else { return nil }
+        guard result.query != nil || result.domain != nil || !result.links.isEmpty || result.services != nil, bytes(result) <= limit else { return nil }
         return result
     }
 

@@ -117,11 +117,11 @@ extension Conversation {
         guard !domain.isEmpty else {
             throw RuntimeError.bridge("ox.service.attach: requires a non-empty domain")
         }
-        let existing = attachedService(domain: domain)
-        let service = try await serviceManager.serviceForCaller(domain: domain, reason: .attach)
-        if existing == nil { try await gateServiceAttach(service) }
         return try await tracked(Actions.serviceAttach, .object(["domain": .string(domain)]), purpose: purpose) {
-            serviceManager.selectServiceForAttachment(service)
+            let candidate = try await serviceManager.serviceForCaller(domain: domain, reason: .attach)
+            if attachedService(domain: domain) == nil { try await gateServiceAttach(candidate) }
+            let service = try await serviceManager.selectServiceForAttachment(candidate)
+            let existing = attachedService(domain: domain)
             serviceManager.setSaved(service, true)
             if let existing, let index = attachedServices.firstIndex(where: { $0 === existing }) {
                 var services = attachedServices

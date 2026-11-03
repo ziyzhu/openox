@@ -8,6 +8,7 @@ window.ox.install(({ action }) => {
       while (Date.now() < deadline) {
         if (location.hostname !== "search.brave.com") throw new Error("Unexpected Brave search host");
         if (document.querySelector("form[action*='challenge'], iframe[src*='captcha'], [data-testid='captcha']")) throw new Error("Brave requires human verification");
+        if ([...document.querySelectorAll("h1, h2")].some(node => clean(node.textContent) === "Verifying you're not a bot")) throw new Error("Brave requires human verification");
         const items = [], seen = new Set();
         for (const root of document.querySelectorAll("[data-type='web']")) {
           const heading = root.querySelector(".search-snippet-title");

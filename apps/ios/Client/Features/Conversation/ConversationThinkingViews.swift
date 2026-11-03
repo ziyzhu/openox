@@ -901,14 +901,12 @@ private enum InvocationFormat {
     }
 
     private static func searchSources(_ invocation: Invocation, serviceManager: ServiceManager) -> [Source]? {
+        let requested = invocation.args.objectValue?["services"]?.arrayValue?.compactMap(\.stringValue)
         let services: [String]
-        if let requested = invocation.args.objectValue?["services"]?.arrayValue {
-            services = requested.compactMap(\.stringValue)
-        } else if case .succeeded(let result?) = invocation.outcome {
-            let groups = (result.objectValue?["results"]?.arrayValue ?? []) + (result.objectValue?["errors"]?.arrayValue ?? [])
-            services = groups.compactMap { $0.objectValue?["service"]?.stringValue }
-        } else {
-            return nil
+        switch invocation.outcome {
+        case .running: services = requested ?? []
+        case .succeeded: services = invocation.sources?.services ?? requested ?? []
+        case .failed: return nil
         }
         return services.filter { $0.hasPrefix("web:") }.map {
             serviceSource(domain: String($0.dropFirst(4)), invocation: invocation, serviceManager: serviceManager)
