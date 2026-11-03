@@ -744,6 +744,7 @@ final class Service: NSObject, Identifiable {
     }
 
     func openOwnedPage(for action: Action, owner: OwnedPageOwner) async throws -> ServiceWebPage {
+        guard invalidationTask == nil else { throw EvalError.contextInvalidated }
         let page: ServiceWebPage
         if case .session = owner, let existing = sessionPage(for: action) {
             if existing.openingTask == nil {
