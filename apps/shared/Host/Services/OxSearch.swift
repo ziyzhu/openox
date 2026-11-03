@@ -58,8 +58,8 @@ nonisolated enum OxSearch {
                             "type": .string("array"),
                             "items": .object([
                                 "type": .string("object"),
-                                "properties": .object(Dictionary(uniqueKeysWithValues: ["service", "code", "message", "recovery"].map { ($0, JSONValue.object(["type": .string("string")])) })),
-                                "required": .array(["service", "code", "message", "recovery"].map(JSONValue.string)),
+                                "properties": .object(Dictionary(uniqueKeysWithValues: ["service", "code", "message"].map { ($0, JSONValue.object(["type": .string("string")])) })),
+                                "required": .array(["service", "code", "message"].map(JSONValue.string)),
                                 "additionalProperties": .bool(false),
                             ]),
                         ]),
@@ -142,7 +142,7 @@ nonisolated enum OxSearch {
                   throw fail('invalid_contract', `${service}:search does not declare standard search results.`);
                 }
                 if (action.requireApproval === true) throw fail('invalid_contract', 'Standard search must be read-only and requireApproval must be false.');
-                if (action.requireAuth && !options.sessions?.[service]) throw fail('authentication_required', `${service} requires a selected session.`, 'Invoke listSessions and copy the intended authenticated descriptor into sessions for this service.');
+                if (action.requireAuth && !options.sessions?.[service]) throw fail('authentication_required', `${service} requires an authenticated session. Select a session or sign in before searching.`);
                 const maximum = input.properties.limit.maximum;
                 if (!Number.isInteger(maximum) || maximum < 1 || maximum > 50) throw fail('invalid_contract', 'Search limit must declare a maximum from 1 to 50.');
                 const limit = Math.min(options.limit ?? 10, maximum);
@@ -159,7 +159,7 @@ nonisolated enum OxSearch {
                 results.push(result);
               } catch (error) {
                 if (['cancelled', 'permission_denied', 'handoff_incomplete'].includes(error.code)) throw error;
-                errors.push({service, code: error.code ?? 'search_failed', message: String(error.message ?? error), recovery: error.recovery ?? 'Inspect service state before retrying.'});
+                errors.push({service, code: error.code ?? 'search_failed', message: String(error.message ?? error)});
               }
             }
             if (!results.length) throw fail('all_searches_failed', errors.map(error => `${error.service}: ${error.code}: ${error.message}`).join('; '), 'Inspect each service failure. Do not report that no matches exist.');
