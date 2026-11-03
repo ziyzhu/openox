@@ -18,7 +18,7 @@
       },
       "requireAuth": false,
       "requireApproval": false,
-      "baseUrl": "https://manus.im/app"
+      "baseUrl": "https://manus.im/login?redirectUrl=https%3A%2F%2Fmanus.im%2Fapp"
     },
     {
       "id": "listSessions",
@@ -57,7 +57,7 @@
       },
       "requireAuth": false,
       "requireApproval": false,
-      "baseUrl": "https://manus.im/app"
+      "baseUrl": "https://manus.im/login"
     },
     {
       "id": "getCurrentUser",

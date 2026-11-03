@@ -2,7 +2,7 @@
   "domain": "claude.ai",
   "name": "Claude",
   "description": "Chat with Claude using your signed-in website account, read paginated conversation history including image and document metadata, and choose a model. Sending messages requires approval. Continuing chats requires a loaded sidebar entry.",
-  "baseUrl": "https://claude.ai/",
+  "baseUrl": "https://claude.ai/robots.txt",
   "actions": [
     {
       "id": "login",

@@ -26,7 +26,7 @@ const retryFetch = async (input, init, options) => {
 
 window.ox.install(({ action }) => {
     const ORIGIN = "https://secure.bankofamerica.com";
-    const OVERVIEW_URL = `${ORIGIN}/myaccounts/ao/accounts-overview.go`;
+    const EXECUTION_URL = `${ORIGIN}/robots.txt`;
     const PAY_TRANSFER_URL = `${ORIGIN}/pay-transfer-pay-portal/`;
     const SIGNON_URL = `${ORIGIN}/auth/signon/`;
     const signedOut = () => new Error("Bank of America session is signed out. Run login, rediscover sessions, then retry.");
@@ -34,11 +34,15 @@ window.ox.install(({ action }) => {
         accept: "application/json, text/javascript, */*; q=0.01",
         "x-requested-with": "XMLHttpRequest",
     });
-    const getJson = async (path) => {
+    const getJson = async (path, redirect = 'follow') => {
         const res = await retryFetch(ORIGIN + path, {
             headers: baseHeaders(),
             credentials: "include",
+            cache: "no-store",
+            redirect,
         });
+        if (res.type === 'opaqueredirect')
+            throw new Error(`GET ${path} redirected instead of returning account data; authentication is unverified`);
         if (res.status === 401)
             throw signedOut();
         if (!res.ok)
@@ -58,7 +62,7 @@ window.ox.install(({ action }) => {
             throw new Error(`POST ${path} HTTP ${res.status}`);
         return res.json();
     };
-    const fetchCustomer = () => getJson("/myaccounts/target/services/common/v2/customer");
+    const fetchCustomer = () => getJson("/myaccounts/target/services/common/v2/customer", "manual");
     const accountTokenOf = (account) => {
         const match = String(account?.additionalParam ?? "").match(/(?:^|[?&])adx=([0-9a-f]{64})(?:&|$)/i);
         return match?.[1] ?? null;
@@ -112,7 +116,7 @@ window.ox.install(({ action }) => {
             const id = p?.customerId;
             if (!id)
                 throw Error('Bank of America account identity unavailable; customer response has no stable account identifier');
-            return [{ id: String(id), label: String(p.name?.full || id), url: OVERVIEW_URL }];
+            return [{ id: String(id), label: String(p.name?.full || id), url: EXECUTION_URL }];
         } });
     action("listAccounts", {
         async invoke() {

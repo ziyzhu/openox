@@ -407,6 +407,7 @@
     },
     {
       "id": "search",
+      "baseUrl": "https://news.ycombinator.com/robots.txt",
       "label": "Search stories and comments",
       "description": "Search the public HN Algolia index by query, story/comment type, author, inclusive UTC dates and relevance or newest order. Continuation is the source page; the index has a retrieval window and is not a complete archive. complete requires an exhaustive source count and no omitted query hits; empty estimated results are not claimed exhaustive.",
       "inputSchema": {

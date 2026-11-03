@@ -2,7 +2,7 @@
   "domain": "chase.com",
   "name": "Chase Travel",
   "description": "A travel-rewards service for cardmembers. View your travel profile, Ultimate Rewards points, travel credits, trips, recent searches, featured deals, and cart. Read-only; sign-in required.",
-  "baseUrl": "https://secure.chase.com/web/auth/nav?navKey=chaseTravelHome&treatment=chase",
+  "baseUrl": "https://secure.chase.com/robots.txt",
   "$defs": {
     "statementCredit": {
       "type": "object",

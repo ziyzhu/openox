@@ -2,7 +2,7 @@
   "domain": "mail.google.com",
   "name": "Gmail",
   "description": "A personal email service. List signed-in accounts, browse and search mailboxes, read complete conversations, and create, update, send, or discard drafts. Sign-in required.",
-  "baseUrl": "https://mail.google.com/mail/u/0/",
+  "baseUrl": "https://mail.google.com/mail/_/bscframe",
   "$defs": {
     "account": {
       "type": "object",
@@ -466,7 +466,7 @@
       },
       "requireApproval": false,
       "requireAuth": true,
-      "baseUrl": "https://mail.google.com/mail/u/0/"
+      "baseUrl": "https://mail.google.com/mail/_/bscframe"
     },
     {
       "id": "createDraft",

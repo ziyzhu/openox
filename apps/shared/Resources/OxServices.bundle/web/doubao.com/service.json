@@ -6,6 +6,7 @@
   "actions": [
     {
       "id": "login",
+      "baseUrl": "https://www.doubao.com/robots.txt",
       "label": "Log in",
       "description": "Prepare website login for the user. Completion does not verify authentication.",
       "inputSchema": {
@@ -21,6 +22,7 @@
     },
     {
       "id": "listSessions",
+      "baseUrl": "https://www.doubao.com/robots.txt",
       "label": "List signed-in accounts",
       "description": "Discover currently authenticated accounts. Errors do not establish absence.",
       "inputSchema": {

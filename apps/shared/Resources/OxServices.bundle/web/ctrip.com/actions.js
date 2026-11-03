@@ -137,6 +137,21 @@ window.ox.install(({ action }) => {
             return null;
         } });
     action('listSessions', { async invoke() {
+            const statusResponse = await fetch('https://passport.ctrip.com/ssoproxy/ssoIsLogon', {
+                method: 'POST',
+                credentials: 'include',
+                cache: 'no-store',
+                headers: { 'content-type': 'application/x-www-form-urlencoded' },
+                body: '',
+            });
+            if (!statusResponse.ok)
+                throw Error('Ctrip login status HTTP ' + statusResponse.status);
+            const status = await statusResponse.json();
+            if (status?.returnCode === 510 && typeof status.message === 'string'
+                && status.message.endsWith('ticket is empty，user has not login,ticketName=cticket'))
+                return [];
+            if (status?.returnCode !== 0)
+                throw Error('Ctrip login status response is unrecognized');
             const r = await fetch(LOGIN_URL, { credentials: 'include', cache: 'no-store' });
             if (!r.ok)
                 throw Error('Ctrip account HTTP ' + r.status);
@@ -145,7 +160,7 @@ window.ox.install(({ action }) => {
                 throw Error('Unexpected Ctrip account origin');
             const d = new DOMParser().parseFromString(await r.text(), 'text/html');
             if (u.hostname === 'passport.ctrip.com' && d.querySelector('input[type="password"]'))
-                return [];
+                throw Error('Ctrip account state changed during discovery; rediscover sessions');
             const id = cookie('login_uid');
             const account = [...d.querySelectorAll('[data-uid]')].find(e => e.getAttribute('data-uid') === id);
             if (!id || !account)

@@ -2,7 +2,7 @@
   "domain": "premera.com",
   "name": "Premera Blue Cross",
   "description": "Read the signed-in member's coverage balances, personal information, and recent claims. Read-only.",
-  "baseUrl": "https://member.premera.com/",
+  "baseUrl": "https://member.premera.com/robots.txt",
   "$defs": {
     "amountProgress": {
       "type": "object",

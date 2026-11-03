@@ -113,6 +113,18 @@ window.ox.install(({ action }) => {
         } });
     action('listSessions', { async invoke() {
             profileIdCache = null;
+            const session = await fetch('https://functions.americanexpress.com/ReadUserSession.v1', {
+                credentials: 'include',
+                cache: 'no-store',
+            });
+            if (session.status === 400) {
+                const error = await session.json();
+                if (error?.errorCode === 'IDENT01'
+                    && error.description === 'Must provide user JWT after "aat=" under header key "Cookie"')
+                    return [];
+            }
+            if (!session.ok)
+                throw Error('American Express session HTTP ' + session.status);
             const j = await fetchProfile();
             if (!j?.profile_id)
                 throw Error('American Express profile identity unavailable');

@@ -14,9 +14,10 @@ async function client() {
 }
 async function identity(){
   const c=await client();
+  const context=moduleLoader(54906).Ax().http.withDefaultHttpContext({skipGlobalAuthEffects:true,suppressToast:true,sensitive:true,disableChallengeRetry:true});
   let timer;
   try {
-    const r=await Promise.race([c.get('/api/v0/users/current'),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('DeepSeek identity request timed out')),7000);})]);
+    const r=await Promise.race([c.get('/api/v0/users/current',{context}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('DeepSeek identity request timed out')),7000);})]);
     const j=r.json;
     if(r.status===200&&j?.code===0&&j.data?.biz_code===0&&typeof j.data.biz_data?.id==='string'&&j.data.biz_data.id.length>0)return {signedIn:true,account:j.data.biz_data};
     if(r.status===200&&j?.code===40002&&j.msg==='Missing Token')return {signedIn:false};

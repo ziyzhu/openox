@@ -24,6 +24,7 @@ const retryFetch = async (input, init, options) => {
 window.ox.install(({ action }) => {
     const ORIGIN = "https://secure.chase.com";
     const DASHBOARD_URL = `${ORIGIN}/web/auth/dashboard`;
+    const EXECUTION_URL = `${ORIGIN}/robots.txt`;
     const jpmcHeaders = (post = false) => {
         const h = {
             "x-jpmc-channel": "id=C30",
@@ -39,6 +40,7 @@ window.ox.install(({ action }) => {
             method: "POST",
             headers: jpmcHeaders(true),
             credentials: "include",
+            cache: "no-store",
             body: body ? new URLSearchParams(body).toString() : "",
         });
         if (res.status === 401)
@@ -100,7 +102,7 @@ window.ox.install(({ action }) => {
             }
             if (!d?.personId)
                 throw Error('Chase account identity unavailable');
-            return [{ id: String(d.personId), label: 'Chase ' + String(d.personId), url: DASHBOARD_URL }];
+            return [{ id: String(d.personId), label: 'Chase ' + String(d.personId), url: EXECUTION_URL }];
         } });
     action("listAccounts", {
         async invoke() {

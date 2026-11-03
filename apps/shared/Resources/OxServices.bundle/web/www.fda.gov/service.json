@@ -2,7 +2,7 @@
   "domain": "www.fda.gov",
   "name": "FDA",
   "description": "The U.S. food and drug safety agency. Search official information, browse recalls, read drug labels, check shortages, identify drug products and medical devices, and retrieve FDA pages. No sign-in required.",
-  "baseUrl": "https://www.fda.gov/",
+  "baseUrl": "https://www.fda.gov/robots.txt",
   "$defs": {
     "searchResult": {
       "type": "object",

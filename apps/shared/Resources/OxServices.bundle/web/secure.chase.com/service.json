@@ -2,7 +2,7 @@
   "domain": "secure.chase.com",
   "name": "Chase",
   "description": "A major U.S. consumer bank. List your credit card accounts with balances and payment due dates, read one account's detail (statement balance, available credit, APRs, autopay, last payment), list recent card transactions, and read your rewards point balances across cards.",
-  "baseUrl": "https://secure.chase.com/web/auth/dashboard",
+  "baseUrl": "https://secure.chase.com/robots.txt",
   "$defs": {
     "accountSummary": {
       "type": "object",

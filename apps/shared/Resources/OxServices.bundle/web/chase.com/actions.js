@@ -26,6 +26,7 @@ const retryFetch = async (input, init, options) => {
 
 window.ox.install(({ action }) => {
     const START_URL = "https://secure.chase.com/web/auth/nav?navKey=chaseTravelHome&treatment=chase";
+    const EXECUTION_URL = "https://secure.chase.com/robots.txt";
     const GATEWAY = "https://secure.chase.com/svc/wr/profile/l4/gateway/chase-travel/loyalty/bank-rewards/cte-app/v1";
     const uuid = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
         const r = (Math.random() * 16) | 0;
@@ -43,6 +44,7 @@ window.ox.install(({ action }) => {
     const get = async (path) => {
         const r = await retryFetch(`${GATEWAY}${path}`, {
             credentials: "include",
+            cache: "no-store",
             headers: jpmcHeaders(),
         });
         if (!r.ok)
@@ -144,10 +146,17 @@ window.ox.install(({ action }) => {
         } });
     action('listSessions', { async invoke() {
             accountsCache = null;
-            const j = await get('/travel-profiles?all-accounts-hidden-indicator=true');
+            let j;
+            try {
+                j = await get('/travel-profiles?all-accounts-hidden-indicator=true');
+            } catch (error) {
+                if (error?.message === 'GET /travel-profiles HTTP 401')
+                    return [];
+                throw error;
+            }
             if (!j?.onlineProfileIdentifier)
                 throw Error('Chase Travel account identity unavailable');
-            return [{ id: String(j.onlineProfileIdentifier), label: 'Chase Travel ' + String(j.onlineProfileIdentifier), url: START_URL }];
+            return [{ id: String(j.onlineProfileIdentifier), label: 'Chase Travel ' + String(j.onlineProfileIdentifier), url: EXECUTION_URL }];
         } });
     action("getTravelProfile", {
         async invoke() {
