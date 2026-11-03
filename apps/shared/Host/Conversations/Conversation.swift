@@ -1869,7 +1869,6 @@ final class Conversation: Identifiable {
     }
 
     func agentConfiguration(client: any ProviderClient, model: ProviderModel) -> AgentConfiguration {
-        let serviceManager = serviceManager
         let conversationID = id
         return AgentConfiguration(
             client: client,
@@ -1878,13 +1877,8 @@ final class Conversation: Identifiable {
             tools: [ConversationTool(conversation: self)],
             streamOptions: StreamOptions(sessionID: conversationID.uuidString),
             transformContext: { request in
-                let messages = await ConversationURLServiceContext.transform(
-                    request.messages,
-                    serviceManager: serviceManager,
-                    conversationID: conversationID
-                )
                 return await ModelAdapterPipeline.transform(
-                    messages: messages,
+                    messages: request.messages,
                     model: request.model,
                     loadsFilesLazily: client.supportsTools(for: request.model),
                     wireProtocol: client.wireProtocol(for: request.model)

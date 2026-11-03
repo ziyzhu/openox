@@ -5,30 +5,6 @@ extension Scenario {
         .fail(message: "RESOURCE_EXHAUSTED: exceeded your current quota", reason: .error)
     ])
 
-    static let urlServiceContext = Scenario(name: "url-service-context") { ctx in
-        let userURL = "https://github.com/earendil-works/pi"
-        let toolURL = "https://www.google.com/maps/place/Seattle"
-        guard !ctx.systemPrompt.contains("<url-relations") else {
-            return [.say("URL service context leaked into the system prompt."), .stop(.stop)]
-        }
-        if let result = ctx.toolResults.last(where: { $0.toolName == "execute" }) {
-            let text = result.content.concatenatedText
-            guard text.contains("<url-relations provenance=\"runtime-generated\">")
-                    && text.contains(toolURL)
-                    && text.contains("- www.google.com |")
-                    && text.contains("- google.com |") else {
-                return [.say("Tool URL service context was incorrect."), .stop(.stop)]
-            }
-            return [.say("URL service context ready."), .stop(.stop)]
-        }
-        guard ctx.transientContext.contains("<url-relations provenance=\"runtime-generated\">")
-                && ctx.transientContext.contains(userURL)
-                && ctx.transientContext.contains("- github.com |") else {
-            return [.say("User URL service context was incorrect."), .stop(.stop)]
-        }
-        return [execute("console.log({ url: \"\(toolURL)\" });")]
-    }
-
     static let skillCatalog = Scenario(name: "skill-catalog") { ctx in
         let expectsService = ctx.latestUserSaid("attached")
         let expectsUserSkill = ctx.latestUserSaid("user")

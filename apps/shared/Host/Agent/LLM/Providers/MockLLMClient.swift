@@ -335,7 +335,6 @@ extension Scenario {
             Entry("71", "rate limit — normalize provider quota errors", .rateLimited),
             Entry("72", "prompt context — unified skills and current service and file state", .skillCatalog),
             Entry("73", "memory — freeze prompt context and read updates on demand", .memoryOnDemand),
-            Entry("78", "URL context — annotate user and tool URLs with related services", .urlServiceContext),
             Entry("80", "app information — read app identity and current model", .appInformation),
             Entry("90", "app logs — approve or deny diagnostic access", .appLogs),
         ]),
