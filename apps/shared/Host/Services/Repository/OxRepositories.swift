@@ -52,7 +52,35 @@ nonisolated enum OxRepositories {
                             ]),
                             "additionalProperties": .bool(false),
                         ]),
-                        "outputSchema": .object(["type": .string("object")]),
+                        "outputSchema": .object([
+                            "type": .string("object"), "properties": .object([
+                                "conflicts": .object(["type": .string("array"), "items": .object([
+                                    "type": .string("object"), "properties": .object([
+                                        "service": .object(["type": .string("string")]),
+                                        "selectedRepository": .object(["type": .array([.string("string"), .string("null")])]),
+                                        "candidates": .object(["type": .string("array"), "items": .object([
+                                            "type": .string("object"), "properties": .object(["repository": .object(["type": .string("string")]), "name": .object(["type": .string("string")])]),
+                                            "required": .array(["repository", "name"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                                        ])]),
+                                    ]), "required": .array(["service", "selectedRepository", "candidates"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                                ])]),
+                                "truncated": .object(["type": .string("boolean")]),
+                                "comparison": .object([
+                                    "type": .string("object"), "properties": .object([
+                                        "identical": .object(["type": .string("boolean")]),
+                                        "candidates": .object(["type": .string("array"), "items": .object([
+                                            "type": .string("object"), "properties": .object([
+                                                "repository": .object(["type": .string("string")]),
+                                                "files": .object(["type": .string("array"), "items": .object([
+                                                    "type": .string("object"), "properties": .object(["path": .object(["type": .string("string")]), "bytes": .object(["type": .string("integer")]), "sha256": .object(["type": .string("string")])]),
+                                                    "required": .array(["path", "bytes", "sha256"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                                                ])]),
+                                            ]), "required": .array(["repository", "files"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                                        ])]),
+                                    ]), "required": .array(["identical", "candidates"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                                ]),
+                            ]), "required": .array(["conflicts", "truncated"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                        ]),
                     ])
                 ),
                 (
@@ -68,7 +96,11 @@ nonisolated enum OxRepositories {
                             "required": .array([.string("service"), .string("repository")]),
                             "additionalProperties": .bool(false),
                         ]),
-                        "outputSchema": .object(["type": .string("object")]),
+                        "outputSchema": .object([
+                            "type": .string("object"), "properties": .object([
+                                "service": .object(["type": .string("string")]), "selectedRepository": .object(["type": .string("string")]), "reloadRequired": .object(["type": .string("boolean")]),
+                            ]), "required": .array(["service", "selectedRepository", "reloadRequired"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                        ]),
                     ])
                 ),
                 (
@@ -83,7 +115,12 @@ nonisolated enum OxRepositories {
                             "required": .array([.string("origin")]),
                             "additionalProperties": .bool(false),
                         ]),
-                        "outputSchema": .object(["type": .string("object")]),
+                        "outputSchema": .object([
+                            "type": .string("object"), "properties": .object([
+                                "id": .object(["type": .string("string")]), "name": .object(["type": .string("string")]), "origin": .object(["type": .string("string")]),
+                                "serviceCount": .object(["type": .string("integer")]), "skillCount": .object(["type": .string("integer")]), "connected": .object(["type": .string("boolean"), "const": .bool(true)]),
+                            ]), "required": .array(["id", "name", "origin", "serviceCount", "skillCount", "connected"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                        ]),
                     ])
                 ),
                 (
@@ -98,7 +135,12 @@ nonisolated enum OxRepositories {
                             "required": .array([.string("repository")]),
                             "additionalProperties": .bool(false),
                         ]),
-                        "outputSchema": .object(["type": .string("object")]),
+                        "outputSchema": .object([
+                            "type": .string("object"), "properties": .object([
+                                "id": .object(["type": .string("string")]), "name": .object(["type": .string("string")]),
+                                "serviceCount": .object(["type": .string("integer")]), "skillCount": .object(["type": .string("integer")]), "synced": .object(["type": .string("boolean"), "const": .bool(true)]),
+                            ]), "required": .array(["id", "name", "serviceCount", "skillCount", "synced"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                        ]),
                     ])
                 ),
                 (
@@ -140,7 +182,10 @@ nonisolated enum OxRepositories {
                             "required": .array([.string("repository")]),
                             "additionalProperties": .bool(false),
                         ]),
-                        "outputSchema": .object(["type": .string("object")]),
+                        "outputSchema": .object([
+                            "type": .string("object"), "properties": .object(["id": .object(["type": .string("string")]), "disconnected": .object(["type": .string("boolean"), "const": .bool(true)])]),
+                            "required": .array(["id", "disconnected"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                        ]),
                     ])
                 ),
             ]

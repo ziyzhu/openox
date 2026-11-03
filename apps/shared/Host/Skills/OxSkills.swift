@@ -74,9 +74,21 @@ nonisolated enum OxSkills {
             const options = __oxOptions(value, 'ox.skill.run');
             const script = String(options.script);
             if (!script.endsWith('.js') || script.split('/').some(part => !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(part))) throw new Error('Invalid skill script path');
-            const file = await ox.fs.read({path: 'skills/' + String(options.name) + '/scripts/' + script, options: {maxBytes: 524288}, purpose: String(options.purpose)});
-            if (file.truncated || typeof file.text !== 'string') throw new Error('Skill script could not be read completely');
-            return await new (Object.getPrototypeOf(async function(){}).constructor)('ox', 'args', file.text)(ox, options.args ?? null);
+            const path = 'skills/' + String(options.name) + '/scripts/' + script;
+            const chunks = [];
+            let offset = 1;
+            let characters = 0;
+            while (true) {
+              const file = await ox.fs.read({path, offset, purpose: String(options.purpose)});
+              if (typeof file.text !== 'string') throw new Error('Skill script could not be read completely');
+              characters += file.text.length;
+              if (characters > 524288) throw new Error('Skill script exceeds size limit');
+              chunks.push(file.text);
+              if (!file.truncated) break;
+              if (!Number.isSafeInteger(file.nextOffset) || file.nextOffset <= offset) throw new Error('Skill script could not be read completely');
+              offset = file.nextOffset;
+            }
+            return await new (Object.getPrototypeOf(async function(){}).constructor)('ox', 'args', chunks.join('\\n'))(ox, options.args ?? null);
           },
           delete: (value) => { const options = __oxOptions(value, 'ox.skill.delete'); return __nativeSkillDelete(String(options.name), String(options.purpose)); }
         """

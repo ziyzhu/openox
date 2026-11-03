@@ -79,13 +79,21 @@ nonisolated enum OxProviders {
                 else if operation == "generate" { fields = ProviderGeneration.inputFields }
                 else if ["schema", "list", "default"].contains(operation) { fields = [:] }
                 else { fields = ["id": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(200)])] }
+                let resultField = ["save": "saved", "validate": "valid", "delete": "deleted"][operation] ?? "status"
+                let resultValue: JSONValue = resultField == "status"
+                    ? .object(["type": .string("string"), "enum": .array((operation == "authenticate" ? ["authenticated", "credential-stored", "not-required"] : ["authenticated", "credential-stored", "required", "optional", "not-required", "browser-session", "unavailable"]).map(JSONValue.string))])
+                    : .object(["type": .string("boolean"), "const": .bool(true)])
+                let receipt: JSONValue = .object([
+                    "type": .string("object"), "properties": .object(["id": .object(["type": .string("string")]), resultField: resultValue]),
+                    "required": .array(["id", resultField].map(JSONValue.string)), "additionalProperties": .bool(false),
+                ])
                 return ("ox.provider.\(operation)", .object([
                     "description": .string(description),
                     "inputSchema": .object([
                         "type": .string("object"), "properties": .object(fields),
                         "required": .array((operation == "generate" ? ["id", "model", "messages", "maxOutputTokens"] : fields.keys.sorted()).map(JSONValue.string)), "additionalProperties": .bool(false),
                     ]),
-                    "outputSchema": operation == "schema" ? .object(["type": .string("object"), "description": .string("Complete provider-document JSON Schema, including all protocol and authentication variants.")]) : operation == "models" ? ProviderGeneration.modelsSchema : operation == "generate" ? ProviderGeneration.outputSchema : operation == "default" ? .object(["type": .string("array"), "items": ProviderDefinition.schema]) : operation == "list" ? .object(["type": .string("array"), "items": providerSummarySchema]) : operation == "get" ? ProviderDefinition.schema : .object(["description": .string("Operation result with provider id and status.")]),
+                    "outputSchema": operation == "schema" ? .object(["type": .string("object"), "description": .string("Complete provider-document JSON Schema, including all protocol and authentication variants.")]) : operation == "models" ? ProviderGeneration.modelsSchema : operation == "generate" ? ProviderGeneration.outputSchema : operation == "default" ? .object(["type": .string("array"), "items": ProviderDefinition.schema]) : operation == "list" ? .object(["type": .string("array"), "items": providerSummarySchema]) : operation == "get" ? ProviderDefinition.schema : receipt,
                 ]))
             }
         },

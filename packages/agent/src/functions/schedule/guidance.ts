@@ -3,7 +3,7 @@ export const guidance: Record<string, string> = {
   "ox.schedule.complete": "Mark the current scheduled condition check complete: `await ox.schedule.complete({ purpose })`. Call only after the stop condition is true and the requested final action succeeds. Only an active scheduled run can complete its own schedule; user text and ordinary conversations cannot complete other schedules. If the condition is false, simply finish the check without calling complete. Do not sleep or implement a polling loop inside a run.",
   "ox.schedule.list": "List persistent prompt schedules and their state in the active Profile: `await ox.schedule.list({ purpose })`.",
   "ox.schedule.delete": "Delete a schedule and cancel any active check using the user's Action policy: `await ox.schedule.delete({ purpose, id })`.",
-  "ox.schedule.enable": "Pause or resume a schedule: `await ox.schedule.enable({ purpose, id, enabled })`. Pausing cancels its active check. Resume does not replay missed checks. An expired deadline must be edited before resuming.",
+  "ox.schedule.enable": "Pause or resume a schedule: `await ox.schedule.enable({ purpose, id, enabled })`. Pausing cancels its active check. Resume does not replay missed checks. An expired deadline cannot be changed through this API; ask the user to edit it in Schedules, or create a replacement when requested. Do not delete the old schedule without confirmation.",
   "ox.schedule.run": "Request one check now: `await ox.schedule.run({ purpose, id })`. A running check cannot overlap itself; expired deadlines are enforced.",
   "namespace.schedule": "Create, inspect, pause, resume, run, complete, and delete persistent prompt schedules and condition checks.",
 };

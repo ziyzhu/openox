@@ -289,11 +289,20 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
         };
         const __oxValidationError = (value, schema, path) => {
           if (schema == null || typeof schema !== 'object') return null;
-          if (Array.isArray(schema.oneOf) || Array.isArray(schema.anyOf)) {
-            const errors = (schema.oneOf ?? schema.anyOf).map(candidate => __oxValidationError(value, candidate, path));
-            if (errors.some(error => error == null)) return null;
-            return errors[0] ?? `${path || 'value'} is invalid.`;
+          for (const keyword of ['oneOf', 'anyOf', 'allOf']) {
+            if (!Array.isArray(schema[keyword])) continue;
+            const errors = schema[keyword].map(candidate => __oxValidationError(value, candidate, path));
+            const matches = errors.filter(error => error == null).length;
+            if (keyword === 'oneOf' && matches !== 1 || keyword === 'anyOf' && matches === 0 || keyword === 'allOf' && matches !== errors.length) {
+              const selected = schema[keyword].findIndex(candidate => {
+                const discriminators = Object.entries(candidate.properties ?? {}).filter(([, field]) => field.const !== undefined || Array.isArray(field.enum));
+                return discriminators.length > 0 && discriminators.every(([key, field]) => __oxValidationError(value?.[key], field, key) == null);
+              });
+              return (selected < 0 ? errors.find(error => error != null) : errors[selected]) ?? `${path || 'value'} must match exactly one alternative.`;
+            }
           }
+          if (schema.not != null && __oxValidationError(value, schema.not, path) == null) return `${path || 'value'} contains a forbidden combination.`;
+          if (Object.prototype.hasOwnProperty.call(schema, 'const') && !Object.is(schema.const, value)) return `${path || 'value'} must equal ${JSON.stringify(schema.const)}.`;
           const types = schema.type == null ? [] : Array.isArray(schema.type) ? schema.type : [schema.type];
           if (types.length && !types.some(type => __oxMatchesType(value, type))) {
             const expected = types.map(type => type === 'integer' ? 'an integer' : `a ${type}`).join(' or ');
@@ -335,6 +344,7 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
             }
           }
           if (typeof value === 'string') {
+            if (schema.pattern != null && !new RegExp(schema.pattern).test(value)) return `'${path}' must match ${schema.pattern}.`;
             if (schema.minLength != null && value.length < schema.minLength || schema.maxLength != null && value.length > schema.maxLength) {
               const range = schema.minLength != null && schema.maxLength != null
                 ? `${schema.minLength}–${schema.maxLength}`

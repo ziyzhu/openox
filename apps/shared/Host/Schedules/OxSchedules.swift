@@ -23,7 +23,15 @@ nonisolated enum OxSchedules {
                         "minute": integer(0, 59),
                         "weekday": enumeration(["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]),
                         "timeZone": text,
-                    ], required: ["name", "prompt", "frequency"]),
+                    ], required: ["name", "prompt", "frequency"], oneOf: [
+                        .object(["properties": .object(["frequency": .object(["const": .string("once")])]), "required": .array([.string("fireAt")])]),
+                        .object(["properties": .object(["frequency": .object(["const": .string("interval")])]), "required": .array([.string("intervalSeconds")])]),
+                        .object(["properties": .object(["frequency": .object(["const": .string("daily")])]), "required": .array(["hour", "minute"].map(JSONValue.string))]),
+                        .object(["properties": .object(["frequency": .object(["const": .string("weekly")])]), "required": .array(["hour", "minute", "weekday"].map(JSONValue.string))]),
+                    ], anyOf: [
+                        .object(["not": .object(["required": .array([.string("condition")]), "properties": .object(["condition": .object(["type": .string("string"), "minLength": .int(1)])])])]),
+                        .object(["required": .array([.string("deadline")]), "properties": .object(["frequency": enumeration(["interval", "daily", "weekly"])])]),
+                    ]),
                     output: schedule
                 ),
                 entry(
@@ -137,13 +145,15 @@ nonisolated enum OxSchedules {
         (name, .object(["description": .string(description), "inputSchema": input, "outputSchema": output]))
     }
 
-    private static func object(_ properties: [String: JSONValue], required: [String] = []) -> JSONValue {
+    private static func object(_ properties: [String: JSONValue], required: [String] = [], oneOf: [JSONValue] = [], anyOf: [JSONValue] = []) -> JSONValue {
         var schema: [String: JSONValue] = [
             "type": .string("object"),
             "properties": .object(properties),
             "additionalProperties": .bool(false),
         ]
         if !required.isEmpty { schema["required"] = .array(required.map(JSONValue.string)) }
+        if !oneOf.isEmpty { schema["oneOf"] = .array(oneOf) }
+        if !anyOf.isEmpty { schema["anyOf"] = .array(anyOf) }
         return .object(schema)
     }
 }

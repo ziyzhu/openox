@@ -38,6 +38,7 @@ nonisolated enum OxActions {
                             ]),
                         ]),
                         "required": .array([.string("name"), .string("purpose")]),
+                        "not": .object(["required": .array(["session", "pageUrl"].map(JSONValue.string))]),
                         "additionalProperties": .bool(false),
                     ]),
                     "outputSchema": .object([
@@ -104,7 +105,7 @@ nonisolated enum OxActions {
         }
         return .object([
             "type": .string("object"), "properties": .object(properties),
-            "required": .array(properties.keys.sorted().map(JSONValue.string)), "additionalProperties": .bool(false),
+            "required": .array(["domain", "kind", "evidence", kind == "web" ? "sessions" : "state"].map(JSONValue.string)), "additionalProperties": .bool(false),
         ])
     }
 
@@ -118,7 +119,7 @@ nonisolated enum OxActions {
         if kind != "web" { properties["state"] = .object(["type": .string("string")]) }
         return .object([
             "type": .string("object"), "properties": .object(properties),
-            "required": .array(properties.keys.sorted().map(JSONValue.string)), "additionalProperties": .bool(false),
+            "required": .array((["domain", "kind", "completed", "completion"] + (kind == "web" ? [] : ["state"])).map(JSONValue.string)), "additionalProperties": .bool(false),
         ])
     }
 

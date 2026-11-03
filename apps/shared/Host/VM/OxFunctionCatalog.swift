@@ -116,8 +116,8 @@ nonisolated enum OxFunctionCatalog {
     static func descriptions() -> String {
         let namespaces = namespaceDescriptions.map { "ox.\($0.0) — \($0.1)" }
         let functions = catalogEntries.compactMap { name, schema -> String? in
-            guard let description = schema.objectValue?["description"]?.stringValue else { return nil }
-            return "\(name) — \(description.split(whereSeparator: \.isWhitespace).joined(separator: " "))"
+            guard let description = compactDescription(schema) else { return nil }
+            return "\(name) — \(description)"
         }.sorted()
         return (namespaces + [""] + functions).joined(separator: "\n")
     }
@@ -176,6 +176,16 @@ nonisolated enum OxFunctionCatalog {
         var lines = ["\(indentation)\(label)\(optional): \(schemaSummary(fields))"]
         guard fields["enum"] == nil, fields["const"] == nil else { return lines }
 
+        for keyword in ["oneOf", "anyOf", "allOf"] {
+            if let branches = fields[keyword]?.arrayValue {
+                for (index, branch) in branches.enumerated() {
+                    lines.append(contentsOf: schemaLines(label: "\(keyword)[\(index + 1)]", value: branch, required: true, depth: depth + 1))
+                }
+            }
+        }
+        if let excluded = fields["not"] {
+            lines.append(contentsOf: schemaLines(label: "not", value: excluded, required: true, depth: depth + 1))
+        }
         if let properties = fields["properties"]?.objectValue {
             let requiredKeys = fields["required"]?.arrayValue?.compactMap(\.stringValue) ?? []
             let requiredSet = Set(requiredKeys)
@@ -208,10 +218,13 @@ nonisolated enum OxFunctionCatalog {
         } else if let types = fields["type"]?.arrayValue {
             summary = types.compactMap(\.stringValue).joined(separator: " | ")
         } else {
-            summary = fields["type"]?.stringValue ?? "value"
+            summary = fields["type"]?.stringValue ?? (fields["required"] == nil ? "value" : "object")
         }
         if summary == "object", fields["additionalProperties"]?.boolValue == false {
             summary = "exact object"
+        }
+        if fields["properties"] == nil, let required = fields["required"]?.arrayValue {
+            summary += " requiring \(required.compactMap(\.stringValue).joined(separator: ", "))"
         }
         let constraints = schemaConstraints(fields)
         if !constraints.isEmpty { summary += " [\(constraints.joined(separator: ", "))]" }

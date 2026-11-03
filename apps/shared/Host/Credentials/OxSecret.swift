@@ -9,21 +9,35 @@ nonisolated enum OxSecret {
                 ("ox.secret.list", .object([
                     "description": .string(ModelGuidance.text("ox.secret.list")),
                     "inputSchema": .object(["type": .string("object"), "properties": .object([:])]),
-                    "outputSchema": .object(["description": .string("Array of { key, displayName, fields: string[], available: boolean }. Fields contains only top-level JSON field names, sorted, or [] when the secret is unavailable. Never includes secret values.")]),
+                    "outputSchema": .object(["type": .string("array"), "items": .object([
+                        "type": .string("object"), "properties": .object([
+                            "key": .object(["type": .string("string")]), "displayName": .object(["type": .string("string")]),
+                            "fields": .object(["type": .string("array"), "items": .object(["type": .string("string")]), "description": .string("Sorted top-level field names only; empty when unavailable. Never secret values.")]),
+                            "available": .object(["type": .string("boolean")]),
+                        ]), "required": .array(["key", "displayName", "fields", "available"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                    ])]),
                 ])),
                 ("ox.secret.add", .object([
                     "description": .string(ModelGuidance.text("ox.secret.add")),
                     "inputSchema": .object(["type": .string("object"), "properties": .object([
                         "key": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(128)]),
                     ]), "required": .array([.string("key")])]),
-                    "outputSchema": .object(["description": .string("Key and saved or cancelled status.")]),
+                    "outputSchema": .object([
+                        "type": .string("object"), "properties": .object([
+                            "key": .object(["type": .string("string")]), "status": .object(["type": .string("string"), "enum": .array(["saved", "cancelled"].map(JSONValue.string))]),
+                        ]), "required": .array(["key", "status"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                    ]),
                 ])),
                 ("ox.secret.delete", .object([
                     "description": .string(ModelGuidance.text("ox.secret.delete")),
                     "inputSchema": .object(["type": .string("object"), "properties": .object([
                         "key": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(128)]),
                     ]), "required": .array([.string("key")])]),
-                    "outputSchema": .object(["description": .string("Key and deleted or cancelled status.")]),
+                    "outputSchema": .object([
+                        "type": .string("object"), "properties": .object([
+                            "key": .object(["type": .string("string")]), "status": .object(["type": .string("string"), "enum": .array(["deleted", "cancelled"].map(JSONValue.string))]),
+                        ]), "required": .array(["key", "status"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                    ]),
                 ])),
             ]
         },

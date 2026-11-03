@@ -2,6 +2,27 @@ import Foundation
 import JavaScriptCore
 
 nonisolated enum OxServices {
+    static let snapshotSchema: JSONValue = .object([
+        "type": .string("object"), "properties": .object([
+            "domain": .object(["type": .string("string")]), "name": .object(["type": .string("string")]),
+            "description": .object(["type": .string("string")]),
+            "kind": .object(["type": .string("string"), "enum": .array(["web", "api", "ios", "mcp"].map(JSONValue.string))]),
+            "login": .object(["type": .string("string"), "enum": .array(["notRequired", "signedIn", "signedOut", "authorized", "notAuthorized", "unknown"].map(JSONValue.string))]),
+            "saved": .object(["type": .string("boolean")]), "attached": .object(["type": .string("boolean")]),
+            "reloaded": .object(["type": .string("boolean")]), "endpoint": .object(["type": .string("string")]),
+            "transport": .object(["type": .string("string")]), "faviconUrl": .object(["type": .array([.string("string"), .string("null")])]),
+            "repository": .object(["type": .string("string")]), "repositoryProvenance": .object(["type": .string("string")]),
+        ]), "required": .array(["domain", "name", "kind", "login", "saved", "attached"].map(JSONValue.string)), "additionalProperties": .bool(false),
+    ])
+
+    static let sourceSchema: JSONValue = .object([
+        "type": .string("object"), "properties": .object([
+            "domain": .object(["type": .string("string")]), "manifestPath": .object(["type": .string("string")]),
+            "source": .object(["type": .string("string"), "const": .string("local")]),
+            "kind": .object(["type": .string("string")]), "reloadRequired": .object(["type": .string("boolean")]),
+        ]), "required": .array(["domain", "manifestPath", "source"].map(JSONValue.string)), "additionalProperties": .bool(false),
+    ])
+
     static let function = OxFunction(
         namespace: "service",
         schema: {
@@ -20,9 +41,7 @@ nonisolated enum OxServices {
                             ]),
                             "additionalProperties": .bool(false),
                         ]),
-                        "outputSchema": .object([
-                            "description": .string("Array of attached service snapshots."),
-                        ]),
+                        "outputSchema": .object(["type": .string("array"), "items": snapshotSchema]),
                     ])
                 ),
                 (
@@ -53,7 +72,16 @@ nonisolated enum OxServices {
                             "additionalProperties": .bool(false),
                         ]),
                         "outputSchema": .object([
-                            "description": .string("The attached service snapshot, an action-keyed map of summaries or complete schemas, and applicable access helper contracts."),
+                            "type": .string("object"), "properties": .object([
+                                "service": snapshotSchema,
+                                "actions": .object(["type": .string("object"), "additionalProperties": .object(["type": .string("object"), "description": .string("Action summary, or full inputSchema/outputSchema when actions were requested.")])]),
+                                "access": .object(["type": .string("object"), "properties": .object([
+                                    "kind": .object(["type": .string("string")]),
+                                    "checkAccess": .object(["type": .string("object"), "description": .string("Applicable function, inputSchema and outputSchema contract.")]),
+                                    "requestAccess": .object(["type": .string("object"), "description": .string("Applicable function, inputSchema and outputSchema contract.")]),
+                                ]), "required": .array([.string("kind")]), "additionalProperties": .bool(false)]),
+                                "capabilitiesAvailable": .object(["type": .string("boolean")]), "capabilityError": .object(["type": .string("string")]),
+                            ]), "required": .array(["service", "actions", "access", "capabilitiesAvailable"].map(JSONValue.string)), "additionalProperties": .bool(false),
                         ]),
                     ])
                 ),
@@ -98,9 +126,13 @@ nonisolated enum OxServices {
                                 "faviconUrl": .object(["type": .string("string"), "format": .string("uri"), "pattern": .string("^https://"), "maxLength": .int(2048), "description": .string("Optional public HTTPS PNG, JPEG, or ICO URL for this MCP connection.")]),
                             ]),
                             "required": .array([.string("kind")]),
+                            "oneOf": .array([
+                                .object(["properties": .object(["kind": .object(["enum": .array(["web", "api"].map(JSONValue.string))])]), "required": .array([.string("domain")]), "not": .object(["anyOf": .array(["endpoint", "transport", "faviconUrl"].map { .object(["required": .array([.string($0)])]) })])]),
+                                .object(["properties": .object(["kind": .object(["const": .string("mcp")])]), "required": .array([.string("endpoint")]), "not": .object(["required": .array([.string("domain")])])]),
+                            ]),
                             "additionalProperties": .bool(false),
                         ]),
-                        "outputSchema": .object(["type": .string("object")]),
+                        "outputSchema": .object(["anyOf": .array([sourceSchema, snapshotSchema])]),
                     ])
                 ),
                 (
@@ -124,7 +156,7 @@ nonisolated enum OxServices {
                             "required": .array([.string("domain")]),
                             "additionalProperties": .bool(false),
                         ]),
-                        "outputSchema": .object(["type": .string("object")]),
+                        "outputSchema": .object(["anyOf": .array([sourceSchema, snapshotSchema])]),
                     ])
                 ),
                 (
@@ -143,7 +175,7 @@ nonisolated enum OxServices {
                             "required": .array([.string("domain")]),
                             "additionalProperties": .bool(false),
                         ]),
-                        "outputSchema": .object(["type": .string("object")]),
+                        "outputSchema": sourceSchema,
                     ])
                 ),
                 (
@@ -162,7 +194,13 @@ nonisolated enum OxServices {
                             "required": .array([.string("domain")]),
                             "additionalProperties": .bool(false),
                         ]),
-                        "outputSchema": .object(["type": .string("object")]),
+                        "outputSchema": .object([
+                            "type": .string("object"), "properties": .object([
+                                "domain": .object(["type": .string("string")]), "kind": .object(["type": .string("string")]),
+                                "deleted": .object(["type": .string("boolean"), "const": .bool(true)]), "source": .object(["type": .string("string")]),
+                                "replacementRepository": .object(["type": .string("string")]), "replacementProvenance": .object(["type": .string("string")]),
+                            ]), "required": .array(["domain", "kind", "deleted"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                        ]),
                     ])
                 ),
                 (
@@ -183,9 +221,7 @@ nonisolated enum OxServices {
                             ]),
                             "required": .array([.string("domain")]),
                         ]),
-                        "outputSchema": .object([
-                            "description": .string("The attached service's snapshot."),
-                        ]),
+                        "outputSchema": snapshotSchema,
                     ])
                 ),
                 (
@@ -206,9 +242,7 @@ nonisolated enum OxServices {
                             ]),
                             "required": .array([.string("domain")]),
                         ]),
-                        "outputSchema": .object([
-                            "description": .string("The detached service's snapshot."),
-                        ]),
+                        "outputSchema": snapshotSchema,
                     ])
                 ),
                 (
@@ -225,6 +259,7 @@ nonisolated enum OxServices {
                                 "purpose": .object(["type": .string("string")]),
                             ]),
                             "required": .array([.string("name")]),
+                            "not": .object(["required": .array(["session", "pageUrl"].map(JSONValue.string))]),
                             "additionalProperties": .bool(false),
                         ]),
                         "outputSchema": .object([
