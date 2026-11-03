@@ -10,7 +10,8 @@ Goal: keep the public name `ox.web.search`, replacing its separate native backen
 - Targets use qualified IDs such as `web:google.com`. Each target invokes `<service>:search` through normal attachment, validation, authentication, execution, and Action policy.
 - One default scope per service. Keep other scopes specialized, such as `searchUsers`, `searchJobs`, and `searchOrders`.
 - Provider-specific navigation and extraction belong in bundled services. Remove the native public-search engine, not the public function name.
-- Keep `ox.service.find` for repository discovery; do not couple every content search to service suggestions.
+- Choose target domains from the request or public research. Existing and bundled services are reusable implementations, not capability boundaries. If an explicit target lacks a compatible search action, build or extend its service through Evolve before searching; never substitute another domain silently.
+- Remove `ox.service.list` and `ox.service.find` from the agent-facing API. Retain catalog access for UI/CLI administration and `listAttached` for conversation context, not as an inventory of supported domains.
 
 ## Function contract
 

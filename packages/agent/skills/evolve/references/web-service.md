@@ -7,7 +7,7 @@ Browser is for observing and developing service actions, not fulfillment. Use re
 ## Discover
 
 1. Inspect the Browser contracts needed for the unresolved question. Navigate to the requested URL, allow the top-level URL to settle, and identify the coherent product and account surface.
-2. Search `ox.service.find` for the requested host, final host, and plausible parent-domain candidates. Reuse existing coverage. Inspect its manifest and available source read-only; defer copying or creation until evidence supports the action scope. Discovery alone must not leave a Local draft.
+2. Check existing source for the requested host, final host, and plausible parent domains with targeted `ox.fs.glob` lookups under `services/web/`, then read matching manifests and available source. Reuse suitable implementations; no match means build the needed service, not that the domain is unsupported. Defer copying or creation until evidence supports the action scope. Discovery alone must not leave a Local draft.
 3. Choose one bare lowercase domain for a coherent product, equal to or a parent suffix of its execution hosts. Normalize a main `www.example.com` surface to `example.com`. Reuse one multi-tenant product service across employers or workspaces; different accounts or tenant subdomains do not alone require another service. Read the authentication reference for target-specific discovery and routing. Keep genuinely distinct products separate. Explain unsupported scope before substituting a narrower service than the user requested.
 4. Use the recognizable product name, adding a suffix only to distinguish products. Inspect one existing service only if its observed implementation pattern clarifies the task; Bundled `actions.js` is readable without copying.
 

@@ -22,7 +22,6 @@ const evidence = (sessions: object[]) => ({ domain, kind: "web", evidence: "list
 export default {
   task: `Open my eye doctor's patient portal at https://${domain}/login so I can log in.`,
   stubs: { state: { loginAcknowledged: false }, functions: {
-    "ox.service.find": [{ result: [service] }],
     "ox.service.attach": [{ result: service }],
     "ox.service.listAttached": [{ result: [service] }],
     "ox.service.inspect": [{ result: { service, capabilitiesAvailable: true, access: {

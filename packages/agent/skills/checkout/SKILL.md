@@ -9,7 +9,7 @@ Carry the requested transaction through preparation, user review and payment, an
 
 ## Prepare
 
-Discover the merchant's service with `ox.service.find`, read its manifest, attach it, and inspect its preparation and read actions with `ox.service.inspect`. Inspect the full contracts of needed actions before calling `ox.service.invoke`. Reuse the existing cart, booking, or order when it matches the request; preserve unrelated items and completed effects.
+Identify the merchant's domain from the request or public research, attach its existing service, and inspect its preparation and read actions with `ox.service.inspect`. If no implementation exists or the needed actions are missing, use Evolve to build or extend the service, then invoke it; bundled coverage does not limit merchant support. Inspect the full contracts of needed actions before calling `ox.service.invoke`. Reuse the existing cart, booking, or order when it matches the request; preserve unrelated items and completed effects.
 
 Prepare and price the transaction through service actions. Resolve items, quantities, dates, delivery or fulfillment, and required account details from the request and authorized current state. Ask only when a missing choice prevents progress. Establish the merchant, itemized charges, discounts, taxes, fees, shipping, final total and currency, and applicable recurring charges, cancellation or refund terms. Surface unavailable or provisional amounts and material changes before commitment. Keep credentials in the service's secure user flow; never request payment secrets in conversation or store them in service source.
 

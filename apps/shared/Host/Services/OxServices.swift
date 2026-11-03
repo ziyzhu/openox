@@ -7,48 +7,6 @@ nonisolated enum OxServices {
         schema: {
             [
                 (
-                    "ox.service.find",
-                    .object([
-                        "description": .string(ModelGuidance.text("ox.service.find")),
-                        "inputSchema": .object([
-                            "type": .string("object"),
-                            "properties": .object([
-                                "query": .object([
-                                    "type": .string("string"),
-                                    "description": .string("What the user wants to do, in a few words (e.g. \"stream music\", \"order food\")."),
-                                ]),
-                                "purpose": .object([
-                                    "type": .string("string"),
-                                    "description": .string("Short (<10 words) description of why you're making this call, shown to the user as the step label."),
-                                ]),
-                            ]),
-                            "required": .array([.string("query")]),
-                        ]),
-                        "outputSchema": .object([
-                            "description": .string("Array of service snapshots, best match first."),
-                        ]),
-                    ])
-                ),
-                (
-                    "ox.service.list",
-                    .object([
-                        "description": .string(ModelGuidance.text("ox.service.list")),
-                        "inputSchema": .object([
-                            "type": .string("object"),
-                            "properties": .object([
-                                "kind": .object([
-                                    "type": .string("string"),
-                                    "enum": .array([.string("web"), .string("api"), .string("ios"), .string("mcp")]),
-                                ]),
-                            ]),
-                            "additionalProperties": .bool(false),
-                        ]),
-                        "outputSchema": .object([
-                            "description": .string("Array of available service snapshots with domain, name, description when present, kind, login, saved, attached, and repository or MCP connection metadata when applicable."),
-                        ]),
-                    ])
-                ),
-                (
                     "ox.service.listAttached",
                     .object([
                         "description": .string(ModelGuidance.text("ox.service.listAttached")),
@@ -298,18 +256,6 @@ nonisolated enum OxServices {
             }
         },
         installNatives: { ctx, env in
-            let findBlock: @convention(block) (String, JSValue) -> JSValue = { query, purposeValue in
-                let purpose = purposeValue.toString()!
-                return env.call { try await $0.findServices(query: query, purpose: purpose) }
-            }
-            ctx.setObject(findBlock as AnyObject, forKeyedSubscript: "__nativeServiceFind" as NSString)
-
-            let listBlock: @convention(block) (JSValue, JSValue) -> JSValue = { kindValue, purposeValue in
-                let kind = kindValue.isString ? kindValue.toString() : nil
-                return env.call { try await $0.listServices(kind: kind, purpose: purposeValue.toString()!) }
-            }
-            ctx.setObject(listBlock as AnyObject, forKeyedSubscript: "__nativeServiceList" as NSString)
-
             let listAttachedBlock: @convention(block) (JSValue, JSValue) -> JSValue = { kindValue, purposeValue in
                 let kind = kindValue.isString ? kindValue.toString() : nil
                 return env.call { try await $0.listAttachedServices(kind: kind, purpose: purposeValue.toString()!) }
@@ -393,8 +339,6 @@ nonisolated enum OxServices {
             ctx.setObject(loginBlock as AnyObject, forKeyedSubscript: "__nativeServiceLogin" as NSString)
         },
         jsFragment: """
-          find: (value) => { const options = __oxOptions(value, 'ox.service.find'); return __nativeServiceFind(String(options.query), String(options.purpose)); },
-          list: (value) => { const options = __oxOptions(value, 'ox.service.list'); return __nativeServiceList(options.kind == null ? null : String(options.kind), String(options.purpose)); },
           listAttached: (value) => { const options = __oxOptions(value, 'ox.service.listAttached'); return __nativeServiceListAttached(options.kind == null ? null : String(options.kind), String(options.purpose)); },
           inspect: (value) => { const options = __oxOptions(value, 'ox.service.inspect'); return __nativeServiceInspect(String(options.domain), options.actions ?? null, String(options.purpose)); },
           validate: (value) => { const options = __oxOptions(value, 'ox.service.validate'); return __nativeServiceValidate(String(options.domain), String(options.purpose)); },

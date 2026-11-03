@@ -266,7 +266,7 @@ final class ServiceOperations {
         }
         let exact = serviceManager.service(domain: identifier)
         guard exact != nil || matches.count <= 1 else {
-            throw RuntimeError.bridge("ox.service.update: multiple MCP services match '\(identifier)'; use the assigned domain from ox.service.list.")
+            throw RuntimeError.bridge("ox.service.update: multiple MCP services match '\(identifier)'; use the assigned domain from the saved services/mcp/<domain>/service.json definition.")
         }
         guard let service = exact ?? matches.first else {
             throw RuntimeError.bridge("ox.service.update: service '\(identifier)' does not exist; use ox.service.create for a new service.")

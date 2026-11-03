@@ -23,7 +23,7 @@ Test the trigger and workflow against two realistic requests that should use the
 
 ## Choose services
 
-Identify the external capability needed by each step. Search with `ox.service.find`, read the strongest candidates at their returned `manifestPath`, and compare their domains, descriptions, and actions.
+Identify the external capability and target domain needed by each step from the request or public research. Attach and inspect existing implementations for those domains; use Evolve to build or extend missing web or API actions before verifying the workflow. Existing repository coverage is a convenience, not a limit on which domains the workflow can use.
 
 Choose the smallest useful set of service domains from verified capabilities; an empty set is valid. Reuse established workflow requirements and proceed without a separate proposal or creation confirmation. Ask only when a consequential choice cannot be inferred from the request and observed evidence.
 
