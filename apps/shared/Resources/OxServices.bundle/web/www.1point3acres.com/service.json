@@ -106,47 +106,54 @@
   },
   "actions": [
     {
-      "id": "getSignInUrl",
-      "label": "Sign-in URL",
-      "description": "URL of the sign-in page.",
+      "id": "login",
+      "label": "Log in",
+      "description": "Prepare website login for the user. Completion does not verify authentication.",
       "inputSchema": {
         "type": "object",
+        "properties": {},
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "url"
-        ],
-        "additionalProperties": false
+        "type": "null"
       },
       "requireApproval": false,
       "requireAuth": false
     },
     {
-      "id": "getSignInState",
-      "label": "Auth state",
-      "description": "Whether the user is signed in.",
+      "id": "listSessions",
+      "label": "List signed-in accounts",
+      "description": "Discover currently authenticated accounts. Errors do not establish absence.",
       "inputSchema": {
         "type": "object",
+        "properties": {},
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "signedIn": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "signedIn"
-        ],
-        "additionalProperties": false
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
       },
       "requireApproval": false,
       "requireAuth": false
@@ -481,14 +488,6 @@
       "name": "一亩三分地",
       "description": "面向海外生活与职业发展的中文社区。搜索和阅读留学、求职、面试、签证和美国移民讨论，也可查询绿卡排期和 H-1B 担保排名。",
       "actions": {
-        "getSignInUrl": {
-          "label": "登录一亩三分地",
-          "description": "打开一亩三分地登录页。"
-        },
-        "getSignInState": {
-          "label": "检查一亩三分地登录状态",
-          "description": "检查你是否已登录一亩三分地。"
-        },
         "searchThreads": {
           "label": "搜索帖子",
           "description": "按精确关键词或内容含义搜索论坛讨论。"
@@ -512,6 +511,14 @@
         "getCurrentUser": {
           "label": "当前用户",
           "description": "已登录用户的资料:用户名、用户组、积分与大米。"
+        },
+        "login": {
+          "label": "登录",
+          "description": "为用户准备网站登录。完成交互不代表已通过身份验证。"
+        },
+        "listSessions": {
+          "label": "列出已登录账号",
+          "description": "发现当前已通过身份验证的账号。错误不代表没有账号。"
         }
       }
     }

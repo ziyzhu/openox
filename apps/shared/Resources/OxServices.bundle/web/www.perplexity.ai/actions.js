@@ -187,19 +187,19 @@ window.ox.install(({ action: register }) => {
             throw new Error("Perplexity did not return a completed answer");
         return final;
     };
-    action("getSignInUrl", {
-        async invoke() {
-            return { url: `${ORIGIN}/auth/signin` };
-        },
-    });
-    action("getSignInState", {
-        async invoke() {
-            const session = await getSession();
-            const signedIn = !!session?.user?.id;
-            console.log(`getSignInState signedIn=${signedIn}`);
-            return { signedIn };
-        },
-    });
+    action('login', { async invoke() {
+            const destination = `${ORIGIN}/auth/signin`;
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            const s = await getSession();
+            if (!s.user)
+                return [];
+            const u = s.user;
+            return [{ id: u.id, label: u.email || u.name || u.id, url: ORIGIN + '/' }];
+        } });
     action("askQuestion", {
         async invoke({ query }) {
             const frontendId = crypto.randomUUID();

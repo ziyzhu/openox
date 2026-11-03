@@ -208,27 +208,26 @@ const log = (...args) => console.log(...args);
         if (locale) localizations = localizations.filter((x) => x.locale === locale);
         return { appId: String(appId), versionId: String(versionId), version: String(va.versionString ?? ""), platform: String(va.platform ?? ""), state: String(va.appVersionState ?? va.appStoreState ?? ""), releaseType: nullableString(va.releaseType), earliestReleaseAt: nullableString(va.earliestReleaseDate), copyright: nullableString(va.copyright), localizations };
     };
-    action("getSignInUrl", {
-        async invoke() {
-            return { url: `${ORIGIN}/login` };
-        },
-    });
-    action("getSignInState", {
-        async invoke() {
-            const { response, text } = await rawSession();
-            if (response.status === 401 || response.status === 403 || response.status === 302)
-                return { signedIn: false };
-            if (response.status < 200 || response.status >= 300)
-                throw new Error(`App Store Connect session HTTP ${response.status}`);
-            try {
-                const body = JSON.parse(text);
-                return { signedIn: Boolean(body?.provider?.publicProviderId && body?.user) };
-            }
-            catch {
-                return { signedIn: false };
-            }
-        },
-    });
+    action('login', { async invoke() {
+            const destination = `${ORIGIN}/login`;
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            const { response: r, text } = await rawSession();
+            if (r.status === 401)
+                return [];
+            if (!r.ok || r.redirected)
+                throw Error('App Store Connect session HTTP ' + r.status);
+            const j = parseJson(text, 'Session discovery');
+            const team = j?.provider?.publicProviderId;
+            const u = j?.user;
+            const id = u?.dsId;
+            if (!team || !id)
+                throw Error('App Store Connect account identity unavailable');
+            return [{ id: String(id) + ':' + String(team), label: String(u.emailAddress || u.fullName || id) + ' — ' + String(j.provider.name || team), url: ORIGIN + '/' }];
+        } });
     action("listApps", {
         async invoke({ cursor, limit }) {
             const { team } = await session();

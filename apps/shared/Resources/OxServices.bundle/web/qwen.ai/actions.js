@@ -1,14 +1,27 @@
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 async function wait(fn,ms=12000){const end=Date.now()+ms;do{const v=fn();if(v)return v;await pause(120);}while(Date.now()<end);throw Error('Qwen interface not ready');}
 let apiCache=null;
-async function api(){if(apiCache)return apiCache;const s=await wait(()=>[...document.scripts].find(x=>x.src.includes('/qwen-chat-fe/')&&x.src.endsWith('/js/main.js')));const m=await import(s.src);const identityClient=typeof m.dN==='function'?m.dN:null;const requestClient=typeof m.p==='function'?m.p:null;if(typeof identityClient!=='function'||typeof requestClient!=='function')throw Error('Qwen website request clients changed');apiCache={module:m,identityClient,requestClient};return apiCache;}
+async function api(){if(apiCache)return apiCache;const s=await wait(()=>[...document.scripts].find(x=>x.src.includes('/qwen-chat-fe/')&&x.src.endsWith('/js/main.js')));const m=await import(s.src);const identityClient=typeof m.eq==='function'&&String(m.eq).includes('"/auths/"')?m.eq:null;const requestClient=typeof m.aH==='function'&&String(m.aH).includes('responseType')?m.aH:null;if(typeof identityClient!=='function'||typeof requestClient!=='function')throw Error('Qwen website request clients changed');apiCache={module:m,identityClient,requestClient};return apiCache;}
 async function identity(){const {identityClient}=await api();const j=await identityClient(false);if(j?.success===true&&typeof j.data?.id==='string'&&j.data.id)return j.data;if(j?.success===false&&(j.data?.code==='Unauthorized'||j.data?.code==='unauthorized'))return null;throw Error('Unexpected Qwen identity response');}
 async function request(path,params){const {requestClient}=await api();const j=await requestClient(path,{method:'GET',params,toast:false});if(j?.success!==true)throw Error('Qwen read failed: '+String(j?.data?.code||'unexpected response'));return j.data;}
 async function list(page){const a=await request('/chats/',{page,exclude_project:true});if(!Array.isArray(a))throw Error('Unexpected Qwen history');return a;}
 window.ox.install(({action})=>{
 registerModelActions(action);
-action('getSignInUrl',{async invoke(){return {url:'https://chat.qwen.ai/'};}});
-action('getSignInState',{async invoke(){return {signedIn:!!(await identity())};}});
+action('login', { async invoke() {
+        if (document.querySelector('[role="dialog"] input[type="email"], [role="dialog"] input[type="password"]'))
+            return null;
+        const button = [...document.querySelectorAll('button')].find(e => !e.closest('form,[role="dialog"]') && e.getClientRects().length && e.textContent.trim() === 'Log in');
+        if (!button)
+            throw Error('Qwen login control unavailable');
+        button.click();
+        return null;
+    } });
+action('listSessions', { async invoke() {
+        const u = await identity();
+        if (!u)
+            return [];
+        return [{ id: u.id, label: String(u.email || u.name || u.id), url: 'https://chat.qwen.ai/' }];
+    } });
 action('getCurrentUser',{async invoke(){const u=await identity();if(!u)throw Error('Sign in to Qwen');return {id:u.id,name:String(u.name||''),email:String(u.email||'')};}});
 action('listWebsiteModels',{async invoke(){const d=await request('/models/');if(!Array.isArray(d?.data))throw Error('Unexpected model catalog');return {items:d.data.map(x=>({id:String(x.id),name:String(x.name)})),nextCursor:null};}});
 action('listConversations',{async invoke(a){const page=Number(a.cursor||1);const items=await list(page);return {items:items.map(x=>({id:String(x.id),title:String(x.title||'')})),nextCursor:items.length?String(page+1):null};}});
@@ -64,7 +77,8 @@ const checked = async (request, path, options) => {
         if (attachments.length) {
           const managers = Object.values(module).filter(value => typeof value === 'function' && typeof value.prototype?.addFiles === 'function' && typeof value.prototype?.retryFile === 'function');
           if (managers.length !== 1) throw new Error('Qwen attachment uploader is unavailable');
-          const identity = await module.dN(false);
+          const {identityClient} = await api();
+          const identity = await identityClient(false);
           const manager = new managers[0]({parsedFileTypes: ['file'], userId: identity?.data?.id});
           send({id, type: 'progress', phase: 'uploading'});
           await manager.addFiles(attachments);

@@ -343,14 +343,6 @@
       "name": "大通银行",
       "description": "美国个人银行服务。查看信用卡账户、余额、还款到期日、账户明细、近期交易和积分余额，还可向已保存的收款人支付账单。需登录。",
       "actions": {
-        "getSignInUrl": {
-          "label": "登录大通银行",
-          "description": "打开大通银行登录页。"
-        },
-        "getSignInState": {
-          "label": "检查大通登录状态",
-          "description": "检查你是否已登录大通银行。"
-        },
         "listAccounts": {
           "label": "账户列表",
           "description": "列出已登录用户的账户及余额、还款到期信息。"
@@ -374,55 +366,68 @@
         "createPayment": {
           "label": "支付账单",
           "description": "使用你选择的账户、金额和可用付款日期，向已保存的收款人安排账单付款。提交前需你批准。"
+        },
+        "login": {
+          "label": "登录",
+          "description": "为用户准备网站登录。完成交互不代表已通过身份验证。"
+        },
+        "listSessions": {
+          "label": "列出已登录账号",
+          "description": "发现当前已通过身份验证的账号。错误不代表没有账号。"
         }
       }
     }
   },
   "actions": [
     {
-      "id": "getSignInUrl",
-      "label": "Sign in to Chase",
-      "description": "Opens the Chase sign-in page.",
+      "id": "login",
+      "label": "Log in",
+      "description": "Prepare website login for the user. Completion does not verify authentication.",
       "inputSchema": {
         "type": "object",
         "properties": {},
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "url"
-        ],
-        "additionalProperties": false
+        "type": "null"
       },
       "requireApproval": false,
       "requireAuth": false
     },
     {
-      "id": "getSignInState",
-      "label": "Check Chase sign-in",
-      "description": "Checks whether you are signed in to Chase.",
+      "id": "listSessions",
+      "label": "List signed-in accounts",
+      "description": "Discover currently authenticated accounts. Errors do not establish absence.",
       "inputSchema": {
         "type": "object",
         "properties": {},
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "signedIn": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "signedIn"
-        ],
-        "additionalProperties": false
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
       },
       "requireApproval": false,
       "requireAuth": false

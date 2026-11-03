@@ -5,7 +5,6 @@ window.ox.install(({ action }) => {
   const visible = el => !!el && !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
   const waitFor = async (fn, label, timeout = 12000) => { const end = Date.now() + timeout; let value; while (Date.now() < end) { value = fn(); if (value) return value; await sleep(150); } throw new Error(label + ': timed out'); };
   const ensureRoute = kind => { const ok = location.hostname === 'outlook.live.com' && location.pathname.startsWith(kind === 'mail' ? '/mail' : '/calendar'); if (!ok) throw new Error(kind + ': Outlook application route is not ready'); };
-  const authSignal = async () => { const r = await fetch('/mail/', { credentials: 'include', redirect: 'manual', cache: 'no-store', headers: { accept: 'text/html' } }); if (r.status !== 200 || r.type !== 'basic' || new URL(r.url).hostname !== 'outlook.live.com') return false; const t = await r.text(); if (!/owa\.mailindex|owaIsAuthenticated|webpackChunkOwa/.test(t)) throw new Error('getSignInState: unexpected Outlook shell response'); return Object.keys(localStorage).some(k => /^msal\.3\.account\.keys$/i.test(k)) && Object.keys(localStorage).some(k => /^msal\.3\|.*\|idtoken\|/i.test(k)); };
   const expandFolderGroups = () => { for(const el of document.querySelectorAll('[role="treeitem"][aria-expanded="false"]')){ if(visible(el)) el.click(); } };
   const folderRows = () => [...document.querySelectorAll('[role="treeitem"][data-folder-name], [role="treeitem"][data-folder-id], [role="treeitem"]')].filter(visible).filter(e=>e.dataset.folderName||e.dataset.folderId||/inbox|drafts|sent|archive|deleted|junk/i.test(clean(e.getAttribute('aria-label')||e.innerText)));
   const folderKey = el => clean(el?.dataset?.folderName||el?.dataset?.folderId||el?.getAttribute('aria-label')||el?.innerText).split(/[\n,]/)[0].toLowerCase();
@@ -35,8 +34,27 @@ window.ox.install(({ action }) => {
   const openMessage = async id => { ensureRoute('mail'); let row=messageRows().find(e=>e.dataset.convid===id); if(!row){ location.href='/mail/inbox/id/'+encodeURIComponent(id); } else row.click(); await waitFor(()=>document.querySelector('[role="main"] [aria-label="Email message"], [role="main"] [aria-label="Message body"]'),'getMessage'); return document.querySelector('[role="main"]'); };
   const parseEventEl = el => { const label=clean(el.getAttribute('aria-label')); const text=clean(el.innerText); const raw=label||text; const id=el.dataset.itemid||el.dataset.itemId||el.getAttribute('data-item-id')||hash(raw); const tm=raw.match(/((?:\d{1,2}:\d{2}\s*(?:AM|PM)).*?(?:\d{1,2}:\d{2}\s*(?:AM|PM)))/i); return {id,subject:text||raw.split(',')[0]||'',startText:tm?tm[1].split(/\s+to\s+/i)[0]:'',endText:tm&&/\s+to\s+/i.test(tm[1])?tm[1].split(/\s+to\s+/i)[1]:'',location:'',allDay:/all day/i.test(raw)}; };
   const actions = {
-    async getSignInUrl(){ return {url:'https://outlook.live.com/mail/'}; },
-    async getSignInState(){ return {signedIn:await authSignal()}; },
+    async login() {
+        location.assign('https://outlook.live.com/mail/');
+        return null;
+    },
+    async listSessions() {
+        const r = await fetch('/mail/', { credentials: 'include', cache: 'no-store' });
+        if (!r.ok)
+            throw Error('Outlook account HTTP ' + r.status);
+        const u = new URL(r.url);
+        if (u.hostname === 'login.live.com')
+            return [];
+        if (u.hostname !== 'outlook.live.com' || !u.pathname.startsWith('/mail/'))
+            throw Error('Unexpected Outlook account route');
+        const text = await r.text();
+        if (!/owa\.mailindex|owaIsAuthenticated|webpackChunkOwa/.test(text))
+            throw Error('Unrecognized Outlook application shell');
+        const match = text.match(/"UserEmailAddress"\s*:\s*"([^"\s]+@[^"\s]+)"/i);
+        if (!match)
+            throw Error('Outlook server account identity unavailable');
+        return [{ id: match[1], label: match[1], url: 'https://outlook.live.com/mail/' }];
+    },
     async listFolders(){ ensureRoute('mail'); const rows=await waitForFolderPane(null,'listFolders'); const seen=new Set(); const items=[]; for(const el of rows){const id=clean(el.dataset.folderName).toLowerCase(); if(!id||seen.has(id))continue; seen.add(id); const text=clean(el.innerText); const name=clean((el.innerText||'').split(/\n+/).map(clean).find(x=>x&&/[A-Za-z0-9]/.test(x)&&!/^\d+\s*unread$/i.test(x))||id); const m=text.match(/(\d+)\s*unread/i); items.push({id,name,unreadCount:m?Number(m[1]):null});} return {items,nextCursor:null}; },
     async listMessages(args={}){ ensureRoute('mail'); await selectFolder(args.folderId||'inbox'); const state=await waitFor(messageListState,'listMessages usable fresh message list',18000); const items=state.rows.map(parseMessageRow); return pageItems(items,args.cursor??null,args.limit??25); },
     async searchMessages(args={}){ ensureRoute('mail'); await waitFor(()=>document.querySelector('input[aria-label*="Search for email" i]'),'searchMessages search box'); const q=clean(args.query); if(!q)throw new Error('searchMessages: query is required'); const input=document.querySelector('input[aria-label*="Search for email" i]'); if(!input)throw new Error('searchMessages: search box unavailable'); input.focus(); input.value=q; input.dispatchEvent(new Event('input',{bubbles:true})); input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',bubbles:true})); await sleep(1200); await waitFor(()=>document.querySelector('[role="listbox"]'),'searchMessages'); return pageItems(messageRows().map(parseMessageRow),args.cursor??null,args.limit??25); },

@@ -130,48 +130,55 @@
   },
   "actions": [
     {
-      "id": "getSignInUrl",
-      "label": "Sign in to Taobao",
-      "description": "Taobao sign-in URL (QR or phone).",
+      "id": "login",
+      "label": "Log in",
+      "description": "Prepare website login for the user. Completion does not verify authentication.",
       "inputSchema": {
         "type": "object",
+        "properties": {},
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "url"
-        ],
-        "additionalProperties": false
+        "type": "null"
       },
       "defaultArgs": {},
       "requireApproval": false,
       "requireAuth": false
     },
     {
-      "id": "getSignInState",
-      "label": "Check provider sign-in",
-      "description": "Checks whether you are signed in to Taobao.",
+      "id": "listSessions",
+      "label": "List signed-in accounts",
+      "description": "Discover currently authenticated accounts. Errors do not establish absence.",
       "inputSchema": {
         "type": "object",
+        "properties": {},
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "signedIn": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "signedIn"
-        ],
-        "additionalProperties": false
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
       },
       "defaultArgs": {},
       "requireApproval": false,
@@ -408,14 +415,6 @@
       "name": "淘宝",
       "description": "综合网购平台。搜索淘宝和天猫商品，查看价格、款式、图片和买家问答。登录后还可查看收藏状态和购物车数量。",
       "actions": {
-        "getSignInUrl": {
-          "label": "登录淘宝",
-          "description": "打开淘宝登录页，可使用二维码或手机号登录。"
-        },
-        "getSignInState": {
-          "label": "检查淘宝登录状态",
-          "description": "检查你是否已登录淘宝。"
-        },
         "searchItems": {
           "label": "搜索商品",
           "description": "按关键词搜索淘宝和天猫商品。"
@@ -439,6 +438,14 @@
         "listItemQuestions": {
           "label": "商品问大家",
           "description": "按商品 ID 或商品网址分页获取买家提问和热门回答（问大家）。"
+        },
+        "login": {
+          "label": "登录",
+          "description": "为用户准备网站登录。完成交互不代表已通过身份验证。"
+        },
+        "listSessions": {
+          "label": "列出已登录账号",
+          "description": "发现当前已通过身份验证的账号。错误不代表没有账号。"
         }
       }
     }

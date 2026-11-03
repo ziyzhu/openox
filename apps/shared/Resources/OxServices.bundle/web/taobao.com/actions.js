@@ -41,18 +41,26 @@ window.ox.install(({ action }) => {
             throw new Error(`mtop ${api}: ${ret || "no ret"}`);
         return r?.data ?? {};
     };
-    action("getSignInUrl", { async invoke() { return { url: "https://login.taobao.com" }; } });
-    action("getSignInState", {
-        async invoke() {
+    action('login', { async invoke() {
+            const destination = "https://login.taobao.com";
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            let u;
             try {
-                return { signedIn: !!cookie("unb") || !!cookie("tracknick") };
+                u = await mtop('mtop.user.getUserSimple', '1.0', {});
             }
-            catch (e) {
-                console.log("getSignInState: " + (e?.message ?? String(e)));
-                throw e;
+            catch (error) {
+                if (/^mtop mtop\.user\.getUserSimple: FAIL_SYS_SESSION_EXPIRED(?:::|$)/.test(String(error?.message || '')))
+                    return [];
+                throw error;
             }
-        },
-    });
+            if (!u?.userNumId)
+                throw Error('Taobao account identity unavailable');
+            return [{ id: String(u.userNumId), label: cleanText(u.displayNick || u.nick || u.userNumId), url: ORIGIN + '/' }];
+        } });
     const searchData = (query, page) => ({
         appId: "34385",
         params: JSON.stringify({

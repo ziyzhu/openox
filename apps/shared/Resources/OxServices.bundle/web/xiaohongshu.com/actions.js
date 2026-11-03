@@ -61,30 +61,30 @@ window.ox.install(({ action }) => {
         const problem = pageProblem();
         return `${location.href} (${document.title || "no title"})${problem ? `: ${problem}` : ""}`;
     };
-    action("getSignInUrl", { async invoke() { return { url: `${ORIGIN}/login` }; } });
-    action("getSignInState", {
-        async invoke() {
-            try {
-                const response = await fetch(`${ORIGIN}/notification`, {
-                    method: "HEAD",
-                    credentials: "include",
-                    redirect: "follow",
-                    cache: "no-store",
-                });
-                const url = new URL(response.url);
-                const signedOut = response.redirected && url.origin === ORIGIN && url.pathname === "/login";
-                const signedIn = !response.redirected && url.origin === ORIGIN && url.pathname === "/notification";
-                console.log(`getSignInState: status=${response.status} redirected=${response.redirected} path=${url.pathname}`);
-                if (!signedIn && !signedOut)
-                    throw new Error("unexpected authentication response");
-                return { signedIn };
-            }
-            catch (e) {
-                console.log("getSignInState: " + (e?.message ?? String(e)));
-                throw e;
-            }
-        },
-    });
+    action('login', { async invoke() {
+            const destination = `${ORIGIN}/login`;
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            const r = await fetch(ORIGIN + '/notification', { credentials: 'include', cache: 'no-store' });
+            if (!r.ok)
+                throw Error('Xiaohongshu account HTTP ' + r.status);
+            const u = new URL(r.url);
+            if (u.origin !== ORIGIN)
+                throw Error('Unexpected account origin');
+            if (u.pathname === '/login')
+                return [];
+            if (u.pathname !== '/notification')
+                throw Error('Unclassified account route');
+            const d = new DOMParser().parseFromString(await r.text(), 'text/html');
+            const me = [...d.querySelectorAll('a[href]')].find(a => /^(我|Me)$/.test(a.textContent.trim()) && /\/user\/profile\/[a-f0-9]{24}/i.test(a.getAttribute('href') || ''));
+            const id = me?.getAttribute('href')?.match(/\/user\/profile\/([a-f0-9]{24})/i)?.[1];
+            if (!id)
+                throw Error('Xiaohongshu current account identity unavailable');
+            return [{ id, label: id, url: ORIGIN + '/notification' }];
+        } });
     const buildFeedItem = (entry) => {
         const card = entry?.noteCard || {};
         const id = entry?.id;

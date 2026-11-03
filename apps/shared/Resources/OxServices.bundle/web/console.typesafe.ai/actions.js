@@ -8,9 +8,9 @@ async function sessionState() {
     const data = JSON.parse(text);
     if (Array.isArray(data?.buckets)) return {signedIn: true};
   }
-  if (response.status === 401 && contentType.includes('application/problem+json')) {
+  if (response.status === 401 && (contentType.includes('application/problem+json') || contentType.includes('application/json'))) {
     const data = JSON.parse(text);
-    if (data?.code === 'unauthenticated') return {signedIn: false};
+    if (data?.code === 'unauthenticated' || data?.code === 'session_expired') return {signedIn: false};
   }
   throw new Error('Unrecognized TypeSafe session response');
 }
@@ -186,8 +186,23 @@ async function evaluate(state, questions, model = 'jev-latest') {
 }
 
 window.ox.install(({action}) => {
-  action('getSignInUrl', {async invoke() { return {url: 'https://console.typesafe.ai/login?returnTo=%2Fplayground'}; }});
-  action('getSignInState', {async invoke() { return sessionState(); }});
+  action('login', { async invoke() {
+          const destination = 'https://console.typesafe.ai/login?returnTo=%2Fplayground';
+          if (location.href !== new URL(destination, location.href).href)
+              location.assign(destination);
+          return null;
+      } });
+  action('listSessions', { async invoke() {
+          const s = await sessionState();
+          if (!s.signedIn)
+              return [];
+          const u = await currentUser();
+          if (!u.email)
+              throw Error('TypeSafe account identity unavailable');
+          if (u.organizations.filter(o => o.isActive).length !== 1)
+              throw Error('TypeSafe session routing requires one active organization');
+          return [{ id: u.email, label: u.email, url: 'https://console.typesafe.ai/playground' }];
+      } });
   action('getCurrentUser', {async invoke() { return currentUser(); }});
   action('listModels', {async invoke() { return models(); }});
   action('getUsage', {async invoke(args) { return usage(args); }});

@@ -175,40 +175,28 @@ window.ox.install(({ action }) => {
         propertyDefaultType: "string",
     }));
 
-    action("getSignInUrl", {
-        async invoke() {
-            return { url: `${ORIGIN}/login/` };
-        },
-    });
+    action('login', { async invoke() {
+            const destination = `${ORIGIN}/login/`;
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
 
-    action("getSignInState", {
-        async invoke() {
+    action('listSessions', { async invoke() {
             const token = await getAccessToken();
-            if (!token) {
-                console.log("getSignInState: no token, signedIn=false");
-                return { signedIn: false };
-            }
-            const response = await retryFetch("/api/app/me/?include_workspace_users=false", {
-                credentials: "include",
-                headers: {
-                    accept: "application/json",
-                    authorization: `Bearer ${token}`,
-                },
-            });
-            if (response.status === 401 || response.status === 403 || response.redirected || response.url.includes("/login")) {
-                console.log(`getSignInState: status=${response.status} signedIn=false`);
-                return { signedIn: false };
-            }
-            const contentType = response.headers.get("content-type") ?? "";
-            if (!response.ok || !contentType.includes("json")) {
-                throw new Error(`Mixpanel sign-in check failed (HTTP ${response.status})`);
-            }
-            const json = await response.json();
-            if (json?.status !== "ok" || !json?.results?.user_id) throw new Error("Unexpected Mixpanel identity response");
-            console.log(`getSignInState: status=${response.status} signedIn=true`);
-            return { signedIn: true };
-        },
-    });
+            if (!token)
+                return [];
+            const r = await fetch('/api/app/me/?include_workspace_users=false', { credentials: 'include', cache: 'no-store', headers: { accept: 'application/json', authorization: 'Bearer ' + token } });
+            if (r.status === 401)
+                return [];
+            if (!r.ok || r.redirected)
+                throw Error('Mixpanel identity HTTP ' + r.status);
+            const j = await r.json();
+            const u = j.results;
+            if (j.status !== 'ok' || !u?.user_id)
+                throw Error('Invalid Mixpanel identity');
+            return [{ id: String(u.user_id), label: String(u.user_email || u.user_name || u.user_id), url: 'https://mixpanel.com/' }];
+        } });
 
     action("getCurrentUser", {
         async invoke() {

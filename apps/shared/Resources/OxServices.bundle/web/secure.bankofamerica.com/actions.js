@@ -29,7 +29,7 @@ window.ox.install(({ action }) => {
     const OVERVIEW_URL = `${ORIGIN}/myaccounts/ao/accounts-overview.go`;
     const PAY_TRANSFER_URL = `${ORIGIN}/pay-transfer-pay-portal/`;
     const SIGNON_URL = `${ORIGIN}/auth/signon/`;
-    const signedOut = () => new Error("Bank of America session is signed out. Run getSignInUrl, sign in, then retry.");
+    const signedOut = () => new Error("Bank of America session is signed out. Run login, rediscover sessions, then retry.");
     const baseHeaders = () => ({
         accept: "application/json, text/javascript, */*; q=0.01",
         "x-requested-with": "XMLHttpRequest",
@@ -39,7 +39,7 @@ window.ox.install(({ action }) => {
             headers: baseHeaders(),
             credentials: "include",
         });
-        if (res.status === 401 || res.status === 403)
+        if (res.status === 401)
             throw signedOut();
         if (!res.ok)
             throw new Error(`GET ${path} HTTP ${res.status}`);
@@ -52,7 +52,7 @@ window.ox.install(({ action }) => {
             credentials: "include",
             body: JSON.stringify(body ?? {}),
         });
-        if (res.status === 401 || res.status === 403)
+        if (res.status === 401)
             throw signedOut();
         if (!res.ok)
             throw new Error(`POST ${path} HTTP ${res.status}`);
@@ -92,19 +92,28 @@ window.ox.install(({ action }) => {
             return { url: PAY_TRANSFER_URL };
         },
     });
-    action("getSignInUrl", {
-        async invoke() {
-            return { url: SIGNON_URL };
-        },
-    });
-    action("getSignInState", {
-        async invoke() {
-            const profile = (await fetchCustomer())?.profile;
-            const signedIn = Boolean(profile?.name?.first || profile?.name?.full);
-            console.log(`bofa getSignInState signedIn=${signedIn}`);
-            return { signedIn };
-        },
-    });
+    action('login', { async invoke() {
+            const destination = SIGNON_URL;
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            let j;
+            try {
+                j = await fetchCustomer();
+            }
+            catch (error) {
+                if (error?.message === signedOut().message)
+                    return [];
+                throw error;
+            }
+            const p = j?.profile;
+            const id = p?.customerId;
+            if (!id)
+                throw Error('Bank of America account identity unavailable; customer response has no stable account identifier');
+            return [{ id: String(id), label: String(p.name?.full || id), url: OVERVIEW_URL }];
+        } });
     action("listAccounts", {
         async invoke() {
             const items = await fetchAccounts();

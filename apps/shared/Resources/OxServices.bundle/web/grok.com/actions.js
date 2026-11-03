@@ -66,8 +66,24 @@ window.ox.install(({action})=>{
 registerModelActions(action);
 action('searchConversations',{async invoke({query}){if(!query.trim())throw Error('Search query must not be blank');const r=await fetch('/rest/app-chat/conversations?pageSize=60&searchQuery='+encodeURIComponent(query),{credentials:'include',cache:'no-store'});if(!r.ok||r.redirected)throw Error('Grok search failed: '+r.status);const j=await r.json();if(!Array.isArray(j.conversations)||j.conversations.some(x=>typeof x.conversationId!=='string'||typeof x.title!=='string'))throw Error('Unexpected Grok search response');if(j.nextPageToken)throw Error('Grok returned more search results; continuation is not yet verified. Narrow the query.');return {items:j.conversations.map(x=>({id:x.conversationId,title:x.title,url:'https://grok.com/c/'+encodeURIComponent(x.conversationId)})),nextCursor:null};}});
 action('getInterfaceState',{async invoke(){const e=await wait(editor);const b=document.querySelector('button[data-testid="chat-submit"]');const text=e.editor?.state?.doc?.textContent;return {path:location.pathname,editorPresent:!!e,domLength:e.textContent.trim().length,stateLength:typeof text==='string'?text.trim().length:-1,testDraftMatches:text?.trim()==='Reply exactly OX_GROK_OK',messageCount:document.querySelectorAll('.message-bubble').length,submitPresent:!!b,submitDisabled:!b||b.disabled,sidebarIds:[...document.querySelectorAll('a[href]')].map(a=>new URL(a.href).pathname).filter(p=>p.startsWith('/c/')).slice(0,60)};}});
-action('getSignInUrl',{invoke:async()=>({url:'https://grok.com/sign-in?return_to=%2F'})});
-action('getSignInState',{invoke:session});
+action('login', { async invoke() {
+        location.assign('https://grok.com/sign-in?return_to=%2F');
+        return null;
+    } });
+action('listSessions', { async invoke() {
+        const s = await session();
+        if (!s.signedIn)
+            return [];
+        const response = await fetch('/', {credentials:'include',cache:'no-store'});
+        if (!response.ok || response.redirected)
+            throw Error('Grok account page HTTP ' + response.status);
+        const accountPage = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const controls = [...accountPage.querySelectorAll('button[aria-label*="account" i],button[aria-label*="profile" i]')];
+        const emails = [...new Set(controls.flatMap(e => (e.getAttribute('aria-label') + ' ' + e.textContent).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || []))];
+        if (emails.length !== 1)
+            throw Error('Grok current account identity unavailable');
+        return [{ id: emails[0], label: emails[0], url: 'https://grok.com/' }];
+    } });
 action('listConversations',{async invoke({limit=20}){const r=await fetch('/rest/app-chat/conversations?pageSize='+limit,{credentials:'include',cache:'no-store'});if(!r.ok||r.redirected)throw new Error('Conversation request failed: '+r.status);const j=await r.json();if(!Array.isArray(j.conversations))throw new Error('Unexpected conversation response');return {items:j.conversations.map(c=>({conversationId:c.conversationId,title:c.title||'',url:'https://grok.com/c/'+encodeURIComponent(c.conversationId),createTime:c.createTime||null,modifyTime:c.modifyTime||null})),nextCursor:j.nextPageToken||null};}});
 action('openConversation',{invoke:({conversationId})=>openTarget(conversationId)});
 action('getCurrentConversation',{invoke:({conversationId})=>serverRead(conversationId)});

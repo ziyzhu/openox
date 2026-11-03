@@ -78,16 +78,20 @@ window.ox.install(({ action }) => {
         lastpost: t.dateline ?? 0,
         url: `${BBS}/thread-${t.tid}-1-1.html`,
     });
-    action("getSignInUrl", {
-        async invoke() {
-            return { url: "https://auth.1point3acres.com/login" };
-        },
-    });
-    action("getSignInState", {
-        async invoke() {
-            return { signedIn: !!(await me())?.uid };
-        },
-    });
+    action('login', { async invoke() {
+            const destination = "https://auth.1point3acres.com/login";
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            const u = await me();
+            if (u === null)
+                return [];
+            if (!u?.uid)
+                throw Error('Unclassified account response');
+            return [{ id: String(u.uid), label: String(u.username || u.uid), url: 'https://www.1point3acres.com/' }];
+        } });
     action("getCurrentUser", {
         async invoke() {
             const u = await me();

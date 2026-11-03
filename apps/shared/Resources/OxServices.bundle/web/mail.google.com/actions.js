@@ -46,8 +46,6 @@ const normalizeGmailRecipients = (values) => {
 };
 window.ox.install(({ action }) => {
     const ORIGIN = "https://mail.google.com";
-    const MAIL_ROOT = `${ORIGIN}/mail/u/0/`;
-    const BOOTSTRAP_URL = `${ORIGIN}/mail/_/bscframe`;
     const ACCOUNTS_URL = "https://accounts.google.com/ListAccounts?gpsia=1&source=Ox&json=standard";
     const MAILBOXES = new Set(["inbox", "starred", "sent", "drafts", "spam", "trash", "all"]);
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -83,12 +81,15 @@ window.ox.install(({ action }) => {
         if (!Array.isArray(payload) || !Array.isArray(payload[1])) {
             throw new Error("Google account list response was invalid");
         }
+        if (payload[1].some(entry => !Array.isArray(entry)
+            || typeof entry[3] !== "string" || !entry[3].includes("@")
+            || ![0, 1, false, true].includes(entry[9])))
+            throw new Error("Google account authentication state was not recognized");
         const accounts = payload[1]
             .filter((entry) => Array.isArray(entry)
             && typeof entry[3] === "string"
             && entry[3].includes("@")
-            && entry[9] !== 0
-            && entry[9] !== false
+            && (entry[9] === 1 || entry[9] === true)
             && entry[14] !== 1
             && entry[14] !== true)
             .map((entry, index) => ({
@@ -103,9 +104,12 @@ window.ox.install(({ action }) => {
         const accounts = await availableAccounts();
         if (accounts.length === 0)
             throw new Error("No signed-in Gmail accounts are available");
-        if (!accountId)
-            return accounts[0];
-        const account = accounts.find(({ accountId: candidate }) => candidate.toLowerCase() === accountId.toLowerCase());
+        const selected = new URL(location.href).searchParams.get("authuser");
+        if (!selected || !selected.includes("@"))
+            throw new Error("Select a Gmail session before account-sensitive actions");
+        if (accountId && accountId.toLowerCase() !== selected.toLowerCase())
+            throw new Error("Gmail accountId does not match the selected session");
+        const account = accounts.find(({ accountId: candidate }) => candidate.toLowerCase() === selected.toLowerCase());
         if (account)
             return account;
         throw new Error(`Gmail account is not available: ${accountId}`);
@@ -125,13 +129,6 @@ window.ox.install(({ action }) => {
         return document;
     };
     const ensureMailbox = async () => waitFor(mailboxDocument, "Gmail mailbox", 30000);
-    const probeMailbox = async () => {
-        const response = await retryFetch(MAIL_ROOT, {
-            credentials: "include",
-            redirect: "manual",
-        });
-        return response.ok && response.type !== "opaqueredirect";
-    };
     const normalizedHash = (value) => {
         try {
             return decodeURIComponent(value);
@@ -685,24 +682,19 @@ window.ox.install(({ action }) => {
             throw new Error("Gmail draft thread id is invalid");
         return { id: draftId, threadId: draftThreadId };
     };
-    action("getSignInUrl", {
-        async invoke() {
-            const continueUrl = encodeURIComponent(`${MAIL_ROOT}#inbox`);
-            return { url: `https://accounts.google.com/ServiceLogin?service=mail&continue=${continueUrl}` };
-        },
-    });
+    action('login', { async invoke() {
+            location.assign('https://accounts.google.com/ServiceLogin?service=mail&continue=' + encodeURIComponent(ORIGIN + '/mail/'));
+            return null;
+        } });
     action("getAddAccountUrl", {
         async invoke() {
             return { url: "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Fmail.google.com%2Fmail%2F&sacu=1&service=mail&flowName=WebLiteSignIn&flowEntry=AddSession" };
         },
     });
-    action("getSignInState", {
-        async invoke() {
-            const signedIn = await probeMailbox();
-            console.log(`getSignInState signedIn=${signedIn}`);
-            return { signedIn };
-        },
-    });
+    action('listSessions', { async invoke() {
+            const accounts = await availableAccounts();
+            return accounts.map(a => ({ id: a.accountId, label: a.email, url: accountURL(a.accountId, '#inbox').href }));
+        } });
     action("listAccounts", {
         async invoke() {
             return { accounts: await availableAccounts() };

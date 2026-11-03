@@ -52,7 +52,18 @@ window.ox.install(({action})=>{
   action('chat',{async invoke({message}){await ready();if(draft())throw Error('Unsent draft: refusing new chat');if(ref()||readChat().messages.length){await sidebar();document.querySelector('a[aria-label="New chat"]').click();await until(()=>location.pathname==='/chat'&&!document.querySelector('[data-testid=chatQuestion]'));}return send(message);}});
   action('continueChat',{async invoke({conversationId,message}){await openChat(conversationId);return send(message);}});
 
-  action('getSignInUrl',{async invoke(){return {url:'https://copilot.com/'};}});
-  action('getSignInState',{async invoke(){return {signedIn:(await readSession()).signedIn};}});
+  action('login', { async invoke() {
+          const destination = 'https://copilot.com/';
+          if (location.href !== new URL(destination, location.href).href)
+              location.assign(destination);
+          return null;
+      } });
+  action('listSessions', { async invoke() {
+          const s = await readSession();
+          if (!s.signedIn)
+              return [];
+          const a = s.account;
+          return [{ id: a.accountType + ':' + a.objectId, label: a.accountUpn || a.userName || a.objectId, url: 'https://copilot.com/' }];
+      } });
   action('getCurrentUser',{async invoke(){const s=await readSession();if(!s.signedIn)throw new Error('Sign in to Copilot first');const a=s.account;return {name:typeof a.userName==='string'?a.userName:'',email:typeof a.accountUpn==='string'?a.accountUpn:'',accountType:a.accountType};}});
 });

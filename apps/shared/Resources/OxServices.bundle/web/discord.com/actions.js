@@ -65,19 +65,23 @@ async function openChannel(serverId, channelId) {
 }
 
 window.ox.install(({ action }) => {
-  action('getSignInUrl', {
-    async invoke() {
-      return {url: 'https://discord.com/login'};
-    },
-  });
+  action('login', { async invoke() {
+          const destination = 'https://discord.com/login';
+          if (location.href !== new URL(destination, location.href).href)
+              location.assign(destination);
+          return null;
+      } });
 
-  action('getSignInState', {
-    async invoke() {
-      if (signedInRoot()) return {signedIn: true};
-      if (loginVisible()) return {signedIn: false};
-      throw new Error('Discord sign-in state is not recognizable.');
-    },
-  });
+  action('listSessions', { async invoke() {
+          await waitFor(() => signedInRoot() || loginVisible(), 'Discord account page not ready');
+          if (loginVisible() && !signedInRoot())
+              return [];
+          const panel = document.querySelector('[aria-label="User area"]');
+          const name = panel?.querySelector('[class*="username"]')?.textContent?.trim();
+          if (!name)
+              throw Error('Discord current username unavailable');
+          return [{ id: name, label: name, url: 'https://discord.com/channels/@me' }];
+      } });
 
   action('listServers', {
     async invoke() {

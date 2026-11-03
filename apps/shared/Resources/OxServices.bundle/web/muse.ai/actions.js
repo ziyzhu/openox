@@ -33,7 +33,7 @@ async function signInState(){
  const r=await fetch('/api/auth/check',{method:'POST',credentials:'include',cache:'no-store'});
  if(r.redirected)throw new Error('Unexpected Muse authentication redirect');
  const j=await r.json();
- if(r.status===200&&j.ok===true&&j.outcome==='validated'&&typeof j.viewer_id==='string')return {signedIn:true};
+ if(r.status===200&&j.ok===true&&j.outcome==='validated'&&typeof j.viewer_id==='string'&&j.viewer_id)return {signedIn:true,id:j.viewer_id};
  if(r.status===401&&j.type==='hatchAdmissionInvalidated'&&j.reason==='session')return {signedIn:false};
  throw new Error('Unclassified Muse authentication response: '+r.status);
 }
@@ -65,8 +65,18 @@ async function searchSaved({query}){if(!query.trim())throw Error('Search query m
 
 window.ox.install(({action})=>{
  action('searchConversations',{invoke:searchSaved});
- action('getSignInUrl',{async invoke(){return {url:'https://muse.ai/'};}});
- action('getSignInState',{invoke:signInState});
+ action('login', { async invoke() {
+         const destination = 'https://muse.ai/';
+         if (location.href !== new URL(destination, location.href).href)
+             location.assign(destination);
+         return null;
+     } });
+ action('listSessions', { async invoke() {
+         const s = await signInState();
+         if (!s.signedIn)
+             return [];
+         return [{ id: s.id, label: s.id, url: 'https://muse.ai/' }];
+     } });
  action('getCurrentConversation',{async invoke(args){await ready(22000);return readConversation(args.limit||30);}});
  action('chat',{invoke:sendMessage});
  action('continueChat',{invoke:sendMessage});

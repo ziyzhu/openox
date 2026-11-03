@@ -280,8 +280,25 @@
       await waitFor(()=>location.pathname.startsWith('/c/')&&(already||location.pathname!==before)&&messages().length,'Conversation did not finish loading',10000);
       return {url:pageUrl(),conversationRef:reference()};
     }});
-    action('getSignInUrl',{async invoke(){return {url:'https://chatgpt.com/auth/login'};}});
-    action('getSignInState',{async invoke(){return {signedIn:!!(await identity())};}});
+    action('login', { async invoke() {
+            const destination = 'https://chatgpt.com/auth/login';
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            const r = await fetch('/api/auth/session', { credentials: 'include', cache: 'no-store' });
+            if (r.redirected || r.status !== 200)
+                throw Error('Session discovery HTTP ' + r.status);
+            const j = await r.json();
+            if (!j || typeof j !== 'object' || Array.isArray(j))
+                throw Error('Invalid session response');
+            if (typeof j.user?.id === 'string' && j.user.id)
+                return [{ id: j.user.id, label: j.user.email || j.user.name || j.user.id, url: 'https://chatgpt.com/' }];
+            if (Object.keys(j).every(k => k === 'WARNING_BANNER') && [...document.querySelectorAll('button')].some(e => visible(e) && /^(Log in|Sign in)$/.test(e.textContent.trim())))
+                return [];
+            throw Error('Unclassified account state');
+        } });
     action('getCurrentUser',{async invoke(){const j=await identity();if(!j)throw new Error('Sign in to ChatGPT');return {id:j.id,name:typeof j.name==='string'?j.name:null,email:typeof j.email==='string'?j.email:null};}});
     action('chat',{async invoke(args){return send(args.message,true);}});
     action('continueChat',{async invoke(args){if(args.conversationRef!==reference())throw new Error('Stale conversation reference; read the current conversation first');if(!messages().length)throw new Error('No loaded conversation to continue');return send(args.message,false);}});

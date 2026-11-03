@@ -285,43 +285,31 @@ window.ox.install(({ action }) => {
     const fetchAuthedDoc = async (path, diagnostic) => {
         const doc = await fetchDoc(path, diagnostic);
         if (clean(doc.title).toLowerCase().includes("sign-in")) {
-            throw new Error("Amazon session is signed out. Run getSignInUrl, sign in, then retry.");
+            throw new Error("Amazon session is signed out. Run login, rediscover sessions, then retry.");
         }
         return doc;
     };
     const GATED_PATH = "/gp/css/order-history";
-    const probeSignedIn = async () => {
-        const res = await retryFetch(ORIGIN + GATED_PATH, { credentials: "include" });
-        const doc = new DOMParser().parseFromString(await res.text(), "text/html");
-        const href = clean(res.url).toLowerCase();
-        const title = clean(doc.title).toLowerCase();
-        console.log(`probeSignedIn: href=${href} title=${title}`);
-        return !href.includes("/ap/signin") && !title.includes("amazon sign-in");
-    };
-    action("getSignInUrl", {
-        async invoke() {
-            const returnTo = `${ORIGIN}/gp/yourstore/home?` + new URLSearchParams({
-                path: "/gp/yourstore/home",
-                signIn: "1",
-                useRedirectOnSuccess: "1",
-                action: "sign-out",
-                ref_: "nav_AccountFlyout_signout",
-            });
-            const params = new URLSearchParams({
-                "openid.pape.max_auth_age": "900",
-                "openid.return_to": returnTo,
-                "openid.assoc_handle": "usflex",
-                "openid.mode": "checkid_setup",
-                "openid.ns": "http://specs.openid.net/auth/2.0",
-            });
-            return { url: `${ORIGIN}/ap/signin?${params}` };
-        },
-    });
-    action("getSignInState", {
-        async invoke() {
-            return { signedIn: await probeSignedIn() };
-        },
-    });
+    action('login', { async invoke() {
+            if (!location.pathname.startsWith('/ap/signin'))
+                location.assign(ORIGIN + '/ap/signin');
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            const r = await fetch(ORIGIN + GATED_PATH, { credentials: 'include', cache: 'no-store' });
+            if (!r.ok)
+                throw Error('Amazon account HTTP ' + r.status);
+            const u = new URL(r.url);
+            if (u.origin !== ORIGIN)
+                throw Error('Unexpected Amazon account origin');
+            if (u.pathname.startsWith('/ap/signin'))
+                return [];
+            const d = new DOMParser().parseFromString(await r.text(), 'text/html');
+            const id = d.querySelector('[data-csa-c-customer-id]')?.getAttribute('data-csa-c-customer-id');
+            if (!id)
+                throw Error('Amazon current account identity unavailable');
+            return [{ id, label: clean(d.querySelector('#nav-link-accountList-nav-line-1')?.textContent) || id, url: ORIGIN + GATED_PATH }];
+        } });
     action("searchProducts", {
         async invoke({ query, cursor, limit = 20, department, sort = "featured" } = {}) {
             if (!query)
@@ -1203,7 +1191,7 @@ window.ox.install(({ action }) => {
             const res = await retryFetch(ORIGIN + "/auto-deliveries/ajax/subscriptionList?deviceType=desktop&deviceContext=web", { credentials: "include" });
             const doc = new DOMParser().parseFromString(await res.text(), "text/html");
             if (clean(doc.title).toLowerCase().includes("sign-in")) {
-                throw new Error("Amazon session is signed out. Run getSignInUrl, sign in, then retry.");
+                throw new Error("Amazon session is signed out. Run login, rediscover sessions, then retry.");
             }
             const items = [...doc.querySelectorAll(".subscription-card")]
                 .filter((card) => !card.querySelector(".store-front-ingress-message-container") &&

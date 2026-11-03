@@ -18,9 +18,12 @@ async function identity(){
   try {
     const r=await Promise.race([c.get('/api/v0/users/current'),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('DeepSeek identity request timed out')),7000);})]);
     const j=r.json;
-    if(r.status===200&&j?.code===0&&j.data?.biz_code===0&&typeof j.data.biz_data?.id==='string'&&j.data.biz_data.id.length>0)return {signedIn:true};
+    if(r.status===200&&j?.code===0&&j.data?.biz_code===0&&typeof j.data.biz_data?.id==='string'&&j.data.biz_data.id.length>0)return {signedIn:true,account:j.data.biz_data};
     if(r.status===200&&j?.code===40002&&j.msg==='Missing Token')return {signedIn:false};
     throw new Error('Unrecognized DeepSeek identity response');
+  }catch(error){
+    if(error?.name==='BizError'&&error?.code===40002)return {signedIn:false};
+    throw error;
   }finally{clearTimeout(timer);}
 }
 function chatPath(){return /^\/a\/chat\/s\/[^/]+$/.test(location.pathname);}
@@ -102,8 +105,18 @@ async function serverHistory(conversationId){const c=await client();const r=awai
 window.ox.install(({action})=>{
  action('searchConversations',{async invoke(args){return searchHistory(args);}});
  action('getConversation',{async invoke({conversationId}){return serverHistory(conversationId);}});
- action('getSignInUrl',{async invoke(){return {url:'https://chat.deepseek.com/sign_in'};}});
- action('getSignInState',{async invoke(){return identity();}});
+ action('login', { async invoke() {
+         const destination = 'https://chat.deepseek.com/sign_in';
+         if (location.href !== new URL(destination, location.href).href)
+             location.assign(destination);
+         return null;
+     } });
+ action('listSessions', { async invoke() {
+         const s = await identity();
+         if (!s.signedIn)
+             return [];
+         return [{ id: s.account.id, label: s.account.email || s.account.name || s.account.id, url: 'https://chat.deepseek.com/' }];
+     } });
  action('getCurrentConversation',{async invoke(){return read();}});
  action('openConversation',{async invoke(args){return open(args.title);}});
  action('chat',{async invoke(args){await fresh();return send(args.message);}});

@@ -167,26 +167,26 @@ window.ox.install(({ action }) => {
             url: `${ORIGIN}/trips/v1/${encodeURIComponent(numericId(String(trip?.id ?? "")))}`,
         };
     };
-    action("getSignInUrl", {
-        async invoke() {
-            return { url: `${ORIGIN}/login` };
-        },
-    });
-    action("getSignInState", {
-        async invoke() {
-            const res = await requestGet("TripListQuery", HASHES.upcomingTrips, {});
-            if (!res.ok) {
-                if (res.status === 401 || res.status === 403)
-                    return { signedIn: false };
-                throw new Error(`getSignInState HTTP ${res.status}`);
-            }
-            const text = await res.text();
-            if (!text.trim().startsWith("{"))
-                return { signedIn: false };
-            const json = JSON.parse(text);
-            return { signedIn: Boolean(json?.data?.viewer?.trips) };
-        },
-    });
+    action('login', { async invoke() {
+            const destination = `${ORIGIN}/login`;
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            const r = await requestGet('TripListQuery', HASHES.upcomingTrips, {});
+            if (r.status === 401)
+                return [];
+            if (!r.ok || r.redirected)
+                throw Error('Airbnb account HTTP ' + r.status);
+            const j = await r.json();
+            const v = j?.data?.viewer;
+            if (v === null && !j.errors?.length)
+                return [];
+            if (!v?.trips || !v?.id)
+                throw Error('Airbnb current account identity unavailable');
+            return [{ id: String(v.id), label: String(v.id), url: ORIGIN + '/trips' }];
+        } });
     action("searchStays", {
         async invoke({ query, checkIn, checkOut, adults = 1, children = 0, infants = 0, pets = 0, minBathrooms, freeParking = false, maxPrice, cursor, limit = 18, } = {}) {
             const start = dateValue(checkIn, "checkIn");

@@ -290,37 +290,26 @@ window.ox.install(({ action }) => {
     };
     const paginationNumber = (element) => element.querySelector(".d-pagination-page-content")?.textContent?.trim() ??
         "";
-    action("getSignInUrl", {
-        async invoke() {
-            return { url: `${ORIGIN}/login` };
-        },
-    });
-    action("getSignInState", {
-        async invoke() {
-            const response = await retryFetch(`${ORIGIN}/api/galaxy/creator/home/personal_info`, {
-                credentials: "include",
-                headers: { accept: "application/json" },
-            });
-            if (response.status === 401 || response.status === 403) {
-                console.log(`getSignInState status=${response.status} signedIn=false`);
-                return { signedIn: false };
-            }
-            if (!response.ok) {
-                throw new Error(`getSignInState HTTP ${response.status}`);
-            }
-            const contentType = response.headers.get("content-type") ?? "";
-            if (!contentType.includes("json")) {
-                throw new Error("getSignInState non-JSON response");
-            }
-            const value = await response.json();
-            const signedIn = value?.success === true &&
-                number(value?.code) === 0 &&
-                value?.data !== null &&
-                typeof value?.data === "object";
-            console.log(`getSignInState status=${response.status} signedIn=${signedIn}`);
-            return { signedIn };
-        },
-    });
+    action('login', { async invoke() {
+            const destination = `${ORIGIN}/login`;
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            const r = await fetch(ORIGIN + '/api/galaxy/creator/home/personal_info', { credentials: 'include', cache: 'no-store', headers: { accept: 'application/json' } });
+            if (r.status === 401)
+                return [];
+            if (!r.ok || r.redirected)
+                throw Error('Creator account HTTP ' + r.status);
+            const j = await r.json();
+            if (j?.success !== true || number(j.code) !== 0 || !j.data)
+                throw Error('Unclassified creator account response');
+            const id = String(j.data.red_num || '');
+            if (!id)
+                throw Error('Creator account identity unavailable');
+            return [{ id, label: String(j.data.name || id), url: ORIGIN + '/' }];
+        } });
     action("getCreatorProfile", {
         async invoke() {
             const data = await captureData(/\/api\/galaxy\/creator\/home\/personal_info(?:\?|$)/, "creator profile", true);

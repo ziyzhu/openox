@@ -195,14 +195,40 @@ window.ox.install(({ action }) => {
         recurse(root);
         return out;
     };
-    action("getSignInUrl", { async invoke() { return { url: "https://www.instagram.com/accounts/login/" }; } });
-    action("getSignInState", {
-        async invoke() {
-            // sessionid is httpOnly and unreadable from JS; ds_user_id is set
-            // alongside it on login and IS JS-readable, so it's the login signal.
-            return { signedIn: Boolean(cookie("ds_user_id")) };
-        },
-    });
+    action('login', { async invoke() {
+            const destination = "https://www.instagram.com/accounts/login/";
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            const r = await fetch('/', { credentials: 'include', cache: 'no-store' });
+            if (!r.ok)
+                throw Error('Instagram account HTTP ' + r.status);
+            const u = new URL(r.url);
+            if (u.origin !== 'https://www.instagram.com')
+                throw Error('Unexpected Instagram origin');
+            if (u.pathname.startsWith('/accounts/login'))
+                return [];
+            const d = new DOMParser().parseFromString(await r.text(), 'text/html');
+            const pending = [...d.scripts].filter(s => s.type === 'application/json' && s.textContent.includes('PolarisViewer')).map(s => JSON.parse(s.textContent));
+            const viewers = [];
+            while (pending.length) {
+                const node = pending.pop();
+                if (Array.isArray(node) && node[0] === 'PolarisViewer')
+                    viewers.push(node[2]);
+                else if (node && typeof node === 'object')
+                    pending.push(...Object.values(node));
+            }
+            if (viewers.length !== 1)
+                throw Error('Instagram current account identity unavailable');
+            const viewer = viewers[0];
+            if (viewer?.data === null && viewer.id === null)
+                return [];
+            if (typeof viewer?.id !== 'string' || !/^[1-9][0-9]+$/.test(viewer.id) || viewer.data?.id !== viewer.id)
+                throw Error('Instagram current account identity unavailable');
+            return [{ id: viewer.id, label: viewer.data.username || viewer.id, url: 'https://www.instagram.com/' }];
+        } });
     action("getProfile", {
         async invoke({ username } = {}) {
             const u = await fetchProfile(username || "");

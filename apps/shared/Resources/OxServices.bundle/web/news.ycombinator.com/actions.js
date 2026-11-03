@@ -87,10 +87,6 @@ window.ox.install(({ action }) => {
             return c;
         });
     };
-    const probeSignedIn = async () => {
-        const doc = await fetchDoc("/news");
-        return !!doc.querySelector("#me");
-    };
     const storyFromRow = (row) => {
         const r = parseRow(row);
         return {
@@ -99,16 +95,28 @@ window.ox.install(({ action }) => {
             comments: r.comments, hidden: false,
         };
     };
-    action("getSignInUrl", {
-        async invoke() {
-            return { url: "https://news.ycombinator.com/login" };
-        },
-    });
-    action("getSignInState", {
-        async invoke() {
-            return { signedIn: await probeSignedIn() };
-        },
-    });
+    action('login', { async invoke() {
+            const destination = "https://news.ycombinator.com/login";
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            const r = await fetch('/news', { credentials: 'include', cache: 'no-store' });
+            if (!r.ok || new URL(r.url).host !== 'news.ycombinator.com')
+                throw Error('Account page unavailable');
+            const d = new DOMParser().parseFromString(await r.text(), 'text/html');
+            const me = d.querySelector('#me');
+            if (!me) {
+                if ([...d.querySelectorAll('a[href]')].some(a => a.textContent.trim() === 'login' && /^\/?login(?:\?|$)/.test(a.getAttribute('href') || '')))
+                    return [];
+                throw Error('Unclassified account state');
+            }
+            const id = me.textContent.trim();
+            if (!/^[a-zA-Z0-9_-]+$/.test(id) || new URL(me.getAttribute('href'), r.url).searchParams.get('id') !== id)
+                throw Error('Invalid account evidence');
+            return [{ id, label: id, url: 'https://news.ycombinator.com/news' }];
+        } });
     action("getCurrentUser", {
         async invoke() {
             const doc = await fetchDoc("/news");

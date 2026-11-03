@@ -105,29 +105,19 @@ window.ox.install(({ action }) => {
         return j;
     };
     const profileId = async () => profileIdCache ?? (await fetchProfile(), profileIdCache);
-    action("getSignInUrl", { async invoke() { return { url: LOGIN_URL }; } });
-    action("getSignInState", {
-        async invoke() {
-            try {
-                const r = await retryFetch(`${GATEWAY}/profile_mgmt/profiles/inquiry_results`, {
-                    method: "POST",
-                    credentials: "include",
-                    headers: { ...profileHeaders(), "content-type": "application/json" },
-                    body: JSON.stringify({}),
-                });
-                const signedIn = r.ok;
-                console.log(`getSignInState: status=${r.status} signedIn=${signedIn}`);
-                if (!signedIn && r.status !== 401 && r.status !== 403) {
-                    throw new Error(`getSignInState HTTP ${r.status}`);
-                }
-                return { signedIn };
-            }
-            catch (e) {
-                console.log("getSignInState: " + (e?.message ?? String(e)));
-                throw e;
-            }
-        },
-    });
+    action('login', { async invoke() {
+            const destination = LOGIN_URL;
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            profileIdCache = null;
+            const j = await fetchProfile();
+            if (!j?.profile_id)
+                throw Error('American Express profile identity unavailable');
+            return [{ id: String(j.profile_id), label: 'American Express ' + String(j.profile_id), url: ORIGIN + '/en-us/account/summary' }];
+        } });
     action("getProfile", {
         async invoke() {
             try {

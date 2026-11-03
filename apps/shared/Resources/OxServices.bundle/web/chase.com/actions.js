@@ -136,27 +136,19 @@ window.ox.install(({ action }) => {
         const a = await accounts();
         return a[0]?.digitalAccountIdentifier ?? null;
     };
-    action("getSignInUrl", { async invoke() { return { url: START_URL }; } });
-    action("getSignInState", {
-        async invoke() {
-            try {
-                const r = await retryFetch(`${GATEWAY}/travel-profiles?all-accounts-hidden-indicator=true`, {
-                    credentials: "include",
-                    headers: jpmcHeaders(),
-                });
-                const signedIn = r.ok;
-                console.log(`getSignInState: status=${r.status} signedIn=${signedIn}`);
-                if (!signedIn && r.status !== 401 && r.status !== 403) {
-                    throw new Error(`getSignInState HTTP ${r.status}`);
-                }
-                return { signedIn };
-            }
-            catch (e) {
-                console.log("getSignInState: " + (e?.message ?? String(e)));
-                throw e;
-            }
-        },
-    });
+    action('login', { async invoke() {
+            const destination = START_URL;
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            accountsCache = null;
+            const j = await get('/travel-profiles?all-accounts-hidden-indicator=true');
+            if (!j?.onlineProfileIdentifier)
+                throw Error('Chase Travel account identity unavailable');
+            return [{ id: String(j.onlineProfileIdentifier), label: 'Chase Travel ' + String(j.onlineProfileIdentifier), url: START_URL }];
+        } });
     action("getTravelProfile", {
         async invoke() {
             try {

@@ -130,20 +130,28 @@ window.ox.install(({ action }) => {
         });
         return items;
     };
-    action("getSignInUrl", { async invoke() { return { url: LOGIN_URL }; } });
-    action("getSignInState", {
-        async invoke() {
-            try {
-                const signedIn = !!cookie("login_uid");
-                console.log(`getSignInState: login_uid=${signedIn ? "present" : "absent"}`);
-                return { signedIn };
-            }
-            catch (e) {
-                console.log("getSignInState: " + (e?.message ?? String(e)));
-                throw e;
-            }
-        },
-    });
+    action('login', { async invoke() {
+            const destination = LOGIN_URL;
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            const r = await fetch(LOGIN_URL, { credentials: 'include', cache: 'no-store' });
+            if (!r.ok)
+                throw Error('Ctrip account HTTP ' + r.status);
+            const u = new URL(r.url);
+            if (!u.hostname.endsWith('.ctrip.com'))
+                throw Error('Unexpected Ctrip account origin');
+            const d = new DOMParser().parseFromString(await r.text(), 'text/html');
+            if (u.hostname === 'passport.ctrip.com' && d.querySelector('input[type="password"]'))
+                return [];
+            const id = cookie('login_uid');
+            const account = [...d.querySelectorAll('[data-uid]')].find(e => e.getAttribute('data-uid') === id);
+            if (!id || !account)
+                throw Error('Ctrip server account identity unavailable');
+            return [{ id, label: gbk(cookie('AHeadUserInfo').match(/(?:^|&)UserName=([^&]*)/)?.[1] || '') || id, url: 'https://www.ctrip.com/' }];
+        } });
     action("searchFlightCities", {
         async invoke({ query }) {
             try {

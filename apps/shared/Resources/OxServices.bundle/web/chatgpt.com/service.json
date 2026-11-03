@@ -5,51 +5,54 @@
   "baseUrl": "https://chatgpt.com/",
   "actions": [
     {
-      "id": "getSignInUrl",
-      "label": "Sign in",
-      "description": "Open ChatGPT sign-in.",
+      "id": "login",
+      "label": "Log in",
+      "description": "Prepare website login for the user. Completion does not verify authentication.",
       "inputSchema": {
         "type": "object",
         "properties": {},
-        "required": [],
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "url"
-        ],
-        "additionalProperties": false
+        "type": "null"
       },
       "requireAuth": false,
       "requireApproval": false
     },
     {
-      "id": "getSignInState",
-      "label": "Check sign-in",
-      "description": "Check the current server session.",
+      "id": "listSessions",
+      "label": "List signed-in accounts",
+      "description": "Discover currently authenticated accounts. Errors do not establish absence.",
       "inputSchema": {
         "type": "object",
         "properties": {},
-        "required": [],
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "signedIn": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "signedIn"
-        ],
-        "additionalProperties": false
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
       },
       "requireAuth": false,
       "requireApproval": false

@@ -668,48 +668,55 @@
   },
   "actions": [
     {
-      "id": "getSignInUrl",
-      "label": "Sign in to Airbnb",
-      "description": "Opens the Airbnb sign-in page.",
+      "id": "login",
+      "label": "Log in",
+      "description": "Prepare website login for the user. Completion does not verify authentication.",
       "inputSchema": {
         "type": "object",
+        "properties": {},
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "url"
-        ],
-        "additionalProperties": false
+        "type": "null"
       },
       "defaultArgs": {},
       "requireApproval": false,
       "requireAuth": false
     },
     {
-      "id": "getSignInState",
-      "label": "Check Airbnb sign-in",
-      "description": "Checks whether you are signed in to Airbnb.",
+      "id": "listSessions",
+      "label": "List signed-in accounts",
+      "description": "Discover currently authenticated accounts. Errors do not establish absence.",
       "inputSchema": {
         "type": "object",
+        "properties": {},
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "signedIn": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "signedIn"
-        ],
-        "additionalProperties": false
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
       },
       "defaultArgs": {},
       "requireApproval": false,
@@ -1217,14 +1224,6 @@
       "name": "爱彼迎",
       "description": "住宿与旅行服务平台。筛选房源和本地服务，查看房源详情、可订日期与评价，并查看登录账户中的行程、预订详情和心愿单内容。还可打开爱彼迎结算页，由你亲自核对并完成住宿预订。",
       "actions": {
-        "getSignInUrl": {
-          "label": "登录爱彼迎",
-          "description": "打开爱彼迎登录页。"
-        },
-        "getSignInState": {
-          "label": "检查爱彼迎登录状态",
-          "description": "检查你是否已登录爱彼迎。"
-        },
         "searchStays": {
           "label": "搜索住宿",
           "description": "按准确出行日期和住客人数搜索爱彼迎房源，可筛选最少浴室数、免费停车和最高价格，并返回页面显示的价格、评分、主要房间信息和房源链接。"
@@ -1260,6 +1259,14 @@
         "listWishlists": {
           "label": "心愿单列表",
           "description": "列出你的爱彼迎心愿单，包括出行日期、成人、儿童和婴儿人数、已收藏的房源、体验和地点编号、所有者与协作者、隐私状态和链接。需要登录。"
+        },
+        "login": {
+          "label": "登录",
+          "description": "为用户准备网站登录。完成交互不代表已通过身份验证。"
+        },
+        "listSessions": {
+          "label": "列出已登录账号",
+          "description": "发现当前已通过身份验证的账号。错误不代表没有账号。"
         }
       }
     }

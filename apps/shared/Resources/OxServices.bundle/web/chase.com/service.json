@@ -304,48 +304,55 @@
   },
   "actions": [
     {
-      "id": "getSignInUrl",
-      "label": "Authenticate provider",
-      "description": "Chase sign-in URL that lands on the Chase Travel home.",
+      "id": "login",
+      "label": "Log in",
+      "description": "Prepare website login for the user. Completion does not verify authentication.",
       "inputSchema": {
         "type": "object",
+        "properties": {},
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "url"
-        ],
-        "additionalProperties": false
+        "type": "null"
       },
       "defaultArgs": {},
       "requireApproval": false,
       "requireAuth": false
     },
     {
-      "id": "getSignInState",
-      "label": "Auth state",
-      "description": "Checks whether you are signed in to Chase Travel.",
+      "id": "listSessions",
+      "label": "List signed-in accounts",
+      "description": "Discover currently authenticated accounts. Errors do not establish absence.",
       "inputSchema": {
         "type": "object",
+        "properties": {},
         "additionalProperties": false
       },
       "outputSchema": {
-        "type": "object",
-        "properties": {
-          "signedIn": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "signedIn"
-        ],
-        "additionalProperties": false
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
       },
       "defaultArgs": {},
       "requireApproval": false,
@@ -782,14 +789,6 @@
       "name": "大通旅行",
       "description": "面向持卡人的旅行积分服务。查看旅行资料、Ultimate Rewards 积分、旅行额度、行程、近期搜索、精选优惠和购物车。只读，需登录。",
       "actions": {
-        "getSignInUrl": {
-          "label": "登录大通旅行",
-          "description": "打开大通旅行登录页。"
-        },
-        "getSignInState": {
-          "label": "检查大通旅行登录状态",
-          "description": "检查你是否已登录大通旅行。"
-        },
         "getTravelProfile": {
           "label": "获取旅行档案",
           "description": "持卡人的大通旅行档案:卡片(昵称、尾号)、Ultimate Rewards 积分余额、信用额度与可用额度。"
@@ -821,6 +820,14 @@
         "getCartCount": {
           "label": "购物车数量",
           "description": "持卡人大通旅行购物车中的商品数量。"
+        },
+        "login": {
+          "label": "登录",
+          "description": "为用户准备网站登录。完成交互不代表已通过身份验证。"
+        },
+        "listSessions": {
+          "label": "列出已登录账号",
+          "description": "发现当前已通过身份验证的账号。错误不代表没有账号。"
         }
       }
     }

@@ -28,7 +28,7 @@ An installed app's validator or installed CLI's `repository validate` can lag be
 
 ## Live verification evidence
 
-Verify the promoted service through Ox on a reserved simulator. Verification may exercise already declared actions, but must not become endpoint exploration or service redesign.
+Verify the promoted service through Ox on a reserved simulator. Verification may exercise already declared actions, but must not become endpoint exploration or service redesign. Local sources and source selections are device-wide; a fresh QA Profile does not isolate them. Inspect source conflicts and activate the intended Built-in source before claiming built-in verification, preserving Local files and recording the previous selection.
 
 - Ask the user to perform login, challenges, and account selection.
 - Require explicit approval before any live mutation.

@@ -307,21 +307,27 @@ window.ox.install(({ action }) => {
         return cachedMe;
     };
     const PROFILE_DECO = "com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-101";
-    action("getSignInUrl", { async invoke() { return { url: "https://www.linkedin.com/login" }; } });
-    action("getSignInState", {
-        async invoke() {
+    action('login', { async invoke() {
+            const destination = "https://www.linkedin.com/login";
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            cachedMe = null;
+            let u;
             try {
-                if (!cookie("JSESSIONID"))
-                    return { signedIn: false };
-                const json = await apiGet("/voyager/api/me", NORMALIZED);
-                return { signedIn: Boolean(json?.data?.plainId) };
+                u = await fetchMe();
             }
-            catch (e) {
-                console.log(`linkedin getSignInState probe failed: ${String(e?.message ?? e)}`);
-                throw e;
+            catch (error) {
+                if (error?.message === '/voyager/api/me: HTTP 401')
+                    return [];
+                throw error;
             }
-        },
-    });
+            if (!u.memberId)
+                throw Error('LinkedIn account identity unavailable');
+            return [{ id: u.memberId, label: u.profile.name || u.memberId, url: 'https://www.linkedin.com/feed/' }];
+        } });
     action("getMe", {
         async invoke() {
             return (await fetchMe()).profile;

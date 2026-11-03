@@ -57,7 +57,7 @@ async function signInState(){
   const b=JSON.parse(scripts[0].textContent.slice(prefix.length).trim().replace(/;$/,''));
   const c=b?.loaderData?.chat_layout?.chat_layout;const a=c?.accountInfo;const s=c?.userSetting;
   if(a?.message==='error'&&a?.data?.user_id===0&&String(s?.code)==='671000007')return {signedIn:false};
-  if(a?.message==='success'&&a?.data?.is_visitor_account===false&&typeof a?.data?.user_id_str==='string'&&a.data.user_id_str.length>0&&s?.code===0&&s?.data?.is_login===true)return {signedIn:true};
+  if(a?.message==='success'&&a?.data?.is_visitor_account===false&&typeof a?.data?.user_id_str==='string'&&a.data.user_id_str.length>0&&s?.code===0&&s?.data?.is_login===true)return {signedIn:true,account:a.data};
   throw Error('Unclassified Doubao session response.');
  }finally{clearTimeout(timer);}
 }
@@ -103,8 +103,18 @@ async function searchChats({query}){
 window.ox.install(({action})=>{
  registerModelActions(action);
  action('searchConversations',{invoke:searchChats});
- action('getSignInUrl',{async invoke(){return {url:'https://www.doubao.com/chat/'};}});
- action('getSignInState',{async invoke(){return await signInState();}});
+ action('login', { async invoke() {
+         const destination = 'https://www.doubao.com/chat/';
+         if (location.href !== new URL(destination, location.href).href)
+             location.assign(destination);
+         return null;
+     } });
+ action('listSessions', { async invoke() {
+         const s = await signInState();
+         if (!s.signedIn)
+             return [];
+         return [{ id: s.account.user_id_str, label: s.account.name || s.account.user_id_str, url: 'https://www.doubao.com/chat/' }];
+     } });
  action('getCurrentConversation',{async invoke({limit=50}){await ready();const all=messages();const animationFrameObserved=await new Promise(resolve=>{let done=false;const timer=setTimeout(()=>{if(!done){done=true;resolve(false);}},600);requestAnimationFrame(()=>{if(!done){done=true;clearTimeout(timer);resolve(true);}});});return {lastSubmissionEvents:lastSubmissionEvents.slice(),url:location.href,conversationRef:currentRef(),messages:all.slice(-limit),renderedOnly:true,truncated:all.length>limit,interfaceState:{animationFrameObserved,editorStateSynchronized:editor()?.editor?.state===editor()?.editor?.view?.state,editorCount:document.querySelectorAll('.tiptap[contenteditable="true"]').length,draftLength:editor()?.innerText?.length||0,docLength:editor()?.editor?.view?.state?.doc?.textContent?.length||0,editorInitialized:editor()?.editor?.isInitialized===true,sameView:editor()?.editor?.view?.dom===editor()},recentConversations:recent().slice(0,100).map(({title,conversationRef})=>({title,conversationRef}))};}});
  action('openConversation',{async invoke({title}){return await open(title);}});
  action('diagnoseComposer',{async invoke(){await ready();assertEmpty();await wait(()=>editor()?.editor?.isInitialized,3000,'initialized editor');const e=editor();const v=e.editor.view;const text='OX unsent composer diagnostic';let result;try{v.dispatch(v.state.tr.insertText(text));await wait(()=>draftText()===text,2500,'diagnostic draft');await sleep(1000);const bs=Array.from(document.querySelectorAll(sel('chat_input_send_button')));const b=bs.find(visible);const key=b&&Object.keys(b).find(k=>k.startsWith('__reactProps'));result={draftAccepted:draftText()===text,draftCleared:false,editorStateSynchronized:e.editor.state===v.state,buttonCount:bs.length,sendHandlerPresent:!!key&&typeof b[key].onClick==='function',sendEnabled:!!b&&!b.disabled&&b.getAttribute('data-disabled')!=='true',buttonConnected:!!b?.isConnected};}finally{if(editor()===e&&v.state.doc.textContent===text){v.dispatch(v.state.tr.delete(0,v.state.doc.content.size));}}if(!result)throw Error('Diagnostic failed; check draft before proceeding.');result.draftCleared=!draftText();return result;}});

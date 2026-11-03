@@ -390,17 +390,19 @@ async function sendOrdinaryTask(message, targetId) {
 }
 
 window.ox.install(({action}) => {
-  action('getSignInUrl', {async invoke() {
-    return {url: 'https://manus.im/login?redirectUrl=https%3A%2F%2Fmanus.im%2Fapp'};
-  }});
-  action('getSignInState', {async invoke() {
-    await waitForManusAuthShell();
-    const account = await freshManusUserInfo();
-    if (account) return {signedIn: true};
-    if (manuscriptAuthObservation?.signedIn === true && Date.now() - manuscriptAuthObservation.at < 30000) return {signedIn: true};
-    if (/^\/login(?:\/|$)/.test(location.pathname) || manuscriptAuthObservation?.signedIn === false) return {signedIn: false};
-    throw Error('Manus session state is not ready; reload and retry');
-  }});
+  action('login', { async invoke() {
+          const destination = 'https://manus.im/login?redirectUrl=https%3A%2F%2Fmanus.im%2Fapp';
+          if (location.href !== new URL(destination, location.href).href)
+              location.assign(destination);
+          return null;
+      } });
+  action('listSessions', { async invoke() {
+          await waitForManusAuthShell();
+          const a = await freshManusUserInfo();
+          if (!a)
+              return [];
+          return [{ id: a.userId, label: String(a.displayname || [a.firstname, a.lastname].filter(Boolean).join(' ') || a.userId), url: 'https://manus.im/app' }];
+      } });
   action('getCurrentUser', {async invoke() {
     const account = await freshManusUserInfo();
     if (!account) throw Error('Sign in to Manus first');

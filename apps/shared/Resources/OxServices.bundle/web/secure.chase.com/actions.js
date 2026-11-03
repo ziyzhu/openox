@@ -41,7 +41,7 @@ window.ox.install(({ action }) => {
             credentials: "include",
             body: body ? new URLSearchParams(body).toString() : "",
         });
-        if (res.status === 401 || res.status === 403)
+        if (res.status === 401)
             throw signedOut();
         if (!res.ok)
             throw new Error(`POST ${path} HTTP ${res.status}`);
@@ -52,13 +52,13 @@ window.ox.install(({ action }) => {
             headers: jpmcHeaders(),
             credentials: "include",
         });
-        if (res.status === 401 || res.status === 403)
+        if (res.status === 401)
             throw signedOut();
         if (!res.ok)
             throw new Error(`GET ${path} HTTP ${res.status}`);
         return res.json();
     };
-    const signedOut = () => new Error("Chase session is signed out. Run getSignInUrl, sign in, then retry.");
+    const signedOut = () => new Error("Chase session is signed out. Run login, rediscover sessions, then retry.");
     const fetchBootstrap = async () => postForm("/svc/rl/accounts/l4/v1/app/data/list");
     const accountTilesOf = (bootstrap) => {
         const cache = Array.isArray(bootstrap?.cache) ? bootstrap.cache : [];
@@ -82,17 +82,26 @@ window.ox.install(({ action }) => {
         lockStatus: t?.tileDetail?.creditCardLockStatus ?? null,
         closed: t?.tileDetail?.closed ?? null,
     });
-    action("getSignInUrl", {
-        async invoke() {
-            return { url: DASHBOARD_URL };
-        },
-    });
-    action("getSignInState", {
-        async invoke() {
-            const data = await fetchBootstrap();
-            return { signedIn: Boolean(data?.personId) };
-        },
-    });
+    action('login', { async invoke() {
+            const destination = DASHBOARD_URL;
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            let d;
+            try {
+                d = await fetchBootstrap();
+            }
+            catch (error) {
+                if (error?.message === signedOut().message)
+                    return [];
+                throw error;
+            }
+            if (!d?.personId)
+                throw Error('Chase account identity unavailable');
+            return [{ id: String(d.personId), label: 'Chase ' + String(d.personId), url: DASHBOARD_URL }];
+        } });
     action("listAccounts", {
         async invoke() {
             const data = await fetchBootstrap();

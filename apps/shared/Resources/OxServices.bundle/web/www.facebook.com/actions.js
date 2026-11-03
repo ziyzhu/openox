@@ -518,36 +518,30 @@ window.ox.install(({ action }) => {
         return result.payloads;
     };
     const variables = (operation) => clone(operationBaselines[operation].variables);
-    action("getSignInUrl", { async invoke() { return { url: "https://www.facebook.com/login/" }; } });
-    action("getSignInState", {
-        async invoke() {
-            let response;
-            try {
-                response = await fetch("/me", {
-                    method: "GET",
-                    credentials: "include",
-                    cache: "no-store",
-                    redirect: "follow",
-                });
-            }
-            catch (error) {
-                throw new Error(`Facebook sign-in check failed: ${String(error?.message || error)}`);
-            }
-            const expectedOrigin = "https://www.facebook.com";
-            const final = new URL(response.url);
-            if (final.origin !== expectedOrigin)
-                throw new Error("Facebook sign-in check left the trusted origin");
-            if (response.status !== 200)
-                throw new Error(`Facebook sign-in check returned unexpected status ${response.status}`);
-            if (!response.headers.get("content-type")?.toLowerCase().includes("text/html"))
-                throw new Error("Facebook sign-in check returned unexpected content");
-            if (response.redirected && final.pathname === "/")
-                return { signedIn: false };
-            if (response.redirected && /^\/[A-Za-z0-9.]+\/$/.test(final.pathname))
-                return { signedIn: true };
-            throw new Error(`Facebook sign-in check returned unexpected route ${final.pathname}`);
-        },
-    });
+    action('login', { async invoke() {
+            const destination = "https://www.facebook.com/login/";
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            const r = await fetch('/me', { credentials: 'include', cache: 'no-store' });
+            if (!r.ok)
+                throw Error('Facebook account HTTP ' + r.status);
+            const u = new URL(r.url);
+            if (u.origin !== 'https://www.facebook.com')
+                throw Error('Unexpected Facebook account origin');
+            if (/^\/login(?:\/|$)/.test(u.pathname))
+                return [];
+            const d = new DOMParser().parseFromString(await r.text(), 'text/html');
+            const scripts = [...d.scripts].map(s => s.textContent).join('\n');
+            if (/"ACCOUNT_ID"\s*:\s*"0"/.test(scripts) && /"USER_ID"\s*:\s*"0"/.test(scripts) && d.querySelector('form input[type="password"]'))
+                return [];
+            const match = scripts.match(/"ACCOUNT_ID"\s*:\s*"([1-9][0-9]+)"/);
+            if (!match)
+                throw Error('Facebook current account identity unavailable');
+            return [{ id: match[1], label: match[1], url: 'https://www.facebook.com/' }];
+        } });
     action("listGroupPosts", {
         async invoke({ groupId, cursor, limit } = {}) {
             const operation = cursor

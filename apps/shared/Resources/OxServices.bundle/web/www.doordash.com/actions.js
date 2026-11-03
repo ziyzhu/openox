@@ -389,8 +389,7 @@ window.ox.install(({ action }) => {
             items,
         };
     };
-    action("getSignInUrl", {
-        async invoke() {
+    action('login', { async invoke() {
             const query = new URLSearchParams({
                 client_id: "1666519390426295040",
                 intl: "en-US",
@@ -404,24 +403,22 @@ window.ox.install(({ action }) => {
                 scope: "*",
                 state: "/",
             });
-            return { url: `https://identity.doordash.com/auth?${query}` };
-        },
-    });
-    action("getSignInState", {
-        async invoke() {
-            const response = await retryFetch(`${ORIGIN}/unified-gateway/notification_preferences/v1/doordash/consumer`, {
-                credentials: "include",
-                headers: { Accept: "application/json" },
-                redirect: "manual",
-            });
-            if (response.status === 401 || response.status === 403 || response.status === 302) {
-                return { signedIn: false };
-            }
-            if (!response.ok)
-                throw new Error(`DoorDash sign-in probe HTTP ${response.status}`);
-            return { signedIn: true };
-        },
-    });
+            const destination = `https://identity.doordash.com/auth?${query}`;
+            if (location.href !== new URL(destination, location.href).href)
+                location.assign(destination);
+            return null;
+        } });
+    action('listSessions', { async invoke() {
+            const r = await fetch(ORIGIN + '/unified-gateway/notification_preferences/v1/doordash/consumer', { credentials: 'include', cache: 'no-store', headers: { Accept: 'application/json' } });
+            if (r.status === 401)
+                return [];
+            if (!r.ok || r.redirected)
+                throw Error('DoorDash account HTTP ' + r.status);
+            const j = await r.json();
+            if (!j?.consumer_id)
+                throw Error('DoorDash current consumer identity unavailable');
+            return [{ id: String(j.consumer_id), label: String(j.consumer_id), url: ORIGIN + '/' }];
+        } });
     action("getStore", {
         async invoke({ storeId } = {}) {
             if (!clean(storeId))

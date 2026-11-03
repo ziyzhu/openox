@@ -42,8 +42,22 @@ async function send(message,target,organizationId){
 }
 window.ox.install(({action})=>{
 registerModelActions(action);
- action('getSignInUrl',{async invoke(){return {url:'https://claude.ai/login'};}});
- action('getSignInState',{async invoke(){return {signedIn:(await account())!==null};}});
+ action('login', { async invoke() {
+         const destination = 'https://claude.ai/login';
+         if (location.href !== new URL(destination, location.href).href)
+             location.assign(destination);
+         return null;
+     } });
+ action('listSessions', { async invoke() {
+         const a = await account();
+         if (!a)
+             return [];
+         const orgs = a.memberships.map(m => m.organization).filter(o => o && typeof o.uuid === 'string' && o.uuid);
+         if (orgs.length !== 1)
+             throw Error('Claude session routing requires one active organization');
+         const o = orgs[0];
+         return [{ id: a.uuid + ':' + o.uuid, label: (a.email_address || a.display_name || a.uuid) + ' — ' + (o.name || o.uuid), url: 'https://claude.ai/new' }];
+     } });
  action('getCurrentUser',{async invoke(){const a=await account();if(!a)throw Error('Sign in to Claude first');return {id:a.uuid,name:a.full_name||a.display_name||'',email:a.email_address||'',organizations:a.memberships.map(m=>({id:m.organization.uuid,name:m.organization.name||''}))};}});
  action('listConversations',{async invoke({organizationId,limit=20,cursor='0'}){const o=await org(organizationId),offset=Number(cursor);if(!Number.isSafeInteger(offset)||offset<0)throw Error('Invalid cursor');const j=await json('/api/organizations/'+encodeURIComponent(o)+'/chat_conversations_v2?limit='+limit+'&offset='+offset+'&archived=false&consistency=eventual');if(!Array.isArray(j.data)||typeof j.has_more!=='boolean')throw Error('Unexpected conversation list');if(j.has_more&&j.data.length===0)throw Error('Source pagination stalled');return {items:j.data.map(summary),nextCursor:j.has_more?String(offset+j.data.length):null};}});
  action('searchConversations',{async invoke({organizationId,query,scope='ranked',cursor,limit=25}){if(!query.trim())throw Error('Search query must not be blank');const o=await org(organizationId);if(scope==='titles'){const offset=Number(cursor||'0'),pageSize=Math.min(limit,30);if(!Number.isSafeInteger(offset)||offset<0)throw Error('Invalid title-search cursor');const j=await json('/api/organizations/'+encodeURIComponent(o)+'/chat_conversations_v2?limit='+pageSize+'&offset='+offset+'&archived=false&consistency=eventual');if(!Array.isArray(j.data)||typeof j.has_more!=='boolean'||j.has_more&&!j.data.length)throw Error('Unexpected history pagination response');const q=query.trim().toLocaleLowerCase();return {items:j.data.filter(x=>String(x.name||'').toLocaleLowerCase().includes(q)).map(summary),nextCursor:j.has_more?String(offset+j.data.length):null,degraded:false,mode:'title-substring',scope:'titles-unarchived',complete:!j.has_more};}if(cursor)throw Error('Native ranked search has no verified continuation; use scope=titles for paginated title search');const j=await json('/api/organizations/'+encodeURIComponent(o)+'/conversation/search/v2?query='+encodeURIComponent(query)+'&n='+limit+'&target_snippet_size=100');if(!Array.isArray(j.data)||typeof j.degraded!=='boolean'||typeof j.executed_mode!=='string')throw Error('Unexpected search response');if(j.next_page_token!==null)throw Error('Source returned an unsupported ranked-search continuation; use title search or narrow the query');return {items:j.data.map(x=>summary(x.conversation)),nextCursor:null,degraded:j.degraded,mode:j.executed_mode,scope:'ranked',complete:false};}});

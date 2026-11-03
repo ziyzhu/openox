@@ -68,44 +68,28 @@ window.ox.install(({ action }) => {
         result: text(row?.result, row?.outcome, row?.status),
         score: text(row?.score, row?.scoreText),
     });
-    action("getSignInUrl", {
-        async invoke() {
-            const state = `oa${Math.floor(1e3 * Math.random() * Date.now())}`;
-            document.cookie = `oauth_state_${IDP_CLIENT_ID}=${state}; path=/`;
-            const params = new URLSearchParams({
-                scope: "openid offline_access email",
-                response_type: "code",
-                client_id: IDP_CLIENT_ID,
-                redirect_uri: `${ORIGIN}/en/login.html`,
-                audience: "usta",
-                state,
-            });
-            const url = `${ACCOUNT}/authorize?${params}`;
-            console.log(`getSignInUrl -> ${url}`);
-            return { url };
-        },
-    });
-    action("getSignInState", {
-        async invoke() {
+    action('login', { async invoke() {
+            if (location.pathname !== '/en/login.html')
+                location.assign(ORIGIN + '/en/login.html');
+            return null;
+        } });
+    action('listSessions', { async invoke() {
             if (!accessToken()) {
-                console.log("getSignInState signedIn=false (no access token)");
-                return { signedIn: false };
+                const login = [...document.querySelectorAll('a,button')].some(e => e.getClientRects().length && /^sign in$/i.test(e.textContent.trim()));
+                if (login)
+                    return [];
+                throw Error('USTA credential unavailable; account state is unclassified');
             }
-            try {
-                const profile = await meGet("/v1/customers/me");
-                const signedIn = Boolean(profile?.uaid || profile?.email);
-                console.log(`getSignInState signedIn=${signedIn}`);
-                return { signedIn };
-            }
-            catch (e) {
-                const message = String(e?.message ?? e);
-                console.log(`getSignInState failed (${message})`);
-                if (/HTTP (?:401|403)\b/.test(message))
-                    return { signedIn: false };
-                throw e;
-            }
-        },
-    });
+            const r = await fetch(SERVICES + '/v1/customers/me', { credentials: 'omit', cache: 'no-store', headers: accessToken() ? { authorization: 'Bearer ' + accessToken() } : {} });
+            if (r.status === 401)
+                return [];
+            if (!r.ok || r.redirected)
+                throw Error('USTA account HTTP ' + r.status);
+            const u = await r.json();
+            if (!u?.uaid)
+                throw Error('USTA account identity unavailable');
+            return [{ id: String(u.uaid), label: String(u.email || u.uaid), url: ORIGIN + '/en/home.html' }];
+        } });
     const geocode = async (q) => {
         const data = await apiJson(`${PLAYTENNIS}/v0/Geocoding/LocationSearch?q=${encodeURIComponent(q)}`);
         return (data?.Places || [])

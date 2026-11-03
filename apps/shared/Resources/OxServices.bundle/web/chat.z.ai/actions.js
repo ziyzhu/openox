@@ -18,8 +18,21 @@ async function searchTitles({query,cursor='1'}){if(!query.trim())throw Error('Se
 
 window.ox.install(({action})=>{
 action('searchConversations',{invoke:searchTitles});
-action('getSignInUrl',{async invoke(){return {url:'https://chat.z.ai/'};}});
-action('getSignInState',{async invoke(){return {signedIn:!!await identity()};}});
+action('login', { async invoke() {
+        if (document.querySelector('[role="dialog"] input[type="email"], [role="dialog"] input[type="password"]'))
+            return null;
+        const button = [...document.querySelectorAll('button')].find(e => !e.closest('form,[role="dialog"]') && e.getClientRects().length && e.textContent.trim() === 'Sign in');
+        if (!button)
+            throw Error('Z.ai sign-in control unavailable');
+        button.click();
+        return null;
+    } });
+action('listSessions', { async invoke() {
+        const u = await identity();
+        if (!u)
+            return [];
+        return [{ id: u.id, label: String(u.email || u.name || u.id), url: 'https://chat.z.ai/' }];
+    } });
 action('getCurrentUser',{async invoke(){const j=await identity();if(!j)throw Error('Sign in required');return {id:j.id,name:String(j.name||''),email:String(j.email||'')};}});
 action('listModels',{async invoke(){const j=await request('/api/models');if(!Array.isArray(j.data))throw Error('Invalid models response');return {items:j.data.map(x=>({id:String(x.id),name:String(x.name)})),nextCursor:null};}});
 action('listConversations',{async invoke({cursor}){const page=Number(cursor||'1');const j=await request('/api/v1/chats/?page='+page+'&type=default');if(!Array.isArray(j))throw Error('Invalid chat list');return {items:j.map(x=>({id:String(x.id),title:String(x.title),url:'https://chat.z.ai/c/'+x.id})),nextCursor:j.length?String(page+1):null};}});

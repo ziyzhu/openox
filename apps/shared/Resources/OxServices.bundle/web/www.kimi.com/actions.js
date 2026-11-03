@@ -28,7 +28,7 @@ const identity = async () => {
   } catch (error) {
     const status = Number(error?.status ?? error?.code ?? error?.rawResponse?.status ?? error?.response?.status);
     const code = error?.body?.code ?? error?.rawResponse?.body?.code ?? error?.response?.data?.code ?? error?.details?.code;
-    if (status === 401 && code === 'unauthenticated') return null;
+    if ((status === 401 && code === 'unauthenticated') || (String(error?.message || '') === '[unauthenticated]' && [...document.querySelectorAll('button')].some(e => visible(e) && e.textContent.trim() === 'Log in'))) return null;
     throw new Error('Kimi account request failed: ' + String(error?.message || error));
   }
 };
@@ -109,8 +109,21 @@ const send = async message => {
 };
 window.ox.install(({action}) => {
 registerModelActions(action);
-  action('getSignInUrl', {async invoke() {return {url: 'https://www.kimi.com/'};}});
-  action('getSignInState', {async invoke() {return {signedIn: !!(await identity())};}});
+  action('login', { async invoke() {
+          if (document.querySelector('[role="dialog"] input[type="email"], [role="dialog"] input[type="password"]'))
+              return null;
+          const button = [...document.querySelectorAll('button')].find(e => !e.closest('form,[role="dialog"]') && visible(e) && e.textContent.trim() === 'Log in');
+          if (!button)
+              throw Error('Kimi login control unavailable');
+          button.click();
+          return null;
+      } });
+  action('listSessions', { async invoke() {
+          const u = await identity();
+          if (!u)
+              return [];
+          return [{ id: u.id, label: String(u.nickname || u.name || u.id), url: 'https://www.kimi.com/' }];
+      } });
   action('getCurrentUser', {async invoke() {const u = await identity(); if (!u) throw new Error('Sign in to Kimi first'); return {id: u.id, name: u.nickname || null};}});
   action('getInterfaceState', {async invoke() {await service('kimi.gateway.account.v1.UserService'); return {path: location.pathname, readyState: document.readyState, composer: !!composer(), modelPicker: !!document.querySelector('.current-model')};}});
   action('listConversations', {async invoke(args) {return chats(args);}});
