@@ -27,11 +27,20 @@ const ORIGIN = "https://www.google.com";
 const normalizedUrl = (value) => {
     try {
         const url = new URL(value, ORIGIN);
-        const redirected = url.hostname.endsWith(".google.com") && url.pathname === "/url"
+        if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+        const redirected = (url.hostname === "google.com" || url.hostname.endsWith(".google.com")) && url.pathname === "/url"
             ? url.searchParams.get("q")
             : null;
-        const resolved = redirected ? new URL(redirected) : url;
-        return resolved.protocol === "http:" || resolved.protocol === "https:" ? resolved.href : null;
+        if (redirected) {
+            try {
+                const target = new URL(redirected);
+                return target.protocol === "http:" || target.protocol === "https:" ? target.href : null;
+            } catch {
+                return /^[a-z][a-z\d+.-]*:/i.test(redirected) || redirected.startsWith("//") || /\s/.test(redirected)
+                    ? null : url.href;
+            }
+        }
+        return url.href;
     }
     catch {
         return null;
@@ -195,8 +204,10 @@ window.ox.install(({ action }) => {
                     const url = normalizedUrl(link.getAttribute("href"));
                     const title = cleanText(heading.textContent);
                     if (!url || !title || seen.has(url)) continue;
-                    const host = new URL(url).hostname;
-                    if (host === "google.com" || host.endsWith(".google.com")) continue;
+                    const parsedUrl = new URL(url);
+                    const host = parsedUrl.hostname;
+                    if ((host === "google.com" || host.endsWith(".google.com"))
+                        && !(parsedUrl.pathname === "/url" && parsedUrl.searchParams.get("q"))) continue;
                     const root = link.closest("div[data-hveid]") ?? link.closest(".MjjYud") ?? link.parentElement?.parentElement;
                     const snippet = cleanText(root?.querySelector(".VwiC3b, .s3v9rd, [data-sncf]")?.textContent) || null;
                     seen.add(url);
