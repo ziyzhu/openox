@@ -155,12 +155,7 @@ nonisolated private enum InvocationSources {
 
     static func result(_ value: JSONValue?, name: String, sources: Invocation.Sources?) -> Invocation.Sources? {
         var result = sources ?? Invocation.Sources()
-        if name == Actions.webSearch {
-            result.links = (value?.objectValue?["items"]?.arrayValue ?? []).prefix(8).compactMap { item in
-                guard let url = complete(item.objectValue?["url"]?.stringValue) else { return nil }
-                return Invocation.Sources.Link(url: url, title: item.objectValue?["title"]?.stringValue.map { InvocationPreview.text($0, limit: 128).value })
-            }
-        } else if name == Actions.webFetch, let url = complete(value?.objectValue?["url"]?.stringValue) {
+        if name == Actions.webFetch, let url = complete(value?.objectValue?["url"]?.stringValue) {
             result.links = [Invocation.Sources.Link(url: url)]
         }
         return result

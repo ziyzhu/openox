@@ -1,6 +1,7 @@
 {
   "domain": "search.brave.com",
   "name": "Brave Search",
+  "faviconUrl": "https://openox.ai/assets/services/search.brave.com/favicon.png",
   "description": "Search the public web with Brave Search without signing in.",
   "baseUrl": "https://search.brave.com/",
   "actions": [{

@@ -1,6 +1,7 @@
 {
   "domain": "duckduckgo.com",
   "name": "DuckDuckGo",
+  "faviconUrl": "https://openox.ai/assets/services/duckduckgo.com/favicon.png",
   "description": "Search the public web with DuckDuckGo without signing in.",
   "baseUrl": "https://duckduckgo.com/",
   "actions": [{

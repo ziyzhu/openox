@@ -854,6 +854,9 @@ private enum InvocationFormat {
             guard let path = invocation.args.objectValue?["path"]?.stringValue,
                   !path.isEmpty else { return nil }
             let parts = path.split(separator: "/")
+            if parts.count >= 4, parts[0] == "services", ["web", "api", "ios", "mcp"].contains(parts[1]) {
+                return [serviceSource(domain: String(parts[2]), invocation: invocation, serviceManager: serviceManager)]
+            }
             if parts.count >= 2, ["history", "conversations"].contains(parts[0]) {
                 let id: UUID? = if let uuid = UUID(uuidString: String(parts[1])) {
                     uuid
@@ -877,7 +880,7 @@ private enum InvocationFormat {
             }
             return [Source(label: (path as NSString).lastPathComponent, icon: .file(path), accessibilityLabel: path)]
         case Actions.webSearch:
-            if let sources = searchSources(invocation), !sources.isEmpty {
+            if let sources = searchSources(invocation, serviceManager: serviceManager), !sources.isEmpty {
                 return sources
             }
             let query = invocation.sources?.query ?? args?["query"]?.stringValue ?? ""
@@ -890,30 +893,31 @@ private enum InvocationFormat {
             return query.isEmpty ? nil : [Source(label: query, icon: .none, results: invocation)]
         case Actions.serviceAttach, Actions.serviceValidate, Actions.serviceLogin, Actions.serviceSolve, Actions.servicePayment, Actions.serviceDetach:
             guard let domain = invocation.sources?.domain ?? args?["domain"]?.stringValue, !domain.isEmpty else { return nil }
-            let service = serviceManager.service(domain: domain)
-            return [Source(label: service?.title ?? domain, icon: service.map(Source.Icon.service) ?? .none, results: service == nil ? invocation : nil)]
+            return [serviceSource(domain: domain, invocation: invocation, serviceManager: serviceManager)]
         default:
             guard let domain = invokeDomain(invocation.name) else { return nil }
-            let service = serviceManager.service(domain: domain)
-            return [Source(label: service?.title ?? domain, icon: service.map(Source.Icon.service) ?? .none, results: service == nil ? invocation : nil)]
+            return [serviceSource(domain: domain, invocation: invocation, serviceManager: serviceManager)]
         }
     }
 
-    private static func searchSources(_ invocation: Invocation) -> [Source]? {
-        if invocation.preview != nil {
-            return (invocation.sources?.links ?? []).compactMap { link in
-                guard let url = URL(string: link.url), let domain = domain(url) else { return nil }
-                return webSource(url: url, domain: domain, title: link.title)
-            }
+    private static func searchSources(_ invocation: Invocation, serviceManager: ServiceManager) -> [Source]? {
+        let services: [String]
+        if let requested = invocation.args.objectValue?["services"]?.arrayValue {
+            services = requested.compactMap(\.stringValue)
+        } else if case .succeeded(let result?) = invocation.outcome {
+            let groups = (result.objectValue?["results"]?.arrayValue ?? []) + (result.objectValue?["errors"]?.arrayValue ?? [])
+            services = groups.compactMap { $0.objectValue?["service"]?.stringValue }
+        } else {
+            return nil
         }
-        guard case .succeeded(let result?) = invocation.outcome,
-              let items = result.objectValue?["items"]?.arrayValue else { return nil }
-        return items.compactMap { item in
-            guard let value = item.objectValue?["url"]?.stringValue,
-                  let url = URL(string: value),
-                  let domain = domain(url) else { return nil }
-            return webSource(url: url, domain: domain, title: item.objectValue?["title"]?.stringValue)
+        return services.filter { $0.hasPrefix("web:") }.map {
+            serviceSource(domain: String($0.dropFirst(4)), invocation: invocation, serviceManager: serviceManager)
         }
+    }
+
+    private static func serviceSource(domain: String, invocation: Invocation, serviceManager: ServiceManager) -> Source {
+        let service = serviceManager.service(domain: domain)
+        return Source(label: service?.title ?? domain, icon: service.map(Source.Icon.service) ?? .domain(domain), results: service == nil ? invocation : nil)
     }
 
     private static func fetchSource(_ invocation: Invocation) -> Source? {

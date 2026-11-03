@@ -183,6 +183,8 @@ nonisolated enum TraceEntry: Identifiable, Equatable, Codable {
 }
 
 nonisolated struct Invocation: Identifiable, Equatable, Hashable, Codable, Sendable {
+    @TaskLocal static var parentID: UUID?
+
     let id: UUID
     let name: String
     let purpose: String

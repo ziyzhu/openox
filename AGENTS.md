@@ -3,6 +3,7 @@
 1. The app must remain neutral to LLM provider.
 1. Logs are user-owned on-device diagnostics.
 1. Keep enough structured logs to diagnose production issues.
+1. Composite built-in function calls should appear as one conversation step; keep internal operations in structured diagnostics without bypassing their approval checks.
 1. Do not use code comments; communicate through code.
 1. Prefer small, simple changes; consider refactoring as you work.
 1. Prefer composition over inheritance, using helpers, extensions, or owned collaborators.
@@ -28,6 +29,7 @@
 1. Keep temporary screenshots, recordings, traces, and diagnostics outside the repository.
 1. App Store Connect owns listing metadata and media.
 1. Hosted service and model-provider icons live only in the `openox-service-assets-prod` S3 bucket.
+1. Search must not change conversation attachments or saved services. Source chips for searches and service implementation files should represent services, not queries, result pages, or filenames.
 
 ## Verification Rules
 

@@ -1090,10 +1090,12 @@ final class Conversation: Identifiable {
     func appendInvocation(name: String, purpose: String, args: JSONValue) -> UUID {
         ensureExecutionContext()
         let invocation = Invocation(name: name, purpose: purpose, args: args)
-        document.apply(.recordInvocation(invocation))
-        activeRun?.backgroundExecution?.updateStep(InvocationPreview.text(purpose).value)
+        if Invocation.parentID == nil {
+            document.apply(.recordInvocation(invocation))
+            activeRun?.backgroundExecution?.updateStep(InvocationPreview.text(purpose).value)
+        }
         activeLatency?.recordCallStarted(id: invocation.id.uuidString, name: name, kind: .function)
-        Log.session.info("Conversation.invocation appended id=\(invocation.id) name=\(name)")
+        Log.session.info("Conversation.invocation appended id=\(invocation.id) name=\(name) parent=\(Invocation.parentID?.uuidString ?? "none")")
         return invocation.id
     }
 
@@ -1145,10 +1147,14 @@ final class Conversation: Identifiable {
             try? JSONEncoder().encode(value ?? .null).count
         } else { nil }
         activeLatency?.recordCallCompleted(id: invocationID.uuidString, failed: failed, resultBytes: resultBytes)
-        document.apply(.resolveInvocation(id: invocationID, outcome: outcome))
+        if let parent = Invocation.parentID {
+            Log.session.info("Conversation.invocation resolved id=\(invocationID) parent=\(parent) failed=\(failed) resultBytes=\(resultBytes ?? 0)")
+        } else {
+            document.apply(.resolveInvocation(id: invocationID, outcome: outcome))
+        }
     }
 
-    func tracked<T>(_ action: String, _ args: JSONValue, purpose: String, _ body: () async throws -> T) async throws -> T {
+    func tracked<T>(_ action: String, _ args: JSONValue, purpose: String, groupsCalls: Bool = false, _ body: () async throws -> T) async throws -> T {
         let standalone = ensureExecutionContext()
         let invocationID = appendInvocation(name: action, purpose: purpose, args: args)
         do {
@@ -1158,7 +1164,9 @@ final class Conversation: Identifiable {
                 args: args.toAny(),
                 purpose: purpose
             )
-            let value = try await body()
+            let value = try await Invocation.$parentID.withValue(groupsCalls ? invocationID : Invocation.parentID) {
+                try await body()
+            }
             resolveInvocation(invocationID: invocationID, outcome: .succeeded(Self.outcomeValue(value)))
             if standalone { finishStandaloneExecution() }
             return value

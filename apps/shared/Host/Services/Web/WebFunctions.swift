@@ -44,16 +44,6 @@ extension Conversation {
         }
     }
 
-    public func authorizeSearch(arguments: JSONValue, purpose: String) async throws -> JSONValue? {
-        try await requireApproval(
-            action: Actions.webSearch,
-            defaultPolicy: Actions.defaultPolicy(for: Actions.webSearch),
-            args: arguments.toAny(),
-            purpose: purpose
-        )
-        return nil
-    }
-
     public func fetchWeb(url: String, options: JSONValue?, purpose: String) async throws -> JSONValue? {
         let fields: [String: JSONValue]
         switch options {

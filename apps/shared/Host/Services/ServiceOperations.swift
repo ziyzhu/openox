@@ -94,6 +94,10 @@ final class ServiceOperations {
 
     func invokeAction(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
         let (service, actionID) = try await resolveAction(name)
+        return try await invokeAction(service: service, actionID: actionID, args: args, session: session, pageURL: pageURL, purpose: purpose)
+    }
+
+    func invokeAction(service: Service, actionID: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
         guard !service.isMCPService || serviceManager.service(domain: service.domain) === service else {
             throw RuntimeError.bridge("This MCP connection changed or was removed. Attach the current service before invoking it.")
         }
@@ -582,6 +586,12 @@ final class ServiceOperations {
         guard !cleanDomain.isEmpty, cleanDomain.count <= 500 else {
             throw RuntimeError.bridge("ox.service.inspect: domain must contain 1-500 characters")
         }
+        let service = try await resolveService(cleanDomain)
+        return try await inspectService(service: service, actions: actions, purpose: purpose)
+    }
+
+    func inspectService(service: Service, actions: [String]?, purpose: String) async throws -> JSONValue? {
+        let cleanDomain = service.domain
         if let actions {
             guard (1...10).contains(actions.count),
                   actions.allSatisfy({ !$0.isEmpty && $0.count <= 500 }),
@@ -589,7 +599,6 @@ final class ServiceOperations {
                 throw RuntimeError.bridge("ox.service.inspect: actions must contain 1-10 unique action IDs of 1-500 characters")
             }
         }
-        let service = try await resolveService(cleanDomain)
         var fields: [String: JSONValue] = ["domain": .string(cleanDomain)]
         if let actions { fields["actions"] = .array(actions.map(JSONValue.string)) }
         return try await tracked(Actions.serviceInspect, .object(fields), purpose: purpose) {
