@@ -70,7 +70,7 @@ nonisolated struct FileReferenceAdapter: ModelAdapter {
 
     private func needsRecovery(kind: TransientAttachment.Kind, mimeType: String, model: ProviderModel) -> Bool {
         switch kind {
-        case .image: false
+        case .image: !model.modalities.input.contains(.image)
         case .pdf: !model.modalities.input.contains(.pdf)
         case .text: false
         case .file:
@@ -101,7 +101,7 @@ nonisolated struct FileReferenceAdapter: ModelAdapter {
         case .pdf:
             guidance = "PDF input is unavailable for this model. Use ox.fs.read with the file reference/path to extract text, or ox.web.fetch for the source URL. Text extraction may omit diagrams or return no text for scanned pages."
         case .image:
-            guidance = "Image input is unavailable for this model and local OCR/classification failed."
+            guidance = "Image input is unavailable for this model. Use ox.vision.analyze with the file reference/path for on-device OCR and classification, or switch to a model with image input when original pixels are needed."
         case .text:
             guidance = "The text attachment is not valid UTF-8. Use ox.fs.read with the file reference/path or ox.web.fetch for the source URL; if decoding fails, request a UTF-8 export."
         case .file:
