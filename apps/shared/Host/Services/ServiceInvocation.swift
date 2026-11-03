@@ -77,8 +77,17 @@ extension Service {
             scripts: scripts,
             session: selectedSession
         )
-        if let approve, actionId != WebConversationContract.actionID || WebConversationContract.requiresApproval(args) {
-            let allow = await approve(name, args.toAny())
+        func approveInvocation(_ id: String, input: JSONValue) async -> Bool {
+            let qualifiedName = definition.qualifiedActionName(id)
+            if let approve { return await approve(qualifiedName, input.toAny()) }
+            if WebSessionContract.isEnabled(definition),
+               id == WebSessionContract.listAction || id == WebSessionContract.loginAction {
+                return manager.actionPolicy(for: qualifiedName, default: .allow) == .allow
+            }
+            return true
+        }
+        if actionId != WebConversationContract.actionID || WebConversationContract.requiresApproval(args) {
+            let allow = await approveInvocation(actionId, input: args)
             Log.service.info("Service.invoke approval name=\(name) allow=\(allow)")
             if !allow { return .failure(InvokeError.denied(name)) }
         }
@@ -120,6 +129,14 @@ extension Service {
                 try await manager.requireInvocationAccess(for: self)
                 if let selectedSession, WebSessionContract.isEnabled(definition),
                    actionId != WebSessionContract.loginAction, actionId != WebSessionContract.listAction {
+                    guard await approveInvocation(WebSessionContract.listAction, input: .object([:])) else {
+                        throw InvokeError.denied("\(domain):\(WebSessionContract.listAction)")
+                    }
+                    try Task.checkCancellation()
+                    try await manager.requireInvocationAccess(for: self)
+                    guard owns(session), session.navigationGeneration == startingNavigation else {
+                        throw EvalError.contextInvalidated
+                    }
                     let probe = "return await window.ox.callServiceAction('listSessions', {}, { session: \(sessionJSON) });"
                     let rawSessions = try await evalAsync(session, probe, context: "sessions:\(invocation)")
                     let sessions = rawSessions.map(JSONValue.from) ?? .null

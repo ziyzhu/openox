@@ -35,8 +35,9 @@ async function inputText(path: string): Promise<string> {
 }
 
 async function invoke(args: string[], context: CliContext): Promise<void> {
-  const parsed = options(args, "host service invoke <domain>:<action> [--args '{}'] [--args-file <path|->] [--approve]", {
+  const parsed = options(args, "host service invoke <domain>:<action> [--args '{}'] [--args-file <path|->] [--session '<descriptor>' | --session-file <path|-> | --page-url <https-url>] [--approve]", {
     args: { type: "string" }, "args-file": { type: "string" }, approve: { type: "boolean" },
+    session: { type: "string" }, "session-file": { type: "string" }, "page-url": { type: "string" },
   }, 1);
   if (!parsed) return;
   const { values, positionals, timeoutMs } = parsed;
@@ -44,13 +45,37 @@ async function invoke(args: string[], context: CliContext): Promise<void> {
   const separator = target.lastIndexOf(":");
   if (separator <= 0 || separator === target.length - 1) fail("expected <domain>:<action> (e.g. x.com:search)");
   if (values.args !== undefined && values["args-file"] !== undefined) fail("use either --args or --args-file, not both");
+  if ([values.session, values["session-file"], values["page-url"]].filter(value => value !== undefined).length > 1) {
+    fail("use only one of --session, --session-file, or --page-url");
+  }
+  if (values["args-file"] === "-" && values["session-file"] === "-") fail("stdin can supply only one input file");
+  let session: { id: string; label: string; url: string } | undefined;
+  if (values.session !== undefined || values["session-file"] !== undefined) {
+    const text = values["session-file"] !== undefined ? await inputText(String(values["session-file"])) : String(values.session);
+    let descriptor: unknown;
+    try { descriptor = JSON.parse(text); }
+    catch (error) { fail(`invalid session JSON: ${(error as Error).message}`); }
+    if (!descriptor || typeof descriptor !== "object" || Array.isArray(descriptor)
+      || Object.keys(descriptor).sort().join(",") !== "id,label,url"
+      || !Object.values(descriptor).every(value => typeof value === "string" && value.trim().length > 0)) {
+      fail("session must be a listSessions descriptor with nonempty id, label, and url strings");
+    }
+    session = descriptor as typeof session;
+  }
+  const pageUrl = values["page-url"] === undefined ? undefined : String(values["page-url"]);
+  if (pageUrl !== undefined) {
+    let url: URL | undefined;
+    try { url = new URL(pageUrl); }
+    catch { fail("--page-url requires a public HTTPS URL"); }
+    if (!url || url.protocol !== "https:" || url.username || url.password) fail("--page-url requires a public HTTPS URL without credentials");
+  }
   const raw = values["args-file"] !== undefined ? await inputText(String(values["args-file"])) : String(values.args ?? "{}");
   let actionArgs: unknown;
   try { actionArgs = JSON.parse(raw); }
   catch (error) { fail(`invalid action arguments JSON: ${(error as Error).message}`); }
   const host = createHostServiceRuntime(context.host);
   printResult(await host.invoke({ domain: target.slice(0, separator), action: target.slice(separator + 1),
-    args: actionArgs, approved: values.approve === true ? true : undefined, timeoutMs }));
+    args: actionArgs, session, pageUrl, approved: values.approve === true ? true : undefined, timeoutMs }));
 }
 
 async function evaluate(args: string[], context: CliContext): Promise<void> {

@@ -559,7 +559,7 @@ final class Service: NSObject, Identifiable {
         super.init()
         if definition.isAPI {
             if let authorization = apiService?.authorization, authorization.auth.requiresCredentials {
-                auth = .observed(AuthObservation(value: authorization.isConfigured ? .signedIn : .signedOut, observedAt: Date(), evidence: .configured))
+                auth = .unknown
             } else {
                 auth = .notRequired
             }
@@ -609,6 +609,7 @@ final class Service: NSObject, Identifiable {
     @discardableResult
     func loadManifest(reason: CapabilityReason = .inspect) async -> JSONValue? {
         if let mcp = remoteMCPService {
+            if reason == .attach || reason == .serviceDetail { return definition.manifest }
             await loadMCPCapabilities(mcp, reason: reason)
             return capabilityState == .ready ? definition.manifest : nil
         }

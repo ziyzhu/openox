@@ -24,7 +24,7 @@ final class RemoteMCPService {
     init(endpoint: URL, transport: RemoteMCPTransport?) {
         self.endpoint = endpoint
         self.transport = transport
-        self.requiresAuthorization = RemoteMCPOAuth.hasCredential(endpoint: endpoint)
+        self.requiresAuthorization = false
         self.isAuthorized = false
     }
 
@@ -37,6 +37,23 @@ final class RemoteMCPService {
               url.scheme?.lowercased() == "https" || allowsDevelopmentHTTP(url),
               WebFetchURLPolicy.allows(url) else { throw RemoteMCPError.invalidEndpoint }
         return url
+    }
+
+    func checkAccess() async throws -> Service.Auth {
+        guard await WebFetchURLPolicy.allowsResolved(endpoint, allowsTailscale: true) else { throw RemoteMCPError.invalidEndpoint }
+        let token = try RemoteMCPOAuth.configuredAccessToken(endpoint: endpoint)
+        let probe = RemoteMCPClient(endpoint: endpoint, transport: transport, accessToken: token)
+        do {
+            _ = try await probe.connect()
+            await probe.disconnect()
+            return token == nil ? .notRequired : .authorized
+        } catch RemoteMCPError.authorizationRequired {
+            await probe.disconnect()
+            return .authorizationRequired
+        } catch {
+            await probe.disconnect()
+            throw error
+        }
     }
 
     func resolve(allowsAuthorization: Bool = false, refresh: Bool = false) async throws -> RemoteMCPDescriptor {

@@ -5,6 +5,8 @@ export type InvokeRequest = {
   action: string;
   args: unknown;
   approved?: boolean;
+  session?: { id: string; label: string; url: string };
+  pageUrl?: string;
   timeoutMs: number;
 };
 
@@ -40,6 +42,8 @@ class WebSocketHostServiceRuntime implements HostServiceRuntime {
   invoke(request: InvokeRequest) {
     return callHost("services.invoke", { domain: request.domain, action: request.action, args: request.args,
       ...(request.approved === undefined ? {} : { approve: request.approved }),
+      ...(request.session === undefined ? {} : { session: request.session }),
+      ...(request.pageUrl === undefined ? {} : { pageUrl: request.pageUrl }),
     }, request.timeoutMs, this.endpoint);
   }
 

@@ -301,14 +301,31 @@ nonisolated enum OxServices {
                             "type": .string("object"),
                             "properties": .object([
                                 "domain": .object(["type": .string("string")]),
-                                "signedIn": .object(["type": .string("boolean"), "const": .bool(true)]),
+                                "signedIn": .object(["type": .string("boolean")]),
+                                "completed": .object(["type": .string("boolean")]),
+                                "state": .object(["type": .string("string")]),
+                                "completion": .object(["type": .string("string")]),
                             ]),
                             "required": .array([.string("domain"), .string("signedIn")]),
                             "additionalProperties": .bool(false),
                         ]),
                     ])
                 ),
-            ]
+            ] + ["ox.service.checkAccess", "ox.service.requestAccess"].map { name in
+                (name, .object([
+                    "description": .string(ModelGuidance.text(name)),
+                    "inputSchema": .object([
+                        "type": .string("object"),
+                        "properties": .object([
+                            "domain": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(500)]),
+                            "purpose": .object(["type": .string("string")]),
+                        ]),
+                        "required": .array([.string("domain")]),
+                        "additionalProperties": .bool(false),
+                    ]),
+                    "outputSchema": .object(["type": .string("object")]),
+                ]))
+            }
         },
         installNatives: { ctx, env in
             let findBlock: @convention(block) (String, JSValue) -> JSValue = { query, purposeValue in
@@ -386,6 +403,11 @@ nonisolated enum OxServices {
             }
             ctx.setObject(showPageBlock as AnyObject, forKeyedSubscript: "__nativeServiceShowPage" as NSString)
 
+            let checkAccessBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
+                env.call { try await $0.checkServiceAccess(domain: domain, purpose: purposeValue.toString()!) }
+            }
+            ctx.setObject(checkAccessBlock as AnyObject, forKeyedSubscript: "__nativeServiceCheckAccess" as NSString)
+
             let loginBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
                 let purpose = purposeValue.toString()!
                 return env.call(suspendingTimeout: true) { try await $0.loginService(domain: domain, purpose: purpose) }
@@ -405,6 +427,8 @@ nonisolated enum OxServices {
           attach: (value) => { const options = __oxOptions(value, 'ox.service.attach'); return __nativeServiceAttach(String(options.domain), String(options.purpose)); },
           detach: (value) => { const options = __oxOptions(value, 'ox.service.detach'); return __nativeServiceDetach(String(options.domain), String(options.purpose)); },
           showPage: (value) => { const options = __oxOptions(value, 'ox.service.showPage'); return __nativeServiceShowPage(String(options.name), options.input ?? null, options.session ?? null, options.pageUrl ?? null, String(options.purpose)); },
+          checkAccess: (value) => { const options = __oxOptions(value, 'ox.service.checkAccess'); return __nativeServiceCheckAccess(String(options.domain), String(options.purpose)); },
+          requestAccess: (value) => { const options = __oxOptions(value, 'ox.service.requestAccess'); return __nativeServiceLogin(String(options.domain), String(options.purpose)); },
           login: (value) => { const options = __oxOptions(value, 'ox.service.login'); return __nativeServiceLogin(String(options.domain), String(options.purpose)); }
         """
     )

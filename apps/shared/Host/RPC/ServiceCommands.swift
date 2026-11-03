@@ -86,9 +86,15 @@ extension OxHostProtocol {
         }
         Log.agent.debug("OxHostRPC.services.invoke id=\(reply.id) \(domain):\(action)")
         withService(domain: domain, serviceManager: serviceManager, reply: reply) { svc in
-            let approve: @MainActor (String, Any?) async -> Bool = { _, _ in
-                let name = svc.definition.qualifiedActionName(action)
-                let actionDefault: ActionPolicy = svc.definition.action(action, includingStandard: true)?.requireApproval == false ? .allow : .ask
+            if command.session != nil || command.pageUrl != nil {
+                guard svc.isWebService else {
+                    return .failure(RuntimeError.bridge("Session routing is supported only for web services"))
+                }
+            }
+            let approve: @MainActor (String, Any?) async -> Bool = { invokedName, _ in
+                let invokedAction = invokedName.split(separator: ":").last.map(String.init) ?? action
+                let name = svc.definition.qualifiedActionName(invokedAction)
+                let actionDefault: ActionPolicy = svc.definition.action(invokedAction, includingStandard: true)?.requireApproval == false ? .allow : .ask
                 switch serviceManager.actionPolicy(for: name, default: actionDefault) {
                 case .allow: return command.approve != false
                 case .block: return false
@@ -130,7 +136,7 @@ extension OxHostProtocol {
             if WebSessionContract.isEnabled(svc.definition), action == WebSessionContract.loginAction {
                 return .failure(RuntimeError.bridge("Login requires a user interaction. Invoke the service login action through a conversation VM so the Host can present and await its live page."))
             }
-            return await svc.invokeAction(action, args: args, approve: approve)
+            return await svc.invokeAction(action, args: args, session: command.session, pageURL: command.pageUrl, approve: approve)
         }
     }
 

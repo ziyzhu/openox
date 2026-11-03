@@ -168,7 +168,7 @@ final class ConversationServiceAttachments {
             serviceManager.setAttachedServices(replacement, for: id)
         }
         for svc in replacement {
-            Task { _ = await svc.loadManifest() }
+            Task { _ = await svc.loadManifest(reason: .attach) }
         }
     }
 

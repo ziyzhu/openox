@@ -182,6 +182,10 @@ struct SelectableText: UIViewRepresentable {
 
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.conversationLinkHandler = conversationLinkHandler
+        let linkAttributes = linkTextAttributes
+        if !NSDictionary(dictionary: view.linkTextAttributes).isEqual(to: linkAttributes) {
+            view.linkTextAttributes = linkAttributes
+        }
         switch streaming {
         case .plain(let streamingPlain):
             context.coordinator.updateStreamingPlain(streamingPlain, in: view)
@@ -190,7 +194,6 @@ struct SelectableText: UIViewRepresentable {
         case nil:
             context.coordinator.endStreaming()
             if context.coordinator.lastSet !== attributed {
-                view.linkTextAttributes = linkTextAttributes
                 view.attributedText = attributed
                 context.coordinator.textReplaced(attributed)
             }

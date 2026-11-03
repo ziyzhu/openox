@@ -97,6 +97,9 @@ final class ServiceOperations {
         guard !service.isMCPService || serviceManager.service(domain: service.domain) === service else {
             throw RuntimeError.bridge("This MCP connection changed or was removed. Attach the current service before invoking it.")
         }
+        if service.isMCPService, await service.loadManifest(reason: .invoke) == nil {
+            throw RuntimeError.bridge("Service capabilities are unavailable; invoke ox.service.login if authorization is required")
+        }
         let input = args ?? .object([:])
         if session != nil || pageURL != nil {
             guard service.isWebService, let baseURL = service.definition.baseURL else {
@@ -137,7 +140,17 @@ final class ServiceOperations {
                 let attachments = try await resolveConversationAttachments(input.objectValue?["attachments"]?.arrayValue ?? [])
                 return try await serviceManager.invokeConversation(service: service, args: input, owner: conversationOwner, attachments: attachments)
             }
-            let approve: @MainActor (String, Any?) async -> Bool = { _, _ in true }
+            let approve: @MainActor (String, Any?) async -> Bool = { name, args in
+                guard service.isWebService,
+                      name == service.definition.qualifiedActionName(WebSessionContract.listAction),
+                      name != qualifiedName else { return true }
+                do {
+                    try await self.requireApproval(action: name, defaultPolicy: .allow, args: args, purpose: purpose)
+                    return true
+                } catch {
+                    return false
+                }
+            }
             let result: Result<JSONValue, Error>
             if let implementation = service.apiService {
                 result = await implementation.invoke(service: service, actionID: actionID, args: input, approve: approve)
@@ -577,12 +590,12 @@ final class ServiceOperations {
             }
         }
         let service = try await resolveService(cleanDomain)
-        guard await service.loadManifest(reason: .inspect) != nil else {
-            throw RuntimeError.bridge("ox.service.inspect: service '\(cleanDomain)' capabilities are unavailable; authorize or retry the service first.")
-        }
         var fields: [String: JSONValue] = ["domain": .string(cleanDomain)]
         if let actions { fields["actions"] = .array(actions.map(JSONValue.string)) }
         return try await tracked(Actions.serviceInspect, .object(fields), purpose: purpose) {
+            guard await service.loadManifest(reason: .inspect) != nil else {
+                throw RuntimeError.bridge("ox.service.inspect: service '\(cleanDomain)' capabilities are unavailable; invoke ox.service.login if authorization is required.")
+            }
             let definition = service.definition
             let details: [String: JSONValue]
             if let actions {
@@ -684,6 +697,55 @@ final class ServiceOperations {
             guard lease.isActive else { throw Service.EvalError.contextInvalidated }
             Log.service.info("Service.showPage dismissed domain=\(service.domain) session=\(lease.page.logLabel)")
             return .object(["shown": .bool(true)])
+        }
+    }
+
+    func checkServiceAccess(domain: String, purpose: String) async throws -> JSONValue? {
+        let service = try await resolveService(domain)
+        guard serviceManager.actionPolicy(for: Actions.serviceCheckAccess, default: .allow) == .allow else {
+            throw RuntimeError.bridge("checkAccess is not allowed by Action policy; no access check was performed")
+        }
+        if service.isWebService {
+            guard WebSessionContract.isEnabled(service.definition) else {
+                throw RuntimeError.bridge("checkAccess requires a web service with listSessions; missing support does not establish signed-out state")
+            }
+            let name = service.definition.qualifiedActionName(WebSessionContract.listAction)
+            let defaultPolicy: ActionPolicy = service.definition.action(WebSessionContract.listAction)?.requireApproval == true ? .ask : .allow
+            guard serviceManager.actionPolicy(for: name, default: defaultPolicy) == .allow else {
+                throw RuntimeError.bridge("listSessions requires approval or is blocked; checkAccess never prompts or bypasses that policy")
+            }
+            return try await recorded(Actions.serviceCheckAccess, .object(["domain": .string(domain)]), purpose: purpose) {
+                let result = await service.invokeAction(WebSessionContract.listAction, args: .object([:]), approve: { name, _ in
+                    self.serviceManager.actionPolicy(for: name, default: defaultPolicy) == .allow
+                })
+                return .object(["domain": .string(domain), "kind": .string("web"), "evidence": .string("listSessions"), "sessions": try result.get()])
+            }
+        }
+        return try await recorded(Actions.serviceCheckAccess, .object(["domain": .string(domain)]), purpose: purpose) {
+            let auth: Service.Auth
+            let evidence: String
+            if let api = service.apiService {
+                auth = try api.authorization.configuredAccess()
+                evidence = "credentialConfiguration"
+            } else if let mcp = service.remoteMCPService {
+                auth = try await mcp.checkAccess()
+                evidence = "mcpConnection"
+            } else {
+                auth = try await service.readAccess()
+                evidence = "devicePermission"
+            }
+            try Task.checkCancellation()
+            service.setAuth(auth)
+            let state: String
+            switch auth {
+            case .notRequired: state = "notRequired"
+            case .authorized: state = "authorized"
+            case .authorizationRequired: state = "authorizationRequired"
+            case .notAuthorized: state = "denied"
+            case .observed(let observation): state = observation.value == .signedIn ? "configured" : "notConfigured"
+            default: throw RuntimeError.bridge("Access could not be determined")
+            }
+            return .object(["domain": .string(domain), "kind": .string(Self.serviceKind(service)), "state": .string(state), "evidence": .string(evidence), "verified": .bool(!service.isAPIService)])
         }
     }
 

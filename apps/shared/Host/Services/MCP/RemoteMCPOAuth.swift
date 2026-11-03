@@ -436,6 +436,12 @@ enum RemoteMCPOAuth {
         return RemoteMCPHTTPResponse(data: data, response: response)
     }
 
+    static func configuredAccessToken(endpoint: URL) throws -> String? {
+        guard let encoded = try Credentials.secretChecked(for: account(endpoint: endpoint)) else { return nil }
+        let credential = try JSONDecoder().decode(RemoteMCPOAuthCredential.self, from: Data(encoded.utf8))
+        return credential.tokens?.accessToken
+    }
+
     private static func load(endpoint: URL) -> RemoteMCPOAuthCredential? {
         guard let encoded = Credentials.secret(for: account(endpoint: endpoint)),
               let data = encoded.data(using: .utf8) else { return nil }

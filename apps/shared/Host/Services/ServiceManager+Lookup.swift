@@ -12,7 +12,7 @@ extension ServiceManager {
         let required = resolved.map(\.domain)
         let unavailable = await withTaskGroup(of: String?.self, returning: [String].self) { group in
             for service in resolved {
-                group.addTask { await service.loadManifest() == nil ? service.domain : nil }
+                group.addTask { await service.loadManifest(reason: .attach) == nil ? service.domain : nil }
             }
             var unavailable: [String] = []
             for await domain in group {

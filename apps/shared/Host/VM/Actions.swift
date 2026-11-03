@@ -49,6 +49,7 @@ nonisolated enum Actions {
     static let serviceList = "ox.service.list"
     static let serviceListAttached = "ox.service.listAttached"
     static let serviceInspect = "ox.service.inspect"
+    static let serviceCheckAccess = "ox.service.checkAccess"
     static let serviceValidate = "ox.service.validate"
     static let serviceCreate = "ox.service.create"
     static let serviceUpdate = "ox.service.update"
@@ -95,7 +96,7 @@ nonisolated enum Actions {
         webSearch, webFetch,
         fsList, fsRead, fsAttach, fsWrite, fsEdit, fsRm, fsMkdir, fsMove, fsCopy, fsGlob, fsGrep,
         visionAnalyze,
-        serviceFind, serviceList, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
+        serviceFind, serviceList, serviceListAttached, serviceInspect, serviceCheckAccess, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryEnable, repositoryDisconnect,
         repositoryConflicts, repositoryResolve,
         serviceAttach, serviceShowPage, serviceLogin, serviceDetach,
@@ -163,7 +164,7 @@ nonisolated enum Actions {
         case serviceFind: L10n.string("Search services")
         case serviceList: L10n.string("Services")
         case serviceListAttached: L10n.string("List attached services")
-        case serviceInspect: L10n.string("Inspect a service")
+        case serviceInspect, serviceCheckAccess: L10n.string("Inspect a service")
         case serviceValidate: L10n.string("Validate a service")
         case serviceCreate: L10n.string("Create a service")
         case serviceUpdate: L10n.string("Update a service")

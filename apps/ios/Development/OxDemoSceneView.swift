@@ -162,7 +162,6 @@ struct OxDemoSceneView: View {
             onSend: { playback.showCompletedScene() },
             onStop: { playback.stop() },
             onSpeechBegin: { _ in },
-            serviceAuthSource: .snapshot,
             serviceScrollProgress: playback.serviceScrollProgress
         )
     }

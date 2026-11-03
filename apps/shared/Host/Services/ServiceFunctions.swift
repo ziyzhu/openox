@@ -130,7 +130,6 @@ extension Conversation {
             } else {
                 setAttachedServices(attachedServices + [service])
             }
-            await service.checkAccess(reason: .attach)
             guard case .object(var result) = try Self.encodeToJSON(service.snapshot(attached: true)) else {
                 throw RuntimeError.bridge("ox.service.attach: failed to encode service snapshot")
             }
@@ -147,6 +146,10 @@ extension Conversation {
 
     public func showServicePage(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
         try await serviceOperations.showServicePage(name: name, args: args, session: session, pageURL: pageURL, purpose: purpose)
+    }
+
+    public func checkServiceAccess(domain: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.checkServiceAccess(domain: domain, purpose: purpose)
     }
 
     public func loginService(domain: String, purpose: String) async throws -> JSONValue? {

@@ -81,6 +81,8 @@ ox --conversation <conversation-id> vm inspect
 ox --conversation <conversation-id> vm call ox.fs.read --args '<json>'
 ```
 
+For filesystem staging, use `ox.fs.list` without a path to discover the conversation's working directory, or read the metadata's `workingDirectory`. Do not construct a writable path from the public conversation UUID: the working-directory identifier can differ. `/tmp` is read-only execution output, not a staging destination. Relative ordinary file paths resolve in the current working directory.
+
 A saved conversation may be listed before it is hydrated. Current Hosts load full-UUID conversation reads, sends, stops, and responses without changing the selected conversation. Prefixes resolve only hydrated conversations and can be ambiguous; use full IDs for Client routing. VM commands still require a hydrated conversation. For those commands or older Hosts, run `ox --conversation <full-id> conversation open`; this selects it and discards an outgoing temporary conversation. For a pending choice or authorized approval, inspect with `ox --conversation <id> conversation inspect --pending --json`, then use `ox --conversation <id> conversation respond <answer> --prompt <prompt-id>`. Use a returned option label or an allowed custom answer; never infer approval. Stale IDs are rejected. Credential entry and app-only interactions remain in Ox. Older Hosts without `conversations.open` or `conversations.respond` require the app sidebar and prompt UI; in the idb accessibility tree, `conversation.confirm.Approve` is active while `conversation.confirm.receipt.Approve` records an approval already completed.
 
 First-time `ox.service.attach` from an idle conversation can return a stopped outcome because interactive prompts require an active agent run. Inspect the app and logs before retrying; do not treat this as proof the user declined. For an authorized development task, attach through the app's Services picker, then use `ox.service.attach` to reload validated Local edits. Preserve genuine declined or blocked decisions.
@@ -172,12 +174,14 @@ The Host's native picker grants access; a CLI-local path cannot authorize remote
 
 ```sh
 ox [--host <ws-url>] host services [--json] [--timeout 30000]
-ox [--host <ws-url>] host service invoke <domain>:<action> --args '<json>' [--approve] [--timeout 30000]
+ox [--host <ws-url>] host service invoke <domain>:<action> --args '<json>' [--session '<descriptor>' | --session-file <path|-> | --page-url <https-url>] [--approve] [--timeout 30000]
 ox [--host <ws-url>] host service eval <domain> --script '<javascript>' [--timeout 30000]
 ox [--host <ws-url>] host service reload <domain> [--timeout 30000]
 ox [--host <ws-url>] host service refresh-auth <domain> [--timeout 30000]
 ox [--host <ws-url>] host service sync [--timeout 60000]
 ```
+
+Opening or attaching a service does not check access or request setup. Use `ox vm call ox.service.checkAccess --args '{"purpose":"Check service access","domain":"<domain>"}'` for non-prompting, type-specific evidence. API configuration is not server verification; MCP connectivity is not tool authorization; device permission is not account access. Web checks invoke listSessions only when its effective policy allows it; Ask and Block fail without a prompt. Errors never establish absence. Use `ox.service.requestAccess` (or compatible `ox.service.login`) for non-web credential, OAuth, or permission handoffs; both retain the existing signIn policy. Access checks and required handoffs otherwise happen when actions are invoked. For session-aware web services, invoke `listSessions`, select an actual returned descriptor, and pass it with `--session` or `--session-file`. `--page-url` routes discovery or public actions without claiming authentication. These routing options are mutually exclusive. Website `login` requires the conversation VM so the Host can present and await its live page; direct Host invocation does not bypass that interaction.
 
 Treat `invoke` as a real action that may read authenticated data or mutate
 external state. Supply `--approve` only when the user's request authorizes the

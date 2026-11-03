@@ -38,7 +38,6 @@ struct ServiceDetailView: View {
     var browserSessionID: UUID? = nil
     @Environment(ServiceManager.self) private var serviceManager
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
 
     private var service: Service {
         serviceManager.service(domain: initialService.domain) ?? initialService
@@ -47,16 +46,12 @@ struct ServiceDetailView: View {
     private var capabilities: ServiceDetailCapabilities { service.detailCapabilities }
 
     private var actions: [Manifest.Action] { service.definition.actions }
-    private var loadingManifest: Bool { service.capabilityState == .unloaded || service.capabilityState == .loading }
-    @State private var loginRequestActive = false
-    @State private var signingOut = false
+    private var loadingManifest: Bool { service.capabilityState == .loading }
     @State private var descriptionExpanded = false
     @State private var descriptionFullHeight: CGFloat = 0
     @State private var descriptionLimitedHeight: CGFloat = 0
     @State private var confirmClearWebData = false
     @State private var showPageInspector = false
-    @State private var authorizingMCP = false
-    @State private var mcpAuthorizationError: String?
     @State private var mcpRemovalError: String?
     @State private var confirmRemoveMCP = false
     @State private var confirmDeleteLocalService = false
@@ -163,18 +158,8 @@ struct ServiceDetailView: View {
         } message: {
             Text(mcpRemovalError ?? "")
         }
-        .alert("Couldn't authorize MCP server", isPresented: Binding(
-            get: { mcpAuthorizationError != nil },
-            set: { if !$0 { mcpAuthorizationError = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(mcpAuthorizationError ?? "")
-        }
         .task(id: service.id) {
             _ = await service.loadManifest(reason: .serviceDetail)
-            guard !Task.isCancelled, service.supportsAuthentication else { return }
-            await service.checkAccess(reason: .serviceDetail)
         }
     }
 
@@ -187,106 +172,6 @@ struct ServiceDetailView: View {
             dismiss()
         } catch {
             localServiceDeleteError = error.localizedDescription
-        }
-    }
-
-    // MARK: - Auth chip
-
-    @ViewBuilder
-    private var authChip: some View {
-        switch capabilities.authentication {
-        case .systemPermission:
-            permissionButton
-        case .service:
-            if loginRequestActive || service.auth == .unknown || service.auth.isChecking {
-                loginButton(loggingIn: true)
-                    .accessibilityIdentifier(A11yID.ConversationControls.Attach.loginProgress(service.domain))
-            } else {
-                switch service.loginState {
-                case .signedOut, .notAuthorized, .unknown:
-                    let loggingIn = service.auth.isLoggingIn
-                    loginButton(loggingIn: loggingIn)
-                        .accessibilityIdentifier(
-                            loggingIn
-                                ? A11yID.ConversationControls.Attach.loginProgress(service.domain)
-                                : A11yID.ConversationControls.Attach.login(service.domain)
-                        )
-                case .signedIn, .authorized:
-                    if signingOut {
-                        ServiceLoginButton(
-                            loggingIn: true,
-                            isDisabled: true,
-                            layout: .compact,
-                            action: {}
-                        )
-                        .accessibilityLabel(String(localized: "Signing out…"))
-                        .accessibilityIdentifier(A11yID.ConversationControls.Attach.signOutProgress(service.domain))
-                    } else {
-                        Button("Sign out") { Task { await signOut() } }
-                            .buttonStyle(OxChipButton(filled: false, secondaryFill: colorScheme == .light ? Theme.Colors.surface : Theme.Colors.chipOnBackground))
-                            .accessibilityIdentifier(A11yID.ConversationControls.Attach.signOut(service.domain))
-                    }
-                case .notRequired:
-                    EmptyView()
-                }
-            }
-        case .mcp:
-            if let title = service.accessAuthorizationTitle {
-                Button {
-                    Task { await authorizeMCP() }
-                } label: {
-                    Group {
-                        if authorizingMCP {
-                            CellularAutomatonLoader(size: 16, tint: Theme.Colors.onPrimary.dynamic)
-                                .accessibilityLabel(String(localized: "Authorizing…"))
-                        } else {
-                            Text(title)
-                                .font(Theme.Fonts.labelMd)
-                                .foregroundStyle(Theme.Colors.onPrimary)
-                        }
-                    }
-                    .frame(minWidth: 64)
-                    .frame(minHeight: 18)
-                }
-                .buttonStyle(OxChipButton(filled: true))
-                .disabled(authorizingMCP)
-                .accessibilityIdentifier(A11yID.ConversationControls.Attach.login(service.domain))
-            }
-        case .none:
-            EmptyView()
-        }
-    }
-
-    private func loginButton(loggingIn: Bool) -> some View {
-        ServiceLoginButton(
-            loggingIn: loggingIn,
-            isDisabled: loggingIn,
-            layout: .compact
-        ) {
-            guard !loginRequestActive else { return }
-            loginRequestActive = true
-            Task { @MainActor in
-                defer { loginRequestActive = false }
-                try? await service.requestAccess(source: .serviceDetail)
-            }
-        }
-    }
-
-    private func signOut() async {
-        guard !signingOut else { return }
-        signingOut = true
-        defer { signingOut = false }
-        await service.signOut()
-    }
-
-    private func authorizeMCP() async {
-        authorizingMCP = true
-        defer { authorizingMCP = false }
-        do {
-            try await service.requestAccess()
-        } catch {
-            Log.service.error("RemoteMCP.authorize failed id=\(service.domain) error=\(error.localizedDescription)")
-            mcpAuthorizationError = error.localizedDescription
         }
     }
 
@@ -303,9 +188,6 @@ struct ServiceDetailView: View {
                 Text(service.title)
                     .font(Theme.Fonts.headline)
                     .foregroundStyle(Theme.Colors.onSurface)
-                Spacer(minLength: Theme.Spacing.xs)
-                authChip
-                    .frame(height: Theme.Size.chipHeight)
             }
             .frame(minHeight: 64)
             Spacer(minLength: 0)
@@ -500,15 +382,6 @@ struct ServiceDetailView: View {
         case .onDevice: "Its actions and permitted device data become available to this conversation."
         case .remote: "Its remote Actions can receive arguments from this conversation and return data to Ox."
         }
-    }
-
-    private var permissionButton: some View {
-        Button(LocalizedStringKey(service.accessActionLabel)) {
-            Task { try? await service.requestAccess() }
-        }
-        .buttonStyle(OxChipButton(filled: service.auth == .authorizationRequired))
-        .disabled(service.auth == .unknown || service.auth.isUnavailable)
-        .accessibilityIdentifier(A11yID.ConversationControls.Attach.devicePermission(service.domain))
     }
 
     @ViewBuilder

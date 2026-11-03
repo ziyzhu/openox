@@ -217,7 +217,7 @@ final class Conversation: Identifiable {
         isSelected = true
         serviceManager.setAttachedServices(attachedServices, for: id)
         for service in attachedServices {
-            Task { _ = await service.loadManifest() }
+            Task { _ = await service.loadManifest(reason: .attach) }
         }
         Log.session.info("Conversation.selection id=\(id) selected=true busy=\(isBusy)")
         stream.setVisible(true)
@@ -860,7 +860,7 @@ final class Conversation: Identifiable {
         let updated = attachedServices.filter { service in
             previousVersions[service.domain] != nil && previousVersions[service.domain] != currentVersions[service.domain]
         }
-        for service in updated { _ = await service.loadManifest() }
+        for service in updated { _ = await service.loadManifest(reason: .attach) }
         if !updated.isEmpty {
             Log.session.info("Conversation.syncToMonoRepository id=\(id) updated=\(updated.map(\.domain).joined(separator: ",")) invalidated=false")
         }
@@ -1729,7 +1729,7 @@ final class Conversation: Identifiable {
         submission.latency.mark(.agentConfigured)
         submission.latency.mark(.manifestsStarted)
         await withTaskGroup(of: Void.self) { group in
-            for svc in attachedServices { group.addTask { _ = await svc.loadManifest() } }
+            for svc in attachedServices { group.addTask { _ = await svc.loadManifest(reason: .attach) } }
         }
         submission.latency.mark(.manifestsReady)
         let attached = attachedServices.map { $0.snapshot(attached: true) }

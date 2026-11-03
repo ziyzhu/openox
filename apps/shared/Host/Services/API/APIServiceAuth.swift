@@ -164,6 +164,25 @@ final class APIServiceAuthorization {
         return true
     }
 
+    func configuredAccess() throws -> Service.Auth {
+        guard auth.requiresCredentials else { return .notRequired }
+        let current: APIServiceCredential?
+        if case .oauth = auth {
+            if let raw = try Credentials.secretChecked(for: account) {
+                let stored = try JSONDecoder().decode(APIServiceCredential.self, from: Data(raw.utf8))
+                current = stored.version == 1 && stored.binding == binding ? stored : nil
+            } else {
+                current = nil
+            }
+        } else if let stored = try Secret.apiServiceCredential(id: secretIdentity, fingerprint: binding, auth: auth) {
+            current = APIServiceCredential(binding: binding, secret: stored.0, username: stored.1)
+        } else {
+            current = nil
+        }
+        let configured = current != nil && current != rejectedCredential
+        return .observed(Service.AuthObservation(value: configured ? .signedIn : .signedOut, observedAt: Date(), evidence: .configured))
+    }
+
     func checkAccess(previous: Service.AuthObservation?) async throws -> Service.Auth {
         guard auth.requiresCredentials else { return .notRequired }
         var current = credential

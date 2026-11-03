@@ -81,7 +81,6 @@ export function parseGlobalOptions(args: string[]): { context: CliContext; rest:
   ]);
   const removedOptions = new Map([
     ["--runtime", "--runtime was removed; the selected Host owns service page implementation"],
-    ["--session", "--session was removed; use --conversation for ox vm"],
     ["--vm-session", "--vm-session was renamed to --conversation"],
     ["--root", "--root was renamed to --profile"],
   ]);

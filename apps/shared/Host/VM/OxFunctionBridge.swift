@@ -44,6 +44,7 @@ public protocol OxFunctionBridge: AnyObject {
     func attachService(domain: String, purpose: String) async throws -> JSONValue?
     func detachService(domain: String, purpose: String) async throws -> JSONValue?
     func showServicePage(name: String, args: JSONValue?, session: JSONValue?, pageURL: String?, purpose: String) async throws -> JSONValue?
+    func checkServiceAccess(domain: String, purpose: String) async throws -> JSONValue?
     func loginService(domain: String, purpose: String) async throws -> JSONValue?
     func createSkill(name: String, description: String, instructions: String, services: [String], purpose: String) async throws -> JSONValue?
     func copySkill(source: String, name: String, purpose: String) async throws -> JSONValue?

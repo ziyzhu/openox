@@ -237,7 +237,6 @@ struct ConversationComposer: View, Equatable {
     let onSend: () -> Void
     let onStop: () -> Void
     let onSpeechBegin: (Bool) -> Void
-    var serviceAuthSource = ServiceChip.AuthSource.live
     var serviceScrollProgress: CGFloat? = nil
     var hidesPlaceholder = false
     var onInputFrameChange: (CGRect) -> Void = { _ in }
@@ -278,7 +277,6 @@ struct ConversationComposer: View, Equatable {
             && lhs.isEmbedded == rhs.isEmbedded
             && lhs.iconButtonSize == rhs.iconButtonSize
             && lhs.composerButtonSize == rhs.composerButtonSize
-            && lhs.serviceAuthSource == rhs.serviceAuthSource
             && lhs.serviceScrollProgress == rhs.serviceScrollProgress
             && lhs.hidesPlaceholder == rhs.hidesPlaceholder
     }
@@ -932,7 +930,6 @@ struct ConversationComposer: View, Equatable {
             title: picked.title,
             onOpen: { onOpenService(picked) },
             showsAuthStatus: true,
-            authSource: serviceAuthSource,
             onRemove: {
                 Log.ui.info("ConversationComposer.detachService domain=\(picked.domain)")
                 onRemoveService(picked)

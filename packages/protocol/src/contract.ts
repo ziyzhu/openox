@@ -1,6 +1,6 @@
 import { Type, type Static, type TSchema } from "typebox";
 
-export const RPC_VERSION = 2;
+export const RPC_VERSION = 3;
 const S = Type.String;
 const B = Type.Boolean;
 const I = Type.Integer;
@@ -39,7 +39,11 @@ export const Schemas = {
     category: nullable(S({ minLength: 1, maxLength: 80 })), query: nullable(S({ minLength: 1, maxLength: 200 })),
     since: nullable(S({ minLength: 1, maxLength: 40 })),
   }),
-  ActionRequest: object("ActionRequest", { domain: S(), action: S(), args: nullable(json()), approve: nullable(B()) }),
+  ActionRequest: object("ActionRequest", {
+    domain: S(), action: S(), args: nullable(json()), approve: nullable(B()),
+    session: nullable(swift(Type.Object({ id: S({ minLength: 1 }), label: S({ minLength: 1 }), url: S({ minLength: 1 }) }, { additionalProperties: false }), "JSONValue")),
+    pageUrl: nullable(S()),
+  }),
   EvaluateRequest: object("EvaluateRequest", { domain: S(), script: S() }),
   ServiceRequest: object("ServiceRequest", { domain: S() }),
   NewConversationRequest: object("NewConversationRequest", { temporary: nullable(B()), providerId: nullable(S()), modelId: nullable(S()) }),

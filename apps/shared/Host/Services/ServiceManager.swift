@@ -302,7 +302,6 @@ final class ServiceManager {
         _ rawEndpoint: String,
         transport: RemoteMCPTransport? = nil,
         faviconURL: URL? = nil,
-        allowsAuthorization: Bool = true,
         replacing: Service? = nil
     ) async throws -> Service {
         let endpoint = try RemoteMCPService.endpoint(rawEndpoint)
@@ -327,14 +326,6 @@ final class ServiceManager {
             ),
             manager: self
         )
-        if await service.loadManifest(reason: .serviceDetail) == nil,
-           service.auth == .authorizationRequired,
-           allowsAuthorization {
-            try await service.requestAccess()
-        }
-        guard service.capabilityState == .ready else {
-            throw RemoteMCPError.protocolError("Ox could not load this MCP server's tools")
-        }
         try Task.checkCancellation()
         if existing == nil {
             try await repository.saveMCPService(
@@ -420,19 +411,6 @@ final class ServiceManager {
 
     private func updateMCPActivation(from previous: Set<String>) {
         let current = attachedDomains
-        for domain in current.subtracting(previous) {
-            guard let service = service(domain: domain), let mcp = service.remoteMCPService else { continue }
-            Task {
-                do {
-                    guard self.service(domain: domain) === service, self.attachedDomains.contains(domain),
-                          await service.loadManifest(reason: .attach) != nil,
-                          self.service(domain: domain) === service, self.attachedDomains.contains(domain) else { return }
-                    try await mcp.activate()
-                } catch {
-                    Log.service.error("RemoteMCP.attach failed id=\(domain) error=\(error.localizedDescription)")
-                }
-            }
-        }
         for domain in previous.subtracting(current) {
             guard let mcp = service(domain: domain)?.remoteMCPService else { continue }
             Task { await mcp.deactivate() }
