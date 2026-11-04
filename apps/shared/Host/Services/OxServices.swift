@@ -100,7 +100,7 @@ nonisolated enum OxServices {
                         "outputSchema": .object([
                             "type": .string("object"), "properties": .object([
                                 "service": snapshotSchema,
-                                "actions": .object(["type": .string("object"), "additionalProperties": .object(["type": .string("object"), "description": .string("Action summary, or full inputSchema/outputSchema when actions were requested.")])]),
+                                "actions": .object(["type": .string("object"), "additionalProperties": .object(["type": .string("object"), "description": .string("Action summary, or complete inputSchema/outputSchema for small services or explicitly requested actions.")])]),
                                 "access": .object(["type": .string("object"), "properties": .object([
                                     "kind": .object(["type": .string("string")]),
                                     "checkAccess": .object(["type": .string("object"), "description": .string("Applicable function, inputSchema and outputSchema contract.")]),

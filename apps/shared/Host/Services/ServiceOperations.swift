@@ -607,23 +607,24 @@ final class ServiceOperations {
                 throw RuntimeError.bridge("ox.service.inspect: service '\(cleanDomain)' capabilities are unavailable; use requestAccess if authorization is required, otherwise inspect the source or connection error.")
             }
             let definition = service.definition
-            let details: [String: JSONValue]
-            if !available {
-                details = [:]
-            } else if let actions {
-                details = try Dictionary(uniqueKeysWithValues: actions.map { id in
+            let index = available ? OxActions.index(definition: definition) : [:]
+            var details = available ? Dictionary(uniqueKeysWithValues: definition.exposedActions.map { action in
+                (action.id, index[definition.qualifiedActionName(action.id)] ?? .object([:]))
+            }) : [:]
+            var fullContracts = false
+            if available, actions != nil || definition.exposedActions.count <= 10 {
+                let schemas = try Dictionary(uniqueKeysWithValues: (actions ?? definition.exposedActions.map(\.id)).map { id in
                     guard let detail = OxActions.detail(definition: definition, id: id) else {
                         throw RuntimeError.bridge("ox.service.inspect: unknown exposed action '\(cleanDomain):\(id)'.")
                     }
                     return (id, detail)
                 })
-            } else {
-                let index = OxActions.index(definition: definition)
-                details = Dictionary(uniqueKeysWithValues: definition.exposedActions.map { action in
-                    (action.id, index[definition.qualifiedActionName(action.id)] ?? .object([:]))
-                })
+                if actions != nil || JSONValue.object(schemas).jsonString().utf8.count <= 32 * 1024 {
+                    details = schemas
+                    fullContracts = true
+                }
             }
-            Log.session.info("bridge.service.inspect domain=\(cleanDomain) schemas=\(actions != nil) count=\(details.count)")
+            Log.session.info("bridge.service.inspect domain=\(cleanDomain) schemas=\(fullContracts) count=\(details.count)")
             var result: [String: JSONValue] = [
                 "service": try self.serviceSnapshot(service),
                 "actions": .object(details),
