@@ -77,17 +77,15 @@ it("shares the core across hosts, supplies presentation in turn context, and rej
   expect(conversationContext).toContain("Markdown conversation bubbles");
   expect(conversationContext).toContain("![title](path)");
   expect(conversationContext).toContain("mounts/<folder-id>");
-  realm.guide = { catalog: "ox.fs.read", variant: "portable", timeoutSeconds: 10, maxLines: 100, maxBytes: 2048, canCancelLoops: true };
+  realm.guide = { catalog: "ox.fs.read", timeoutSeconds: 10, maxLines: 100, maxBytes: 2048, canCancelLoops: true };
   const guide = runInContext("OxPrompts.executeGuidance(guide)", realm) as string;
   expect(guide).toContain("10 seconds");
   expect(guide).toContain("100 lines or 2 KiB");
-  expect(guide).not.toContain("ox.service.inspect");
+  expect(guide).toContain("ox.service.inspect");
   expect(guide).not.toContain("ox.web.fetch");
   expect(guide).not.toContain("does not forcibly stop");
   expect(guide).toContain("supports interrupting JavaScript loops");
-  expect(runInContext("OxPrompts.executeGuidance({...guide,variant:'ox'})", realm)).toContain("synchronous .help()");
-  expect(() => runInContext("OxPrompts.executeGuidance({...guide,variant:'website'})", realm)).toThrow("Unknown execution guidance variant");
-  expect(() => runInContext("OxPrompts.executeGuidance({...guide,variant:'__proto__'})", realm)).toThrow("Unknown execution guidance variant");
+  expect(guide).toContain("synchronous .help()");
 });
 
 for (const name of ["harness", "harness-storage"]) {

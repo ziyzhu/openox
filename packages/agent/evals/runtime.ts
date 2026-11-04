@@ -56,7 +56,7 @@ export class EvalRuntime {
     }), profileID: "eval", mounts: [{ path: "", access: "readWrite", source: { kind: "backend", backend: memoryFiles(fixture.files) } }], models, registry: createRegistry(), createBlobID: async () => crypto.randomUUID(), settings: { retry: { enabled: false }, compaction: { enabled: false } } });
     try {
       for (const [path, text] of Object.entries({ "MEMORY.md": "", ...fixture.files })) { if (path === "MEMORY.md" || path.startsWith("skills/")) await runtime.session.files.write(path, text); }
-      const description = executeGuidance({ catalog: contractCatalog(), variant: "ox", timeoutSeconds: 10, maxLines: 1000, maxBytes: 262144, canCancelLoops: true });
+      const description = executeGuidance({ catalog: contractCatalog(), timeoutSeconds: 10, maxLines: 1000, maxBytes: 262144, canCancelLoops: true });
       const parameters = Type.Object({ source: Type.String({ minLength: 1, maxLength: 100000 }) });
       runtime.extension = defineExtension({ name: "eval-ox", sections: [section("ox", input => runtime.prompts.get(String(input.conversationId))!, { tag: false })], tools: [defineTool({ name: "execute", description, parameters, replay: "unsafe",
         execute: async ({ source }, api, context) => {
