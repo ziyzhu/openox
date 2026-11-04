@@ -2,6 +2,39 @@ import SwiftUI
 import UIKit
 
 enum Theme {
+    enum Appearance: String, CaseIterable {
+        case system
+        case light
+        case dark
+
+        static let storageKey = "appearance"
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .system: "System"
+            case .light: "Light"
+            case .dark: "Dark"
+            }
+        }
+
+        var interfaceStyle: UIUserInterfaceStyle {
+            switch self {
+            case .system: .unspecified
+            case .light: .light
+            case .dark: .dark
+            }
+        }
+
+        func apply() {
+            for scene in UIApplication.shared.connectedScenes {
+                guard let scene = scene as? UIWindowScene else { continue }
+                for window in scene.windows {
+                    window.overrideUserInterfaceStyle = interfaceStyle
+                }
+            }
+        }
+    }
+
     enum Colors {
         static let primary         = DynamicColor(light: 0xFFA500, dark: 0xF5A030)
         static let primaryPressed  = DynamicColor(light: 0xD87A0A, dark: 0xC77410)

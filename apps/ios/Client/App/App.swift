@@ -39,6 +39,7 @@ private struct OxApplicationView: View {
         case failed(URL)
     }
 
+    @AppStorage(Theme.Appearance.storageKey) private var appearance = Theme.Appearance.system
     @State private var incomingWebLink: IncomingWebLink?
     @AppStorage("app.hasCompletedOnboarding") private var onboarded = false
     @Environment(\.scenePhase) private var scenePhase
@@ -64,6 +65,9 @@ private struct OxApplicationView: View {
     var body: some View {
         appContent
             .appPresentations(presentations)
+            .onChange(of: appearance, initial: true) { _, value in
+                value.apply()
+            }
             .environment(client.services)
             .environment(hostAccess)
             .onOpenURL { url in
@@ -141,6 +145,7 @@ private struct OxApplicationView: View {
             .onChange(of: scenePhase, initial: true) { _, phase in
                 webSocketTransport.reconcile()
                 guard phase == .active else { return }
+                appearance.apply()
                 Task {
                     do {
                         try await client.prepare()

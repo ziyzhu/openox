@@ -10,6 +10,7 @@ types remain authoritative in their `Codable` implementations.
 <app container>/
 ├── Library/
 │   ├── Preferences/                         UserDefaults
+│   │   ├── appearance                      iOS system, light, or dark appearance selection
 │   │   ├── app.hasCompletedOnboarding       onboarding completion
 │   │   ├── serviceDisplayNames              app-wide service domain → local display name; retained across refresh/removal
 │   │   ├── savedServices                    attached service domains
@@ -106,7 +107,7 @@ Service-inspector conversation content optionally stores `pageID`, a transient l
 - Provider configuration and model caches — owner: Host/ModelProviders/ProviderRegistry.swift; configuration uses Application Support/providers.json and derived model caches use Caches; preference conversion belongs to ApplicationStorageMigrator
 - Keychain credentials — owner: Host/Credentials/Credentials.swift
 - Retired read-aloud voice preference — retained in UserDefaults and ignored
-- App-group theme — current value owners: Theme.swift and ShareExtension; legacy migration owner: Host/Storage/ApplicationStorageMigrator.swift
+- iOS appearance — owner: Client/UI/Theme.swift; `appearance` in the app's standard UserDefaults domain stores `system`, `light`, or `dark` through SwiftUI AppStorage. Missing values follow System. App-wide across Profiles, eligible for normal device backup, retained until changed or app data is removed. OxApplicationView applies the override; SettingsSheet edits it.
 - Fixed app-storage paths and backup policy — owner: Host/Storage/AppStoragePaths.swift
 - Active and saved profiles — owners: Host/Storage/StorageRoot.swift and Host/Profile/ProfileStore.swift
 - Profile execution/history/documents — owner: Pi Durable; host-neutral open runtime: packages/agent/src/profile/runtime.ts (`ProfileRuntime`, formerly `OxAgentSession`; persisted formats unchanged); native Session/owner lifetime: Host/Durable/DurableProfileStore.swift; native conversation/presentation: Host/Conversations/Conversation.swift and ConversationManager.swift; application facade: Host/Profile/ProfileRepository.swift. Native type renames do not change persisted ConversationMeta, Turn, RPC, or compatibility-ID formats.
@@ -297,8 +298,8 @@ MCP definitions that they cannot update.
 
 ## Shared preferences
 
-The app and ShareExtension follow the system appearance. Current builds ignore the
-retired `app.theme` preference, so a downgraded build keeps its saved selection.
+The app follows the saved `appearance` selection; ShareExtension follows the system.
+Current builds ignore the retired `app.theme` preference, so a downgraded build keeps its saved selection.
 
 Application migration converts the legacy `autoApproveActions` allow-list and
 `autoApproveAll` preference into `actionApprovalPolicies`. The versioned JSON value

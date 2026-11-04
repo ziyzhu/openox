@@ -5,6 +5,7 @@ struct SettingsSheet: View {
     let ready: Bool
     let onSelectService: (Service) -> Void
 
+    @AppStorage(Theme.Appearance.storageKey) private var appearance = Theme.Appearance.system
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceManager.self) private var serviceManager
     @State private var profilePath: [UUID]
@@ -163,6 +164,26 @@ struct SettingsSheet: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier(A11yID.Settings.language)
+
+                            Divider().settingsContentInset()
+
+                            Menu {
+                                Picker("Appearance", selection: $appearance) {
+                                    ForEach(Theme.Appearance.allCases, id: \.self) { option in
+                                        Text(option.title)
+                                            .tag(option)
+                                            .accessibilityIdentifier("settings.appearance.\(option.rawValue)")
+                                    }
+                                }
+                            } label: {
+                                SettingsDisclosureRow(
+                                    title: "Appearance",
+                                    value: Text(appearance.title),
+                                    indicator: "chevron.up.chevron.down"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("settings.appearance")
 
                             Divider().settingsContentInset()
 

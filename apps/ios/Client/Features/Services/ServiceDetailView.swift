@@ -181,17 +181,21 @@ struct ServiceDetailView: View {
         }
     }
 
-    @ViewBuilder
     private var descriptionSection: some View {
-        if service.summary.isEmpty {
-            Text("No description.")
-                .font(Theme.Fonts.bodyMd)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-        } else {
-            Text(service.summary)
-                .font(Theme.Fonts.bodyMd)
-                .foregroundStyle(Theme.Colors.onSurface)
-                .fixedSize(horizontal: false, vertical: true)
+        SettingsSection(layout: .group) {
+            Group {
+                if service.summary.isEmpty {
+                    Text("No description.")
+                        .font(Theme.Fonts.bodyMd)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                } else {
+                    Text(service.summary)
+                        .font(Theme.Fonts.bodyMd)
+                        .foregroundStyle(Theme.Colors.onSurface)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .settingsRowPadding()
         }
     }
 
