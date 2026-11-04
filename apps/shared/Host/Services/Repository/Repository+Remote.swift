@@ -109,8 +109,8 @@ extension Repository {
 
     func connectMountedRepository(path: String) async throws -> String {
         let components = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-        guard components.count >= 2, components[0] == "files", components.allSatisfy({ !$0.isEmpty }),
-              path.utf8.count <= 2048 else { throw Failure(message: "Use files/<grant-id>[/repository-subfolder]") }
+        guard components.count >= 2, ["mounts", "files"].contains(components[0]), components.allSatisfy({ !$0.isEmpty }),
+              path.utf8.count <= 2048 else { throw Failure(message: "Use mounts/<grant-id>[/repository-subfolder]") }
         let grantID = components[1]
         let relativePath = Array(components.dropFirst(2))
         let root = try await DeviceFolderStore.shared.repositoryRoot(grantID: grantID, relativePath: relativePath, profileId: StorageRoot.shared.activeId)

@@ -61,7 +61,7 @@ it("shares the core across hosts, supplies presentation in turn context, and rej
   expect(prompt).not.toContain("iOS");
   expect(prompt).not.toContain("Browser");
   expect(prompt).not.toContain("ox.app");
-  expect(prompt).not.toContain("files/<folder-id>");
+  expect(prompt).not.toContain("mounts/<folder-id>");
   expect(prompt).not.toContain("ox.service");
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,active:{hostID:'wrong',profileID:'profile-a'}}})", realm)).toThrow("unavailable");
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[...input.hostContext.hosts,...input.hostContext.hosts]}})", realm)).toThrow("Duplicate");
@@ -70,13 +70,13 @@ it("shares the core across hosts, supplies presentation in turn context, and rej
     hostContext: { active: scope, hosts: [{ ...scope, functions: ["ox.fs.read"], serviceKinds: [], presentation: "text", externalFiles: false }] } };
   const textContext = Object.values(composeOxTurnSections(state, { memory: "" })).join("\n");
   expect(textContext).toContain("text with Markdown support");
-  expect(textContext).not.toContain("files/<folder-id>");
+  expect(textContext).not.toContain("mounts/<folder-id>");
   state.hostContext!.hosts[0]!.presentation = "conversation-bubbles";
   state.hostContext!.hosts[0]!.externalFiles = true;
   const conversationContext = Object.values(composeOxTurnSections(state, { memory: "" })).join("\n");
   expect(conversationContext).toContain("Markdown conversation bubbles");
   expect(conversationContext).toContain("![title](path)");
-  expect(conversationContext).toContain("files/<folder-id>");
+  expect(conversationContext).toContain("mounts/<folder-id>");
   realm.guide = { catalog: "ox.fs.read", variant: "portable", timeoutSeconds: 10, maxLines: 100, maxBytes: 2048, canCancelLoops: true };
   const guide = runInContext("OxPrompts.executeGuidance(guide)", realm) as string;
   expect(guide).toContain("10 seconds");

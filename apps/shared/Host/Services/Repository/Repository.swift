@@ -561,7 +561,7 @@ actor Repository {
             Log.service.error("Repository.mounted unavailable id=\(record.id) grant=\(record.grantID) error=\(error.localizedDescription)")
             package = .failure(error)
         }
-        return loaded(package, id: record.id, fallbackName: "files/\(record.grantID)", provenance: .mounted, isEnabled: record.isEnabled, root: root)
+        return loaded(package, id: record.id, fallbackName: "mounts/\(record.grantID)", provenance: .mounted, isEnabled: record.isEnabled, root: root)
     }
 
     private func loadInstalledRepository(_ stored: InstalledRepository) -> LoadedRepository {

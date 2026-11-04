@@ -70,13 +70,13 @@ function validateMutation(operation: FileOperation, args: FileRequest, path: str
   if (immutableRoots.has(path.split("/").slice(0, 2).join("/"))) throw new FileError("permission_denied", "Bundled System skills are read-only; copy to a distinct name to customize", path);
 }
 export function resolveFileRequest(args: FileRequest, cwd: string): FileRequest {
-  const roots = new Set(["MEMORY.md", "skills", "services", "files", "artifacts", "conversations", "history", "tmp"]);
+  const roots = new Set(["MEMORY.md", "skills", "services", "mounts", "files", "artifacts", "conversations", "history", "chats", "tmp"]);
   const resolve = (path: string) => {
     if (path.startsWith("/") || roots.has(path.split("/")[0]!)) {
       const parts = canonical(path).split("/");
-      const uuid = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(parts[1] ?? "");
-      if (parts[0] === "history" || (parts[0] === "conversations" && uuid)) {
-        parts[0] = uuid ? "history" : "conversations";
+      if (parts[0] === "files") parts[0] = "mounts";
+      if (["history", "chats"].includes(parts[0]!)) {
+        parts[0] = "conversations";
         if (parts[2] === "messages.jsonl") parts[2] = "turns.jsonl";
         if (parts[2] === "metadata") parts[2] = "conversation.json";
         if (parts[2] === "history") parts[2] = "turns.jsonl";
@@ -316,7 +316,7 @@ export class AgentFileSystem {
     const match = expression(literal ? escaped(args.pattern!) : args.pattern!, operation === "glob", options.ignoreCase);
     const root = getOrThrow(await env.fileInfo(base, context));
     if (operation === "glob" && root.kind !== "directory") throw new FileError("not_directory", "Not a directory", base);
-    const excluded = base ? [] : ["files"];
+    const excluded = base ? [] : ["mounts", "files"];
     const candidates = await fileCandidates(env, root, new Set(excluded), context);
     if (operation === "grep" && base !== "conversations" && !base.startsWith("conversations/")) candidates.paths = candidates.paths.filter(path => !/^conversations\/[^/]+\/(conversation\.json|turns\.jsonl|metadata|history)$/.test(path));
     if (operation === "grep") return grepFiles(env, candidates, args, match, context);

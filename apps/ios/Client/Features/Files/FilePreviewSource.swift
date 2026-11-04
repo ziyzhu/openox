@@ -34,7 +34,7 @@ nonisolated struct FilePreviewSource: Sendable {
             origin = .draft
         } else if let scope, let root, path.count > root.count, path.starts(with: root) {
             origin = .profile(scope)
-        } else if let profileID = scope?.profileID, reference.count > 2, reference[0] == "files" {
+        } else if let profileID = scope?.profileID, reference.count > 2, ["mounts", "files"].contains(reference[0]) {
             origin = .device(grantID: reference[1], path: Array(reference.dropFirst(2)), profileID: profileID)
         } else {
             origin = .unavailable

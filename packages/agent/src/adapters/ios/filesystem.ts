@@ -41,7 +41,7 @@ export async function invokeFilesystem(runtime: ProfileRuntime, capability: stri
     move: async (from, to) => { await call("move", from, { to }); },
     copy: async (from, to) => { await call("copy", from, { to }); },
   };
-  const inputs: FileMount[] = mounts.filter(mount => mount.path !== "" && (!runtime.files.physical || !["artifacts", "conversations"].includes(mount.path))).map(mount => ({ ...mount, visibility: mount.path === "history" ? "unlisted" : "listed",
+  const inputs: FileMount[] = mounts.filter(mount => mount.path !== "" && (!runtime.files.physical || !["artifacts", "conversations"].includes(mount.path))).map(mount => ({ ...mount,
     source: { kind: "backend", backend, path: mount.path } }));
   if (runtime.files.physical) {
     const search = operation === "glob" || operation === "grep";

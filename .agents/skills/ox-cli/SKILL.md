@@ -161,7 +161,7 @@ requirement before invoking it.
 ```sh
 ox --host <ws-url> host files mount --timeout 120000
 ox --host <ws-url> host files list --json
-ox --host <ws-url> host repository connect files/<grant-id>[/subfolder]
+ox --host <ws-url> host repository connect mounts/<grant-id>[/subfolder]
 ox --host <ws-url> host repository list --json
 ox --host <ws-url> host service sync
 ox --host <ws-url> host repository disconnect <repository-id>

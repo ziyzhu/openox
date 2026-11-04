@@ -399,7 +399,7 @@ test("bounded iOS commands route qualified references and execute structured pro
     const prompt = composeIOSPrompt(config.promptState);
     expect(await adapter.command({ action: "composePrompt", promptState: config.promptState })).toEqual(prompt);
     const turnState = { skills: [{ name: "example", description: "Example skill" }], skillConflicts: [],
-      attachedServices: [{ domain: "ios:files", login: "authorized" as const }], fileMounts: ["files/a"],
+      attachedServices: [{ domain: "ios:files", login: "authorized" as const }], fileMounts: ["mounts/a"],
       filePaths: ["artifacts/note.md"], storageMode: "temporary" as const, responseLanguage: { identifier: "zh-Hans", name: "Chinese (Simplified)" }, hostContext };
     const foreignScope = { ...scope, hostID: "another-host" };
     await expect(adapter.command({ action: "run", reference: attached.reference, content: "wrong owner", turnState: { ...turnState,
@@ -415,7 +415,7 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(modelRequests[0]!.messages.every(message => message.role !== "system")).toBe(true);
     expect(JSON.stringify(modelRequests[0]!.messages)).not.toContain("<turn-state>");
     expect(modelRequests[0]!.systemPrompt).toContain("<attached_services>\n- ios:files");
-    expect(modelRequests[0]!.systemPrompt).toContain("<mounted_folders>\n- `files/a/`");
+    expect(modelRequests[0]!.systemPrompt).toContain("<mounted_folders>\n- `mounts/a/`");
     expect(modelRequests[0]!.systemPrompt).toContain("<hosts>\nActive host/Profile:");
     expect(modelRequests[0]!.systemPrompt).toContain("ios-host");
     expect(modelRequests[0]!.systemPrompt).toContain("<storage>\nThis is a temporary conversation");
@@ -429,7 +429,7 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(modelRequests[1]!.systemPrompt).not.toContain("ox_soul");
     expect(modelRequests[1]!.systemPrompt).toContain("frozen memory");
     expect(modelRequests[1]!.systemPrompt).not.toContain("new live memory");
-    expect(modelRequests[1]!.systemPrompt).not.toContain("files/a");
+    expect(modelRequests[1]!.systemPrompt).not.toContain("mounts/a");
     expect(modelRequests[1]!.systemPrompt).toContain("<attached_services>\nNo services are attached.\n</attached_services>");
     const isolatedCreated = await adapter.command({ action: "conversationCreate" }) as typeof created;
     const isolated = await adapter.command({ action: "attach", config: { ...config, isolatedFiles: true }, conversationID: isolatedCreated.reference.conversationID }) as typeof attached;

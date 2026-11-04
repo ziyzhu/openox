@@ -57,7 +57,7 @@ export const ProfileFileState = defineDoc<ProfileFileStateValue>({
   checkpointWhen: (_, __, info) => info.deltasSinceBase >= 31,
 });
 const context = BACKGROUND_CONTEXT;
-const reserved = new Set(["payloads", "staging", "profile.json", "state.sqlite", "state.sqlite-wal", "state.sqlite-shm", "memory.md", "soul.md", "skill-selections.json", "skills", "services", "files", "history", "chats"]);
+const reserved = new Set(["payloads", "staging", "profile.json", "state.sqlite", "state.sqlite-wal", "state.sqlite-shm", "memory.md", "soul.md", "skill-selections.json", "skills", "services", "mounts", "files", "history", "chats"]);
 export const publicDocument = (path: string) => ["MEMORY.md", "SOUL.md"].includes(path) || path.startsWith("skills/");
 export function documentPath(input: string) {
   const path = canonical(input);

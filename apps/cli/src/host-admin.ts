@@ -53,7 +53,7 @@ const FILE_COMMANDS = {
 };
 const REPOSITORY_COMMANDS = {
   list: command("repositories.list", "host repository list"),
-  connect: command("repositories.connectFolder", "host repository connect files/<grant-id>[/subfolder]", "path"),
+  connect: command("repositories.connectFolder", "host repository connect mounts/<grant-id>[/subfolder]", "path"),
   disconnect: command("repositories.disconnectFolder", "host repository disconnect <repository-id>", "repositoryId"),
 };
 

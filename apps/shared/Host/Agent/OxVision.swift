@@ -12,7 +12,7 @@ nonisolated enum OxVision {
                     "properties": .object([
                         "source": .object([
                             "type": .string("string"),
-                            "description": .string("Conversation or shared Profile-relative image path, or files/<folder-id>/<image> inside a selected folder."),
+                            "description": .string("Conversation or shared Profile-relative image path, or mounts/<folder-id>/<image> inside a selected folder."),
                         ]),
                     ]),
                     "required": .array([.string("source")]),

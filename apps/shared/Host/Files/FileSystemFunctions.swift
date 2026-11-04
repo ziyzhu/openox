@@ -17,7 +17,6 @@ extension Conversation {
         var path = path
         var parts = path.split(separator: "/").map(String.init)
         if parts.count == 3, parts[0] == "conversations", ["conversation.json", "turns.jsonl"].contains(parts[2]) {
-            parts[0] = "history"
             if let id = Int(parts[1]), id >= 0, let profileID = scope.profileID {
                 parts[1] = DurableConversationReference(profileID: profileID, conversationID: id).compatibilityID.description
             }
@@ -102,9 +101,9 @@ extension Conversation {
                 fileSystemItem(path: "artifacts", type: "directory", size: nil),
                 fileSystemItem(path: "skills", type: "directory", size: nil),
                 fileSystemItem(path: "services", type: "directory", size: nil),
-                fileSystemItem(path: "history", type: "directory", size: nil),
+                fileSystemItem(path: "conversations", type: "directory", size: nil),
             ]
-            rootItems.append(fileSystemItem(path: "files", type: "directory", size: nil))
+            rootItems.append(fileSystemItem(path: "mounts", type: "directory", size: nil))
             rootItems.append(contentsOf: try await resourceFiles().entries().map {
                 fileSystemItem(path: $0.path, type: $0.isDirectory ? "directory" : "file", size: $0.size)
             })
@@ -163,7 +162,7 @@ extension Conversation {
             }
         case .conversations:
             items = await fileSystemConversationSummaries().map {
-                fileSystemItem(path: "history/\(ConversationID($0.id))", type: "directory", size: nil)
+                fileSystemItem(path: "conversations/\(ConversationID($0.id))", type: "directory", size: nil)
             }
         case .conversation(let id):
             let sizes = try await repository.virtualConversationFileSizes(
@@ -172,12 +171,12 @@ extension Conversation {
                 snapshot: conversationManager?.readableConversationState(id, in: scope)
             )
             items = [
-                fileSystemItem(path: "history/\(id)/conversation.json", type: "file", size: sizes.metadata),
-                fileSystemItem(path: "history/\(id)/turns.jsonl", type: "file", size: sizes.transcript),
+                fileSystemItem(path: "conversations/\(id)/conversation.json", type: "file", size: sizes.metadata),
+                fileSystemItem(path: "conversations/\(id)/turns.jsonl", type: "file", size: sizes.transcript),
             ]
         case .files:
             items = DeviceFolderStore.shared.grants(for: scope.profileID).map {
-                fileSystemItem(path: "files/\($0.id)", type: "directory", size: nil)
+                fileSystemItem(path: "mounts/\($0.id)", type: "directory", size: nil)
             }
         case .deviceFolder, .deviceItem:
             items = try await self.listDeviceFiles(location)
@@ -503,7 +502,7 @@ extension Conversation {
         guard [Actions.fsWrite, Actions.fsEdit, Actions.fsRm].contains(action),
               let path = (args as? [String: Any])?["path"] as? String else { return }
         let root = path.split(separator: "/").first.map(String.init) ?? ""
-        if ["MEMORY.md", "skills", "services", "files"].contains(root) {
+        if ["MEMORY.md", "skills", "services", "mounts", "files"].contains(root) {
             try await requireWritableFileContext(fileSystemLocation(path), action: action)
         } else if !isTemporary || durableRoute?.fileScope == nil {
             try requireProfileMutation(action)

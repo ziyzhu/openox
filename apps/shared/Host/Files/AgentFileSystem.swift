@@ -2,10 +2,25 @@ import Foundation
 
 extension Conversation {
     var fileSystemMounts: [JSONValue] {
-        let roots = VirtualFileSystem.hostRoots + ["files"]
+        let roots = VirtualFileSystem.hostRoots + ["mounts"]
         return roots.map { root in
-            JSONValue.object(["path": .string(root), "access": .string(["history", "tmp"].contains(root) ? "readOnly" : "readWrite")])
+            JSONValue.object(["path": .string(root), "access": .string(root == "tmp" ? "readOnly" : "readWrite")])
         } + [JSONValue.object(["path": .string(""), "access": .string("readOnly")])]
+    }
+
+    private func resolveConversationFilePath(_ path: String) throws -> String {
+        var parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        let root = parts.first == "" ? 1 : 0
+        guard parts.count > root + 1, ["conversations", "history", "chats"].contains(parts[root]),
+              let uuid = UUID(uuidString: parts[root + 1]) else { return path }
+        let reference = try DurableProfileStore.shared.reference(for: ConversationID(uuid), in: scope)
+        parts[root] = "conversations"
+        parts[root + 1] = String(reference.conversationID)
+        if parts.count == root + 3 {
+            if parts[root + 2] == "metadata" { parts[root + 2] = "conversation.json" }
+            if ["history", "messages.jsonl"].contains(parts[root + 2]) { parts[root + 2] = "turns.jsonl" }
+        }
+        return parts.joined(separator: "/")
     }
 
     public func fileSystemOperation(name: String, arguments: JSONValue) async throws -> JSONValue? {
@@ -19,7 +34,7 @@ extension Conversation {
             try await durablePreparation?.value
             guard let route = durableRoute else { throw RuntimeError.bridge("Agent filesystem is unavailable") }
             let normalized = try await route.session.runtime.command(.object(["action": .string("filesystemValidate"),
-                "operation": .string("read"), "arguments": .object(["path": .string(path), "purpose": .string(args["purpose"]?.stringValue ?? "Attach file")]),
+                "operation": .string("read"), "arguments": .object(["path": .string(try resolveConversationFilePath(path)), "purpose": .string(args["purpose"]?.stringValue ?? "Attach file")]),
                 "conversationID": .int(route.conversationID)]))
             guard let source = normalized.objectValue?["path"]?.stringValue else { throw RuntimeError.bridge("Invalid attachment path") }
             return try await attachFileSystem(path: source, purpose: args["purpose"]?.stringValue ?? "Attach file")
@@ -27,19 +42,13 @@ extension Conversation {
         guard let action = actions[name], var args = arguments.objectValue else { throw RuntimeError.bridge("Invalid filesystem operation") }
         try await durablePreparation?.value
         guard let route = durableRoute else { throw RuntimeError.bridge("Agent filesystem is unavailable") }
+        for key in ["path", "from", "to"] {
+            if let path = args[key]?.stringValue { args[key] = .string(try resolveConversationFilePath(path)) }
+        }
         let validated = try await route.session.runtime.command(.object(["action": .string("filesystemValidate"),
             "operation": .string(name), "arguments": .object(args), "profileID": .string(route.profileID.uuidString),
             "conversationID": .int(route.conversationID)]))
-        guard var fields = validated.objectValue else { throw RuntimeError.bridge("Invalid agent filesystem request") }
-        if let historyPath = fields["path"]?.stringValue {
-            var parts = historyPath.split(separator: "/").map(String.init)
-            if parts.count >= 2, parts[0] == "history", let id = Int(parts[1]), id >= 0, let profileID = scope.profileID {
-                parts[1] = DurableConversationReference(profileID: profileID, conversationID: id).compatibilityID.description
-                if parts.count == 3, parts[2] == "metadata" { parts[2] = "conversation.json" }
-                if parts.count == 3, parts[2] == "history" { parts[2] = "turns.jsonl" }
-                fields["path"] = .string(parts.joined(separator: "/"))
-            }
-        }
+        guard let fields = validated.objectValue else { throw RuntimeError.bridge("Invalid agent filesystem request") }
         guard let path = fields["from"]?.stringValue ?? fields["path"]?.stringValue else {
             throw RuntimeError.bridge("Invalid agent filesystem request")
         }
@@ -54,7 +63,7 @@ extension Conversation {
                 for candidate in [path, args["to"]?.stringValue].compactMap({ $0 }) {
                     let root = candidate.split(separator: "/").first.map(String.init) ?? ""
                     let temporaryFiles = isTemporary && route.fileScope != nil && !["MEMORY.md", "skills", "history"].contains(root)
-                    if !["files", "services"].contains(root), !temporaryFiles { try requireProfileMutation(action) }
+                    if !["mounts", "services"].contains(root), !temporaryFiles { try requireProfileMutation(action) }
                 }
             }
             let result = try await route.session.host.fileSystem(owner: self, runtime: route.session.runtime,

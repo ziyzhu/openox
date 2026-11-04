@@ -476,11 +476,11 @@ final class ServiceOperations {
 
     func connectRepository(origin: String, purpose: String) async throws -> JSONValue? {
         let origin = origin.trimmingCharacters(in: .whitespacesAndNewlines)
-        let mounted = origin.hasPrefix("files/")
+        let mounted = origin.hasPrefix("mounts/") || origin.hasPrefix("files/")
         if !mounted {
             guard let url = URL(string: origin), url.scheme == "https", url.host != nil,
                   url.user == nil, url.password == nil, url.fragment == nil else {
-                throw RuntimeError.bridge("ox.repository.connect: use a public HTTPS Git URL without credentials or a fragment, or files/<grant-id>[/subfolder]")
+                throw RuntimeError.bridge("ox.repository.connect: use a public HTTPS Git URL without credentials or a fragment, or mounts/<grant-id>[/subfolder]")
             }
         }
         return try await tracked(

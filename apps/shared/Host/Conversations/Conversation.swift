@@ -1754,7 +1754,7 @@ final class Conversation: Identifiable {
         }
         submission.latency.mark(.manifestsReady)
         let attached = attachedServices.map { $0.snapshot(attached: true) }
-        let fileMountPaths = DeviceFolderStore.shared.grants(for: scope.profileID).map { "files/\($0.id)" }
+        let fileMountPaths = DeviceFolderStore.shared.grants(for: scope.profileID).map { "mounts/\($0.id)" }
         var turnSkills: [Skill] = []
         var skillConflicts: [String] = []
         do {

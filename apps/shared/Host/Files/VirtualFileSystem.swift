@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated public struct VirtualFileSystem: Sendable {
-    static let hostRoots = ["MEMORY.md", "artifacts", "skills", "services", "history", "tmp"]
+    static let hostRoots = ["MEMORY.md", "artifacts", "skills", "services", "conversations", "tmp"]
     static let maximumReadBytes = FileLimits.textBytes
     static let maximumSearchFiles = 1_000
 
@@ -45,13 +45,13 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .service(let kind, let domain): "services/\(kind.rawValue)/\(domain)"
             case .serviceItem(let kind, let domain, let components):
                 "services/\(kind.rawValue)/\(domain)/\(components.joined(separator: "/"))"
-            case .conversations: "history"
-            case .conversation(let id): "history/\(id)"
-            case .conversationMetadata(let id): "history/\(id)/conversation.json"
-            case .conversationTurns(let id): "history/\(id)/turns.jsonl"
-            case .files: "files"
-            case .deviceFolder(let id): "files/\(id)"
-            case .deviceItem(let id, let components): "files/\(id)/\(components.joined(separator: "/"))"
+            case .conversations: "conversations"
+            case .conversation(let id): "conversations/\(id)"
+            case .conversationMetadata(let id): "conversations/\(id)/conversation.json"
+            case .conversationTurns(let id): "conversations/\(id)/turns.jsonl"
+            case .files: "mounts"
+            case .deviceFolder(let id): "mounts/\(id)"
+            case .deviceItem(let id, let components): "mounts/\(id)/\(components.joined(separator: "/"))"
             }
         }
 
@@ -120,7 +120,8 @@ nonisolated public struct VirtualFileSystem: Sendable {
               !path.hasSuffix("/"),
               !path.contains("\\") else { throw Error.invalidPath(rawPath) }
         var parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-        if parts.first == "history" { parts[0] = "conversations" }
+        if let root = parts.first, ["history", "chats"].contains(root) { parts[0] = "conversations" }
+        if parts.first == "files" { parts[0] = "mounts" }
         guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
             throw Error.invalidPath(rawPath)
         }
@@ -172,10 +173,10 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case let parts where parts.count == 3 && parts[0] == "conversations" && parts[2] == "turns.jsonl":
             guard let id = UUID(uuidString: parts[1]) else { throw Error.invalidPath(rawPath) }
             return .conversationTurns(ConversationID(id))
-        case ["files"]: return .files
-        case let parts where parts.count == 2 && parts[0] == "files":
+        case ["mounts"]: return .files
+        case let parts where parts.count == 2 && parts[0] == "mounts":
             return .deviceFolder(parts[1])
-        case let parts where parts.count > 2 && parts[0] == "files":
+        case let parts where parts.count > 2 && parts[0] == "mounts":
             return .deviceItem(parts[1], Array(parts.dropFirst(2)))
         default: throw Error.invalidPath(rawPath)
         }

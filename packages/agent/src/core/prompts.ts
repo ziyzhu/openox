@@ -15,7 +15,7 @@ export interface TurnState {
 }
 type LoginState = "notRequired" | "signedIn" | "signedOut" | "authorized" | "notAuthorized" | "unknown";
 const persistedStorage = "This conversation is saved to the Profile.";
-const temporaryStorage = "This is a temporary conversation. You may read Profile-owned files, but cannot save changes to Profile files, including `MEMORY.md` or user skills. Selected external files under `files/<folder-id>/` are separate: they may still be changed with runtime approval. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
+const temporaryStorage = "This is a temporary conversation. You may read Profile-owned files, but cannot save changes to Profile files, including `MEMORY.md` or user skills. Selected external files under `mounts/<folder-id>/` are separate: they may still be changed with runtime approval. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
 const temporaryProfileStorage = "This is a temporary conversation. You may read Profile-owned files, but cannot save changes to Profile files, including `MEMORY.md` or user skills. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
 const normalized = (text: string) => text.split(/\s+/u).filter(Boolean).join(" ");
 const ordered = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
