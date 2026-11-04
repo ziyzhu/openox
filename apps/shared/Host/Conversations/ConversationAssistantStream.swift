@@ -84,8 +84,9 @@ final class ConversationAssistantStream {
 
     func reconcile(_ assistant: AssistantMessage) {
         let final = Self.text(of: assistant)
-        guard !final.hasPrefix(text) else {
-            let delta = String(final.dropFirst(text.count))
+        textBlockIndex = Self.lastTextBlock(of: assistant)
+        guard !final.utf8.starts(with: text.utf8) else {
+            let delta = String(decoding: final.utf8.dropFirst(text.utf8.count), as: UTF8.self)
             text = final
             buffer(delta)
             return
@@ -99,6 +100,7 @@ final class ConversationAssistantStream {
     func present(_ assistant: AssistantMessage) -> String {
         output.discardText()
         text = Self.text(of: assistant)
+        textBlockIndex = Self.lastTextBlock(of: assistant)
         return text
     }
 
@@ -156,6 +158,10 @@ final class ConversationAssistantStream {
         let pending = delivery
         delivery = .delivered
         if case .awaited(let continuation) = pending { continuation.resume() }
+    }
+
+    private static func lastTextBlock(of assistant: AssistantMessage) -> Int? {
+        assistant.content.lastIndex { if case .text = $0 { true } else { false } }
     }
 
     private static func text(of assistant: AssistantMessage) -> String {

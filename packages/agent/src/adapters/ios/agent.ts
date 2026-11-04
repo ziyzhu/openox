@@ -7,7 +7,7 @@ import { AgentDoc, defineExtension, defineTool, section, type EntryDraft, type U
 import { openProfileRuntime, type ProfileRuntime, type ConversationReference, type ConversationHistoryCursor,
   type ConversationListCursor, type ConversationIndexCursor, type PresentationChange, installOxProfile, type NormalizedProfileDraft,
   ApplicationPresentation, type ApplicationPresentationChange, LegacyProfileFile, ProfileFile, ProfileIndex, canonical, type TextFileMount,
-  ConversationApplicationMetadata, ConversationPresentation, type FilePayloadStore, type FileRecord } from "../../index";
+  ConversationApplicationMetadata, ConversationPresentation, type FilePayloadStore, type FileRecord, type CommittedEvent } from "../../index";
 import type { CompactionCheckpoint, ConversationId, EntryId, GenerationCheckpoint, HarnessInspection, SubmissionId, TaskId, ToolExecutionApi, ToolTaskInput } from "@earendil-works/pi-durable";
 import { legacyFilePath, validateFileRecord } from "../../profile/file-payloads";
 import { publicDocument, type ProfileFileRecord } from "../../profile/file-store";
@@ -30,6 +30,12 @@ import type { JsonObject } from "@earendil-works/pi-durable";
 import { prepareProfileExport, importProfileIdentity } from "../../profile/portability";
 
 const context = BACKGROUND_CONTEXT;
+interface EventOutbox { events: CommittedEvent[]; sending?: Promise<void>; failure?: unknown }
+function queueEvent(queue: CommittedEvent[], event: CommittedEvent) {
+  const last = queue.at(-1);
+  if (event.type !== "message_update" || last?.type !== "message_update" || (last.partial && !event.partial)) queue.push(event);
+  else queue[queue.length - 1] = event.partial ? event : { ...event, changes: [...last.changes, ...event.changes] };
+}
 interface Config { title?: string; promptState: SystemPromptInput; isolatedFiles?: boolean; model: string; contextWindow: number; maxTokens: number;
   reasoning: boolean; systemUpdates?: boolean; tools: (Tool & { executionMode?: ToolExecutionMode })[]; toolExecutionMode?: ToolExecutionMode;
   providerID?: string; thinkingLevel?: ModelThinkingLevel | null; nativeReasoningEffort?: string | null }
@@ -131,6 +137,14 @@ export class IOSAgentAdapter {
       const preparingFiles = args.prepareFiles === true;
       const filePayloads = args.fileBacked && (!args.physicalFiles || preparingFiles) ? nativeFilePayloads() : undefined;
       const database = nativeDatabase((op, sql, params) => native("sql", { op, sql, params }));
+      const outboxes = new Map<ConversationId, EventOutbox>();
+      const sendEvents = async (id: ConversationId, outbox: EventOutbox) => {
+        try {
+          while (outbox.events.length && this.attachments.has(id)) {
+            await native("agentEvents", { conversationID: id, reference: session.conversations.reference(id), events: outbox.events.splice(0) });
+          }
+        } catch (error) { outbox.failure = error; }
+      };
       const session: ProfileRuntime = await openProfileRuntime({ database, models: this.models, profileID: args.profileID,
         filePayloads,
         fileStorage: args.physicalFiles || args.prepareFiles ? { kind: preparingFiles ? "prepare" : "physical", backend: nativeFiles(), publicFiles: args.publicFiles } : undefined,
@@ -144,7 +158,13 @@ export class IOSAgentAdapter {
           names: files.filter(file => !file.hidden).flatMap(file => [file.path.split("/").at(-1)!, ...(file.aliases ?? []).map(alias => alias.replace(/^artifacts\//, ""))]) }),
         beforeProgress: reference => this.guardProgress(reference),
         onEvents: async (id, events) => {
-          if (this.attachments.has(id)) await native("agentEvents", { conversationID: id, reference: session.conversations.reference(id), events });
+          if (!this.attachments.has(id)) return;
+          const outbox = outboxes.get(id) ?? outboxes.set(id, { events: [] }).get(id)!;
+          if (outbox.failure) throw outbox.failure;
+          for (const event of events) queueEvent(outbox.events, event);
+          outbox.sending ??= sendEvents(id, outbox).finally(() => { outbox.sending = undefined; });
+          if (events.some(event => event.type !== "message_update")) await outbox.sending;
+          if (outbox.failure) throw outbox.failure;
         },
         onReport: error => { void native("report", { message: String(error) }); },
       });

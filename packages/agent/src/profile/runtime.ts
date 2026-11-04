@@ -38,9 +38,12 @@ interface Projection {
   stream: AgentEventStream;
   pending: Set<SubmissionId>;
   partial?: AssistantMessage;
+  partialPresented?: boolean;
   ending?: string;
   waiter?: { id?: SubmissionId; delivered: Set<SubmissionId>; resolve(): void; reject(error: Error): void };
 }
+const isTextDelta = (event: Extract<AgentEvent, { type: "message_update" }>) =>
+  event.changes.every(change => change.type === "text_delta" || change.type === "thinking_delta");
 
 export class ProfileRuntime {
   readonly files: ProfileFiles;
@@ -192,9 +195,14 @@ export class ProfileRuntime {
         throw new Error("Committed event overflow requires snapshot rehydration; this isolated rollout cannot continue safely");
       }
       const enriched = events.map(event => {
-        if (event.type === "message_start" && event.message.role === "assistant") projection.partial = structuredClone(event.message);
+        if (event.type === "message_start" && event.message.role === "assistant") {
+          projection.partial = structuredClone(event.message);
+          projection.partialPresented = true;
+        }
         if (event.type === "message_update" && projection.partial) {
           applyChanges(projection.partial, event);
+          if (projection.partialPresented && isTextDelta(event)) return event;
+          projection.partialPresented = true;
           return { ...event, partial: structuredClone(projection.partial) };
         }
         return event;
