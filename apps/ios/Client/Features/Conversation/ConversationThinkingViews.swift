@@ -854,8 +854,9 @@ private enum InvocationFormat {
             guard let path = invocation.args.objectValue?["path"]?.stringValue,
                   !path.isEmpty else { return nil }
             let parts = path.split(separator: "/")
-            if parts.count >= 4, parts[0] == "services", ["web", "api", "ios", "mcp"].contains(parts[1]) {
-                return [serviceSource(domain: String(parts[2]), invocation: invocation, serviceManager: serviceManager)]
+            if parts.count >= 5, parts[0] == "repositories", let kind = Repository.ServiceKind(rawValue: String(parts[2])) {
+                let id = String(parts[3])
+                return [serviceSource(domain: kind == .iOS ? "ios:\(id)" : id, invocation: invocation, serviceManager: serviceManager)]
             }
             if parts.count >= 2, ["history", "conversations"].contains(parts[0]) {
                 let id: UUID? = if let uuid = UUID(uuidString: String(parts[1])) {
