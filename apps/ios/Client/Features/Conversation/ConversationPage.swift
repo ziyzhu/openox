@@ -277,6 +277,14 @@ struct ConversationPage: View {
                 authProbe: authProbe
             )
         }
+        .environment(\.openConversation, onOpenConversation)
+        .environment(\.conversationFileResolver, ConversationFileResolver(
+            revision: conversation.filesRevision,
+            resolve: { [conversation] path in await conversation.messageFile(path: path) },
+            read: { [conversation] path in
+                try await conversation.fileBackend(operation: "read", path: path, arguments: .object([:]))
+            }
+        ))
     }
 
     private func projectedPage(
@@ -312,14 +320,6 @@ struct ConversationPage: View {
                 browserPageMount.reconcile(page: browserPage, ownerIDs: servicePageOwnerIDs)
             }
             .toast($toast, accessibilityIdentifier: A11yID.ConversationControls.toast)
-            .environment(\.openConversation, onOpenConversation)
-            .environment(\.conversationFileResolver, ConversationFileResolver(
-                revision: conversation.filesRevision,
-                resolve: { [conversation] path in await conversation.messageFile(path: path) },
-                read: { [conversation] path in
-                    try await conversation.fileBackend(operation: "read", path: path, arguments: .object([:]))
-                }
-            ))
             .task(id: MessageFilesKey(conversation: conversation.id, blocks: conversation.transcriptBlockCount,
                                       isBusy: conversation.isBusy, files: conversation.filesRevision)) {
                 guard !conversation.isBusy else { return }

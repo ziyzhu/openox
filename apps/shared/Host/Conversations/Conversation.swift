@@ -509,11 +509,14 @@ final class Conversation: Identifiable {
             if self.transcriptPreview != transcriptPreview { self.transcriptPreview = transcriptPreview }
             let hasTranscript = !document.projection.isEmpty
             if self.hasTranscript != hasTranscript { self.hasTranscript = hasTranscript }
+            let lastMessageAt = document.lastMessageAt
+            if self.lastMessageAt != lastMessageAt { self.lastMessageAt = lastMessageAt }
         }
     }
     private(set) var transcriptRevision: UInt64 = 0
     private(set) var transcriptPreview: String?
     private(set) var hasTranscript = false
+    private(set) var lastMessageAt: Date?
     private var currentExecutionFiles: [FileItem] = []
     var currentExecutionTransientAttachments: [(sequence: Int, attachment: TransientAttachment)] = []
     private var currentExecutionActivatedSkills: [String: ActivatedSkillContext] = [:]
@@ -853,7 +856,7 @@ final class Conversation: Identifiable {
             preview: transcriptPreview,
             hasUnreadResponse: hasUnreadResponse,
             scheduleID: scheduleID,
-            lastMessageAt: document.lastMessageAt
+            lastMessageAt: lastMessageAt
         )
     }
 

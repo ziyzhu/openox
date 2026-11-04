@@ -24,7 +24,7 @@ nonisolated enum OxWeb {
                                         "type": .string("integer"),
                                         "minimum": .int(1),
                                         "maximum": .int(FileLimits.fileBytes),
-                                        "description": .string("Maximum text bytes to return."),
+                                        "description": .string("Maximum text or feed field bytes to return. Feeds default to 64 KiB and at most 100 entries."),
                                     ]),
                                     "maxPages": .object([
                                         "type": .string("integer"),
@@ -57,7 +57,22 @@ nonisolated enum OxWeb {
                             ]),
                             "kind": .object([
                                 "type": .string("string"),
-                                "enum": .array(["image", "pdf", "text", "html", "file"].map(JSONValue.string)),
+                                "enum": .array(["image", "pdf", "text", "html", "file", "feed"].map(JSONValue.string)),
+                            ]),
+                            "feed": .object([
+                                "type": .string("object"),
+                                "properties": .object([
+                                    "entries": .object([
+                                        "type": .string("array"),
+                                        "maxItems": .int(100),
+                                        "items": .object([
+                                            "type": .string("object"),
+                                            "additionalProperties": .object(["type": .string("string")]),
+                                        ]),
+                                    ]),
+                                ]),
+                                "required": .array([.string("entries")]),
+                                "additionalProperties": .object(["type": .string("string")]),
                             ]),
                             "filename": .object(["type": .string("string")]),
                             "bytes": .object(["type": .string("integer")]),

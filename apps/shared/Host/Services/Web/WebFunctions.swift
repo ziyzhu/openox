@@ -59,6 +59,21 @@ extension Conversation {
         return try await tracked(Actions.webFetch, .object(["url": .string(request.url.absoluteString)]), purpose: purpose) {
             let (_, response) = try await fetchWebResource(request)
             let readOptions = FileLibrary.readOptions(from: options)
+            if response.kind == .text || response.kind == .file || response.kind == .html {
+                let maxBytes = min(max(readOptions.maxBytes ?? 65_536, 1), FileLimits.fileBytes)
+                let feed = try await Task.detached(priority: .userInitiated) {
+                    try WebFeed.parse(data: response.data, url: response.url, maxBytes: maxBytes)
+                }.value
+                if let feed {
+                    var result = webFetchJSON(response, read: nil).objectValue ?? [:]
+                    result["kind"] = .string("feed")
+                    result["feed"] = feed.value
+                    result["truncated"] = .bool(feed.truncated)
+                    result["unsupported"] = .null
+                    Log.webFetch.info("feed extraction result url=\(LogPrivacy.url(response.url.absoluteString)) bytes=\(response.data.count) truncated=\(feed.truncated)")
+                    return .object(result)
+                }
+            }
             let read: FileLibrary.Read?
             switch response.kind {
             case .text, .html, .pdf:
