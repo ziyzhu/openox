@@ -5,7 +5,7 @@ export const guidanceTexts: Record<string, string> = {
   ...functionGuidance,
   "namespace.output": "Retrieve complete captured JavaScript output.",
   "provider.claude-subscription.identity": providerIdentity("claude-subscription"),
-  "output.cacheExceeded": "JavaScript output cache exceeds 32 MiB. Filter results before printing and rerun the source.",
+  "output.cacheExceeded": "JavaScript output cache exceeds 32 MiB. Calls may already have completed; output storage failure does not roll back effects. Inspect external state before retrying writes. Rerun only read-only or confirmed safe operations, filtering results before printing.",
   "image.fileRead": "Use ox.vision.analyze for on-device OCR and classification, or ox.fs.attach with a Profile-relative file path when original pixels are needed.",
   "file.conversion": "This file type can't be read as text. Use ox.fs.attach if the selected provider supports its format, or convert it to text, an image, or PDF."
 };

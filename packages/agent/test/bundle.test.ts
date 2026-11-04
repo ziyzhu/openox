@@ -82,7 +82,7 @@ it("shares the core across hosts, supplies presentation in turn context, and rej
   expect(guide).toContain("10 seconds");
   expect(guide).toContain("100 lines or 2 KiB");
   expect(guide).toContain("ox.service.inspect");
-  expect(guide).not.toContain("ox.web.fetch");
+  expect(guide).toContain("ox.web.fetch");
   expect(guide).not.toContain("does not forcibly stop");
   expect(guide).toContain("supports interrupting JavaScript loops");
   expect(guide).toContain("synchronous .help()");
