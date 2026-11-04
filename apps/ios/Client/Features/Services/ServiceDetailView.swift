@@ -47,9 +47,6 @@ struct ServiceDetailView: View {
 
     private var actions: [Manifest.Action] { service.definition.actions }
     private var loadingManifest: Bool { service.capabilityState == .loading }
-    @State private var descriptionExpanded = false
-    @State private var descriptionFullHeight: CGFloat = 0
-    @State private var descriptionLimitedHeight: CGFloat = 0
     @State private var confirmClearWebData = false
     @State private var showPageInspector = false
     @State private var mcpRemovalError: String?
@@ -80,7 +77,6 @@ struct ServiceDetailView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
-                header
                 descriptionSection
                 actionsSection
                 domainSection
@@ -94,6 +90,16 @@ struct ServiceDetailView: View {
         .navigationTitle(service.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    ServiceAvatar(service: service, size: 24, shape: .roundedRect(Theme.Radius.sm))
+                        .accessibilityHidden(true)
+                    Text(service.title)
+                        .font(.headline)
+                        .lineLimit(1)
+                }
+                .accessibilityAddTraits(.isHeader)
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: Theme.Spacing.sm) {
                     let saved = serviceManager.isSaved(service)
@@ -175,67 +181,18 @@ struct ServiceDetailView: View {
         }
     }
 
-    // MARK: - Header
-
-    private var header: some View {
-        HStack(alignment: .bottom, spacing: Theme.Spacing.lg) {
-            ServiceAvatar(
-                service: service,
-                size: 64,
-                shape: .roundedRect(Theme.Radius.lg)
-            )
-            VStack(alignment: .leading, spacing: 0) {
-                Text(service.title)
-                    .font(Theme.Fonts.headline)
-                    .foregroundStyle(Theme.Colors.onSurface)
-            }
-            .frame(minHeight: 64)
-            Spacer(minLength: 0)
-        }
-    }
-
-    // MARK: - Description
-
-    private var descriptionTruncated: Bool {
-        descriptionFullHeight > descriptionLimitedHeight + 1
-    }
-
+    @ViewBuilder
     private var descriptionSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            if service.summary.isEmpty {
-                Text("No description.")
-                    .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-            } else {
-                Text(service.summary)
-                    .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                    .lineLimit(descriptionExpanded ? nil : 4)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .background(heightProbe(lineLimit: nil) { descriptionFullHeight = $0 })
-                    .background(heightProbe(lineLimit: 4) { descriptionLimitedHeight = $0 })
-                if descriptionTruncated {
-                    Button(descriptionExpanded ? "Less" : "More") {
-                        withAnimation(Theme.Animation.quick) { descriptionExpanded.toggle() }
-                    }
-                    .font(Theme.Fonts.labelMd)
-                    .foregroundStyle(Theme.Colors.primary)
-                }
-            }
+        if service.summary.isEmpty {
+            Text("No description.")
+                .font(Theme.Fonts.bodyMd)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+        } else {
+            Text(service.summary)
+                .font(Theme.Fonts.bodyMd)
+                .foregroundStyle(Theme.Colors.onSurface)
+                .fixedSize(horizontal: false, vertical: true)
         }
-    }
-
-    private func heightProbe(lineLimit: Int?, onMeasure: @escaping (CGFloat) -> Void) -> some View {
-        Text(service.summary)
-            .font(Theme.Fonts.bodyMd)
-            .lineLimit(lineLimit)
-            .fixedSize(horizontal: false, vertical: true)
-            .hidden()
-            .background(GeometryReader { geo in
-                Color.clear
-                    .onAppear { onMeasure(geo.size.height) }
-                    .onChange(of: geo.size.height) { _, h in onMeasure(h) }
-            })
     }
 
     @ViewBuilder
@@ -474,7 +431,7 @@ struct ServiceDetailView: View {
     private func actionRow(_ action: Manifest.Action) -> some View {
         let isStandard = service.definition.isStandardAction(action.id)
         return actionCard {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 HStack(spacing: Theme.Spacing.sm) {
                     Text(action.label)
                         .font(Theme.Fonts.bodyMd)
@@ -500,6 +457,7 @@ struct ServiceDetailView: View {
                         if isStandard { chip("Standard") }
                         if action.requireAuth { chip("Authenticated") }
                     }
+                    .padding(.top, SettingsLayout.rowVerticalInset - Theme.Spacing.xs)
                 }
             }
         }
