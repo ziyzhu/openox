@@ -15,6 +15,15 @@ nonisolated enum OxServices {
         ]), "required": .array(["domain", "name", "kind", "login", "saved", "attached"].map(JSONValue.string)), "additionalProperties": .bool(false),
     ])
 
+    static var inventorySchema: JSONValue {
+        var schema = snapshotSchema.objectValue!
+        var properties = schema["properties"]!.objectValue!
+        properties["manifestPath"] = .object(["type": .string("string")])
+        properties["validationError"] = .object(["type": .string("string")])
+        schema["properties"] = .object(properties)
+        return .object(schema)
+    }
+
     static let sourceSchema: JSONValue = .object([
         "type": .string("object"), "properties": .object([
             "domain": .object(["type": .string("string")]), "manifestPath": .object(["type": .string("string")]),
@@ -27,6 +36,23 @@ nonisolated enum OxServices {
         namespace: "service",
         schema: {
             [
+                (
+                    "ox.service.list",
+                    .object([
+                        "description": .string(ModelGuidance.text("ox.service.list")),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "kind": .object([
+                                    "type": .string("string"),
+                                    "enum": .array(["web", "api", "ios", "mcp"].map(JSONValue.string)),
+                                ]),
+                            ]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object(["type": .string("array"), "items": inventorySchema]),
+                    ])
+                ),
                 (
                     "ox.service.listAttached",
                     .object([
@@ -291,6 +317,12 @@ nonisolated enum OxServices {
             }
         },
         installNatives: { ctx, env in
+            let listBlock: @convention(block) (JSValue, JSValue) -> JSValue = { kindValue, purposeValue in
+                let kind = kindValue.isString ? kindValue.toString() : nil
+                return env.call { try await $0.listServices(kind: kind, purpose: purposeValue.toString()!) }
+            }
+            ctx.setObject(listBlock as AnyObject, forKeyedSubscript: "__nativeServiceList" as NSString)
+
             let listAttachedBlock: @convention(block) (JSValue, JSValue) -> JSValue = { kindValue, purposeValue in
                 let kind = kindValue.isString ? kindValue.toString() : nil
                 return env.call { try await $0.listAttachedServices(kind: kind, purpose: purposeValue.toString()!) }
@@ -374,6 +406,7 @@ nonisolated enum OxServices {
             ctx.setObject(loginBlock as AnyObject, forKeyedSubscript: "__nativeServiceLogin" as NSString)
         },
         jsFragment: """
+          list: (value) => { const options = __oxOptions(value, 'ox.service.list'); return __nativeServiceList(options.kind == null ? null : String(options.kind), String(options.purpose)); },
           listAttached: (value) => { const options = __oxOptions(value, 'ox.service.listAttached'); return __nativeServiceListAttached(options.kind == null ? null : String(options.kind), String(options.purpose)); },
           inspect: (value) => { const options = __oxOptions(value, 'ox.service.inspect'); return __nativeServiceInspect(String(options.domain), options.actions ?? null, String(options.purpose)); },
           validate: (value) => { const options = __oxOptions(value, 'ox.service.validate'); return __nativeServiceValidate(String(options.domain), String(options.purpose)); },

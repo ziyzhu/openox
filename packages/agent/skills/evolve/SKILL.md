@@ -27,6 +27,8 @@ Source inspection, copying, attachment changes, and straightforward deletion nee
 
 For remote MCP connections, use the supplied endpoint or official documentation and check relevant saved definitions under `services/mcp/` with targeted `ox.fs.glob` lookups. Reuse a matching connection; missing saved source is not a capability limit. If necessary, use `ox.web.search` and fetch official documentation; verify endpoint, transport, and authentication rather than guessing. Create with `ox.service.create({ purpose, kind: "mcp", endpoint, transport? })`, omit domain, and use the returned domain to inspect, attach, and verify its tools. Creation saves immediately and may request login. Do not author API handlers for MCP or assume local stdio installation has a remote HTTPS endpoint. Report local-only limitations and investigate a documented API alternative within scope.
 
+For service inventories and validation audits, use `ox.service.list` to enumerate selected sources, including invalid definitions and their errors. Use repository provenance to target Local repairs; do not validate every directory in the merged VFS as though it were Local. Repair needed invalid contracts, validate, reload with `ox.service.attach`, and retry the original action before returning to the task.
+
 ## Service authoring loop
 
 Fulfill website tasks through service actions. Browser is for evidence and service development, not direct fulfillment or fallback. Distinguish a confirmed service defect from login, human verification, rate limiting, missing resources, and temporary failures. Failed discovery does not establish absence. If authoring is blocked, report the concrete blocker.

@@ -13,6 +13,10 @@ extension ServiceManager {
         let out: [Listing] = files.compactMap { file in
             guard let raw = try? JSONDecoder().decode(JSONValue.self, from: file.data) else { return nil }
             let manifest = Manifest.localized(raw, locale: locale)
+            guard (manifest.objectValue?["kind"]?.stringValue == "api") == (file.kind == .api) else {
+                Log.service.error("ServiceManager.listServices kind mismatch domain=\(file.domain)")
+                return nil
+            }
             do {
                 let definition = try ServiceDefinition(
                     manifest: manifest,

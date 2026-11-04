@@ -646,11 +646,26 @@ final class ServiceOperations {
             guard serviceManager.monoRepositoryState == .ready else {
                 throw RuntimeError.bridge("ox.service.list: Ox Server is still loading services. Try again later.")
             }
-            let snapshots = try serviceManager.services
-                .filter { kind == nil || Self.serviceKind($0) == kind }
-                .sorted { $0.domain < $1.domain }
-                .map { try self.serviceSnapshot($0) }
-            Log.session.info("bridge.service.list kind=\(kind ?? "all") count=\(snapshots.count)")
+            let services = Dictionary(uniqueKeysWithValues: serviceManager.services.map { ($0.domain, $0) })
+            var entries = try services.values.filter { $0.isIOSService || $0.isMCPService }.map { service in
+                var fields = try Self.serviceSnapshotFields(service, attached: attachedDomains().contains(service.domain))
+                fields["manifestPath"] = .string("services/\(Self.serviceKind(service))/\(service.domain)/service.json")
+                return JSONValue.object(fields)
+            }
+            for entry in try await serviceManager.serviceSourceListings() {
+                guard var fields = entry.objectValue, let domain = fields["domain"]?.stringValue else { continue }
+                fields["login"] = .string("unknown")
+                fields["saved"] = .bool(serviceManager.savedDomains.contains(domain))
+                fields["attached"] = .bool(attachedDomains().contains(domain))
+                if fields["validationError"] == nil, let service = services[domain] {
+                    fields.merge(try Self.serviceSnapshotFields(service, attached: attachedDomains().contains(domain))) { current, _ in current }
+                }
+                entries.append(.object(fields))
+            }
+            let snapshots = entries
+                .filter { kind == nil || $0.objectValue?["kind"]?.stringValue == kind }
+                .sorted { ($0.objectValue?["domain"]?.stringValue ?? "") < ($1.objectValue?["domain"]?.stringValue ?? "") }
+            Log.session.info("bridge.service.list kind=\(kind ?? "all") count=\(snapshots.count) invalid=\(snapshots.filter { $0.objectValue?["validationError"] != nil }.count)")
             return .array(snapshots)
         }
     }

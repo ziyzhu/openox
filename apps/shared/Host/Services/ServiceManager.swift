@@ -1008,6 +1008,39 @@ final class ServiceManager {
         Log.service.info("ServiceManager.semantic finish generation=\(generation) installed=\(installed)")
     }
 
+    func serviceSourceListings() async throws -> [JSONValue] {
+        let files = try await storageManifestFiles()
+        let locale = monoRepositoryLocale
+        return await Task.detached(priority: .userInitiated) {
+            files.map { file -> JSONValue in
+                var manifest: JSONValue = .null
+                var validationError: String?
+                do {
+                    manifest = Manifest.localized(try JSONDecoder().decode(JSONValue.self, from: file.data), locale: locale)
+                    let definition = try ServiceDefinition(manifest: manifest, repositoryID: file.repositoryID, provenance: file.provenance)
+                    guard definition.domain == file.domain, definition.isAPI == (file.kind == .api) else {
+                        throw RuntimeError.bridge("Service identity does not match \(file.kind.rawValue)/\(file.domain)")
+                    }
+                } catch {
+                    validationError = error.localizedDescription
+                }
+                let fields = manifest.objectValue ?? [:]
+                let kind = file.kind.rawValue
+                var entry: [String: JSONValue] = [
+                    "domain": .string(file.domain),
+                    "name": .string(fields["name"]?.stringValue ?? file.domain),
+                    "kind": .string(kind),
+                    "repository": .string(file.repositoryID),
+                    "repositoryProvenance": .string(file.provenance.rawValue),
+                    "manifestPath": .string("services/\(kind)/\(file.domain)/service.json"),
+                ]
+                if let description = fields["description"]?.stringValue { entry["description"] = .string(description) }
+                if let validationError { entry["validationError"] = .string(validationError) }
+                return .object(entry)
+            }
+        }.value
+    }
+
     func listServices(locale: String?) async -> [Listing]? {
         guard let files = monoRepository?.webManifests else { return nil }
         let out = await Task.detached(priority: .userInitiated) {

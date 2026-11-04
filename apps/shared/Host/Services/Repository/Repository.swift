@@ -18,6 +18,7 @@ actor Repository {
     }
 
     struct ManifestFile: Sendable {
+        let kind: ServiceKind
         let repositoryID: String
         let provenance: Descriptor.Provenance
         let domain: String
@@ -447,12 +448,8 @@ actor Repository {
             }
             switch service.id.kind {
             case .web, .api:
-                guard let manifest = try? JSONDecoder().decode(JSONValue.self, from: data),
-                      (manifest.objectValue?["kind"]?.stringValue == "api") == (service.id.kind == .api) else {
-                    Log.service.error("Repository.manifest kind-mismatch id=\(service.id.rawValue)")
-                    continue
-                }
                 web.append(ManifestFile(
+                    kind: service.id.kind,
                     repositoryID: repository.descriptor.id,
                     provenance: repository.descriptor.provenance,
                     domain: service.id.runtimeID,
