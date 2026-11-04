@@ -341,12 +341,21 @@ extension Conversation {
         }
     }
 
+    enum TurnEnding: Equatable {
+        case stopped
+        case failed(String)
+    }
+
     enum Notice: Equatable {
         case none
         case error(String)
+        case turnFailed(String)
 
         var errorMessage: String? {
-            if case .error(let message) = self { message } else { nil }
+            switch self {
+            case .none: nil
+            case .error(let message), .turnFailed(let message): message
+            }
         }
     }
 

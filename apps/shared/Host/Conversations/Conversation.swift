@@ -330,7 +330,7 @@ final class Conversation: Identifiable {
     var activity: Activity {
         switch activeRun {
         case nil:
-            if showsStoppedTurn { return .idle(.stopped) }
+            if turnEnding == .stopped { return .idle(.stopped) }
             return .idle(hasUnreadResponse ? .unread : .read)
         case .some(let run):
             switch run.phase {
@@ -655,12 +655,15 @@ final class Conversation: Identifiable {
         while let run = activeRun { await run.task.value }
     }
 
-    var showsStoppedTurn: Bool {
+    var turnEnding: TurnEnding? {
         guard !isBusy,
               submissions.isEmpty,
-              case let .agent(turn, _) = document.turns.last,
-              case .cancelled = turn.outcome else { return false }
-        return true
+              case let .agent(turn, _) = document.turns.last else { return nil }
+        return switch turn.outcome {
+        case .cancelled: .stopped
+        case let .failed(_, message): .failed(Self.userFacingError(message, kind: llmFailureKind(message: message)))
+        case .running, .completed: nil
+        }
     }
     var hasPendingInteraction: Bool { interaction != nil }
     @ObservationIgnored private var finishingStartedAt: Date?
@@ -1831,7 +1834,7 @@ final class Conversation: Identifiable {
         markActivity(sealedAt)
         if let err, err != "aborted" {
             Log.session.error("Conversation.runOne agent error: \(err)")
-            notice = .error(Self.userFacingError(err, kind: failureKind))
+            notice = .turnFailed(Self.userFacingError(err, kind: failureKind))
         }
         let outcomeName = if err == "aborted" {
             "aborted"

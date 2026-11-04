@@ -340,7 +340,7 @@ struct ConversationPage: View {
                 }
             }
             .onChange(of: conversation.notice, initial: true) { previous, notice in
-                if let message = notice.errorMessage {
+                if case .error(let message) = notice {
                     toast = Toast(message: message, role: .error)
                 } else if previous.errorMessage != nil, toast?.role == .error {
                     toast = nil
@@ -978,11 +978,35 @@ struct ConversationPage: View {
     }
 
     @ViewBuilder
-    private var stoppedRow: some View {
-        if conversation.showsStoppedTurn {
-            StoppedTurnDivider()
+    private var turnEndingRow: some View {
+        switch conversation.turnEnding {
+        case .stopped:
+            TurnEndingCard.stopped(onResume: stoppedTurnResume)
                 .id("__stopped")
                 .padding(.top, ConversationTranscriptMetrics.blockSpacing)
+        case .failed(let message):
+            TurnEndingCard.failed(message: message, onRetry: failedTurnRetry)
+                .id("__failed")
+                .padding(.top, ConversationTranscriptMetrics.blockSpacing)
+        case nil:
+            EmptyView()
+        }
+    }
+
+    private var stoppedTurnResume: (() -> Void)? {
+        guard isModelConfigured else { return nil }
+        return {
+            Log.ui.info("ConversationPage.resumeStopped conversation=\(conversation.id)")
+            latestSubmissionID = conversation.enqueue(L10n.string("Continue", comment: "Message sent when the user resumes a stopped conversation reply.")).id
+        }
+    }
+
+    private var failedTurnRetry: (() -> Void)? {
+        guard !conversation.isTemporary,
+              let blockID = conversation.transcript.last(where: \.isUserInitiated)?.id else { return nil }
+        return {
+            Log.ui.info("ConversationPage.retryFailed conversation=\(conversation.id) atBlock=\(blockID)")
+            latestSubmissionID = conversation.retry(at: blockID)?.id
         }
     }
 
@@ -1170,13 +1194,13 @@ struct ConversationPage: View {
                 }
                 if let queued = anchoredQueuedMessage {
                     activityRow(blocks: renderedBlocks)
-                    stoppedRow
+                    turnEndingRow
                     ForEach(conversation.queuedMessages.filter { $0.id != queued.id }) { queued in
                         queuedRow(queued)
                     }
                 } else if !hasAnchor {
                     activityRow(blocks: renderedBlocks)
-                    stoppedRow
+                    turnEndingRow
                     queuedRows
                 }
             }
@@ -1203,7 +1227,7 @@ struct ConversationPage: View {
                             blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs, identified: false, recordsTail: block.id == renderedBlocks.last?.id)
                         }
                         activityRow(blocks: renderedBlocks)
-                        stoppedRow
+                        turnEndingRow
                         queuedRows
                     }
                 }

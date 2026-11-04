@@ -78,13 +78,117 @@ struct ConversationInteractiveRowSurface: ViewModifier {
     }
 }
 
-struct StoppedTurnDivider: View {
-    var body: some View {
-        TranscriptStatusDivider(
-            label: Text("Stopped"),
+struct TurnEndingCard: View {
+    private struct Action {
+        let title: Text
+        let accessibilityIdentifier: String
+        let perform: () -> Void
+    }
+
+    private let title: Text
+    private let systemImage: String
+    private let iconTint: DynamicColor
+    private let message: String?
+    private let accessibilityIdentifier: String
+    private let action: Action?
+
+    static func stopped(onResume: (() -> Void)?) -> TurnEndingCard {
+        TurnEndingCard(
+            title: Text("Stopped"),
             systemImage: "stop.circle.fill",
-            accessibilityIdentifier: "conversation.stopped"
+            iconTint: Theme.Colors.conversationSecondary,
+            message: nil,
+            accessibilityIdentifier: "conversation.stopped",
+            action: onResume.map {
+                Action(
+                    title: Text("Resume", comment: "Button on a stopped conversation reply that lets the agent continue where it stopped."),
+                    accessibilityIdentifier: "conversation.stopped.resume",
+                    perform: $0
+                )
+            }
         )
+    }
+
+    static func failed(message: String, onRetry: (() -> Void)?) -> TurnEndingCard {
+        TurnEndingCard(
+            title: Text("Failed", comment: "Card shown after a conversation reply that ended with an error."),
+            systemImage: "exclamationmark.circle.fill",
+            iconTint: Theme.Colors.error,
+            message: message,
+            accessibilityIdentifier: "conversation.failed",
+            action: onRetry.map {
+                Action(
+                    title: Text("Retry", comment: "Button that tries a failed action again."),
+                    accessibilityIdentifier: "conversation.failed.retry",
+                    perform: $0
+                )
+            }
+        )
+    }
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .trailing, spacing: Theme.Spacing.sm) {
+                    details
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    actionButton
+                }
+            } else {
+                HStack(alignment: .lastTextBaseline, spacing: Theme.Spacing.md) {
+                    details
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    actionButton
+                }
+            }
+        }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.vertical, Theme.Spacing.md)
+        .frame(maxWidth: .infinity, minHeight: Theme.Size.minimumTouchTarget, alignment: .leading)
+        .conversationCardOutline()
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            Label {
+                title.foregroundStyle(Theme.Colors.onSurface)
+            } icon: {
+                Image(systemName: systemImage).foregroundStyle(iconTint)
+            }
+            .font(Theme.Fonts.labelMd)
+            .accessibilityIdentifier(accessibilityIdentifier)
+            if let message {
+                Text(message)
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("\(accessibilityIdentifier).message")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var actionButton: some View {
+        if let action {
+            Button(action: action.perform) {
+                action.title
+                    .font(Theme.Fonts.labelMd)
+                    .foregroundStyle(Theme.Colors.onSurface)
+                    .lineLimit(1)
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .frame(minHeight: 36)
+                    .background(Theme.Colors.surfaceSunken, in: Capsule(style: .continuous))
+                    .frame(minHeight: Theme.Size.minimumTouchTarget)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(RequestButtonStyle())
+            .accessibilityIdentifier(action.accessibilityIdentifier)
+        }
     }
 }
 
