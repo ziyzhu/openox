@@ -9,6 +9,7 @@ final class Conversation: Identifiable {
     let createdAt: Date
     let scheduleID: UUID?
     let javaScriptOutputs = JavaScriptOutputStore()
+    var appFileRevisions: [String: String] = [:]
     @ObservationIgnored private(set) var durableRoute: DurableConversationRoute?
     @ObservationIgnored var preparedConfiguration: AgentConfiguration?
     @ObservationIgnored var durablePreparation: Task<Void, Error>?

@@ -16,14 +16,16 @@ const itemProperties = { path, name: string("Final component."), type: { type: "
 const itemRequired = ["path", "name", "type", "size", "mtimeMs", "cloud"];
 const item = object(itemProperties, itemRequired);
 const nullableString = { type: ["string", "null"] };
+const cursor = { ...string("Continuation from the previous page of this same operation, path, query, and options."), minLength: 1, maxLength: 65_536 };
 const diagnostics = array(object({ path, message: string("Why this path could not be read completely or searched.") }, ["path", "message"]));
 const tools = { read: createReadTool(), write: createWriteTool(), edit: createEditTool() };
 export const filesystemInputs = Object.fromEntries(Object.entries(tools).map(([name, tool]) => [name, {
   ...tool.parameters, ...input(tool.parameters.properties, tool.parameters.required),
 }]));
 const schemas = {
-  list: { inputSchema: input({ path, options: object({ limit: integer("Maximum entries.", 1, 100) }) }),
-    outputSchema: object({ items: array(item), truncated: boolean("More entries remain.") }, ["items", "truncated"]) },
+  stat: { inputSchema: input({ path }, ["path"]), outputSchema: item },
+  list: { inputSchema: input({ path, cursor, options: object({ limit: integer("Maximum entries.", 1, 100) }) }),
+    outputSchema: object({ items: array(item), truncated: boolean("More entries remain."), nextCursor: nullableString }, ["items", "truncated", "nextCursor"]) },
   read: { inputSchema: { ...filesystemInputs.read, properties: { ...filesystemInputs.read.properties,
     offset: integer("Line number to start reading from (1-indexed).", 1, Number.MAX_SAFE_INTEGER),
     limit: integer("Maximum number of lines to read.", 1, Number.MAX_SAFE_INTEGER),
@@ -43,14 +45,14 @@ const schemas = {
   rm: { inputSchema: input({ path, recursive: boolean("Explicitly trash a nonempty directory and all its contents, including dotfiles.") }, ["path"]), outputSchema: object({ path, deleted: boolean("Moved to native trash.") }, ["path", "deleted"]) },
   move: { inputSchema: input({ from: path, to: path }, ["from", "to"]), outputSchema: item },
   copy: { inputSchema: input({ from: path, to: path }, ["from", "to"]), outputSchema: item },
-  glob: { inputSchema: input({ path, pattern: string("Glob supporting *, **, and ?."), options: object({ limit: integer("Maximum paths.", 1, 1_000) }) }, ["pattern"]),
-    outputSchema: object({ paths: array(path), diagnostics, truncated: boolean("Search is incomplete because a limit was reached or a directory was unavailable.") }, ["paths", "truncated"]) },
-  grep: { inputSchema: input({ path, pattern: string("Regular expression or literal text."), options: object({
+  glob: { inputSchema: input({ path, cursor, pattern: string("Glob supporting *, **, and ?."), options: object({ limit: integer("Maximum paths.", 1, 1_000) }) }, ["pattern"]),
+    outputSchema: object({ paths: array(path), diagnostics, truncated: boolean("Search is incomplete because a limit was reached or a directory was unavailable."), nextCursor: nullableString }, ["paths", "truncated", "nextCursor"]) },
+  grep: { inputSchema: input({ path, cursor, pattern: string("Regular expression or literal text."), options: object({
     limit: integer("Maximum matches.", 1, 200), glob: string("Path glob."), ignoreCase: boolean("Ignore case."), literal: boolean("Literal search."), contextLines: integer("Context lines.", 0, 5),
   }) }, ["pattern"]), outputSchema: object({ matches: array(object({ path, line: integer("Line number.", 1, Number.MAX_SAFE_INTEGER), text: string("Matched excerpt."),
     before: array(string("Context.")), after: array(string("Context.")) }, ["path", "line", "text", "before", "after"])),
-    scannedFiles: integer("Scanned files.", 0, 1_000), skippedFiles: integer("Unsupported files.", 0, 1_000), diagnostics, truncated: boolean("Search is incomplete because a limit was reached or a directory was unavailable.") },
-    ["matches", "scannedFiles", "skippedFiles", "truncated"]) },
+    scannedFiles: integer("Scanned files.", 0, 1_000), skippedFiles: integer("Unsupported files.", 0, 1_000), diagnostics, truncated: boolean("Search is incomplete because a limit was reached or a directory was unavailable."), nextCursor: nullableString },
+    ["matches", "scannedFiles", "skippedFiles", "truncated", "nextCursor"]) },
   attach: { inputSchema: input({ path: string("File path or public HTTP(S) URL.") }, ["path"]),
     outputSchema: object({ filename: string("Filename."), contentType: string("MIME type."), bytes: integer("Attachment bytes.", 1, 20 * 1024 * 1024), kind: { type: "string", enum: ["image", "pdf", "text", "file"] } },
       ["filename", "contentType", "bytes", "kind"]) },

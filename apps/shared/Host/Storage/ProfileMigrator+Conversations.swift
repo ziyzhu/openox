@@ -324,12 +324,12 @@ extension ProfileMigrator {
     }
 
     private static func modelMigrationFallbackRegion(defaults: UserDefaults = .standard) -> LLMRegion {
-        if let data = defaults.data(forKey: ProviderRegistry.defaultModelKey),
+        if let data = ApplicationStorageMigrator.legacyPreference(ProviderRegistry.defaultModelKey, defaults: defaults) as? Data,
            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let region = (object["region"] as? String).flatMap(LLMRegion.init(rawValue:)) {
             return region
         }
-        if let region = defaults.string(forKey: "app.region").flatMap(LLMRegion.init(rawValue:)) {
+        if let region = ((try? AppState.load())?.region ?? (ApplicationStorageMigrator.legacyPreference("app.region", defaults: defaults) as? String)).flatMap(LLMRegion.init(rawValue:)) {
             return region
         }
         return Locale.current.region?.identifier == "CN" ? .china : .global

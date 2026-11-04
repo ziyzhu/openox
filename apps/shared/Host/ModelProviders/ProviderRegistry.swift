@@ -16,7 +16,7 @@ nonisolated struct ProviderCatalog: Codable, Equatable, Sendable {
         try validate()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try FileManager.default.createDirectory(at: AppStoragePaths.applicationSupport, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: AppStoragePaths.configuration, withIntermediateDirectories: true)
         try encoder.encode(self).write(to: AppStoragePaths.providersConfiguration, options: .atomic)
     }
 
@@ -301,6 +301,40 @@ final class ProviderRegistry {
         deauthenticate(definition)
         rebuildClients()
         Log.agent.info("ProviderRegistry.delete provider=\(id)")
+    }
+
+    func validateReplacement(_ next: ProviderCatalog, expected: ProviderCatalog) throws {
+        guard catalogAvailable, catalog == expected, try ProviderCatalog.load() == expected else {
+            throw StorageMigrationError.collision("provider configuration changed externally")
+        }
+        try next.validate()
+        for definition in next.providers where !expected.providers.contains(definition) {
+            _ = try ProviderClientFactory.make(definition, presentation: presentation(for: definition))
+        }
+        let removed = expected.providers.filter { old in !next.providers.contains(where: { $0.id == old.id }) }
+        if let selection = next.defaultModel, removed.contains(where: { $0.id == selection.providerID }) {
+            throw RuntimeError.bridge("Clear the default model before removing its provider override")
+        }
+        if next.defaultModel != expected.defaultModel {
+            guard next.providers == expected.providers else {
+                throw RuntimeError.bridge("Edit provider definitions and the default model separately")
+            }
+            _ = try next.defaultModel.map { try resolveSelection($0) }
+        }
+    }
+
+    func replaceConfiguration(_ next: ProviderCatalog, expected: ProviderCatalog) throws {
+        try validateReplacement(next, expected: expected)
+        guard next != expected else { return }
+        var normalized = next
+        if next.defaultModel != expected.defaultModel {
+            normalized.defaultModel = try next.defaultModel.map { try resolveSelection($0).selection }
+        }
+        let removed = expected.providers.filter { old in !next.providers.contains(where: { $0.id == old.id }) }
+        try persist(normalized)
+        for definition in removed { deauthenticate(definition) }
+        if normalized.providers != expected.providers { rebuildClients() }
+        Log.agent.info("ProviderRegistry.configuration updated providers=\(normalized.providers.count)")
     }
 
     func deauthenticate(_ definition: ProviderDefinition) {

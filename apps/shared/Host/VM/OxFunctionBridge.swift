@@ -6,19 +6,8 @@ public protocol OxFunctionBridge: AnyObject {
     func deleteConversation(id: String, purpose: String) async throws -> JSONValue?
     func providerOperation(name: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?
     func secretOperation(name: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?
-    func appInfo(purpose: String) async throws -> JSONValue?
-    func appProfile(purpose: String) async throws -> JSONValue?
-    func appProfiles(purpose: String) async throws -> JSONValue?
-    func appNotifications(purpose: String) async throws -> JSONValue?
-    func appLanguage(purpose: String) async throws -> JSONValue?
-    func setAppLanguage(selection: String, purpose: String) async throws -> JSONValue?
     func appModel(purpose: String) async throws -> JSONValue?
-    func appDefaultModel(purpose: String) async throws -> JSONValue?
-    func setAppDefaultModel(options: JSONValue, purpose: String) async throws -> JSONValue?
     func setAppModel(options: JSONValue, purpose: String) async throws -> JSONValue?
-    func appActionPolicies(options: JSONValue?, purpose: String) async throws -> JSONValue?
-    func appRepositories(purpose: String) async throws -> JSONValue?
-    func appLogs(options: JSONValue?, purpose: String) async throws -> JSONValue?
     func renameConversation(title: String, purpose: String) async throws -> JSONValue?
     func invokeAction(name: String, args: JSONValue?, session: JSONValue?, pageURL: String?, purpose: String) async throws -> JSONValue?
     func searchWeb(arguments: JSONValue, purpose: String) async throws -> JSONValue?
@@ -34,6 +23,7 @@ public protocol OxFunctionBridge: AnyObject {
     func createService(kind: String, domain: String, endpoint: String?, transport: String?, faviconURL: JSONValue?, purpose: String) async throws -> JSONValue?
     func updateService(domain: String, fields: [String: JSONValue], purpose: String) async throws -> JSONValue?
     func deleteService(domain: String, purpose: String) async throws -> JSONValue?
+    func appRepositories(purpose: String) async throws -> JSONValue?
     func connectRepository(origin: String, purpose: String) async throws -> JSONValue?
     func repositoryConflicts(service: String?, compare: Bool, purpose: String) async throws -> JSONValue?
     func resolveRepositoryConflict(service: String, repository: String, purpose: String) async throws -> JSONValue?

@@ -136,7 +136,7 @@ nonisolated enum RepositoryMigrator {
         defaults: UserDefaults = .standard,
         selectLocal: ([String]) throws -> Void
     ) throws {
-        guard let data = defaults.data(forKey: legacyRemoteMCPKey) else { return }
+        guard let data = ApplicationStorageMigrator.legacyPreference(legacyRemoteMCPKey, defaults: defaults) as? Data else { return }
         let connections = try JSONDecoder().decode([LegacyRemoteMCP].self, from: data)
         let manager = FileManager.default
         let packageURL = root.appendingPathComponent("repository.json", isDirectory: false)
@@ -191,18 +191,18 @@ nonisolated enum RepositoryMigrator {
         output.append(0x0A)
         try output.write(to: packageURL, options: .atomic)
         try selectLocal(Array(Set(renamed.values)).sorted())
-        try renameServiceReferences(renamed, defaults: defaults)
+        try renameServiceReferences(renamed)
         defaults.removeObject(forKey: legacyRemoteMCPKey)
         Log.service.info("StorageMigrator.remoteMCPConnections stored=\(connections.count) created=\(created) renamed=\(renamed.count) skipped=\(skipped)")
     }
 
-    private static func renameServiceReferences(_ renamed: [String: String], defaults: UserDefaults) throws {
+    private static func renameServiceReferences(_ renamed: [String: String]) throws {
         guard !renamed.isEmpty else { return }
-        if let saved = defaults.stringArray(forKey: ServiceManager.savedKey) {
-            defaults.set(saved.map { renamed[$0] ?? $0 }.sorted(), forKey: ServiceManager.savedKey)
-        }
-        guard let data = defaults.data(forKey: ServiceManager.actionPoliciesKey),
-              var policies = try? JSONDecoder().decode(ActionPolicyConfiguration.self, from: data) else { return }
+        var preferences = try ServicePreferences.load()
+        preferences.saved = Array(Set(preferences.saved.map { renamed[$0] ?? $0 })).sorted()
+        preferences.names = Dictionary(preferences.names.map { (renamed[$0.key] ?? $0.key, $0.value) }) { current, _ in current }
+        try preferences.save()
+        var policies = try ActionPolicyConfiguration.load()
         func renamedAction(_ action: String) -> String {
             for (legacy, id) in renamed {
                 if action == "ox.service.attach:\(legacy)" { return "ox.service.attach:\(id)" }
@@ -213,7 +213,7 @@ nonisolated enum RepositoryMigrator {
         }
         policies.actions = Dictionary(policies.actions.map { (renamedAction($0.key), $0.value) }) { current, _ in current }
         policies.sources = Dictionary(policies.sources.map { (renamed[$0.key] ?? $0.key, $0.value) }) { current, _ in current }
-        defaults.set(try JSONEncoder().encode(policies), forKey: ServiceManager.actionPoliciesKey)
+        try policies.save()
     }
 
     static func migrateLegacyLocalServiceManifests(at root: URL) throws {

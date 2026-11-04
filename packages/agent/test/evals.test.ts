@@ -18,7 +18,7 @@ function faux(sources: string[], reply = "The active Profile is EvalQA in local 
 const open = (sources: string[], stubs: StubFixture = {}) => EvalRuntime.open("fixture", "controlled", stubs, [], faux(sources));
 
 test("production agent loop scores a case from actual stub receipts and the final answer", async () => {
-  const outcome = await evaluate(await loadCase("app-profile"), "fixture", "controlled", 15000, faux(["console.log(await ox.app.profile({purpose:'Inspect Profile'}));"]));
+  const outcome = await evaluate(await loadCase("app-profile"), "fixture", "controlled", 15000, faux(["console.log(await ox.fs.read({path:'app/status.json',purpose:'Inspect Profile'}));"]));
   expect(outcome.checks.filter(check => !check.passed)).toEqual([]);
   expect(outcome.status).toBe("pass");
   expect(outcome.metrics).toMatchObject({ modelResponses: 2, toolCalls: 1, oxCalls: 1, failedOxCalls: 0 });
@@ -28,7 +28,7 @@ test("production agent loop scores a case from actual stub receipts and the fina
 test("fabricated completion fails without actual tool receipts", async () => {
   const outcome = await evaluate(await loadCase("app-profile"), "fixture", "controlled", 15000, faux([]));
   expect(outcome.status).toBe("fail");
-  expect(outcome.checks.find(check => check.detail === "ox.app.profile succeeded")?.passed).toBe(false);
+  expect(outcome.checks.find(check => check.detail === "ox.fs.read succeeded")?.passed).toBe(false);
 });
 
 test("prompt-behavior cases distinguish asking from proceeding and absence from cross-checking", async () => {
@@ -54,7 +54,7 @@ test("real execute loop preserves filesystem state, errors, contract validation 
     "console.log(await ox.fs.write({path:'note.txt',content:'before',purpose:'Write note'}));",
     "console.log(await ox.fs.edit({path:'note.txt',edits:[{oldText:'before',newText:'after'}],purpose:'Edit note'}));",
     "console.log(await ox.fs.read({path:'note.txt',purpose:'Read note'}));",
-    "try {await ox.app.profile({purpose:'Read',unknown:true})} catch(e) {console.log(e.code)}; try {await ox.fs.rm({path:'note.txt',purpose:'Trash'})} catch(e) {console.log(e.code)}",
+    "try {await ox.fs.read({path:'note.txt',purpose:'Read',unknown:true})} catch(e) {console.log(e.code)}; try {await ox.fs.rm({path:'note.txt',purpose:'Trash'})} catch(e) {console.log(e.code)}",
   ], { denied: ["ox.fs.rm"] });
   try {
     const turn = await runtime.run("Edit a note", 15000);
@@ -66,25 +66,24 @@ test("real execute loop preserves filesystem state, errors, contract validation 
 }, 20000);
 
 test("stub state transitions commit only after valid output and remain isolated across runtimes", async () => {
-  const stubs = { state: { language: { selection: "en", locale: "en" } }, functions: {
-    "ox.app.language": [{ result: { $state: "language" } }],
-    "ox.app.setLanguage": [{ args: { selection: "zh-Hans" }, result: { selection: "zh-Hans", locale: "zh-Hans", changed: true }, set: { language: { selection: "zh-Hans", locale: "zh-Hans" } } }],
+  const stubs = { state: { title: "Before" }, functions: {
+    "ox.conversation.rename": [{ args: { title: "After" }, result: { title: "After", renamed: true }, set: { title: "After" } }],
   } };
-  const runtime = await open(["await ox.app.setLanguage({selection:'zh-Hans',purpose:'Set language'}); console.log(await ox.app.language({purpose:'Verify'}));"], stubs);
+  const runtime = await open(["console.log(await ox.conversation.rename({title:'After',purpose:'Rename conversation'}));"], stubs);
   const other = await open([], stubs);
   try {
     await runtime.run("Use Chinese", 15000);
-    expect(runtime.stubs.state.language).toEqual({ selection: "zh-Hans", locale: "zh-Hans" });
-    expect(other.stubs.state.language).toEqual({ selection: "en", locale: "en" });
-    expect(() => runtime.stubs.call("ox.app.setLanguage", { selection: "en", purpose: "Unsupported" })).toThrow("No prepared stub");
+    expect(runtime.stubs.state.title).toBe("After");
+    expect(other.stubs.state.title).toBe("Before");
+    expect(() => runtime.stubs.call("ox.conversation.rename", { title: "Other", purpose: "Unsupported" })).toThrow("No prepared stub");
   } finally { await runtime.close(); await other.close(); }
 }, 20000);
 
 test("invalid stub output cannot mutate state and failed calls remain observable", async () => {
-  const runtime = await open(["try {await ox.app.setLanguage({selection:'zh-Hans',purpose:'Change language'})} catch(e) {console.log(e.message)}"], { state: { language: "en" }, functions: { "ox.app.setLanguage": [{ result: { changed: "wrong-type" }, set: { language: "zh-Hans" } }] } });
+  const runtime = await open(["try {await ox.conversation.rename({title:'After',purpose:'Rename conversation'})} catch(e) {console.log(e.message)}"], { state: { title: "Before" }, functions: { "ox.conversation.rename": [{ result: { renamed: "wrong-type" }, set: { title: "After" } }] } });
   try {
     const turn = await runtime.run("Set Chinese", 15000);
-    expect(runtime.stubs.state.language).toBe("en");
+    expect(runtime.stubs.state.title).toBe("Before");
     expect(turn.calls[0]?.error).toMatchObject({ code: "operation_failed" });
   } finally { await runtime.close(); }
 });
@@ -107,7 +106,7 @@ test("execute exposes namespace and function help without process, network, or d
   expect(result).toContain("inputSchema");
   expect(result).toContain("EvalError");
   expect(calls).toEqual([]);
-  expect(Object.keys(catalog)).toHaveLength(99);
+  expect(Object.keys(catalog).some(name => name.startsWith("ox.app."))).toBe(false);
 });
 
 test("cancellation terminates runaway execute code without a Host or simulator", async () => {

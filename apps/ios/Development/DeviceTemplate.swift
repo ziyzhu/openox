@@ -124,13 +124,31 @@ enum DeviceTemplate {
             let previous: [String: Any] = ["app": originalDefaults(appKeys, from: .standard), "appGroup": originalDefaults(groupKeys, from: group)]
             try PropertyListSerialization.data(fromPropertyList: previous, format: .binary, options: 0)
                 .write(to: directory.appendingPathComponent("preferences-before.plist"), options: .atomic)
+            for (source, name) in [(AppStoragePaths.configuration, "configuration-before"), (AppStoragePaths.state, "state-before.json")] {
+                if FileManager.default.fileExists(atPath: source.path) {
+                    try FileManager.default.copyItem(at: source, to: directory.appendingPathComponent(name))
+                }
+            }
             try applyDefaults(decoded.userDefaults?.app, to: .standard)
             try applyDefaults(decoded.userDefaults?.appGroup, to: group)
+            StorageMigrator.migrateApplicationStorage()
             if let settings = decoded.settings {
-                if let language = settings.language { UserDefaults.standard.set(language, forKey: "app.language") }
-                if let value = settings.onboardingCompleted { UserDefaults.standard.set(value, forKey: "app.hasCompletedOnboarding") }
+                if let language = settings.language {
+                    var value = try AppSettings.load()
+                    value.language = language
+                    try value.save()
+                }
+                if let onboarded = settings.onboardingCompleted {
+                    var value = try AppState.load()
+                    value.onboarded = onboarded
+                    try value.save()
+                }
                 if let region = settings.region, let value = LLMRegion(rawValue: region) { AppRegion.shared.setForTesting(value) }
-                if let value = settings.allowHostConnections { UserDefaults.standard.set(value, forKey: HostAccess.preferenceKey) }
+                if let enabled = settings.allowHostConnections {
+                    var value = try HostConfiguration.load()
+                    value.allowConnections = enabled
+                    try value.save()
+                }
                 if let value = settings.defaultModel {
                     let selection = value == .null ? nil : try model(value)
                     if FileManager.default.fileExists(atPath: AppStoragePaths.providersConfiguration.path) {
@@ -204,7 +222,7 @@ enum DeviceTemplate {
                 try await DurableProfileStore.shared.close(in: scope)
             }
             if let selection = request.selection, let profile = profiles[selection.profile] {
-                UserDefaults.standard.set(profile.id.uuidString, forKey: "storage.activeProfile")
+                try StorageRoot.shared.prefer(profile)
                 try await StorageRoot.shared.resolve()
             }
             if let website = request.websiteState { try await services.restoreWebsiteData(website.data) }

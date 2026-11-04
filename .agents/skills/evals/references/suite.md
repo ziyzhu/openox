@@ -56,10 +56,10 @@ import type { EvalCase } from "../scripts/types.ts";
 
 export default {
   task: "Which Profile am I using, and where is it stored?",
-  stubs: { state: { profile: { name: "EvalQA", storage: "local" } } },
+  stubs: { files: { "app/status.json": JSON.stringify({ profiles: { profiles: [{ name: "EvalQA", storage: "local", active: true }], truncated: false } }) } },
   attached: [],
   timeoutMs: 120_000,
-  checks: run => [called(run, "ox.app.profile"), mentions(run, "EvalQA")],
+  checks: run => [called(run, "ox.fs.read"), mentions(run, "EvalQA")],
 } satisfies EvalCase;
 ```
 
@@ -72,16 +72,15 @@ Stubs:
 
 ```json
 {
-  "state": {"language": {"selection": "en", "locale": "en"}},
+  "state": {"title": "Before"},
   "files": {"notes.txt": "Existing content"},
   "denied": ["ox.secret.delete"],
   "functions": {
-    "ox.app.language": [{"result": {"$state": "language"}}],
-    "ox.app.setLanguage": [{
-      "args": {"selection": "zh-Hans"},
-      "when": {"language": {"selection": "en", "locale": "en"}},
-      "result": {"selection": "zh-Hans", "locale": "zh-Hans", "changed": true},
-      "set": {"language": {"selection": "zh-Hans", "locale": "zh-Hans"}}
+    "ox.conversation.rename": [{
+      "args": {"title": "After"},
+      "when": {"title": "Before"},
+      "result": {"title": "After", "renamed": true},
+      "set": {"title": "After"}
     }]
   }
 }
@@ -90,8 +89,8 @@ Stubs:
 Rules match argument subsets and current state. `$arg` and `$state` references
 resolve values without executing case code. `set` applies atomically after
 validating the result. An `error` contains `code`, `message`, and `recovery` and
-never applies mutations. No matching rule fails explicitly. Profile, providers,
-repositories and schedules have default readers; the Profile is `EvalQA`. File
+never applies mutations. No matching rule fails explicitly. Providers,
+repositories and schedules have default readers; Profile status is seeded as a file. File
 operations use the production filesystem logic over in-memory storage seeded from
 `files`, and System skill files come from the actual bundled packages. Human choices
 are explicit stub results for `ox.user.choose`. Browser, payment, service, and media

@@ -14,7 +14,7 @@ nonisolated enum CredentialMigrator {
         let defaults = UserDefaults.standard
         let legacyIndexKey = "vault.index"
         let legacyAccounts = try Credentials.accounts(prefix: "vault:")
-        let legacyData = defaults.data(forKey: legacyIndexKey)
+        let legacyData = ApplicationStorageMigrator.legacyPreference(legacyIndexKey, defaults: defaults) as? Data
         guard legacyData != nil || !legacyAccounts.isEmpty else { return }
 
         var convertedData: Data?
@@ -22,7 +22,7 @@ nonisolated enum CredentialMigrator {
             let data = try convertLegacySecretsIndex(legacyData)
             let converted = try JSONDecoder().decode(SecretIndex.self, from: data)
             try converted.validate()
-            if let destination = defaults.data(forKey: Secret.indexKey) {
+            if let destination = ApplicationStorageMigrator.legacyPreference(Secret.indexKey, defaults: defaults) as? Data {
                 let current = try JSONDecoder().decode(SecretIndex.self, from: destination)
                 try current.validate()
                 let encoder = JSONEncoder()
@@ -47,7 +47,7 @@ nonisolated enum CredentialMigrator {
                 }
             }
         }
-        if let convertedData, defaults.data(forKey: Secret.indexKey) == nil {
+        if let convertedData, ApplicationStorageMigrator.legacyPreference(Secret.indexKey, defaults: defaults) == nil {
             defaults.set(convertedData, forKey: Secret.indexKey)
             guard defaults.data(forKey: Secret.indexKey) == convertedData else {
                 throw StorageMigrationError.invalidApplicationStorage("secrets index")
@@ -56,6 +56,36 @@ nonisolated enum CredentialMigrator {
         for account in legacyAccounts { try Credentials.deleteSecretChecked(for: account) }
         if legacyData != nil { defaults.removeObject(forKey: legacyIndexKey) }
         Log.app.info("StorageMigrator.secretsRenamed items=\(legacyAccounts.count) index=\(legacyData != nil)")
+    }
+
+    static func migrateSecretStorage(defaults: UserDefaults = .standard) throws {
+        let exists = FileManager.default.fileExists(atPath: AppStoragePaths.secretIndex.path)
+        let source = ApplicationStorageMigrator.legacyPreference(Secret.indexKey, defaults: defaults)
+        let migrated: SecretIndex?
+        if let source {
+            guard let data = source as? Data else { throw StorageMigrationError.invalidApplicationStorage("secret index") }
+            migrated = try JSONDecoder().decode(SecretIndex.self, from: data)
+            try migrated?.validate()
+        } else { migrated = nil }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        if exists {
+            let current = try SecretIndex.load()
+            if let migrated, try encoder.encode(current) != encoder.encode(migrated) {
+                throw StorageMigrationError.collision("secret index")
+            }
+        } else {
+            let next = migrated ?? SecretIndex()
+            try next.save()
+            guard try encoder.encode(SecretIndex.load()) == encoder.encode(next) else {
+                throw StorageMigrationError.invalidApplicationStorage("secret index publication")
+            }
+            Log.app.info("StorageMigrator.secretFile done version=1")
+        }
+        if source != nil {
+            defaults.removeObject(forKey: Secret.indexKey)
+            guard defaults.synchronize() else { throw StorageMigrationError.invalidApplicationStorage("secret index preference cleanup") }
+        }
     }
 
     private static func convertLegacySecretsIndex(_ data: Data) throws -> Data {

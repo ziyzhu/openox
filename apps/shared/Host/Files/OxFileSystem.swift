@@ -2,7 +2,7 @@ import Foundation
 import JavaScriptCore
 
 nonisolated enum OxFileSystem {
-    static let actions = [Actions.fsList, Actions.fsRead, Actions.fsAttach, Actions.visionAnalyze,
+    static let actions = [Actions.fsStat, Actions.fsList, Actions.fsRead, Actions.fsAttach, Actions.visionAnalyze,
                           Actions.fsWrite, Actions.fsEdit, Actions.fsRm, Actions.fsMkdir, Actions.fsMove, Actions.fsCopy, Actions.fsGlob, Actions.fsGrep]
 
     static let function = OxFunction(
@@ -16,6 +16,7 @@ nonisolated enum OxFileSystem {
             context.setObject(operation as AnyObject, forKeyedSubscript: "__nativeFS" as NSString)
         },
         jsFragment: """
+          stat: (value) => __nativeFS('stat', __oxOptions(value, 'ox.fs.stat')),
           list: (value) => __nativeFS('list', __oxOptions(value, 'ox.fs.list')),
           read: (value) => __nativeFS('read', __oxOptions(value, 'ox.fs.read')),
           attach: (value) => __nativeFS('attach', __oxOptions(value, 'ox.fs.attach')),

@@ -40,6 +40,20 @@ nonisolated struct SecretIndex: Codable, Sendable {
     var entries: [SecretEntry] = []
     var bindings: [SecretBinding] = []
 
+    static func load() throws -> Self {
+        let value = try JSONDecoder().decode(Self.self, from: Data(contentsOf: AppStoragePaths.secretIndex))
+        try value.validate()
+        return value
+    }
+
+    func save() throws {
+        try validate()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try FileManager.default.createDirectory(at: AppStoragePaths.configuration, withIntermediateDirectories: true)
+        try encoder.encode(self).write(to: AppStoragePaths.secretIndex, options: .atomic)
+    }
+
     func validate() throws {
         guard version == 1,
               Set(entries.map(\.key)).count == entries.count,
@@ -333,19 +347,11 @@ nonisolated enum Secret {
     }
 
     private static func index() throws -> SecretIndex {
-        guard let data = UserDefaults.standard.data(forKey: indexKey) else { return SecretIndex() }
-        let current = try JSONDecoder().decode(SecretIndex.self, from: data)
-        try current.validate()
-        return current
+        try SecretIndex.load()
     }
 
     private static func save(_ index: SecretIndex) throws {
-        try index.validate()
-        let data = try JSONEncoder().encode(index)
-        UserDefaults.standard.set(data, forKey: indexKey)
-        guard UserDefaults.standard.data(forKey: indexKey) == data else {
-            throw RuntimeError.bridge("Secret metadata could not be saved")
-        }
+        try index.save()
     }
 
     private static func generatedKey(base: String, kind: SecretConsumerKind, id: String) throws -> String {

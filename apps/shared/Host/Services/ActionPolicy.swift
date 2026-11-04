@@ -29,6 +29,26 @@ nonisolated struct ActionPolicyConfiguration: Codable, Equatable, Sendable {
         self.actions = actions
     }
 
+    func validate() throws {
+        guard format == Self.currentFormat else {
+            throw StorageMigrationError.invalidApplicationStorage("Action policies")
+        }
+    }
+
+    static func load() throws -> Self {
+        let value = try JSONDecoder().decode(Self.self, from: Data(contentsOf: AppStoragePaths.actionPolicies))
+        try value.validate()
+        return value
+    }
+
+    func save() throws {
+        try validate()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try FileManager.default.createDirectory(at: AppStoragePaths.configuration, withIntermediateDirectories: true)
+        try encoder.encode(self).write(to: AppStoragePaths.actionPolicies, options: .atomic)
+    }
+
     func policy(for action: String, default actionDefault: ActionPolicy) -> ActionPolicy {
         actions[action] ?? sources[Self.sourceID(for: action)] ?? defaultPolicy ?? actionDefault
     }

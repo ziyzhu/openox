@@ -9,29 +9,25 @@ types remain authoritative in their `Codable` implementations.
 ```text
 <app container>/
 ├── Library/
-│   ├── Preferences/                         UserDefaults
-│   │   ├── appearance                      iOS system, light, or dark appearance selection
-│   │   ├── app.hasCompletedOnboarding       onboarding completion
-│   │   ├── serviceDisplayNames              app-wide service domain → local display name; retained across refresh/removal
-│   │   ├── savedServices                    attached service domains
-│   │   ├── actionApprovalPolicies           versioned Automatic, Ask, Allow, or Block policies for Actions
-│   │   ├── api.url                          Ox service API override
-│   │   ├── app.region                       last detected network region
-│   │   ├── app.language                     UI and agent language override
-│   │   ├── host.allowConnections             app-wide Host access toggle; absent means off
-│   │   ├── conversation.importMemoryIntentDisplays   app-wide count of starter intent displays, capped at three
-│   │   ├── speech.voice.identifier          legacy read-aloud voice preference, ignored and retained
-│   │   ├── storage.activeProfile            active profile UUID
-│   │   └── chatgpt.installationId           per-install Codex client ID
+│   ├── Preferences/                         framework preferences and ignored predecessor keys
+│   │   └── appearance                      iOS system, light, or dark appearance selection
 │   ├── Application Support/
-│   │   ├── providers.json                   format-2 provider overrides and optional defaultModel selection
-│   │   ├── service-repositories.json        built-in, Local, Development, and installed repository enablement; conflict resolutions
-│   │   ├── mounted-repositories.json       version 1 repository bindings to Files grant IDs and relative folders
+│   │   ├── Configuration/
+│   │   │   ├── settings.json               format-1 app language selection
+│   │   │   ├── policy.json                 format-2 global/source/action approval overrides
+│   │   │   ├── services.json               format-1 saved domains and display names
+│   │   │   ├── host.json                   format-1 Host connection permission; defaults off
+│   │   │   ├── secrets.json                version-1 Secret metadata/bindings; no secret values
+│   │   │   ├── providers.json              format-2 provider overrides and optional defaultModel
+│   │   │   ├── service-repositories.json   repository enablement, origins, conflict resolutions
+│   │   │   ├── mounted-repositories.json   version-1 bindings to Files grants
+│   │   │   ├── external-profiles.json      selected Profile bookmarks/display names
+│   │   │   └── device-folder-grants.json    Profile-bound native bookmarks
+│   │   ├── state.json                      format-1 onboarding, starter count, active Profile,
+│   │   │                                   cached region, ChatGPT agent Host identity
 │   │   ├── service-repositories/development/ simulator development HEAD snapshot
 │   │   ├── RepositoryStaging/              private repository downloads, recoverable snapshot backups, and mutation staging
 │   │   ├── RepositoryMigrationBackups/     retained predecessor repository-skill migration sources
-│   │   ├── external-profiles.json           selected Profile folder bookmarks and optional display names
-│   │   ├── device-folder-grants.json         Profile-bound native folder bookmarks; nullable profileId means unassigned
 │   │   ├── scheduled-skills.json             legacy schedule migration source
 │   │   ├── Profiles/<uuid>/profile.json    predecessor registration and downgrade guard
 │   │   ├── Profiles/<uuid>/state.sqlite    retained predecessor database; inactive after portable migration
@@ -100,10 +96,10 @@ Choice, approval, and secret-entry prompts are transient `Conversation` interact
 
 Service-inspector conversation content optionally stores `pageID`, a transient live service-page UUID. Older links omit it and keep their existing inspector behavior. Service-page cards resolve only the matching resident page; after closure or restart they show unavailable rather than creating a replacement or repeating an action. The optional field requires no migration and contains no website data.
 
-- UserDefaults onboarding state — owner: App.swift
-- UserDefaults Host access toggle — owner: Platform/Models/HostAccess.swift; app-wide, retained across Profile switches, follows device backup policy, removed with app preferences. Additive Boolean key with no predecessor representation or migration; missing state defaults off, including upgrades from builds that listened automatically.
-- UserDefaults import-memory starter count — owner: Client/Features/Conversation/ConversationComposer.swift
-- UserDefaults service state — owner: Services/ServiceManager.swift
+- App state file — owners: Platform/Models/AppState.swift and its concrete AppStateStore; UI onboarding/starter count, StorageRoot, AppRegion, and ChatGPTSubscriptionAccount use the same serialized MainActor writer.
+- Host configuration file — owner: Platform/Models/HostAccess.swift; app-wide, retained across Profile switches, normal device backup eligibility, absent permission defaults off. Only trusted user controls can change it.
+- Language settings file — owners: Platform/Models/AppSettings.swift and AppLocale; persisted before publishing the observable language and nonisolated locale cache.
+- Service preferences and Action policy files — owner: Services/ServiceManager.swift; persist before publishing changes. Unavailable policy is Ask, and failed Always allow publication does not approve the pending operation.
 - Provider configuration and model caches — owner: Host/ModelProviders/ProviderRegistry.swift; configuration uses Application Support/providers.json and derived model caches use Caches; preference conversion belongs to ApplicationStorageMigrator
 - Keychain credentials — owner: Host/Credentials/Credentials.swift
 - Retired read-aloud voice preference — retained in UserDefaults and ignored
@@ -298,6 +294,12 @@ MCP definitions that they cannot update.
 
 ## Shared preferences
 
+Language, Host access, service preferences, policy, provider/repository configuration, and secret metadata are authoritative JSON files under Application Support/Configuration, with internal state in Application Support/state.json. ApplicationStorageMigrator verifies and moves the five predecessor top-level JSON catalogs, then converts app language, Host access, service names/saved domains, Action policies, onboarding, starter count, active Profile, cached region, and the actual `chatgpt.agentHostID` key. Ignored `chatgpt.installationId`, `api.url`, retired voice/theme keys, and framework preferences are not activated or swept. CredentialMigrator converts `secret.index` after legacy vault conversion and before credential consumers. Source preferences/files are removed only after publication verification; divergent coexisting representations and malformed/future files block preparation with both representations preserved. Subsequent launches do not recreate retired preference keys. Files remain device-wide, outside Profile exports, with normal backup eligibility; Keychain values and device-bound bookmark semantics are unchanged. Older writers do not understand the new locations; returning from a downgrade rejects divergent data rather than silently resetting configuration.
+
+The agent accesses one virtual `app/` mount. settings.json, providers.json, and services.json accept bounded validated edits through their owners, requiring current revisions, normal filesystem policy, and existing semantic Action approval. Provider definitions and default-model changes must be separate writes. policy.json is read-only. status.json and exact-action views under actions/ are generated on demand, not persisted copies. Secret metadata, bookmarks, installation identity, state.json, and host.json are not mounted; status exposes only Host access. Logs are a separate redacted approval-gated JSONL view, readable/searchable only by explicitly naming app/logs.jsonl, never by directory-wide content searches. App files cannot be attached, deleted, moved, or copied; temporary conversations cannot mutate them. A preexisting physical Profile app path retains its user-file access and disables the virtual app mount for that Profile; no collision bytes are moved or hidden. The ox.app function namespace and its aliases are removed; historical Action identifiers remain policy keys for equivalent filesystem operations.
+
+The predecessor preference behavior below describes migration sources.
+
 The app follows the saved `appearance` selection; ShareExtension follows the system.
 Current builds ignore the retired `app.theme` preference, so a downgraded build keeps its saved selection.
 
@@ -323,11 +325,9 @@ is the unit Ox creates, renames, duplicates, moves, and deletes.
 
 Exactly one profile is active. `StorageRoot` publishes an immutable `ProfileScope`
 for asynchronous operations; work never resolves a path through a mutable global
-after it begins. The active UUID is device-local and persists in
-`storage.activeProfile`.
+after it begins. The active UUID is device-local and persists as activeProfileID in Application Support/state.json.
 
-Storage owners discover and persist only `profile.json` and
-`storage.activeProfile`.
+Profile identity is discovered from profile.json; preferred activation is stored in state.json.
 
 Ox automatically discovers valid profiles that are immediate children of its
 local and iCloud Documents directories. It does not scan elsewhere in Files.
@@ -807,8 +807,8 @@ bootstrap therefore leaves target IndexedDB data unchanged.
 ## Provider configuration and credentials
 
 New-conversation provider/model defaults and provider additions/overrides live together
-in `Library/Application Support/providers.json`, written atomically by `ProviderCatalog`.
-Region and language remain in UserDefaults. Each conversation persists its own
+in `Library/Application Support/Configuration/providers.json`, written atomically by `ProviderCatalog`.
+Region is internal cached state in state.json; language is in Configuration/settings.json. Each conversation persists its own
 provider/model selection. Conversation saves write the existing `nativeReasoningEffort`
 metadata field for non-Pi effort values; null defers to Pi thinking. They explicitly
 clear Pi thinking when the selected model has no compatible effort; a switch must not retain
@@ -853,7 +853,7 @@ rejects divergent legacy preferences instead of silently discarding either side.
 Reusable credentials use generic-password Keychain accounts `secret:<key>` under
 the bundle-derived `<application bundle identifier>.llm` service. Each item is a
 validated flat UTF-8 JSON object of string fields (16 KiB maximum). New items use After First Unlock
-This Device Only accessibility. `secret.index` in app UserDefaults is a version-1
+This Device Only accessibility. `Configuration/secrets.json` is a version-1
 JSON `SecretIndex` with entries (key, display name, origin, use policy) and
 bindings (consumer kind and ID, key, destination, configuration fingerprint,
 required fields). Values are absent from the index. A missing Keychain item
@@ -907,9 +907,7 @@ complete lines. There is no age-based expiry.
 
 This file is the sole app diagnostic store. The CLI and other Clients read a
 filtered, cursor-paginated history through `logs.list` (up to 2,000 records per
-page); the approval-gated `ox.app.logs` function
-filters the retained file, including previous app runs. Reads flush pending writes
-and run on the log file's serial utility queue. No Logs row or viewer appears in
+page). The approval-gated virtual `app/logs.jsonl` view redacts retained entries, including previous app runs, clips individual messages at 2,048 characters with an explicit truncated field, and preserves chronological order. Agent read/grep output uses ordinary filesystem bounds; directory searches cannot read this protected view. Each operation observes a fresh snapshot; offsets are not durable cursors across compaction. Snapshot reads flush pending writes and run on the log file's serial utility queue; redacted view serialization runs off MainActor. No Logs row or viewer appears in
 Settings, and no separate in-memory history is retained. The existing JSONL path
 and record format are unchanged, so previously written logs remain readable
 without a migration. RPC cursors carry only transient read positions and filter
@@ -933,7 +931,7 @@ needed for diagnosis but never credentials or reusable secrets.
 | Provider overrides and default selection | Application Support/providers.json | Device backup policy | Delete provider, reset default, or delete app |
 | Discovered models and model capabilities | Caches | Purgeable local cache | System eviction or refresh |
 | Secret values | Keychain | This device only | Sign out generated entry or delete any entry |
-| Secret metadata and bindings | UserDefaults | Device backup policy | Sign out or delete entry |
+| Secret metadata and bindings | Configuration/secrets.json | Device backup policy | Sign out or delete entry |
 | Managed provider OAuth | Keychain | System policy | Sign out |
 | Service website state | Domain website store | Local persistent state | Sign out service family |
 | Remote MCP endpoints and transports | Documents/Repositories/Local | Device backup policy | Disconnect the MCP server |

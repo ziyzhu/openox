@@ -108,8 +108,7 @@ struct ActionApproval {
         guard let answer = await choose(request), !Task.isCancelled else { return .stopped }
         Log.service.info("ActionApproval.answer action=\(action) caller=\(ownerID) answer=\(answer)")
         if answer == request.alwaysApprove {
-            serviceManager.setActionPolicy(.allow, for: action)
-            return .approved
+            return serviceManager.setActionPolicy(.allow, for: action) ? .approved : .denied
         }
         return answer == request.approve ? .approved : .denied
     }

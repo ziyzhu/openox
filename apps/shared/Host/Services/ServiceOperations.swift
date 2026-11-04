@@ -595,6 +595,7 @@ final class ServiceOperations {
                 guard var fields = entry.objectValue, let domain = fields["domain"]?.stringValue else { continue }
                 fields["login"] = .string("unknown")
                 fields["saved"] = .bool(serviceManager.savedDomains.contains(domain))
+                if let name = serviceManager.serviceNames[domain] { fields["name"] = .string(name) }
                 fields["attached"] = .bool(attachedDomains().contains(domain))
                 if fields["validationError"] == nil, let service = services[domain] {
                     fields.merge(try Self.serviceSnapshotFields(service, attached: attachedDomains().contains(domain))) { current, _ in current }

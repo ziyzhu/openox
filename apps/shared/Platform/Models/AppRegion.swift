@@ -14,12 +14,11 @@ final class AppRegion {
     @ObservationIgnored private var monitoring = false
     @ObservationIgnored private var fixedRegion: LLMRegion?
 
-    private static let key = "app.region"
     nonisolated private static let detectionURL = URL(string: "https://cloudflare.com/cdn-cgi/trace")!
 
     private init() {
         fixedRegion = nil
-        let stored = UserDefaults.standard.string(forKey: Self.key).flatMap(LLMRegion.init(rawValue:))
+        let stored = (try? AppState.load())?.region.flatMap(LLMRegion.init(rawValue:))
         region = fixedRegion ?? stored ?? (Locale.current.region?.identifier == "CN" ? .china : .global)
         let source = fixedRegion == nil ? (stored == nil ? "locale-fallback" : "cached-network") : "simulator"
         Log.app.info("AppRegion ready region=\(region.rawValue) source=\(source)")
@@ -52,7 +51,8 @@ final class AppRegion {
         }
         let previous = region
         region = detected
-        UserDefaults.standard.set(detected.rawValue, forKey: Self.key)
+        do { try AppStateStore.shared.update { $0.region = detected.rawValue } }
+        catch { Log.app.error("AppRegion.save failed error=\(error.localizedDescription)") }
         Log.app.info("AppRegion detected region=\(detected.rawValue) changed=\(previous != detected)")
     }
 
@@ -63,7 +63,8 @@ final class AppRegion {
         pathMonitor.cancel()
         monitoring = false
         region = value
-        UserDefaults.standard.set(value.rawValue, forKey: Self.key)
+        do { try AppStateStore.shared.update { $0.region = value.rawValue } }
+        catch { Log.app.error("AppRegion.save failed error=\(error.localizedDescription)") }
         Log.app.info("AppRegion test region=\(value.rawValue)")
     }
 

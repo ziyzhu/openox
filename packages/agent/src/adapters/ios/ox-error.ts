@@ -14,6 +14,7 @@ const fileRecovery: Record<FileError["code"], string> = {
 };
 
 export function oxError(error: unknown): Error & OxErrorFields {
+  if (error instanceof Error && !(error instanceof FileError) && error.cause instanceof FileError) return oxError(error.cause);
   if (error instanceof FileError && error.code === "unknown" && error.cause instanceof Error) return oxError(error.cause);
   const source = error instanceof Error ? error : new Error(String(error));
   const fields = source as Partial<OxErrorFields>;

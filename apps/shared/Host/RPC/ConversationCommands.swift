@@ -292,7 +292,7 @@ extension OxHostProtocol {
                 }
                 let fields: [String: String?] = ["level": command.level, "category": command.category,
                                                 "query": command.query, "since": command.since]
-                let query = try AppLogQuery(options: .object(fields.compactMapValues { $0.map(JSONValue.string) }))
+                let query = try LogQuery(options: .object(fields.compactMapValues { $0.map(JSONValue.string) }))
                 let page = try await LogFile.shared.page(limit: limit, cursor: command.cursor, level: query.level,
                                                          category: query.category, query: query.query, since: query.since)
                 let formatter = ISO8601DateFormatter()

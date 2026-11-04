@@ -254,7 +254,8 @@ struct ConversationComposer: View, Equatable {
     @State private var editorDraftID: UUID?
     @State private var hasShownImportMemory = false
     @State private var speechLayoutState: LayoutState?
-    @AppStorage("conversation.importMemoryIntentDisplays") private var importMemoryIntentDisplays = 0
+    @State private var appState = AppStateStore.shared
+    private var importMemoryIntentDisplays: Int { appState.value.memoryIntentDisplays }
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -331,7 +332,8 @@ struct ConversationComposer: View, Equatable {
                 if previous.sessionID != opportunity.sessionID { hasShownImportMemory = false }
                 guard opportunity.isEligible, !hasShownImportMemory, importMemoryIntentDisplays < 3 else { return }
                 hasShownImportMemory = true
-                importMemoryIntentDisplays += 1
+                do { try appState.update { $0.memoryIntentDisplays = min(3, $0.memoryIntentDisplays + 1) } }
+                catch { Log.app.error("ConversationComposer.starterCount save failed error=\(error.localizedDescription)") }
                 Log.ui.info("ConversationComposer.importMemoryIntent shown conversation=\(sessionID) display=\(importMemoryIntentDisplays)")
             }
             .onChange(of: speech.isPresented) { _, isPresented in

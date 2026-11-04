@@ -11,7 +11,7 @@ import { profileMounts } from "../../profile/filesystem";
 
 export interface NativeFileMount { path: string; access: "readOnly" | "readWrite" }
 export async function invokeFilesystem(runtime: ProfileRuntime, capability: string, mounts: NativeFileMount[], operation: FileOperation, args: FileRequest, signal: AbortSignal) {
-  if (!capability || !Array.isArray(mounts) || !["list", "read", "write", "edit", "rm", "mkdir", "move", "copy", "glob", "grep"].includes(operation)) throw new Error("Invalid filesystem capability");
+  if (!capability || !Array.isArray(mounts) || !["stat", "list", "read", "write", "edit", "rm", "mkdir", "move", "copy", "glob", "grep"].includes(operation)) throw new Error("Invalid filesystem capability");
   const context = withAbortSignal(signal, BACKGROUND_CONTEXT);
   const originals = new Map<string, string>();
   const call = async <T>(op: string, path: string, values: object = {}) => {

@@ -49,7 +49,7 @@ try {
       const htmlGuide = await ox.fs.read({path:'skills/visualize/references/html.md',purpose:'Read HTML workflow'});
       if (!providerGuide.text.includes('# Model Providers') || !htmlGuide.text.includes('# HTML Results and Apps')) throw Error('Missing bundled references');
       const before = await ox.fs.read({path:'MEMORY.md',purpose:'Read QA memory'});
-      const parallel = await Promise.all([ox.app.profile({purpose:'Inspect QA Profile'}),ox.fs.read({path:'MEMORY.md',purpose:'Read QA memory'})]);
+      const parallel = await Promise.all([ox.fs.read({path:'app/status.json',purpose:'Inspect QA Profile'}),ox.fs.read({path:'MEMORY.md',purpose:'Read QA memory'})]);
       const invalid = [];
       for (const invoke of [()=>ox.fs.read({path:17,purpose:'Check schema'}),()=>ox.web.browser.navigate({url:17,purpose:'Check nested schema'})]) {
         try {await invoke(); throw Error('Invalid input accepted')} catch(e) {if(e.code!=='invalid_argument') throw e; invalid.push(JSON.parse(JSON.stringify(e)));}
@@ -57,21 +57,21 @@ try {
       let denied;
       try {await ox.fs.write({path:'skills/manage-providers/SKILL.md',content:'forbidden',purpose:'Verify read-only mount'}); throw Error('System skill write accepted')}
       catch(e) {if(e.code!=='permission_denied') throw e; denied=JSON.parse(JSON.stringify(e));}
-      return {count:names.length,skills,profile:parallel[0],memory:before,denied,invalid,aliases:ox.app.setModel===ox.conversation.setModel};
+      return {count:names.length,skills,profile:JSON.parse(parallel[0].text).profiles.profiles.find(profile=>profile.active),memory:before,denied,invalid,appRemoved:typeof ox.app==='undefined'};
     `;
     const result = await call(["vm","eval","--script",source],conversation.conversationId);
     await writeFile(join(evidence,`${temporary ? "temporary" : "saved"}-${conversation.conversationId}.json`),JSON.stringify(result,null,2),{mode:0o600});
     assert.equal(result.value.profile.name,name);
     assert.equal(result.value.count,functionNames.length);
     assert.deepEqual(result.value.skills,["checkout","evolve","import-memory","visualize"]);
-    assert.equal(result.value.aliases,true);
+    assert.equal(result.value.appRemoved,true);
     assert.equal(result.value.memory.truncated,false);
     assert.equal(result.value.invalid.length,2);
     await call(["profile","select",previous!]);
     await assert.rejects(call(["vm","call","ox.fs.read","--args",JSON.stringify({path:"MEMORY.md",purpose:"Reject stale Profile access"})],conversation.conversationId));
     await call(["profile","select",created.profile.id]);
   }
-  console.log(`PASS VM contracts, all namespace/function help, temporary/saved filesystem reads, parallel calls, Profile switching, validation, error serialization, read-only skill protection, aliases. Evidence: ${evidence}`);
+  console.log(`PASS VM contracts, all namespace/function help, temporary/saved filesystem reads, parallel calls, Profile switching, validation, error serialization, read-only skill protection, removed app namespace. Evidence: ${evidence}`);
 } finally {
   try { if (previous) await call(["profile","select",previous]); }
   finally { release(); }

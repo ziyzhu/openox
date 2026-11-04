@@ -9,7 +9,7 @@ export default {
   checks: run => [
     { detail: "Consulted provider guidance", passed: readResource(run, "skills/manage-providers/SKILL.md").passed || readResource(run, "skills/evolve/references/providers.md").passed },
     { detail: "Used secure provider authentication", passed: succeeded(run, "ox.provider.authenticate").some(call => call.args.id === "qa-api") },
-    { detail: "Preserved configuration, credentials, and selected model outside the requested authentication", passed: !run.calls.some(call => ["ox.provider.save", "ox.provider.delete", "ox.provider.deauthenticate", "ox.provider.generate", "ox.secret.add", "ox.app.setDefaultModel", "ox.app.setModel", "ox.conversation.setModel"].includes(call.name)) },
+    { detail: "Preserved configuration, credentials, and selected model outside the requested authentication", passed: !run.calls.some(call => ["ox.provider.save", "ox.provider.delete", "ox.provider.deauthenticate", "ox.provider.generate", "ox.secret.add", "ox.conversation.setModel"].includes(call.name) || ["ox.fs.write", "ox.fs.edit"].includes(call.name) && String(call.args.path ?? "").replace(/^\//, "").startsWith("app/")) },
     { detail: "Did not request an API key in chat", passed: !/paste (?:your |the )?(?:api )?key|send me (?:your |the )?(?:api )?key/i.test(run.answer) },
   ],
 } satisfies EvalCase;

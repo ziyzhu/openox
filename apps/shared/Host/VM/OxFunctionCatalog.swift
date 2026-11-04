@@ -2,7 +2,6 @@ import Foundation
 
 nonisolated enum OxFunctionCatalog {
     private static let namespaceDescriptions: [(String, String)] = [
-        ("app", ModelGuidance.text("namespace.app")),
         ("conversation", ModelGuidance.text("namespace.conversation")),
         ("provider", ModelGuidance.text("namespace.provider")),
         ("repository", ModelGuidance.text("namespace.repository")),
@@ -18,7 +17,6 @@ nonisolated enum OxFunctionCatalog {
     ]
 
     static let all: [OxFunction] = [
-        OxAppInformation.function,
         OxProviders.function,
         OxSecret.function,
         OxConversations.function,

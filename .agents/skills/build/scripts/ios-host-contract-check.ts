@@ -162,7 +162,9 @@ export async function check(): Promise<string> {
     StorageMigrationSupport: new Set(migrationFiles),
     ConversationMigrator: new Set([...migrationFiles, "apps/shared/Host/Durable/DurableFileStore.swift"]),
   };
-  const readOnlyCompatibility: Record<string, string> = {
+  const scopedCompatibility: Record<string, string> = {
+    "StorageMigrator apps/ios/Client/App/App.swift": "migrateApplicationStorage",
+    "StorageMigrator apps/ios/Development/DeviceTemplate.swift": "migrateApplicationStorage",
     "ProfileMigrator apps/shared/Host/Files/VirtualFileSystem.swift": "legacyWorkflowLocation",
     "ConversationMigrator apps/shared/Host/Conversations/ConversationServiceAttachments.swift": "migratedServiceDomains",
     "ConversationMigrator apps/shared/Host/Conversations/ConversationDocument.swift": "isRenameAction",
@@ -171,8 +173,8 @@ export async function check(): Promise<string> {
     const path = relative(ROOT, allSwiftFiles[index]);
     for (const owner of migrationOwners) {
       const calls = [...source.matchAll(new RegExp(`\\b${owner}\\.([a-zA-Z0-9_]+)\\s*\\(`, "g"))];
-      const readOnly = calls.every(match => readOnlyCompatibility[`${owner} ${path}`] === match[1]);
-      if (calls.length && !migrationCallers[owner].has(path) && !readOnly) {
+      const scoped = calls.every(match => scopedCompatibility[`${owner} ${path}`] === match[1]);
+      if (calls.length && !migrationCallers[owner].has(path) && !scoped) {
         failures.push(`${path}: persisted compatibility must enter through an approved ${owner} caller`);
       }
     }

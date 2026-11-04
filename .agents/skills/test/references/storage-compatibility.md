@@ -11,7 +11,7 @@ Read [storage.md](storage.md) before changing or reviewing storage. Update it in
 
 ## Compatibility boundary
 
-Use `StorageMigrator` as the ordered startup and recovery coordinator. Keep compatibility transforms in `ProfileMigrator`, `ApplicationStorageMigrator`, `CredentialMigrator`, and `RepositoryMigrator` under `apps/shared/Host/Profile/`; share stateless conversion and verified-copy helpers through `StorageMigrationSupport`. Profile activation must pass through `ProfileMigrator` before publishing its scope; repositories and schedules must pass through their scoped preparation before loading. Runtime consumers must not infer legacy formats or read potentially old state before preparation completes.
+Use `StorageMigrator` as the ordered startup and recovery coordinator. Keep compatibility transforms in `ProfileMigrator`, `ApplicationStorageMigrator`, `CredentialMigrator`, and `RepositoryMigrator` under `apps/shared/Host/Storage/`; share stateless conversion and verified-copy helpers through `StorageMigrationSupport`. Profile activation must pass through `ProfileMigrator` before publishing its scope; repositories and schedules must pass through their scoped preparation before loading. Runtime consumers must not infer legacy formats or read potentially old state before preparation completes.
 
 Run application-wide migration before constructing storage consumers. Resolve and migrate the active Profile before publishing it to conversations, skills, artifacts, or other readers. Prepare the Local service repository before service discovery and search indexing. Apply the same gate before activating another Profile. Keep upgrades lazy: discovery must not migrate inactive Profiles, and their settings must not open old-format content before activation. Existing interrupted-publication recovery remains an application-wide prerequisite.
 
@@ -33,6 +33,8 @@ Before running another checkout or older build against an existing app container
 Build inventory-relative paths from traversed entry names, not by slicing absolute URL strings: Foundation enumeration can expand `/var` or `/tmp` aliases to `/private/...`. Verify aliased roots and nested entries while retaining symlink rejection. For URL enumerators, derive relative paths from `pathComponents.suffix(enumerator.level)`. Run `bun run typecheck` to catch the known absolute-path slicing and replacement patterns.
 
 Prefer ordered, retry-safe milestones. Stamp a milestone only after all of its operations succeed. Preserve a recoverable source or equivalent destination across interruption. Define collision behavior explicitly; never replace ambiguous user data. Preserve Local Git history, index state, working-tree changes, and detached views unless the migration specifically and safely transforms them.
+
+When moving UserDefaults values into authoritative files, read the app's persistent domain rather than its search-list getters. Registered, argument, suite, and global fallbacks are not persisted app input; after cleanup they can otherwise recreate removed keys, import unintended approval policies, or cause false destination conflicts. Verify the first launch and relaunch with fallback-domain values present.
 
 Run legacy Profile transforms on an isolated verified copy, then publish the complete validated destination through the recovery journal. Preserve the original representation until publication; milestone progress on a working copy must not advance the original Profile.
 

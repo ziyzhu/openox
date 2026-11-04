@@ -40,11 +40,10 @@ final class StorageRoot {
     var beforeProfileChange: (@MainActor () async throws -> Void)?
     var profileDidChange: (@MainActor () async throws -> Void)?
 
-    private static let activeKey = "storage.activeProfile"
     private static let defaultName = "Default"
 
     private var storedActiveId: UUID? {
-        UserDefaults.standard.string(forKey: Self.activeKey).flatMap(UUID.init(uuidString:))
+        AppStateStore.shared.value.activeProfileID
     }
 
     var otherProfiles: [Profile] {
@@ -56,13 +55,7 @@ final class StorageRoot {
     }
 
     private func storeActiveProfile(_ id: UUID) throws {
-        let defaults = UserDefaults.standard
-        let previous = defaults.object(forKey: Self.activeKey)
-        defaults.set(id.uuidString, forKey: Self.activeKey)
-        guard defaults.synchronize() else {
-            defaults.set(previous, forKey: Self.activeKey)
-            throw RuntimeError.bridge("The active Profile preference could not be saved")
-        }
+        try AppStateStore.shared.update { $0.activeProfileID = id }
     }
 
     private init() {

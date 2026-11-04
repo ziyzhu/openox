@@ -253,13 +253,15 @@ final class ConversationInteractionGate {
     func resolvePrompt(blockId: UUID, answer: String) {
         guard case .presenting(.prompt(let prompt, let continuation), let queued) = state,
               prompt.id == blockId else { return }
+        var resolvedAnswer = answer
         if let approval = prompt.autoApproval,
-           answer == approval.alwaysApprove {
-            serviceManager.setActionPolicy(.allow, for: approval.action)
+           answer == approval.alwaysApprove,
+           !serviceManager.setActionPolicy(.allow, for: approval.action) {
+            resolvedAnswer = approval.deny
         }
         prompt.secretEntry?.cancel()
         advance(queued)
-        continuation.resume(returning: .answered(answer))
+        continuation.resume(returning: .answered(resolvedAnswer))
     }
 
     private func waitForPrompt(_ prompt: PendingPrompt) async -> PromptResult {

@@ -11,14 +11,15 @@ import { bundledSkills } from "./bundled-skills";
 import { decodeBase64 } from "./base64";
 
 const tools = { read: createReadTool(), write: createWriteTool(), edit: createEditTool() };
-export type FileOperation = "list" | "read" | "write" | "edit" | "rm" | "mkdir" | "move" | "copy" | "glob" | "grep";
+export type FileOperation = "stat" | "list" | "read" | "write" | "edit" | "rm" | "mkdir" | "move" | "copy" | "glob" | "grep";
 export interface FileRequest {
   path?: string; from?: string; to?: string; recursive?: boolean; purpose?: string; offset?: number; limit?: number; content?: string; base64?: string;
-  edits?: { oldText: string; newText: string }[]; pattern?: string;
+  edits?: { oldText: string; newText: string }[]; pattern?: string; cursor?: string;
   options?: { limit?: number; glob?: string; ignoreCase?: boolean; literal?: boolean; contextLines?: number };
 }
 type SearchMatch = { path: string; line: number; text: string; before: string[]; after: string[] };
-type Candidates = { paths: string[]; truncated: boolean; diagnostics: { path: string; message: string }[] };
+type FilePosition = { path: string; line?: number; size?: number; mtimeMs?: number };
+type Candidates = { paths: string[]; truncated: boolean; diagnostics: { path: string; message: string }[]; nextPath: string | null };
 const maximumFiles = 1_000;
 const maximumEntries = 10_000;
 const mutations = new Set(["write", "edit", "rm", "mkdir", "move", "copy"]);
@@ -30,6 +31,36 @@ const limit = (value: number | undefined, fallback: number, maximum: number) => 
   if (value !== undefined && (!Number.isSafeInteger(value) || value < 1 || value > maximum)) throw new FileError("invalid", "Invalid filesystem limit");
   return value ?? fallback;
 };
+function comparePaths(left: string, right: string) {
+  const a = left.split("/"), b = right.split("/");
+  for (let index = 0; index < Math.min(a.length, b.length); index++) {
+    if (a[index] !== b[index]) return a[index]! < b[index]! ? -1 : 1;
+  }
+  return a.length - b.length;
+}
+function cursorQuery(env: MountedExecutionEnv, operation: FileOperation, args: FileRequest) {
+  const options = args.options ?? {};
+  return JSON.stringify([1, env.id, operation, args.path, args.pattern ?? null, options.limit ?? (operation === "list" ? 50 : 100),
+    options.glob ?? null, options.ignoreCase ?? false, options.literal ?? false, options.contextLines ?? 0]);
+}
+function cursorPosition(env: MountedExecutionEnv, operation: FileOperation, args: FileRequest): FilePosition | undefined {
+  if (args.cursor === undefined) return;
+  try {
+    const value = JSON.parse(args.cursor);
+    if (value.query !== cursorQuery(env, operation, args) || typeof value.path !== "string" || value.path.length > 4_096
+      || canonical(value.path) !== value.path || (args.path && value.path !== args.path && !value.path.startsWith(args.path + "/"))
+      || Object.keys(value).some(key => !["query", "path", "line", "size", "mtimeMs"].includes(key))) throw new Error();
+    if (value.line !== undefined && (operation !== "grep" || !Number.isSafeInteger(value.line) || value.line < 0
+      || !Number.isSafeInteger(value.size) || value.size < 0 || !Number.isFinite(value.mtimeMs))) throw new Error();
+    return value;
+  } catch { throw new FileError("invalid", "Invalid filesystem cursor or changed query; restart without cursor", args.path); }
+}
+function nextCursor(env: MountedExecutionEnv, operation: FileOperation, args: FileRequest, position: FilePosition | null) {
+  if (position === null) return null;
+  const cursor = JSON.stringify({ query: cursorQuery(env, operation, args), path: position.path, line: position.line, size: position.size, mtimeMs: position.mtimeMs });
+  if (cursor.length > 65_536) throw new FileError("invalid", "Filesystem cursor exceeds its safety limit; narrow the search", args.path);
+  return cursor;
+}
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 function expression(pattern: string, glob = false, ignoreCase = false) {
   if (!pattern || pattern.length > 1_024) throw new FileError("invalid", "Invalid search pattern");
@@ -70,7 +101,7 @@ function validateMutation(operation: FileOperation, args: FileRequest, path: str
   if (immutableRoots.has(path.split("/").slice(0, 2).join("/"))) throw new FileError("permission_denied", "Bundled System skills are read-only; copy to a distinct name to customize", path);
 }
 export function resolveFileRequest(args: FileRequest, cwd: string): FileRequest {
-  const roots = new Set(["MEMORY.md", "skills", "repositories", "mounts", "files", "artifacts", "conversations", "history", "chats", "tmp"]);
+  const roots = new Set(["app", "MEMORY.md", "skills", "repositories", "mounts", "files", "artifacts", "conversations", "history", "chats", "tmp"]);
   const resolve = (path: string) => {
     if (path.startsWith("/") || roots.has(path.split("/")[0]!)) {
       const parts = canonical(path).split("/");
@@ -156,33 +187,57 @@ function readPage(result: ToolExecutionResult, args: FileRequest, totalLines: nu
   const diagnostics = clippedLine ? [{ path: args.path!, message: "One line exceeds the 50 KiB read limit. Its remainder cannot be resumed with line offsets; use a narrower source or explicit conversion." }] : [];
   return { path: args.path, text, truncated, unsupported: null, nextOffset: truncated && !clippedLine ? next : null, diagnostics };
 }
-async function fileCandidates(env: MountedExecutionEnv, root: FileInfo, excluded: Set<string>, context: Context): Promise<Candidates> {
+async function fileCandidates(env: MountedExecutionEnv, root: FileInfo, excluded: Set<string>, position: FilePosition | undefined, context: Context): Promise<Candidates> {
   const pending = [root];
   const paths: string[] = [];
   const diagnostics: Candidates["diagnostics"] = [];
   let visited = 0;
   let truncated = false;
+  let lastPath = canonical(root.path);
+  let nextPath: string | null = null;
+  let deferred = false;
+  const remaining = (info: FileInfo) => {
+    if (!position || info === root) return true;
+    const path = canonical(info.path);
+    return comparePaths(path, position.path) > 0
+      || info.kind === "directory" && (path === position.path || position.path.startsWith(path + "/"))
+      || path === position.path && position.line !== undefined;
+  };
   while (pending.length) {
     context.abortSignal?.throwIfAborted();
-    const info = pending.shift()!;
-    if (++visited > maximumEntries || paths.length >= maximumFiles) { truncated = true; break; }
+    const info = pending.pop()!;
     const path = canonical(info.path);
     if (excluded.has(path)) continue;
+    if (!remaining(info)) continue;
+    if (++visited > maximumEntries || paths.length >= maximumFiles) { truncated = true; nextPath = lastPath; break; }
+    lastPath = path;
     if (info.kind === "directory") {
       const result = await env.listDir(path, context);
       context.abortSignal?.throwIfAborted();
-      if (result.ok) pending.push(...result.value);
-      else {
+      if (result.ok) {
+        pending.push(...result.value.filter(remaining).sort((a, b) => comparePaths(canonical(b.path), canonical(a.path))));
+        if (pending.length > maximumEntries) {
+          pending.splice(0, pending.length - maximumEntries);
+          deferred = true;
+        }
+      } else {
         if (info === root || !["not_found", "not_directory", "permission_denied", "unknown"].includes(result.error.code)) throw result.error;
         truncated = true;
         diagnostics.push({ path, message: result.error.message });
       }
-    } else if (info.kind === "file") paths.push(path);
+    } else if (info.kind === "file") {
+      if (position && path === position.path && position.line === undefined) continue;
+      paths.push(path);
+    }
   }
-  return { paths: paths.sort(), truncated, diagnostics };
+  if (deferred) { truncated = true; nextPath ??= lastPath; }
+  return { paths, truncated, diagnostics, nextPath };
 }
-async function searchFile(env: MountedExecutionEnv, path: string, remainingBytes: number, context: Context) {
+async function searchFile(env: MountedExecutionEnv, path: string, remainingBytes: number, position: FilePosition | undefined, context: Context) {
   const info = getOrThrow(await env.fileInfo(path, context));
+  if (position?.path === path && position.line !== undefined && (position.size !== info.size || position.mtimeMs !== (info.mtimeMs ?? 0))) {
+    throw new FileError("invalid", "Search file changed; restart without cursor", path);
+  }
   if (info.size > remainingBytes) return { kind: "limited" as const };
   const result = await env.readTextFile(path, context);
   if (!result.ok) {
@@ -191,12 +246,12 @@ async function searchFile(env: MountedExecutionEnv, path: string, remainingBytes
   }
   const bytes = encoder.encode(result.value).length;
   if (bytes > remainingBytes) return { kind: "limited" as const };
-  return { kind: "text" as const, text: result.value, bytes };
+  return { kind: "text" as const, text: result.value, bytes, size: info.size, mtimeMs: info.mtimeMs ?? 0 };
 }
-function searchLines(path: string, text: string, pattern: RE2JS, contextLines: number, remainingMatches: number, context: Context) {
+function searchLines(path: string, text: string, pattern: RE2JS, contextLines: number, remainingMatches: number, context: Context, startLine = 0) {
   const lines = text.split("\n");
   const matches: SearchMatch[] = [];
-  for (let index = 0; index < lines.length; index++) {
+  for (let index = startLine; index < lines.length; index++) {
     context.abortSignal?.throwIfAborted();
     const found = pattern.matcher(lines[index]!);
     if (!found.find()) continue;
@@ -209,30 +264,45 @@ function searchLines(path: string, text: string, pattern: RE2JS, contextLines: n
 }
 const relativePath = (base: string, path: string) => base && path !== base ? path.slice(base.length + 1) : path;
 const searchBudget = (base: string) => base === "conversations" || base.startsWith("conversations/") ? 16 * 1024 * 1024 : 2 * 1024 * 1024;
-async function grepFiles(env: MountedExecutionEnv, candidates: Candidates, args: FileRequest, match: RE2JS, context: Context) {
+async function grepFiles(env: MountedExecutionEnv, candidates: Candidates, args: FileRequest, match: RE2JS, position: FilePosition | undefined, context: Context) {
   const base = args.path!;
   const options = args.options ?? {};
   const count = options.limit ?? 100;
   const filter = options.glob ? expression(options.glob, true) : undefined;
-  const budget = searchBudget(base);
+  const budget = base === "app/logs.jsonl" && env.mounts.some(mount => mount.path === "app") ? 32 * 1024 * 1024 : searchBudget(base);
   const contextLines = options.contextLines ?? 0;
   const matches: SearchMatch[] = [];
   let scannedFiles = 0;
   let skippedFiles = 0;
   let bytes = 0;
   let truncated = candidates.truncated;
+  let resume: FilePosition | null = position ?? null;
+  let continuation: FilePosition | null = candidates.nextPath === null ? null : { path: candidates.nextPath };
   for (const path of candidates.paths) {
     context.abortSignal?.throwIfAborted();
-    if (filter && !filter.test(relativePath(base, path))) continue;
-    const file = await searchFile(env, path, budget - bytes, context);
-    if (file.kind === "limited") { truncated = true; break; }
-    if (file.kind === "unsupported") { skippedFiles++; continue; }
+    if (filter && !filter.test(relativePath(base, path))) { resume = { path }; continue; }
+    const file = await searchFile(env, path, budget - bytes, position, context);
+    if (file.kind === "limited") {
+      truncated = true;
+      if (bytes > 0) { continuation = resume; break; }
+      candidates.diagnostics.push({ path, message: "File exceeds the per-page search byte budget; narrow or convert this source." });
+      resume = { path };
+      continue;
+    }
+    if (file.kind === "unsupported") { skippedFiles++; resume = { path }; continue; }
     scannedFiles++;
     bytes += file.bytes;
-    matches.push(...searchLines(path, file.text, match, contextLines, count + 1 - matches.length, context));
-    if (matches.length > count) { truncated = true; break; }
+    const remaining = count - matches.length;
+    const found = searchLines(path, file.text, match, contextLines, remaining + 1, context, position?.path === path ? position.line ?? 0 : 0);
+    matches.push(...found.slice(0, remaining));
+    if (found.length > remaining) {
+      truncated = true;
+      continuation = { path, line: found[remaining]!.line - 1, size: file.size, mtimeMs: file.mtimeMs };
+      break;
+    }
+    resume = { path };
   }
-  return { matches: matches.slice(0, count), scannedFiles, skippedFiles, truncated, diagnostics: candidates.diagnostics };
+  return { matches, scannedFiles, skippedFiles, truncated, nextCursor: nextCursor(env, "grep", args, continuation), diagnostics: candidates.diagnostics };
 }
 
 export class AgentFileSystem {
@@ -272,6 +342,7 @@ export class AgentFileSystem {
   private async perform(env: MountedExecutionEnv, operation: FileOperation, args: FileRequest, context: Context): Promise<unknown> {
     context.abortSignal?.throwIfAborted();
     const path = args.from ?? args.path!;
+    if (operation === "stat") return item(getOrThrow(await env.fileInfo(path, context)));
     if (operation === "mkdir") {
       getOrThrow(await env.createDir(path, { recursive: args.recursive ?? false }, context));
       return item(getOrThrow(await env.fileInfo(path, context)));
@@ -281,9 +352,14 @@ export class AgentFileSystem {
       return item(getOrThrow(await env.fileInfo(args.to!, context)));
     }
     if (operation === "list") {
-      const entries = getOrThrow(await env.listDir(path, context));
+      const position = cursorPosition(env, operation, args);
+      const entries = getOrThrow(await env.listDir(path, context))
+        .filter(entry => !position || comparePaths(canonical(entry.path), position.path) > 0)
+        .sort((a, b) => comparePaths(canonical(a.path), canonical(b.path)));
       const count = args.options?.limit ?? 50;
-      return { items: entries.slice(0, count).map(item), truncated: entries.length > count };
+      const page = entries.slice(0, count);
+      return { items: page.map(item), truncated: entries.length > count,
+        nextCursor: nextCursor(env, operation, args, entries.length > count ? { path: canonical(page.at(-1)!.path) } : null) };
     }
     if (operation === "rm") {
       if ((getOrThrow(await env.fileInfo(path, context))).kind === "directory") {
@@ -313,14 +389,22 @@ export class AgentFileSystem {
     const options = args.options ?? {};
     const literal = operation === "grep" && options.literal;
     const match = expression(literal ? escaped(args.pattern!) : args.pattern!, operation === "glob", options.ignoreCase);
+    const position = cursorPosition(env, operation, args);
     const root = getOrThrow(await env.fileInfo(base, context));
+    if (position?.line !== undefined) getOrThrow(await env.fileInfo(position.path, context));
     if (operation === "glob" && root.kind !== "directory") throw new FileError("not_directory", "Not a directory", base);
     const excluded = base ? [] : ["mounts", "files"];
-    const candidates = await fileCandidates(env, root, new Set(excluded), context);
+    const candidates = await fileCandidates(env, root, new Set(excluded), position, context);
     if (operation === "grep" && base !== "conversations" && !base.startsWith("conversations/")) candidates.paths = candidates.paths.filter(path => !/^conversations\/[^/]+\/(conversation\.json|turns\.jsonl|metadata|history)$/.test(path));
-    if (operation === "grep") return grepFiles(env, candidates, args, match, context);
+    if (operation === "grep" && base !== "app/logs.jsonl" && env.mounts.some(mount => mount.path === "app") && candidates.paths.includes("app/logs.jsonl")) {
+      candidates.paths = candidates.paths.filter(path => path !== "app/logs.jsonl");
+      candidates.diagnostics.push({ path: "app/logs.jsonl", message: "App-wide logs are excluded from directory searches; read or search this path explicitly with approval." });
+    }
+    if (operation === "grep") return grepFiles(env, candidates, args, match, position, context);
     const paths = candidates.paths.filter(path => match.test(relativePath(base, path)));
     const count = options.limit ?? 100;
-    return { paths: paths.slice(0, count), truncated: candidates.truncated || paths.length > count, diagnostics: candidates.diagnostics };
+    const continuation = paths.length > count ? paths[count - 1]! : candidates.nextPath;
+    return { paths: paths.slice(0, count), truncated: candidates.truncated || paths.length > count,
+      nextCursor: nextCursor(env, operation, args, continuation === null ? null : { path: continuation }), diagnostics: candidates.diagnostics };
   }
 }

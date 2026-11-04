@@ -53,9 +53,8 @@ final class ChatGPTSubscriptionAccount: SubscriptionAccount, @unchecked Sendable
         let pkce = OAuthSupport.makePKCE()
         let state = UUID().uuidString
         let nonce = UUID().uuidString
-        let hostKey = "chatgpt.agentHostID"
-        let hostID = UserDefaults.standard.string(forKey: hostKey) ?? "urn:uuid:\(UUID().uuidString.lowercased())"
-        UserDefaults.standard.set(hostID, forKey: hostKey)
+        let hostID = AppStateStore.shared.value.chatGPTAgentHostID ?? "urn:uuid:\(UUID().uuidString.lowercased())"
+        try AppStateStore.shared.update { $0.chatGPTAgentHostID = hostID }
         let url = ChatGPTOAuth.authorizeURL(pkce: pkce, state: state, nonce: nonce, hostID: hostID, registration: registration)
         Log.network.info("ChatGPTAccount.login started registration=\(registration == nil ? "new" : "existing")")
         guard let callback = await presenter.oauth(url, ChatGPTOAuth.redirectURI) else {

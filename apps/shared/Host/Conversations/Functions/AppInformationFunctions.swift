@@ -40,17 +40,6 @@ extension Conversation {
         }
     }
 
-    public func appProfile(purpose: String) async throws -> JSONValue? {
-        try await tracked(Actions.appProfile, .object([:]), purpose: purpose) {
-            StorageRoot.shared.active.map { active in
-                JSONValue.object([
-                    "name": .string(active.name),
-                    "storage": .string(active.location.rawValue),
-                ])
-            } ?? .null
-        }
-    }
-
     public func appProfiles(purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.appProfiles, .object([:]), purpose: purpose) {
             let storage = StorageRoot.shared
@@ -82,45 +71,6 @@ extension Conversation {
             .object([
                 "selection": .string(AppLocale.shared.language.rawValue),
                 "locale": .string(AppLocale.shared.locale.identifier),
-            ])
-        }
-    }
-
-    public func setAppLanguage(selection: String, purpose: String) async throws -> JSONValue? {
-        guard let language = AppLocale.Language(rawValue: selection) else {
-            throw RuntimeError.bridge("ox.app.setLanguage: selection must be system, en, or zh-Hans")
-        }
-        return try await tracked(Actions.appSetLanguage, .object(["selection": .string(selection)]), purpose: purpose) {
-            try Task.checkCancellation()
-            let locale = AppLocale.shared
-            let changed = locale.language != language
-            locale.language = language
-            Log.app.info("bridge.app.setLanguage selection=\(selection) changed=\(changed)")
-            return .object([
-                "selection": .string(locale.language.rawValue),
-                "locale": .string(locale.locale.identifier),
-                "changed": .bool(changed),
-            ])
-        }
-    }
-
-    public func setAppDefaultModel(options: JSONValue, purpose: String) async throws -> JSONValue? {
-        try await tracked(Actions.appSetDefaultModel, options, purpose: purpose) {
-            let registry = ProviderRegistry.shared
-            let previous = registry.defaultModel
-            guard let selection = options.objectValue?["selection"] else {
-                throw RuntimeError.bridge("ox.app.setDefaultModel: selection is required; use null for automatic selection")
-            }
-            let resolved = selection == .null ? nil : try await self.resolveAppModelSelection(selection, current: previous)
-            try Task.checkCancellation()
-            guard registry.defaultModel == previous else {
-                throw RuntimeError.bridge("The default model changed during verification; inspect it before retrying")
-            }
-            let changed = try registry.setDefaultModel(resolved?.selection)
-            return .object([
-                "configured": .bool(registry.defaultModel != nil),
-                "selection": registry.defaultModel?.appInformation ?? .null,
-                "changed": .bool(changed),
             ])
         }
     }
@@ -210,16 +160,6 @@ extension Conversation {
         }
     }
 
-    public func appActionPolicies(options: JSONValue?, purpose: String) async throws -> JSONValue? {
-        let query = try AppActionPolicyQuery(options: options)
-        return try await tracked(Actions.appActionPolicies, options ?? .object([:]), purpose: purpose) {
-            query.read(
-                serviceManager.actionPolicies,
-                actionDefaultPolicy: query.action.map(serviceManager.defaultPolicy(for:))
-            )
-        }
-    }
-
     public func appRepositories(purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.appRepositories, .object([:]), purpose: purpose) {
             let repositories = serviceManager.repositories
@@ -240,18 +180,6 @@ extension Conversation {
                 }),
                 "truncated": .bool(repositories.count > limit),
             ])
-        }
-    }
-
-    public func appLogs(options: JSONValue?, purpose: String) async throws -> JSONValue? {
-        let query = try AppLogQuery(options: options)
-        return try await tracked(Actions.appLogs, options ?? .object([:]), purpose: purpose) {
-            try Task.checkCancellation()
-            let snapshot = try await LogFile.shared.snapshot()
-            try Task.checkCancellation()
-            let result = query.read(snapshot)
-            Log.session.info("bridge.app.logs entries=\(result.objectValue?["entries"]?.arrayValue?.count ?? 0) truncated=\(result.objectValue?["truncated"]?.boolValue ?? false)")
-            return result
         }
     }
 
@@ -366,89 +294,6 @@ nonisolated struct AppActionPolicyQuery {
             } ?? .null,
             "overrides": .array(Array(matches.prefix(limit))),
             "truncated": .bool(matches.count > limit),
-        ])
-    }
-}
-
-nonisolated struct AppLogQuery {
-    let level: Logger.Level
-    let category: String?
-    let query: String?
-    let since: Date?
-    let limit: Int
-
-    init(options: JSONValue?) throws {
-        guard let fields = options?.objectValue,
-              Set(fields.keys).isSubset(of: ["level", "category", "query", "since", "limit"]) else {
-            throw RuntimeError.bridge("ox.app.logs: expected log filters.")
-        }
-        func string(_ key: String, maximum: Int) throws -> String? {
-            guard let value = fields[key] else { return nil }
-            guard let text = value.stringValue, !text.isEmpty, text.count <= maximum else {
-                throw RuntimeError.bridge("ox.app.logs: invalid \(key).")
-            }
-            return text
-        }
-        let levels: [String: Logger.Level] = ["debug": .debug, "info": .info, "warning": .warning, "error": .error]
-        guard let level = levels[try string("level", maximum: 7) ?? "debug"] else {
-            throw RuntimeError.bridge("ox.app.logs: invalid level.")
-        }
-        self.level = level
-        category = try string("category", maximum: 80)
-        query = try string("query", maximum: 200)
-        if let timestamp = try string("since", maximum: 40) {
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            let fractional = formatter.date(from: timestamp)
-            formatter.formatOptions = [.withInternetDateTime]
-            guard let date = fractional ?? formatter.date(from: timestamp) else {
-                throw RuntimeError.bridge("ox.app.logs: since must be an ISO 8601 timestamp with a time zone.")
-            }
-            since = date
-        } else {
-            since = nil
-        }
-        if let value = fields["limit"] {
-            guard case .int(let count) = value, (1...100).contains(count) else {
-                throw RuntimeError.bridge("ox.app.logs: limit must be an integer from 1 to 100.")
-            }
-            limit = count
-        } else {
-            limit = 50
-        }
-    }
-
-    func read(_ snapshot: [LogEntry]) -> JSONValue {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        var entries: [JSONValue] = []
-        var bytes = 0
-        var truncated = false
-        for entry in snapshot.reversed() {
-            guard entry.level >= level,
-                  category == nil || entry.category == category,
-                  since.map({ entry.date >= $0 }) ?? true else { continue }
-            let message = LogPrivacy.text(entry.message, limit: Int.max)
-            guard query.map({ message.localizedCaseInsensitiveContains($0) }) ?? true else { continue }
-            let value = JSONValue.object([
-                "timestamp": .string(formatter.string(from: entry.date)),
-                "level": .string(entry.level.name),
-                "category": .string(entry.category),
-                "message": .string(String(message.prefix(2_048))),
-                "truncated": .bool(message.count > 2_048),
-            ])
-            let size = value.jsonString(fallback: "").utf8.count
-            guard entries.count < limit, bytes + size <= 64 * 1024 else {
-                truncated = true
-                break
-            }
-            entries.append(value)
-            bytes += size
-        }
-        return .object([
-            "entries": .array(entries),
-            "truncated": .bool(truncated),
-            "oldestAvailable": snapshot.first.map { .string(formatter.string(from: $0.date)) } ?? .null,
         ])
     }
 }

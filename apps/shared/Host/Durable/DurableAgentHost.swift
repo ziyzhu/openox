@@ -78,13 +78,15 @@ actor DurableAgentHost {
         let scope: ProfileScope
         let operation: String
         let roots: Set<String>
+        let path: String
         let cancelled = Mutex(false)
 
-        init(owner: Conversation, scope: ProfileScope, operation: String, roots: Set<String>) {
+        init(owner: Conversation, scope: ProfileScope, operation: String, roots: Set<String>, path: String) {
             self.owner = owner
             self.scope = scope
             self.operation = operation
             self.roots = roots
+            self.path = path
         }
     }
     private var fileCapabilities: [String: FileCapability] = [:]
@@ -95,7 +97,8 @@ actor DurableAgentHost {
         let capability = UUID().uuidString
         let reference = await owner.durableRoute?.reference
         let state = FileCapability(owner: owner, scope: await owner.scope, operation: operation,
-            roots: Set(mounts.compactMap { $0.objectValue?["path"]?.stringValue }))
+            roots: Set(mounts.compactMap { $0.objectValue?["path"]?.stringValue }),
+            path: arguments.objectValue?["path"]?.stringValue ?? arguments.objectValue?["from"]?.stringValue ?? "")
         fileCapabilities[capability] = state
         defer { fileCapabilities[capability] = nil }
         return try await withTaskCancellationHandler {
@@ -137,7 +140,13 @@ actor DurableAgentHost {
             throw RuntimeError.bridge("Filesystem search cannot activate skills")
         }
         try Task.checkCancellation()
-        let result = try await capability.owner.fileBackend(operation: operation, path: path, arguments: params)
+        let result: JSONValue
+        if capability.roots.contains("app"), root == "app" {
+            result = try await capability.owner.appFileBackend(operation: operation, path: path, arguments: params,
+                requestedOperation: capability.operation, requestedPath: capability.path)
+        } else {
+            result = try await capability.owner.fileBackend(operation: operation, path: path, arguments: params)
+        }
         guard StorageRoot.currentScope == capability.scope, !capability.cancelled.withLock({ $0 }) else {
             throw RuntimeError.bridge("Filesystem backend scope expired during the operation")
         }

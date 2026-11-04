@@ -10,6 +10,11 @@ nonisolated enum ApplicationStorageMigrator {
     @MainActor
     static func migrate() {
         Log.app.info("StorageMigrator.application start")
+        do { try migrateConfigurationLocations() }
+        catch {
+            Log.app.error("StorageMigrator.configurationLocations deferred error=\(error.localizedDescription)")
+            return
+        }
         migrateExternalProfiles(
             in: AppStoragePaths.applicationSupport,
             destination: AppStoragePaths.externalProfiles
@@ -22,6 +27,11 @@ nonisolated enum ApplicationStorageMigrator {
             defaults: .standard,
             currentKey: RepositoryMigrator.legacyRemoteMCPKey
         )
+        do { try migrateEarlyStateStorage() }
+        catch {
+            Log.app.error("StorageMigrator.appState deferred error=\(error.localizedDescription)")
+            return
+        }
         if !FileManager.default.fileExists(atPath: AppStoragePaths.providersConfiguration.path) {
             migrateCustomLLMProviders(defaults: .standard, key: ProviderRegistry.customProvidersKey)
             migrateDefaultModel(defaults: .standard, fallbackRegion: AppRegion.shared.region)
@@ -37,14 +47,21 @@ nonisolated enum ApplicationStorageMigrator {
         migrateFilesPolicies()
         migrateFolderOwnership()
         migrateSavedServices()
+        do {
+            try migrateSettingsStorage()
+            try migratePolicyStorage()
+            try migrateStateAndServiceStorage()
+        } catch {
+            Log.app.error("StorageMigrator.configuration deferred error=\(error.localizedDescription)")
+        }
         CredentialMigrator.removeLegacyRepositoryAuthorization()
         Log.app.info("StorageMigrator.application done")
     }
 
     private static func migrateProviderStorage(defaults: UserDefaults = .standard) throws {
         let exists = FileManager.default.fileExists(atPath: AppStoragePaths.providersConfiguration.path)
-        let legacyCatalog = defaults.object(forKey: ProviderRegistry.catalogKey)
-        let legacySelection = defaults.object(forKey: ProviderRegistry.defaultModelKey)
+        let legacyCatalog = legacyPreference(ProviderRegistry.catalogKey, defaults: defaults)
+        let legacySelection = legacyPreference(ProviderRegistry.defaultModelKey, defaults: defaults)
         guard !exists || legacyCatalog != nil || legacySelection != nil else { return }
         Log.app.info("StorageMigrator.providerStorage start source=preferences target=providers.json existing=\(exists)")
         var migrated: ProviderCatalog
@@ -75,7 +92,7 @@ nonisolated enum ApplicationStorageMigrator {
     }
 
     private static func migrateDiscoveredModels(defaults: UserDefaults = .standard) {
-        guard let data = defaults.data(forKey: ProviderRegistry.discoveredModelsKey) else { return }
+        guard let data = legacyPreference(ProviderRegistry.discoveredModelsKey, defaults: defaults) as? Data else { return }
         do {
             if !FileManager.default.fileExists(atPath: AppStoragePaths.discoveredModels.path),
                (try? JSONDecoder().decode([String: ProviderRegistry.DiscoveredModels].self, from: data)) != nil {
@@ -107,7 +124,7 @@ nonisolated enum ApplicationStorageMigrator {
                 removedFiles += 1
             }
         }
-        let selection = defaults.data(forKey: ProviderRegistry.defaultModelKey)
+        let selection = (legacyPreference(ProviderRegistry.defaultModelKey, defaults: defaults) as? Data)
             .flatMap { try? JSONDecoder().decode(ModelSelection.self, from: $0) }
         let clearedDefault = selection?.providerID == providerID
         if clearedDefault { defaults.removeObject(forKey: ProviderRegistry.defaultModelKey) }
@@ -117,8 +134,12 @@ nonisolated enum ApplicationStorageMigrator {
     }
 
     private static func migrateActionApprovalPolicies(defaults: UserDefaults = .standard) {
+        if FileManager.default.fileExists(atPath: AppStoragePaths.actionPolicies.path),
+           legacyPreference(ServiceManager.actionPoliciesKey, defaults: defaults) == nil,
+           legacyPreference(ServiceManager.legacyAutoApproveActionsKey, defaults: defaults) == nil,
+           legacyPreference(ServiceManager.legacyAutoApproveAllKey, defaults: defaults) == nil { return }
         let retired = Set(["ox.app.inspect"])
-        if let data = defaults.data(forKey: ServiceManager.actionPoliciesKey) {
+        if let data = legacyPreference(ServiceManager.actionPoliciesKey, defaults: defaults) as? Data {
             do {
                 let stored = try JSONDecoder().decode(ActionPolicyConfiguration.self, from: data)
                 let migratedFormat = stored.format == ActionPolicyConfiguration.legacyFormat
@@ -167,12 +188,12 @@ nonisolated enum ApplicationStorageMigrator {
             return
         }
 
-        let legacy = defaults.stringArray(forKey: ServiceManager.legacyAutoApproveActionsKey) ?? []
+        let legacy = legacyPreference(ServiceManager.legacyAutoApproveActionsKey, defaults: defaults) as? [String] ?? []
         let retained = Set(legacy).filter { !isRetiredApproval($0, retired: retired) && !$0.hasPrefix("ios:files:") }
         let actions = retained.sorted().reduce(into: [String: ActionPolicy]()) { actions, action in
             actions[canonicalApprovalAction(action)] = .allow
         }
-        let allowsAll = defaults.bool(forKey: ServiceManager.legacyAutoApproveAllKey)
+        let allowsAll = legacyPreference(ServiceManager.legacyAutoApproveAllKey, defaults: defaults) as? Bool ?? false
         let configuration = ActionPolicyConfiguration(
             defaultPolicy: allowsAll ? .allow : nil,
             actions: actions
@@ -216,7 +237,7 @@ nonisolated enum ApplicationStorageMigrator {
     }
 
     private static func migrateFilesPolicies(defaults: UserDefaults = .standard) {
-        guard let data = defaults.data(forKey: ServiceManager.actionPoliciesKey) else { return }
+        guard let data = legacyPreference(ServiceManager.actionPoliciesKey, defaults: defaults) as? Data else { return }
         do {
             var configuration = try JSONDecoder().decode(ActionPolicyConfiguration.self, from: data)
             guard configuration.format == ActionPolicyConfiguration.currentFormat else { return }
@@ -235,7 +256,7 @@ nonisolated enum ApplicationStorageMigrator {
     }
 
     private static func migrateSavedServices(defaults: UserDefaults = .standard) {
-        guard let stored = defaults.stringArray(forKey: ServiceManager.savedKey) else { return }
+        guard let stored = legacyPreference(ServiceManager.savedKey, defaults: defaults) as? [String] else { return }
         let retained = stored.filter { $0 != BrowserFunctionCatalog.internalDomain && $0 != "ios:files" }
         guard retained != stored else { return }
         defaults.set(retained, forKey: ServiceManager.savedKey)
@@ -261,7 +282,67 @@ nonisolated enum ApplicationStorageMigrator {
         return "web:\(action)"
     }
 
+    private static func migrateSettingsStorage(defaults: UserDefaults = .standard) throws {
+        let exists = FileManager.default.fileExists(atPath: AppStoragePaths.settings.path)
+        let legacy = legacyPreference("app.language", defaults: defaults)
+        if exists {
+            let settings = try AppSettings.load()
+            if let legacy {
+                guard let language = legacy as? String, settings.language == language else {
+                    throw StorageMigrationError.collision("app settings")
+                }
+            }
+        } else {
+            var settings = AppSettings()
+            if let legacy {
+                guard let language = legacy as? String else {
+                    throw StorageMigrationError.invalidApplicationStorage("app language")
+                }
+                settings.language = language
+            }
+            try settings.save()
+            guard try AppSettings.load() == settings else {
+                throw StorageMigrationError.invalidApplicationStorage("app settings")
+            }
+            Log.app.info("StorageMigrator.settings done format=1")
+        }
+        if legacy != nil {
+            defaults.removeObject(forKey: "app.language")
+            guard defaults.synchronize() else { throw StorageMigrationError.invalidApplicationStorage("app settings publication") }
+        }
+    }
+
+    private static func migratePolicyStorage(defaults: UserDefaults = .standard) throws {
+        let exists = FileManager.default.fileExists(atPath: AppStoragePaths.actionPolicies.path)
+        let legacy = legacyPreference(ServiceManager.actionPoliciesKey, defaults: defaults)
+        let source: ActionPolicyConfiguration?
+        if let legacy {
+            guard let data = legacy as? Data else { throw StorageMigrationError.invalidApplicationStorage("Action policies") }
+            source = try JSONDecoder().decode(ActionPolicyConfiguration.self, from: data)
+            try source?.validate()
+        } else { source = nil }
+        if exists {
+            let current = try ActionPolicyConfiguration.load()
+            if let source, source != current { throw StorageMigrationError.collision("Action policies") }
+        } else {
+            let configuration = source ?? ActionPolicyConfiguration()
+            try configuration.save()
+            guard try ActionPolicyConfiguration.load() == configuration else {
+                throw StorageMigrationError.invalidApplicationStorage("Action policies")
+            }
+            Log.app.info("StorageMigrator.policyFile done format=\(configuration.format)")
+        }
+        if legacy != nil {
+            defaults.removeObject(forKey: ServiceManager.actionPoliciesKey)
+            guard defaults.synchronize() else { throw StorageMigrationError.invalidApplicationStorage("Action policy publication") }
+        }
+    }
+
     static func validateApplicationStorage() throws {
+        try migrateConfigurationLocations()
+        try migrateSettingsStorage()
+        try migratePolicyStorage()
+        try migrateStateAndServiceStorage()
         let manager = FileManager.default
         let support = AppStoragePaths.applicationSupport
         let legacyProfiles = support
@@ -292,14 +373,14 @@ nonisolated enum ApplicationStorageMigrator {
         let defaults = UserDefaults.standard
         try migrateProviderStorage()
         _ = try ProviderCatalog.load()
-        if defaults.object(forKey: RepositoryMigrator.legacyRemoteMCPKey) != nil {
-            guard let data = defaults.data(forKey: RepositoryMigrator.legacyRemoteMCPKey),
+        if legacyPreference(RepositoryMigrator.legacyRemoteMCPKey, defaults: defaults) != nil {
+            guard let data = legacyPreference(RepositoryMigrator.legacyRemoteMCPKey, defaults: defaults) as? Data,
                   (try? JSONDecoder().decode([RepositoryMigrator.LegacyRemoteMCP].self, from: data)) != nil else {
                 throw StorageMigrationError.invalidApplicationStorage("remote MCP server")
             }
         }
-        if defaults.object(forKey: ProviderRegistry.customProvidersKey) != nil {
-            guard let data = defaults.data(forKey: ProviderRegistry.customProvidersKey),
+        if legacyPreference(ProviderRegistry.customProvidersKey, defaults: defaults) != nil {
+            guard let data = legacyPreference(ProviderRegistry.customProvidersKey, defaults: defaults) as? Data,
                   (try? JSONDecoder().decode([CustomLLMProvider].self, from: data)) != nil else {
                 throw StorageMigrationError.invalidApplicationStorage("custom provider")
             }
@@ -393,7 +474,7 @@ nonisolated enum ApplicationStorageMigrator {
         currentKey: String
     ) {
         let legacyKey = "remoteMCPEndpoints"
-        if let data = defaults.data(forKey: currentKey),
+        if let data = legacyPreference(currentKey, defaults: defaults) as? Data,
            (try? JSONDecoder().decode([RepositoryMigrator.LegacyRemoteMCP].self, from: data)) != nil {
             defaults.removeObject(forKey: legacyKey)
             return
@@ -415,7 +496,7 @@ nonisolated enum ApplicationStorageMigrator {
         defaults: UserDefaults,
         key: String
     ) {
-        guard let data = defaults.data(forKey: key) else { return }
+        guard let data = legacyPreference(key, defaults: defaults) as? Data else { return }
         do {
             let providers = try JSONDecoder().decode([CustomLLMProvider].self, from: data)
             let legacyModelsStored = try JSONSerialization.jsonObject(with: data) as? [[String: Any]]
@@ -442,7 +523,7 @@ nonisolated enum ApplicationStorageMigrator {
             defaultProviderKey,
             defaultRegionKey,
         ]
-        if let data = defaults.data(forKey: ProviderRegistry.defaultModelKey),
+        if let data = legacyPreference(ProviderRegistry.defaultModelKey, defaults: defaults) as? Data,
            let stored = try? JSONDecoder().decode(ModelSelection.self, from: data) {
             var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             if let region = (object?["region"] as? String).flatMap(LLMRegion.init(rawValue:)) {
@@ -455,18 +536,18 @@ nonisolated enum ApplicationStorageMigrator {
             legacyKeys.forEach { defaults.removeObject(forKey: $0) }
             return
         }
-        guard defaults.object(forKey: ProviderRegistry.defaultModelKey) == nil else { return }
-        let hasLegacyValue = legacyKeys.contains { defaults.object(forKey: $0) != nil }
+        guard legacyPreference(ProviderRegistry.defaultModelKey, defaults: defaults) == nil else { return }
+        let hasLegacyValue = legacyKeys.contains { legacyPreference($0, defaults: defaults) != nil }
         guard hasLegacyValue else { return }
-        let region = defaults.string(forKey: defaultRegionKey).flatMap(LLMRegion.init(rawValue:)) ?? fallbackRegion
-        let providerID = defaults.string(forKey: defaultProviderKey)
-        let selectedModels = defaults.dictionary(forKey: selectedModelsKey) as? [String: String] ?? [:]
+        let region = (legacyPreference(defaultRegionKey, defaults: defaults) as? String).flatMap(LLMRegion.init(rawValue:)) ?? fallbackRegion
+        let providerID = legacyPreference(defaultProviderKey, defaults: defaults) as? String
+        let selectedModels = legacyPreference(selectedModelsKey, defaults: defaults) as? [String: String] ?? [:]
         let modelID = providerID.flatMap {
             selectedModels["\(region.rawValue)\u{1F}\($0)"] ?? selectedModels[$0]
         }
         let selection: ModelSelection?
         if let providerID, let modelID {
-            let efforts = defaults.dictionary(forKey: selectedReasoningEffortsKey) as? [String: String] ?? [:]
+            let efforts = legacyPreference(selectedReasoningEffortsKey, defaults: defaults) as? [String: String] ?? [:]
             selection = ModelSelection(
                 region: region,
                 providerID: StorageMigrationSupport.providerIdentity(providerID, region: region, modelID: modelID),
@@ -568,7 +649,7 @@ nonisolated enum ApplicationStorageMigrator {
             }
             try Credentials.setSecretChecked(value, for: "api:\(destination)")
         }
-        let existing = defaults.data(forKey: ProviderRegistry.catalogKey)
+        let existing = legacyPreference(ProviderRegistry.catalogKey, defaults: defaults) as? Data
         if let existing {
             let catalog = try JSONDecoder().decode(ProviderCatalog.self, from: existing)
             if catalog.format == 2 {
@@ -585,7 +666,7 @@ nonisolated enum ApplicationStorageMigrator {
             try ProviderClientFactory.validateAdapter(entry.definition)
         }
         var catalog = ProviderCatalog()
-        let selection = defaults.data(forKey: ProviderRegistry.defaultModelKey).flatMap { try? JSONDecoder().decode(ModelSelection.self, from: $0) }
+        let selection = (legacyPreference(ProviderRegistry.defaultModelKey, defaults: defaults) as? Data).flatMap { try? JSONDecoder().decode(ModelSelection.self, from: $0) }
         if let existing {
             struct Overlay: Decodable {
                 let providers: [ProviderDefinition]
@@ -604,7 +685,7 @@ nonisolated enum ApplicationStorageMigrator {
                 disabled.models = []
                 catalog.providers.append(disabled)
             }
-        } else if let data = defaults.data(forKey: ProviderRegistry.customProvidersKey) {
+        } else if let data = legacyPreference(ProviderRegistry.customProvidersKey, defaults: defaults) as? Data {
             let custom = try JSONDecoder().decode([CustomLLMProvider].self, from: data)
             for provider in custom {
                 var definition = provider.definition

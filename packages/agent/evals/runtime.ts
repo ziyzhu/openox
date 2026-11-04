@@ -18,7 +18,7 @@ export type AttachedService = TurnState["attachedServices"][number];
 type Messages = Awaited<ReturnType<ProfileRuntime["run"]>>["messages"];
 export type Turn = { status: "completed" | "failed" | "timeout"; error?: string; systemPrompt: string; messages: Messages; calls: Call[] };
 
-const namespaces = ["app", "conversation", "provider", "repository", "secret", "service", "user", "web", "fs", "output", "skill", "schedule", "vision"];
+const namespaces = ["conversation", "provider", "repository", "secret", "service", "user", "web", "fs", "output", "skill", "schedule", "vision"];
 const contractCatalog = () => [...namespaces.map(name => `ox.${name} — ${guidanceText(`namespace.${name}`)}`), "", ...Object.entries(catalog).map(([name, contract]) => `${name} — ${contract.description.split(/\s+/).join(" ")}`).sort()].join("\n");
 
 export function evalModels(provider: string): Models {

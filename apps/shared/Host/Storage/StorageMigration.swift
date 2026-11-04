@@ -55,6 +55,7 @@ nonisolated enum StorageMigrator {
         try ProfileMigrator.privatizeAbandonedProfileStages()
         try ApplicationStorageMigrator.validateApplicationStorage()
         try CredentialMigrator.migrateLegacySecrets()
+        try CredentialMigrator.migrateSecretStorage()
         try CredentialMigrator.migrateManagedOAuthAccounts()
         try CredentialMigrator.migratePublicationToken()
         try await storage.resolve()

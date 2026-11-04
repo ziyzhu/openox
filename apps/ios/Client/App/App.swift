@@ -9,6 +9,7 @@ struct OxApp: App {
         #if DEBUG
         guard !OxDemoLaunch.enabled && !OxAppStoreScreenshotLaunch.enabled else { return }
         #endif
+        StorageMigrator.migrateApplicationStorage()
         ScheduleScheduler.shared.register()
     }
 
@@ -41,7 +42,8 @@ private struct OxApplicationView: View {
 
     @AppStorage(Theme.Appearance.storageKey) private var appearance = Theme.Appearance.system
     @State private var incomingWebLink: IncomingWebLink?
-    @AppStorage("app.hasCompletedOnboarding") private var onboarded = false
+    @State private var appState = AppStateStore.shared
+    private var onboarded: Bool { appState.value.onboarded }
     @Environment(\.scenePhase) private var scenePhase
     @State private var skillImports = SkillImportCoordinator()
     @State private var conversationImports = ConversationImportCoordinator()
@@ -174,7 +176,10 @@ private struct OxApplicationView: View {
         if onboarded {
             RootView(client: client, skillImports: skillImports, conversationImports: conversationImports)
         } else {
-            OnboardingView { onboarded = true }
+            OnboardingView {
+                do { try appState.update { $0.onboarded = true } }
+                catch { Log.app.error("Onboarding.save failed error=\(error.localizedDescription)") }
+            }
         }
     }
 }

@@ -106,7 +106,7 @@ extension Scenario {
     static let appInformation = Scenario(name: "app-information") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute("""
-            const info = await ox.app.info({ purpose: "Read app identity" });
+            const info = JSON.parse((await ox.fs.read({ path: "app/status.json", purpose: "Read app identity" })).text).app;
             const model = await ox.conversation.model({ purpose: "Read current model" });
             console.log({ info, model });
             """)]
@@ -124,9 +124,9 @@ extension Scenario {
         guard let output = ctx.resultText("execute") else {
             return [execute("""
             try {
-              const result = await ox.app.logs({ level: "info", category: "Session", query: "Conversation.", limit: 3, purpose: "Read diagnostic logs" });
-              const valid = result.entries.length > 0 && result.entries.length <= 3 && result.entries.every((entry, index, entries) => entry.category === "Session" && ["info", "warning", "error"].includes(entry.level) && entry.message.toLowerCase().includes("conversation.") && (index === 0 || entry.timestamp <= entries[index - 1].timestamp));
-              console.log(JSON.stringify({ valid, count: result.entries.length, truncated: result.truncated }));
+              const result = await ox.fs.grep({ path: "app/logs.jsonl", pattern: '"category":"Session"', options: { literal: true, limit: 3 }, purpose: "Read diagnostic logs" });
+              const valid = result.matches.length > 0 && result.matches.length <= 3 && result.matches.every(entry => entry.text.includes('"category":"Session"'));
+              console.log(JSON.stringify({ valid, count: result.matches.length, truncated: result.truncated }));
             } catch (error) {
               console.log(JSON.stringify({ error: String(error) }));
             }
@@ -141,7 +141,7 @@ extension Scenario {
         guard result["valid"] == .bool(true) else {
             return [.say("App log approval or filtering failed."), .stop(.stop)]
         }
-        return [.say("Approved log access returned bounded, filtered diagnostics in newest-first order."), .stop(.stop)]
+        return [.say("Approved log access returned bounded, filtered diagnostics."), .stop(.stop)]
     }
 
     static let deferredCompaction = Scenario(name: "deferred-compaction", steps: [

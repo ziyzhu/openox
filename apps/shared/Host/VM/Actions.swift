@@ -32,6 +32,7 @@ nonisolated enum Actions {
     static let appRenameConversation = "ox.app.renameConversation"
     static let webSearch = "ox.web.search"
     static let webFetch = "ox.web.fetch"
+    static let fsStat = "ox.fs.stat"
     static let fsList = "ox.fs.list"
     static let fsRead = "ox.fs.read"
     static let fsAttach = "ox.fs.attach"
@@ -94,7 +95,7 @@ nonisolated enum Actions {
         appModel, appDefaultModel, appSetModel, appSetDefaultModel, appActionPolicies, appRepositories,
         appLogs, appRenameConversation,
         webSearch, webFetch,
-        fsList, fsRead, fsAttach, fsWrite, fsEdit, fsRm, fsMkdir, fsMove, fsCopy, fsGlob, fsGrep,
+        fsStat, fsList, fsRead, fsAttach, fsWrite, fsEdit, fsRm, fsMkdir, fsMove, fsCopy, fsGlob, fsGrep,
         visionAnalyze,
         serviceFind, serviceList, serviceListAttached, serviceInspect, serviceCheckAccess, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryEnable, repositoryDisconnect,
@@ -116,7 +117,7 @@ nonisolated enum Actions {
 
     static func defaultPolicy(for action: String) -> ActionPolicy {
         guard builtIn.contains(action) else { return .ask }
-        return action.hasSuffix(".delete") || action == fsRm || action == providerGenerate || [scheduleCreate, scheduleEnable, scheduleRun].contains(action) ? .ask : .allow
+        return action.hasSuffix(".delete") || action == fsRm || action == providerGenerate || action == appLogs || [scheduleCreate, scheduleEnable, scheduleRun].contains(action) ? .ask : .allow
     }
 
     static func label(for action: String) -> String? {
@@ -151,6 +152,7 @@ nonisolated enum Actions {
         case appRenameConversation: L10n.string("Rename conversation")
         case webSearch: L10n.string("Search the web")
         case webFetch: L10n.string("Fetch a web resource")
+        case fsStat: L10n.string("Inspect a file")
         case fsList: L10n.string("List files")
         case fsRead, outputRead: L10n.string("Read a file")
         case fsWrite: L10n.string("Write a file")

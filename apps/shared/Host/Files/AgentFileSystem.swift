@@ -2,7 +2,7 @@ import Foundation
 
 extension Conversation {
     var fileSystemMounts: [JSONValue] {
-        let roots = VirtualFileSystem.hostRoots + ["mounts"]
+        let roots = VirtualFileSystem.hostRoots + ["mounts"] + (appFilesAvailable ? ["app"] : [])
         return roots.map { root in
             JSONValue.object(["path": .string(root), "access": .string(root == "tmp" ? "readOnly" : "readWrite")])
         } + [JSONValue.object(["path": .string(""), "access": .string("readOnly")])]
@@ -24,7 +24,7 @@ extension Conversation {
     }
 
     public func fileSystemOperation(name: String, arguments: JSONValue) async throws -> JSONValue? {
-        let actions = ["list": Actions.fsList, "read": Actions.fsRead, "write": Actions.fsWrite,
+        let actions = ["stat": Actions.fsStat, "list": Actions.fsList, "read": Actions.fsRead, "write": Actions.fsWrite,
                        "edit": Actions.fsEdit, "rm": Actions.fsRm, "mkdir": Actions.fsMkdir, "move": Actions.fsMove, "copy": Actions.fsCopy,
                        "glob": Actions.fsGlob, "grep": Actions.fsGrep]
         if name == "attach", let args = arguments.objectValue, let path = args["path"]?.stringValue {
@@ -58,10 +58,11 @@ extension Conversation {
         if let base64 = recorded.removeValue(forKey: "base64")?.stringValue {
             recorded["bytes"] = .int(base64.utf8.count / 4 * 3)
         }
-        return try await tracked(action, .object(recorded), purpose: purpose) {
+        return try await tracked(action, .object(recorded), purpose: purpose, groupsCalls: true) {
             if ["write", "edit", "rm", "mkdir", "move", "copy"].contains(name) {
                 for candidate in [path, args["to"]?.stringValue].compactMap({ $0 }) {
                     let root = candidate.split(separator: "/").first.map(String.init) ?? ""
+                    if root == "app", appFilesAvailable { try requireProfileMutation(action) }
                     let temporaryFiles = isTemporary && route.fileScope != nil && !["MEMORY.md", "skills", "history"].contains(root)
                     if !["mounts", "repositories"].contains(root), !temporaryFiles { try requireProfileMutation(action) }
                 }

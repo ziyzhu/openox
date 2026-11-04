@@ -74,7 +74,7 @@ export class Stubs {
       Object.assign(this.state, changes);
       return result;
     }
-    const readers: Record<string, string> = { "ox.app.profile": "profile", "ox.provider.list": "providers", "ox.repository.list": "repositories", "ox.schedule.list": "schedules" };
+    const readers: Record<string, string> = { "ox.provider.list": "providers", "ox.repository.list": "repositories", "ox.schedule.list": "schedules" };
     if (readers[name]) return this.output(name, this.state[readers[name]!]);
     throw new StubError("stub_unconfigured", `No prepared stub matches ${name}`, "Prepare this function's state and response in the eval fixture.");
   }

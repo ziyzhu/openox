@@ -94,28 +94,32 @@ final class ServiceManager {
         var id: String { rawValue }
     }
 
-    private(set) var serviceNames: [String: String] {
-        didSet { UserDefaults.standard.set(serviceNames, forKey: Self.serviceNamesKey) }
-    }
+    private var preferences: ServicePreferences
+    var serviceNames: [String: String] { preferences.names }
+    var savedDomains: Set<String> { Set(preferences.saved) }
 
     func renameService(_ service: Service, to name: String) {
-        serviceNames[service.domain] = name
-        Log.service.info("ServiceManager.rename domain=\(service.domain)")
+        var next = preferences
+        next.names[service.domain] = name
+        do { try replaceServicePreferences(next) }
+        catch { Log.service.error("ServiceManager.rename save failed error=\(error.localizedDescription)") }
     }
 
-    private(set) var savedDomains: Set<String> {
-        didSet { UserDefaults.standard.set(savedDomains.sorted(), forKey: Self.savedKey) }
-    }
-
-    private(set) var actionPolicies: ActionPolicyConfiguration {
-        didSet {
-            guard let data = try? JSONEncoder().encode(actionPolicies) else {
-                Log.service.error("ServiceManager.actionPolicies encode failed")
-                return
-            }
-            UserDefaults.standard.set(data, forKey: Self.actionPoliciesKey)
+    func replaceServicePreferences(_ next: ServicePreferences) throws {
+        guard try ServicePreferences.load() == preferences else {
+            throw StorageMigrationError.collision("service preferences changed externally")
         }
+        try next.save()
+        preferences = next
     }
+
+    private func removeSavedDomain(_ domain: String) throws {
+        var next = preferences
+        next.saved.removeAll { $0 == domain }
+        try replaceServicePreferences(next)
+    }
+
+    private(set) var actionPolicies: ActionPolicyConfiguration
 
     @ObservationIgnored private var attachedServiceDomainsByConversation: [UUID: Set<String>] = [:]
     @ObservationIgnored var webConversations: [UUID: WebConversation] = [:]
@@ -172,8 +176,7 @@ final class ServiceManager {
     init(nativeServices: any NativeServiceCatalog, memoryWarningNotification: Notification.Name? = nil) {
         self.nativeServices = nativeServices
         repository = Repository(developmentRemote: Self.launchServerURL)
-        serviceNames = UserDefaults.standard.dictionary(forKey: Self.serviceNamesKey) as? [String: String] ?? [:]
-        savedDomains = Set(UserDefaults.standard.stringArray(forKey: Self.savedKey) ?? [])
+        preferences = (try? ServicePreferences.load()) ?? ServicePreferences()
         actionPolicies = Self.loadActionPolicies()
         folderGrantObserver = NotificationCenter.default.addObserver(forName: DeviceFolderStore.didChange, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -195,18 +198,29 @@ final class ServiceManager {
         }
     }
 
-    private static func loadActionPolicies(defaults: UserDefaults = .standard) -> ActionPolicyConfiguration {
-        guard let data = defaults.data(forKey: actionPoliciesKey) else { return ActionPolicyConfiguration() }
+    private static func loadActionPolicies() -> ActionPolicyConfiguration {
         do {
-            let configuration = try JSONDecoder().decode(ActionPolicyConfiguration.self, from: data)
-            guard configuration.format == ActionPolicyConfiguration.currentFormat else {
-                Log.service.error("ServiceManager.actionPolicies unsupported format=\(configuration.format)")
-                return ActionPolicyConfiguration(defaultPolicy: .ask)
-            }
-            return configuration
+            return try ActionPolicyConfiguration.load()
         } catch {
-            Log.service.error("ServiceManager.actionPolicies decode failed error=\(error.localizedDescription)")
+            Log.service.error("ServiceManager.actionPolicies unavailable error=\(error.localizedDescription)")
             return ActionPolicyConfiguration(defaultPolicy: .ask)
+        }
+    }
+
+    @discardableResult
+    private func updateActionPolicies(_ update: (inout ActionPolicyConfiguration) -> Void) -> Bool {
+        do {
+            guard try ActionPolicyConfiguration.load() == actionPolicies else {
+                throw StorageMigrationError.collision("Action policies changed externally")
+            }
+            var next = actionPolicies
+            update(&next)
+            try next.save()
+            actionPolicies = next
+            return true
+        } catch {
+            Log.service.error("ServiceManager.actionPolicies save failed error=\(error.localizedDescription)")
+            return false
         }
     }
 
@@ -233,8 +247,7 @@ final class ServiceManager {
     }
 
     func reloadPersistedStorage() {
-        serviceNames = UserDefaults.standard.dictionary(forKey: Self.serviceNamesKey) as? [String: String] ?? [:]
-        savedDomains = Set(UserDefaults.standard.stringArray(forKey: Self.savedKey) ?? [])
+        preferences = (try? ServicePreferences.load()) ?? ServicePreferences()
         actionPolicies = Self.loadActionPolicies()
     }
 
@@ -249,19 +262,21 @@ final class ServiceManager {
 
     func setSaved(_ service: Service, _ saved: Bool) {
         guard isSaved(service) != saved else { return }
-        if saved {
-            savedDomains.insert(service.domain)
-        } else {
-            savedDomains.remove(service.domain)
+        var next = preferences
+        next.saved = Array(saved ? savedDomains.union([service.domain]) : savedDomains.subtracting([service.domain])).sorted()
+        do {
+            try replaceServicePreferences(next)
+            Log.service.info("ServiceManager.setSaved domain=\(service.domain) saved=\(saved)")
+        } catch {
+            Log.service.error("ServiceManager.setSaved failed error=\(error.localizedDescription)")
         }
-        Log.service.info("ServiceManager.setSaved domain=\(service.domain) saved=\(saved)")
     }
 
     var defaultActionPolicy: ActionPolicy? {
         get { actionPolicies.defaultPolicy }
         set {
             guard actionPolicies.defaultPolicy != newValue else { return }
-            actionPolicies.defaultPolicy = newValue
+            guard updateActionPolicies({ $0.defaultPolicy = newValue }) else { return }
             Log.service.info("ServiceManager.actionPolicy default=\(newValue?.rawValue ?? "automatic")")
         }
     }
@@ -272,10 +287,12 @@ final class ServiceManager {
 
     func explicitActionPolicy(for action: String) -> ActionPolicy? { actionPolicies.actions[action] }
 
-    func setActionPolicy(_ policy: ActionPolicy?, for action: String) {
-        guard actionPolicies.actions[action] != policy else { return }
-        actionPolicies.actions[action] = policy
+    @discardableResult
+    func setActionPolicy(_ policy: ActionPolicy?, for action: String) -> Bool {
+        guard actionPolicies.actions[action] != policy else { return true }
+        guard updateActionPolicies({ $0.actions[action] = policy }) else { return false }
         Log.service.info("ServiceManager.actionPolicy action=\(action) policy=\(policy?.rawValue ?? "inherited")")
+        return true
     }
 
     func sourcePolicy(for source: String) -> ActionPolicy? { actionPolicies.sources[source] }
@@ -286,7 +303,7 @@ final class ServiceManager {
 
     func setSourcePolicy(_ policy: ActionPolicy?, for source: String) {
         guard actionPolicies.sources[source] != policy else { return }
-        actionPolicies.sources[source] = policy
+        guard updateActionPolicies({ $0.sources[source] = policy }) else { return }
         Log.service.info("ServiceManager.actionPolicy source=\(source) policy=\(policy?.rawValue ?? "inherited")")
     }
 
@@ -364,7 +381,7 @@ final class ServiceManager {
             _ = try await deleteLocalService(domain: service.domain, locale: monoRepositoryLocale)
         }
         await service.remoteMCPService?.remove()
-        savedDomains.remove(service.domain)
+        try removeSavedDomain(service.domain)
         clearMCPApprovals(service)
         if let remaining = self.service(domain: service.domain) { remaining.resetMCPCapabilities() }
         monoRepositoryRevision &+= 1
@@ -373,10 +390,12 @@ final class ServiceManager {
     }
 
     private func clearMCPApprovals(_ service: Service) {
-        actionPolicies.actions = actionPolicies.actions.filter {
-            !$0.key.hasPrefix("mcp:\(service.domain):") && !$0.key.hasPrefix("\(service.domain):")
+        updateActionPolicies { policies in
+            policies.actions = policies.actions.filter {
+                !$0.key.hasPrefix("mcp:\(service.domain):") && !$0.key.hasPrefix("\(service.domain):")
+            }
+            policies.sources.removeValue(forKey: service.domain)
         }
-        actionPolicies.sources.removeValue(forKey: service.domain)
     }
 
     func attachedService(for url: URL) -> Service? {
@@ -725,7 +744,7 @@ final class ServiceManager {
         let kind = try await repository.deleteLocalService(id: domain)
         _ = await loadRepositories(locale: locale)
         if service(domain: domain) == nil {
-            savedDomains.remove(domain)
+            try removeSavedDomain(domain)
             let previous = attachedDomains
             for conversationID in Array(attachedServiceDomainsByConversation.keys) {
                 attachedServiceDomainsByConversation[conversationID]?.remove(domain)

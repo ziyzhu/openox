@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Synchronization
 
 @MainActor
 @Observable
@@ -20,27 +21,42 @@ final class AppLocale {
         }
     }
 
+    private var settings: AppSettings
+
     var language: Language {
-        didSet {
-            guard language != oldValue else { return }
-            UserDefaults.standard.set(language.rawValue, forKey: Self.key)
-            Log.app.info("AppLocale.language -> \(language.rawValue)")
+        get { Language(rawValue: settings.language) ?? .system }
+        set {
+            do { try setLanguage(newValue) }
+            catch { Log.app.error("AppLocale.save failed error=\(error.localizedDescription)") }
         }
     }
 
-    nonisolated private static let key = "app.language"
+    nonisolated private static let localeLanguage = Mutex<String>(
+        (try? AppSettings.load())?.language ?? "system"
+    )
 
     private init() {
-        let stored = UserDefaults.standard.string(forKey: Self.key)
-        self.language = stored.flatMap(Language.init(rawValue:)) ?? .system
+        settings = (try? AppSettings.load()) ?? AppSettings()
+        Self.localeLanguage.withLock { $0 = settings.language }
         Log.app.info("AppLocale ready language=\(self.language.rawValue) locale=\(self.locale.identifier)")
     }
 
-    nonisolated static var resolvedLocale: Locale {
-        guard let stored = UserDefaults.standard.string(forKey: key), stored != Language.system.rawValue else {
-            return .current
+    func setLanguage(_ language: Language) throws {
+        guard try AppSettings.load() == settings else {
+            throw StorageMigrationError.collision("app settings changed externally")
         }
-        return Locale(identifier: stored)
+        guard language.rawValue != settings.language else { return }
+        var next = settings
+        next.language = language.rawValue
+        try next.save()
+        settings = next
+        Self.localeLanguage.withLock { $0 = next.language }
+        Log.app.info("AppLocale.language -> \(language.rawValue)")
+    }
+
+    nonisolated static var resolvedLocale: Locale {
+        let stored = localeLanguage.withLock { $0 }
+        return stored == "system" ? .current : Locale(identifier: stored)
     }
 
     var locale: Locale {

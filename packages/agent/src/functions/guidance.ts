@@ -1,4 +1,3 @@
-import { guidance as app } from "./app/guidance";
 import { guidance as conversation } from "./conversation/guidance";
 import { guidance as fs } from "./fs/guidance";
 import { guidance as provider } from "./provider/guidance";
@@ -12,7 +11,6 @@ import { guidance as vision } from "./vision/guidance";
 import { guidance as web } from "./web/guidance";
 
 export const functionGuidance: Record<string, string> = {
-  ...app,
   ...conversation,
   ...fs,
   ...provider,
