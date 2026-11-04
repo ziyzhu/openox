@@ -4,18 +4,19 @@ extension Conversation {
     public func searchWeb(arguments: JSONValue, purpose: String) async throws -> JSONValue? {
         let options = arguments.objectValue ?? [:]
         let query = options["query"]?.stringValue ?? ""
-        let services = options["services"]?.arrayValue?.compactMap(\.stringValue)
-            ?? ["web:search.brave.com", "web:duckduckgo.com", "web:google.com"]
+        let domains = options["domains"]?.arrayValue?.compactMap(\.stringValue)
+            ?? ["search.brave.com", "duckduckgo.com", "google.com", "reddit.com", "x.com", "en.wikipedia.org"]
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw OxSearch.failure("invalid_argument", "Search query must not be blank.")
         }
-        guard services.allSatisfy({ $0.range(of: "^web:[a-z0-9.-]+$", options: .regularExpression) != nil }) else {
-            throw OxSearch.failure("invalid_argument", "Use a qualified web service ID.")
+        guard (1...6).contains(domains.count), Set(domains).count == domains.count,
+              domains.allSatisfy({ $0.range(of: "^[a-z0-9.-]+$", options: .regularExpression) != nil }) else {
+            throw OxSearch.failure("invalid_argument", "Use one to six unique bare domains.")
         }
         for field in ["cursors", "sessions"] {
             let values = options[field]?.objectValue ?? [:]
-            guard values.keys.allSatisfy(services.contains) else {
-                throw OxSearch.failure("invalid_argument", "\(field) contains an unselected service.")
+            guard values.keys.allSatisfy(domains.contains) else {
+                throw OxSearch.failure("invalid_argument", "\(field) contains an unselected domain.")
             }
             let schema: JSONValue = field == "sessions" ? WebSessionContract.sessionSchema
                 : .object(["type": .string("string"), "minLength": .int(1)])
@@ -25,13 +26,14 @@ extension Conversation {
             }
         }
         var recorded = options
-        recorded["services"] = .array(services.map(JSONValue.string))
+        recorded["domains"] = .array(domains.map(JSONValue.string))
         return try await tracked(Actions.webSearch, .object(recorded), purpose: purpose, groupsCalls: true) {
             let outcomes = try await withThrowingTaskGroup(of: (Int, Result<JSONValue, OxFunctionError>).self) { group in
-                for (index, service) in services.enumerated() {
+                for (index, domain) in domains.enumerated() {
+                    let service = "web:\(domain)"
                     group.addTask {
                         do {
-                            return (index, .success(try await self.searchPage(service: service, options: options, purpose: purpose)))
+                            return (index, .success(try await self.searchPage(domain: domain, options: options, purpose: purpose)))
                         } catch {
                             let failure = OxFunctionError.from(error)
                             if ["cancelled", "permission_denied", "handoff_incomplete"].contains(failure.code) { throw error }
@@ -40,13 +42,14 @@ extension Conversation {
                         }
                     }
                 }
-                var outcomes = [Result<JSONValue, OxFunctionError>?](repeating: nil, count: services.count)
+                var outcomes = [Result<JSONValue, OxFunctionError>?](repeating: nil, count: domains.count)
                 for try await (index, outcome) in group { outcomes[index] = outcome }
                 return outcomes
             }
             var results: [JSONValue] = []
             var errors: [JSONValue] = []
-            for (service, outcome) in zip(services, outcomes) {
+            for (domain, outcome) in zip(domains, outcomes) {
+                let service = "web:\(domain)"
                 switch outcome {
                 case .success(let page): results.append(page)
                 case .failure(let failure): errors.append(.object(["service": .string(service), "code": .string(failure.code), "message": .string(failure.message)]))
@@ -58,16 +61,16 @@ extension Conversation {
                     guard let fields = error.objectValue else { return nil }
                     return "\(fields["service"]?.stringValue ?? ""): \(fields["code"]?.stringValue ?? ""): \(fields["message"]?.stringValue ?? "")"
                 }.joined(separator: "; ")
-                throw OxFunctionError(code: "all_searches_failed", message: message, recovery: "Inspect each service failure. Do not report that no matches exist.")
+                throw OxFunctionError(code: "all_searches_failed", message: message, recovery: "For missing services or standard search actions, use Evolve to build or extend the requested domain, verify it, then retry. Inspect other failures; do not substitute domains or report that no matches exist.")
             }
             return .object(["query": .string(query), "results": .array(results), "errors": .array(errors)])
         }
     }
 
-    private func searchPage(service: String, options: [String: JSONValue], purpose: String) async throws -> JSONValue {
-        let domain = String(service.dropFirst(4))
+    private func searchPage(domain: String, options: [String: JSONValue], purpose: String) async throws -> JSONValue {
+        let service = "web:\(domain)"
         guard let target = serviceManager.service(domain: domain), target.isWebService else {
-            throw OxSearch.failure("search_unsupported", "\(service) is not an available web service.")
+            throw OxSearch.failure("search_unsupported", "\(domain) has no available web service. Use Evolve to build and verify its standard search action, then retry this domain.")
         }
         try await serviceManager.requireRepositoryAccess(for: target)
         guard await target.loadManifest(reason: .inspect) != nil else {
@@ -75,13 +78,13 @@ extension Conversation {
         }
         guard target.definition.exposedActions.contains(where: { $0.id == "search" }),
               let action = OxActions.detail(definition: target.definition, id: "search")?.objectValue else {
-            throw OxSearch.failure("search_unsupported", "\(service) does not expose standard search.")
+            throw OxSearch.failure("search_unsupported", "\(domain) does not expose standard search. Use Evolve to extend and verify its search action, then retry this domain.")
         }
         let input = try OxSearch.searchInput(action: action, service: service)
         guard action["requireApproval"]?.boolValue != true else {
             throw OxSearch.failure("invalid_contract", "Standard search must be read-only and requireApproval must be false.")
         }
-        let session = options["sessions"]?.objectValue?[service]
+        let session = options["sessions"]?.objectValue?[domain]
         guard action["requireAuth"]?.boolValue != true || session != nil else {
             throw OxSearch.failure("authentication_required", "\(service) requires an authenticated session. Select a session or sign in before searching.")
         }
@@ -90,7 +93,7 @@ extension Conversation {
             throw OxSearch.failure("invalid_contract", "Search limit must declare a maximum from 1 to 50.")
         }
         let limit = min(options["limit"]?.intValue ?? 10, maximum)
-        let cursor = options["cursors"]?.objectValue?[service]
+        let cursor = options["cursors"]?.objectValue?[domain]
         var args: [String: JSONValue] = ["query": options["query"] ?? .null, "limit": .int(limit)]
         args["cursor"] = cursor
         let issues = JSONSchemaValidator.validate(.object(args), against: input, definitions: [:])

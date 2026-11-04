@@ -39,9 +39,9 @@ nonisolated enum OxSearch {
                     "type": .string("object"),
                     "properties": .object([
                         "query": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(1000)]),
-                        "services": .object([
-                            "type": .string("array"), "minItems": .int(1), "maxItems": .int(4), "uniqueItems": .bool(true),
-                            "items": .object(["type": .string("string"), "pattern": .string("^web:[a-z0-9.-]+$")]),
+                        "domains": .object([
+                            "type": .string("array"), "minItems": .int(1), "maxItems": .int(6), "uniqueItems": .bool(true),
+                            "items": .object(["type": .string("string"), "pattern": .string("^[a-z0-9.-]+$")]),
                         ]),
                         "limit": .object(["type": .string("integer"), "minimum": .int(1), "maximum": .int(50), "default": .int(10)]),
                         "cursors": .object(["type": .string("object"), "additionalProperties": .object(["type": .string("string"), "minLength": .int(1)])]),
