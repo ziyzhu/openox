@@ -37,10 +37,6 @@ extension Conversation: OxFunctionBridge {
         try await serviceOperations.updateService(domain: domain, fields: fields, purpose: purpose)
     }
 
-    public func copyService(domain: String, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.copyService(domain: domain, purpose: purpose)
-    }
-
     public func deleteService(domain: String, purpose: String) async throws -> JSONValue? {
         let result = try await serviceOperations.deleteService(domain: domain, purpose: purpose)
         if result?.objectValue?["kind"]?.stringValue == "mcp" {
@@ -118,6 +114,7 @@ extension Conversation {
             throw RuntimeError.bridge("ox.service.attach: requires a non-empty domain")
         }
         return try await tracked(Actions.serviceAttach, .object(["domain": .string(domain)]), purpose: purpose) {
+            await serviceManager.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
             let candidate = try await serviceManager.serviceForCaller(domain: domain, reason: .attach)
             if attachedService(domain: domain) == nil { try await gateServiceAttach(candidate) }
             let service = try await serviceManager.selectServiceForAttachment(candidate)

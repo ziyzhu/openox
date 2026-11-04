@@ -229,6 +229,7 @@ extension Conversation {
                 "repositories": .array(repositories.prefix(limit).map { repository in
                     .object([
                         "id": .string(repository.id),
+                        "path": .string("repositories/\(repository.id)"),
                         "name": .string(repository.name),
                         "provenance": .string(repository.provenance.rawValue),
                         "enabled": .bool(repository.isEnabled),

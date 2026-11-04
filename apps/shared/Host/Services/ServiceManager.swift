@@ -61,6 +61,7 @@ final class ServiceManager {
     private let index = ServiceSearchIndex()
     @ObservationIgnored private var faviconData: [String: Data] = [:]
     @ObservationIgnored private let repository: Repository
+    var fileRepository: Repository { repository }
     @ObservationIgnored private var monoRepository: Repository.MonoRepository?
     @ObservationIgnored private var monoRepositoryLocale: String?
     @ObservationIgnored private var monoRepositoryGeneration: UInt64 = 0
@@ -766,14 +767,12 @@ final class ServiceManager {
         try await repository.sourcePaths(kind: kind.repositoryKind, id: domain)
     }
 
-    private func localScriptKind(_ domain: String) -> ServicesMount.Kind {
-        monoRepository?.repositories.contains(where: {
-            $0.id == Repository.localID && $0.services.contains(where: { $0.id == "api:\(domain)" })
-        }) == true ? .api : .web
+    private func localScriptKind(_ domain: String) async throws -> ServicesMount.Kind {
+        try await repository.localServiceKind(domain) == .api ? .api : .web
     }
 
     func validateService(domain: String) async throws {
-        let kind: ServicesMount.Kind = service(domain: domain)?.isMCPService == true ? .mcp : localScriptKind(domain)
+        let kind: ServicesMount.Kind = service(domain: domain)?.isMCPService == true ? .mcp : try await localScriptKind(domain)
         try await validateLocalService(kind: kind, domain: domain)
         Log.service.info("ServiceManager.validate passed domain=\(domain)")
     }
@@ -792,11 +791,11 @@ final class ServiceManager {
             return service
         }
 
-        let kind = localScriptKind(domain)
         let definition: ServiceDefinition
         if let service, !service.isLocalService {
             definition = service.definition
         } else {
+            let kind = try await localScriptKind(domain)
             try await validateLocalService(kind: kind, domain: domain)
             let manifestData = try await repository.readLocalSource(kind: kind.repositoryKind, id: domain, path: ["service.json"])
             let raw = try JSONDecoder().decode(JSONValue.self, from: manifestData)
@@ -1032,7 +1031,7 @@ final class ServiceManager {
                     "kind": .string(kind),
                     "repository": .string(file.repositoryID),
                     "repositoryProvenance": .string(file.provenance.rawValue),
-                    "manifestPath": .string("services/\(kind)/\(file.domain)/service.json"),
+                    "manifestPath": .string("repositories/\(file.repositoryID)/\(kind)/\(file.domain)/service.json"),
                 ]
                 if let description = fields["description"]?.stringValue { entry["description"] = .string(description) }
                 if let validationError { entry["validationError"] = .string(validationError) }

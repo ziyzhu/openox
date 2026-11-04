@@ -713,7 +713,7 @@ export class IOSAgentAdapter {
         return turnState ? composeOxTurnSections(turnState as unknown as TurnState, config.promptState)[key] : undefined;
       }));
     }
-    if (session.files.physical) sections.push(section("cwd", () => `conversations/${conversation.id}/\nRelative file paths resolve here. Use / for the Profile root and absolute paths such as /reports/report.md for shared files. Mounted resource paths such as skills/ and services/ remain Profile-relative.`));
+    if (session.files.physical) sections.push(section("cwd", () => `conversations/${conversation.id}/\nRelative file paths resolve here. Use / for the Profile root and absolute paths such as /reports/report.md for shared files. Mounted resource paths such as skills/ and repositories/ remain Profile-relative.`));
     const extension = defineExtension({ name: extensionName ?? `ox-conversation:${alias.slice(10)}`, sections,
       tools: config.tools.map(tool => defineTool({ ...tool, replay: "unsafe", executionMode: config.toolExecutionMode === "sequential" ? "sequential" : tool.executionMode ?? config.toolExecutionMode ?? "sequential",
         execute: async (arguments_, api, ctx) => this.executeNativeTool(tool.name, arguments_, api, ctx) })) });

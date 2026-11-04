@@ -5,8 +5,12 @@ extension Conversation {
         SkillsMount(repository: repository, scope: scope, manager: serviceManager, session: skillSession)
     }
 
-    private var servicesMount: ServicesMount {
-        ServicesMount(manager: serviceManager)
+    private var fileRepository: Repository { serviceManager.fileRepository }
+
+    private func repositoryText(_ id: String, path: [String]) async throws -> String {
+        let data = try await fileRepository.readRepositoryFile(id, path: path, profileID: scope.profileID)
+        guard let text = String(data: data, encoding: .utf8) else { throw FileError.textNotUTF8 }
+        return text
     }
 
     func fileBackend(operation: String, path: String, arguments: JSONValue) async throws -> JSONValue {
@@ -100,7 +104,7 @@ extension Conversation {
                 fileSystemItem(path: "MEMORY.md", type: "file", size: UserMemory.shared.text.utf8.count),
                 fileSystemItem(path: "artifacts", type: "directory", size: nil),
                 fileSystemItem(path: "skills", type: "directory", size: nil),
-                fileSystemItem(path: "services", type: "directory", size: nil),
+                fileSystemItem(path: "repositories", type: "directory", size: nil),
                 fileSystemItem(path: "conversations", type: "directory", size: nil),
             ]
             rootItems.append(fileSystemItem(path: "mounts", type: "directory", size: nil))
@@ -136,29 +140,15 @@ extension Conversation {
                 let resource = skill.resources.first { $0.name == relative }
                 return fileSystemItem(path: "\(skill.directoryPath)/\(relative)", type: resource == nil ? "directory" : "file", size: resource?.content.utf8.count)
             }
-        case .services:
-            items = ServicesMount.Kind.allCases.map {
-                fileSystemItem(path: "services/\($0.rawValue)", type: "directory", size: nil)
+        case .repositories:
+            items = serviceManager.repositories.map {
+                fileSystemItem(path: "repositories/\($0.id)", type: "directory", size: nil)
             }
-        case .serviceKind(let kind):
-            items = servicesMount.entries(kind: kind).map {
-                fileSystemItem(path: $0.directoryPath, type: "directory", size: nil)
-            }
-        case .service(let kind, let domain):
-            items = try await servicesMount.sourceEntries(kind: kind, domain: domain, path: []).map {
-                fileSystemItem(
-                    path: "services/\(kind.rawValue)/\(domain)/\($0.name)",
-                    type: $0.isDirectory ? "directory" : "file",
-                    size: $0.size
-                )
-            }
-        case .serviceItem(let kind, let domain, let path):
-            items = try await servicesMount.sourceEntries(kind: kind, domain: domain, path: path).map {
-                fileSystemItem(
-                    path: "services/\(kind.rawValue)/\(domain)/\((path + [$0.name]).joined(separator: "/"))",
-                    type: $0.isDirectory ? "directory" : "file",
-                    size: $0.size
-                )
+        case .repository(let id), .repositoryItem(let id, _):
+            let path: [String]
+            if case .repositoryItem(_, let components) = location { path = components } else { path = [] }
+            items = try await fileRepository.listRepositoryFiles(id, path: path, profileID: scope.profileID).map {
+                fileSystemItem(path: location.path + "/" + $0.name, type: $0.isDirectory ? "directory" : "file", size: $0.size)
             }
         case .conversations:
             items = await fileSystemConversationSummaries().map {
@@ -396,14 +386,20 @@ extension Conversation {
 
     private func writeFileBackend(path: String, base64: String) async throws -> JSONValue {
         let location = try await fileSystemLocation(path)
-        guard case .deviceItem = location else { throw VirtualFileSystem.Error.unsupportedMutation(location.path) }
         guard base64.utf8.count <= (FileLimits.fileBytes + 2) / 3 * 4, let data = Data(base64Encoded: base64) else {
             throw RuntimeError.bridge("Invalid or oversized file Base64")
         }
         try await requireWritableFileContext(location, action: Actions.fsWrite)
         try await authorizeFileAccess(location, operation: .write)
         try await fileMutationCoordinator.perform(key: fileMutationKey(location)) {
-            try await self.writeDeviceFile(location, data: data)
+            switch location {
+            case .repositoryItem(let id, let path):
+                try await self.fileRepository.writeRepositoryFile(id, path: path, data: data)
+            case .deviceItem:
+                try await self.writeDeviceFile(location, data: data)
+            default:
+                throw VirtualFileSystem.Error.unsupportedMutation(location.path)
+            }
         }
         Log.session.info("bridge.fs.write path=\(location.path) bytes=\(data.count) binary=true")
         return fileSystemItem(path: location.path, type: "file", size: data.count)
@@ -411,6 +407,11 @@ extension Conversation {
 
     private func directoryFileBackend(path: String, recursive: Bool) async throws -> JSONValue {
         let location = try await fileSystemLocation(path)
+        if case .repositoryItem(let id, let path) = location {
+            try await requireWritableFileContext(location, action: Actions.fsMkdir)
+            try await fileRepository.createRepositoryDirectory(id, path: path, recursive: recursive)
+            return .null
+        }
         guard case .deviceItem = location else {
             guard try await fileSystemIsDirectory(location) else { throw VirtualFileSystem.Error.unsupportedMutation(location.path) }
             _ = try await listFileBackend(path: path)
@@ -430,6 +431,11 @@ extension Conversation {
     private func transferFileBackend(from path: String, to destinationPath: String, copy: Bool) async throws -> JSONValue {
         let source = try await fileSystemLocation(path)
         let destination = try await fileSystemLocation(destinationPath)
+        if case .repositoryItem(let sourceID, let from) = source, case .repositoryItem(let destinationID, let to) = destination {
+            try await requireWritableFileContext(destination, action: copy ? Actions.fsCopy : Actions.fsMove)
+            try await fileRepository.transferRepositoryFile(from: sourceID, path: from, to: destinationID, destinationPath: to, copy: copy, profileID: scope.profileID)
+            return .null
+        }
         guard case .deviceItem(let grantID, let from) = source, case .deviceItem(let destinationID, let to) = destination else {
             throw VirtualFileSystem.Error.unsupportedMutation(source.path)
         }
@@ -450,9 +456,9 @@ extension Conversation {
         try Task.checkCancellation()
         try await requireWritableFileContext(location, action: Actions.fsRm)
         try await authorizeFileAccess(location, operation: .delete)
-        if case .serviceItem(let kind, let domain, let path) = location {
+        if case .repositoryItem(let id, let path) = location {
             try await fileMutationCoordinator.perform(key: fileMutationKey(location)) {
-                try await self.servicesMount.deleteSource(kind: kind, domain: domain, path: path, recursive: recursive)
+                try await self.fileRepository.removeRepositoryFile(id, path: path, recursive: recursive)
             }
             return .object(["path": .string(location.path), "deleted": .bool(true)])
         }
@@ -493,7 +499,7 @@ extension Conversation {
             break
         case .deviceFolder(let id):
             _ = try DeviceFolderStore.shared.requireGrant(id, profileId: scope.profileID)
-        case .root, .memory, .artifacts, .resources, .skills, .services, .conversations:
+        case .root, .memory, .artifacts, .resources, .skills, .repositories, .conversations:
             return
         }
         try requireFileBackendScope()
@@ -504,7 +510,7 @@ extension Conversation {
         guard [Actions.fsWrite, Actions.fsEdit, Actions.fsRm].contains(action),
               let path = (args as? [String: Any])?["path"] as? String else { return }
         let root = path.split(separator: "/").first.map(String.init) ?? ""
-        if ["MEMORY.md", "skills", "services", "mounts", "files"].contains(root) {
+        if ["MEMORY.md", "skills", "repositories", "mounts", "files"].contains(root) {
             try await requireWritableFileContext(fileSystemLocation(path), action: action)
         } else if !isTemporary || durableRoute?.fileScope == nil {
             try requireProfileMutation(action)
@@ -517,9 +523,10 @@ extension Conversation {
             try await skillsMount.requireWritable(name: name, path: location.path)
         case .resource, .skillDirectory:
             throw VirtualFileSystem.Error.unsupportedMutation(location.path)
-        case .serviceItem:
+        case .repositoryItem(let id, let path):
+            try await fileRepository.requireWritableRepository(id, path: path)
             return
-        case .services, .serviceKind, .service, .conversations, .conversation, .conversationMetadata, .conversationTurns:
+        case .repositories, .repository, .conversations, .conversation, .conversationMetadata, .conversationTurns:
             throw VirtualFileSystem.Error.unsupportedMutation(location.path)
         default:
             break
@@ -527,7 +534,7 @@ extension Conversation {
         switch location.area {
         case .files, .deviceFolder:
             return
-        case .root, .memory, .artifacts, .resources, .skills, .services, .conversations:
+        case .root, .memory, .artifacts, .resources, .skills, .repositories, .conversations:
             try requireProfileMutation(action)
         }
     }
@@ -538,8 +545,8 @@ extension Conversation {
             return try await resourceFiles().isDirectory(path)
         case .skillResource(let name, let path):
             return try await skillsMount.entry(named: name).resources.contains { $0.name.hasPrefix(path + "/") }
-        case .serviceItem(let kind, let domain, let path):
-            return try await servicesMount.sourceIsDirectory(kind: kind, domain: domain, path: path)
+        case .repositoryItem(let id, let path):
+            return try await fileRepository.repositoryFileIsDirectory(id, path: path, profileID: scope.profileID)
         case .deviceItem:
             return try await withDeviceFile(location, mode: .read) { url in
                 try url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true
@@ -551,11 +558,11 @@ extension Conversation {
 
     private func fileMutationKey(_ location: VirtualFileSystem.Location) -> String {
         let path = location.path.lowercased()
-        if case .serviceItem = location { return "services:\(path)" }
+        if case .repositoryItem = location { return "repositories:\(path)" }
         switch location.area {
         case .files, .deviceFolder:
             return "files:\(path)"
-        case .root, .memory, .artifacts, .resources, .skills, .services, .conversations:
+        case .root, .memory, .artifacts, .resources, .skills, .repositories, .conversations:
             return "profile:\(scope.root.standardizedFileURL.path.lowercased()):\(path)"
         }
     }
@@ -633,10 +640,8 @@ extension Conversation {
         case .skillResource(let name, let referenceName):
             let reference = try await skillsMount.resource(skill: name, path: referenceName)
             return try fileSystemTextRead(reference.content)
-        case .serviceItem(let kind, let domain, let path):
-            return try fileSystemTextRead(
-                try await servicesMount.sourceText(kind: kind, domain: domain, path: path)
-            )
+        case .repositoryItem(let id, let path):
+            return try fileSystemTextRead(try await repositoryText(id, path: path))
         case .conversationMetadata(let id):
             let data = try await virtualConversationMetadata(id)
             return try fileSystemTextRead(String(decoding: data, as: UTF8.self))
@@ -656,7 +661,7 @@ extension Conversation {
                 unsupported = result.unsupported
             }
             return FileLibrary.Read(text: result.text, truncated: result.truncated, unsupported: unsupported)
-        case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .conversations, .conversation, .files, .deviceFolder:
+        case .root, .artifacts, .skills, .skill, .skillDirectory, .repositories, .repository, .conversations, .conversation, .files, .deviceFolder:
             throw VirtualFileSystem.Error.notFile(location.path)
         }
     }
@@ -687,8 +692,8 @@ extension Conversation {
             return try await skillsMount.entry(named: name).content
         case .skillResource(let name, let referenceName):
             return try await skillsMount.resource(skill: name, path: referenceName).content
-        case .serviceItem(let kind, let domain, let path):
-            return try await servicesMount.sourceText(kind: kind, domain: domain, path: path)
+        case .repositoryItem(let id, let path):
+            return try await repositoryText(id, path: path)
         case .conversationMetadata(let id):
             return String(decoding: try await virtualConversationMetadata(id), as: UTF8.self)
         case .conversationTurns(let id):
@@ -702,7 +707,7 @@ extension Conversation {
                 guard let text = String(data: data, encoding: .utf8) else { throw FileError.textNotUTF8 }
                 return text
             }
-        case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .conversations, .conversation, .files, .deviceFolder:
+        case .root, .artifacts, .skills, .skill, .skillDirectory, .repositories, .repository, .conversations, .conversation, .files, .deviceFolder:
             throw VirtualFileSystem.Error.notFile(location.path)
         }
     }
@@ -748,13 +753,13 @@ extension Conversation {
             skill.resources = resources
             _ = try await skillsMount.save(skill)
             return fileSystemItem(path: location.path, type: "file", size: data.count)
-        case .serviceItem(let kind, let domain, let path):
-            try await servicesMount.writeSource(kind: kind, domain: domain, path: path, content: content)
+        case .repositoryItem(let id, let path):
+            try await fileRepository.writeRepositoryFile(id, path: path, data: data)
             return fileSystemItem(path: location.path, type: "file", size: data.count)
         case .deviceItem:
             try await writeDeviceFile(location, data: data, expected: expected)
             return fileSystemItem(path: location.path, type: "file", size: data.count)
-        case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .conversations, .conversation, .conversationMetadata, .conversationTurns, .files, .deviceFolder:
+        case .root, .artifacts, .skills, .skill, .skillDirectory, .repositories, .repository, .conversations, .conversation, .conversationMetadata, .conversationTurns, .files, .deviceFolder:
             throw VirtualFileSystem.Error.notFile(location.path)
         }
     }

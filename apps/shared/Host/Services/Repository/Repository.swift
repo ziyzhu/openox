@@ -92,6 +92,7 @@ actor Repository {
             let id: String
             let repositoryID: String
             let repositoryName: String
+            let path: String
         }
 
         let id: String
@@ -255,6 +256,7 @@ actor Repository {
     var configuration: Configuration
     var activeSources: [String: ActiveSource] = [:]
     var candidateSources: [String: [ActiveSource]] = [:]
+    var fileRoots: [String: URL] = [:]
     var localPreparation: StoragePreparation?
     var mountedRepositories = MountedRepositoryStore()
     private var applicationRepositories: [LoadedRepository]?
@@ -313,6 +315,7 @@ actor Repository {
         }
         guard await StorageRoot.shared.activeId == profileId else { throw CancellationError() }
         let available = application + mounted
+        fileRoots = Dictionary(uniqueKeysWithValues: application.map { ($0.descriptor.id, $0.root) })
         let loaded = available.compactMap { loaded in
             if case .ready = loaded.descriptor.state { return loaded }
             return nil
@@ -413,7 +416,8 @@ actor Repository {
                     Conflict.Candidate(
                         id: "\(serviceID):\($0.repository.descriptor.id)",
                         repositoryID: $0.repository.descriptor.id,
-                        repositoryName: $0.repository.descriptor.name
+                        repositoryName: $0.repository.descriptor.name,
+                        path: "repositories/\($0.repository.descriptor.id)/\($0.service.id.path)"
                     )
                 },
                 selectedRepositoryID: chosen?.repository.descriptor.id

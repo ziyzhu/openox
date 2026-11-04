@@ -145,17 +145,12 @@ nonisolated enum OxServices {
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
-                                "kind": .object(["type": .string("string"), "enum": .array([.string("web"), .string("api"), .string("mcp")])]),
-                                "domain": .object(["type": .string("string"), "minLength": .int(3), "maxLength": .int(253)]),
+                                "kind": .object(["type": .string("string"), "const": .string("mcp")]),
                                 "endpoint": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(2048), "description": .string("Public HTTPS MCP endpoint without credentials. Required for MCP; omit domain.")]),
                                 "transport": .object(["type": .string("string"), "enum": .array([.string("auto"), .string("streamable-http"), .string("sse")])]),
                                 "faviconUrl": .object(["type": .string("string"), "format": .string("uri"), "pattern": .string("^https://"), "maxLength": .int(2048), "description": .string("Optional public HTTPS PNG, JPEG, or ICO URL for this MCP connection.")]),
                             ]),
-                            "required": .array([.string("kind")]),
-                            "oneOf": .array([
-                                .object(["properties": .object(["kind": .object(["enum": .array(["web", "api"].map(JSONValue.string))])]), "required": .array([.string("domain")]), "not": .object(["anyOf": .array(["endpoint", "transport", "faviconUrl"].map { .object(["required": .array([.string($0)])]) })])]),
-                                .object(["properties": .object(["kind": .object(["const": .string("mcp")])]), "required": .array([.string("endpoint")]), "not": .object(["required": .array([.string("domain")])])]),
-                            ]),
+                            "required": .array([.string("kind"), .string("endpoint")]),
                             "additionalProperties": .bool(false),
                         ]),
                         "outputSchema": .object(["anyOf": .array([sourceSchema, snapshotSchema])]),
@@ -170,38 +165,14 @@ nonisolated enum OxServices {
                             "properties": .object([
                                 "domain": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(253), "description": .string("Existing service domain. Direct MCP also accepts a saved connection name or unique endpoint host.")]),
                                 "name": .object(["type": .string("string"), "minLength": .int(1), "description": .string("Local display name for any service kind.")]),
-                                "description": .object(["type": .array([.string("string"), .string("null")]), "description": .string("Local web/API description; null removes it.")]),
-                                "baseUrl": .object(["type": .string("string"), "format": .string("uri"), "description": .string("Local web execution URL or API HTTPS base URL. Web URLs must remain on the service domain or its subdomains.")]),
-                                "actions": .object(["type": .string("array"), "items": .object(["type": .string("object")]), "description": .string("Replace the complete Local web/API action declarations. Handlers remain in actions.js; edit them with ox.fs and validate before attaching.")]),
-                                "$defs": .object(["type": .array([.string("object"), .string("null")]), "description": .string("Replace Local web/API shared JSON Schema definitions; null removes them.")]),
-                                "auth": .object(["type": .string("object"), "description": .string("Replace Local API authentication configuration, never credentials. Supported objects: {type: 'none'}; {type: 'apiKey', in: 'header'|'query', name: '<header-or-query-name>'}; {type: 'http', scheme: 'basic'|'bearer'}; or {type: 'oauth2', flow: 'authorizationCode', authorizationURL: '<HTTPS URL>', tokenURL: '<HTTPS URL>', clientID: '<registered public client>', redirectURI: '<app callback URI>', scopes: ['<scope>'], pkce: 'S256'}. OAuth endpoints cannot contain credentials, query, or fragment; callback uses a non-HTTP app scheme without query or fragment. Requires setup again.")]),
                                 "endpoint": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(2048)]),
                                 "transport": .object(["type": .string("string"), "enum": .array([.string("auto"), .string("streamable-http"), .string("sse")])]),
-                                "faviconUrl": .object(["type": .array([.string("string"), .string("null")]), "format": .string("uri"), "pattern": .string("^https://"), "maxLength": .int(2048), "description": .string("Public HTTPS PNG, JPEG, or ICO URL. Local web/API and direct MCP support this field; null removes a Local override or restores MCP-advertised icons.")]),
+                                "faviconUrl": .object(["type": .array([.string("string"), .string("null")]), "format": .string("uri"), "pattern": .string("^https://"), "maxLength": .int(2048), "description": .string("Public HTTPS PNG, JPEG, or ICO URL for a Local MCP connection; null restores MCP-advertised icons.")]),
                             ]),
                             "required": .array([.string("domain")]),
                             "additionalProperties": .bool(false),
                         ]),
                         "outputSchema": .object(["anyOf": .array([sourceSchema, snapshotSchema])]),
-                    ])
-                ),
-                (
-                    "ox.service.copy",
-                    .object([
-                        "description": .string(ModelGuidance.text("ox.service.copy")),
-                        "inputSchema": .object([
-                            "type": .string("object"),
-                            "properties": .object([
-                                "domain": .object([
-                                    "type": .string("string"),
-                                    "minLength": .int(1),
-                                    "maxLength": .int(253),
-                                ]),
-                            ]),
-                            "required": .array([.string("domain")]),
-                            "additionalProperties": .bool(false),
-                        ]),
-                        "outputSchema": sourceSchema,
                     ])
                 ),
                 (
@@ -355,10 +326,6 @@ nonisolated enum OxServices {
             }
             ctx.setObject(updateBlock as AnyObject, forKeyedSubscript: "__nativeServiceUpdate" as NSString)
 
-            let copyBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
-                env.call(suspendingTimeout: true) { try await $0.copyService(domain: domain, purpose: purposeValue.toString()!) }
-            }
-            ctx.setObject(copyBlock as AnyObject, forKeyedSubscript: "__nativeServiceCopy" as NSString)
 
             let deleteBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
                 env.call(suspendingTimeout: true) { try await $0.deleteService(domain: domain, purpose: purposeValue.toString()!) }
@@ -412,7 +379,6 @@ nonisolated enum OxServices {
           validate: (value) => { const options = __oxOptions(value, 'ox.service.validate'); return __nativeServiceValidate(String(options.domain), String(options.purpose)); },
           create: (value) => { const options = __oxOptions(value, 'ox.service.create'); return __nativeServiceCreate(options, String(options.purpose)); },
           update: (value) => { const options = __oxOptions(value, 'ox.service.update'); return __nativeServiceUpdate(options, String(options.purpose)); },
-          copy: (value) => { const options = __oxOptions(value, 'ox.service.copy'); return __nativeServiceCopy(String(options.domain), String(options.purpose)); },
           delete: (value) => { const options = __oxOptions(value, 'ox.service.delete'); return __nativeServiceDelete(String(options.domain), String(options.purpose)); },
           attach: (value) => { const options = __oxOptions(value, 'ox.service.attach'); return __nativeServiceAttach(String(options.domain), String(options.purpose)); },
           detach: (value) => { const options = __oxOptions(value, 'ox.service.detach'); return __nativeServiceDetach(String(options.domain), String(options.purpose)); },

@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated public struct VirtualFileSystem: Sendable {
-    static let hostRoots = ["MEMORY.md", "artifacts", "skills", "services", "conversations", "tmp"]
+    static let hostRoots = ["MEMORY.md", "artifacts", "skills", "repositories", "conversations", "tmp"]
     static let maximumReadBytes = FileLimits.textBytes
     static let maximumSearchFiles = 1_000
 
@@ -16,10 +16,9 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case skillFile(String)
         case skillDirectory(String, String)
         case skillResource(String, String)
-        case services
-        case serviceKind(ServicesMount.Kind)
-        case service(ServicesMount.Kind, String)
-        case serviceItem(ServicesMount.Kind, String, [String])
+        case repositories
+        case repository(String)
+        case repositoryItem(String, [String])
         case conversations
         case conversation(ConversationID)
         case conversationMetadata(ConversationID)
@@ -40,11 +39,10 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .skillFile(let name): "skills/\(name)/SKILL.md"
             case .skillDirectory(let name, let path): "skills/\(name)/\(path)"
             case .skillResource(let name, let path): "skills/\(name)/\(path)"
-            case .services: "services"
-            case .serviceKind(let kind): "services/\(kind.rawValue)"
-            case .service(let kind, let domain): "services/\(kind.rawValue)/\(domain)"
-            case .serviceItem(let kind, let domain, let components):
-                "services/\(kind.rawValue)/\(domain)/\(components.joined(separator: "/"))"
+            case .repositories: "repositories"
+            case .repository(let id): "repositories/\(id)"
+            case .repositoryItem(let id, let components):
+                "repositories/\(id)/\(components.joined(separator: "/"))"
             case .conversations: "conversations"
             case .conversation(let id): "conversations/\(id)"
             case .conversationMetadata(let id): "conversations/\(id)/conversation.json"
@@ -57,8 +55,8 @@ nonisolated public struct VirtualFileSystem: Sendable {
 
         var isDirectory: Bool {
             switch self {
-            case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .conversations, .conversation, .files, .deviceFolder: true
-            case .resource, .memory, .artifact, .skillFile, .skillResource, .serviceItem, .conversationMetadata, .conversationTurns, .deviceItem: false
+            case .root, .artifacts, .skills, .skill, .skillDirectory, .repositories, .repository, .conversations, .conversation, .files, .deviceFolder: true
+            case .resource, .memory, .artifact, .skillFile, .skillResource, .repositoryItem, .conversationMetadata, .conversationTurns, .deviceItem: false
             }
         }
 
@@ -68,7 +66,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .artifacts, .artifact: .artifacts
             case .resource: .resources
             case .skills, .skill, .skillFile, .skillDirectory, .skillResource: .skills
-            case .services, .serviceKind, .service, .serviceItem: .services
+            case .repositories, .repository, .repositoryItem: .repositories
             case .conversations, .conversation, .conversationMetadata, .conversationTurns: .conversations
             case .files: .files
             case .deviceFolder(let id), .deviceItem(let id, _): .deviceFolder(id)
@@ -84,7 +82,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case artifacts
         case resources
         case skills
-        case services
+        case repositories
         case conversations
         case files
         case deviceFolder(String)
@@ -150,19 +148,11 @@ nonisolated public struct VirtualFileSystem: Sendable {
             if ["references", "scripts"].contains(path) { return .skillDirectory(name, path) }
             guard SkillFiles.isResourcePath(path) || SkillFiles.isResourcePath(path + "/file.js") else { throw Error.invalidPath(rawPath) }
             return .skillResource(name, path)
-        case ["services"]: return .services
-        case let parts where parts.count == 2 && parts[0] == "services":
-            guard let kind = ServicesMount.Kind(rawValue: parts[1]) else { throw Error.invalidPath(rawPath) }
-            return .serviceKind(kind)
-        case let parts where parts.count == 3 && parts[0] == "services":
-            guard let kind = ServicesMount.Kind(rawValue: parts[1]), ServicesMount.isID(parts[2]) else { throw Error.invalidPath(rawPath) }
-            return .service(kind, parts[2])
-        case let parts where parts.count >= 4 && parts[0] == "services":
-            guard let kind = ServicesMount.Kind(rawValue: parts[1]),
-                  ServicesMount.isID(parts[2]) else {
-                throw Error.invalidPath(rawPath)
-            }
-            return .serviceItem(kind, parts[2], Array(parts.dropFirst(3)))
+        case ["repositories"]: return .repositories
+        case let parts where parts.count == 2 && parts[0] == "repositories":
+            return .repository(parts[1])
+        case let parts where parts.count > 2 && parts[0] == "repositories":
+            return .repositoryItem(parts[1], Array(parts.dropFirst(2)))
         case ["conversations"]: return .conversations
         case let parts where parts.count == 2 && parts[0] == "conversations":
             guard let id = UUID(uuidString: parts[1]) else { throw Error.invalidPath(rawPath) }

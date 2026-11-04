@@ -70,7 +70,7 @@ function validateMutation(operation: FileOperation, args: FileRequest, path: str
   if (immutableRoots.has(path.split("/").slice(0, 2).join("/"))) throw new FileError("permission_denied", "Bundled System skills are read-only; copy to a distinct name to customize", path);
 }
 export function resolveFileRequest(args: FileRequest, cwd: string): FileRequest {
-  const roots = new Set(["MEMORY.md", "skills", "services", "mounts", "files", "artifacts", "conversations", "history", "chats", "tmp"]);
+  const roots = new Set(["MEMORY.md", "skills", "repositories", "mounts", "files", "artifacts", "conversations", "history", "chats", "tmp"]);
   const resolve = (path: string) => {
     if (path.startsWith("/") || roots.has(path.split("/")[0]!)) {
       const parts = canonical(path).split("/");

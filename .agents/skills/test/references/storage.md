@@ -505,10 +505,11 @@ System, enabled repository, and active Profile packages share one catalog before
 service attachment. Duplicate non-System names require a Profile source selection;
 System packages always own their reserved names. Untrusted packages cannot shadow
 System names or grant mutation permissions. Local packages are writable;
-installed and bundled packages are read-only. Every selected service exposes
-its manifest for discovery. Bundled, Remote, and Development source files remain
-hidden and read-only; Local exposes its additional source files at the same
-`services/<kind>/<id>/` path. Repository host paths, markers,
+installed and bundled packages are read-only. Repository package files are exposed independently under
+`repositories/<repository-id>/`, including manifests, service source, and skill files.
+Only Local is writable through this view; Bundled, Development, Remote, and
+connected repositories are read-only. Connected files retain separately granted
+write access through mounts/. Reading a repository never selects its services. Repository host paths, markers,
 `chats/<chat-uuid>/context.json`, and unrelated secret contents are not
 addressable. The conversation mount returns a current snapshot for loaded persisted conversations and the saved
 files for unloaded conversations. `ProfileRepository` encodes both with the same metadata
@@ -716,8 +717,9 @@ directly without Git initialization, commits, checkout, or a separate Save step.
 Existing `.git` metadata is retained untouched for external recovery, but is not
 read or updated by Ox; the current source files are authoritative, including when
 an older build left a detached checkout. There is no built-in version history or
-automatic rollback. The repository never introduces another virtual directory: its selected services
-resolve directly into `services/<kind>/<id>/`. Local file writes are atomic and
+automatic rollback. The virtual filesystem exposes Local at `repositories/local/`, independently
+of selected service sources. New services are registered in repository.json;
+filesystem copies and edits neither select sources nor reload attachments. Local file writes are atomic and
 enforce write permissions, path containment, symbolic-link rejection, and the
 general file size limit without validating service contents. Local drafts
 may contain incomplete, missing, or inconsistent service files across app restarts.

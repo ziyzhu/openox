@@ -63,7 +63,7 @@ extension Conversation {
                 for candidate in [path, args["to"]?.stringValue].compactMap({ $0 }) {
                     let root = candidate.split(separator: "/").first.map(String.init) ?? ""
                     let temporaryFiles = isTemporary && route.fileScope != nil && !["MEMORY.md", "skills", "history"].contains(root)
-                    if !["mounts", "services"].contains(root), !temporaryFiles { try requireProfileMutation(action) }
+                    if !["mounts", "repositories"].contains(root), !temporaryFiles { try requireProfileMutation(action) }
                 }
             }
             let result = try await route.session.host.fileSystem(owner: self, runtime: route.session.runtime,

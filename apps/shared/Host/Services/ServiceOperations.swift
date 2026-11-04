@@ -231,35 +231,10 @@ final class ServiceOperations {
     }
 
     func createService(kind: String, domain: String, endpoint: String?, transport: String?, faviconURL: JSONValue?, purpose: String) async throws -> JSONValue? {
-        if kind == "mcp" {
-            guard domain.isEmpty, let endpoint else {
-                throw RuntimeError.bridge("ox.service.create: MCP requires endpoint and no domain; Ox assigns the service ID.")
-            }
-            return try await saveMCP(endpoint: endpoint, transport: transport, faviconURL: faviconURL, replacing: nil, purpose: purpose)
+        guard kind == "mcp", domain.isEmpty, let endpoint else {
+            throw RuntimeError.bridge("ox.service.create: MCP requires endpoint and no domain. Create web/API source with ox.fs under repositories/local/.")
         }
-        guard endpoint == nil, transport == nil, faviconURL == nil else {
-            throw RuntimeError.bridge("ox.service.create: endpoint, transport, and faviconUrl apply only to MCP services.")
-        }
-        guard let serviceKind = Repository.ServiceKind(rawValue: kind), [.web, .api].contains(serviceKind) else {
-            throw RuntimeError.bridge("ox.service.create: kind must be 'web', 'api', or 'mcp'")
-        }
-        let cleanDomain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !cleanDomain.isEmpty else {
-            throw RuntimeError.bridge("ox.service.create: web services require domain.")
-        }
-        let args: JSONValue = .object(["kind": .string(kind), "domain": .string(cleanDomain)])
-        return try await tracked(Actions.serviceCreate, args, purpose: purpose) {
-            try await self.serviceManager.createService(
-                kind: serviceKind,
-                id: cleanDomain,
-                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
-            )
-            return .object([
-                "domain": .string(cleanDomain),
-                "manifestPath": .string("services/\(kind)/\(cleanDomain)/service.json"),
-                "source": .string("local"),
-            ])
-        }
+        return try await saveMCP(endpoint: endpoint, transport: transport, faviconURL: faviconURL, replacing: nil, purpose: purpose)
     }
 
     func updateService(domain: String, fields: [String: JSONValue], purpose: String) async throws -> JSONValue? {
@@ -270,7 +245,7 @@ final class ServiceOperations {
         }
         let exact = serviceManager.service(domain: identifier)
         guard exact != nil || matches.count <= 1 else {
-            throw RuntimeError.bridge("ox.service.update: multiple MCP services match '\(identifier)'; use the assigned domain from the saved services/mcp/<domain>/service.json definition.")
+            throw RuntimeError.bridge("ox.service.update: multiple MCP services match '\(identifier)'; use the assigned domain from the saved repositories/local/mcp/<domain>/service.json definition.")
         }
         guard let service = exact ?? matches.first else {
             throw RuntimeError.bridge("ox.service.update: service '\(identifier)' does not exist; use ox.service.create for a new service.")
@@ -296,8 +271,7 @@ final class ServiceOperations {
         let kind = Self.serviceKind(service)
         let allowed: Set<String>
         switch kind {
-        case "web": allowed = ["description", "baseUrl", "faviconUrl", "actions", "$defs"]
-        case "api": allowed = ["description", "baseUrl", "faviconUrl", "actions", "$defs", "auth"]
+        case "web", "api": allowed = []
         case "mcp": allowed = ["endpoint", "transport", "faviconUrl"]
         default: throw RuntimeError.bridge("ox.service.update: native services support only name.")
         }
@@ -318,24 +292,7 @@ final class ServiceOperations {
                 purpose: purpose
             )
         }
-        guard !fields.isEmpty else {
-            throw RuntimeError.bridge("ox.service.update: provide at least one manifest field for a Local \(kind) service.")
-        }
-        let sourceKind: ServicesMount.Kind = kind == "api" ? .api : .web
-        var args = fields
-        args["domain"] = .string(service.domain)
-        if let name { args["name"] = .string(name) }
-        return try await tracked(Actions.serviceUpdate, .object(args), purpose: purpose) {
-            try await self.serviceManager.updateServiceManifest(kind: sourceKind, domain: service.domain, fields: fields)
-            if let name { self.serviceManager.renameService(service, to: name) }
-            return .object([
-                "domain": .string(service.domain),
-                "kind": .string(kind),
-                "manifestPath": .string("services/\(kind)/\(service.domain)/service.json"),
-                "source": .string("local"),
-                "reloadRequired": .bool(true),
-            ])
-        }
+        throw RuntimeError.bridge("ox.service.update: provide a name, or edit Local source with ox.fs under repositories/local/.")
     }
 
     private func saveMCP(endpoint: String, transport: String?, faviconURL: JSONValue?, replacing: Service?, name: String? = nil, purpose: String) async throws -> JSONValue? {
@@ -373,26 +330,6 @@ final class ServiceOperations {
             if let name { self.serviceManager.renameService(service, to: name) }
             if let replacing { serviceChanged(replacing.domain) }
             return try serviceSnapshot(service)
-        }
-    }
-
-    func copyService(domain: String, purpose: String) async throws -> JSONValue? {
-        let cleanDomain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard let service = serviceManager.service(domain: cleanDomain) else {
-            throw RuntimeError.bridge("ox.service.copy: service '\(cleanDomain)' does not exist.")
-        }
-        let kind = Self.serviceKind(service)
-        let args: JSONValue = .object(["domain": .string(cleanDomain)])
-        return try await tracked(Actions.serviceCopy, args, purpose: purpose) {
-            try await self.serviceManager.copyServiceToLocal(
-                domain: cleanDomain,
-                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
-            )
-            return .object([
-                "domain": .string(cleanDomain),
-                "manifestPath": .string("services/\(kind)/\(cleanDomain)/service.json"),
-                "source": .string("local"),
-            ])
         }
     }
 
@@ -445,7 +382,8 @@ final class ServiceOperations {
                         "service": .string(conflict.serviceID),
                         "selectedRepository": conflict.selectedRepositoryID.map(JSONValue.string) ?? .null,
                         "candidates": .array(conflict.candidates.map { candidate in
-                            .object(["repository": .string(candidate.repositoryID), "name": .string(candidate.repositoryName)])
+                            .object(["repository": .string(candidate.repositoryID), "name": .string(candidate.repositoryName),
+                                "path": .string(candidate.path)])
                         }),
                     ])
                 }),
@@ -650,7 +588,7 @@ final class ServiceOperations {
             let services = Dictionary(uniqueKeysWithValues: serviceManager.services.map { ($0.domain, $0) })
             var entries = try services.values.filter { $0.isIOSService || $0.isMCPService }.map { service in
                 var fields = try Self.serviceSnapshotFields(service, attached: attachedDomains().contains(service.domain))
-                fields["manifestPath"] = .string("services/\(Self.serviceKind(service))/\(service.domain)/service.json")
+                fields["manifestPath"] = .string(Self.manifestPath(service))
                 return JSONValue.object(fields)
             }
             for entry in try await serviceManager.serviceSourceListings() {
@@ -858,6 +796,15 @@ final class ServiceOperations {
         return "web"
     }
 
+    private static func manifestPath(_ service: Service) -> String {
+        let kind = serviceKind(service)
+        let repository: String
+        if case .repository(let id, _) = service.definition.source { repository = id }
+        else { repository = service.isIOSService ? Repository.bundledID : Repository.localID }
+        let identity = service.domain.hasPrefix("ios:") ? String(service.domain.dropFirst(4)) : service.domain
+        return "repositories/\(repository)/\(kind)/\(identity)/service.json"
+    }
+
     private struct ServiceFindResult: Encodable {
         struct MatchedAction: Encodable {
             let id: String
@@ -880,7 +827,7 @@ final class ServiceOperations {
             let snapshot = match.service.snapshot(attached: attached)
             domain = snapshot.domain
             self.kind = kind
-            manifestPath = "services/\(kind)/\(snapshot.domain)/service.json"
+            manifestPath = ServiceOperations.manifestPath(match.service)
             if case .repository(let id, let provenance) = match.service.definition.source {
                 repository = id
                 repositoryProvenance = provenance.rawValue
