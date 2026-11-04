@@ -597,16 +597,6 @@ private struct RequestActionButton: View {
             isPrimary ? AnyShapeStyle(primaryFill) : secondaryFill,
             in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         )
-        .overlay(alignment: .trailing) {
-            if isSelected {
-                Image(systemName: "checkmark.circle")
-                    .font(Theme.Fonts.labelMd)
-                    .fontWeight(.medium)
-                    .foregroundStyle(isPrimary ? Theme.Colors.onPrimary : Theme.Colors.onSurface)
-                    .padding(.trailing, Theme.Spacing.sm)
-                    .accessibilityHidden(true)
-            }
-        }
     }
 }
 
