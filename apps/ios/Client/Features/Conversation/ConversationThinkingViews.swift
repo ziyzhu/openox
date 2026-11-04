@@ -471,6 +471,10 @@ private struct SourceChip: View {
                 Image(systemName: "doc")
                     .foregroundStyle(Theme.Colors.conversationSecondary)
                     .frame(width: 16, height: 20)
+            case .repository:
+                Image(systemName: "shippingbox")
+                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .frame(width: 16, height: 20)
             case .conversation:
                 Image(systemName: "bubble.left.and.bubble.right")
                     .foregroundStyle(Theme.Colors.conversationSecondary)
@@ -503,6 +507,7 @@ private struct SourceChipButton: View {
         case results(Invocation)
         case skill(Skill)
         case service(Service)
+        case repository(String)
 
         var id: String {
             switch self {
@@ -510,6 +515,7 @@ private struct SourceChipButton: View {
             case .results(let invocation): "results:\(invocation.id)"
             case .skill(let skill): "skill:\(skill.id)"
             case .service(let service): "service:\(service.domain)"
+            case .repository(let id): "repository:\(id)"
             }
         }
     }
@@ -528,6 +534,8 @@ private struct SourceChipButton: View {
                 destination = .service(service)
             } else if let skill = source.skill {
                 destination = .skill(skill)
+            } else if let repositoryID = source.repositoryID {
+                destination = .repository(repositoryID)
             } else {
                 action()
             }
@@ -560,6 +568,8 @@ private struct SourceChipButton: View {
                     case .service(let service):
                         ServiceDetailView(initialService: service, primaryAction: nil, isAttached: false, onPrimaryAction: nil)
                             .presentationDetents([.medium, .large])
+                    case .repository(let id):
+                        RepositoryDetailView(repositoryID: id)
                     }
                 }
                 .toolbar {
@@ -804,6 +814,7 @@ private enum InvocationFormat {
             case file(String)
             case conversation(UUID)
             case skill(Skill)
+            case repository(Repository.Descriptor)
         }
 
         let label: String
@@ -827,6 +838,11 @@ private enum InvocationFormat {
             return nil
         }
 
+        var repositoryID: String? {
+            if case .repository(let repository) = icon { return repository.id }
+            return nil
+        }
+
         var id: String {
             switch icon {
             case .service(let service): "service:\(service.domain)"
@@ -835,6 +851,7 @@ private enum InvocationFormat {
             case .file(let path): "file:\(path)"
             case .conversation(let id): "conversation:\(id.uuidString)"
             case .skill(let skill): "skill:\(skill.id)"
+            case .repository(let repository): "repository:\(repository.id)"
             }
         }
 
@@ -857,6 +874,10 @@ private enum InvocationFormat {
             if parts.count >= 5, parts[0] == "repositories", let kind = Repository.ServiceKind(rawValue: String(parts[2])) {
                 let id = String(parts[3])
                 return [serviceSource(domain: kind == .iOS ? "ios:\(id)" : id, invocation: invocation, serviceManager: serviceManager)]
+            }
+            if parts.count >= 2, parts[0] == "repositories",
+               let repository = serviceManager.repositories.first(where: { $0.id == parts[1] }) {
+                return [Source(label: repository.name, icon: .repository(repository))]
             }
             if parts.count >= 2, ["history", "conversations"].contains(parts[0]) {
                 let id: UUID? = if let uuid = UUID(uuidString: String(parts[1])) {
