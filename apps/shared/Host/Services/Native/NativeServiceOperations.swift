@@ -14,6 +14,7 @@ final class NativeServiceOperations {
     let presentations: AppPresentations
     let requireActive: () throws -> Void
     let showBrowser: (Service, UUID) -> Void
+    let showServicePage: (Service, Service.ServiceWebPage) throws -> Void
     let attachTransient: (TransientAttachment) throws -> Void
     let importFile: (TransientAttachment, String) async throws -> FileItem
     let choose: (Prompt) async throws -> String?
@@ -25,6 +26,7 @@ final class NativeServiceOperations {
         presentations: AppPresentations,
         requireActive: @escaping () throws -> Void,
         showBrowser: @escaping (Service, UUID) -> Void,
+        showServicePage: @escaping (Service, Service.ServiceWebPage) throws -> Void,
         attachTransient: @escaping (TransientAttachment) throws -> Void,
         importFile: @escaping (TransientAttachment, String) async throws -> FileItem,
         choose: @escaping (Prompt) async throws -> String?,
@@ -35,10 +37,16 @@ final class NativeServiceOperations {
         self.presentations = presentations
         self.requireActive = requireActive
         self.showBrowser = showBrowser
+        self.showServicePage = showServicePage
         self.attachTransient = attachTransient
         self.importFile = importFile
         self.choose = choose
         self.authorizeBrowserSite = authorizeBrowserSite
+    }
+
+    func presentServicePage(_ service: Service, page: Service.ServiceWebPage) throws {
+        if let presenter = presentations.browser { presenter(service, page) }
+        else { try showServicePage(service, page) }
     }
 
     private func presentBrowser(_ service: Service) async throws {

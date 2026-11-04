@@ -696,20 +696,8 @@ final class ServiceOperations {
             }
             defer { lease.release() }
             guard lease.page.page.url != nil else { throw Service.EvalError.notReady }
-            let session = ServiceHandoffSession(
-                service: service,
-                servicePage: lease.page,
-                title: service.title,
-                navigationTitle: service.title
-            )
-            Log.service.info("Service.showPage presenting domain=\(service.domain) action=\(actionID) session=\(lease.page.logLabel)")
-            let outcome = await native.presentations.serviceHandoff.present(session: session)
-            try Task.checkCancellation()
-            guard outcome == .completed else {
-                throw OxFunctionError(code: "handoff_incomplete", message: "ox.service.showPage: the presentation was cancelled or unavailable.", recovery: "Do not reopen automatically. Ask the user whether to continue. The live page is preserved.")
-            }
-            guard lease.isActive else { throw Service.EvalError.contextInvalidated }
-            Log.service.info("Service.showPage dismissed domain=\(service.domain) session=\(lease.page.logLabel)")
+            try native.presentServicePage(service, page: lease.page)
+            Log.service.info("Service.showPage shown domain=\(service.domain) action=\(actionID) session=\(lease.page.logLabel)")
             return .object(["shown": .bool(true)])
         }
     }

@@ -84,7 +84,7 @@ extension Scenario {
     static let botControl = Scenario(name: "bot-control") { ctx in
         if let result = ctx.toolResults.last(where: { $0.toolName == "execute" }) {
             guard !result.isError else { return [.stop(.stop)] }
-            return [.say("The verification page was dismissed. Check the resulting capture before retrying."), .stop(.stop)]
+            return [.say("The live verification page is above. Tell me when you have completed verification so I can check the resulting capture."), .stop(.stop)]
         }
         let domain = "archive.ph"
         return [
@@ -96,7 +96,7 @@ extension Scenario {
     static let payment = Scenario(name: "payment") { ctx in
         if let result = ctx.toolResults.last(where: { $0.toolName == "execute" }) {
             guard !result.isError else { return [.stop(.stop)] }
-            return [.say("The checkout page was dismissed. Payment is not verified by dismissal."), .stop(.stop)]
+            return [.say("The live checkout page is above. Tell me when you have completed payment so I can check the order."), .stop(.stop)]
         }
         let domain = "www.doordash.com"
         return [

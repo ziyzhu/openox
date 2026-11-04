@@ -224,7 +224,7 @@ private struct InlineCanvasPageCard: View {
         }
         .fullScreenCover(item: $canvas.browser) { browser in
             NavigationStack {
-                ServicePageInspector(service: browser.service, browserSessionID: browser.id)
+                ServicePageInspector(service: browser.service, browserSessionID: browser.id, pageID: browser.pageID)
                     .safeAreaInset(edge: .bottom) { CanvasInteractionView(canvas: canvas) }
             }
         }
@@ -328,7 +328,7 @@ private struct InlineCanvasExpandedView: View {
         }
         .fullScreenCover(item: $canvas.browser) { browser in
             NavigationStack {
-                ServicePageInspector(service: browser.service, browserSessionID: browser.id)
+                ServicePageInspector(service: browser.service, browserSessionID: browser.id, pageID: browser.pageID)
                     .safeAreaInset(edge: .bottom) { CanvasInteractionView(canvas: canvas) }
             }
         }

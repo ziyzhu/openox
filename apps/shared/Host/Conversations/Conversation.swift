@@ -445,6 +445,13 @@ final class Conversation: Identifiable {
                     serviceName: service.title
                 ))
             },
+            showServicePage: { [unowned self] service, page in
+                embedServiceInspector(ServiceInspectorLink(
+                    domain: service.domain,
+                    serviceName: service.title,
+                    pageID: page.id
+                ))
+            },
             attachTransient: { [unowned self] attachment in
                 guard document.hasOpenExecution else {
                     throw RuntimeError.bridge("Browser exports require an active agent execution.")

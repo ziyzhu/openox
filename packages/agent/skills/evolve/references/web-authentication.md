@@ -20,7 +20,7 @@ Copy a returned descriptor into top-level `session` for subsequent invocations. 
 
 Reuse a selected descriptor across actions; do not add discovery before every invocation because the Host revalidates it. Rediscover after login, expiry or an account switch. Public actions may execute without a session. When several accounts are available, select using the user's request or ask if ambiguous. If access expires, discover again or request login rather than inventing a signed-out session. Shared cookies can change from another page. Never infer current authentication from a cached descriptor or cookie presence alone.
 
-Use `ox.service.showPage` with the same action name, input and top-level `session` or `pageUrl` to show its existing page without reloading or repeating effects. User interaction reserves the page against competing actions. Inspect uncertain mutations before retrying; never automatically repeat writes after login.
+Use `ox.service.showPage` with the same action name, input and top-level `session` or `pageUrl` to show its existing page without reloading or repeating effects. Showing the page returns immediately and does not reserve it against subsequent actions. End the turn for human verification or payment; inspect fresh state after the user reports completion. Inspect uncertain mutations before retrying; never automatically repeat writes after login.
 
 ## Repair existing services
 

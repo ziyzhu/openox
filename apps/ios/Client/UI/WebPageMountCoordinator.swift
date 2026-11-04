@@ -19,6 +19,15 @@ final class WebPageMountCoordinator {
     @ObservationIgnored private var mountedOwnerID: UUID?
     @ObservationIgnored private var revision = 0
     @ObservationIgnored private var unmountWaiters: [CheckedContinuation<Void, Never>] = []
+    @ObservationIgnored private var servicePageCoordinators: [UUID: WebPageMountCoordinator] = [:]
+
+    func coordinator(for pageID: UUID?) -> WebPageMountCoordinator {
+        guard let pageID else { return self }
+        if let coordinator = servicePageCoordinators[pageID] { return coordinator }
+        let coordinator = WebPageMountCoordinator()
+        servicePageCoordinators[pageID] = coordinator
+        return coordinator
+    }
 
     func isInline(page: WebPage?, ownerID: UUID) -> Bool {
         guard placement == .inline(ownerID), let page else { return false }

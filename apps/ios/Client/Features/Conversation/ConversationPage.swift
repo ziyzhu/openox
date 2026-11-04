@@ -294,7 +294,7 @@ struct ConversationPage: View {
         let dockedPrompt: Conversation.PendingPrompt? = if case .prompt(let prompt) = activeInteraction { prompt } else { nil }
         let browserPage = browserPage
         let servicePageOwnerIDs = blocks.compactMap { block -> UUID? in
-            guard case .agentContent(.serviceInspector) = block.kind else { return nil }
+            guard case .agentContent(.serviceInspector(let link)) = block.kind, link.pageID == nil else { return nil }
             return block.id
         }
         let transcript = transcript(
@@ -1036,7 +1036,12 @@ struct ConversationPage: View {
                 ConversationInlineServicePages(
                     anchors: anchors,
                     browserPage: browserPage,
-                    browserPageMount: browserPageMount
+                    browserPageMount: browserPageMount,
+                    servicePageLinks: Dictionary(uniqueKeysWithValues: blocks.compactMap { block in
+                        guard case .agentContent(.serviceInspector(let link)) = block.kind, link.pageID != nil else { return nil }
+                        return (block.id, link)
+                    }),
+                    servicePageOwnerIDs: blocks.map(\.id)
                 )
             }
             .contentMargins(.bottom, dockClearance, for: .scrollContent)

@@ -467,6 +467,10 @@ final class Service: NSObject, Identifiable {
 
     var pages: [WebPage] { servicePages.map(\.page) }
 
+    func servicePage(id: UUID) -> ServiceWebPage? {
+        ownedPages.values.first { $0.page.id == id }?.page
+    }
+
     func owns(_ page: ServiceWebPage) -> Bool {
         servicePages.contains { $0 === page }
     }

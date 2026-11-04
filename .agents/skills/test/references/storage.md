@@ -97,6 +97,8 @@ Primary owners:
 
 Choice, approval, and secret-entry prompts are transient `Conversation` interactions, not new persisted presentation steps. Resolving one returns its answer to the waiting operation without recording a separate prompt receipt. Older prompt steps remain readable but are omitted from conversation display. Model-facing tool results and explicit Always allow policies retain their existing persistence.
 
+Service-inspector conversation content optionally stores `pageID`, a transient live service-page UUID. Older links omit it and keep their existing inspector behavior. Service-page cards resolve only the matching resident page; after closure or restart they show unavailable rather than creating a replacement or repeating an action. The optional field requires no migration and contains no website data.
+
 - UserDefaults onboarding state — owner: App.swift
 - UserDefaults Host access toggle — owner: Platform/Models/HostAccess.swift; app-wide, retained across Profile switches, follows device backup policy, removed with app preferences. Additive Boolean key with no predecessor representation or migration; missing state defaults off, including upgrades from builds that listened automatically.
 - UserDefaults import-memory starter count — owner: Client/Features/Conversation/ConversationComposer.swift

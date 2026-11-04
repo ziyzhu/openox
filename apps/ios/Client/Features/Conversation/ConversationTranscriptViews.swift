@@ -129,12 +129,16 @@ private struct ServiceInspectorRow: View {
         return serviceManager.browserActionSessions.existingSession(for: conversationID, service: service)
     }
     private var canInspect: Bool {
+        if link.pageID != nil { return page != nil }
         guard let service else { return false }
         guard service.domain == BrowserFunctionCatalog.internalDomain else { return true }
         return browserSession != nil
     }
     private var page: WebPage? {
-        browserSession?.webPage
+        if let pageID = link.pageID {
+            return service?.servicePage(id: pageID)?.page
+        }
+        return browserSession?.webPage
     }
     private var isInline: Bool {
         pageMount.isInline(page: page, ownerID: rowID)
@@ -176,7 +180,7 @@ private struct ServiceInspectorRow: View {
         }) {
             if let service {
                 NavigationStack {
-                    ServicePageInspector(service: service, browserSessionID: conversationID)
+                    ServicePageInspector(service: service, browserSessionID: conversationID, pageID: link.pageID)
                 }
             }
         }
@@ -660,7 +664,7 @@ struct BlockView: View, Equatable {
                             link: link,
                             conversationID: conversationID,
                             rowID: block.id,
-                            pageMount: browserPageMount
+                            pageMount: browserPageMount.coordinator(for: link.pageID)
                         )
                             .padding(.horizontal, 4)
                     case let .shoveler(shoveler):

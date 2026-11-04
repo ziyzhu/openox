@@ -24,6 +24,7 @@ final class HTMLView {
     struct Browser: Identifiable {
         let id: UUID
         let service: Service
+        var pageID: UUID? = nil
     }
 
     let id = UUID()
@@ -206,6 +207,9 @@ final class HTMLView {
                 ),
                 requireActive: { [unowned self] in try requireRunning() },
                 showBrowser: { [unowned self] service, owner in browser = Browser(id: owner, service: service) },
+                showServicePage: { [unowned self] service, page in
+                    browser = Browser(id: page.id, service: service, pageID: page.id)
+                },
                 attachTransient: { _ in
                     throw RuntimeError.bridge("Browser exports are available only to conversation agents.")
                 },

@@ -3,6 +3,7 @@ import Foundation
 nonisolated struct ServiceInspectorLink: Codable, Equatable, Sendable {
     let domain: String
     let serviceName: String
+    var pageID: UUID? = nil
 }
 
 nonisolated enum ServiceControl: Equatable, Sendable {

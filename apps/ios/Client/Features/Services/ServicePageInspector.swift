@@ -4,6 +4,7 @@ import WebKit
 struct ServicePageInspector: View {
     let service: Service
     var browserSessionID: UUID? = nil
+    var pageID: UUID? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var page: WebPage?
     @State private var servicePage: Service.ServiceWebPage?
@@ -50,10 +51,14 @@ struct ServicePageInspector: View {
         }
         .task {
             do {
-                let inspectionPage = try await service.openInspectionPage(browserSessionID: browserSessionID)
-                let openedPage = inspectionPage.page
+                let inspectionPage = pageID == nil
+                    ? try await service.openInspectionPage(browserSessionID: browserSessionID)
+                    : nil
+                guard let openedPage = pageID.flatMap({ service.servicePage(id: $0) }) ?? inspectionPage?.page else {
+                    throw Service.EvalError.notActive
+                }
                 defer {
-                    service.closeInspectionPage(inspectionPage)
+                    if let inspectionPage { service.closeInspectionPage(inspectionPage) }
                     self.servicePage = nil
                     page = nil
                     Log.webView.info("ServicePageInspector.close domain=\(service.domain)")
