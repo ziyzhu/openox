@@ -35,6 +35,7 @@
 
 1. Reproduce the issue first before attempting to fix it so that you can verify the fix.
 1. Do not add unit tests; prefer E2E tests.
+1. Reuse the fixed `ox-1`–`ox-5` simulator pool for all simulator work. Reserve one suitable existing device per task. If compatible devices are busy, coordinate or wait; do not create or clone task-named simulators. Creating devices outside the pool requires explicit user approval. Record initial boot state, shut down devices the task booted unless ownership was handed off, and release reservations on exit. A booted device or attached automation process does not establish active use or ownership.
 1. Before committing native source or build-configuration changes, build each affected app target; shared changes require both iOS and macOS builds. Portable checks do not replace native compilation. If a required build cannot run, report the blocker and obtain approval before committing.
 1. For each commit, review lines of code and cyclomatic complexity.
 1. For each commit, review the performance implications.

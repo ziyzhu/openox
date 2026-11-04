@@ -77,7 +77,7 @@ pass it explicitly; never rely on a default booted target.
 - Record the reserved device's initial boot state. On completion, failure, or interruption, shut down devices this task booted after confirming no ownership handoff occurred. Leave previously booted devices running, release task-owned claims, and report any cleanup that could not be completed. Never use `simctl shutdown all`.
 - Missing iOS 27 support blocks `ox-4` and `ox-5`; do not substitute iOS 26 or change the pool policy. Partial setup can proceed on the first three reserved targets.
 - Before touching a device, check other agents' sessions and repository QA claims, then coordinate ownership. Choose another device if it is in use; never interrupt or change another agent's simulator. Those claims cover repository runners only; no activity signal proves exclusive ownership. Clone only free, shutdown simulators; preserve originals as backups and verify replacements with `xcrun simctl list devices available --json`.
-- When no suitable simulator exists, create it in Xcode's **Devices and Simulators** window using the assigned runtime. After reserving a suitable iOS 26 baseline, for example:
+- Create or clone simulators only to provision missing members of the fixed pool with their assigned runtimes. If compatible pool devices are busy, coordinate or wait; do not create task-named devices to bypass contention. Creating devices outside the pool requires explicit user approval. Provision missing members in Xcode's **Devices and Simulators** window or clone a free, shutdown baseline. After reserving a suitable iOS 26 baseline, for example:
 
 ```sh
 xcrun simctl clone "$BASELINE_UDID" ox-1
