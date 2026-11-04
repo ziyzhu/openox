@@ -37,7 +37,7 @@ nonisolated final class APIServiceHTTP: NSObject, URLSessionTaskDelegate, Sendab
             if Task.isCancelled { throw CancellationError() }
             let failure = error as NSError
             Log.service.error("APIServiceHTTP.transport failed domain=\(failure.domain) code=\(failure.code)")
-            throw APIServiceError.invalidResponse
+            throw error
         }
     }
 }

@@ -359,7 +359,10 @@ actor RemoteMCPClient {
             }
             return values.last
         }
-        return try JSONDecoder().decode(JSONValue.self, from: data)
+        guard let value = try? JSONDecoder().decode(JSONValue.self, from: data) else {
+            throw RemoteMCPError.invalidResponse
+        }
+        return value
     }
 
     private func openLegacySSE() async throws {

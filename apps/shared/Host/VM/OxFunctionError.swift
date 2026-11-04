@@ -26,8 +26,40 @@ nonisolated struct OxFunctionError: LocalizedError, Sendable {
 
     static func from(_ error: any Error) -> Self {
         if let error = error as? Self { return error }
-        if error is CancellationError {
+        if error is CancellationError || (error as? URLError)?.code == .cancelled {
             return Self(code: "cancelled", message: "The operation was cancelled.", recovery: "Stop. Do not repeat the operation unless the user asks; inspect any possible effects before retrying a write.")
+        }
+        if case VirtualMachine.Error.js(_, _, let value) = error,
+           let value, let failure = Self(value: value) { return failure }
+        if error is URLError {
+            return Self(code: "transport_error", message: "The service connection failed; the action may have taken effect.", recovery: "Inspect the connection and resulting service state before deciding whether to retry. Do not automatically replay a write after a transport failure.")
+        }
+        if let error = error as? APIServiceError {
+            let guidance: (String, String) = switch error {
+            case .invalidConfiguration: ("invalid_contract", "Inspect the API service manifest and repair its configuration before invoking it.")
+            case .authorizationRequired, .authorizationFailed, .http(401): ("authentication_required", "Use the access contract from ox.service.inspect and request access only if needed. Verify any possible effects before retrying a write.")
+            case .invalidRequest: ("invalid_argument", "Inspect the action input and API handler, then correct the request. Verify any earlier effects before retrying a write.")
+            case .destinationDenied, .mutationDenied, .http(403): ("permission_denied", "Do not bypass destination restrictions, authentication, or Action approval checks. Inspect the service contract and any earlier effects before proceeding.")
+            case .responseTooLarge: ("resource_limit", "Narrow the requested response. Verify any possible effects before retrying a write.")
+            case .http: ("http_error", "Inspect the HTTP failure and resulting service state. Do not automatically replay a write.")
+            case .invalidResponse: ("invalid_output", "Inspect the API response and any possible effects. Do not repeat a write merely because its response was invalid.")
+            }
+            return Self(code: guidance.0, message: error.localizedDescription, recovery: guidance.1)
+        }
+        if let error = error as? RemoteMCPError {
+            let guidance: (String, String) = switch error {
+            case .invalidEndpoint: ("invalid_argument", "Inspect the MCP connection and use a supported endpoint without embedded credentials.")
+            case .authorizationRequired: ("authentication_required", "Use the access contract from ox.service.inspect and request access only if needed. Verify any possible effects before retrying a write.")
+            case .oauth: ("authentication_unavailable", "Inspect the OAuth failure; it does not establish that credentials are absent. Do not reopen authentication or replay a write automatically.")
+            case .invalidResponse: ("invalid_output", "Inspect the MCP response and any possible effects. Do not repeat a write merely because its response was invalid.")
+            case .responseTooLarge, .tooManyTools: ("resource_limit", "Inspect the MCP server limits and narrow its response or exposed tools. Verify any possible effects before retrying a write.")
+            case .http: ("http_error", "Inspect the HTTP failure and resulting service state. Do not automatically replay a write.")
+            case .protocolError: ("invalid_contract", "Inspect the MCP server's protocol behavior. Verify any possible effects before retrying a write.")
+            case .unsupportedProtocolVersion, .missingServerCapability: ("not_supported", "Use an MCP server with a supported protocol version and the required capabilities. Do not repeatedly retry the same connection.")
+            case .server: ("server_error", "Inspect the MCP server failure and resulting service state. Do not automatically replay a write.")
+            case .tool: ("tool_error", "Inspect the tool failure and resulting service state. A tool error does not establish that no effects occurred; do not automatically replay a write.")
+            }
+            return Self(code: guidance.0, message: error.localizedDescription, recovery: guidance.1)
         }
         if let error = error as? Service.InvokeError {
             let guidance: (String, String) = switch error {

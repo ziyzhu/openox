@@ -61,19 +61,19 @@ public actor VirtualMachine {
 
     public enum Error: LocalizedError {
         case noContext
-        case js(String, logs: [VirtualMachineLog] = [])
+        case js(String, logs: [VirtualMachineLog] = [], failure: JSONValue? = nil)
         case timeout(TimeInterval, logs: [VirtualMachineLog] = [])
         public var errorDescription: String? {
             switch self {
             case .noContext: return "snippet runtime: failed to create JSContext"
-            case .js(let s, _): return s
+            case .js(let s, _, _): return s
             case .timeout(let t, _): return "snippet timed out after \(Int(t))s"
             }
         }
         public var logs: [VirtualMachineLog] {
             switch self {
             case .noContext: return []
-            case .js(_, let l), .timeout(_, let l): return l
+            case .js(_, let l, _), .timeout(_, let l): return l
             }
         }
     }
@@ -163,7 +163,7 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
                     let reject: @convention(block) (JSValue) -> Void = { err in
                         let msg = jsErrorString(err)
                         Log.agent.error("snippet rejected ms=\(elapsedMs()): \(msg)")
-                        handle.settle(.failure(VirtualMachine.Error.js(msg, logs: handle.snapshotLogs())))
+                        handle.settle(.failure(VirtualMachine.Error.js(msg, logs: handle.snapshotLogs(), failure: jsFunctionError(err)?.value)))
                     }
                     ctx.setObject(resolve as AnyObject, forKeyedSubscript: "__nativeResolve" as NSString)
                     ctx.setObject(reject  as AnyObject, forKeyedSubscript: "__nativeReject"  as NSString)
@@ -483,15 +483,16 @@ nonisolated private final class JSPromiseCallbacks: @unchecked Sendable {
     var reject: JSValue?
 }
 
+nonisolated private func jsFunctionError(_ value: JSValue) -> OxFunctionError? {
+    guard value.isObject,
+          let code = value.objectForKeyedSubscript("code"), code.isString,
+          let message = value.objectForKeyedSubscript("message"), message.isString,
+          let recovery = value.objectForKeyedSubscript("recovery"), recovery.isString else { return nil }
+    return OxFunctionError(code: code.toString(), message: message.toString(), recovery: recovery.toString())
+}
+
 nonisolated private func jsErrorString(_ value: JSValue) -> String {
-    let message: String
-    if value.isObject,
-       let code = value.objectForKeyedSubscript("code"), code.isString,
-       let recovery = value.objectForKeyedSubscript("recovery"), recovery.isString {
-        message = JSONValue.object(["code": .string(code.toString() ?? "operation_failed"),
-                                    "message": .string(value.objectForKeyedSubscript("message")?.toString() ?? "Unknown error"),
-                                    "recovery": .string(recovery.toString() ?? "")]).jsonString()
-    } else { message = value.toString() ?? "unknown JavaScript error" }
+    let message = jsFunctionError(value)?.value.jsonString() ?? value.toString() ?? "unknown JavaScript error"
     guard value.isObject,
           let stack = value.objectForKeyedSubscript("stack"), stack.isString,
           let frames = stack.toString(), !frames.isEmpty else { return message }

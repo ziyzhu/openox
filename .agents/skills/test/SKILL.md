@@ -32,6 +32,10 @@ use `bun .agents/skills/test/protocol/native/vm.ts --help` or
 `bun .agents/skills/test/protocol/native/ox-errors.ts --help` against a fresh QA app.
 These native checks require an explicit reserved simulator and assigned Host endpoint;
 portable fixtures alone do not establish native implementation conformance.
+For API/MCP error audits, inspect the fields caught by conversation JavaScript,
+including errors crossing an API handler's nested runtime. Use isolated fixtures
+and server-side dispatch counts to verify that denied calls never dispatch and
+uncertain writes are not replayed; preserve and restore approval policies.
 
 ## Backward compatibility
 

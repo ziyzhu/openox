@@ -238,7 +238,7 @@ nonisolated enum BrowserFunctionCatalog {
                 "evicted": integer(minimum: 0),
                 "events": .object([
                     "type": .string("array"),
-                    "items": .object([:]),
+                    "items": object(capturedEventProperties, required: ["id", "kind", "timestamp"]),
                 ]),
             ], required: ["active", "dropped", "evicted", "events"])
         ),
@@ -250,7 +250,10 @@ nonisolated enum BrowserFunctionCatalog {
                 ["id": string(minimum: 1, maximum: 100)],
                 required: ["id"]
             ),
-            outputSchema: .object(["type": .string("object")])
+            outputSchema: object(capturedEventProperties.merging([
+                "requestBody": nullableString,
+                "responseBody": nullableString,
+            ]) { _, value in value }, required: ["id", "kind", "timestamp"])
         ),
         Action(
             id: "stopCapture",
@@ -335,6 +338,30 @@ nonisolated enum BrowserFunctionCatalog {
             "coverage": string(),
         ], required: ["scope", "scopeFound", "readyState", "busy", "headings", "dialogs", "messages", "controls", "truncated", "coverage"]),
     ], required: ["pageID", "navigationGeneration", "url", "title", "estimatedProgress", "isLoading", "hasOnlySecureContent", "isBlockedByScreenTime", "fullscreenState", "document"])
+    private static let capturedEventProperties: [String: JSONValue] = [
+        "id": string(),
+        "kind": .object([
+            "type": .string("string"),
+            "enum": .array(["mark", "fetch", "xhr", "form", "resource", "websocket"].map(JSONValue.string)),
+        ]),
+        "timestamp": .object([
+            "type": .string("number"),
+            "description": .string("Milliseconds since the Unix epoch."),
+        ]),
+        "label": string(),
+        "site": nullableString,
+        "frameURL": string(),
+        "method": string(),
+        "url": string(),
+        "requestHeaders": .object(["type": .string("object"), "additionalProperties": string()]),
+        "responseHeaders": .object(["type": .string("object"), "additionalProperties": string()]),
+        "status": integer(minimum: 0),
+        "durationMs": .object(["type": .string("number")]),
+        "started": .object(["type": .string("number")]),
+        "error": string(),
+        "initiatorType": string(),
+        "event": string(),
+    ]
     private static let stringArray: JSONValue = .object(["type": .string("array"), "items": string()])
     private static let historyItem = object([
         "initialUrl": string(),
