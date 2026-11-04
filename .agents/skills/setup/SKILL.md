@@ -107,6 +107,50 @@ Resolve `BASELINE_UDID` and, after cloning, `OX1_UDID` from the inventory before
 - For CLI access, turn on **Settings > Host** and keep Ox foreground. Physical-device and Release Hosts require Tailscale on both devices. A Debug Simulator launch can explicitly opt into localhost with `SIMCTL_CHILD_OX_HOST_LOOPBACK=1` in the simctl launch environment; it binds only `127.0.0.1` on the assigned port and uses the same ordinary Host API. This flag is compiled out on physical devices and Release builds; a normal relaunch restores Tailscale-only access. `OX_DEBUG_ENDPOINT` selects the port, not the ingress mode. Verify `ox --host ws://127.0.0.1:<debug-port> host describe` for loopback, or use `ox host list`/the tailnet address for Tailscale. A `starting` log is not readiness. Preserve failure logs, never add unrestricted listeners or bypass approvals, and restore temporary settings afterward.
 - Use Mock for a no-cost smoke test; real provider calls require authorization. Enter provider credentials through Ox's secure UI when needed. The ignored `secrets/API_KEYS.json` is only for local test bootstrap; never request a key in conversation or pass it on a command line.
 
+## Reuse a simulator ChatGPT login
+
+An explicitly authorized transfer of just the ChatGPT OAuth Keychain entry can
+reuse a login without separate sign-in or whole-simulator cloning. Verified between
+iOS 26 simulators with Xcode 26.2, including a different destination bundle ID. This
+does not establish physical-device or cross-runtime portability.
+
+- Reserve both numbered simulators and preserve their boot state. Use explicit
+  `--host <endpoint>` selectors for all Ox commands. Before copying, read
+  `ox vm help ox.provider.list`, then call `ox.provider.list` with a short purpose
+  through `ox vm call`. Confirm the source ChatGPT status is `authenticated`;
+  provider/model listings alone do not prove login.
+- Resolve each installed app's `OXKeychainService` from its Info.plist and its actual
+  simulator Keychain access group from build/embedded simulated entitlements. Do not
+  hardcode a developer team, bundle ID, or service. Confirm the account key against
+  `ChatGPTSubscriptionAccount` and `ManagedOAuthAccount`; currently it is
+  `oauth:model-provider:chatgpt:siwc`.
+- Use a temporary native helper with Foundation and Security, built for the selected
+  simulator architecture and SDK. Query only that service/account with
+  `SecItemCopyMatching`. For simulator helpers, embed the matching access-group
+  entitlements at link time with `-Xlinker -sectcreate -Xlinker __TEXT -Xlinker
+  __entitlements -Xlinker <entitlements.plist>`, then ad-hoc sign normally. Signing
+  a standalone helper with device-style entitlements alone failed; the same helper
+  with linker-embedded simulated entitlements worked. Do not disable security checks.
+- Run separate source/destination helpers with `xcrun simctl spawn <udid> <helper>`.
+  Capture the source credential in a local coordinator's process memory and feed it
+  directly to the destination's stdin. Never return credential bytes to the agent,
+  terminal output, logs, environment variables, command arguments, or plaintext files.
+  Keep helpers outside the repository; do not copy or modify Keychain databases.
+- Require an absent destination entry, or accept an identical entry without writing.
+  Stop on a differing credential; replacement requires separate confirmation. Import
+  with `SecItemAdd`, preserve the app's accessibility setting, and read back to verify
+  equality without printing values. Do not modify the source entry.
+- Restart the destination app with its intended Host launch environment to clear
+  cached signed-out state. Confirm ChatGPT reports `authenticated`; with authorization
+  for a real model call, run a bounded `ox conversation send` smoke check. Remove the
+  helpers and release reservations afterward. `sim:bootstrap` and template
+  `--allow-keychain` do not export a ChatGPT session.
+
+These are copies of one OAuth session, not independent logins. Avoid concurrent use;
+refresh-token rotation or revocation may invalidate the other copy. Signing out of
+either copy can revoke the shared session. A copied credential is not proof of
+working inference, and transfer does not repair unrelated startup/migration failures.
+
 ## Device templates
 
 `bun run sim:launch --device ox-N --template <json>` builds, installs, and launches
