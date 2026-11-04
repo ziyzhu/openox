@@ -208,8 +208,10 @@ extension Conversation {
     }
 
     private func readFileBackend(path: String) async throws -> JSONValue {
-        let root = path.split(separator: "/").first.map(String.init) ?? ""
-        if let route = durableRoute, root == "artifacts" || !VirtualFileSystem.hostRoots.contains(root) || (!isTemporary && root == "MEMORY.md") {
+        let parts = path.split(separator: "/")
+        let root = parts.first.map(String.init) ?? ""
+        let conversationFile = root == "conversations" && !(parts.count == 3 && ["conversation.json", "turns.jsonl"].contains(String(parts[2])))
+        if let route = durableRoute, conversationFile || root == "artifacts" || !VirtualFileSystem.hostRoots.contains(root) || (!isTemporary && root == "MEMORY.md") {
             let record = try await route.session.runtime.command(.object(["action": .string("fileStat"), "path": .string(path), "byPath": .bool(true)]))
             if record.objectValue?["file"] != .null, record.objectValue?["file"] != nil {
                 let media = try await fileSystemMedia(path: path)

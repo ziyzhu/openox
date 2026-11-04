@@ -18,7 +18,7 @@ export interface FileRequest {
   options?: { limit?: number; glob?: string; ignoreCase?: boolean; literal?: boolean; contextLines?: number };
 }
 type SearchMatch = { path: string; line: number; text: string; before: string[]; after: string[] };
-type Candidates = { paths: string[]; truncated: boolean; diagnostics: { severity: string; code: string; message: string }[] };
+type Candidates = { paths: string[]; truncated: boolean; diagnostics: { path: string; message: string }[] };
 const maximumFiles = 1_000;
 const maximumEntries = 10_000;
 const mutations = new Set(["write", "edit", "rm", "mkdir", "move", "copy"]);
@@ -153,8 +153,7 @@ function readPage(result: ToolExecutionResult, args: FileRequest, totalLines: nu
   const clippedLine = result.diagnostics?.some(value => value.code === "truncated" && value.severity === "warn") ?? false;
   const next = (args.offset ?? 1) + text.split("\n").length;
   const truncated = clippedLine || next <= totalLines;
-  const diagnostics = (result.diagnostics ?? []).map(value => clippedLine && value.code === "truncated"
-    ? { ...value, message: "One line exceeds the 50 KiB read limit. Its remainder cannot be resumed with line offsets; use a narrower source or explicit conversion." } : value);
+  const diagnostics = clippedLine ? [{ path: args.path!, message: "One line exceeds the 50 KiB read limit. Its remainder cannot be resumed with line offsets; use a narrower source or explicit conversion." }] : [];
   return { path: args.path, text, truncated, unsupported: null, nextOffset: truncated && !clippedLine ? next : null, diagnostics };
 }
 async function fileCandidates(env: MountedExecutionEnv, root: FileInfo, excluded: Set<string>, context: Context): Promise<Candidates> {
@@ -176,7 +175,7 @@ async function fileCandidates(env: MountedExecutionEnv, root: FileInfo, excluded
       else {
         if (info === root || !["not_found", "not_directory", "permission_denied", "unknown"].includes(result.error.code)) throw result.error;
         truncated = true;
-        diagnostics.push({ severity: "warn", code: result.error.code, message: `Could not search ${path}: ${result.error.message}` });
+        diagnostics.push({ path, message: result.error.message });
       }
     } else if (info.kind === "file") paths.push(path);
   }
@@ -230,10 +229,10 @@ async function grepFiles(env: MountedExecutionEnv, candidates: Candidates, args:
     if (file.kind === "unsupported") { skippedFiles++; continue; }
     scannedFiles++;
     bytes += file.bytes;
-    matches.push(...searchLines(path, file.text, match, contextLines, count - matches.length, context));
-    if (matches.length >= count) { truncated = true; break; }
+    matches.push(...searchLines(path, file.text, match, contextLines, count + 1 - matches.length, context));
+    if (matches.length > count) { truncated = true; break; }
   }
-  return { matches, scannedFiles, skippedFiles, truncated, diagnostics: candidates.diagnostics };
+  return { matches: matches.slice(0, count), scannedFiles, skippedFiles, truncated, diagnostics: candidates.diagnostics };
 }
 
 export class AgentFileSystem {

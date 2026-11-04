@@ -132,7 +132,7 @@ export function mountedFileSystem(scope: string, inputs: readonly FileMount[]): 
   const text = async (input: string, context: Context) => {
     const { mount, target } = route(input);
     const content = await mount.backend.read(target, context);
-    if (typeof content !== "string") throw new FileError("invalid", "Binary files require a dedicated image/document operation", input);
+    if (typeof content !== "string") throw new FileError("not_supported", "Binary files require a dedicated image/document operation", input);
     return content;
   };
   const unavailable = async () => err<never, FileError>(new FileError("not_supported", "Operation is unavailable in the mounted filesystem"));
