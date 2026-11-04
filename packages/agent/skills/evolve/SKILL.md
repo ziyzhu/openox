@@ -1,6 +1,6 @@
 ---
 name: evolve
-description: "Use when creating, connecting, extending, repairing, or verifying services and reusable skills, or configuring and troubleshooting model providers and their model lists. Also use when a missing or confirmed broken capability prevents completing the request. Ordinary use of working services or configured models does not require this skill."
+description: "Use when creating, connecting, extending, repairing, auditing, or verifying services and reusable skills, repairing service validation failures after app updates or incompatible contract changes, or configuring and troubleshooting model providers and their model lists. Also use when a missing or confirmed broken capability prevents completing the request. Ordinary use of working services or configured models does not require this skill."
 ---
 
 # Evolve
@@ -16,8 +16,8 @@ Load only the references needed for this task. Paths are relative to this skill 
 | Task | Read before implementation |
 | --- | --- |
 | Configure, connect, refresh, audit, restore, or repair a model provider or its models | `references/providers.md` |
-| Explore a website to build or repair a service, or substantively verify web handlers | `references/web-service.md` |
-| Connect a direct HTTP API with Host-managed authentication | `references/api-service.md` |
+| Explore a website to build or repair a service, repair web service validation failures, or substantively verify web handlers | `references/web-service.md` |
+| Connect a direct HTTP API with Host-managed authentication or repair API service validation failures | `references/api-service.md` |
 | Create, improve, copy, share, or verify a reusable skill | `references/skills.md` |
 | Add or repair website conversation Actions | Web service reference, then `references/model-service.md` |
 | Add or standardize a website's default search action | Web service reference, then `references/search.md` |
@@ -31,7 +31,11 @@ For remote MCP connections, use the supplied endpoint or official documentation 
 
 Fulfill website tasks through service actions. Browser is for evidence and service development, not direct fulfillment or fallback. Distinguish a confirmed service defect from login, human verification, rate limiting, missing resources, and temporary failures. Failed discovery does not establish absence. If authoring is blocked, report the concrete blocker.
 
-Legacy authentication-action validation errors are source defects, not evidence that the user is signed out. Inspect the selected source and repair the contract while preserving unrelated Local behavior. A different Built-in candidate does not authorize overwriting Local work or silently switching sources. If repair requires a consequential source choice or cannot be verified, surface that decision or blocker instead of substituting indexed excerpts for the requested website action.
+When evolving services, check saved Local web and API drafts for validation failures, including services unrelated to the current attachment. Inspect `ox.repository.list`, enumerate service directories under `services/web/` and `services/api/` with `ox.fs`, and identify Local candidates through `ox.repository.conflicts`. Do not rely on attached services, catalog counts, or repository readiness alone: invalid source may be absent from the usable catalog. Validate each complete Local draft with `ox.service.validate` using its bare domain. Catch each failure separately, retain its diagnostic, and continue checking the remaining services. Respect listing limits and report inaccessible or truncated coverage rather than claiming every service passed.
+
+Repair confirmed validation failures, including incompatibilities introduced by app updates, through the applicable service reference. Read the affected source and current contracts, make the smallest compatible patch preserving intended behavior and unrelated Local work, then revalidate the whole draft until it passes or a concrete blocker remains. Use `ox.fs.edit` when an invalid manifest prevents `ox.service.update`. Do not delete actions merely to pass validation, replace intentional incomplete drafts, or repeat an unchanged failing check. Validation failures are source defects, not evidence that the user is signed out; legacy authentication-action errors follow the same repair loop. A different Built-in candidate does not authorize overwriting Local work or silently switching sources. Copy eligible read-only source before repair; report source that cannot be copied or edited as blocked.
+
+Validation alone does not verify runtime behavior. Attach or reload services needed for the original request and exercise repaired handlers through their actual service actions, preserving approval and authentication gates. Do not attach unrelated services just to audit them. Report which repairs passed validation, which received live verification, and any remaining failures or incomplete drafts, then complete the original request. If repair requires a consequential source choice or cannot be verified, surface that decision or blocker instead of substituting indexed excerpts for the requested website action.
 
 1. Start with the target domain from the request or public research. Check relevant source under `services/<kind>/<domain>/` with `ox.fs`, and inspect repository readiness. Reuse suitable source; missing coverage means build the needed service, not that the domain is unsupported. Local is always enabled; if not ready, report its state rather than deleting drafts or trying another domain. Copy eligible read-only services before editing; iOS services are not authorable. Resolve source conflicts through `ox.repository.conflicts` and `ox.repository.resolve` without replacing Local work.
 2. Gather the smallest sufficient website or official API evidence. Preflight the product favicon alongside discovery, using the icon reference. A new or updated customer-facing web or API service must have a verified `faviconUrl` before attachment; if no candidate passes, preserve the draft and existing attachment and report the blocker.

@@ -805,6 +805,20 @@ final class ConversationManager {
         }
     }
 
+    private var conversationsForLifecycle: [Conversation] {
+        var conversations = records.values.compactMap { $0.hydration.conversation }
+        if let current, !conversations.contains(where: { $0 === current }) { conversations.append(current) }
+        return conversations
+    }
+
+    func suspendModelPreparation() {
+        for conversation in conversationsForLifecycle { conversation.suspendModelPreparation() }
+    }
+
+    func resumeAfterForeground() {
+        for conversation in conversationsForLifecycle { conversation.resumeAfterForeground() }
+    }
+
     func notifyPendingInteractions() {
         for record in records.values { record.hydration.conversation?.notifyPendingInteraction() }
         current?.notifyPendingInteraction()

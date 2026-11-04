@@ -56,6 +56,11 @@ nonisolated struct OpenAIResponsesWebSocketEvents: AsyncSequence, @unchecked Sen
 actor OpenAIResponsesWebSocketPool {
     static let shared = OpenAIResponsesWebSocketPool()
 
+    enum Activity: String {
+        case foreground
+        case background
+    }
+
     struct Lease: @unchecked Sendable {
         let task: URLSessionWebSocketTask
         let key: Key?
@@ -79,8 +84,20 @@ actor OpenAIResponsesWebSocketPool {
     private let clock = ContinuousClock()
     private let idleDuration: Duration = .seconds(5 * 60)
     private let maximumAge: Duration = .seconds(55 * 60)
+    private var activity = Activity.foreground
     private var entries: [Key: Entry] = [:]
     private var fallbackSessions: [String: ContinuousClock.Instant] = [:]
+
+    func setActivity(_ activity: Activity) {
+        self.activity = activity
+        let idle = entries.filter { !$0.value.busy }
+        for (key, entry) in idle {
+            entry.expiration?.cancel()
+            entry.task.cancel(with: .normalClosure, reason: Data("app_\(activity.rawValue)".utf8))
+            entries.removeValue(forKey: key)
+        }
+        Log.network.info("ResponsesWebSocket.lifecycle activity=\(activity.rawValue) retired=\(idle.count) leased=\(entries.count)")
+    }
 
     func fallbackActive(sessionID: String?) -> Bool {
         fallbackSessions = fallbackSessions.filter { $0.value > clock.now }
@@ -131,7 +148,7 @@ actor OpenAIResponsesWebSocketPool {
             lease.task.cancel(with: .normalClosure, reason: Data("done".utf8))
             return
         }
-        guard keep, entry.task.state == .running else {
+        guard keep, activity == .foreground, entry.task.state == .running else {
             entry.expiration?.cancel()
             entry.task.cancel(with: .normalClosure, reason: Data("done".utf8))
             entries.removeValue(forKey: key)

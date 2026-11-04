@@ -168,8 +168,8 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         guard completion.outcome == nil else { return }
         let interruptedPhase = phase
         let expiration = onExpiration
-        finish(.expired)
         expiration?()
+        finish(.expired)
         let elapsedMs = submittedAt.map { Int(Date().timeIntervalSince($0) * 1_000) } ?? -1
         Log.session.warning("ConversationBackground.expire conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) phase=\(interruptedPhase.rawValue) elapsedMs=\(elapsedMs) completedUnits=\(completedUnits)")
     }

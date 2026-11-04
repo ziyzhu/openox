@@ -96,9 +96,14 @@ protocol ConversationBackgroundExecution: AnyObject {
 
 @MainActor
 protocol ConversationExecution {
+    var foregroundExecutionAvailable: Bool { get }
     func backgroundExecution(conversationID: UUID, runID: RunID, onExpiration: @escaping () -> Void) -> any ConversationBackgroundExecution
     func protectPersistence(_ operation: @escaping @MainActor () async -> Void)
     func frameDriver(handler: @escaping @MainActor (CFTimeInterval) -> Void) -> any StreamFrameDriving
+}
+
+extension ConversationExecution {
+    var foregroundExecutionAvailable: Bool { true }
 }
 
 @MainActor

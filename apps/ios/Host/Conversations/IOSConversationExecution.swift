@@ -4,6 +4,8 @@ import QuartzCore
 
 @MainActor
 struct IOSConversationExecution: ConversationExecution {
+    var foregroundExecutionAvailable: Bool { UIApplication.shared.applicationState == .active }
+
     func backgroundExecution(conversationID: UUID, runID: RunID, onExpiration: @escaping () -> Void) -> any ConversationBackgroundExecution {
         IOSConversationBackgroundExecution(conversationID: conversationID, runID: runID, onExpiration: onExpiration)
     }

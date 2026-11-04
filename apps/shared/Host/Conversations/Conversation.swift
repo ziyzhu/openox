@@ -121,12 +121,22 @@ final class Conversation: Identifiable {
         if client.preparationRequiresPrompt { scheduleModelPreparation() }
     }
 
-    private func scheduleModelPreparation() {
+    func suspendModelPreparation() {
         modelPreparationTask?.cancel()
         modelPreparationTask = nil
-        guard isSelected else { return }
+    }
+
+    func resumeAfterForeground() {
+        guard execution.foregroundExecutionAvailable else { return }
+        startWorker()
+        scheduleModelPreparation()
+    }
+
+    private func scheduleModelPreparation() {
+        suspendModelPreparation()
+        guard isSelected, !isBusy, execution.foregroundExecutionAvailable else { return }
         modelPreparationTask = Task { @MainActor [weak self] in
-            guard !Task.isCancelled, let self, self.isSelected else { return }
+            guard !Task.isCancelled, let self, self.isSelected, self.execution.foregroundExecutionAvailable else { return }
             let client = self.client
             let model = self.model
             let authenticationStarted = ContinuousClock.now
@@ -148,6 +158,7 @@ final class Conversation: Identifiable {
                     tools = []
                 }
                 try Task.checkCancellation()
+                guard execution.foregroundExecutionAvailable else { return }
             } catch {
                 if !Task.isCancelled { Log.agent.warning("LLM.prepare context unavailable conversation=\(self.id) error=\(error.localizedDescription)") }
                 return
@@ -1550,7 +1561,8 @@ final class Conversation: Identifiable {
     }
 
     private func startWorker() {
-        guard !isBusy, let submission = submissions.next else { return }
+        guard !isBusy, executionLease == .externallyManaged || execution.foregroundExecutionAvailable,
+              let submission = submissions.next else { return }
         let runID = RunID()
         let queueDepth = submissions.count
         let task = Task { @MainActor [weak self] in
@@ -1702,6 +1714,8 @@ final class Conversation: Identifiable {
         guard activeRun?.id == runID else { return }
         activeRun?.backgroundExecutionExpired = true
         Log.session.warning("Conversation.backgroundLeaseExpired id=\(id) run=\(runID.rawValue)")
+        stream.flush()
+        stopCurrentTurn()
     }
 
     private func runOne(_ submission: Submission, runID: RunID) async {
