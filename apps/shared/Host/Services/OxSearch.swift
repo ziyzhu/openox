@@ -30,6 +30,33 @@ nonisolated enum OxSearch {
         "additionalProperties": .bool(false),
     ])
 
+    static let mergedResultSchema: JSONValue = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "title": .object(["type": .string("string")]),
+            "url": .object(["type": .array([.string("string"), .string("null")])]),
+            "snippet": .object(["type": .array([.string("string"), .string("null")])]),
+            "score": .object(["type": .string("number"), "minimum": .int(0), "description": .string("Reciprocal rank fusion retrieval score, not factual confidence.")]),
+            "sources": .object([
+                "type": .string("array"), "minItems": .int(1),
+                "items": .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "service": .object(["type": .string("string")]),
+                        "rank": .object(["type": .string("integer"), "minimum": .int(1)]),
+                        "title": .object(["type": .string("string")]),
+                        "url": .object(["type": .array([.string("string"), .string("null")])]),
+                        "snippet": .object(["type": .array([.string("string"), .string("null")])]),
+                    ]),
+                    "required": .array(["service", "rank", "title", "url", "snippet"].map(JSONValue.string)),
+                    "additionalProperties": .bool(false),
+                ]),
+            ]),
+        ]),
+        "required": .array(["title", "url", "snippet", "score", "sources"].map(JSONValue.string)),
+        "additionalProperties": .bool(false),
+    ])
+
     static let function = OxFunction(
         namespace: "web",
         schema: {
@@ -54,6 +81,7 @@ nonisolated enum OxSearch {
                     "properties": .object([
                         "query": .object(["type": .string("string")]),
                         "results": .object(["type": .string("array"), "items": resultSchema]),
+                        "mergedResults": .object(["type": .string("array"), "items": mergedResultSchema]),
                         "errors": .object([
                             "type": .string("array"),
                             "items": .object([

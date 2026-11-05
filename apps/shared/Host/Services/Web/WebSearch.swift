@@ -63,7 +63,8 @@ extension Conversation {
                 }.joined(separator: "; ")
                 throw OxFunctionError(code: "all_searches_failed", message: message, recovery: "For missing services or standard search actions, use Evolve to build or extend the requested domain, verify it, then retry. Inspect other failures; do not substitute domains or report that no matches exist.")
             }
-            return .object(["query": .string(query), "results": .array(results), "errors": .array(errors)])
+            return .object(["query": .string(query), "results": .array(results), "errors": .array(errors),
+                            "mergedResults": .array(OxSearch.mergeSearchResults(results))])
         }
     }
 
