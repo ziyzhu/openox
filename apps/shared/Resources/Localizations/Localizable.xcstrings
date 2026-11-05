@@ -2513,16 +2513,6 @@
         }
       }
     },
-    "Choose a default model to start a conversation." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择默认模型以开始对话。"
-          }
-        }
-      }
-    },
     "Choose a model" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2551,6 +2541,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择默认模型"
+          }
+        }
+      }
+    },
+    "Choose model" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择模型"
           }
         }
       }
@@ -9785,6 +9785,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "标准"
+          }
+        }
+      }
+    },
+    "Start a conversation" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始对话"
           }
         }
       }

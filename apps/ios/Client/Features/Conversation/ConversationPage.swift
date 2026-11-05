@@ -261,7 +261,7 @@ struct ConversationPage: View {
     private var page: some View {
         let interaction = activeInteraction
         let isLogin = if case .serviceControl(let item) = interaction, case .login = item.control { true } else { false }
-        let showsComposer = (interaction == nil || isLogin) && isModelConfigured && !webInputFocused
+        let showsComposer = (interaction == nil || isLogin) && !webInputFocused
         let authProbe = conversation.pendingServiceControl.flatMap { item -> Conversation.PendingServiceControl? in
             guard isAttached(item.control), case .login = item.control else { return nil }
             return item
@@ -1525,8 +1525,8 @@ struct ConversationPage: View {
     }
 
     private func ensureModelAccess() -> Bool {
-        guard modelAccessNeedsAttention else { return true }
-        Log.ui.info("ConversationPage.modelAccess blocked conversation=\(conversation.id) provider=\(conversation.modelSelection.providerID) reason=unavailable")
+        guard !isModelConfigured || modelAccessNeedsAttention else { return true }
+        Log.ui.info("ConversationPage.modelAccess blocked conversation=\(conversation.id) provider=\(conversation.modelSelection.providerID) reason=\(isModelConfigured ? "unavailable" : "unconfigured")")
         modalPresentation = .modelPicker
         return false
     }

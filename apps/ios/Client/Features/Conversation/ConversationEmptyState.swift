@@ -44,11 +44,11 @@ struct ConversationEmptyState: View {
 
     private var modelSetupState: some View {
         VStack(spacing: Theme.Spacing.lg) {
-            Text("Choose a default model to start a conversation.")
+            Text("Start a conversation")
                 .font(Theme.Fonts.headline)
                 .foregroundStyle(Theme.Colors.onSurface)
                 .multilineTextAlignment(.center)
-            Button("Choose default model", action: onChooseModel)
+            Button("Choose model", action: onChooseModel)
                 .font(Theme.Fonts.labelMd)
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.Colors.primary)

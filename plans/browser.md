@@ -2,7 +2,7 @@
 
 Goal: qualify Ox as an Apple-approved browser so users can authenticate to third-party websites with passkeys inside Ox. Keep the existing WebKit browser; establish Profile-owned website sessions through an agreed storage transition. Current website sessions are app-wide. Do not build a separate engine or custom JavaScript passkey bridge.
 
-Status: external-link handling and selected navigation paths are implemented and simulator-verified. The audit reproduced cross-Profile cookie/local-storage sharing and a nonfunctional JavaScript popup; Profile isolation and broader compatibility remain unfinished. Apple approval and passkey behavior in an entitled Ox build remain unverified. Users should not need to select Ox as their default browser to use embedded passkeys; verify this on-device before promising support.
+Status: Apple rejected the entitlement request on October 20, 2026 because reviewers could not reach arbitrary-URL browsing at launch and the documented “+” entry was absent without model setup. The model-dependent composer visibility was reproduced and fixed; browsing without a default model is simulator-verified. External-link handling and selected navigation paths are also implemented and simulator-verified. Cross-Profile cookie/local-storage sharing and a nonfunctional JavaScript popup remain unresolved. Apple approval and passkey behavior in an entitled Ox build remain unverified. Users should not need to select Ox as their default browser to use embedded passkeys; verify this on-device before promising support.
 
 ## Benefits and trade-offs
 
@@ -21,7 +21,8 @@ Costs and limitations:
 
 ## 1. Confirm eligibility and permission compatibility
 
-- [ ] Ask Apple about eligibility for an AI app with user-controlled general browsing, or submit an entitlement request describing Ox honestly.
+- [x] Receive Apple’s entitlement-request decision. Apple declined the initial request for missing launch-time browsing access; this is not approval or a categorical ruling on AI apps. The original submission text has not been inspected.
+- [ ] Resubmit after verifying provider-independent browsing, identifying the exact candidate version/build, and providing a launch-to-website recording. Ask Apple which build they will assess.
 - [x] Remove the native Bluetooth service, provider/helpers, session ownership, permission requests, usage key, and translations with maintainer approval.
 - [x] Remove the read/write Photos provider, native actions, bundled service, permission key, and permission translations with maintainer approval.
 - [x] Preserve and simulator-verify picker-based photo attachments without Photos library authorization. Add-only image saving is not implemented.
@@ -48,7 +49,7 @@ Questions to submit to Apple after maintainer review:
 4. Are there additional restrictions on Ox's user-authorized Contacts, calendar, reminders, camera, microphone, local-network, background-processing, or iCloud features?
 5. What build and review evidence should accompany the request, and how can external-link behavior be demonstrated before production entitlement approval?
 
-No inquiry has been submitted. Photos and Bluetooth removals are approved and implemented. Do not represent the remaining compliance plan as implemented or Apple-approved.
+Apple’s email, “Your Default Web Browser entitlement request status is ready.” (October 20, 2026), says the app lacked a URL bar/search field for arbitrary URLs, the documented “+” button was absent, and requiring chat-engine authentication would violate launch-time browser requirements. It invites another request once the app meets the requirements. The email does not identify the assessed version/build. Photos and Bluetooth removals are maintainer-approved and implemented. Do not represent the remaining compliance plan as implemented or Apple-approved.
 
 Apple's public guidance does not specify whether entitlement assessment uses the published version or the latest uploaded build; the request form requires login and its evidence fields have not been inspected. Identify the intended candidate version/build and any available TestFlight access, distinguish it from the published version, and ask Apple which build to assess. Do not assume the latest upload is automatically assessed or that the changes must be published first. Managed-capability approval does not replace App Review of the submitted entitled build.
 
@@ -59,7 +60,8 @@ Build on `apps/ios/Client/UI/WebBrowserView.swift`, `ServiceBrowserView`, and `L
 Existing: `.browse` mode already has editable address entry, back/forward, reload/stop, progress, a "Try Again" error overlay, Share, and Open in Safari.
 
 Entry points (approved direction: composer URL, "+" menu, empty start page with service websites; recent pages deferred):
-- [x] Reproduce current state on a simulator: no launch path reaches the Browser without the agent or an external link.
+- [x] Reproduce original state on a simulator: no launch path reaches the Browser without the agent or an external link.
+- [x] Reproduce Apple’s no-default-model case: the composer, “+” menu, and URL suggestion were hidden. Remove the model gate from composer visibility while retaining model setup checks on message/skill submission. Verify onboarding → “+” → Browser → arbitrary URL and composer URL suggestions without configuring a default model.
 - [x] Composer URL: when trimmed composer text is a single bare domain or `http(s)` URL, show an "Open <host>" suggestion using the existing composer suggestion-panel pattern. Selecting it opens the Browser and keeps the draft; Send still goes to the agent. Ignore multi-word text and `sandbox:` links.
 - [x] "+" menu: add a "Browser" row to `AttachMenuCard` that opens an empty Browser with the address field focused.
 - [x] Empty Browser: let `ServiceBrowserSession` start without an initial URL, auto-focus the address field, and show a start page instead of a blank web view.
@@ -75,7 +77,7 @@ Navigation audit:
 Recent pages (deferred, needs approval): Profile-local capped list of URL, title, and last visit, recorded only for user-initiated top-level navigations, cleared with Profile website data, logged by domain only. It is a new persisted file, so it requires predecessor/changed-build evidence and should follow Profile isolation.
 
 Verification:
-- [ ] Simulator E2E on iPhone and iPad layouts with VoiceOver labels and stable identifiers for each new control and per-service row. iPhone (ox-1, iOS 26) verified: "+" → start page, address entry, tile navigation, composer suggestion (`hello`/`hello world` show none; `Apple.com/iphone` opens www.apple.com), draft retained. iPad and dark mode pending.
+- [ ] Simulator E2E on iPhone and iPad layouts with VoiceOver labels and stable identifiers for each new control and per-service row. iPhone (ox-1, iOS 26) verified: "+" → start page, address entry, tile navigation, composer suggestion (`hello`/`hello world` show none; `Apple.com/iphone` opens www.apple.com), draft retained. Fresh-install iPad Air 11-inch (M3), iOS 26, verified in portrait and landscape: introductory disclosure, no-model launch state, “+” → Browser, address editing, bare-domain/HTTPS navigation, composer suggestion, and draft retention. Dark-mode launch/suggestion screenshots captured. Full VoiceOver, larger text, multitasking/window-size coverage, and other iPad sizes remain pending.
 - [ ] Screenshots of composer suggestion, "+" menu row, empty start page, and no-services state for review.
 - [ ] Report LOC, cyclomatic complexity, file-tree, and call-stack diffs.
 
@@ -158,12 +160,16 @@ The retrieved sources support the browser route for third-party domains without 
 - [ ] Exercise external links, redirects, popups, uploads, downloads, and Profile switching.
 - [ ] Capture screenshots or video for human visual review; keep evidence outside the repository.
 - [ ] Keep sanitized structured logs sufficient to diagnose production failures.
-- [ ] Prepare concise review instructions demonstrating general browsing and external-link handling.
+- [ ] Prepare concise review instructions demonstrating general browsing and external-link handling. Start with no model provider configured: launch Ox, finish the introductory disclosure if shown, tap “+” → Browser, enter `https://www.apple.com/iphone/`, and submit. Alternatively, type `Apple.com/iphone` in the composer and tap “Open apple.com”; do not tap Send or configure a model. Include the exact candidate version/build and a recording, and confirm Apple can access that build.
 - [ ] Review LOC, cyclomatic complexity, file-tree changes, and call-stack changes for each implementation change.
 
 Execution order: eligibility and permission clarification → minimum browser UX → external-link handling → navigation and Profile verification → approved signing → physical-device passkey verification.
 
 ## Evidence and references
+
+Launch-access remediation: iOS 26 simulator ox-2, configured bundle identifier `ai.oxcraft.bot`; baseline and changed Debug builds succeeded. With an empty provider catalog and no default model, baseline lacked the composer/“+” entry. The changed build verified the introductory disclosure → “+” → Browser → arbitrary HTTPS URL, bare-domain navigation, composer URL suggestions, and draft retention. Send opens model setup without consuming the draft or enqueuing a message. Website rendering was visually checked; WebKit page text was not exposed in the idb accessibility tree. Evidence: `/tmp/ox-browser-launch/`. This used preserved app data with provider configuration temporarily cleared and onboarding replayed, not a fresh installation. Entitled physical-device delivery and passkeys remain untested.
+
+iPad layout review: a maintainer-authorized temporary iPad Air 11-inch (M3), iOS 26 simulator used a fresh install of `ai.oxcraft.bot` with no default model. The current iOS build passed. Portrait and landscape browsing entry, address submission, website rendering, composer URL suggestion, and draft retention worked; screenshots showed no blocking clipping or overlap in those paths. Some long start-page service names truncate. Evidence: `/tmp/ox-browser-ipad/`; landscape captures are rotated for viewing because simctl returned portrait-oriented framebuffer images. This was a basic layout/interaction check, not full accessibility, multitasking, or browser-compliance verification.
 
 Sections 3–5 audit: iOS 26 simulator ox-2, baseline and changed Debug builds succeeded. Controlled HTTP fixture requests, native input, AX alerts, and screenshots verified the paths marked above. Evidence is outside Git at `/tmp/ox-browser-audit/`; no real website authentication, entitled physical-device delivery, or passkeys were tested. Profile isolation and JavaScript popup checks failed as described above; rejection notices do not establish download support.
 
