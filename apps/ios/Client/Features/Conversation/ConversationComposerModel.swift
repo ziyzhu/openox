@@ -110,7 +110,7 @@ final class ConversationComposerModel {
         }
     }
 
-    var websiteSuggestion: URL? {
+    var websiteURL: URL? {
         guard surface == .none, draftAttachments.isEmpty else { return nil }
         let value = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard value.contains("://") || value.range(of: #"^[^/?#]+\.[a-z]{2,}(?:[/?#].*)?$"#, options: [.regularExpression, .caseInsensitive]) != nil else { return nil }
@@ -312,6 +312,5 @@ enum AttachmentChoice {
     case camera
     case photos
     case files
-    case website
     case service(Service)
 }

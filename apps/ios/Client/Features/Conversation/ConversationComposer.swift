@@ -297,7 +297,7 @@ struct ConversationComposer: View, Equatable {
     private var inputAccessibilityValue: Text {
         if !inputText.isEmpty { return Text(verbatim: inputText) }
         if isEditingMessage { return Text("Edit message") }
-        return Text("Type a message")
+        return Text("Ask something or enter a URL")
     }
 
     private var trailingControlSize: CGFloat {
@@ -321,8 +321,8 @@ struct ConversationComposer: View, Equatable {
                     containerWidth = width
                 }
             }
-            .onChange(of: canSubmit, initial: true) { _, canSubmit in
-                onPreparationIntent(canSubmit)
+            .onChange(of: canSubmit && (isEditingMessage || composer.websiteURL == nil), initial: true) { _, needsModel in
+                onPreparationIntent(needsModel)
             }
             .onChange(of: composer.draft) { previous, current in
                 guard previous.first != "/", current.first == "/" else { return }
@@ -727,7 +727,7 @@ struct ConversationComposer: View, Equatable {
                     if isEditingMessage {
                         Text("Edit message", comment: "Placeholder shown while editing a previously sent message.")
                     } else {
-                        Text("Type a message")
+                        Text("Ask something or enter a URL")
                     }
                 }
                     .font(Theme.Fonts.bodyMd)
@@ -816,6 +816,8 @@ struct ConversationComposer: View, Equatable {
                 .padding(.trailing, 6)
                 .padding(.vertical, 5)
                 .accessibilityLabel("Attaching")
+        } else if composer.canSubmit, composer.websiteURL != nil {
+            composerButton(systemName: "globe", label: String(localized: "Open website"), id: A11yID.ConversationControls.openWebsite, action: submit)
         } else if composer.canSubmit {
             composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.ConversationControls.send, fill: Theme.Colors.composerSend, action: submit)
         } else if isBusy, !composer.suppressesStopControl {
@@ -976,7 +978,7 @@ struct ConversationComposer: View, Equatable {
             return
         }
         guard let invocation = composer.slashInvocation else {
-            composer.delayStopControl()
+            if composer.websiteURL == nil { composer.delayStopControl() }
             onSend()
             return
         }

@@ -71,6 +71,7 @@ struct WebBrowserView: View {
     var initialURL: URL? = nil
     var errorMessage: String? = nil
     var startPage: AnyView? = nil
+    var showsBrowserBar = true
     let navigate: @MainActor (URL) async -> Bool
     let goBack: @MainActor () -> Void
     let goForward: @MainActor () -> Void
@@ -99,14 +100,16 @@ struct WebBrowserView: View {
                 .overlay { errorOverlay }
                 .overlay { if currentURL == nil, let startPage { startPage } }
                 .safeAreaBar(edge: .bottom, spacing: 0) {
-                    browserBar
-                        .padding(.bottom, isCompact ? -min(20, geometry.safeAreaInsets.bottom) : 0)
+                    if showsBrowserBar {
+                        browserBar
+                            .padding(.bottom, isCompact ? -min(20, geometry.safeAreaInsets.bottom) : 0)
+                    }
                 }
         }
             .animation(chromeAnimation, value: addressFocused)
             .animation(chromeAnimation, value: scrollChrome.isCompact)
             .task {
-                guard currentURL == nil, startPage != nil, mode.allowsAddressEditing else { return }
+                guard showsBrowserBar, currentURL == nil, startPage != nil, mode.allowsAddressEditing else { return }
                 addressFocused = true
             }
             .onChange(of: currentURL, initial: true) { previous, current in
@@ -166,7 +169,7 @@ struct WebBrowserView: View {
                 let offset = min(maximum, max(0, geometry.contentOffset.y + geometry.contentInsets.top))
                 return (offset / 8).rounded(.down) * 8
             } action: { _, offset in
-                guard !addressFocused, !page.isLoading else { return }
+                guard showsBrowserBar, !addressFocused, !page.isLoading else { return }
                 scrollChrome.update(offset: offset)
             }
     }

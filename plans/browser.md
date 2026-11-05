@@ -55,15 +55,16 @@ Apple's public guidance does not specify whether entitlement assessment uses the
 
 ## 2. Complete the minimum browser experience
 
-Build on `apps/ios/Client/UI/WebBrowserView.swift`, `ServiceBrowserView`, and `LinkOpener`. Keep the conversation as the launch screen; add no top-bar chrome. Every entry path reuses `LinkOpener`/`AppPresentationCoordinator.presentBrowser` and creates no conversation.
+Build on `apps/ios/Client/UI/WebBrowserView.swift` and the existing live-page card. Keep the conversation as the launch screen; add no top-bar chrome. Composer URLs open a temporary inline browser without creating a message, persisted conversation item, agent turn, or service invocation. External links retain the `LinkOpener`/`AppPresentationCoordinator.presentBrowser` path.
 
 Existing: `.browse` mode already has editable address entry, back/forward, reload/stop, progress, a "Try Again" error overlay, Share, and Open in Safari.
 
-Entry points (approved direction: composer URL, "+" menu, empty start page with service websites; recent pages deferred):
+Entry points (approved direction: combined chat/URL composer and inline browsing; recent pages deferred):
 - [x] Reproduce original state on a simulator: no launch path reaches the Browser without the agent or an external link.
 - [x] Reproduce Apple’s no-default-model case: the composer, “+” menu, and URL suggestion were hidden. Remove the model gate from composer visibility while retaining model setup checks on message/skill submission. Verify onboarding → “+” → Browser → arbitrary URL and composer URL suggestions without configuring a default model.
-- [x] Composer URL: when trimmed composer text is a single bare domain or `http(s)` URL, show an "Open <host>" suggestion using the existing composer suggestion-panel pattern. Selecting it opens the Browser and keeps the draft; Send still goes to the agent. Ignore multi-word text and `sandbox:` links.
-- [x] "+" menu: add a "Browser" row to `AttachMenuCard` that opens an empty Browser with the address field focused.
+- [x] Composer URL: use “Ask something or enter a URL”; a standalone domain or HTTP(S) URL changes Send to a globe labeled “Open website”. Submission consumes the URL draft and opens/reuses one interactive inline browser before model validation. Ordinary text, embedded URLs, and attachments retain the message path. No default model is required; cancelling model setup preserves a text draft.
+- [x] Remove the standalone URL suggestion and Browser attachment-menu row after verifying their replacement.
+- [x] Reuse `LivePageCard` and browser content with expand/collapse and close. All inline web views omit the browser bar; expanded browsers retain editable address and navigation. Keep inline/expanded/collapsing presentation explicit so the same WebPage is never attached to two views. The browser is temporary; conversation changes and relaunch do not restore it.
 - [x] Empty Browser: let `ServiceBrowserSession` start without an initial URL, auto-focus the address field, and show a start page instead of a blank web view.
 - [x] Start page: list web services (saved first) by name, favicon, and manifest `baseUrl`; tapping one navigates the same session. Saved services and website data are still app-wide, not Profile-owned. No new persisted state.
 - [x] Show a neutral empty state when no web services exist; address entry stays primary. Not simulator-verified because bundled services are always present.
@@ -78,7 +79,7 @@ Recent pages (deferred, needs approval): Profile-local capped list of URL, title
 
 Verification:
 - [ ] Simulator E2E on iPhone and iPad layouts with VoiceOver labels and stable identifiers for each new control and per-service row. iPhone (ox-1, iOS 26) verified: "+" → start page, address entry, tile navigation, composer suggestion (`hello`/`hello world` show none; `Apple.com/iphone` opens www.apple.com), draft retained. Fresh-install iPad Air 11-inch (M3), iOS 26, verified in portrait and landscape: introductory disclosure, no-model launch state, “+” → Browser, address editing, bare-domain/HTTPS navigation, composer suggestion, and draft retention. Dark-mode launch/suggestion screenshots captured. Full VoiceOver, larger text, multitasking/window-size coverage, and other iPad sizes remain pending.
-- [ ] Screenshots of composer suggestion, "+" menu row, empty start page, and no-services state for review.
+- [x] Capture combined-composer globe action, inline browser, expanded browser, retained text draft, and attachment menu without Browser for visual review. Evidence: `/tmp/ox-inline-composer/`. Previous suggestion/menu screenshots document the superseded flow; no-services coverage remains pending.
 - [ ] Report LOC, cyclomatic complexity, file-tree, and call-stack diffs.
 
 Gate: a reviewer can open Ox, reach a website in one or two taps without the agent, and recover from navigation errors.
@@ -160,12 +161,14 @@ The retrieved sources support the browser route for third-party domains without 
 - [ ] Exercise external links, redirects, popups, uploads, downloads, and Profile switching.
 - [ ] Capture screenshots or video for human visual review; keep evidence outside the repository.
 - [ ] Keep sanitized structured logs sufficient to diagnose production failures.
-- [ ] Prepare concise review instructions demonstrating general browsing and external-link handling. Start with no model provider configured: launch Ox, finish the introductory disclosure if shown, tap “+” → Browser, enter `https://www.apple.com/iphone/`, and submit. Alternatively, type `Apple.com/iphone` in the composer and tap “Open apple.com”; do not tap Send or configure a model. Include the exact candidate version/build and a recording, and confirm Apple can access that build.
+- [ ] Prepare concise review instructions demonstrating general browsing and external-link handling. Start with no model provider configured: launch Ox, finish the introductory disclosure if shown, type `Apple.com/iphone` into “Ask something or enter a URL”, and tap the globe (“Open website”). Expand the inline browser to demonstrate its editable address field; no model setup or agent turn is needed. Include the exact candidate version/build and a recording, and confirm Apple can access that build.
 - [ ] Review LOC, cyclomatic complexity, file-tree changes, and call-stack changes for each implementation change.
 
 Execution order: eligibility and permission clarification → minimum browser UX → external-link handling → navigation and Profile verification → approved signing → physical-device passkey verification.
 
 ## Evidence and references
+
+Combined-composer implementation: iOS 26 simulator ox-2, normal `ai.oxcraft.bot` app with preserved data and temporarily empty provider configuration, restored afterward. Verified no-model URL submission, editable address navigation, back/forward, expand/collapse three times, close, text/model-setup cancellation with draft retention, URL/text/invalid-scheme/credential classification, and removal of the Browser attachment row. With the configured Mock model restored, verified URL submission reuses one browser and ordinary Send still produces a conversation reply. The initial collapse crash was reproduced and fixed by withholding the inline WebPage until full-screen dismissal completes. iOS/macOS Debug builds and localization checks passed. Evidence: `/tmp/ox-inline-composer/`. This is not a fresh-install, iPad, full accessibility, entitled-device, or passkey verification of the new flow. No iPad exists in the fixed simulator pool; previous iPad evidence below applies only to the superseded flow.
 
 Launch-access remediation: iOS 26 simulator ox-2, configured bundle identifier `ai.oxcraft.bot`; baseline and changed Debug builds succeeded. With an empty provider catalog and no default model, baseline lacked the composer/“+” entry. The changed build verified the introductory disclosure → “+” → Browser → arbitrary HTTPS URL, bare-domain navigation, composer URL suggestions, and draft retention. Send opens model setup without consuming the draft or enqueuing a message. Website rendering was visually checked; WebKit page text was not exposed in the idb accessibility tree. Evidence: `/tmp/ox-browser-launch/`. This used preserved app data with provider configuration temporarily cleared and onboarding replayed, not a fresh installation. Entitled physical-device delivery and passkeys remain untested.
 

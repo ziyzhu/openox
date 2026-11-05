@@ -236,7 +236,6 @@ nonisolated enum A11yID {
             static let photos = "conversation.attach.photos"
             static let files = "conversation.attach.files"
             static let services = "conversation.attach.services"
-            static let website = "conversation.attach.website"
             static let explore = "conversation.attach.explore"
             static let exploreBack = "conversation.attach.exploreBack"
             static let servicesLoading = "conversation.attach.servicesLoading"

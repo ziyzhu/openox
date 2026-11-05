@@ -4,7 +4,6 @@
     "Failed" : { "comment" : "Card shown after a conversation reply that ended with an error.", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "失败" } } } },
     "Retry" : { "comment" : "Button that tries a failed action again.", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重试" } } } },
     "Refresh" : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新" } } } },
-    "Open %@" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开 %@" } } } },
     "No Websites" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "没有网站" } } } },
     "Enter a website address below." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请在下方输入网站地址。" } } } },
     "Create new": {
@@ -1642,6 +1641,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "询问问题"
+          }
+        }
+      }
+    },
+    "Ask something or enter a URL" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提问或输入网址"
           }
         }
       }
@@ -6801,6 +6810,16 @@
         }
       }
     },
+    "Open website" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开网站"
+          }
+        }
+      }
+    },
     "Open to view the live page" : {
       "localizations" : {
         "zh-Hans" : {
@@ -10726,16 +10745,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "类型"
-          }
-        }
-      }
-    },
-    "Type a message" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "输入消息"
           }
         }
       }

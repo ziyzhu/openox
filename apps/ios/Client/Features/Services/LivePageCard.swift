@@ -21,6 +21,7 @@ struct LivePageCard: View {
     let subtitle: String
     let mount: WebPageMount?
     let inlinePageAnchorID: UUID?
+    var browserSession: ServiceBrowserSession? = nil
     let isPresented: Bool
     let placeholder: Placeholder
     let activate: (() -> Void)?
@@ -133,6 +134,12 @@ struct LivePageCard: View {
                 .aspectRatio(1, contentMode: .fit)
                 .anchorPreference(key: LivePageCardAnchorKey.self, value: .bounds) {
                     [inlinePageAnchorID: $0]
+                }
+        } else if let browserSession, !isPresented {
+            Color.clear
+                .aspectRatio(1, contentMode: .fit)
+                .overlay {
+                    ServiceBrowserContent(session: browserSession, showsBrowserBar: false)
                 }
         } else if let mount, !isPresented {
             Color.clear

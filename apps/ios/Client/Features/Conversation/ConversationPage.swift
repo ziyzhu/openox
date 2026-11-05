@@ -58,6 +58,7 @@ struct ConversationPage: View {
     }
 
     @State var composer = ConversationComposerModel()
+    @State private var manualBrowserSession: ServiceBrowserSession?
     @State private var speechInput = ConversationSpeechInput()
     @Environment(\.scenePhase) private var scenePhase
     @State private var latestSubmissionID: UUID?
@@ -408,16 +409,6 @@ struct ConversationPage: View {
                 slashPickerOverlay(floatsTopStrip: floatsTopStrip)
             }
         }
-        .overlay(alignment: .bottom) {
-            if showsComposer, editedBlockID == nil {
-                ComposerWebsiteSuggestion(
-                    composer: composer,
-                    isFocused: composerFocused,
-                    composerHeight: effectiveComposerHeight(floatsTopStrip: floatsTopStrip),
-                    onOpen: openWebsiteSuggestion
-                )
-            }
-        }
         .overlay { sendFlightOverlay }
         let observedTranscript = composedTranscript
         .onChange(of: speechInput.notice) { _, message in
@@ -438,6 +429,8 @@ struct ConversationPage: View {
             sendHandoff = .idle
             scroller.cancelSendHandoff()
             speechInput.cancel(reason: "conversationChanged")
+            manualBrowserSession?.stop()
+            manualBrowserSession = nil
             cancelEditing(reason: "conversationChanged", keepFocus: false)
         }
         .onChange(of: editedBlockID) { _, blockID in
@@ -668,10 +661,16 @@ struct ConversationPage: View {
         }
     }
 
-    private func openWebsiteSuggestion(_ url: URL) {
-        Log.ui.info("ConversationPage.openWebsite conversation=\(conversation.id) host=\(url.host ?? "?")")
-        composerFocused = false
-        LinkOpener.open(url: url, serviceManager: serviceManager)
+    private func openWebsite(_ url: URL) {
+        Log.ui.info("ConversationPage.openWebsite conversation=\(conversation.id) host=\(url.host ?? "?") disposition=inline")
+        prepareComposerSubmission()
+        composer.discardDraft()
+        if let manualBrowserSession {
+            _ = manualBrowserSession.navigate(to: url)
+        } else {
+            manualBrowserSession = ServiceBrowserSession(url: url, serviceManager: serviceManager)
+        }
+        DispatchQueue.main.async { scroller.rideToBottom() }
     }
 
     private func effectiveComposerHeight(floatsTopStrip: Bool) -> CGFloat {
@@ -705,9 +704,6 @@ struct ConversationPage: View {
             modalPresentation = .photos
         case .files:
             modalPresentation = .files
-        case .website:
-            composerFocused = false
-            LinkOpener.openStartPage(serviceManager: serviceManager)
         case .service(let picked):
             attachService(picked)
         }
@@ -1177,7 +1173,7 @@ struct ConversationPage: View {
         let holdsHistory = holdsTranscript
         let historyTail = sendTranscriptTail
         return VStack(spacing: 0) {
-            if conversation.canChangeRetention {
+            if conversation.canChangeRetention, manualBrowserSession == nil {
                 ConversationEmptyState(
                     isModelConfigured: isModelConfigured,
                     isTemporary: conversation.isTemporary,
@@ -1265,6 +1261,13 @@ struct ConversationPage: View {
                     guard !Task.isCancelled else { return }
                     await scrollToTurn(submissionID)
                 }
+            }
+            if let manualBrowserSession {
+                ConversationBrowserCard(session: manualBrowserSession) {
+                    manualBrowserSession.stop()
+                    self.manualBrowserSession = nil
+                }
+                .padding(.top, ConversationTranscriptMetrics.blockSpacing)
             }
             Color.clear
                 .frame(height: 1)
@@ -1433,7 +1436,7 @@ struct ConversationPage: View {
             onAttachmentChoice: handleAttachChoice,
             onServices: startServiceMention,
             onSubmitSkill: submitSkill,
-            onPreparationIntent: conversation.setModelPreparationIntent,
+            onPreparationIntent: { conversation.setModelPreparationIntent(isModelConfigured && $0) },
             onCancelEdit: { cancelEditing(reason: "user", keepFocus: true) },
             onSend: { send() },
             onStop: {
@@ -1588,6 +1591,10 @@ struct ConversationPage: View {
     }
 
     private func send() {
+        if editedBlockID == nil, let url = composer.websiteURL {
+            openWebsite(url)
+            return
+        }
         guard ensureModelAccess() else { return }
         if let editedBlockID {
             commitEdit(blockID: editedBlockID)

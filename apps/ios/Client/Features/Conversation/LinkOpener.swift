@@ -69,41 +69,35 @@ enum LinkOpener {
         return coordinator.presentBrowser(session)
     }
 
-    @discardableResult
-    static func openStartPage(serviceManager: ServiceManager) -> Bool {
-        let coordinator = AppPresentationCoordinator.shared
-        guard coordinator.canOpenBrowser else { return false }
-        Log.ui.info("LinkOpener.open disposition=start-page")
-        return coordinator.presentBrowser(ServiceBrowserSession(serviceManager: serviceManager))
-    }
 }
 
 struct ServiceBrowserView: View {
     let session: ServiceBrowserSession
-    @State private var toast: Toast?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            browser
-                .toast($toast, accessibilityIdentifier: "serviceBrowser.navigationNotice")
+            ServiceBrowserContent(session: session)
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) { doneButton }
                 }
         }
-        .onAppear(perform: session.start)
         .onDisappear(perform: session.stop)
-        .onChange(of: session.navigationNotice, initial: true) { _, message in
-            toast = message.map { Toast(message: $0, role: .error) }
-        }
-        .onChange(of: toast?.id) { _, _ in
-            if toast == nil { session.dismissNavigationNotice() }
-        }
     }
 
-    private var browser: some View {
+    private var doneButton: some View {
+        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceBrowser.done) { dismiss() }
+    }
+}
+
+struct ServiceBrowserContent: View {
+    let session: ServiceBrowserSession
+    var showsBrowserBar = true
+    @State private var toast: Toast?
+
+    var body: some View {
         WebBrowserView(
             page: session.page,
             mode: .browse,
@@ -114,14 +108,75 @@ struct ServiceBrowserView: View {
                 Log.ui.info("ServiceBrowser.startPage open host=\(url.host ?? "?")")
                 _ = session.navigate(to: url)
             }),
+            showsBrowserBar: showsBrowserBar,
             navigate: { session.navigate(to: $0) },
             goBack: session.goBack,
             goForward: session.goForward,
             reloadOrStop: session.reloadOrStop
         )
+        .toast($toast, accessibilityIdentifier: "serviceBrowser.navigationNotice")
+        .onAppear(perform: session.start)
+        .onChange(of: session.navigationNotice, initial: true) { _, message in
+            toast = message.map { Toast(message: $0, role: .error) }
+        }
+        .onChange(of: toast?.id) { _, _ in
+            if toast == nil { session.dismissNavigationNotice() }
+        }
+    }
+}
+
+struct ConversationBrowserCard: View {
+    let session: ServiceBrowserSession
+    let close: () -> Void
+    @State private var presentation: Presentation = .inline
+
+    private enum Presentation {
+        case inline
+        case expanded
+        case collapsing
     }
 
-    private var doneButton: some View {
-        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceBrowser.done) { dismiss() }
+    var body: some View {
+        LivePageCard(
+            service: nil,
+            fallbackSystemImage: "globe",
+            title: String(localized: "Browser"),
+            subtitle: session.page.url?.host ?? session.serviceDomain,
+            mount: nil,
+            inlinePageAnchorID: nil,
+            browserSession: session,
+            isPresented: presentation != .inline,
+            placeholder: .invitation(String(localized: "View live page")),
+            activate: nil,
+            expand: { presentation = .expanded },
+            cancel: close,
+            accessibilityIdentifier: "conversation.browser",
+            expandAccessibilityIdentifier: "conversation.browser.expand",
+            cancelAccessibilityIdentifier: "conversation.browser.close"
+        )
+        .fullScreenCover(isPresented: Binding(
+            get: { presentation == .expanded },
+            set: { presentation = $0 ? .expanded : .collapsing }
+        ), onDismiss: {
+            presentation = .inline
+        }) {
+            NavigationStack {
+                if presentation == .expanded {
+                    ServiceBrowserContent(session: session)
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                SheetDismissToolbarButton(accessibilityIdentifier: "conversation.browser.collapse") {
+                                    presentation = .collapsing
+                                }
+                            }
+                        }
+                }
+            }
+        }
+        .onDisappear {
+            if presentation == .inline { session.stop() }
+        }
     }
 }
