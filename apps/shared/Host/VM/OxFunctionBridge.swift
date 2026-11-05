@@ -18,7 +18,7 @@ public protocol OxFunctionBridge: AnyObject {
     func findServices(query: String, purpose: String) async throws -> JSONValue?
     func listServices(kind: String?, purpose: String) async throws -> JSONValue?
     func listAttachedServices(kind: String?, purpose: String) async throws -> JSONValue?
-    func inspectService(domain: String, actions: [String]?, purpose: String) async throws -> JSONValue?
+    func inspectService(domain: String, cursor: String?, purpose: String) async throws -> JSONValue?
     func validateService(domain: String, purpose: String) async throws -> JSONValue?
     func createService(kind: String, domain: String, endpoint: String?, transport: String?, faviconURL: JSONValue?, purpose: String) async throws -> JSONValue?
     func updateService(domain: String, fields: [String: JSONValue], purpose: String) async throws -> JSONValue?
@@ -33,8 +33,6 @@ public protocol OxFunctionBridge: AnyObject {
     func attachService(domain: String, purpose: String) async throws -> JSONValue?
     func detachService(domain: String, purpose: String) async throws -> JSONValue?
     func showServicePage(name: String, args: JSONValue?, session: JSONValue?, pageURL: String?, purpose: String) async throws -> JSONValue?
-    func checkServiceAccess(domain: String, pageURL: String?, purpose: String) async throws -> JSONValue?
-    func requestServiceAccess(domain: String, input: JSONValue?, pageURL: String?, purpose: String) async throws -> JSONValue?
     func loginService(domain: String, purpose: String) async throws -> JSONValue?
     func createSkill(name: String, description: String, instructions: String, services: [String], purpose: String) async throws -> JSONValue?
     func copySkill(source: String, name: String, purpose: String) async throws -> JSONValue?

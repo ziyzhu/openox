@@ -27,8 +27,12 @@ nonisolated enum WebSessionContract {
               (list.inputSchema?.objectValue?["required"]?.arrayValue ?? []).isEmpty,
               list.outputSchema?.objectValue?["type"]?.stringValue == "array",
               validSessionSchema(list.outputSchema?.objectValue?["items"]),
+              login.inputSchema?.objectValue?["type"]?.stringValue == "object",
+              login.inputSchema?.objectValue?["additionalProperties"]?.boolValue == false,
+              (login.inputSchema?.objectValue?["properties"]?.objectValue ?? [:]).isEmpty,
+              (login.inputSchema?.objectValue?["required"]?.arrayValue ?? []).isEmpty,
               login.outputSchema?.objectValue?["type"]?.stringValue == "null" else {
-            throw ServiceDefinition.ValidationError.invalid("session actions: provide listSessions and login as the web authentication contract; discovery and login cannot require authentication; listSessions must return authenticated session descriptors and login must return null")
+            throw ServiceDefinition.ValidationError.invalid("session actions: provide listSessions and login as the web authentication contract; discovery and login cannot require authentication; listSessions and login must accept empty closed objects, listSessions must return authenticated session descriptors and login must return null")
         }
     }
 
@@ -105,7 +109,7 @@ extension Service {
             Log.service.info("Service.session default domain=\(domain) action=\(action.id) available=\(discovered.arrayValue?.count ?? 0) selected=\(selected != nil)")
         }
         guard !action.requireAuth || selected != nil else {
-            throw OxFunctionError(code: "authentication_required", message: "No logged-in session was selected or discovered. No action was executed.", recovery: "Use requestAccess if login is needed, or checkAccess to inspect available accounts. pageUrl does not select an authenticated session. Never fabricate a descriptor or automatically replay writes.")
+            throw OxFunctionError(code: "authentication_required", message: "No logged-in session was selected or discovered. No action was executed.", recovery: "Invoke the website's standard login action if needed, or listSessions to inspect available accounts. pageUrl does not select an authenticated session. Never fabricate a descriptor or automatically replay writes.")
         }
         return selected
     }

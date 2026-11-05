@@ -113,6 +113,7 @@ nonisolated struct ServiceDefinition: Sendable {
         self.actionIndex = actionIndex
         self.definitions = object["$defs"]?.objectValue ?? [:]
         self.remoteMCPIcons = []
+        try validateStandardServiceActions()
     }
 
     init(iOS manifest: IOSCatalogManifest, repositoryID: String? = nil) throws {
@@ -146,6 +147,7 @@ nonisolated struct ServiceDefinition: Sendable {
         self.actionIndex = actionIndex
         self.definitions = [:]
         self.remoteMCPIcons = []
+        try validateStandardServiceActions()
     }
 
     init(mcp manifest: MCPCatalogManifest, repositoryID: String? = nil) throws {
@@ -239,12 +241,50 @@ nonisolated struct ServiceDefinition: Sendable {
         return url
     }
 
-    var exposedActions: [Manifest.Action] {
-        let sessions = WebSessionContract.isEnabled(self)
-        return actions.filter {
-            !isStandardAction($0.id)
-                && !(sessions && [WebSessionContract.listAction, WebSessionContract.loginAction].contains($0.id))
+    var standardServiceActions: [Manifest.Action] {
+        if !isAPI && !isIOS && !isMCP {
+            return ModelGuidance.standardServiceActions.objectValue?["web"]?.arrayValue?.compactMap { value in
+                guard let expected = value.objectValue, let id = expected["id"]?.stringValue,
+                      let action = actionIndex[id] else { return nil }
+                if [WebSessionContract.listAction, WebSessionContract.loginAction].contains(id) {
+                    return WebSessionContract.isEnabled(self) ? action : nil
+                }
+                if id == "search" {
+                    var contract = action.raw
+                    for field in ["inputSchema", "outputSchema"] {
+                        if var schema = contract[field]?.objectValue {
+                            schema["$defs"] = .object(definitions)
+                            contract[field] = .object(schema)
+                        }
+                    }
+                    guard !action.requireApproval,
+                          let input = try? OxSearch.searchInput(action: contract, service: domain),
+                          let maximum = input.objectValue?["properties"]?.objectValue?["limit"]?.objectValue?["maximum"]?.intValue,
+                          (1...50).contains(maximum) else { return nil }
+                    return action
+                }
+                guard let input = action.inputSchema, let output = action.outputSchema,
+                      (try? ModelServiceContract.normalized(input, definitions: definitions)) == (try? ModelServiceContract.normalized(expected["inputSchema"] ?? .null)),
+                      (try? ModelServiceContract.normalized(output, definitions: definitions)) == (try? ModelServiceContract.normalized(expected["outputSchema"] ?? .null)) else { return nil }
+                return action
+            } ?? []
         }
+        let kind = isAPI ? "api" : isIOS ? "ios" : "mcp"
+        return ModelGuidance.standardServiceActions.objectValue?[kind]?.arrayValue?.compactMap { Manifest.Action($0) } ?? []
+    }
+
+    func validateStandardServiceActions() throws {
+        guard isAPI || isIOS || isMCP else { return }
+        let reserved = Set(standardServiceActions.map(\.id))
+        if let collision = actions.first(where: { reserved.contains($0.id) }) {
+            throw ValidationError.duplicateAction(collision.id)
+        }
+    }
+
+    var exposedActions: [Manifest.Action] {
+        let standard = standardServiceActions
+        let ids = Set(standard.map(\.id))
+        return standard + actions.filter { !isStandardAction($0.id) && !ids.contains($0.id) }
     }
 
     var isAPI: Bool { manifest.objectValue?["kind"]?.stringValue == "api" }
@@ -290,6 +330,7 @@ nonisolated struct ServiceDefinition: Sendable {
     }
 
     func action(_ id: String, includingStandard: Bool = false) -> Manifest.Action? {
+        if isAPI || isIOS || isMCP, let action = standardServiceActions.first(where: { $0.id == id }) { return action }
         guard let action = actionIndex[id] else { return nil }
         return includingStandard || !isStandardAction(id) ? action : nil
     }

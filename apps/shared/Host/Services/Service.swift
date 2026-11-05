@@ -673,6 +673,7 @@ final class Service: NSObject, Identifiable {
             do {
                 let descriptor = try await mcp.resolve()
                 let resolved = ServiceDefinition(mcp: descriptor, metadata: self.definition)
+                try resolved.validateStandardServiceActions()
                 self.applyResolvedDefinition(resolved, reason: reason)
             } catch RemoteMCPError.authorizationRequired {
                 self.setAuth(.authorizationRequired)

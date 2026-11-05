@@ -1,0 +1,82 @@
+{
+  "web": [
+    {
+      "id": "listSessions",
+      "description": "Discover authenticated website accounts and contexts. Required with login when authenticated actions are supported; public-only sites may omit both. Copy real descriptors into invocation.session; never fabricate accounts.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "outputSchema": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "label": { "type": "string" }, "url": { "type": "string" } }, "required": ["id", "label", "url"], "additionalProperties": false } },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "login",
+      "description": "Prepare and present the website's live login page for the user. Required alongside listSessions. Returns null after interaction; acknowledgment is not authentication. Discover sessions afterward. Never request credentials in chat or replay writes after login.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "outputSchema": { "type": "null" },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "search",
+      "description": "Optional read-only default website search. Scope and query syntax are website-specific; limits may be capped by the service. Reuse cursors with the same query and account. Null nextCursor does not prove completeness; failures are not empty results. Optional result data is service-specific.",
+      "inputSchema": { "type": "object", "properties": { "query": { "type": "string", "minLength": 1 }, "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 }, "cursor": { "type": "string", "minLength": 1 } }, "required": ["query"], "additionalProperties": false },
+      "outputSchema": { "type": "object", "properties": { "items": { "type": "array", "items": { "type": "object", "properties": { "title": { "type": "string" }, "url": { "type": ["string", "null"] }, "snippet": { "type": ["string", "null"] }, "id": { "type": "string" }, "data": { "type": "object", "additionalProperties": true } }, "required": ["title", "url", "snippet"], "additionalProperties": false } }, "nextCursor": { "type": ["string", "null"] }, "scope": { "type": "string" }, "coverage": { "type": "string", "enum": ["complete", "partial", "unknown"] } }, "required": ["items", "nextCursor", "scope", "coverage"], "additionalProperties": false },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "api": [
+    {
+      "id": "credentialStatus",
+      "description": "Read credential configuration without prompting or contacting the API. Configured credentials are not verified server access.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "outputSchema": { "type": "object", "properties": { "state": { "type": "string", "enum": ["configured", "notConfigured", "notRequired"] } }, "required": ["state"], "additionalProperties": false },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "configureCredentials",
+      "description": "Open Host-managed credential setup. Never request credentials in chat. Completion means configuration, not verified API access. Do not reopen after cancellation or replay writes.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "outputSchema": { "type": "object", "properties": { "completed": { "const": true }, "completion": { "type": "string", "enum": ["configured", "notRequired"] }, "state": { "type": "string" } }, "required": ["completed", "completion", "state"], "additionalProperties": false },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "mcp": [
+    {
+      "id": "connectionStatus",
+      "description": "Check server connectivity and authentication readiness without prompting or invoking tools. Connectivity is not tool authorization; errors are not absence.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "outputSchema": { "type": "object", "properties": { "state": { "type": "string", "enum": ["authorized", "authorizationRequired", "notRequired"] } }, "required": ["state"], "additionalProperties": false },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "authorize",
+      "description": "Run the server's supported authorization flow through the Host. Available before tool discovery succeeds. Do not reopen after cancellation or replay writes.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "outputSchema": { "type": "object", "properties": { "completed": { "const": true }, "completion": { "type": "string", "enum": ["authorized", "notRequired"] }, "state": { "type": "string" } }, "required": ["completed", "completion", "state"], "additionalProperties": false },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "ios": [
+    {
+      "id": "permissionStatus",
+      "description": "Read native permission state without prompting. OS permission is not account authentication.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "outputSchema": { "type": "object", "properties": { "state": { "type": "string", "enum": ["authorized", "authorizationRequired", "denied", "notRequired"] } }, "required": ["state"], "additionalProperties": false },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "requestPermission",
+      "description": "Ask the user for the service's native OS permission through the Host. Do not reopen after cancellation or replay writes.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "outputSchema": { "type": "object", "properties": { "completed": { "const": true }, "completion": { "type": "string", "enum": ["authorized", "notRequired"] }, "state": { "type": "string" } }, "required": ["completed", "completion", "state"], "additionalProperties": false },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ]
+}

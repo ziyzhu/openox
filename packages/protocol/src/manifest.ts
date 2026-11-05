@@ -250,6 +250,9 @@ export function validateStandardActions(actions: StandardAction[]): string[] {
     if (output.type !== "array" || !item || !hasExactClosedObjectShape(item, { id: "string", label: "string", url: "string" })) {
       at(`actions[${sessionsIdx}].outputSchema`, "must return an array of closed session descriptors requiring id, label and url strings");
     }
+    if (loginIdx >= 0 && !hasExactClosedObjectShape(actions[loginIdx]!.inputSchema, {})) {
+      at(`actions[${loginIdx}].inputSchema`, "must be a closed empty object; target routing belongs in pageUrl or session");
+    }
     if (loginIdx >= 0 && actions[loginIdx]!.outputSchema.type !== "null") {
       at(`actions[${loginIdx}].outputSchema`, "login preparation must return null; user completion does not verify authentication");
     }
@@ -334,7 +337,7 @@ export function validateServiceManifest(input: unknown, profile: ManifestProfile
     for (const action of m.actions) {
       if (action.baseUrl || action.blocking !== undefined) at("actions", "API actions cannot declare page configuration");
       if (action.requireAuth && m.auth?.type === "none") at("actions", "authenticated actions need service authentication");
-      if (["getSignInUrl", "getSignInState"].includes(action.id)) at("actions", "API authentication is managed by the host");
+      if (["getSignInUrl", "getSignInState", "credentialStatus", "configureCredentials"].includes(action.id)) at("actions", "API authentication action IDs are reserved for the host");
     }
   }
 

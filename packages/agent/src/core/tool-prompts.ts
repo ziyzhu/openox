@@ -2,6 +2,7 @@ import { renderToolSignature } from "@earendil-works/pi-codemode/declarations";
 import fsContracts from "../functions/fs/contracts.json";
 import serviceContracts from "../functions/service/contracts.json";
 import webContracts from "../functions/web/contracts.json";
+import { standardServiceActions } from "../functions/service/standard-actions";
 
 const fetchOutput = webContracts["ox.web.fetch"].outputSchema;
 const { additionalProperties: feedValue, ...feedFields } = fetchOutput.properties.feed;
@@ -36,6 +37,10 @@ const commonDeclarations = ["fs", "web", "service"].map(namespace => {
   return `declare namespace ox.${namespace} {\n${functions}\n}`;
 }).join("\n\n");
 
+const standardActionDeclarations = Object.entries(standardServiceActions).map(([kind, actions]) =>
+  `type ${kind}StandardActions = {\n` + actions.map(action => `  /** ${action.description} */\n  ${renderToolSignature({ ...action, name: action.id })}`).join("\n") + "\n};"
+).join("\n\n");
+
 export const countWords = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 const countWord = (value: number) => countWords[value] ?? String(value);
 export interface ExecuteGuidanceInput {
@@ -51,7 +56,8 @@ export function executeGuidance(input: ExecuteGuidanceInput) {
     input.catalog,
     "The catalog lists compact built-in function summaries, not complete contracts. TypeScript declarations and guidance for common functions follow below and may be used immediately without .help(); write JavaScript, not TypeScript, in executions. For other functions, read their full input/output schemas before first use: print unfamiliar functions' synchronous .help() in a separate execution, batch needed helpers, then call them in a later execution. Contracts already supplied here or by ox.service.inspect satisfy this requirement; do not fetch unchanged contracts again. Operational calls require a short purpose; help and ox.provider.schema() do not. Use ox.fs for files.",
     "Common built-in functions:\n```ts\n" + commonDeclarations + "\n```",
-    "Inspect applicable service action and access contracts before use.",
+    "Standard service actions below are called through ox.service.invoke, not as ox methods. Names are web:<domain>:<action>, api:<service>:<action>, mcp:<server>:<action>, or ios:<app>:<action>. Their full contracts are supplied here; no help or schema-discovery call is needed. Website actions are conditional: use standardActions from inspection or previously supplied availability to establish support, reusing evidence already supplied. Other types always provide their two standard actions, including before MCP tool discovery succeeds. Inspect returns standard-action availability without repeating schemas, plus paginated non-standard contracts. Do not assume an optional action exists, add a status preflight to every action, or treat setup as permission to replay writes.",
+    "Standard action contracts:\n```ts\n" + standardActionDeclarations + "\n```",
     "Use service handoffs for login, review, human verification, and payment. Never request credentials in chat, submit payment from preparation, or replay writes after handoff.",
     `Batch independent reads with Promise.allSettled, chain predictable dependent operations in the same execution, and filter large results before printing. For example, attach then inspect a service together; after coherent source edits, validate then reload, stopping on failure. Return to the model when new evidence requires a decision, not between already-determined steps. Serialize writes and approval-dependent calls. Await every call whose outcome matters; pending calls are cancelled when the script ends. Calls are real and not rolled back on failure. Preserve error code, message, and recovery with console.error(error) or an explicit return. Verify uncertain effects before retrying writes.`,
     `Each execution is self-contained; never store continuation state on globalThis. Return concise progress or persist it through an authorized file. Use bounded loops. The active execution limit is ${input.timeoutSeconds} seconds. ${input.canCancelLoops ? "The runtime supports interrupting JavaScript loops." : "Cancellation does not forcibly stop an infinite JavaScript loop."}`,

@@ -2,6 +2,7 @@ import { guidanceTexts } from "./src/core/guidance-texts";
 import { executeGuidance, countWords } from "./src/core/tool-prompts";
 import { SYSTEM_SKILL_NAMES, RESERVED_SKILL_NAMES } from "@openox/protocol/skills";
 import { filesystemContract } from "./src/core/filesystem-contract";
+import { standardServiceActions } from "./src/functions/service/standard-actions";
 
 const swiftString = (text: string) => JSON.stringify(text).replace(/\\u([0-9a-f]{4})/gi, "\\u{$1}");
 
@@ -18,6 +19,10 @@ export function nativeGuidanceSource() {
 nonisolated enum ModelGuidance {
     static let bundledSkillNames: Set<String> = ${JSON.stringify(SYSTEM_SKILL_NAMES)}
     static let reservedSkillNames: Set<String> = ${JSON.stringify(RESERVED_SKILL_NAMES)}
+    static let standardServiceActions: JSONValue = {
+        let data = Data(${swiftString(JSON.stringify(standardServiceActions))}.utf8)
+        return try! JSONDecoder().decode(JSONValue.self, from: data)
+    }()
     static let fileSystemSchemas: [(String, JSONValue)] = {
         let data = Data(${swiftString(JSON.stringify(filesystemContract))}.utf8)
         guard let schemas = try? JSONDecoder().decode(JSONValue.self, from: data).objectValue else {

@@ -108,7 +108,9 @@ extension Service {
             await checkAccess(policy: policy, reason: .modelLogin)
             if source != .serviceDetail, loginState.isAuthenticated { return .completed }
             let descriptor = try await mcp.authorize()
-            applyResolvedDefinition(ServiceDefinition(mcp: descriptor, metadata: definition), reason: .serviceDetail)
+            let resolved = ServiceDefinition(mcp: descriptor, metadata: definition)
+            try resolved.validateStandardServiceActions()
+            applyResolvedDefinition(resolved, reason: .serviceDetail)
             return loginState.isAuthenticated ? .completed : .incomplete
         }
         guard let apiService else {

@@ -82,16 +82,10 @@ nonisolated enum OxServices {
                                     "minLength": .int(1),
                                     "maxLength": .int(500),
                                 ]),
-                                "actions": .object([
-                                    "type": .string("array"),
-                                    "items": .object([
-                                        "type": .string("string"),
-                                        "minLength": .int(1),
-                                        "maxLength": .int(500),
-                                    ]),
-                                    "minItems": .int(1),
-                                    "maxItems": .int(10),
-                                    "uniqueItems": .bool(true),
+                                "cursor": .object([
+                                    "type": .string("string"),
+                                    "minLength": .int(1),
+                                    "maxLength": .int(1500),
                                 ]),
                             ]),
                             "required": .array([.string("domain")]),
@@ -100,14 +94,10 @@ nonisolated enum OxServices {
                         "outputSchema": .object([
                             "type": .string("object"), "properties": .object([
                                 "service": snapshotSchema,
-                                "actions": .object(["type": .string("object"), "additionalProperties": .object(["type": .string("object"), "description": .string("Action summary, or complete inputSchema/outputSchema for small services or explicitly requested actions.")])]),
-                                "access": .object(["type": .string("object"), "properties": .object([
-                                    "kind": .object(["type": .string("string")]),
-                                    "checkAccess": .object(["type": .string("object"), "description": .string("Applicable function, inputSchema and outputSchema contract.")]),
-                                    "requestAccess": .object(["type": .string("object"), "description": .string("Applicable function, inputSchema and outputSchema contract.")]),
-                                ]), "required": .array([.string("kind")]), "additionalProperties": .bool(false)]),
-                                "capabilitiesAvailable": .object(["type": .string("boolean")]), "capabilityError": .object(["type": .string("string")]),
-                            ]), "required": .array(["service", "actions", "access", "capabilitiesAvailable"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                                "actions": .object(["type": .string("object"), "additionalProperties": .object(["type": .string("object"), "description": .string("Complete action inputSchema and outputSchema with metadata.")])]),
+                                "standardActions": .object(["type": .string("array"), "items": .object(["type": .string("string")]), "description": .string("Available standard action IDs; their contracts are supplied upfront.")]),
+                                "nextCursor": .object(["type": .string("string"), "description": .string("Continuation cursor; absent after the last page.")]),
+                            ]), "required": .array(["service", "standardActions", "actions"].map(JSONValue.string)), "additionalProperties": .bool(false),
                         ]),
                     ])
                 ),
@@ -266,25 +256,7 @@ nonisolated enum OxServices {
                         ]),
                     ])
                 ),
-            ] + ["ox.service.checkAccess", "ox.service.requestAccess"].map { name in
-                var properties: [String: JSONValue] = [
-                    "domain": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(500)]),
-                    "purpose": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(80)]),
-                    "pageUrl": .object(["type": .string("string"), "description": .string("Website-only discovery or login target within the service domain.")]),
-                ]
-                if name == "ox.service.requestAccess" { properties["input"] = .object(["type": .string("object")]) }
-                return (name, .object([
-                    "description": .string(ModelGuidance.text(name)),
-                    "inputSchema": .object([
-                        "type": .string("object"), "properties": .object(properties),
-                        "required": .array([.string("purpose"), .string("domain")]),
-                        "additionalProperties": .bool(false),
-                    ]),
-                    "outputSchema": .object(["oneOf": .array(["web", "api", "mcp", "ios"].map { kind in
-                        name == "ox.service.checkAccess" ? OxActions.checkAccessOutput(kind: kind) : OxActions.requestAccessOutput(kind: kind)
-                    })]),
-                ]))
-            }
+            ]
         },
         installNatives: { ctx, env in
             let listBlock: @convention(block) (JSValue, JSValue) -> JSValue = { kindValue, purposeValue in
@@ -299,9 +271,9 @@ nonisolated enum OxServices {
             }
             ctx.setObject(listAttachedBlock as AnyObject, forKeyedSubscript: "__nativeServiceListAttached" as NSString)
 
-            let inspectBlock: @convention(block) (String, JSValue, JSValue) -> JSValue = { domain, actionsValue, purposeValue in
-                let actions = jsValueToJSON(actionsValue)?.arrayValue?.compactMap(\.stringValue)
-                return env.call { try await $0.inspectService(domain: domain, actions: actions, purpose: purposeValue.toString()!) }
+            let inspectBlock: @convention(block) (String, JSValue, JSValue) -> JSValue = { domain, cursorValue, purposeValue in
+                let cursor = cursorValue.isNull || cursorValue.isUndefined ? nil : cursorValue.toString()
+                return env.call { try await $0.inspectService(domain: domain, cursor: cursor, purpose: purposeValue.toString()!) }
             }
             ctx.setObject(inspectBlock as AnyObject, forKeyedSubscript: "__nativeServiceInspect" as NSString)
 
@@ -352,39 +324,18 @@ nonisolated enum OxServices {
             }
             ctx.setObject(showPageBlock as AnyObject, forKeyedSubscript: "__nativeServiceShowPage" as NSString)
 
-            let checkAccessBlock: @convention(block) (String, JSValue, JSValue) -> JSValue = { domain, pageURLValue, purposeValue in
-                let pageURL = pageURLValue.isNull || pageURLValue.isUndefined ? nil : pageURLValue.toString()
-                return env.call { try await $0.checkServiceAccess(domain: domain, pageURL: pageURL, purpose: purposeValue.toString()!) }
-            }
-            ctx.setObject(checkAccessBlock as AnyObject, forKeyedSubscript: "__nativeServiceCheckAccess" as NSString)
-
-            let requestAccessBlock: @convention(block) (String, JSValue, JSValue, JSValue) -> JSValue = { domain, inputValue, pageURLValue, purposeValue in
-                let input = inputValue.isNull || inputValue.isUndefined ? nil : jsValueToJSON(inputValue)
-                let pageURL = pageURLValue.isNull || pageURLValue.isUndefined ? nil : pageURLValue.toString()
-                return env.call(suspendingTimeout: true) { try await $0.requestServiceAccess(domain: domain, input: input, pageURL: pageURL, purpose: purposeValue.toString()!) }
-            }
-            ctx.setObject(requestAccessBlock as AnyObject, forKeyedSubscript: "__nativeServiceRequestAccess" as NSString)
-
-            let loginBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
-                let purpose = purposeValue.toString()!
-                return env.call(suspendingTimeout: true) { try await $0.loginService(domain: domain, purpose: purpose) }
-            }
-            ctx.setObject(loginBlock as AnyObject, forKeyedSubscript: "__nativeServiceLogin" as NSString)
         },
         jsFragment: """
           list: (value) => { const options = __oxOptions(value, 'ox.service.list'); return __nativeServiceList(options.kind == null ? null : String(options.kind), String(options.purpose)); },
           listAttached: (value) => { const options = __oxOptions(value, 'ox.service.listAttached'); return __nativeServiceListAttached(options.kind == null ? null : String(options.kind), String(options.purpose)); },
-          inspect: (value) => { const options = __oxOptions(value, 'ox.service.inspect'); return __nativeServiceInspect(String(options.domain), options.actions ?? null, String(options.purpose)); },
+          inspect: (value) => { const options = __oxOptions(value, 'ox.service.inspect'); return __nativeServiceInspect(String(options.domain), options.cursor ?? null, String(options.purpose)); },
           validate: (value) => { const options = __oxOptions(value, 'ox.service.validate'); return __nativeServiceValidate(String(options.domain), String(options.purpose)); },
           create: (value) => { const options = __oxOptions(value, 'ox.service.create'); return __nativeServiceCreate(options, String(options.purpose)); },
           update: (value) => { const options = __oxOptions(value, 'ox.service.update'); return __nativeServiceUpdate(options, String(options.purpose)); },
           delete: (value) => { const options = __oxOptions(value, 'ox.service.delete'); return __nativeServiceDelete(String(options.domain), String(options.purpose)); },
           attach: (value) => { const options = __oxOptions(value, 'ox.service.attach'); return __nativeServiceAttach(String(options.domain), String(options.purpose)); },
           detach: (value) => { const options = __oxOptions(value, 'ox.service.detach'); return __nativeServiceDetach(String(options.domain), String(options.purpose)); },
-          showPage: (value) => { const options = __oxOptions(value, 'ox.service.showPage'); return __nativeServiceShowPage(String(options.name), options.input ?? null, options.session ?? null, options.pageUrl ?? null, String(options.purpose)); },
-          checkAccess: (value) => { const options = __oxOptions(value, 'ox.service.checkAccess'); return __nativeServiceCheckAccess(String(options.domain), options.pageUrl ?? null, String(options.purpose)); },
-          requestAccess: (value) => { const options = __oxOptions(value, 'ox.service.requestAccess'); return __nativeServiceRequestAccess(String(options.domain), options.input ?? null, options.pageUrl ?? null, String(options.purpose)); },
-          login: (value) => { const options = __oxOptions(value, 'ox.service.requestAccess'); if ('input' in options || 'pageUrl' in options) throw Object.assign(new TypeError('Use ox.service.requestAccess for website routing.'), { code: 'invalid_argument', recovery: 'Inspect the applicable access contract before requesting setup.' }); return __nativeServiceLogin(String(options.domain), String(options.purpose)); }
+          showPage: (value) => { const options = __oxOptions(value, 'ox.service.showPage'); return __nativeServiceShowPage(String(options.name), options.input ?? null, options.session ?? null, options.pageUrl ?? null, String(options.purpose)); }
         """
     )
 }
