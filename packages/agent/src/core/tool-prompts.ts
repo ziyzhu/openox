@@ -1,17 +1,40 @@
+import { renderToolSignature } from "@earendil-works/pi-codemode/declarations";
 import fsContracts from "../functions/fs/contracts.json";
 import serviceContracts from "../functions/service/contracts.json";
 import webContracts from "../functions/web/contracts.json";
+
+const fetchOutput = webContracts["ox.web.fetch"].outputSchema;
+const { additionalProperties: feedValue, ...feedFields } = fetchOutput.properties.feed;
 
 const commonContracts = {
   "ox.fs.read": fsContracts["ox.fs.read"],
   "ox.fs.edit": fsContracts["ox.fs.edit"],
   "ox.fs.write": fsContracts["ox.fs.write"],
   "ox.web.search": webContracts["ox.web.search"],
-  "ox.web.fetch": webContracts["ox.web.fetch"],
+  "ox.web.fetch": {
+    ...webContracts["ox.web.fetch"],
+    outputSchema: {
+      ...fetchOutput,
+      properties: {
+        ...fetchOutput.properties,
+        feed: { allOf: [feedFields, { type: "object", additionalProperties: feedValue }] },
+      },
+    },
+  },
   "ox.service.attach": serviceContracts["ox.service.attach"],
   "ox.service.inspect": serviceContracts["ox.service.inspect"],
   "ox.service.invoke": serviceContracts["ox.service.invoke"],
 };
+
+const commonDeclarations = ["fs", "web", "service"].map(namespace => {
+  const functions = Object.entries(commonContracts).filter(([name]) => name.startsWith(`ox.${namespace}.`))
+    .map(([name, contract]) => {
+      const description = contract.description.replace(/: `await [^`]+`/g, "").replace(/`await [^`]+`/g, "").replace(/`(ox\.[\w.]+)\([^`]*\)`/g, "`$1`").replaceAll("*/", "*\\/");
+      const signature = renderToolSignature({ ...contract, name: name.split(".").at(-1)! });
+      return `  /** ${description} */\n  function ${signature}`;
+    }).join("\n");
+  return `declare namespace ox.${namespace} {\n${functions}\n}`;
+}).join("\n\n");
 
 export const countWords = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 const countWord = (value: number) => countWords[value] ?? String(value);
@@ -26,8 +49,8 @@ export function executeGuidance(input: ExecuteGuidanceInput) {
   return [
     "Run JavaScript as an async function body. Top-level await and return work. Print model-visible results with console.log or return. Use only exposed capabilities; no shell, Node, or direct filesystem access.",
     input.catalog,
-    "The catalog lists compact built-in function summaries; call examples are not complete contracts. Complete contracts for common functions follow below and may be used immediately without .help(). For other functions, read their full input/output schemas before first use: print unfamiliar functions' synchronous .help() in a separate execution, batch needed helpers, then call them in a later execution. Contracts already supplied here or by ox.service.inspect satisfy this requirement; do not fetch unchanged contracts again. Operational calls require a short purpose; help and ox.provider.schema() do not. Use ox.fs for files.",
-    "Complete built-in contracts:\n" + JSON.stringify(commonContracts),
+    "The catalog lists compact built-in function summaries, not complete contracts. TypeScript declarations and guidance for common functions follow below and may be used immediately without .help(); write JavaScript, not TypeScript, in executions. For other functions, read their full input/output schemas before first use: print unfamiliar functions' synchronous .help() in a separate execution, batch needed helpers, then call them in a later execution. Contracts already supplied here or by ox.service.inspect satisfy this requirement; do not fetch unchanged contracts again. Operational calls require a short purpose; help and ox.provider.schema() do not. Use ox.fs for files.",
+    "Common built-in functions:\n```ts\n" + commonDeclarations + "\n```",
     "Inspect applicable service action and access contracts before use.",
     "Use service handoffs for login, review, human verification, and payment. Never request credentials in chat, submit payment from preparation, or replay writes after handoff.",
     `Batch independent reads with Promise.allSettled, chain predictable dependent operations in the same execution, and filter large results before printing. For example, attach then inspect a service together; after coherent source edits, validate then reload, stopping on failure. Return to the model when new evidence requires a decision, not between already-determined steps. Serialize writes and approval-dependent calls. Await every call whose outcome matters; pending calls are cancelled when the script ends. Calls are real and not rolled back on failure. Preserve error code, message, and recovery with console.error(error) or an explicit return. Verify uncertain effects before retrying writes.`,

@@ -31,7 +31,7 @@ For service inventories and validation audits, use `ox.service.list` to enumerat
 
 ## Service authoring loop
 
-Distinguish a confirmed service defect from login, human verification, rate limiting, missing resources, and temporary failures. Failed discovery does not establish absence. If authoring is blocked, report the concrete blocker.
+Distinguish a confirmed service defect from login, human verification, rate limiting, missing resources, and temporary failures. Failed discovery does not establish absence. When observed bot protection or human verification blocks progress, show the live challenge with `ox.service.showPage` for the blocked service action or `ox.web.browser.showPage` for Browser exploration, following `references/web-handoffs.md`. Explain the user step and end the turn until the user reports completion; inspect fresh state before continuing. Do not bypass the challenge or treat it as a service defect. If authoring is otherwise blocked, report the concrete blocker.
 
 When evolving services, inspect and validate only the target service and dependencies needed for the current request. Audit unrelated Local drafts only when the user requests an inventory or validation audit. Use targeted source lookups and `ox.repository.conflicts` when source selection matters; inspect `ox.repository.list` when repository identity or readiness is unknown. Invalid source may be absent from the usable catalog, so do not infer absence from attachments or catalog counts. Validate complete affected Local drafts with `ox.service.validate` using their bare domains. For requested multi-service audits, catch each failure separately, retain its diagnostic, and continue; report inaccessible or truncated coverage rather than claiming every service passed.
 

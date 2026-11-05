@@ -59,10 +59,10 @@ it("shares the core across hosts, supplies presentation in turn context, and rej
   const prompt = runInContext("OxPrompts.composeOxPrompt(input).rendered", realm) as string;
   expect(prompt).toContain("frozen");
   expect(prompt).not.toContain("iOS");
-  expect(prompt).not.toContain("Browser");
+  expect(prompt).toContain("ox.web.browser.showPage");
   expect(prompt).not.toContain("ox.app");
   expect(prompt).not.toContain("mounts/<folder-id>");
-  expect(prompt).not.toContain("ox.service");
+  expect(prompt).toContain("ox.service.showPage");
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,active:{hostID:'wrong',profileID:'profile-a'}}})", realm)).toThrow("unavailable");
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[...input.hostContext.hosts,...input.hostContext.hosts]}})", realm)).toThrow("Duplicate");
   expect(runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[{...input.hostContext.hosts[0],functions:['ox'],serviceKinds:['web','api','ios','mcp'],presentation:'conversation-bubbles',externalFiles:true}]}}).rendered", realm)).toBe(prompt);
@@ -82,7 +82,8 @@ it("shares the core across hosts, supplies presentation in turn context, and rej
   expect(guide).toContain("10 seconds");
   expect(guide).toContain("100 lines or 2 KiB");
   expect(guide).toContain("ox.service.inspect");
-  expect(guide).toContain("ox.web.fetch");
+  expect(guide).toContain("declare namespace ox.web");
+  expect(guide).toContain("function fetch(args:");
   expect(guide).not.toContain("does not forcibly stop");
   expect(guide).toContain("supports interrupting JavaScript loops");
   expect(guide).toContain("synchronous .help()");

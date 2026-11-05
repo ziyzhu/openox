@@ -127,18 +127,14 @@ nonisolated enum OxFunctionCatalog {
             .split(whereSeparator: { $0.isWhitespace })
             .joined(separator: " ")
         let summary: String
-        var usageText: String?
-        if let usage = oneLine.range(of: ": `") {
-            summary = String(oneLine[..<usage.lowerBound])
-            if let end = oneLine[usage.upperBound...].firstIndex(of: "`") {
-                usageText = String(oneLine[usage.upperBound..<end])
-            }
+        let usage = [": `", ": await ", " before calling await ", " with `{"].compactMap { oneLine.range(of: $0)?.lowerBound }.min()
+        if let usage {
+            summary = String(oneLine[..<usage])
         } else {
             let endings = [". ", "? ", "! "].compactMap { oneLine.range(of: $0)?.lowerBound }
             summary = endings.min().map { String(oneLine[...$0]) } ?? oneLine
         }
-        let sentence = summary.last.map { ".?!".contains($0) } == true ? summary : "\(summary)."
-        return usageText.map { "\(sentence) `\($0)`" } ?? sentence
+        return summary.last.map { ".?!".contains($0) } == true ? summary : "\(summary)."
     }
 
     private static func helpText(name: String, schema: JSONValue) -> String {

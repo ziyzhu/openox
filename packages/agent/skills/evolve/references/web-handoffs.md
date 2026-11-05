@@ -1,12 +1,12 @@
 # Website Bot Control and Payment
 
-Human verification and payment use ordinary service actions and `ox.service.showPage`. No special URL or completion-detection actions, helper contracts, or polling are needed. The page appears inline and the call returns immediately without Done/Cancel controls. Users report completion in chat; end the turn rather than polling or continuing dependent work. Authentication uses `references/web-authentication.md`.
+Human verification on a service action's page and payment use ordinary service actions and `ox.service.showPage`. For human verification blocking Browser exploration, show Browser's existing live challenge page with `ox.web.browser.showPage` instead; do not substitute Browser for a service action's page. No special URL or completion-detection actions, helper contracts, or polling are needed. The page appears inline and the call returns immediately without Done/Cancel controls. Users report completion in chat; end the turn rather than polling or continuing dependent work. Authentication uses `references/web-authentication.md`.
 
 ## Bot control
 
 1. Identify the exact observed response showing that the originating action is blocked by human verification. Generic HTTP, parsing, authentication, and application failures are not bot control.
 2. Leave the browser-navigable challenge on the action's live page. A challenge returned only to fetch/XHR is not automatically in the visible document. Prepare the visible challenge without an unsafe repeat of the originating effect.
-3. Call `ox.service.showPage` with the same qualified action name, input, and session or pageUrl used for invocation. It presents that page without invoking, navigating, reloading, or creating a replacement. Never ask for challenge answers or tokens.
+3. Call `ox.service.showPage` with the same qualified action name, input, and routing used for invocation, preserving omitted fields. For a challenge on Browser's page during exploration, call `ox.web.browser.showPage` instead. Present the actual live challenge, explain what the user needs to do, and end the turn until they report completion. Do not bypass protection, ask for challenge answers or tokens, or treat presentation as completion. Showing a service page does not invoke, navigate, reload, or create a replacement.
 4. Preserve approval on the originating mutation. Showing a page grants no authority to repeat or expand its external effects. Verify user completion and cancellation without adding a detector.
 5. After the user reports completion, inspect resulting state before retrying non-idempotent actions: the challenge page may already have completed the effect. Retry only when the effect is observably absent and the existing approval covers the attempt. Reads and safely idempotent operations may be retried directly.
 
