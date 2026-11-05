@@ -28,6 +28,7 @@ nonisolated struct UserTurn: Codable, Equatable, Sendable {
     var at: Date
     var submissionID: SubmissionID? = nil
     var skillInvocation: UserSkillInvocation? = nil
+    var scheduleName: String? = nil
 }
 
 nonisolated struct UserSkillInvocation: Codable, Equatable, Sendable {

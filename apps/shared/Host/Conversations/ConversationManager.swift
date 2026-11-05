@@ -447,7 +447,7 @@ final class ConversationManager {
         catch { return (.failed(error.localizedDescription), conversation.id) }
         defer { Schedules.shared.unbind(conversationID: conversation.id, token: token) }
         let outcome = await withTaskCancellationHandler {
-            await conversation.submitUntilAttention(schedule.expandedIntent, skillInvocation: schedule.legacyInvocation)
+            await conversation.submitUntilAttention(schedule.expandedIntent, skillInvocation: schedule.legacyInvocation, scheduleName: schedule.name)
         } onCancel: {
             Task { @MainActor in
                 if Schedules.shared.run(in: conversation.id)?.token == token { conversation.cancelAll() }

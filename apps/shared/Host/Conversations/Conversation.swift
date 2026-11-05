@@ -1355,7 +1355,8 @@ final class Conversation: Identifiable {
     func submitAndWait(
         _ intent: String,
         attachments: [FileItem] = [],
-        skillInvocation: UserSkillInvocation? = nil
+        skillInvocation: UserSkillInvocation? = nil,
+        scheduleName: String? = nil
     ) async -> ConversationSubmissionOutcome {
         let submissionID = SubmissionID()
         return await withTaskCancellationHandler {
@@ -1369,6 +1370,7 @@ final class Conversation: Identifiable {
                     intent,
                     attachments: attachments,
                     skillInvocation: skillInvocation,
+                    scheduleName: scheduleName,
                     submissionID: submissionID
                 )
             }
@@ -1381,11 +1383,12 @@ final class Conversation: Identifiable {
 
     func submitUntilAttention(
         _ intent: String,
-        skillInvocation: UserSkillInvocation? = nil
+        skillInvocation: UserSkillInvocation? = nil,
+        scheduleName: String? = nil
     ) async -> ConversationSubmissionOutcome {
         await withTaskGroup(of: ConversationSubmissionOutcome.self) { group in
             group.addTask { @MainActor in
-                await self.submitAndWait(intent, skillInvocation: skillInvocation)
+                await self.submitAndWait(intent, skillInvocation: skillInvocation, scheduleName: scheduleName)
             }
             group.addTask { @MainActor in
                 while !Task.isCancelled {
@@ -1408,6 +1411,7 @@ final class Conversation: Identifiable {
         _ intent: String,
         attachments: [FileItem],
         skillInvocation: UserSkillInvocation?,
+        scheduleName: String? = nil,
         submissionID: SubmissionID
     ) -> SubmissionReceipt {
         publishFollowIntents([])
@@ -1420,6 +1424,7 @@ final class Conversation: Identifiable {
                 intent: intent,
                 attachments: attachments,
                 skillInvocation: skillInvocation,
+                scheduleName: scheduleName,
                 at: at,
                 submissionID: submissionID
             ))
@@ -1432,6 +1437,7 @@ final class Conversation: Identifiable {
             text: intent,
             attachments: attachments,
             skillInvocation: skillInvocation,
+            scheduleName: scheduleName,
             latency: latency,
             state: posting ? .posted : .queued
         ))
@@ -1606,6 +1612,7 @@ final class Conversation: Identifiable {
                     intent: submission.text,
                     attachments: submission.attachments,
                     skillInvocation: submission.skillInvocation,
+                    scheduleName: submission.scheduleName,
                     at: at,
                     submissionID: submission.id
                 ))

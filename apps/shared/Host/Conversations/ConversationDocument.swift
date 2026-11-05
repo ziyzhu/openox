@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated enum ConversationDocumentEvent {
-    case appendUser(intent: String, attachments: [FileItem], skillInvocation: UserSkillInvocation? = nil, at: Date, submissionID: SubmissionID? = nil, id: TurnID = TurnID())
+    case appendUser(intent: String, attachments: [FileItem], skillInvocation: UserSkillInvocation? = nil, scheduleName: String? = nil, at: Date, submissionID: SubmissionID? = nil, id: TurnID = TurnID())
     case beginAgentTurn(at: Date, id: TurnID = TurnID())
     case resumeAgentTurn(id: TurnID)
     case beginGeneration(model: String, at: Date, id: AgentGenerationID = AgentGenerationID())
@@ -68,7 +68,7 @@ nonisolated struct ConversationDocument: Sendable {
         for turnValue in ConversationFormat.normalize(turns) {
             switch turnValue {
             case let .user(turn, id):
-                state.apply(.appendUser(intent: turn.intent, attachments: turn.attachments, skillInvocation: turn.skillInvocation, at: turn.at, submissionID: turn.submissionID, id: id))
+                state.apply(.appendUser(intent: turn.intent, attachments: turn.attachments, skillInvocation: turn.skillInvocation, scheduleName: turn.scheduleName, at: turn.at, submissionID: turn.submissionID, id: id))
             case let .agent(turn, id):
                 state.apply(.beginAgentTurn(at: turn.at, id: id))
                 for generation in turn.generations {
@@ -345,15 +345,15 @@ nonisolated struct ConversationDocument: Sendable {
 
     mutating func apply(_ event: ConversationDocumentEvent) {
         switch event {
-        case let .appendUser(intent, attachments, skillInvocation, at, submissionID, id):
+        case let .appendUser(intent, attachments, skillInvocation, scheduleName, at, submissionID, id):
             let entry = turns.count
-            guard appendUser(intent: intent, attachments: attachments, skillInvocation: skillInvocation, at: at, submissionID: submissionID, id: id) else { return }
+            guard appendUser(intent: intent, attachments: attachments, skillInvocation: skillInvocation, scheduleName: scheduleName, at: at, submissionID: submissionID, id: id) else { return }
             let kind: Block.Kind = if let skillInvocation {
                 .userSkill(skillInvocation, attachments: attachments)
             } else {
                 .userText(intent, attachments: attachments)
             }
-            appendBlock(Block(id: nextBlockID(), createdAt: at, kind: kind), entry: entry)
+            appendBlock(Block(id: nextBlockID(), createdAt: at, kind: kind, scheduleName: scheduleName), entry: entry)
         case let .beginAgentTurn(at, id):
             beginAgentTurn(at: at, id: id)
         case let .resumeAgentTurn(id):
@@ -480,6 +480,7 @@ nonisolated struct ConversationDocument: Sendable {
         intent: String,
         attachments: [FileItem],
         skillInvocation: UserSkillInvocation?,
+        scheduleName: String?,
         at: Date,
         submissionID: SubmissionID?,
         id: TurnID
@@ -493,7 +494,8 @@ nonisolated struct ConversationDocument: Sendable {
             attachments: attachments,
             at: at,
             submissionID: submissionID,
-            skillInvocation: skillInvocation
+            skillInvocation: skillInvocation,
+            scheduleName: scheduleName
         ), id: id))
         return true
     }

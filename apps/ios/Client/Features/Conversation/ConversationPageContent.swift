@@ -24,6 +24,7 @@ struct ConversationBlock: Identifiable, Equatable {
     let spacingBefore: CGFloat
     var sourceInvocations: [Invocation] = []
     var isLiveThinking = false
+    var scheduleName: String? = nil
 
     var isUserInitiated: Bool {
         switch kind {
@@ -188,7 +189,8 @@ extension ConversationBlock {
                     sourceBlockID: block.id,
                     createdAt: block.createdAt,
                     kind: kind,
-                    spacingBefore: ConversationTranscriptMetrics.blockSpacing
+                    spacingBefore: ConversationTranscriptMetrics.blockSpacing,
+                    scheduleName: block.scheduleName
                 ))
                 continue
             }
@@ -361,12 +363,18 @@ struct ConversationTranscriptProjectionSnapshot {
     init(key: ConversationTranscriptProjectionKey, conversation: Conversation) {
         self.key = key
         let sourceWindow = conversation.blocksWithTurnID(in: key.requestedSourceRange)
-        let projectedBlocks = ConversationBlock.project(
+        var projectedBlocks = ConversationBlock.project(
             sourceWindow.blocks,
             thinkingActivity: key.thinkingActivity,
             isBusy: key.isBusy,
             interaction: key.interaction
         )
+        if let scheduleID = conversation.scheduleID,
+           let firstUserID = conversation.transcript.first(where: \.isUserInitiated)?.id,
+           let index = projectedBlocks.firstIndex(where: { $0.sourceBlockID == firstUserID }),
+           projectedBlocks[index].scheduleName == nil {
+            projectedBlocks[index].scheduleName = Schedules.shared.schedule(id: scheduleID)?.name ?? ""
+        }
         let requestedOffset = key.requestedSourceRange.lowerBound - sourceWindow.range.lowerBound
         let requestedSourceIDs = sourceWindow.blocks.dropFirst(requestedOffset).map(\.block.id)
         let blocks: [ConversationBlock]

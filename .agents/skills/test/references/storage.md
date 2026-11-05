@@ -94,6 +94,8 @@ Primary owners:
 
 Choice, approval, and secret-entry prompts are transient `Conversation` interactions, not new persisted presentation steps. Resolving one returns its answer to the waiting operation without recording a separate prompt receipt. Older prompt steps remain readable but are omitted from conversation display. Model-facing tool results and explicit Always allow policies retain their existing persistence.
 
+User turns optionally retain `scheduleName` in native presentation annotations. Scheduled submissions snapshot the schedule name without changing their intent or model messages. Older turns omit the field and remain readable; no migration is required. The initial user turn of a schedule-created conversation can also use its existing conversation-level schedule identity for display. Unmarked later historical turns cannot be safely distinguished from manual messages.
+
 Service-inspector conversation content optionally stores `pageID`, a transient live service-page UUID. Older links omit it and keep their existing inspector behavior. Service-page cards resolve only the matching resident page; after closure or restart they show unavailable rather than creating a replacement or repeating an action. The optional field requires no migration and contains no website data.
 
 - App state file — owners: Platform/Models/AppState.swift and its concrete AppStateStore; UI onboarding/starter count, StorageRoot, AppRegion, and ChatGPTSubscriptionAccount use the same serialized MainActor writer.

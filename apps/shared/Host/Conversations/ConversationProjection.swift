@@ -208,7 +208,7 @@ nonisolated enum ConversationProjection {
                 } else {
                     .userText(turn.intent, attachments: turn.attachments)
                 }
-                out.append((Block(id: slot(), createdAt: turn.at, kind: kind), entry))
+                out.append((Block(id: slot(), createdAt: turn.at, kind: kind, scheduleName: turn.scheduleName), entry))
             case let .agent(turn, _):
                 var remainingEmbedCounts = embedCounts(in: turn)
                 let answers = Set(turn.steps.compactMap { step -> String? in

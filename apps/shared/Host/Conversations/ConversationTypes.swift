@@ -369,6 +369,7 @@ extension Conversation {
         let text: String
         let attachments: [FileItem]
         let skillInvocation: UserSkillInvocation?
+        var scheduleName: String? = nil
     }
 
     struct SubmissionReceipt: Equatable {

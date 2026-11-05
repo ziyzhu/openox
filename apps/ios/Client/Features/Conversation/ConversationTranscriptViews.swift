@@ -547,6 +547,25 @@ private struct SkillBubble: View {
     }
 }
 
+private struct ScheduleBubble: View {
+    let name: String
+
+    var title: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? L10n.string("Schedule") : name
+    }
+
+    var body: some View {
+        Label(title, systemImage: "clock")
+            .font(Theme.Fonts.bodyMd)
+            .foregroundStyle(Theme.Colors.onSurface)
+            .padding(.horizontal, 14)
+            .padding(.vertical, Theme.Spacing.md)
+            .conversationCardOutline(cornerRadius: Theme.Radius.xl)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(L10n.string("Schedule")): \(title)")
+    }
+}
+
 struct QueuedBubble: View {
     let message: Conversation.QueuedMessage
     let onOpenAttachment: (FileItem, String) -> Void
@@ -557,7 +576,10 @@ struct QueuedBubble: View {
         VStack(alignment: .trailing, spacing: 4) {
             HStack {
                 Spacer(minLength: 40)
-                if let invocation = message.skillInvocation {
+                if let scheduleName = message.scheduleName {
+                    ScheduleBubble(name: scheduleName)
+                        .opacity(0.55)
+                } else if let invocation = message.skillInvocation {
                     UserSkillBubble(
                         invocation: invocation,
                         attachments: message.attachments,
@@ -624,16 +646,25 @@ struct BlockView: View, Equatable {
     }
 
     private var editMenuCanMutate: Bool? {
-        if case .userText = block.kind { controls.canMutate } else { nil }
+        if block.scheduleName != nil { nil }
+        else if case .userText = block.kind { controls.canMutate } else { nil }
     }
 
     @ViewBuilder
     var body: some View {
         switch block.kind {
         case .userText(let s, let atts):
-            userTextBubble(s, attachments: atts, createdAt: block.createdAt)
+            if let name = block.scheduleName {
+                userScheduleBubble(name, createdAt: block.createdAt)
+            } else {
+                userTextBubble(s, attachments: atts, createdAt: block.createdAt)
+            }
         case .userSkill(let invocation, let atts):
-            userSkillBubble(invocation, attachments: atts, createdAt: block.createdAt)
+            if let name = block.scheduleName {
+                userScheduleBubble(name, createdAt: block.createdAt)
+            } else {
+                userSkillBubble(invocation, attachments: atts, createdAt: block.createdAt)
+            }
         case .agentContent(let item):
             agentContentBubble([item])
         case let .thinking(trace):
@@ -665,6 +696,28 @@ struct BlockView: View, Equatable {
             systemImage: "arrow.down.right.and.arrow.up.left",
             accessibilityIdentifier: A11yID.ConversationControls.Message.contextCompaction
         )
+    }
+
+    private func userScheduleBubble(_ name: String, createdAt: Date) -> some View {
+        let bubble = ScheduleBubble(name: name)
+        return HStack {
+            Spacer(minLength: 40)
+            bubble
+                .contextMenuPreviewShape()
+                .contextMenu {
+                    Section(Self.timestampFormatter.string(from: createdAt)) {
+                        Button {
+                            controls.onCopy(bubble.title)
+                        } label: {
+                            Label(L10n.string("Copy", comment: "Context menu action on a sent message that copies its text to the clipboard."), systemImage: "doc.on.doc")
+                        }
+                    }
+                } preview: {
+                    MessageContextMenuPreview(title: nil, text: bubble.title, attachments: [])
+                }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(A11yID.ConversationControls.Message.user)
     }
 
     private func userTextBubble(_ text: String, attachments: [FileItem], createdAt: Date) -> some View {

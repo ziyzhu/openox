@@ -22,6 +22,7 @@ final class ConversationSubmissionQueue {
         let text: String
         let attachments: [FileItem]
         let skillInvocation: UserSkillInvocation?
+        var scheduleName: String? = nil
         let latency: TurnLatencyTrace
         var state: State
 
@@ -32,7 +33,7 @@ final class ConversationSubmissionQueue {
 
         var queuedMessage: Conversation.QueuedMessage? {
             guard needsPosting else { return nil }
-            return Conversation.QueuedMessage(id: id.rawValue, text: text, attachments: attachments, skillInvocation: skillInvocation)
+            return Conversation.QueuedMessage(id: id.rawValue, text: text, attachments: attachments, skillInvocation: skillInvocation, scheduleName: scheduleName)
         }
 
         mutating func post() {

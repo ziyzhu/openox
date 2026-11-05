@@ -96,7 +96,8 @@ nonisolated enum DurableConversationProjection {
                 let skill = matched?.0.skillInvocation.flatMap { $0.expandedIntent == intent ? $0 : nil }
                 let id = turnID ?? TurnID(StableID.uuid(namespace + ":user"))
                 turns.append(.user(UserTurn(intent: intent, attachments: attachments, at: user.timestamp,
-                                            submissionID: matched?.0.submissionID, skillInvocation: skill), id: id))
+                                            submissionID: matched?.0.submissionID, skillInvocation: skill,
+                                            scheduleName: matched?.0.scheduleName), id: id))
             case .assistant(let assistant):
                 appendAssistant(assistant, namespace: namespace, turnID: turnID)
             case .toolResult(let result):

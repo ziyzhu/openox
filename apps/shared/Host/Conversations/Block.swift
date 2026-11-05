@@ -4,6 +4,7 @@ nonisolated struct Block: Identifiable, Equatable, Codable {
     let id: UUID
     let createdAt: Date
     var kind: Kind
+    var scheduleName: String? = nil
 
     enum Kind: Equatable, Codable {
         case userText(String, attachments: [FileItem] = [])
@@ -32,10 +33,11 @@ nonisolated struct Block: Identifiable, Equatable, Codable {
         self.kind = kind
     }
 
-    init(id: UUID, createdAt: Date, kind: Kind) {
+    init(id: UUID, createdAt: Date, kind: Kind, scheduleName: String? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.kind = kind
+        self.scheduleName = scheduleName
     }
 
     var isUserInitiated: Bool {
