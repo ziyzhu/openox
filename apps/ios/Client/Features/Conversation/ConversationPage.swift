@@ -1002,11 +1002,11 @@ struct ConversationPage: View {
     }
 
     private var failedTurnRetry: (() -> Void)? {
-        guard !conversation.isTemporary,
-              let blockID = conversation.transcript.last(where: \.isUserInitiated)?.id else { return nil }
+        guard case .failed = conversation.turnEnding else { return nil }
         return {
-            Log.ui.info("ConversationPage.retryFailed conversation=\(conversation.id) atBlock=\(blockID)")
-            latestSubmissionID = conversation.retry(at: blockID)?.id
+            guard !conversation.isBusy, case .failed = conversation.turnEnding else { return }
+            Log.ui.info("ConversationPage.retryFailed conversation=\(conversation.id)")
+            latestSubmissionID = conversation.enqueue(L10n.string("Continue", comment: "Message sent when the user resumes a stopped conversation reply.")).id
         }
     }
 
