@@ -32,7 +32,7 @@ extension Service {
         _ actionId: String,
         args: JSONValue,
         role: InvocationRole = .standard,
-        session selectedSession: JSONValue? = nil,
+        session requestedSession: JSONValue? = nil,
         pageURL: String? = nil,
         in ownedPage: ServiceWebPage? = nil,
         approve: (@MainActor (_ action: String, _ args: Any?) async -> Bool)? = nil
@@ -49,9 +49,6 @@ extension Service {
         guard let action = definition.action(actionId, includingStandard: true) else {
             return .failure(InvokeError.unknown(name))
         }
-        if WebSessionContract.isEnabled(definition), action.requireAuth, selectedSession == nil {
-            return .failure(RuntimeError.bridge("This action requires a logged-in session. Invoke listSessions and pass the selected descriptor as session; use login if no suitable session is available."))
-        }
         guard let inputSchema = action.inputSchema, let outputSchema = action.outputSchema else {
             return .failure(InvokeError.invalidContract(name))
         }
@@ -65,18 +62,9 @@ extension Service {
               let scripts = resolutionState.resolved?.actions else {
             return .failure(InvokeError.invalidContract(name))
         }
-        let destination: URL
         do {
-            destination = try executionURL(defaultURL: actionBaseURL, session: selectedSession, pageURL: pageURL)
+            _ = try executionURL(defaultURL: actionBaseURL, session: requestedSession, pageURL: pageURL)
         } catch { return .failure(error) }
-        let pageAction = Action(
-            service: self,
-            definition: action,
-            baseURL: destination,
-            role: actionId == WebSessionContract.loginAction && role == .standard ? .blockingAction : role,
-            scripts: scripts,
-            session: selectedSession
-        )
         func approveInvocation(_ id: String, input: JSONValue) async -> Bool {
             let qualifiedName = definition.qualifiedActionName(id)
             if let approve { return await approve(qualifiedName, input.toAny()) }
@@ -99,9 +87,31 @@ extension Service {
         do { try await manager.requireInvocationAccess(for: self) }
         catch { return .failure(error) }
         if actionId == WebConversationContract.actionID, ownedPage == nil {
-            do { return .success(try await manager.invokeConversation(service: self, args: args, owner: .client)) }
+            do { return .success(try await manager.invokeConversation(service: self, args: args, owner: .client, session: requestedSession, pageURL: pageURL, approve: approve)) }
             catch { return .failure(error) }
         }
+        let selectedSession: JSONValue?
+        let destination: URL
+        do {
+            if ownedPage == nil {
+                selectedSession = try await invocationSession(action: action, session: requestedSession, pageURL: pageURL, approve: approve)
+            } else {
+                selectedSession = requestedSession
+                if WebSessionContract.isEnabled(definition), action.requireAuth, selectedSession == nil {
+                    throw InvokeError.requiresAuth(name)
+                }
+            }
+            destination = try executionURL(defaultURL: actionBaseURL, session: selectedSession, pageURL: pageURL)
+            try Task.checkCancellation()
+        } catch { return .failure(error) }
+        let pageAction = Action(
+            service: self,
+            definition: action,
+            baseURL: destination,
+            role: actionId == WebSessionContract.loginAction && role == .standard ? .blockingAction : role,
+            scripts: scripts,
+            session: selectedSession
+        )
         let argsJSON = (try? JSONEncoder().encode(args))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
         let idJSON = (try? JSONEncoder().encode(actionId))
@@ -147,6 +157,7 @@ extension Service {
                     }
                     guard session.navigationGeneration == startingNavigation else { throw EvalError.contextInvalidated }
                 }
+                session.lastInvocation = (invocationID, actionId, args, requestedSession, pageURL, selectedSession, Date())
                 let raw = try await evalAsync(session, source, context: "invoke:\(invocation)")
                 let value = raw.map(JSONValue.from) ?? .null
                 if WebSessionContract.isEnabled(definition), actionId == WebSessionContract.listAction {

@@ -45,16 +45,20 @@ final class WebConversation {
     private var modelID: JSONValue?
     private var accountID: JSONValue?
     private var options: JSONValue?
+    fileprivate let selectedSession: JSONValue?
+    fileprivate let initialPageURL: String
 
-    private init(id: UUID, service: Service, page: Service.ServiceWebPage, owner: Owner) {
+    private init(id: UUID, service: Service, page: Service.ServiceWebPage, owner: Owner, session: JSONValue?, initialPageURL: String) {
         self.id = id
         self.service = service
         self.page = page
         self.owner = owner
+        selectedSession = session
+        self.initialPageURL = initialPageURL
         navigationGeneration = page.navigationGeneration
     }
 
-    static func open(service: Service, owner: Owner, actionID: String) async throws -> WebConversation {
+    static func open(service: Service, owner: Owner, actionID: String, session: JSONValue?, pageURL: String?, approve: (@MainActor (String, Any?) async -> Bool)?) async throws -> WebConversation {
         service.manager.pruneWebConversations()
         // Reserve before any await, so scope/source cleanup also invalidates pending opens.
         let id = UUID()
@@ -63,10 +67,15 @@ final class WebConversation {
         guard service.manager.webConversations.count + service.manager.openingWebConversations.count <= 12 else {
             throw WebsiteProviderError("Too many website conversations are open or opening")
         }
-        guard let action = await service.resolvedAction(actionID, role: .conversation) else {
+        await service.loadManifest()
+        guard let definition = service.definition.action(actionID) else {
             throw WebsiteProviderError("The website conversation service is unavailable")
         }
-        try await requireAccess(service: service, action: action.definition)
+        try await service.awaitAuthenticationAvailability(name: service.definition.qualifiedActionName(actionID))
+        let selected = try await service.invocationSession(action: definition, session: session, pageURL: pageURL, approve: approve)
+        guard let action = await service.resolvedAction(actionID, role: .conversation, session: selected, pageURL: pageURL) else {
+            throw WebsiteProviderError("The website conversation service is unavailable")
+        }
         try Task.checkCancellation()
         guard service.manager.openingWebConversations[id] != nil else { throw CancellationError() }
         let page = try await service.openOwnedPage(for: action, owner: .conversation(id))
@@ -74,17 +83,10 @@ final class WebConversation {
             service.closeOwnedPage(page)
             throw CancellationError()
         }
-        let conversation = WebConversation(id: id, service: service, page: page, owner: owner)
+        let conversation = WebConversation(id: id, service: service, page: page, owner: owner, session: selected, initialPageURL: action.baseURL.absoluteString)
         service.manager.webConversations[conversation.id] = conversation
         Log.service.info("WebConversation.open domain=\(service.domain) source=\(service.definition.repositoryID ?? "unknown") owner=\(owner.logLabel) session=\(conversation.id) page=\(page.logLabel)")
         return conversation
-    }
-
-    private static func requireAccess(service: Service, action: Manifest.Action) async throws {
-        let name = service.definition.qualifiedActionName(action.id)
-        try await service.awaitAuthenticationAvailability(name: name)
-        guard action.requireAuth else { return }
-        throw WebsiteProviderError("This website conversation requires an explicitly selected logged-in session", kind: .unsupportedInput)
     }
 
     func isExpired(at now: Date = Date()) -> Bool {
@@ -102,27 +104,27 @@ final class WebConversation {
         }
     }
 
-    func invoke(_ actionID: String, args: JSONValue) async throws -> JSONValue {
+    func invoke(_ actionID: String, args: JSONValue, approve: (@MainActor (String, Any?) async -> Bool)? = nil) async throws -> JSONValue {
         try Task.checkCancellation()
         try checkPage()
         lastUsed = Date()
-        let value = try await service.invokeAction(actionID, args: args, role: .conversation, in: page).get()
+        let value = try await service.invokeAction(actionID, args: args, role: .conversation, session: selectedSession, pageURL: WebSessionContract.isEnabled(service.definition) ? initialPageURL : nil, in: page, approve: approve).get()
         try checkPage()
         return value
     }
 
-    func call(_ args: JSONValue, attachments: [WebsiteAttachment] = []) async throws -> JSONValue {
+    func call(_ args: JSONValue, attachments: [WebsiteAttachment] = [], approve: (@MainActor (String, Any?) async -> Bool)? = nil) async throws -> JSONValue {
         try WebConversationContract.validateInput(args, service: service.definition)
         try checkPage()
         switch args.objectValue?["operation"]?.stringValue {
-        case "submit": return try await submit(args, attachments: attachments)
-        case "read": return try await read(args)
-        case "cancel": return try await cancel(args)
+        case "submit": return try await submit(args, attachments: attachments, approve: approve)
+        case "read": return try await read(args, approve: approve)
+        case "cancel": return try await cancel(args, approve: approve)
         default: throw WebsiteProviderError("Unknown website conversation operation")
         }
     }
 
-    private func submit(_ args: JSONValue, attachments: [WebsiteAttachment]) async throws -> JSONValue {
+    private func submit(_ args: JSONValue, attachments: [WebsiteAttachment], approve: (@MainActor (String, Any?) async -> Bool)?) async throws -> JSONValue {
         guard !isBusy, submissions.count < ModelServiceContract.maximumSubmissions, var fields = args.objectValue else {
             throw WebsiteProviderError("Website conversation is busy or its submission limit was reached")
         }
@@ -154,10 +156,14 @@ final class WebConversation {
         isBusy = true
         activeSince = Date()
         do {
-            guard let action = service.definition.action(WebConversationContract.actionID) else { throw WebsiteProviderError("Website conversation Action is unavailable") }
-            try await Self.requireAccess(service: service, action: action)
+            if !attachments.isEmpty, let selectedSession {
+                let sessions = try await invoke(WebSessionContract.listAction, args: .object([:]), approve: approve)
+                guard sessions.arrayValue?.contains(selectedSession) == true else {
+                    throw OxFunctionError(code: "authentication_required", message: "The selected website session is no longer available. No files were staged.", recovery: "Inspect available sessions or request login. Do not switch accounts or automatically replay a submission.")
+                }
+            }
             try await WebsiteAttachmentTransfer.stage(attachments, on: page.page)
-            let value = try await invoke(WebConversationContract.actionID, args: .object(fields))
+            let value = try await invoke(WebConversationContract.actionID, args: .object(fields), approve: approve)
             guard var output = value.objectValue, output["operation"]?.stringValue == "submit",
                   let localID = output["submissionId"]?.stringValue,
                   let reference = output["conversationRef"]?.stringValue,
@@ -196,13 +202,13 @@ final class WebConversation {
         return (handle, fields)
     }
 
-    private func read(_ args: JSONValue) async throws -> JSONValue {
+    private func read(_ args: JSONValue, approve: (@MainActor (String, Any?) async -> Bool)?) async throws -> JSONValue {
         let (handle, fields) = try submissionArguments(args)
         guard let after = fields["after"]?.intValue, after <= (submissions[handle]?.eventDigests.count ?? 0) else {
             throw WebsiteProviderError("Website read cursor skips unobserved events")
         }
         do {
-            let value = try await invoke(WebConversationContract.actionID, args: .object(fields))
+            let value = try await invoke(WebConversationContract.actionID, args: .object(fields), approve: approve)
             guard var output = value.objectValue, output["operation"]?.stringValue == "read",
                   output["conversationRef"]?.stringValue == conversationRef,
                   let events = output["events"]?.arrayValue, let after = fields["after"]?.intValue,
@@ -248,9 +254,9 @@ final class WebConversation {
         }
     }
 
-    private func cancel(_ args: JSONValue) async throws -> JSONValue {
+    private func cancel(_ args: JSONValue, approve: (@MainActor (String, Any?) async -> Bool)?) async throws -> JSONValue {
         let (handle, fields) = try submissionArguments(args)
-        let value = try await invoke(WebConversationContract.actionID, args: .object(fields))
+        let value = try await invoke(WebConversationContract.actionID, args: .object(fields), approve: approve)
         guard value.objectValue?["operation"]?.stringValue == "cancel" else {
             throw WebsiteProviderError("Invalid website cancellation receipt")
         }
@@ -299,14 +305,15 @@ extension ServiceManager {
     }
 
     func invokeConversation(service: Service, args: JSONValue, owner: WebConversation.Owner,
-                            attachments: [WebsiteAttachment] = []) async throws -> JSONValue {
+                            attachments: [WebsiteAttachment] = [], session: JSONValue? = nil, pageURL: String? = nil,
+                            approve: (@MainActor (String, Any?) async -> Bool)? = nil) async throws -> JSONValue {
         try WebConversationContract.validateInput(args, service: service.definition)
         pruneWebConversations()
         let fields = args.objectValue ?? [:]
         let conversation: WebConversation
         let isNew = fields["operation"]?.stringValue == "submit" && fields["conversationRef"] == .null
         if isNew {
-            conversation = try await WebConversation.open(service: service, owner: owner, actionID: WebConversationContract.actionID)
+            conversation = try await WebConversation.open(service: service, owner: owner, actionID: WebConversationContract.actionID, session: session, pageURL: pageURL, approve: approve)
         } else {
             let reference = fields["conversationRef"]?.stringValue
             let submission = fields["submissionId"]?.stringValue
@@ -314,9 +321,13 @@ extension ServiceManager {
                 $0.owner == owner && $0.service === service
                     && (reference == $0.id.uuidString || submission.map($0.ownsSubmission) == true)
             }) else { throw WebsiteProviderError("Website conversation reference expired or belongs to another caller") }
+            guard session == nil || session == found.selectedSession,
+                  pageURL == nil || pageURL == found.initialPageURL else {
+                throw WebsiteProviderError("Website conversation routing cannot switch accounts or targets; start a new conversation", kind: .unsupportedInput)
+            }
             conversation = found
         }
-        do { return try await conversation.call(args, attachments: attachments) }
+        do { return try await conversation.call(args, attachments: attachments, approve: approve) }
         catch {
             if isNew { conversation.close() }
             throw error

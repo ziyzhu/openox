@@ -19,6 +19,7 @@ final class ServiceOperations {
     let begin: (String, JSONValue, String) -> UUID
     let finish: (UUID, Result<JSONValue?, Error>) -> Void
     let native: NativeServiceOperations
+    let presentWebsiteLogin: ((Service, Service.ServiceWebPage, ServiceHandoffSession) async -> ServiceHandoffSession.Outcome)?
 
     init(
         serviceManager: ServiceManager,
@@ -37,7 +38,8 @@ final class ServiceOperations {
         serviceChanged: @escaping (String) -> Void,
         begin: @escaping (String, JSONValue, String) -> UUID,
         finish: @escaping (UUID, Result<JSONValue?, Error>) -> Void,
-        native: NativeServiceOperations
+        native: NativeServiceOperations,
+        presentWebsiteLogin: ((Service, Service.ServiceWebPage, ServiceHandoffSession) async -> ServiceHandoffSession.Outcome)? = nil
     ) {
         self.serviceManager = serviceManager
         self.conversationOwner = conversationOwner
@@ -53,6 +55,7 @@ final class ServiceOperations {
         self.begin = begin
         self.finish = finish
         self.native = native
+        self.presentWebsiteLogin = presentWebsiteLogin
     }
 
     static func encodeToJSON<T: Encodable>(_ value: T) throws -> JSONValue {
@@ -123,9 +126,6 @@ final class ServiceOperations {
         guard let action = service.definition.action(actionID), let inputSchema = action.inputSchema else {
             throw Service.InvokeError.unknown(qualifiedName)
         }
-        if WebSessionContract.isEnabled(service.definition), action.requireAuth, session == nil {
-            throw OxFunctionError(code: "authentication_required", message: "Select a logged-in session before invoking this action. No action was executed.", recovery: "Use the service's checkAccess contract to discover sessions and select the intended account/tenant. Request access only if needed; never invent a descriptor.")
-        }
         let inputViolations = JSONSchemaValidator.validate(
             input,
             against: inputSchema,
@@ -143,10 +143,6 @@ final class ServiceOperations {
                     purpose: purpose
                 )
             }
-            if service.definition.supportsConversation, actionID == WebConversationContract.actionID {
-                let attachments = try await resolveConversationAttachments(input.objectValue?["attachments"]?.arrayValue ?? [])
-                return try await serviceManager.invokeConversation(service: service, args: input, owner: conversationOwner, attachments: attachments)
-            }
             let approve: @MainActor (String, Any?) async -> Bool = { name, args in
                 guard service.isWebService,
                       name == service.definition.qualifiedActionName(WebSessionContract.listAction),
@@ -157,6 +153,10 @@ final class ServiceOperations {
                 } catch {
                     return false
                 }
+            }
+            if service.definition.supportsConversation, actionID == WebConversationContract.actionID {
+                let attachments = try await resolveConversationAttachments(input.objectValue?["attachments"]?.arrayValue ?? [])
+                return try await serviceManager.invokeConversation(service: service, args: input, owner: conversationOwner, attachments: attachments, session: session, pageURL: pageURL, approve: approve)
             }
             let result: Result<JSONValue, Error>
             if let implementation = service.apiService {
@@ -205,7 +205,12 @@ final class ServiceOperations {
             navigationTitle: String(localized: "Log in")
         )
         Log.service.info("Service.login presenting domain=\(service.domain) page=\(lease.page.logLabel)")
-        let outcome = await native.presentations.serviceHandoff.present(session: handoff)
+        let outcome: ServiceHandoffSession.Outcome
+        if let presentWebsiteLogin {
+            outcome = await presentWebsiteLogin(service, lease.page, handoff)
+        } else {
+            outcome = await native.presentations.serviceHandoff.present(session: handoff)
+        }
         try Task.checkCancellation()
         guard outcome == .completed, lease.isActive else {
             throw OxFunctionError(code: "handoff_incomplete", message: "Login interaction was cancelled or unavailable.", recovery: "Do not reopen automatically. Ask the user whether to continue; the page is preserved.")
@@ -645,14 +650,24 @@ final class ServiceOperations {
         let (service, actionID) = try await resolveAction(name)
         let input = args ?? .object([:])
         guard service.isWebService,
-              let action = await service.resolvedAction(actionID, args: input, session: session, pageURL: pageURL) else {
+              await service.resolvedAction(actionID, args: input, session: session, pageURL: pageURL) != nil else {
             throw RuntimeError.bridge("ox.service.showPage: requires a web service action")
         }
         return try await tracked(Actions.serviceShowPage, .object(["name": .string(name), "input": input, "session": session ?? .null, "pageUrl": pageURL.map(JSONValue.string) ?? .null]), purpose: purpose) {
-            guard let lease = try await serviceManager.actionScheduler.reserveForPresentation(action, allowUnready: true) else {
+            let page = service.servicePages.filter { page in
+                guard let prepared = page.lastInvocation else { return false }
+                return prepared.actionID == actionID && prepared.args == input
+                    && prepared.requestedSession == session && prepared.pageURL == pageURL
+            }.max { ($0.lastInvocation?.startedAt ?? .distantPast) < ($1.lastInvocation?.startedAt ?? .distantPast) }
+            guard let page, let prepared = page.lastInvocation,
+                  let action = await service.resolvedAction(actionID, args: input, session: prepared.selectedSession, pageURL: prepared.pageURL),
+                  let lease = try await serviceManager.actionScheduler.reserveForPresentation(action, allowUnready: true) else {
                 throw OxFunctionError(code: "page_unavailable", message: "ox.service.showPage: this action has no idle live page.", recovery: "Wait for active actions to finish. Use the name and input of the action whose page you want to show. This function never opens a replacement page or reruns the action.")
             }
             defer { lease.release() }
+            guard lease.page === page, page.lastInvocation?.id == prepared.id else {
+                throw OxFunctionError(code: "page_unavailable", message: "The prepared page changed before presentation.", recovery: "Inspect the current page state. Do not rediscover a different account or repeat a mutation to replace the page.")
+            }
             guard lease.page.page.url != nil else { throw Service.EvalError.notReady }
             try native.presentServicePage(service, page: lease.page)
             Log.service.info("Service.showPage shown domain=\(service.domain) action=\(actionID) session=\(lease.page.logLabel)")

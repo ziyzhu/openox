@@ -244,6 +244,12 @@ private struct ServiceInspectorRow: View {
         }
         return browserSession?.webPage
     }
+    private var handoff: ServiceHandoffSession? {
+        guard let pageID = link.pageID,
+              let handoff = service?.conversationHandoffs[pageID],
+              handoff.ownerID == conversationID else { return nil }
+        return handoff.session
+    }
     private var isInline: Bool {
         pageMount.isInline(page: page, ownerID: rowID)
     }
@@ -270,6 +276,14 @@ private struct ServiceInspectorRow: View {
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
             browserCard
+            if let handoff, handoff.phase == .running, !isPresented, isInline {
+                ServiceHandoffActions(
+                    cancelAccessibilityIdentifier: "conversation.service.login.\(rowID).cancel",
+                    doneAccessibilityIdentifier: "conversation.service.login.\(rowID).done",
+                    cancel: { finishLogin(handoff, completed: false) },
+                    done: { finishLogin(handoff, completed: true) }
+                )
+            }
             if let browserSession, browserSession.isWaitingForUserInteraction, !isPresented, isInline {
                 ServiceHandoffActions(
                     cancelAccessibilityIdentifier: "conversation.browser.interaction.\(rowID).cancel",
@@ -284,7 +298,7 @@ private struct ServiceInspectorRow: View {
         }) {
             if let service {
                 NavigationStack {
-                    ServicePageInspector(service: service, browserSessionID: conversationID, pageID: link.pageID)
+                    ServicePageInspector(service: service, browserSessionID: conversationID, pageID: link.pageID, handoff: handoff)
                 }
             }
         }
@@ -313,6 +327,12 @@ private struct ServiceInspectorRow: View {
             expandAccessibilityIdentifier: A11yID.ServiceInspector.open + ".\(rowID)",
             cancelAccessibilityIdentifier: ""
         )
+    }
+
+    private func finishLogin(_ handoff: ServiceHandoffSession, completed: Bool) {
+        if let page { pageMount.collapse(page: page, ownerID: rowID) }
+        if completed { handoff.dismissPresentation() }
+        else { handoff.cancel() }
     }
 
     private func finishUserInteraction(completed: Bool) {

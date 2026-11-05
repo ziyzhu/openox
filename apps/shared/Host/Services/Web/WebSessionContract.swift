@@ -89,13 +89,34 @@ nonisolated enum WebSessionContract {
 }
 
 extension Service {
+    func invocationSession(
+        action: Manifest.Action,
+        session: JSONValue?,
+        pageURL: String?,
+        approve: (@MainActor (String, Any?) async -> Bool)?
+    ) async throws -> JSONValue? {
+        guard WebSessionContract.isEnabled(definition),
+              action.id != WebSessionContract.listAction,
+              action.id != WebSessionContract.loginAction else { return session }
+        var selected = session
+        if selected == nil {
+            let discovered = try await invokeAction(WebSessionContract.listAction, args: .object([:]), pageURL: pageURL, approve: approve).get()
+            selected = discovered.arrayValue?.first
+            Log.service.info("Service.session default domain=\(domain) action=\(action.id) available=\(discovered.arrayValue?.count ?? 0) selected=\(selected != nil)")
+        }
+        guard !action.requireAuth || selected != nil else {
+            throw OxFunctionError(code: "authentication_required", message: "No logged-in session was selected or discovered. No action was executed.", recovery: "Use requestAccess if login is needed, or checkAccess to inspect available accounts. pageUrl does not select an authenticated session. Never fabricate a descriptor or automatically replay writes.")
+        }
+        return selected
+    }
+
     func executionURL(defaultURL: URL, session: JSONValue?, pageURL: String?) throws -> URL {
         guard session != nil || pageURL != nil else { return defaultURL }
-        guard WebSessionContract.isEnabled(definition), session == nil || pageURL == nil else {
-            throw RuntimeError.bridge("Session routing requires listSessions/login; supply either session or pageUrl, not both")
+        guard WebSessionContract.isEnabled(definition) else {
+            throw RuntimeError.bridge("Session routing requires listSessions/login")
         }
-        if let session { return try WebSessionContract.destination(session, domain: domain) }
-        guard let pageURL else { return defaultURL }
-        return try WebSessionContract.destination(pageURL, domain: domain)
+        let sessionURL = try session.map { try WebSessionContract.destination($0, domain: domain) }
+        if let pageURL { return try WebSessionContract.destination(pageURL, domain: domain) }
+        return sessionURL ?? defaultURL
     }
 }

@@ -5,12 +5,13 @@ struct ServicePageInspector: View {
     let service: Service
     var browserSessionID: UUID? = nil
     var pageID: UUID? = nil
+    var handoff: ServiceHandoffSession? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var page: WebPage?
     @State private var servicePage: Service.ServiceWebPage?
 
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
             if let page {
                 WebBrowserView(
                     page: page,
@@ -39,6 +40,21 @@ struct ServicePageInspector: View {
                 )
             } else {
                 CellularAutomatonLoader()
+            }
+            if let handoff, handoff.phase == .running {
+                ServiceHandoffActions(
+                    cancelAccessibilityIdentifier: "serviceHandoff.cancel",
+                    doneAccessibilityIdentifier: A11yID.ServiceHandoff.done,
+                    cancel: {
+                        handoff.cancel()
+                        dismiss()
+                    },
+                    done: {
+                        handoff.dismissPresentation()
+                        dismiss()
+                    }
+                )
+                .padding(Theme.Spacing.md)
             }
         }
         .navigationTitle("")

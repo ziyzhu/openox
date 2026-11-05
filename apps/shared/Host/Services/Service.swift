@@ -380,6 +380,7 @@ final class Service: NSObject, Identifiable {
         var additionalUserScripts: [WKUserScript] = []
         var openingTask: Task<Bool, Never>?
         var executionURL: URL?
+        var lastInvocation: (id: UUID, actionID: String, args: JSONValue, requestedSession: JSONValue?, pageURL: String?, selectedSession: JSONValue?, startedAt: Date)?
         var navigationTask: Task<Void, Never>?
         var navigationGeneration = 0
         var finishedNavigationGeneration = 0
@@ -433,6 +434,7 @@ final class Service: NSObject, Identifiable {
 
     private(set) var auth: Auth = .unknown
     private(set) var capabilityState: CapabilityState = .unloaded
+    var conversationHandoffs: [UUID: (ownerID: UUID, session: ServiceHandoffSession)] = [:]
     @ObservationIgnored var authenticationWaiters: [AuthenticationWaiter] = []
     @ObservationIgnored let access = ServiceAccess()
     @ObservationIgnored var ownedPages: [ObjectIdentifier: OwnedPage] = [:]
@@ -915,6 +917,7 @@ final class Service: NSObject, Identifiable {
     }
 
     private func closePage(_ page: ServiceWebPage, error: any Error) {
+        conversationHandoffs[page.id]?.session.cancel()
         page.openingTask?.cancel()
         page.openingTask = nil
         page.navigationTask?.cancel()

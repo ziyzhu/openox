@@ -438,7 +438,20 @@ final class Conversation: Identifiable {
                     }
                 }
             },
-            native: nativeServiceOperations
+            native: nativeServiceOperations,
+            presentWebsiteLogin: { [unowned self] service, page, session in
+                if presentations.browser != nil {
+                    return await presentations.serviceHandoff.present(session: session)
+                }
+                service.conversationHandoffs[page.id] = (id, session)
+                defer { service.conversationHandoffs[page.id] = nil }
+                embedServiceInspector(ServiceInspectorLink(
+                    domain: service.domain,
+                    serviceName: service.title,
+                    pageID: page.id
+                ))
+                return await session.run()
+            }
         )
     }
 

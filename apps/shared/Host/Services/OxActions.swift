@@ -29,7 +29,7 @@ nonisolated enum OxActions {
                             "session": WebSessionContract.sessionSchema,
                             "pageUrl": .object([
                                 "type": .string("string"),
-                                "description": .string("Initial target URL for session discovery, login, or public actions; cannot be combined with session."),
+                                "description": .string("Initial target URL within the service domain, independent of the selected session/account context."),
                             ]),
                             "purpose": .object([
                                 "type": .string("string"),
@@ -38,7 +38,6 @@ nonisolated enum OxActions {
                             ]),
                         ]),
                         "required": .array([.string("name"), .string("purpose")]),
-                        "not": .object(["required": .array(["session", "pageUrl"].map(JSONValue.string))]),
                         "additionalProperties": .bool(false),
                     ]),
                     "outputSchema": .object([
@@ -137,7 +136,7 @@ nonisolated enum OxActions {
         if web { properties["pageUrl"] = .object(["type": .string("string")]) }
         access["checkAccess"] = .object([
             "function": .string("ox.service.checkAccess"),
-            "description": .string("Read typed evidence without prompting; errors are not absence. API configuration is not server acceptance; MCP connectivity is not tool authorization. Website discovery respects Action policies. Reuse selected sessions; invocations revalidate them."),
+            "description": .string("Read typed evidence without prompting; errors are not absence. API configuration is not server acceptance; MCP connectivity is not tool authorization. Website discovery respects Action policies. Invocations without session default to the first freshly discovered session, including when pageUrl is provided. Explicit selections are revalidated without switching accounts."),
             "inputSchema": .object([
                 "type": .string("object"), "properties": .object(properties),
                 "required": .array(["purpose", "domain"].map(JSONValue.string)), "additionalProperties": .bool(false),

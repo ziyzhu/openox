@@ -85,9 +85,6 @@ extension Conversation {
             throw OxSearch.failure("invalid_contract", "Standard search must be read-only and requireApproval must be false.")
         }
         let session = options["sessions"]?.objectValue?[domain]
-        guard action["requireAuth"]?.boolValue != true || session != nil else {
-            throw OxSearch.failure("authentication_required", "\(service) requires an authenticated session. Select a session or sign in before searching.")
-        }
         guard let maximum = input.objectValue?["properties"]?.objectValue?["limit"]?.objectValue?["maximum"]?.intValue,
               (1...50).contains(maximum) else {
             throw OxSearch.failure("invalid_contract", "Search limit must declare a maximum from 1 to 50.")

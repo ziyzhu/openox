@@ -256,7 +256,6 @@ nonisolated enum OxServices {
                                 "purpose": .object(["type": .string("string")]),
                             ]),
                             "required": .array([.string("name")]),
-                            "not": .object(["required": .array(["session", "pageUrl"].map(JSONValue.string))]),
                             "additionalProperties": .bool(false),
                         ]),
                         "outputSchema": .object([
