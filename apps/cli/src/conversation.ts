@@ -1,3 +1,4 @@
+import type { SendConversationResult } from "@openox/protocol";
 import { connectHost, requireHost } from "./host-request.ts";
 import { HostRPCClient, type HostConversationRow } from "./host-rpc.ts";
 import {
@@ -53,8 +54,6 @@ async function listConversations(args: string[], context: CliContext): Promise<v
   printConversations(rows);
 }
 
-type SendResult = { conversationId: string; outcome: string; text?: string; error?: string };
-
 async function openConversation(args: string[], context: CliContext): Promise<void> {
   const options = parseListOptions(args, "open");
   if (!context.conversation) fail("conversation open requires --conversation <full-conversation-uuid>");
@@ -106,7 +105,7 @@ async function sendConversation(args: string[], context: CliContext): Promise<vo
   const options = parseSendOptions(args);
   const text = options.text === "-" ? (await Bun.stdin.text()).trim() : options.text;
   if (!text) fail("conversation send requires message text");
-  const result = await requireHost("conversations.send", context, options.timeoutMs, { text, wait: options.wait }) as SendResult;
+  const result = await requireHost("conversations.send", context, options.timeoutMs, { text, wait: options.wait }) as SendConversationResult;
   if (options.json) console.log(JSON.stringify(result, null, 2));
   else if (result.outcome === "completed") console.log(result.text ?? "");
   else if (result.outcome === "queued") console.log(result.conversationId);

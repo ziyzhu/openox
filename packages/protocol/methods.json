@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "methods": {
     "host.describe": {
       "params": {
@@ -179,7 +179,7 @@
     },
     "conversations.get": {
       "params": {
-        "$ref": "./schema.json#/definitions/SessionRequest"
+        "$ref": "./schema.json#/definitions/ConversationRequest"
       },
       "result": {
         "$ref": "./schema.json#/definitions/GetConversationResult"
@@ -187,7 +187,7 @@
     },
     "conversations.open": {
       "params": {
-        "$ref": "./schema.json#/definitions/SessionRequest"
+        "$ref": "./schema.json#/definitions/ConversationRequest"
       },
       "result": {
         "$ref": "./schema.json#/definitions/GetConversationResult"
@@ -219,7 +219,7 @@
     },
     "conversations.stop": {
       "params": {
-        "$ref": "./schema.json#/definitions/SessionRequest"
+        "$ref": "./schema.json#/definitions/ConversationRequest"
       },
       "result": {
         "$ref": "./schema.json#/definitions/StopConversationResult"

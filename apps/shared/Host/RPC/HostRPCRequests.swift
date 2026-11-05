@@ -1,7 +1,7 @@
 import Foundation
 
 extension OxHostProtocol {
-    static let contractVersion = 3
+    static let contractVersion = 4
 
     enum Method: String, CaseIterable {
         case describe = "host.describe"
@@ -112,12 +112,12 @@ extension OxHostProtocol {
         let domain: String
     }
 
-    struct SessionRequest: Decodable {
-        let sessionId: String?
+    struct ConversationRequest: Decodable {
+        let conversationId: String?
     }
 
     struct RespondConversationRequest: Decodable {
-        let sessionId: String?
+        let conversationId: String?
         let promptId: String
         let answer: String
     }
@@ -129,7 +129,7 @@ extension OxHostProtocol {
     }
 
     struct SendConversationRequest: Decodable {
-        let sessionId: String?
+        let conversationId: String?
         let text: String
         let wait: Bool?
     }

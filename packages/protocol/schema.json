@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "urn:openox:host-rpc:3",
+  "$id": "urn:openox:host-rpc:4",
   "title": "OpenOx Host JSON-RPC messages",
   "anyOf": [
     {
@@ -192,10 +192,10 @@
       },
       "additionalProperties": true
     },
-    "SessionRequest": {
+    "ConversationRequest": {
       "type": "object",
       "properties": {
-        "sessionId": {
+        "conversationId": {
           "anyOf": [
             {
               "type": "string"
@@ -434,7 +434,7 @@
         "text"
       ],
       "properties": {
-        "sessionId": {
+        "conversationId": {
           "anyOf": [
             {
               "type": "string"
@@ -467,7 +467,7 @@
         "answer"
       ],
       "properties": {
-        "sessionId": {
+        "conversationId": {
           "anyOf": [
             {
               "type": "string"
@@ -1204,7 +1204,28 @@
           "type": "string"
         },
         "outcome": {
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "queued"
+            },
+            {
+              "type": "string",
+              "const": "completed"
+            },
+            {
+              "type": "string",
+              "const": "failed"
+            },
+            {
+              "type": "string",
+              "const": "cancelled"
+            },
+            {
+              "type": "string",
+              "const": "needsAttention"
+            }
+          ]
         },
         "text": {
           "type": "string"

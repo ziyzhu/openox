@@ -1,6 +1,6 @@
 import { Type, type Static, type TSchema } from "typebox";
 
-export const RPC_VERSION = 3;
+export const RPC_VERSION = 4;
 const S = Type.String;
 const B = Type.Boolean;
 const I = Type.Integer;
@@ -32,7 +32,7 @@ export const Schemas = {
   FolderGrantRequest: object("FolderGrantRequest", { grantId: S({ minLength: 1, maxLength: 100 }), profileId: nullable(S({ minLength: 36, maxLength: 36 })) }),
   MountedRepositoryRequest: object("MountedRepositoryRequest", { path: S({ minLength: 1, maxLength: 2048 }) }),
   RepositoryIDRequest: object("RepositoryIDRequest", { repositoryId: S({ minLength: 1, maxLength: 100 }) }),
-  SessionRequest: object("SessionRequest", { sessionId: nullable(S()) }),
+  ConversationRequest: object("ConversationRequest", { conversationId: nullable(S()) }),
   GetLogsRequest: object("GetLogsRequest", {
     limit: nullable(I({ minimum: 1, maximum: 2000 })), cursor: nullable(S({ minLength: 1, maxLength: 2048 })),
     level: nullable(S({ enum: ["debug", "info", "warning", "error"] })),
@@ -47,8 +47,8 @@ export const Schemas = {
   EvaluateRequest: object("EvaluateRequest", { domain: S(), script: S() }),
   ServiceRequest: object("ServiceRequest", { domain: S() }),
   NewConversationRequest: object("NewConversationRequest", { temporary: nullable(B()), providerId: nullable(S()), modelId: nullable(S()) }),
-  SendConversationRequest: object("SendConversationRequest", { sessionId: nullable(S()), text: S(), wait: nullable(B()) }),
-  RespondConversationRequest: object("RespondConversationRequest", { sessionId: nullable(S()), promptId: S(), answer: S() }),
+  SendConversationRequest: object("SendConversationRequest", { conversationId: nullable(S()), text: S(), wait: nullable(B()) }),
+  RespondConversationRequest: object("RespondConversationRequest", { conversationId: nullable(S()), promptId: S(), answer: S() }),
   SetKeyRequest: object("SetKeyRequest", {
     providerId: S(), key: nullable(S()), region: nullable(swift(Type.Union([Type.Literal("global"), Type.Literal("china")]), "LLMRegion")),
   }),
@@ -98,7 +98,12 @@ export const Schemas = {
   RespondConversationResult: object("RespondConversationResult", { conversationId: S(), promptId: S() }),
   GetConversationResult: object("GetConversationResult", { data: optional(R("ConversationSnapshot")) }),
   NewConversationResult: object("NewConversationResult", { conversationId: S(), temporary: B(), model: S() }),
-  SendConversationResult: object("SendConversationResult", { conversationId: S(), outcome: S(), text: optional(S()), error: optional(S()) }),
+  SendConversationResult: object("SendConversationResult", {
+    conversationId: S(), outcome: Type.Union([
+      Type.Literal("queued"), Type.Literal("completed"), Type.Literal("failed"), Type.Literal("cancelled"), Type.Literal("needsAttention"),
+    ]),
+    text: optional(S()), error: optional(S()),
+  }),
   StopConversationResult: object("StopConversationResult", { conversationId: S(), wasRunning: B() }),
   ValueResult: object("ValueResult", { value: Type.Unknown() }),
   VMLog: object("VMLog", { level: S(), message: S() }),
@@ -155,12 +160,12 @@ export const Methods = {
   "services.list": method("listServices", "EmptyRequest", "ListServicesResult"),
   "services.sync": method("syncServices", "EmptyRequest", "SyncServicesResult"),
   "conversations.list": method("listConversations", "EmptyRequest", "ListConversationsResult"),
-  "conversations.get": method("getConversation", "SessionRequest", "GetConversationResult"),
-  "conversations.open": method("openConversation", "SessionRequest", "GetConversationResult"),
+  "conversations.get": method("getConversation", "ConversationRequest", "GetConversationResult"),
+  "conversations.open": method("openConversation", "ConversationRequest", "GetConversationResult"),
   "conversations.respond": method("respondConversation", "RespondConversationRequest", "RespondConversationResult"),
   "conversations.new": method("newConversation", "NewConversationRequest", "NewConversationResult"),
   "conversations.send": method("sendConversation", "SendConversationRequest", "SendConversationResult"),
-  "conversations.stop": method("stopConversation", "SessionRequest", "StopConversationResult"),
+  "conversations.stop": method("stopConversation", "ConversationRequest", "StopConversationResult"),
   "providers.list": method("listProviders", "EmptyRequest", "ListProvidersResult"),
   "logs.list": method("getLogs", "GetLogsRequest", "GetLogsResult"),
   "debug.composer.formatting": method("getComposerFormatting", "EmptyRequest", "ComposerFormattingResult"),
@@ -200,3 +205,5 @@ export const ResponseBatchSchema = A(ResponseSchema, { $id: "ResponseBatch", min
 export type MethodName = keyof typeof Methods;
 export type HostDescription = Static<typeof Schemas.HostDescription>;
 export type HostConversationRow = Static<typeof Schemas.ConversationRow>;
+export type SendConversationResult = Static<typeof Schemas.SendConversationResult>;
+export type ConversationOutcome = SendConversationResult["outcome"];
