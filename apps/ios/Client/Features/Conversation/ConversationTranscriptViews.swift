@@ -95,9 +95,9 @@ struct TurnEndingCard: View {
     static func stopped(onResume: (() -> Void)?) -> TurnEndingCard {
         TurnEndingCard(
             title: Text("Stopped"),
-            systemImage: "stop.circle.fill",
+            systemImage: "stop.fill",
             iconTint: Theme.Colors.conversationSecondary,
-            message: nil,
+            message: L10n.string("This reply was stopped before it finished.", comment: "Description on a stopped conversation reply card."),
             accessibilityIdentifier: "conversation.stopped",
             action: onResume.map {
                 Action(
@@ -137,7 +137,7 @@ struct TurnEndingCard: View {
                     actionButton
                 }
             } else {
-                HStack(alignment: .lastTextBaseline, spacing: Theme.Spacing.md) {
+                HStack(alignment: .bottom, spacing: Theme.Spacing.md) {
                     details
                         .frame(maxWidth: .infinity, alignment: .leading)
                     actionButton
@@ -153,21 +153,24 @@ struct TurnEndingCard: View {
     }
 
     private var details: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            Label {
-                title.foregroundStyle(Theme.Colors.onSurface)
-            } icon: {
-                Image(systemName: systemImage).foregroundStyle(iconTint)
-            }
-            .font(Theme.Fonts.labelMd)
-            .accessibilityIdentifier(accessibilityIdentifier)
-            if let message {
-                Text(message)
-                    .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier("\(accessibilityIdentifier).message")
+        HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
+            Image(systemName: systemImage)
+                .font(Theme.Fonts.labelMd)
+                .foregroundStyle(iconTint)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                title
+                    .font(Theme.Fonts.labelMd)
+                    .foregroundStyle(Theme.Colors.onSurface)
+                    .accessibilityIdentifier(accessibilityIdentifier)
+                if let message {
+                    Text(message)
+                        .font(Theme.Fonts.bodySm)
+                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("\(accessibilityIdentifier).message")
+                }
             }
         }
     }
