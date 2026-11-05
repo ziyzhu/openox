@@ -29,12 +29,12 @@
 1. Keep temporary screenshots, recordings, traces, and diagnostics outside the repository.
 1. App Store Connect owns listing metadata and media.
 1. Hosted service and model-provider icons live only in the `openox-service-assets-prod` S3 bucket.
-1. Search must not change conversation attachments or saved services. Source chips for searches and service implementation files should represent services, not queries, result pages, or filenames.
 
 ## Verification Rules
 
 1. Reproduce the issue first before attempting to fix it so that you can verify the fix.
 1. Do not add unit tests; prefer E2E tests.
+1. Reuse the configured iOS bundle identifier for simulator builds and installs; never create task-specific app identities to isolate routine QA. Extra app identities require explicit user approval and removal of task-owned installs before releasing the simulator, including on failure or interruption. Preserve the normal app and its data; uninstalling pre-existing apps requires separate confirmation.
 1. Reuse the fixed `ox-1`–`ox-5` simulator pool for all simulator work. Reserve one suitable existing device per task. If compatible devices are busy, coordinate or wait; do not create or clone task-named simulators. Creating devices outside the pool requires explicit user approval. Record initial boot state, shut down devices the task booted unless ownership was handed off, and release reservations on exit. A booted device or attached automation process does not establish active use or ownership.
 1. Before committing native source or build-configuration changes, build each affected app target; shared changes require both iOS and macOS builds. Portable checks do not replace native compilation. If a required build cannot run, report the blocker and obtain approval before committing.
 1. For each commit, review lines of code and cyclomatic complexity.
