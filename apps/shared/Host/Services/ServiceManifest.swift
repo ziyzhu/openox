@@ -197,7 +197,7 @@ nonisolated struct ServiceDefinition: Sendable {
                 "id": .string(tool.name),
                 "label": .string(tool.title),
                 "description": tool.description.map(JSONValue.string) ?? .null,
-                "inputSchema": tool.inputSchema,
+                "inputSchema": RemoteMCPAttachments.inputSchema(tool.inputSchema),
                 "outputSchema": tool.outputSchema ?? .object([:]),
                 "requireApproval": .bool(true),
                 "requireAuth": .bool(false),

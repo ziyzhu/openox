@@ -39,6 +39,10 @@ For API/MCP error audits, inspect the fields caught by conversation JavaScript,
 including errors crossing an API handler's nested runtime. Use isolated fixtures
 and server-side dispatch counts to verify that denied calls never dispatch and
 uncertain writes are not replayed; preserve and restore approval policies.
+For MCP binary transfers, use nonprivate synthetic images and verify both native
+image/resource decoding and schema-declared file-reference expansion. Check that
+polls and model-visible results contain metadata, not encoded bytes; exercise
+combined-size limits, denied reads, session scope and symlink escapes.
 
 ## Backward compatibility
 

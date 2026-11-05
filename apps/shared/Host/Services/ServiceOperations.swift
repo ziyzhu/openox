@@ -13,6 +13,7 @@ final class ServiceOperations {
     let attachedDomains: () -> Set<String>
     let requireApproval: (String, ActionPolicy, Any?, String?, String?) async throws -> Void
     let presentControl: (ServiceControl, Service) async -> JSONValue?
+    let readMCPFile: (String, String) async throws -> Data
     let receiveFiles: @MainActor ([RemoteMCPFile]) async throws -> Void
     let serviceChanged: (String) -> Void
     let begin: (String, JSONValue, String) -> UUID
@@ -31,6 +32,7 @@ final class ServiceOperations {
         attachedDomains: @escaping () -> Set<String> = { [] },
         approve: @escaping (String, ActionPolicy, Any?, String?, String?) async throws -> Void,
         presentControl: @escaping (ServiceControl, Service) async -> JSONValue?,
+        readMCPFile: @escaping (String, String) async throws -> Data = { _, _ in throw RuntimeError.bridge("This caller cannot transfer local MCP files") },
         receiveFiles: @escaping @MainActor ([RemoteMCPFile]) async throws -> Void,
         serviceChanged: @escaping (String) -> Void,
         begin: @escaping (String, JSONValue, String) -> UUID,
@@ -45,6 +47,7 @@ final class ServiceOperations {
         self.attachedDomains = attachedDomains
         self.requireApproval = approve
         self.presentControl = presentControl
+        self.readMCPFile = readMCPFile
         self.receiveFiles = receiveFiles
         self.serviceChanged = serviceChanged
         self.begin = begin
@@ -169,7 +172,7 @@ final class ServiceOperations {
             } else if let implementation = service.remoteMCPService {
                 result = await implementation.invoke(
                     service: service, actionID: actionID, args: input,
-                    approve: approve, receiveFiles: receiveFiles
+                    approve: approve, readFile: { try await self.readMCPFile($0, purpose) }, receiveFiles: receiveFiles
                 )
             } else {
                 result = await service.invokeAction(

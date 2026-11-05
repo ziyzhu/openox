@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import UniformTypeIdentifiers
 
@@ -66,12 +67,27 @@ extension Conversation {
     func importRemoteMCPFiles(_ values: [RemoteMCPFile]) async throws {
         guard !values.isEmpty else { return }
         try requireProfileMutation(Actions.fsWrite)
-        var files: [FileItem] = []
+        guard StorageRoot.currentScope == scope else { throw RuntimeError.bridge("MCP files belong to a stale Profile scope") }
+        var imported = 0
         for value in values {
-            files.append(try await importAttachment(data: value.data, suggestedName: value.suggestedFilename))
+            let digest = await Task.detached(priority: .userInitiated) {
+                SHA256.hash(data: value.data).map { String(format: "%02x", $0) }.joined()
+            }.value
+            guard StorageRoot.currentScope == scope else { throw RuntimeError.bridge("MCP files belong to a stale Profile scope") }
+            try Task.checkCancellation()
+            guard importedMCPFileDigests.insert(digest).inserted else { continue }
+            do {
+                let file = try await importAttachment(data: value.data, suggestedName: value.suggestedFilename)
+                guard StorageRoot.currentScope == scope else { throw RuntimeError.bridge("MCP files belong to a stale Profile scope") }
+                try Task.checkCancellation()
+                embedFile(file)
+                imported += 1
+            } catch {
+                importedMCPFileDigests.remove(digest)
+                throw error
+            }
         }
-        for file in files { embedFile(file) }
-        Log.session.info("Conversation.importRemoteMCPFiles count=\(files.count) bytes=\(values.reduce(0) { $0 + $1.data.count })")
+        Log.session.info("Conversation.importRemoteMCPFiles count=\(imported) received=\(values.count) bytes=\(values.reduce(0) { $0 + $1.data.count })")
     }
 }
 

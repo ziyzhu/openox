@@ -236,6 +236,7 @@ final class RemoteMCPService {
         actionID: String,
         args: JSONValue,
         approve: @MainActor (_ action: String, _ args: Any?) async -> Bool,
+        readFile: @MainActor (String) async throws -> Data = { _ in throw RemoteMCPError.protocolError("this caller cannot transfer local files") },
         receiveFiles: @MainActor ([RemoteMCPFile]) async throws -> Void = { _ in }
     ) async -> Result<JSONValue, Error> {
         let name = "\(service.domain):\(actionID)"
@@ -251,7 +252,15 @@ final class RemoteMCPService {
         let allowed = await approve(name, args.toAny())
         Log.service.info("RemoteMCP.invoke approval name=\(name) allow=\(allowed)")
         guard allowed else { return .failure(Service.InvokeError.denied(name)) }
+        var wireArgs = args
         do {
+            try await service.manager.requireInvocationAccess(for: service)
+            guard let wireSchema = descriptor?.tools.first(where: { $0.name == actionID })?.inputSchema else {
+                throw RemoteMCPError.protocolError("tool input schema is unavailable")
+            }
+            wireArgs = try await RemoteMCPAttachments.arguments(args, schema: wireSchema, readFile: readFile)
+            let wireViolations = JSONSchemaValidator.validate(wireArgs, against: wireSchema, definitions: [:])
+            guard wireViolations.isEmpty else { return .failure(Service.InvokeError.invalidInput(name, wireViolations)) }
             try await service.manager.requireInvocationAccess(for: service)
             let keepActive = isActive
             let client = try await activate()
@@ -259,7 +268,7 @@ final class RemoteMCPService {
                 if !keepActive { Task { await self.deactivate() } }
             }
             try await service.manager.requireInvocationAccess(for: service)
-            let result = try await client.callTool(name: actionID, arguments: args)
+            let result = try await client.callTool(name: actionID, arguments: wireArgs)
             let outputViolations = JSONSchemaValidator.validate(result.value, against: outputSchema, definitions: [:])
             guard outputViolations.isEmpty else { return .failure(Service.InvokeError.invalidOutput(name, outputViolations)) }
             try await receiveFiles(result.files)
@@ -276,7 +285,7 @@ final class RemoteMCPService {
                 let client = try await activate()
                 await client.setAccessToken(accessToken)
                 try await service.manager.requireInvocationAccess(for: service)
-                let result = try await client.callTool(name: actionID, arguments: args)
+                let result = try await client.callTool(name: actionID, arguments: wireArgs)
                 let outputViolations = JSONSchemaValidator.validate(result.value, against: outputSchema, definitions: [:])
                 guard outputViolations.isEmpty else { return .failure(Service.InvokeError.invalidOutput(name, outputViolations)) }
                 try await receiveFiles(result.files)

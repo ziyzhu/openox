@@ -373,6 +373,7 @@ final class Conversation: Identifiable {
     }
 
     @ObservationIgnored private var standaloneServiceInvocations: Set<UUID> = []
+    @ObservationIgnored var importedMCPFileDigests: Set<String> = []
 
     var serviceOperations: ServiceOperations {
         ServiceOperations(
@@ -404,6 +405,15 @@ final class Conversation: Identifiable {
                     return await present(self, control)
                 }
                 return await interactions.waitForServiceControl(pending)
+            },
+            readMCPFile: { [unowned self] path, purpose in
+                guard StorageRoot.currentScope == scope else { throw RuntimeError.bridge("MCP file belongs to a stale Profile scope") }
+                try await requireApproval(action: Actions.fsRead, defaultPolicy: Actions.defaultPolicy(for: Actions.fsRead), args: ["path": path], purpose: purpose)
+                let media = try await fileSystemMedia(path: path)
+                try Task.checkCancellation()
+                guard StorageRoot.currentScope == scope else { throw RuntimeError.bridge("MCP file belongs to a stale Profile scope") }
+                guard media.data.count <= RemoteMCPAttachments.maximumBytes else { throw RemoteMCPError.protocolError("file exceeds the 2 MiB transfer limit") }
+                return media.data
             },
             receiveFiles: { [unowned self] in try await importRemoteMCPFiles($0) },
             serviceChanged: { [unowned self] domain in

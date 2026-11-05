@@ -199,8 +199,17 @@ actor RemoteMCPClient {
         if fields["isError"]?.boolValue == true {
             throw RemoteMCPError.tool(Self.contentText(fields["content"]) ?? "The MCP tool reported an error.")
         }
-        let value = fields["structuredContent"] ?? fields["content"] ?? .null
-        return RemoteMCPToolResult(value: value, files: try Self.files(fields["content"], value: value))
+        let rawValue = fields["structuredContent"] ?? fields["content"] ?? .null
+        let files = try Self.files(fields["content"], value: rawValue)
+        var fileIndex = 0
+        let content = fields["content"]?.arrayValue?.map { item -> JSONValue in
+            guard let type = item.objectValue?["type"]?.stringValue,
+                  type == "image" || (type == "resource" && item.objectValue?["resource"]?.objectValue != nil) else { return item }
+            let file = files[fileIndex]
+            fileIndex += 1
+            return .object(["type": .string(type), "filename": .string(file.suggestedFilename), "mimeType": .string(file.mimeType), "bytes": .int(file.data.count)])
+        }
+        return RemoteMCPToolResult(value: fields["structuredContent"] ?? content.map(JSONValue.array) ?? .null, files: files)
     }
 
     func disconnect() {
@@ -322,7 +331,9 @@ actor RemoteMCPClient {
     ) async throws -> JSONValue? {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
-        request.httpBody = try JSONEncoder().encode(payload)
+        let body = try JSONEncoder().encode(payload)
+        guard body.count <= Self.maxResponseBytes else { throw RemoteMCPError.protocolError("request exceeds the 4 MiB limit") }
+        request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
         if let accessToken { request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization") }
@@ -519,6 +530,7 @@ actor RemoteMCPClient {
     }
 
     private func postLegacy(_ body: Data, to messageEndpoint: URL) async throws {
+        guard body.count <= Self.maxResponseBytes else { throw RemoteMCPError.protocolError("request exceeds the 4 MiB limit") }
         var request = URLRequest(url: messageEndpoint)
         request.httpMethod = "POST"
         request.httpBody = body
@@ -644,6 +656,10 @@ actor RemoteMCPClient {
 
     private static func files(_ content: JSONValue?, value: JSONValue) throws -> [RemoteMCPFile] {
         let decoded = try content?.arrayValue?.compactMap(fileContent) ?? []
+        guard decoded.count <= RemoteMCPAttachments.maximumFiles,
+              decoded.reduce(0, { $0 + $1.data.count }) <= RemoteMCPAttachments.maximumBytes else {
+            throw RemoteMCPError.protocolError("tool files exceed four attachments or 2 MiB combined")
+        }
         let structuredFilename = decoded.count == 1 ? resultFilename(value) : nil
         return decoded.enumerated().map { index, file in
             let filename = file.filename ?? structuredFilename ?? fallbackFilename(mimeType: file.mimeType, index: index, count: decoded.count)
