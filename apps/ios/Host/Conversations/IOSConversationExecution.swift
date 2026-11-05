@@ -28,7 +28,9 @@ struct IOSConversationFeedback: ConversationFeedback {
     var isBackground: Bool { UIApplication.shared.applicationState == .background }
 
     func notifyAttention(identifier: String, title: String, body: String, isCurrent: @escaping @MainActor () -> Bool) async throws -> Bool {
-        try await NotificationProvider.shared.deliverIfAuthorized(identifier: identifier, title: title, body: body, isCurrent: isCurrent)
+        try await withBackgroundTime("Conversation.notifyAttention") {
+            try await NotificationProvider.shared.deliverIfAuthorized(identifier: identifier, title: title, body: body, isCurrent: isCurrent)
+        }
     }
 
     func dismissAttention(identifier: String) {
@@ -46,18 +48,26 @@ struct IOSConversationFeedback: ConversationFeedback {
         }
         let conversationId = id.uuidString
         Task {
-            do {
-                let delivered = try await NotificationProvider.shared.deliverIfAuthorized(
-                    identifier: "conversation.\(conversationId)", title: title, body: body
-                )
-                if delivered {
-                    Log.session.info("Conversation.notify posted id=\(conversationId) bodyChars=\(body.count)")
-                } else {
-                    Log.session.info("Conversation.notify skipped id=\(conversationId) reason=notAuthorized")
+            await withBackgroundTime("Conversation.notifyCompletion") {
+                do {
+                    let delivered = try await NotificationProvider.shared.deliverIfAuthorized(
+                        identifier: "conversation.\(conversationId)", title: title, body: body
+                    )
+                    if delivered {
+                        Log.session.info("Conversation.notify posted id=\(conversationId) bodyChars=\(body.count)")
+                    } else {
+                        Log.session.info("Conversation.notify skipped id=\(conversationId) reason=notAuthorized")
+                    }
+                } catch {
+                    Log.session.error("Conversation.notify add failed id=\(conversationId) err=\(error.localizedDescription)")
                 }
-            } catch {
-                Log.session.error("Conversation.notify add failed id=\(conversationId) err=\(error.localizedDescription)")
             }
         }
+    }
+
+    private func withBackgroundTime<T>(_ name: String, _ operation: () async throws -> T) async rethrows -> T {
+        let task = UIApplication.shared.beginBackgroundTask(withName: name, expirationHandler: nil)
+        defer { if task != .invalid { UIApplication.shared.endBackgroundTask(task) } }
+        return try await operation()
     }
 }

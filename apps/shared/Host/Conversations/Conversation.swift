@@ -660,9 +660,8 @@ final class Conversation: Identifiable {
         let task: Task<Void, Never>
         var phase: RunPhase
         var activeSubmission: Submission?
-        var backgroundExecutionExpired: Bool
-        var backgroundExecution: (any ConversationBackgroundExecution)?
-        var completionNotification: CompletionNotification?
+        var backgroundExecution: (any ConversationBackgroundExecution)? = nil
+        var completionNotification: CompletionNotification? = nil
     }
 
     private struct CompletionNotification {
@@ -797,7 +796,6 @@ final class Conversation: Identifiable {
             await stream.waitForDelivery()
             document.apply(.finishGeneration(Self.outcome(for: assistant, at: Date())))
             requestPersistence(.generationFinished)
-            activeRun?.backgroundExecution?.advance()
         case .runFinished(let result):
             activeLatency?.mark(.agentCompleted)
             activeRun?.backgroundExecution?.updatePhase(.finishing)
@@ -813,7 +811,6 @@ final class Conversation: Identifiable {
             activeRun?.backgroundExecution?.updatePhase(.working)
         case .toolExecutionEnd(let toolCall, let result):
             document.apply(.recordToolExchange(toolCall, result))
-            activeRun?.backgroundExecution?.advance()
             activeRun?.backgroundExecution?.updatePhase(.thinking)
         case .messageStart(_), .messageEnd(_):
             break
@@ -944,7 +941,6 @@ final class Conversation: Identifiable {
         setRunPhase(.streaming)
         activeRun?.backgroundExecution?.updatePhase(.responding)
         document.apply(.appendText(delta))
-        activeRun?.backgroundExecution?.advance()
     }
 
     func beginExecution(source: String) {
@@ -996,7 +992,6 @@ final class Conversation: Identifiable {
         currentExecutionTransientAttachments = []
         currentExecutionActivatedSkills = [:]
         currentExecutionFetchBytes = 0
-        activeRun?.backgroundExecution?.advance()
         activeRun?.backgroundExecution?.updatePhase(.thinking)
     }
 
@@ -1107,7 +1102,6 @@ final class Conversation: Identifiable {
             throw RuntimeError.bridge("ox.user.progress: no JavaScript execution is active")
         }
         document.apply(.appendProgress(message))
-        activeRun?.backgroundExecution?.advance()
     }
 
     @discardableResult
@@ -1154,7 +1148,6 @@ final class Conversation: Identifiable {
         if let paragraph = Reasoning.paragraphs(trimmed).last {
             activeRun?.backgroundExecution?.updateStep(paragraph)
         }
-        activeRun?.backgroundExecution?.advance()
     }
 
     private func applyAssistantEvent(_ event: AssistantEvent) {
@@ -1162,23 +1155,17 @@ final class Conversation: Identifiable {
         case .textDelta(let index, let delta, _):
             guard !delta.isEmpty else { return }
             stream.registerDelta()
-            activeRun?.backgroundExecution?.advance()
             activeRun?.backgroundExecution?.updatePhase(.responding)
             stream.appendDelta(delta, block: index)
         case .thinkingDelta(_, let delta, _):
             guard !delta.isEmpty else { return }
             stream.registerDelta()
-            activeRun?.backgroundExecution?.advance()
         case .toolCallDelta:
             stream.registerDelta()
-            activeRun?.backgroundExecution?.advance()
             stream.flush()
             setRunPhase(.thinking)
         case .start(let partial):
-            if !partial.content.isEmpty {
-                stream.registerDelta()
-                activeRun?.backgroundExecution?.advance()
-            }
+            if !partial.content.isEmpty { stream.registerDelta() }
             if partial.content.contains(where: { if case .text(let text) = $0 { return !text.text.isEmpty }; return false }) {
                 activeRun?.backgroundExecution?.updatePhase(.responding)
             }
@@ -1598,8 +1585,7 @@ final class Conversation: Identifiable {
                 Log.session.error("Conversation.recovery failed conversation=\(id) submission=\(submissionID) error=\(error.localizedDescription)")
             }
         }
-        activeRun = Run(id: runID, task: task, phase: .thinking, activeSubmission: nil, backgroundExecutionExpired: false,
-            backgroundExecution: nil, completionNotification: nil)
+        activeRun = Run(id: runID, task: task, phase: .thinking, activeSubmission: nil)
         startBackgroundExecution()
     }
 
@@ -1641,15 +1627,7 @@ final class Conversation: Identifiable {
             await runOne(submission, runID: runID)
             activeLatency = nil
         }
-        activeRun = Run(
-            id: runID,
-            task: task,
-            phase: .preparing,
-            activeSubmission: submission,
-            backgroundExecutionExpired: false,
-            backgroundExecution: nil,
-            completionNotification: nil
-        )
+        activeRun = Run(id: runID, task: task, phase: .preparing, activeSubmission: submission)
         startBackgroundExecution()
         Log.session.info("Conversation.worker start id=\(id) run=\(runID.rawValue.uuidString.prefix(8)) queueDepth=\(queueDepth)")
     }
@@ -1665,14 +1643,11 @@ final class Conversation: Identifiable {
     private func finishWorker(_ runID: RunID) {
         guard let run = activeRun, run.id == runID else { return }
         defer { if !submissions.isEmpty { startWorker() } }
-        let backgroundExecutionExpired = run.backgroundExecutionExpired
         let conversationFailed = notice.errorMessage != nil
         let conversationStopped = submissionPresentation.isCancelled || run.task.isCancelled
         let conversationSucceeded = !conversationStopped && !conversationFailed
         let hasUnreadResult = conversationSucceeded || conversationFailed
-        let backgroundOutcome: ConversationBackgroundOutcome = if backgroundExecutionExpired {
-            .expired
-        } else if conversationStopped {
+        let backgroundOutcome: ConversationBackgroundOutcome = if conversationStopped {
             .stopped
         } else if conversationFailed {
             .failed
@@ -1750,13 +1725,11 @@ final class Conversation: Identifiable {
             self?.expireBackgroundExecution(runID: runID)
         }
         activeRun?.backgroundExecution = execution
-        activeRun?.backgroundExecutionExpired = false
         execution.submit()
     }
 
     private func expireBackgroundExecution(runID: RunID) {
         guard activeRun?.id == runID else { return }
-        activeRun?.backgroundExecutionExpired = true
         Log.session.warning("Conversation.backgroundLeaseExpired id=\(id) run=\(runID.rawValue)")
         stream.flush()
         stopCurrentTurn()

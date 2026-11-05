@@ -88,7 +88,6 @@ enum ConversationBackgroundOutcome {
 @MainActor
 protocol ConversationBackgroundExecution: AnyObject {
     func submit()
-    func advance()
     func updatePhase(_ phase: ConversationBackgroundPhase)
     func updateStep(_ text: String)
     func finish(_ outcome: ConversationBackgroundOutcome)

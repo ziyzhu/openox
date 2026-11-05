@@ -5,26 +5,21 @@ import Foundation
 final class IOSConversationBackgroundExecution: ConversationBackgroundExecution {
     private static let activityPulseInterval = Duration.seconds(5)
 
-    private final class CompletionState {
-        var outcome: Outcome?
+    private enum State {
+        case pending
+        case submitted(at: Date)
+        case running(BGContinuedProcessingTask, pulse: Task<Void, Never>, submittedAt: Date)
+        case finished(ConversationBackgroundOutcome)
     }
-
-    typealias Phase = ConversationBackgroundPhase
-
-    typealias Outcome = ConversationBackgroundOutcome
 
     private let identifier: String
     private let conversationID: UUID
     private let runID: RunID
-    private var task: BGContinuedProcessingTask?
-    private var phase = Phase.thinking
+    private let onExpiration: () -> Void
+    private var state = State.pending
+    private var phase = ConversationBackgroundPhase.thinking
     private var stepSubtitle: String?
-    private var submittedAt: Date?
-    private let completion = CompletionState()
     private var completedUnits: Int64 = 0
-    private var lastProgressAt: Date?
-    private var activityPulse: Task<Void, Never>?
-    private var onExpiration: (() -> Void)?
 
     init(conversationID: UUID, runID: RunID, onExpiration: @escaping () -> Void) {
         let bundleID = Bundle.main.bundleIdentifier ?? "ai.openox"
@@ -35,8 +30,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
     }
 
     func submit() {
-        guard completion.outcome == nil else { return }
-        let completion = self.completion
+        guard case .pending = state else { return }
         let identifier = self.identifier
         let registered = BGTaskScheduler.shared.register(
             forTaskWithIdentifier: identifier,
@@ -44,33 +38,26 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         ) { [weak self] task in
             MainActor.assumeIsolated {
                 guard let self else {
-                    let result = completion.outcome?.succeeded ?? false
-                    task.setTaskCompleted(success: result)
-                    Log.session.info("ConversationBackground.receive detached task=\(identifier) success=\(result)")
+                    task.setTaskCompleted(success: false)
+                    Log.session.info("ConversationBackground.receive detached task=\(identifier)")
                     return
                 }
                 self.receive(task)
             }
         }
         guard registered else {
-            completion.outcome = .failed
-            onExpiration = nil
+            state = .finished(.failed)
             Log.session.error("ConversationBackground.register rejected conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier)")
             return
         }
-        let request = BGContinuedProcessingTaskRequest(
-            identifier: identifier,
-            title: phase.title,
-            subtitle: subtitle
-        )
+        let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: phase.title, subtitle: subtitle)
         request.strategy = .queue
         do {
-            submittedAt = Date()
+            state = .submitted(at: Date())
             try BGTaskScheduler.shared.submit(request)
             Log.session.info("ConversationBackground.submit conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) strategy=queue")
         } catch {
-            completion.outcome = .failed
-            onExpiration = nil
+            state = .finished(.failed)
             guard (error as? BGTaskScheduler.Error)?.code != .unavailable else {
                 Log.session.info("ConversationBackground.submit unavailable conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier)")
                 return
@@ -80,53 +67,38 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         }
     }
 
-    func advance() {
-        guard completion.outcome == nil else { return }
-        let now = Date()
-        if let lastProgressAt, now.timeIntervalSince(lastProgressAt) < 1 { return }
-        lastProgressAt = now
-        completedUnits += 1
-        task?.progress.totalUnitCount = completedUnits + 1
-        task?.progress.completedUnitCount = completedUnits
-    }
-
-    func updatePhase(_ phase: Phase) {
-        guard self.phase != phase || stepSubtitle != nil else { return }
+    func updatePhase(_ phase: ConversationBackgroundPhase) {
+        guard !isFinished, self.phase != phase || stepSubtitle != nil else { return }
         self.phase = phase
         stepSubtitle = nil
-        Log.session.info("ConversationBackground.phase conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) phase=\(phase.rawValue) presented=\(task != nil)")
-        guard completion.outcome == nil else { return }
-        task?.updateTitle(phase.title, subtitle: subtitle)
+        Log.session.info("ConversationBackground.phase conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) phase=\(phase.rawValue) presented=\(runningTask != nil)")
+        present()
     }
 
     func updateStep(_ text: String) {
         let value = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        guard !value.isEmpty, completion.outcome == nil else { return }
+        guard !value.isEmpty, !isFinished else { return }
         let subtitle = value.count > 120 ? String(value.prefix(119)) + "…" : value
         guard stepSubtitle != subtitle else { return }
         stepSubtitle = subtitle
-        task?.updateTitle(phase.title, subtitle: subtitle)
+        present()
     }
 
-    func finish(_ outcome: Outcome) {
-        guard completion.outcome == nil else { return }
+    func finish(_ outcome: ConversationBackgroundOutcome) {
+        guard !isFinished else { return }
         if let phase = outcome.phase { updatePhase(phase) }
-        completion.outcome = outcome
-        onExpiration = nil
-        activityPulse?.cancel()
-        activityPulse = nil
-        if let task {
+        if case .running(let task, let pulse, _) = state {
+            pulse.cancel()
             if case .completed = outcome {
                 task.updateTitle(String(localized: "Ox is done"), subtitle: String(localized: "Your response is ready"))
-                let total = max(completedUnits + 1, 1)
-                task.progress.totalUnitCount = total
-                task.progress.completedUnitCount = total
+                task.progress.totalUnitCount = completedUnits + 1
+                task.progress.completedUnitCount = completedUnits + 1
             }
             task.setTaskCompleted(success: outcome.succeeded)
-            self.task = nil
         } else {
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
         }
+        state = .finished(outcome)
         Log.session.info("ConversationBackground.finish conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) outcome=\(outcome.logLabel) success=\(outcome.succeeded)")
     }
 
@@ -135,12 +107,12 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
             rawTask.setTaskCompleted(success: false)
             return
         }
-        if let outcome = completion.outcome {
-            task.setTaskCompleted(success: outcome.succeeded)
+        guard case .submitted(let submittedAt) = state else {
+            let success = if case .finished(let outcome) = state { outcome.succeeded } else { false }
+            task.setTaskCompleted(success: success)
             return
         }
-        self.task = task
-        activityPulse = Task { @MainActor [weak self] in
+        let pulse = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 do {
                     try await Task.sleep(for: Self.activityPulseInterval)
@@ -151,27 +123,43 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
                 self.advance()
             }
         }
-        task.updateTitle(phase.title, subtitle: subtitle)
-        task.progress.totalUnitCount = max(completedUnits + 1, 1)
-        task.progress.completedUnitCount = completedUnits
-        advance()
+        state = .running(task, pulse: pulse, submittedAt: submittedAt)
         task.expirationHandler = { [weak self] in
             Task { @MainActor in
                 self?.expire()
             }
         }
-        let latencyMs = submittedAt.map { Int(Date().timeIntervalSince($0) * 1_000) } ?? -1
+        present()
+        advance()
+        let latencyMs = Int(Date().timeIntervalSince(submittedAt) * 1_000)
         Log.session.info("ConversationBackground.start conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) latencyMs=\(latencyMs)")
     }
 
+    private func advance() {
+        guard let task = runningTask else { return }
+        completedUnits += 1
+        task.progress.totalUnitCount = completedUnits + 1
+        task.progress.completedUnitCount = completedUnits
+    }
+
     private func expire() {
-        guard completion.outcome == nil else { return }
-        let interruptedPhase = phase
-        let expiration = onExpiration
-        expiration?()
+        guard case .running(_, _, let submittedAt) = state else { return }
+        let elapsedMs = Int(Date().timeIntervalSince(submittedAt) * 1_000)
+        Log.session.warning("ConversationBackground.expire conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) phase=\(phase.rawValue) elapsedMs=\(elapsedMs) completedUnits=\(completedUnits)")
+        onExpiration()
         finish(.expired)
-        let elapsedMs = submittedAt.map { Int(Date().timeIntervalSince($0) * 1_000) } ?? -1
-        Log.session.warning("ConversationBackground.expire conversation=\(conversationID) run=\(runID.rawValue) task=\(identifier) phase=\(interruptedPhase.rawValue) elapsedMs=\(elapsedMs) completedUnits=\(completedUnits)")
+    }
+
+    private func present() {
+        runningTask?.updateTitle(phase.title, subtitle: subtitle)
+    }
+
+    private var runningTask: BGContinuedProcessingTask? {
+        if case .running(let task, _, _) = state { task } else { nil }
+    }
+
+    private var isFinished: Bool {
+        if case .finished = state { true } else { false }
     }
 
     private var subtitle: String { stepSubtitle ?? phase.subtitle }

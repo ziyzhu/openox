@@ -14,9 +14,6 @@ final class MacConversationBackgroundExecution: ConversationBackgroundExecution 
         Log.session.info("ConversationBackground.submit conversation=\(conversationID) run=\(runID.rawValue) mode=process")
     }
 
-    func advance() {
-    }
-
     func updatePhase(_ phase: ConversationBackgroundPhase) {
         Log.session.info("ConversationBackground.phase conversation=\(conversationID) run=\(runID.rawValue) phase=\(phase.rawValue) mode=process")
     }
