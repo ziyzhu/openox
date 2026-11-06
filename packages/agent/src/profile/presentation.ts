@@ -39,6 +39,25 @@ function validate(change: ApplicationPresentationChange) {
 function turnID(turn: JsonValue | undefined): string | undefined {
   return turn && typeof turn === "object" && !Array.isArray(turn) && typeof turn.id === "string" && turn.id ? turn.id : undefined;
 }
+function presentedTurn(entry: EntryRecord): JsonValue | undefined {
+  if (entry.kind !== "ox.native.presentation" && entry.kind !== "ox.native.turn") return undefined;
+  return entry.data && typeof entry.data === "object" && !Array.isArray(entry.data) ? entry.data.turn : undefined;
+}
+function isRunning(turn: JsonValue): boolean {
+  const agent = turn && typeof turn === "object" && !Array.isArray(turn) ? turn.agent : undefined;
+  const outcome = agent && typeof agent === "object" && !Array.isArray(agent) ? agent.outcome : undefined;
+  return !!outcome && typeof outcome === "object" && !Array.isArray(outcome) && outcome.type === "running";
+}
+function withoutSupersededPresentation(entries: EntryRecord[]) {
+  const presented = new Set<string>();
+  return [...entries].reverse().filter(entry => {
+    const key = turnID(presentedTurn(entry));
+    if (!key) return true;
+    const superseded = presented.has(key);
+    presented.add(key);
+    return !superseded || entry.kind !== "ox.native.presentation";
+  }).reverse();
+}
 function canonicalJSON(value: JsonValue): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(",")}]`;
   if (value && typeof value === "object") return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonicalJSON(value[key]!)}`).join(",")}}`;
@@ -151,13 +170,12 @@ export class ApplicationPresentation {
     const id = this.runtime.conversations.id(reference);
     const conversation = await this.runtime.harness.conversation(id, context);
     if (!conversation) throw new Error("Conversation not found");
-    const [state, metadata, entries, active] = await Promise.all([
+    const [state, metadata, entries] = await Promise.all([
       this.runtime.conversations.metadata(reference),
       this.runtime.harness.snapshot(ConversationApplicationMetadata, id, context),
       this.runtime.harness.commit(tx => ledger(tx, id), context),
-      conversation.context(context),
     ]);
-    return { ...state, metadata: metadata?.fields ?? {}, entries, messages: active.messages };
+    return { ...state, metadata: metadata?.fields ?? {}, entries: withoutSupersededPresentation(entries) };
   }
   async save(reference: ConversationReference, change: ApplicationPresentationChange) {
     validate(change);
@@ -171,15 +189,18 @@ export class ApplicationPresentation {
       const entries = await ledger(tx, id);
       const turns = new Map<string, JsonValue>();
       for (const entry of entries) {
-        if (entry.kind !== "ox.native.presentation" && entry.kind !== "ox.native.turn") continue;
-        const turn = entry.data && typeof entry.data === "object" && !Array.isArray(entry.data) ? entry.data.turn : undefined;
+        const turn = presentedTurn(entry);
         const key = turnID(turn);
         if (key) turns.set(key, turn!);
       }
       let latest = entries.at(-1)?.id ?? null;
       for (const turn of frozen.turns ?? []) {
         const key = turnID(turn)!;
-        if (turns.has(key) && canonicalJSON(turns.get(key)!) === canonicalJSON(turn)) continue;
+        const stored = turns.get(key), encoded = canonicalJSON(turn);
+        if (stored !== undefined) {
+          const previous = canonicalJSON(stored);
+          if (previous === encoded || (isRunning(turn) && encoded.length < previous.length * 2)) continue;
+        }
         latest = (await tx.appendEntry(id, { kind: "ox.native.presentation", data: { turn } })).id;
         turns.set(key, turn);
       }
