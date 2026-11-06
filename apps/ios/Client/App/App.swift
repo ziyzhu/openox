@@ -40,8 +40,21 @@ private struct OxApplicationView: View {
         case failed(URL)
     }
 
+    private struct WhatsNewPresentation: Identifiable {
+        let releases: [WhatsNewRelease]
+
+        var id: String { releases.map(\.id).joined(separator: ",") }
+    }
+
+    private enum WhatsNewLaunch {
+        case waiting
+        case presenting(WhatsNewPresentation)
+        case finished
+    }
+
     @AppStorage(Theme.Appearance.storageKey) private var appearance = Theme.Appearance.system
     @State private var incomingWebLink: IncomingWebLink?
+    @State private var whatsNewLaunch = WhatsNewLaunch.waiting
     @State private var appState = AppStateStore.shared
     private var onboarded: Bool { appState.value.onboarded }
     @Environment(\.scenePhase) private var scenePhase
@@ -126,6 +139,21 @@ private struct OxApplicationView: View {
             } message: {
                 Text("Ox couldn't prepare the selected Profile. Try opening the link again.")
             }
+            .sheet(item: whatsNewPresentation) { presentation in
+                WhatsNewView(releases: presentation.releases, onDone: finishWhatsNew)
+            }
+            .task(id: canPresentWhatsNew) {
+                guard canPresentWhatsNew, case .waiting = whatsNewLaunch else { return }
+                do { try await client.prepare() } catch { return }
+                guard !Task.isCancelled, canPresentWhatsNew, case .waiting = whatsNewLaunch else { return }
+                let releases = WhatsNew.unseen(since: appState.value.whatsNewSeenVersion)
+                guard !releases.isEmpty else {
+                    whatsNewLaunch = .finished
+                    return
+                }
+                Log.ui.info("WhatsNew.presented versions=\(releases.map(\.version).joined(separator: ","))")
+                whatsNewLaunch = .presenting(WhatsNewPresentation(releases: releases))
+            }
             .task(id: incomingURLToOpen) {
                 guard let url = incomingURLToOpen else { return }
                 do {
@@ -162,13 +190,45 @@ private struct OxApplicationView: View {
     }
 
     private var incomingURLToOpen: URL? {
-        guard onboarded, scenePhase == .active, !StorageRoot.shared.isBusy, presentations.canOpenBrowser,
-              serviceImports.proposal == nil, serviceImports.errorMessage == nil,
-              serviceImports.importedDomain == nil,
-              skillImports.proposal == nil, skillImports.errorMessage == nil,
-              conversationImports.proposal == nil, conversationImports.errorMessage == nil,
+        guard isIdle, presentations.canOpenBrowser, !isPresentingWhatsNew,
               case .pending(let url) = incomingWebLink else { return nil }
         return url
+    }
+
+    private var isIdle: Bool {
+        onboarded && scenePhase == .active && !StorageRoot.shared.isBusy
+            && serviceImports.proposal == nil && serviceImports.errorMessage == nil
+            && serviceImports.importedDomain == nil
+            && skillImports.proposal == nil && skillImports.errorMessage == nil
+            && conversationImports.proposal == nil && conversationImports.errorMessage == nil
+    }
+
+    private var canPresentWhatsNew: Bool {
+        isIdle && incomingWebLink == nil && presentations.presented == nil
+    }
+
+    private var isPresentingWhatsNew: Bool {
+        if case .presenting = whatsNewLaunch { return true }
+        return false
+    }
+
+    private var whatsNewPresentation: Binding<WhatsNewPresentation?> {
+        Binding(
+            get: {
+                if case .presenting(let presentation) = whatsNewLaunch { return presentation }
+                return nil
+            },
+            set: { presentation in
+                guard presentation == nil, isPresentingWhatsNew else { return }
+                finishWhatsNew()
+            }
+        )
+    }
+
+    private func finishWhatsNew() {
+        whatsNewLaunch = .finished
+        do { try appState.update { $0.whatsNewSeenVersion = WhatsNew.appVersion } }
+        catch { Log.app.error("WhatsNew.save failed error=\(error.localizedDescription)") }
     }
 
     @ViewBuilder
@@ -177,7 +237,12 @@ private struct OxApplicationView: View {
             RootView(client: client, skillImports: skillImports, conversationImports: conversationImports)
         } else {
             OnboardingView {
-                do { try appState.update { $0.onboarded = true } }
+                do {
+                    try appState.update {
+                        $0.onboarded = true
+                        $0.whatsNewSeenVersion = WhatsNew.appVersion
+                    }
+                }
                 catch { Log.app.error("Onboarding.save failed error=\(error.localizedDescription)") }
             }
         }

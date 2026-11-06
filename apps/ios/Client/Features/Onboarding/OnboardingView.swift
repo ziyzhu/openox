@@ -105,7 +105,7 @@ struct OnboardingDisclosureRow: View {
     }
 }
 
-private struct OnboardingCellularField: View {
+struct OnboardingCellularField: View {
     let isActive: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -340,7 +340,7 @@ private final class OnboardingCellularFieldView: UIView {
     }
 }
 
-private struct OnboardingCTAButton: ButtonStyle {
+struct OnboardingCTAButton: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(Theme.Fonts.labelMd)

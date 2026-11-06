@@ -42,6 +42,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "typebox": "1.4.3"
   },
   "devDependencies": {

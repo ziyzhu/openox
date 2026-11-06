@@ -16,7 +16,7 @@ async function command(args: string[]) {
 test("CLI help and service argument validation do not connect to a Host", async () => {
   for (const args of [["vm", "inspect"], ["vm", "functions"], ["vm", "help"],
     ["conversation", "open"], ["conversation", "respond"], ["host", "list"], ["host", "discover"], ["service", "refresh-auth"],
-    ["service", "list"], ["files", "mount"], ["files", "list"],
+    ["service", "list"], ["service", "mcp"], ["files", "mount"], ["files", "list"],
     ["repository", "connect"], ["repository", "list"], ["repository", "disconnect"]]) {
     const result = await command([...args, "--help"]);
     expect(result.code).toBe(0);

@@ -2,15 +2,24 @@ import { readFile } from "node:fs/promises";
 import { parseArgs, type ParseArgsOptionsConfig } from "node:util";
 import { C, fail, printResult, terminalText, type CliContext, type SubCommand } from "./lib.ts";
 import { createHostServiceRuntime } from "./service-runtime.ts";
+import { serveServiceMCP } from "./service-mcp.ts";
 
 export const SERVICE_COMMANDS: Record<string, SubCommand> = {
   list: { desc: "Show the Host's services and their live page state", fn: serviceStatus },
+  mcp: { desc: "Expose available service actions as MCP tools over stdio", fn: mcp },
   invoke: { desc: "Invoke a service action through the selected Host", fn: invoke },
   eval: { desc: "Run a JS script on a Host-managed service page", fn: evaluate },
   reload: { desc: "Reload a service page after active actions finish", fn: reload },
   "refresh-auth": { desc: "Recheck a service's authentication state", fn: refreshAuth },
   sync: { desc: "Refresh service definitions and invalidate changed live services", fn: syncServices },
 };
+
+async function mcp(args: string[], context: CliContext): Promise<void> {
+  const parsed = options(args, "service mcp");
+  if (!parsed) return;
+  if (parsed.values.json) fail("--json cannot be used with service mcp; stdout carries MCP messages");
+  await serveServiceMCP(context.host, parsed.timeoutMs);
+}
 
 function options(args: string[], usage: string, config: ParseArgsOptionsConfig = {}, maximumPositionals = 0, defaultTimeout = 30000) {
   const { values, positionals } = parseArgs({

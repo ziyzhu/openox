@@ -12231,6 +12231,1150 @@
           }
         }
       }
+    },
+    "What's New" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新功能"
+          }
+        }
+      }
+    },
+    "Got it" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "知道了"
+          }
+        }
+      }
+    },
+    "Version %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %@"
+          }
+        }
+      }
+    },
+    "Open a web address from the message composer in an inline browser, even before setting up a model provider." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在消息输入框中输入网址，即可用内嵌浏览器打开，无需先配置模型服务商。"
+          }
+        }
+      }
+    },
+    "Retry a failed reply in the same conversation, keeping its history and completed actions." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回复失败后可在原对话中重试，保留对话历史和已完成的操作。"
+          }
+        }
+      }
+    },
+    "See scheduled prompts as compact bubbles labeled with the schedule name." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "定时任务的提示词以紧凑气泡显示，并标注任务名称。"
+          }
+        }
+      }
+    },
+    "Send local images to compatible MCP services and view returned images and files in the conversation." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支持向兼容的 MCP 服务发送本地图片，并在对话中查看返回的图片和文件。"
+          }
+        }
+      }
+    },
+    "Improved website sign-in handoffs and conversation cards." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改进网站登录交接和对话卡片。"
+          }
+        }
+      }
+    },
+    "Choose System, Light, or Dark appearance in Settings." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可在设置中选择跟随系统、浅色或深色外观。"
+          }
+        }
+      }
+    },
+    "Smoother streaming of responses and reasoning, especially for long replies." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回复和思考内容的逐步显示更流畅，长回复尤为明显。"
+          }
+        }
+      }
+    },
+    "Search Brave, DuckDuckGo, Google, Reddit, X, and Wikipedia in parallel without changing your conversation’s attached services. X search requires sign-in." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "并行搜索 Brave、DuckDuckGo、Google、Reddit、X 和维基百科，不会更改对话中已附加的服务。搜索 X 需要登录。"
+          }
+        }
+      }
+    },
+    "Open service and repository details directly from source chips." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点击来源标签即可打开服务或服务仓库详情。"
+          }
+        }
+      }
+    },
+    "Improve website sign-in handling and show live service pages sooner." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改进网站登录处理，更快显示实时服务页面。"
+          }
+        }
+      }
+    },
+    "Read Reddit posts and comments with the new built-in Reddit service." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增内置 Reddit 服务，可阅读帖子和评论。"
+          }
+        }
+      }
+    },
+    "Read RSS and Atom feeds as structured entries." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支持将 RSS 和 Atom 订阅源读取为结构化条目。"
+          }
+        }
+      }
+    },
+    "Open referenced conversations directly from source chips, with clearer conversation titles." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点击来源标签即可打开引用的对话，并显示更清晰的对话标题。"
+          }
+        }
+      }
+    },
+    "Fix Markdown text and bullet colors in light and dark appearance." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修复浅色和深色外观下 Markdown 文字与列表圆点的颜色。"
+          }
+        }
+      }
+    },
+    "Connect to HTTPS MCP servers over Tailscale." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支持通过 Tailscale 连接 HTTPS MCP 服务器。"
+          }
+        }
+      }
+    },
+    "Open generated artifacts directly from references in the reasoning trace." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可直接从推理过程中的引用打开生成的作品。"
+          }
+        }
+      }
+    },
+    "Review website handoffs even when the page stays at the same address, with more reliable browser page updates." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即使网页地址未变，也能查看需要你接手的网页操作；浏览器页面状态更新更加可靠。"
+          }
+        }
+      }
+    },
+    "Improves opening external links from conversations and shows clearer feedback when a link cannot be opened." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改进对话中外部链接的打开方式，并在无法打开时提供更清晰的提示。"
+          }
+        }
+      }
+    },
+    "Keeps unchanged services running when repository sources are refreshed, and improves service sign-in and authoring guidance." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刷新服务仓库来源时，未变更的服务可继续运行；同时改进服务登录和创建指引。"
+          }
+        }
+      }
+    },
+    "Preview, edit, and remove new attachments before sending. Shared files now open in a new conversation draft." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新添加的附件可在发送前预览、编辑或移除。共享的文件会在新对话的草稿中打开。"
+          }
+        }
+      }
+    },
+    "Sign-in, browser, human-verification, and payment handoffs now use more consistent controls. Final purchase review and payment remain yours." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录、浏览器、人机验证和付款交接采用更一致的操作控件。最终购买确认和付款仍由你完成。"
+          }
+        }
+      }
+    },
+    "Reasoning traces show clearer references to files, skills, services, and web pages." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推理过程更清晰地展示引用的文件、技能、服务和网页。"
+          }
+        }
+      }
+    },
+    "Adds global Kimi Coding Plan support and improves provider sign-in and model discovery reliability." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增对国际版 Kimi Coding Plan 的支持，并提升服务商登录和模型发现的可靠性。"
+          }
+        }
+      }
+    },
+    "Improves bundled website actions and conversation controls, and shows the app version and build in Settings." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改进内置网站操作和对话控件，并在“设置”中显示应用版本和构建号。"
+          }
+        }
+      }
+    },
+    "Let Ox prepare purchases for you; it hands the final review and payment to you, then confirms the order went through." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox 可以为你准备购买流程，最终确认和付款由你完成，随后再核实订单是否成功。"
+          }
+        }
+      }
+    },
+    "Voice preferences now live in Ox's memory instead of a separate Voice editor; your existing custom voice is carried over." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表达风格偏好改由 Ox 的记忆保存，不再使用单独的“表达风格”编辑器；你现有的自定义设置会自动保留。"
+          }
+        }
+      }
+    },
+    "When a website needs you to sign in, Ox now shows you the page instead of asking in chat." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站需要登录时，Ox 会直接向你显示页面，而不是在聊天中询问。"
+          }
+        }
+      }
+    },
+    "Ox knows which folders you've granted, asks fewer unnecessary questions, and double-checks unexpected service results." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox 了解你已授权的文件夹，减少不必要的追问，并会复核异常的服务结果。"
+          }
+        }
+      }
+    },
+    "Large HTML files from your folders now open in the viewer, and website navigation is more reliable." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已授权文件夹中的较大 HTML 文件现在可以在查看器中打开，网站导航也更加可靠。"
+          }
+        }
+      }
+    },
+    "Create prompt-based schedules with repeat intervals, conditions, and deadlines, and manage them from a conversation." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建基于提示词的定时任务，设置重复间隔、条件和截止时间，并在对话中管理。"
+          }
+        }
+      }
+    },
+    "Discover and connect remote MCP services and APIs more easily." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更轻松地发现和连接远程 MCP 服务与 API。"
+          }
+        }
+      }
+    },
+    "Work with selected Files folders using the same file operations as your Profile, with removals sent to native trash when supported." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对所选的「文件」文件夹使用与资料库相同的文件操作；支持时，移除的项目会移至系统废纸篓。"
+          }
+        }
+      }
+    },
+    "Enjoy smoother conversation history transitions and clearer skill controls." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史对话切换更流畅，技能控制更清晰。"
+          }
+        }
+      }
+    },
+    "Improved service sign-in and file searches when nested folders are unavailable." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改进服务登录，以及部分子文件夹不可用时的文件搜索。"
+          }
+        }
+      }
+    },
+    "View Mermaid diagrams and SVG drawings directly in chat, and copy diagram source from the full-screen viewer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在聊天中直接查看 Mermaid 图表和 SVG 绘图，并可在全屏查看器中复制图表源码。"
+          }
+        }
+      }
+    },
+    "Preview files in conversations with clearer filenames and layouts." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在对话中预览文件，文件名和布局更清晰。"
+          }
+        }
+      }
+    },
+    "Enjoy smoother response streaming, scrolling, and keyboard transitions, with faster conversation history loading." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回复逐步显示、滚动和键盘切换更流畅，历史对话加载更快。"
+          }
+        }
+      }
+    },
+    "Control Browser access to signed-in sites with per-site approvals." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按网站授权，控制浏览器对已登录网站的访问。"
+          }
+        }
+      }
+    },
+    "Recover more easily when a Profile folder is unavailable, with clearer errors and an option to switch Profiles." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资料库文件夹不可用时，显示更清楚的错误提示，并可切换到其他资料库。"
+          }
+        }
+      }
+    },
+    "Open your service repositories in Files to view and edit their contents." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可在“文件”中打开服务仓库，查看和编辑其中的内容。"
+          }
+        }
+      }
+    },
+    "Local services stay enabled, and remote MCP connections are now stored alongside them." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地服务保持启用，远程 MCP 连接也统一保存在本地仓库中。"
+          }
+        }
+      }
+    },
+    "Simplified Settings and service details." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "简化了设置和服务详情页面。"
+          }
+        }
+      }
+    },
+    "When a ChatGPT session can no longer be refreshed, Ox now asks you to sign in again." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ChatGPT 登录状态无法续期时，Ox 会提示你重新登录。"
+          }
+        }
+      }
+    },
+    "Open the browser directly: Choose Browser from the composer’s + menu without asking the agent. Typing a domain or URL also offers a direct-open suggestion. The start page includes service websites, with saved services first." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直接打开浏览器：无需询问智能体，即可从输入框的“+”菜单中选择“浏览器”。输入域名或网址时，也会显示直接打开的建议。起始页包含各项服务的网站，并优先显示已保存的服务。"
+          }
+        }
+      }
+    },
+    "Smoother browsing: Refined address-bar editing, inline clearing, loading progress, navigation controls, and gestures. Improved recovery after canceled navigation." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更流畅的浏览体验：优化地址栏编辑、清空输入、加载进度、导航控件和手势，并改善取消导航后的恢复体验。"
+          }
+        }
+      }
+    },
+    "Refreshed design: Updated Ox icons, neutral grey surfaces, consistent orange controls, and clearer contrast in light and dark themes." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "焕新的界面设计：更新 Ox 图标，采用中性灰色界面和统一的橙色控件，提升浅色与深色主题下的对比度。"
+          }
+        }
+      }
+    },
+    "Better conversation flow: Smoother Send transitions, better-timed loading indicators, and simpler conversation actions." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更顺畅的对话体验：优化发送时的过渡动画和加载指示器的显示时机，简化对话操作。"
+          }
+        }
+      }
+    },
+    "Richer file presentation: File preview cards and collapsible, per-file code diffs. File attachments use one system picker, and mounted folders can be disconnected with confirmation without deleting their contents." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更丰富的文件展示：新增文件预览卡片，以及可按文件折叠的代码差异视图。文件附件统一使用系统选择器；断开已挂载文件夹前会要求确认，且不会删除其中的内容。"
+          }
+        }
+      }
+    },
+    "Simpler sign-in: Unified credential entry for providers and services, plus improved web sign-in recovery." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更便捷的登录：统一模型提供商与服务的凭据输入流程，并改善网页登录异常后的恢复体验。"
+          }
+        }
+      }
+    },
+    "Clearer background progress: Phase-specific Live Activity titles and restored periodic progress updates." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更清晰的后台进度：实时活动标题可显示当前处理阶段，并恢复定期进度更新。"
+          }
+        }
+      }
+    },
+    "Agent improvements: Bounded generation through configured models, on-demand API/schema discovery, and temporary files for reading large execution outputs." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能体改进：通过已配置的模型执行有明确限制的生成任务，按需发现 API 和数据结构，并使用临时文件读取较大的执行输出。"
+          }
+        }
+      }
+    },
+    "Preview files directly from Shoveler cards." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可直接在 Shoveler 卡片中预览文件。"
+          }
+        }
+      }
+    },
+    "Read diffs in collapsible, per-file sections." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以可折叠的文件分组查看差异。"
+          }
+        }
+      }
+    },
+    "Enjoy smoother message sending and conversation transitions." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "消息发送和对话切换更加流畅。"
+          }
+        }
+      }
+    },
+    "Manage files more easily with improved attachments, folder unmounting, and cancellation." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件附件、文件夹卸载和取消操作更加便捷。"
+          }
+        }
+      }
+    },
+    "Experience more reliable model requests, simpler provider setup, clearer service controls, and refined browser and speech interactions." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型请求更加可靠，服务管理、浏览器和语音交互体验进一步改进。"
+          }
+        }
+      }
+    },
+    "Browse Profile files in Apple Files, with native previews for supported file types." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Apple「文件」中浏览 Profile 文件，并使用系统预览查看支持的文件类型。"
+          }
+        }
+      }
+    },
+    "Mount folders for a specific Profile and connect service repositories directly from those folders. Existing folder access must be explicitly assigned to a Profile." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为指定 Profile 挂载文件夹，并直接连接文件夹中的服务仓库。已有的文件夹访问授权需要手动分配给一个 Profile。"
+          }
+        }
+      }
+    },
+    "View image galleries in conversation replies and open images for a closer look." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在会话回复中查看图片集，打开图片查看细节。"
+          }
+        }
+      }
+    },
+    "Keep the composer visible during service sign-in, and see clearer browser navigation errors." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在服务登录期间保持输入框可见，并更清楚地提示浏览器导航错误。"
+          }
+        }
+      }
+    },
+    "Load long conversation histories in pages and defer Profile content loading until it is needed." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分页加载较长的会话历史，按需加载 Profile 内容。"
+          }
+        }
+      }
+    },
+    "Simplify Settings and improve the light theme." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "简化设置界面，改善浅色主题。"
+          }
+        }
+      }
+    },
+    "Manage settings through chat: ask Ox to change its language, theme, model, or enabled repositories, subject to normal permissions." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在聊天中管理设置：让 Ox 更改语言、主题、模型或启用的服务仓库，操作仍按现有权限规则执行。"
+          }
+        }
+      }
+    },
+    "Use files from selected folders: attach images and PDFs, extract text, and analyze images from folders you explicitly grant access to." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用已授权文件夹中的文件：附加图片和 PDF、提取文字、分析图片，仅访问您明确授权的文件夹。"
+          }
+        }
+      }
+    },
+    "Connect from the terminal: access the foreground iOS Host through Tailscale using the Ox CLI. Remote connections are opt-in." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通过终端连接：开启远程连接后，可使用 Ox 命令行通过 Tailscale 访问前台运行的 iOS 版 Ox。远程连接默认关闭。"
+          }
+        }
+      }
+    },
+    "Faster startup: saved chat histories load on demand rather than all being reconstructed at launch." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动更快：按需加载已保存的聊天记录，不再在启动时重建全部会话。"
+          }
+        }
+      }
+    },
+    "More reliable conversations: improved interrupted-task recovery, Stop behavior, queued messages, and preservation of keyboard focus and drafts." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提高聊天稳定性：改善中断任务的恢复、停止操作和排队消息的处理，保留输入焦点和草稿。"
+          }
+        }
+      }
+    },
+    "Safer website-model handling: better long-conversation handling and clearer uncertain submission outcomes, without automatically resending potentially completed requests." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改善网站模型的使用体验：优化长会话处理，更清楚地提示提交结果不确定的情况，不自动重发可能已完成的请求。"
+          }
+        }
+      }
+    },
+    "Storage reliability: fixes for older chat formats, lower-memory migration, and automatic recovery of unavailable optional storage." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改善存储可靠性：修复旧版聊天记录格式的兼容问题，降低迁移时的内存占用，并自动重试恢复暂时不可用的可选存储。"
+          }
+        }
+      }
+    },
+    "Create or improve reusable website services directly from a chat, with clearer source selection and safer sign-in handoffs." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可在聊天中直接创建或改进可重复使用的网站服务，来源选择更清晰，登录接手更稳妥。"
+          }
+        }
+      }
+    },
+    "Start independent chats for background work and see the current execution step while tasks run." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可启动独立聊天处理后台工作，并在任务执行时查看当前步骤。"
+          }
+        }
+      }
+    },
+    "Use new web model actions for Gemini and Doubao, plus smoother concurrent streaming across supported websites." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增 Gemini 和豆包网站模型操作，并改进多个网站模型并发输出的流畅度。"
+          }
+        }
+      }
+    },
+    "Export the Local service repository, control whether it is enabled, and attach services more easily." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可导出和启停 Local 服务仓库，也能更方便地在聊天中附加服务。"
+          }
+        }
+      }
+    },
+    "Enjoy steadier startup and conversation loading, better Markdown and artifact presentation, and more reliable long-chat recovery." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改进启动与聊天加载、Markdown 和作品展示，以及长对话恢复稳定性。"
+          }
+        }
+      }
+    },
+    "Use Kimi, Qwen, Grok, or Claude through your existing website account as a model provider." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Kimi、通义千问、Grok 或 Claude 的现有网站账户作为模型服务。"
+          }
+        }
+      }
+    },
+    "Search and reopen saved conversations across more AI chat services." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在更多 AI 聊天应用中搜索并重新打开已保存的对话。"
+          }
+        }
+      }
+    },
+    "Import reviewed memories from another AI assistant into your current Profile." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将其他 AI 助手中经过确认的记忆导入当前 Profile。"
+          }
+        }
+      }
+    },
+    "Browse an expanded collection of built-in services, with clearer ordering and more reliable icons." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浏览更多内置服务，排序更清晰，图标显示更可靠。"
+          }
+        }
+      }
+    },
+    "Browser sessions now stay with their chats when you switch conversations." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换对话时，浏览器会话会继续保留在对应聊天中。"
+          }
+        }
+      }
+    },
+    "Improved website sign-in, startup recovery, and general reliability." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改进网站登录、启动恢复和整体稳定性。"
+          }
+        }
+      }
+    },
+    "Share or import Ox service packages, connect service repositories, and propose changes from Ox." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现在可以打包分享和导入 Ox 服务，也能连接服务仓库并在 Ox 中提出改动建议。"
+          }
+        }
+      }
+    },
+    "Suggested next actions now appear as quick prompts above the message composer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后续操作建议会显示为消息输入框上方的快捷提示。"
+          }
+        }
+      }
+    },
+    "Ox can now delete chats after asking for your approval." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox 现在可以在征得你同意后删除聊天。"
+          }
+        }
+      }
+    },
+    "Settings are easier to navigate, with refreshed model choices and interface refinements." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置页面更加清晰，模型选项已更新，界面细节也有所改进。"
+          }
+        }
+      }
+    },
+    "Signing in to supported websites is clearer and more reliable, including Facebook and ChatGPT." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录支持的网站时会立即显示进度，并修复了 Facebook 和 ChatGPT 的登录问题。"
+          }
+        }
+      }
+    },
+    "When Ox needs you to take over a website action, the page stays available." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要你接手网站操作时，相关网页会保持可用。"
+          }
+        }
+      }
+    },
+    "Suggested follow-up actions now fit the current conversation." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后续操作建议会结合当前对话内容。"
+          }
+        }
+      }
+    },
+    "Browse and act on websites directly in chat, with live pages displayed in the conversation." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在聊天中直接浏览和操作网站，网页会显示在对话里。"
+          }
+        }
+      }
+    },
+    "Safe read-only Actions can run automatically, and approval settings are clearer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全的只读操作可自动执行，权限设置也更清楚。"
+          }
+        }
+      }
+    },
+    "Edit sent messages in the composer; pinned and scheduled chats now appear in Recents." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可在输入框中修改已发送的消息；置顶和定时聊天会显示在“最近”中。"
+          }
+        }
+      }
+    },
+    "Connect, refresh, update, and remove MCP servers directly in chat, with approval before changes." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直接在聊天中连接、刷新、更新或移除 MCP 服务器，每次变更都会先征求你的同意。"
+          }
+        }
+      }
+    },
+    "When no existing service fits a website task, Ox can help through Browser and build a local service you can save for reuse." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有合适的现成服务时，牛可通过浏览器帮你处理网站任务，并搭建可保存复用的本地服务。"
+          }
+        }
+      }
+    },
+    "Improved keyboard handling on iPhone, tighter chat step spacing, and more consistent service icons." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改善 iPhone 的键盘适配，调整聊天步骤间距，统一服务图标的显示。"
+          }
+        }
+      }
+    },
+    "Setup is simpler, with a clearer model selection step before your first chat." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新手引导更简洁，首次聊天前会提示你设置模型。"
+          }
+        }
+      }
+    },
+    "You can now open web sources directly from chat activity." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现在可以直接从聊天中的搜索和网页读取记录打开来源网页。"
+          }
+        }
+      }
+    },
+    "Background chat progress is more consistent, and scheduled chats keep questions and permission requests available for you to answer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后台聊天的进度更新更稳定，定时任务中的问题和权限请求也会保留，等待你回复。"
+          }
+        }
+      }
+    },
+    "This update also improves service access checks, refreshes service icons after updates, and refines the Services picker." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此外，我们改进了服务访问状态检查，修复了服务更新后图标未刷新的问题，并调整了服务选择界面的间距。"
+          }
+        }
+      }
+    },
+    "This update makes chat smoother and more reliable, with steadier streaming text and cleaner message layouts. Custom answers now show clear confirmation, onboarding is simpler, and the sidebar can be resized on iPad." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本次更新让聊天更流畅、更稳定，优化了流式文字显示和消息布局，自定义回答也会清晰显示确认结果。新手引导更加简洁，iPad 侧边栏现在支持调整宽度。"
+          }
+        }
+      }
+    },
+    "Added free model options and easier provider onboarding." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增免费模型选项和更便捷的模型服务商设置。"
+          }
+        }
+      }
+    },
+    "Ox can now organize authorized photos into albums, schedule recurring skills, and use hold-to-talk voice input." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox 现在可以整理你授权的照片、安排定期运行的技能，并支持按住说话。"
+          }
+        }
+      }
+    },
+    "Chat streaming, scrolling, and reliability are improved throughout." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "聊天流式显示、滚动和整体稳定性也得到改进。"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

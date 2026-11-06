@@ -7,18 +7,20 @@ enum DeviceTemplate {
         struct Settings: Decodable {
             let language: String?
             let onboardingCompleted: Bool?
+            let whatsNewSeenVersion: String?
             let region: String?
             let defaultModel: JSONValue?
             let allowHostConnections: Bool?
 
             private enum CodingKeys: String, CodingKey {
-                case language, onboardingCompleted, region, defaultModel, allowHostConnections
+                case language, onboardingCompleted, whatsNewSeenVersion, region, defaultModel, allowHostConnections
             }
 
             init(from decoder: Decoder) throws {
                 let values = try decoder.container(keyedBy: CodingKeys.self)
                 language = try values.decodeIfPresent(String.self, forKey: .language)
                 onboardingCompleted = try values.decodeIfPresent(Bool.self, forKey: .onboardingCompleted)
+                whatsNewSeenVersion = try values.decodeIfPresent(String.self, forKey: .whatsNewSeenVersion)
                 region = try values.decodeIfPresent(String.self, forKey: .region)
                 defaultModel = values.contains(.defaultModel) ? try values.decode(JSONValue.self, forKey: .defaultModel) : nil
                 allowHostConnections = try values.decodeIfPresent(Bool.self, forKey: .allowHostConnections)
@@ -138,9 +140,13 @@ enum DeviceTemplate {
                     value.language = language
                     try value.save()
                 }
-                if let onboarded = settings.onboardingCompleted {
+                if settings.onboardingCompleted != nil || settings.whatsNewSeenVersion != nil {
                     var value = try AppState.load()
-                    value.onboarded = onboarded
+                    if let onboarded = settings.onboardingCompleted {
+                        value.onboarded = onboarded
+                        value.whatsNewSeenVersion = onboarded ? WhatsNew.appVersion : nil
+                    }
+                    if let version = settings.whatsNewSeenVersion { value.whatsNewSeenVersion = version }
                     try value.save()
                 }
                 if let region = settings.region, let value = LLMRegion(rawValue: region) { AppRegion.shared.setForTesting(value) }

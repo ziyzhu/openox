@@ -36,6 +36,7 @@ export const DeviceTemplateSchema = object({
   settings: Type.Optional(object({
     language: Type.Optional(Type.Union([Type.Literal("system"), Type.Literal("en"), Type.Literal("zh-Hans")])),
     onboardingCompleted: Type.Optional(Type.Boolean()),
+    whatsNewSeenVersion: Type.Optional(Type.String({ minLength: 1, maxLength: 32 })),
     region: Type.Optional(Type.Union([Type.Literal("global"), Type.Literal("china")])),
     defaultModel: Type.Optional(Type.Union([model, Type.Null()])),
     allowHostConnections: Type.Optional(Type.Boolean()),

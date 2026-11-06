@@ -199,6 +199,16 @@ struct SettingsSheet: View {
 
                     SettingsSection(layout: .group) {
                         VStack(spacing: 0) {
+                            NavigationLink {
+                                WhatsNewListView()
+                            } label: {
+                                SettingsDisclosureRow(title: "What's New", value: Text(""))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier(A11yID.Settings.whatsNew)
+
+                            Divider().settingsContentInset()
+
                             Button { showOnboarding = true } label: {
                                 SettingsDisclosureRow(title: "Take the tour", value: Text(""))
                             }

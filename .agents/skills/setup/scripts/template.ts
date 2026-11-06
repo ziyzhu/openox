@@ -194,7 +194,7 @@ export async function launchTemplate(args = Bun.argv.slice(2), build = true): Pr
     }
     manifest.result = result;
     manifest.status = "applied";
-    if (template.settings?.onboardingCompleted === true || template.selection?.conversation) await ios.wait({ id: "conversation.openSidebar" }, { timeout: 15000 });
+    if ((template.settings?.onboardingCompleted === true || template.selection?.conversation) && !template.settings?.whatsNewSeenVersion) await ios.wait({ id: "conversation.openSidebar" }, { timeout: 15000 });
     await writeFile(join(evidence, "accessibility.json"), JSON.stringify(await ios.describe()), { mode: 0o600 });
     await ios.screenshot(join(evidence, "ready.png"));
     console.log(`APPLIED ${config.device}; run ${runID}`);

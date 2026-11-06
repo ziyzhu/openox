@@ -9,6 +9,12 @@ nonisolated enum A11yID {
         static let complete = "onboarding.complete"
     }
 
+    enum WhatsNew {
+        static func page(_ version: String) -> String { "whatsNew.page.\(version)" }
+        static func done(_ version: String) -> String { "whatsNew.done.\(version)" }
+        static func release(_ version: String) -> String { "whatsNew.release.\(version)" }
+    }
+
     enum NotificationSetup {
         static let permission = "notifications.permission"
     }
@@ -70,6 +76,7 @@ nonisolated enum A11yID {
 
     enum Settings {
         static let close = "settings.close"
+        static let whatsNew = "settings.whatsNew"
         static let defaultModel = "settings.defaultModel"
         static let customProviderName = "settings.customProviderName"
         static let customProviderURL = "settings.customProviderURL"

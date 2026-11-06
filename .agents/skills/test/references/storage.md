@@ -24,7 +24,8 @@ types remain authoritative in their `Codable` implementations.
 │   │   │   ├── external-profiles.json      selected Profile bookmarks/display names
 │   │   │   └── device-folder-grants.json    Profile-bound native bookmarks
 │   │   ├── state.json                      format-1 onboarding, starter count, active Profile,
-│   │   │                                   cached region, ChatGPT agent Host identity
+│   │   │                                   cached region, ChatGPT agent Host identity,
+│   │   │                                   optional last seen What's New version
 │   │   ├── service-repositories/development/ simulator development HEAD snapshot
 │   │   ├── RepositoryStaging/              private repository downloads, recoverable snapshot backups, and mutation staging
 │   │   ├── RepositoryMigrationBackups/     retained predecessor repository-skill migration sources
@@ -98,7 +99,7 @@ User turns optionally retain `scheduleName` in native presentation annotations. 
 
 Service-inspector conversation content optionally stores `pageID`, a transient live service-page UUID. Older links omit it and keep their existing inspector behavior. Service-page cards resolve only the matching resident page; after closure or restart they show unavailable rather than creating a replacement or repeating an action. The optional field requires no migration and contains no website data.
 
-- App state file — owners: Platform/Models/AppState.swift and its concrete AppStateStore; UI onboarding/starter count, StorageRoot, AppRegion, and ChatGPTSubscriptionAccount use the same serialized MainActor writer.
+- App state file — owners: Platform/Models/AppState.swift and its concrete AppStateStore; UI onboarding/starter count/What's New seen version, StorageRoot, AppRegion, and ChatGPTSubscriptionAccount use the same serialized MainActor writer.
 - Host configuration file — owner: Platform/Models/HostAccess.swift; app-wide, retained across Profile switches, normal device backup eligibility, absent permission defaults off. Only trusted user controls can change it.
 - Language settings file — owners: Platform/Models/AppSettings.swift and AppLocale; persisted before publishing the observable language and nonisolated locale cache.
 - Service preferences and Action policy files — owner: Services/ServiceManager.swift; persist before publishing changes. Unavailable policy is Ask, and failed Always allow publication does not approve the pending operation.

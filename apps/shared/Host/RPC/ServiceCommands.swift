@@ -56,10 +56,11 @@ extension OxHostProtocol {
         let login: String
         let page: PageRow?
         let manifest: JSONValue?
+        let actions: [JSONValue]?
         let favicon: String?
 
         private enum CodingKeys: String, CodingKey {
-            case domain, title, phase, navigation, activeInvocations, queuedInvocations, pendingEvaluations, pageCount, page, manifest, favicon
+            case domain, title, phase, navigation, activeInvocations, queuedInvocations, pendingEvaluations, pageCount, page, manifest, actions, favicon
             case login = "signIn"
         }
     }
@@ -264,6 +265,7 @@ extension OxHostProtocol {
                     login: snapshot.login,
                     page: page,
                     manifest: snapshot.manifest,
+                    actions: svc.definition.exposedActions.map { .object($0.raw) },
                     favicon: favicon
                 ))
             }

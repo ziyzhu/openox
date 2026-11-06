@@ -8,11 +8,13 @@ nonisolated struct AppState: Codable, Equatable, Sendable {
     var activeProfileID: UUID?
     var chatGPTAgentHostID: String?
     var region: String?
+    var whatsNewSeenVersion: String?
 
     func validate() throws {
         guard format == 1, (0...3).contains(memoryIntentDisplays),
               region.map({ ["global", "china"].contains($0) }) ?? true,
-              chatGPTAgentHostID.map({ !$0.isEmpty && $0.count <= 500 }) ?? true else {
+              chatGPTAgentHostID.map({ !$0.isEmpty && $0.count <= 500 }) ?? true,
+              whatsNewSeenVersion.map({ !$0.isEmpty && $0.count <= 32 }) ?? true else {
             throw StorageMigrationError.invalidApplicationStorage("app state")
         }
     }

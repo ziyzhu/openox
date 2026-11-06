@@ -111,7 +111,8 @@ export const Schemas = {
   PageRow: object("PageRow", { url: Type.Unknown(), title: Type.Unknown(), isLoading: B(), progress: Type.Number(), canGoBack: B(), canGoForward: B() }),
   ServiceRow: object("ServiceRow", {
     domain: S(), title: S(), phase: S(), navigation: S(), activeInvocations: I(), queuedInvocations: I(),
-    pendingEvaluations: I(), pageCount: I(), signIn: S(), page: optional(R("PageRow")), manifest: optional(Type.Unknown()), favicon: optional(S()),
+    pendingEvaluations: I(), pageCount: I(), signIn: S(), page: optional(R("PageRow")), manifest: optional(Type.Unknown()),
+    actions: optional(A(Type.Unknown())), favicon: optional(S()),
   }),
   ListServicesResult: object("ListServicesResult", { services: A(R("ServiceRow")) }),
   SyncServicesResult: object("SyncServicesResult", { head: Type.Unknown(), changed: A(S()), services: I() }),
