@@ -3,8 +3,6 @@ import { fail, type CliContext, type SubCommand } from "./lib.ts";
 import { discover } from "./discover.ts";
 import { logs } from "./logs.ts";
 import { providers } from "./providers.ts";
-import { hostService, serviceStatus } from "./services.ts";
-import { hostFiles, hostRepositories } from "./host-admin.ts";
 
 export const HOST_COMMANDS: Record<string, SubCommand> = {
   describe: { desc: "Show Host identity, supported protocol versions and methods (--json)", fn: describe },
@@ -12,10 +10,6 @@ export const HOST_COMMANDS: Record<string, SubCommand> = {
   discover: { desc: "Alias for host list", fn: discover },
   logs: { desc: "Read or follow structured Host logs", fn: logs },
   providers: { desc: "List the Host's model providers and their models", fn: providers },
-  services: { desc: "Show the Host's services and their live page state", fn: serviceStatus },
-  service: { desc: "Invoke, evaluate, reload, or sync live services on the Host", fn: hostService },
-  files: hostFiles,
-  repository: hostRepositories,
 };
 
 async function describe(args: string[], context: CliContext): Promise<void> {

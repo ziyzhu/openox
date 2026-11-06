@@ -15,14 +15,16 @@ async function command(args: string[]) {
 
 test("CLI help and service argument validation do not connect to a Host", async () => {
   for (const args of [["vm", "inspect"], ["vm", "functions"], ["vm", "help"],
-    ["conversation", "open"], ["conversation", "respond"], ["host", "list"], ["host", "discover"], ["host", "service", "refresh-auth"]]) {
+    ["conversation", "open"], ["conversation", "respond"], ["host", "list"], ["host", "discover"], ["service", "refresh-auth"],
+    ["service", "list"], ["files", "mount"], ["files", "list"],
+    ["repository", "connect"], ["repository", "list"], ["repository", "disconnect"]]) {
     const result = await command([...args, "--help"]);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("Usage:");
     if (args[0] === "host" && ["list", "discover"].includes(args[1]!)) expect(result.stdout).toContain("Usage: ox host list");
   }
-  for (const args of [["host", "services", "--typo"], ["host", "service", "reload", "example.com", "extra"],
-    ["host", "service", "invoke", "example.com:read", "--args", "{}", "--args-file", "-"],
+  for (const args of [["service", "list", "--typo"], ["service", "reload", "example.com", "extra"],
+    ["service", "invoke", "example.com:read", "--args", "{}", "--args-file", "-"],
     ["vm", "inspect", "--timeout", "invalid"]]) {
     const result = await command(args);
     expect(result.code).toBe(1);

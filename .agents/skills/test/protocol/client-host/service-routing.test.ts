@@ -32,7 +32,7 @@ test("CLI and Host contract preserve independent session and pageUrl routing", a
   const directory = await mkdtemp(join(tmpdir(), "ox-routing-protocol-"));
   async function cli(...args: string[]) {
     const child = Bun.spawn([process.execPath, `${ROOT}/apps/cli/src/ox.ts`,
-      "--host", `ws://127.0.0.1:${server.port}`, "host", "service", "invoke", "example.org:read", ...args, "--json"], {
+      "--host", `ws://127.0.0.1:${server.port}`, "service", "invoke", "example.org:read", ...args, "--json"], {
       env: { ...Bun.env, OX_REPOSITORY: "" }, stdout: "pipe", stderr: "pipe",
     });
     const [code, stdout, stderr] = await Promise.all([

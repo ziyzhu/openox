@@ -166,7 +166,6 @@ const MOVED_COMMANDS: Record<string, string> = {
   discover: "ox host list",
   logs: "ox host logs",
   providers: "ox host providers",
-  service: "ox repository services|actions or ox host services|service",
 };
 
 function validateContext(command: string, subcommand: string | undefined, context: CliContext): void {
@@ -174,10 +173,12 @@ function validateContext(command: string, subcommand: string | undefined, contex
   if (context.conversation && command === "conversation" && (subcommand === "list" || subcommand === "new")) {
     throw new Error(`--conversation does not apply to ox conversation ${subcommand}`);
   }
-  if (context.profile && command !== "profile" && !(command === "host" && subcommand === "files")) throw new Error("--profile applies only to ox profile and ox host files");
+  if (context.profile && command !== "profile" && command !== "files") throw new Error("--profile applies only to ox profile and ox files");
   if (context.repository && command !== "repository") throw new Error("--repository applies only to ox repository");
-  const usesHost = command === "host" || command === "conversation" || command === "vm" || command === "profile";
-  if (context.host && !usesHost) throw new Error("--host applies only to ox host, ox profile, ox conversation, and ox vm");
+  const hostRepositoryAction = command === "repository" && ["list", "connect", "disconnect"].includes(subcommand ?? "");
+  if (context.repository && hostRepositoryAction) throw new Error(`--repository does not apply to ox repository ${subcommand}; use --host`);
+  const usesHost = ["host", "conversation", "vm", "profile", "files", "service"].includes(command) || hostRepositoryAction;
+  if (context.host && !usesHost) throw new Error("--host applies only to ox host, ox profile, ox files, ox service, ox conversation, ox vm, and ox repository list|connect|disconnect");
 }
 
 export function group(name: string, desc: string, subs: Record<string, SubCommand>): CommandGroup {

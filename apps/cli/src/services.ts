@@ -1,19 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { parseArgs, type ParseArgsOptionsConfig } from "node:util";
-import { C, dispatch, fail, printResult, terminalText, type CliContext, type SubCommand } from "./lib.ts";
+import { C, fail, printResult, terminalText, type CliContext, type SubCommand } from "./lib.ts";
 import { createHostServiceRuntime } from "./service-runtime.ts";
 
-const HOST_SERVICE_COMMANDS: Record<string, SubCommand> = {
+export const SERVICE_COMMANDS: Record<string, SubCommand> = {
+  list: { desc: "Show the Host's services and their live page state", fn: serviceStatus },
   invoke: { desc: "Invoke a service action through the selected Host", fn: invoke },
   eval: { desc: "Run a JS script on a Host-managed service page", fn: evaluate },
   reload: { desc: "Reload a service page after active actions finish", fn: reload },
   "refresh-auth": { desc: "Recheck a service's authentication state", fn: refreshAuth },
   sync: { desc: "Refresh service definitions and invalidate changed live services", fn: syncServices },
 };
-
-export async function hostService(args: string[], context: CliContext): Promise<void> {
-  return dispatch("host service", "Exercise live services through the selected Host.", HOST_SERVICE_COMMANDS, args, context);
-}
 
 function options(args: string[], usage: string, config: ParseArgsOptionsConfig = {}, maximumPositionals = 0, defaultTimeout = 30000) {
   const { values, positionals } = parseArgs({
@@ -35,7 +32,7 @@ async function inputText(path: string): Promise<string> {
 }
 
 async function invoke(args: string[], context: CliContext): Promise<void> {
-  const parsed = options(args, "host service invoke <domain>:<action> [--args '{}'] [--args-file <path|->] [--session '<descriptor>' | --session-file <path|->] [--page-url <https-url>] [--approve]", {
+  const parsed = options(args, "service invoke <domain>:<action> [--args '{}'] [--args-file <path|->] [--session '<descriptor>' | --session-file <path|->] [--page-url <https-url>] [--approve]", {
     args: { type: "string" }, "args-file": { type: "string" }, approve: { type: "boolean" },
     session: { type: "string" }, "session-file": { type: "string" }, "page-url": { type: "string" },
   }, 1);
@@ -79,7 +76,7 @@ async function invoke(args: string[], context: CliContext): Promise<void> {
 }
 
 async function evaluate(args: string[], context: CliContext): Promise<void> {
-  const parsed = options(args, "host service eval <domain> [<script> | --script <javascript> | --script-file <path|->]", {
+  const parsed = options(args, "service eval <domain> [<script> | --script <javascript> | --script-file <path|->]", {
     script: { type: "string" }, "script-file": { type: "string" },
   }, 2);
   if (!parsed) return;
@@ -94,7 +91,7 @@ async function evaluate(args: string[], context: CliContext): Promise<void> {
 
 async function serviceOperation(args: string[], context: CliContext, operation: "reload" | "refreshAuth") {
   const name = operation === "reload" ? "reload" : "refresh-auth";
-  const parsed = options(args, `host service ${name} <domain>`, {}, 1);
+  const parsed = options(args, `service ${name} <domain>`, {}, 1);
   if (!parsed) return;
   const domain = parsed.positionals[0] ?? fail("expected <domain>");
   printResult(await createHostServiceRuntime(context.host)[operation]({ domain, timeoutMs: parsed.timeoutMs }));
@@ -109,7 +106,7 @@ async function refreshAuth(args: string[], context: CliContext): Promise<void> {
 }
 
 export async function serviceStatus(args: string[], context: CliContext): Promise<void> {
-  const parsed = options(args, "host services");
+  const parsed = options(args, "service list");
   if (!parsed) return;
   const result = await createHostServiceRuntime(context.host).status(parsed.timeoutMs);
   const services = (result.services ?? []) as Array<Record<string, unknown>>;
@@ -134,7 +131,7 @@ export async function serviceStatus(args: string[], context: CliContext): Promis
 }
 
 async function syncServices(args: string[], context: CliContext): Promise<void> {
-  const parsed = options(args, "host service sync", {}, 0, 60000);
+  const parsed = options(args, "service sync", {}, 0, 60000);
   if (!parsed) return;
   const result = await createHostServiceRuntime(context.host).sync(parsed.timeoutMs);
   if (parsed.values.json) {

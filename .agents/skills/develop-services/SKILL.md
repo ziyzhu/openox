@@ -41,7 +41,7 @@ Use this workflow to copy a device's Local repository for inspection, backup, or
 Target the source Host explicitly, not the default simulator. For the user's iPhone, use `ws://iphone-17-pro-max.taile57b1f.ts.net:9876`, keep Tailscale connected, and keep Ox open. For a simulator, use its assigned endpoint. Select a loaded conversation in the intended Profile with `--conversation <full-id>`; follow the `ox-cli` skill if it needs hydration.
 
 ```sh
-ox --host <ws-url> host repository list --json
+ox --host <ws-url> repository list --json
 ox --host <ws-url> --conversation <full-id> vm help ox.fs.list
 ox --host <ws-url> --conversation <full-id> vm help ox.fs.read
 ox --host <ws-url> --conversation <full-id> vm call ox.fs.list --args '{"purpose":"Export Local repository","path":"repositories/local/"}' --json

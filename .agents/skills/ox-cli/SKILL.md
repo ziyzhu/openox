@@ -12,7 +12,8 @@ Commands are grouped by the resource they act on, and each group has one
 selector flag:
 
 - `ox profile` with `--host <ws-url>`: Profiles owned by that Host; `--profile <id>` scopes inspection or updates. Without `--host`, `--profile <path>` selects a directory for read-only disk inspection. With neither selector, `OX_HOST_ENDPOINT` selects Host-backed reads; otherwise reads use offline discovery.
-- `ox repository` with `--repository <path-or-url>`: a service repository.
+- `ox repository` with `--repository <path-or-url>`: a service repository; `list`, `connect`, and `disconnect` instead manage connections on `--host <ws-url>`.
+- `ox service` and `ox files` with `--host <ws-url>`: live services and authorized folders. `ox files` accepts `--profile <id>`. Commands stay two levels deep: `ox <namespace> <action> [arguments] [flags]`; do not add nested command groups.
 - `ox host` with `--host <ws-url>`: an Ox Host.
 - `ox conversation` and `ox vm` with `--host` and `--conversation <conversation-id>`: a conversation on that
   Host and its VM.
@@ -34,7 +35,7 @@ or tab session IDs; a live service is addressed by its domain.
 - Use `ox profile` for direct Profile file reads.
 - Use `ox repository` for offline repository, service manifest, action, and
   skill inspection.
-- Use `ox host services` and `ox host service` for live service operations.
+- Use `ox service list`, `ox service invoke`, and the other `ox service` actions for live service operations.
 - Skills come from three sources: `ox profile skills` (a Profile's files),
   `ox repository skills` (a repository's files), and `ox vm skills` (what the
   agent in a conversation actually sees).
@@ -163,33 +164,33 @@ requirement before invoking it.
 ## Connect a repository through Files
 
 ```sh
-ox --host <ws-url> host files mount --timeout 120000
-ox --host <ws-url> host files list --json
-ox --host <ws-url> host repository connect mounts/<grant-id>[/subfolder]
-ox --host <ws-url> host repository list --json
-ox --host <ws-url> host service sync
-ox --host <ws-url> host repository disconnect <repository-id>
-ox --host <ws-url> host files unmount <grant-id>
+ox --host <ws-url> files mount --timeout 120000
+ox --host <ws-url> files list --json
+ox --host <ws-url> repository connect mounts/<grant-id>[/subfolder]
+ox --host <ws-url> repository list --json
+ox --host <ws-url> service sync
+ox --host <ws-url> repository disconnect <repository-id>
+ox --host <ws-url> files unmount <grant-id>
 ```
 
-The Host's native picker grants access; a CLI-local path cannot authorize remote access. Connection is explicit and persistent, separate from managed Local. Source must use the current repository version; it is read in place without migration or Git seeding. Current Hosts expose repository files under `repositories/<repository-id>/...`; only files inside Local are writable through that view. Edit connected repositories through the granted Files mount or your editor, not their read-only repository view. Revocation makes connected services unavailable; disconnect does not delete their files. Grant IDs are stable for one grant and never reused for a new authorization. Mounts belong to the selected Profile; `--profile <id>` scopes `host files` commands without switching. Existing grants appear as unassigned until `host files assign <id>` or explicit assignment in Profile → Files. No Files service attachment is required. Mounted services follow the grant's Profile. Older builds do not enforce ownership and can discard ownership fields on writes; downgrade requires review.
+The Host's native picker grants access; a CLI-local path cannot authorize remote access. Connection is explicit and persistent, separate from managed Local. Source must use the current repository version; it is read in place without migration or Git seeding. Current Hosts expose repository files under `repositories/<repository-id>/...`; only files inside Local are writable through that view. Edit connected repositories through the granted Files mount or your editor, not their read-only repository view. Revocation makes connected services unavailable; disconnect does not delete their files. Grant IDs are stable for one grant and never reused for a new authorization. Mounts belong to the selected Profile; `--profile <id>` scopes `files` commands without switching. Existing grants appear as unassigned until `files assign <id>` or explicit assignment in Profile → Files. No Files service attachment is required. Mounted services follow the grant's Profile. Older builds do not enforce ownership and can discard ownership fields on writes; downgrade requires review.
 
 ## Exercise live services through a Host
 
 ```sh
-ox [--host <ws-url>] host services [--json] [--timeout 30000]
-ox [--host <ws-url>] host service invoke <domain>:<action> --args '<json>' [--session '<descriptor>' | --session-file <path|->] [--page-url <https-url>] [--approve] [--timeout 30000]
-ox [--host <ws-url>] host service eval <domain> --script '<javascript>' [--timeout 30000]
-ox [--host <ws-url>] host service reload <domain> [--timeout 30000]
-ox [--host <ws-url>] host service refresh-auth <domain> [--timeout 30000]
-ox [--host <ws-url>] host service sync [--timeout 60000]
+ox [--host <ws-url>] service list [--json] [--timeout 30000]
+ox [--host <ws-url>] service invoke <domain>:<action> --args '<json>' [--session '<descriptor>' | --session-file <path|->] [--page-url <https-url>] [--approve] [--timeout 30000]
+ox [--host <ws-url>] service eval <domain> --script '<javascript>' [--timeout 30000]
+ox [--host <ws-url>] service reload <domain> [--timeout 30000]
+ox [--host <ws-url>] service refresh-auth <domain> [--timeout 30000]
+ox [--host <ws-url>] service sync [--timeout 60000]
 ```
 
 Opening or attaching a service does not check access or request setup. Invoke the service type's standard actions through `ox.service.invoke`: web listSessions/login, API credentialStatus/configureCredentials, MCP connectionStatus/authorize, and iOS permissionStatus/requestPermission. These actions accept empty input; web target routing uses top-level pageUrl or session. Full standard contracts are supplied upfront. `ox.service.inspect` returns standardActions availability, metadata, and complete non-standard contracts in pages of ten; follow nextCursor only when needed. API configuration is not server verification; MCP connectivity is not tool authorization; device permission is not account access. Ask/Block fail without discovery, and errors never establish absence. Website completion only acknowledges interaction. Ordinary website invocations without `--session` or `--session-file` discover fresh sessions under normal Action policies and use the first returned descriptor, including when `--page-url` is provided. Explicit descriptors take precedence, are revalidated, and fail rather than switching accounts if stale. Discover and pass a descriptor for a specific account/tenant or account-stable consequential work; do not preflight every action. No sessions leaves public actions public and protected actions authentication-required. `--page-url` independently selects the initial navigation target within the selected account/context and also routes initial default discovery. It can combine with `--session` or `--session-file`. Both destinations must remain within the service domain, and fresh target-page discovery must confirm the selected account/tenant. Website interaction requires the conversation VM; direct Host invocation does not bypass it. Existing saved signIn and access-check policies remain authoritative for the corresponding Host setup/status actions.
 
 Treat `invoke` as a real action that may read authenticated data or mutate
 external state. Supply `--approve` only when the user's request authorizes the
-effect. Treat `host service eval` as arbitrary code on a Host-managed service page
+effect. Treat `service eval` as arbitrary code on a Host-managed service page
 and keep it narrowly scoped.
 
 Native iOS actions also require their service to be attached to the selected
@@ -205,13 +206,13 @@ implementation from the Client.
 ## Diagnose live connection failures
 
 1. Confirm the Host is running.
-2. Run `ox vm inspect` or `ox host services` as the smallest probe.
+2. Run `ox vm inspect` or `ox service list` as the smallest probe.
 3. Check `--host`, `OX_HOST_ENDPOINT`, then the compatibility
    `OX_DEBUG_ENDPOINT`.
 4. Run `ox host logs --level warning` before widening to device logs.
 
 A dispatcher-unavailable error does not establish a broken service implementation.
-Inspect `host services` navigation state and `Service.navigation` logs first; a
+Inspect `service list` navigation state and `Service.navigation` logs first; a
 terminated web process can leave a resident page unavailable. Verify recovery with
 a new read-only invocation, never by automatically replaying an interrupted write.
 Use `ox.repository.conflicts` to distinguish Local overrides from Built-in sources.
