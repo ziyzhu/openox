@@ -97,8 +97,10 @@ nonisolated enum ServiceImageLoader {
         let theme = if icon.theme == preferredTheme { 3 } else if icon.theme == nil { 2 } else { 1 }
         let size = icon.sizes.compactMap { value -> Int? in
             let parts = value.lowercased().split(separator: "x")
-            guard parts.count == 2, let width = Int(parts[0]), let height = Int(parts[1]) else { return nil }
-            return min(width * height, 1_000_000)
+            guard parts.count == 2, let width = Int(parts[0]), let height = Int(parts[1]),
+                  width > 0, height > 0 else { return nil }
+            let (area, overflow) = width.multipliedReportingOverflow(by: height)
+            return overflow ? 1_000_000 : min(area, 1_000_000)
         }.max() ?? 0
         return theme * 1_000_001 + size
     }

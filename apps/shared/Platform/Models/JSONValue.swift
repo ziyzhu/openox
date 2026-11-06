@@ -41,7 +41,7 @@ nonisolated public indirect enum JSONValue: Codable, Equatable, Sendable {
     public var intValue: Int? {
         switch self {
         case .int(let i): return i
-        case .double(let d): return Int(d)
+        case .double(let d): return Int(exactly: d.rounded(.towardZero))
         default: return nil
         }
     }

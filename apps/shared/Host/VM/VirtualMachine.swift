@@ -431,7 +431,12 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
                 Log.agent.debug("virtual machine console.\(level) with no active run — leaked async?")
                 return
             }
-            let count = Int(args.objectForKeyedSubscript("length")?.toInt32() ?? 0)
+            guard args.isArray,
+                  let length = args.objectForKeyedSubscript("length")?.toDouble(),
+                  let count = Int(exactly: length), count >= 0, count <= FileLimits.fileBytes else {
+                handle.settle(.failure(VirtualMachine.Error.js("Invalid JavaScript console arguments or argument count exceeds the output safety limit.", logs: handle.snapshotLogs())))
+                return
+            }
             let parts = (0..<count).map { i -> String in
                 let v = args.atIndex(i) ?? JSValue(undefinedIn: args.context)!
                 return jsValueToLogString(v)
