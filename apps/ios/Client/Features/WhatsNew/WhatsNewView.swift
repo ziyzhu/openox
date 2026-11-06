@@ -29,7 +29,9 @@ struct WhatsNewView: View {
                             .frame(width: 6, height: 6)
                     }
                 }
-                .padding(.top, Theme.Spacing.md)
+                .padding(Theme.Spacing.sm)
+                .background(Theme.Colors.surface, in: Capsule())
+                .padding(.top, Theme.Spacing.xs)
                 .accessibilityHidden(true)
             }
         }
