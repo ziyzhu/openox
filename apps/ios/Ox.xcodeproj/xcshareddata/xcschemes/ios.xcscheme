@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "F623D4E1D553720072C72D71"
-               BuildableName = "ios.app"
+               BuildableName = "Ox.app"
                BlueprintName = "ios"
                ReferencedContainer = "container:Ox.xcodeproj">
             </BuildableReference>
@@ -33,7 +33,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "F623D4E1D553720072C72D71"
-            BuildableName = "ios.app"
+            BuildableName = "Ox.app"
             BlueprintName = "ios"
             ReferencedContainer = "container:Ox.xcodeproj">
          </BuildableReference>
@@ -58,7 +58,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "F623D4E1D553720072C72D71"
-            BuildableName = "ios.app"
+            BuildableName = "Ox.app"
             BlueprintName = "ios"
             ReferencedContainer = "container:Ox.xcodeproj">
          </BuildableReference>
@@ -84,7 +84,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "F623D4E1D553720072C72D71"
-            BuildableName = "ios.app"
+            BuildableName = "Ox.app"
             BlueprintName = "ios"
             ReferencedContainer = "container:Ox.xcodeproj">
          </BuildableReference>

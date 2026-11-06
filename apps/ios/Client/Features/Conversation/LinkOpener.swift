@@ -127,6 +127,7 @@ struct ServiceBrowserContent: View {
 
 struct ConversationBrowserCard: View {
     let session: ServiceBrowserSession
+    let inlinePageAnchorID: UUID
     let close: () -> Void
     @State private var presentation: Presentation = .inline
 
@@ -143,7 +144,7 @@ struct ConversationBrowserCard: View {
             title: String(localized: "Browser"),
             subtitle: session.page.url?.host ?? session.serviceDomain,
             mount: nil,
-            inlinePageAnchorID: nil,
+            inlinePageAnchorID: presentation == .inline ? inlinePageAnchorID : nil,
             browserSession: session,
             isPresented: presentation != .inline,
             placeholder: .invitation(String(localized: "View live page")),
@@ -174,9 +175,6 @@ struct ConversationBrowserCard: View {
                         }
                 }
             }
-        }
-        .onDisappear {
-            if presentation == .inline { session.stop() }
         }
     }
 }

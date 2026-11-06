@@ -59,6 +59,7 @@ struct ConversationPage: View {
 
     @State var composer = ConversationComposerModel()
     @State private var manualBrowserSession: ServiceBrowserSession?
+    @State private var manualBrowserBeforeSubmissionID: UUID?
     @State private var speechInput = ConversationSpeechInput()
     @Environment(\.scenePhase) private var scenePhase
     @State private var latestSubmissionID: UUID?
@@ -431,6 +432,7 @@ struct ConversationPage: View {
             speechInput.cancel(reason: "conversationChanged")
             manualBrowserSession?.stop()
             manualBrowserSession = nil
+            manualBrowserBeforeSubmissionID = nil
             cancelEditing(reason: "conversationChanged", keepFocus: false)
         }
         .onChange(of: editedBlockID) { _, blockID in
@@ -458,7 +460,10 @@ struct ConversationPage: View {
         }
         .onDisappear {
             speechInput.cancel(reason: "pageDisappear")
-            if !isCurrentConversation() { composer.discardDraft() }
+            if !isCurrentConversation() {
+                composer.discardDraft()
+                manualBrowserSession?.stop()
+            }
             ClientAutomation.setEditDraft = nil
         }
         let serviceObservedTranscript = observedTranscript
@@ -665,6 +670,7 @@ struct ConversationPage: View {
         Log.ui.info("ConversationPage.openWebsite conversation=\(conversation.id) host=\(url.host ?? "?") disposition=inline")
         prepareComposerSubmission()
         composer.discardDraft()
+        manualBrowserBeforeSubmissionID = nil
         if let manualBrowserSession {
             _ = manualBrowserSession.navigate(to: url)
         } else {
@@ -779,6 +785,30 @@ struct ConversationPage: View {
 
     private var anchoredTurnID: TurnID? {
         submissionAnchor?.id
+    }
+
+    private var manualBrowserAnchorID: UUID? {
+        manualBrowserBeforeSubmissionID.flatMap { conversation.anchor(forSubmissionID: $0)?.id }
+    }
+
+    @ViewBuilder
+    private var manualBrowserCard: some View {
+        if let manualBrowserSession {
+            ConversationBrowserCard(session: manualBrowserSession, inlinePageAnchorID: conversation.id) {
+                manualBrowserSession.stop()
+                self.manualBrowserSession = nil
+                manualBrowserBeforeSubmissionID = nil
+            }
+            .padding(.top, ConversationTranscriptMetrics.blockSpacing)
+            .onGeometryChange(for: CGFloat?.self) { geometry in
+                guard sendHandoff == .idle,
+                      manualBrowserAnchorID == nil || manualBrowserAnchorID == anchoredTurnID else { return nil }
+                return geometry.frame(in: .global).maxY
+            } action: {
+                guard let bottom = $0 else { return }
+                scroller.transcriptTail = bottom
+            }
+        }
     }
 
     private var anchoredQueuedMessage: Conversation.QueuedMessage? {
@@ -942,7 +972,7 @@ struct ConversationPage: View {
         identified: Bool = true,
         recordsTail: Bool = false
     ) -> some View {
-        let measuresTail = recordsTail && sendHandoff == .idle
+        let measuresTail = recordsTail && sendHandoff == .idle && !(manualBrowserSession != nil && manualBrowserAnchorID == nil)
         let row = conversationBlockHost(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
             .padding(.top, block.spacingBefore)
             .onGeometryChange(for: CGFloat?.self) {
@@ -952,6 +982,9 @@ struct ConversationPage: View {
                 scroller.transcriptTail = bottom
             }
 
+        if identified, block.id == manualBrowserAnchorID {
+            manualBrowserCard
+        }
         if identified {
             row.id(block.id)
         } else {
@@ -1008,6 +1041,9 @@ struct ConversationPage: View {
 
     @ViewBuilder
     private func queuedRow(_ queued: Conversation.QueuedMessage, identified: Bool = true) -> some View {
+        if identified, queued.id == manualBrowserAnchorID {
+            manualBrowserCard
+        }
         let row = QueuedBubble(
             message: queued,
             onOpenAttachment: { file, sourceID in openAttachment(file, sourceID: sourceID) },
@@ -1063,6 +1099,19 @@ struct ConversationPage: View {
                     }),
                     servicePageOwnerIDs: blocks.map(\.id)
                 )
+                if let manualBrowserSession, let anchor = anchors[conversation.id] {
+                    GeometryReader { geometry in
+                        let frame = geometry[anchor]
+                        ServiceBrowserContent(session: manualBrowserSession, showsBrowserBar: false)
+                            .frame(width: frame.width, height: frame.height)
+                            .clipShape(UnevenRoundedRectangle(
+                                bottomLeadingRadius: Theme.Radius.lg,
+                                bottomTrailingRadius: Theme.Radius.lg
+                            ))
+                            .position(x: frame.midX, y: frame.midY)
+                    }
+                    .clipped()
+                }
             }
             .contentMargins(.bottom, dockClearance, for: .scrollContent)
             .onScrollGeometryChange(for: ConversationViewportController.Frame?.self) { geo in
@@ -1199,6 +1248,9 @@ struct ConversationPage: View {
                     turnEndingRow
                     queuedRows
                 }
+                if hasAnchor, manualBrowserAnchorID == anchoredTurnID {
+                    manualBrowserCard
+                }
             }
             .scrollTargetLayout()
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { old, new in
@@ -1262,12 +1314,8 @@ struct ConversationPage: View {
                     await scrollToTurn(submissionID)
                 }
             }
-            if let manualBrowserSession {
-                ConversationBrowserCard(session: manualBrowserSession) {
-                    manualBrowserSession.stop()
-                    self.manualBrowserSession = nil
-                }
-                .padding(.top, ConversationTranscriptMetrics.blockSpacing)
+            if manualBrowserAnchorID == nil {
+                manualBrowserCard
             }
             Color.clear
                 .frame(height: 1)
@@ -1647,6 +1695,9 @@ struct ConversationPage: View {
             attachments: message.attachments,
             skillInvocation: skillInvocation
         )
+        if manualBrowserSession != nil, manualBrowserAnchorID == nil {
+            manualBrowserBeforeSubmissionID = receipt.id
+        }
         latestSubmissionID = receipt.id
         submissionFrame = .null
         sendFlightBubble = nil
