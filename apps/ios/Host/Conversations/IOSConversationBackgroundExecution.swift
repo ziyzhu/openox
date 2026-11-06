@@ -38,7 +38,7 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
         ) { [weak self] task in
             MainActor.assumeIsolated {
                 guard let self else {
-                    task.setTaskCompleted(success: false)
+                    task.setTaskCompleted(success: true)
                     Log.session.info("ConversationBackground.receive detached task=\(identifier)")
                     return
                 }
@@ -91,10 +91,10 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
             pulse.cancel()
             if case .completed = outcome {
                 task.updateTitle(String(localized: "Ox is done"), subtitle: String(localized: "Your response is ready"))
-                task.progress.totalUnitCount = completedUnits + 1
-                task.progress.completedUnitCount = completedUnits + 1
             }
-            task.setTaskCompleted(success: outcome.succeeded)
+            task.progress.totalUnitCount = completedUnits + 1
+            task.progress.completedUnitCount = completedUnits + 1
+            task.setTaskCompleted(success: true)
         } else {
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
         }
@@ -104,12 +104,11 @@ final class IOSConversationBackgroundExecution: ConversationBackgroundExecution 
 
     private func receive(_ rawTask: BGTask) {
         guard let task = rawTask as? BGContinuedProcessingTask else {
-            rawTask.setTaskCompleted(success: false)
+            rawTask.setTaskCompleted(success: true)
             return
         }
         guard case .submitted(let submittedAt) = state else {
-            let success = if case .finished(let outcome) = state { outcome.succeeded } else { false }
-            task.setTaskCompleted(success: success)
+            task.setTaskCompleted(success: true)
             return
         }
         let pulse = Task { @MainActor [weak self] in
