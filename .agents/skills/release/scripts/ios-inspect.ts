@@ -82,6 +82,28 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
+const whatsNewSource = "apps/ios/Client/Features/WhatsNew/WhatsNewReleases.swift";
+const catalogSource = "apps/shared/Resources/Localizations/Localizable.xcstrings";
+
+async function inAppWhatsNew(): Promise<{ version: string; items: string[] }[]> {
+  const source = await Bun.file(`${ROOT}/${whatsNewSource}`).text();
+  return [...source.matchAll(/WhatsNewRelease\(version: "([\d.]+)", items: \[([\s\S]*?)\]\)/g)].map(match => ({
+    version: match[1]!,
+    items: [...match[2]!.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map(item => JSON.parse(`"${item[1]}"`) as string),
+  }));
+}
+
+function releaseNoteItems(text: string): string[] {
+  const lines = text.split("\n").map(line => line.trim()).filter(Boolean);
+  return lines.every(line => /^[•-]\s/.test(line)) ? lines.map(line => line.replace(/^[•-]\s+/, "")) : [lines.join(" ")];
+}
+
+function sameNotes(remote: string, items: string[], separator: string): boolean {
+  const remoteItems = releaseNoteItems(remote);
+  return remoteItems.length === items.length && remoteItems.every((item, index) => item === items[index])
+    || remoteItems.length === 1 && remoteItems[0] === items.join(separator);
+}
+
 try {
   const branch = await git("branch", "--show-current");
   const commit = await git("rev-parse", "HEAD");
@@ -100,6 +122,21 @@ try {
   if (!sourceVersions.length || !generatedVersions.length
     || [...sourceVersions, ...generatedVersions].some(value => value !== version)) {
     blockers.push("All project.yml and generated project MARKETING_VERSION settings must match the intended version.");
+  }
+
+  const releases = await inAppWhatsNew();
+  const catalog = (await Bun.file(`${ROOT}/${catalogSource}`).json()).strings as Record<string, any>;
+  const entry = releases.find(release => release.version === version);
+  const translations = entry?.items.map(item => catalog[item]?.localizations?.["zh-Hans"]?.stringUnit?.value as string | undefined) ?? [];
+  report.inAppWhatsNew = { source: whatsNewSource, newest: releases[0]?.version ?? null, entry: entry ?? null, zhHans: translations };
+  if (!entry) {
+    blockers.push(`Add ${version} to the top of WhatsNew.releases in ${whatsNewSource} before archiving.`);
+  } else {
+    if (releases[0] !== entry) blockers.push(`${version} must be the first entry in WhatsNew.releases.`);
+    if (!entry.items.length) blockers.push(`In-app What's New for ${version} has no items.`);
+    entry.items.forEach((item, index) => {
+      if (!translations[index]?.trim()) blockers.push(`Add a zh-Hans translation for in-app What's New item "${item}" in ${catalogSource}.`);
+    });
   }
 
   if (values.since) {
@@ -158,8 +195,16 @@ try {
       remote.media = media;
       for (const localization of localizations.data) {
         const locale = String(localization.attributes.locale);
-        if (selected && released && !String(localization.attributes.whatsNew ?? "").trim()) {
+        const notes = String(localization.attributes.whatsNew ?? "").trim();
+        if (selected && released && !notes) {
           blockers.push(`What's New is empty for ${locale}.`);
+        }
+        if (selected && notes && entry) {
+          const expected = locale.startsWith("en") ? entry.items : locale === "zh-Hans" ? translations.map(item => item ?? "") : null;
+          if (!expected) warnings.push(`What's New for ${locale} is not compared with the in-app entry.`);
+          else if (!sameNotes(notes, expected, locale.startsWith("en") ? " " : "")) {
+            blockers.push(`What's New for ${locale} differs from the in-app ${version} entry; keep App Store and in-app notes identical.`);
+          }
         }
         if (locale.startsWith("en") && localization.attributes.promotionalText !== "A self-evolving agent that runs on your phone") {
           blockers.push(`Promotional text differs from approved copy in ${locale}; apply the approved English text during release preparation and verify readback.`);
