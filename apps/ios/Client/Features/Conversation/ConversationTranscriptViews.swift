@@ -321,6 +321,7 @@ private struct ServiceInspectorRow: View {
             subtitle: subtitle,
             mount: nil,
             inlinePageAnchorID: inlinePage == nil ? nil : rowID,
+            isCollapsed: !isInline,
             isPresented: false,
             placeholder: placeholder,
             activate: activatePage,

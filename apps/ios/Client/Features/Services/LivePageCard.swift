@@ -22,6 +22,7 @@ struct LivePageCard: View {
     let mount: WebPageMount?
     let inlinePageAnchorID: UUID?
     var browserSession: ServiceBrowserSession? = nil
+    var isCollapsed = false
     let isPresented: Bool
     let placeholder: Placeholder
     let activate: (() -> Void)?
@@ -34,8 +35,10 @@ struct LivePageCard: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
-            content
+            if !isCollapsed {
+                Divider()
+                content
+            }
         }
         .background(Theme.Colors.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
