@@ -19,23 +19,23 @@ struct OnboardingView: View {
                         .font(Theme.Fonts.display)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(Theme.Colors.onSurface)
-                        .padding(.top, Theme.Spacing.lg)
+                        .padding(.top, Theme.Spacing.xl)
 
                     VStack(spacing: Theme.Spacing.xxl) {
                         OnboardingDisclosureRow(
                             symbol: "globe",
-                            title: "Connect anything",
-                            description: "Ox works across AI assistants, apps, and websites to get things done for you."
+                            title: "Connect to anything",
+                            description: "By turning any website into tools, using your device’s capabilities, and mounting directories."
                         )
                         OnboardingDisclosureRow(
                             symbol: "iphone",
-                            title: "Local first",
-                            description: "Ox runs on your device, keeping your conversations, credentials, and memory stored locally."
+                            title: "Stay yours",
+                            description: "By running on your device and keeping conversation data in a portable folder."
                         )
                         OnboardingDisclosureRow(
-                            symbol: "person",
-                            title: "Yours",
-                            description: "Open source and malleable, Ox evolves with you and uses the models you choose."
+                            symbol: "cube",
+                            title: "Pick any model",
+                            description: "Without changing how you use Ox."
                         )
                     }
                     .padding(.top, Theme.Spacing.xxl)

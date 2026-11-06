@@ -5104,6 +5104,72 @@
         }
       }
     },
+    "Connect to anything" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接一切"
+          }
+        }
+      }
+    },
+    "By turning any website into tools, using your device’s capabilities, and mounting directories." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将任意网站变成工具，调用设备能力，并挂载目录。"
+          }
+        }
+      }
+    },
+    "Stay yours" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终属于你"
+          }
+        }
+      }
+    },
+    "By running on your device and keeping conversation data in a portable folder." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在你的设备上运行，并将对话数据保存在可随身携带的文件夹中。"
+          }
+        }
+      }
+    },
+    "Pick any model" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任选模型"
+          }
+        }
+      }
+    },
+    "Without changing how you use Ox." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无需改变你使用 Ox 的方式。"
+          }
+        }
+      }
+    },
     "Connect anything" : {
       "extractionState" : "manual",
       "localizations" : {
