@@ -34,6 +34,28 @@ Distinguish service-specific defects from reusable authoring-loop issues. Prefer
 
 Use the current session as the notification destination unless the user specifies a developer channel or issue tracker. Send or file external notifications only within that authorization. Keep unresolved findings in the final handoff with their impact and next step; do not silently discard them because the service eventually succeeded.
 
+## Copy Local source to the desktop
+
+Use this workflow to copy a device's Local repository for inspection, backup, or requested promotion. It is a one-way snapshot, not a Git clone, sync, or authorization to promote services. Preserve the device's files and keep exports in a new private directory outside the checkout unless the user specifies another destination; never overwrite existing desktop files without confirmation.
+
+Target the source Host explicitly, not the default simulator. For the user's iPhone, use `ws://iphone-17-pro-max.taile57b1f.ts.net:9876`, keep Tailscale connected, and keep Ox open. For a simulator, use its assigned endpoint. Select a loaded conversation in the intended Profile with `--conversation <full-id>`; follow the `ox-cli` skill if it needs hydration.
+
+```sh
+ox --host <ws-url> host repository list --json
+ox --host <ws-url> --conversation <full-id> vm help ox.fs.list
+ox --host <ws-url> --conversation <full-id> vm help ox.fs.read
+ox --host <ws-url> --conversation <full-id> vm call ox.fs.list --args '{"purpose":"Export Local repository","path":"repositories/local/"}' --json
+ox --host <ws-url> --conversation <full-id> vm call ox.fs.read --args '{"purpose":"Export repository metadata","path":"repositories/local/repository.json"}' --json
+```
+
+1. Confirm Local is available and choose the whole repository or the requested service subtree. Include `repository.json` for a repository snapshot and preserve all relative paths, including service resources and skills. Do not reconstruct source from conversation text or logs.
+2. Recursively list each directory with `ox.fs.list`. Follow every `nextCursor` with the same path and options until complete; inspect `truncated` rather than assuming one page contains everything.
+3. Read each text file with `ox.fs.read`. Follow `nextOffset` until `truncated` is false and write the decoded `text` to the matching desktop path, not the CLI JSON envelope. Preserve chunk boundaries exactly; do not add or remove newlines. Reject paths that escape the export directory.
+4. Treat non-null `unsupported`, unreadable files, diagnostics, or truncation without continuation as incomplete. This text reader does not export binary bytes, and PDF reads extract text rather than the original file. Report those files and use a separately verified byte-preserving export route when needed; never silently omit them or claim a complete repository copy.
+5. Avoid concurrent Local edits during export. Compare directory listings, file sizes, and modification times before and after; retry changed files and report that the API does not provide an atomic snapshot. Report exported paths, file count, and any incomplete files. For a complete repository, run `ox --repository <desktop-export-path> repository validate`; validation does not replace live service verification.
+
+Copying out does not change source selection, reload attachments, or require a Files picker. `ox repository` operates on desktop paths or repository URLs; it cannot directly open an iPhone's virtual path. `ox.fs.copy` is not a device-to-desktop transfer command. Keep service repairs authored through Ox rather than editing the exported copy into a second implementation.
+
 ## Deliver the service
 
 For Local delivery, finish the built-in `evolve` verification workflow, then report the capability delivered, checks performed, limitations, and authoring-loop findings or fixes.
