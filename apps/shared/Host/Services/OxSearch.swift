@@ -80,8 +80,8 @@ nonisolated enum OxSearch {
                             "type": .string("array"),
                             "items": .object([
                                 "type": .string("object"),
-                                "properties": .object(Dictionary(uniqueKeysWithValues: ["service", "code", "message"].map { ($0, JSONValue.object(["type": .string("string")])) })),
-                                "required": .array(["service", "code", "message"].map(JSONValue.string)),
+                                "properties": .object(Dictionary(uniqueKeysWithValues: ["service", "code", "message", "recovery"].map { ($0, JSONValue.object(["type": .string("string")])) })),
+                                "required": .array(["service", "code", "message", "recovery"].map(JSONValue.string)),
                                 "additionalProperties": .bool(false),
                             ]),
                         ]),

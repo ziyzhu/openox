@@ -52,7 +52,7 @@ extension Conversation {
                 let service = "web:\(domain)"
                 switch outcome {
                 case .success(let page): results.append(page)
-                case .failure(let failure): errors.append(.object(["service": .string(service), "code": .string(failure.code), "message": .string(failure.message)]))
+                case .failure(let failure): errors.append(.object(["service": .string(service), "code": .string(failure.code), "message": .string(failure.message), "recovery": .string(failure.recovery)]))
                 case nil: break
                 }
             }
@@ -61,7 +61,11 @@ extension Conversation {
                     guard let fields = error.objectValue else { return nil }
                     return "\(fields["service"]?.stringValue ?? ""): \(fields["code"]?.stringValue ?? ""): \(fields["message"]?.stringValue ?? "")"
                 }.joined(separator: "; ")
-                throw OxFunctionError(code: "all_searches_failed", message: message, recovery: "For missing services or standard search actions, use Evolve to build or extend the requested domain, verify it, then retry. Inspect other failures; do not substitute domains or report that no matches exist.")
+                let recovery = errors.compactMap { error -> String? in
+                    guard let fields = error.objectValue else { return nil }
+                    return "\(fields["service"]?.stringValue ?? ""): \(fields["recovery"]?.stringValue ?? "")"
+                }.joined(separator: "; ")
+                throw OxFunctionError(code: "all_searches_failed", message: message, recovery: "\(recovery) Do not substitute domains or report that no matches exist.")
             }
             return .object(["query": .string(query), "results": .array(results), "errors": .array(errors),
                             "mergedResults": .array(OxSearch.mergeSearchResults(results))])

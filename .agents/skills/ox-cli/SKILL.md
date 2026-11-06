@@ -210,6 +210,12 @@ implementation from the Client.
    `OX_DEBUG_ENDPOINT`.
 4. Run `ox host logs --level warning` before widening to device logs.
 
+A dispatcher-unavailable error does not establish a broken service implementation.
+Inspect `host services` navigation state and `Service.navigation` logs first; a
+terminated web process can leave a resident page unavailable. Verify recovery with
+a new read-only invocation, never by automatically replaying an interrupted write.
+Use `ox.repository.conflicts` to distinguish Local overrides from Built-in sources.
+
 Report the exact command, Host endpoint selection method, target resource, and
 relevant failure text when blocked. Never print credentials or repository URLs
 containing credentials.

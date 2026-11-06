@@ -159,6 +159,10 @@ nonisolated enum ServiceImageLoader {
             }
             return data
         } catch {
+            if error is CancellationError || (error as? URLError)?.code == .cancelled {
+                Log.service.info("Service.icon cancelled url=\(LogPrivacy.url(url.absoluteString))")
+                return nil
+            }
             let reason = (error as? Failure).map { String(describing: $0) } ?? error.localizedDescription
             Log.service.error("Service.icon failed url=\(LogPrivacy.url(url.absoluteString)) reason=\(LogPrivacy.text(reason))")
             return nil

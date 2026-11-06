@@ -47,7 +47,9 @@ final class ServiceActionScheduler {
         }
 
         func needsNavigation(on page: Service.ServiceWebPage) -> Bool {
-            destination.map { $0 != page.executionURL } ?? false
+            guard let destination else { return false }
+            if case .unavailable = page.navigationPhase { return true }
+            return destination != page.executionURL
         }
 
         func blocks(_ page: Service.ServiceWebPage) -> Bool {
@@ -129,16 +131,16 @@ final class ServiceActionScheduler {
         name: String? = nil,
         operation: @escaping @MainActor @Sendable (Service.ServiceWebPage) async throws -> Value
     ) async throws -> Value {
-        guard action.service.owns(page),
-              page.isReady || kind != .invocation || destination.map({ $0 != page.executionURL }) == true else {
-            throw Service.EvalError.notReady
-        }
         let scheduled = ScheduledAction(
             name: name ?? "\(action.service.domain):\(action.definition.id)",
             blocking: action.blocking,
             destination: destination,
             kind: kind
         )
+        guard action.service.owns(page),
+              page.isReady || kind != .invocation || scheduled.needsNavigation(on: page) else {
+            throw Service.EvalError.notReady
+        }
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 guard !Task.isCancelled else {
@@ -279,6 +281,7 @@ final class ServiceActionScheduler {
                 return
             }
             if let destination = action.destination, action.needsNavigation(on: queue.page) {
+                Log.service.info("ServiceActionScheduler navigation id=\(action.id.uuidString.prefix(8)) name=\(action.name) page=\(queue.page.logLabel) phase=\(queue.page.navigationPhase.logLabel) destinationChanged=\(destination != queue.page.executionURL)")
                 guard await queue.service.navigate(destination, in: queue.page) != nil else {
                     action.fail?(Service.EvalError.notReady)
                     self.finish(action, in: queue)
