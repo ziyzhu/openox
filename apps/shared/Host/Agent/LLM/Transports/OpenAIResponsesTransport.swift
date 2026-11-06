@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import Synchronization
 
 public struct OpenAIResponsesTransport: ProviderClient {
     public let id: String
@@ -88,7 +89,14 @@ public struct OpenAIResponsesTransport: ProviderClient {
                 try await withTaskCancellationHandler {
                     try Task.checkCancellation()
                     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                        let pending = Mutex<CheckedContinuation<Void, Error>?>(continuation)
                         lease.task.sendPing { error in
+                            let continuation = pending.withLock { pending in
+                                let continuation = pending
+                                pending = nil
+                                return continuation
+                            }
+                            guard let continuation else { return }
                             if let error { continuation.resume(throwing: error) }
                             else { continuation.resume() }
                         }
