@@ -105,7 +105,7 @@ struct OnboardingDisclosureRow: View {
     }
 }
 
-struct OnboardingCellularField: View {
+private struct OnboardingCellularField: View {
     let isActive: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

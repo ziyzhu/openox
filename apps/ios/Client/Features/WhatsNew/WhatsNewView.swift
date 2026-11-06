@@ -15,7 +15,7 @@ struct WhatsNewView: View {
     var body: some View {
         TabView(selection: $selection) {
             ForEach(releases) { release in
-                WhatsNewPage(release: release, isActive: selection == release.id, onDone: onDone)
+                WhatsNewPage(release: release, onDone: onDone)
                     .tag(release.id)
             }
         }
@@ -46,18 +46,18 @@ struct WhatsNewView: View {
 
 private struct WhatsNewPage: View {
     let release: WhatsNewRelease
-    let isActive: Bool
     let onDone: () -> Void
-
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView(.vertical) {
                 VStack(spacing: 0) {
-                    OnboardingCellularField(isActive: isActive)
-                        .frame(height: dynamicTypeSize.isAccessibilitySize ? 80 : 112)
-                        .padding(.top, Theme.Spacing.lg)
+                    Image("OxIcon")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 64, height: 64)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                        .padding(.top, Theme.Spacing.xl)
                         .accessibilityHidden(true)
 
                     Text("What's New")
