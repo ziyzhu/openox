@@ -504,6 +504,7 @@ struct RootView: View {
     @State private var startup = Startup.idle
     @State private var activeProfileMonitor = ActiveProfileMonitor()
     @State private var childNavigationActive = false
+    @State private var conversationHistoryRequestID = UUID()
     @State private var sharedNoteImporting = false
     @State private var sharedNoteImportError: String?
     @State private var sharedNoteComposer: (conversation: ObjectIdentifier, composer: ConversationComposerModel)?
@@ -827,6 +828,7 @@ struct RootView: View {
                !compactConversationTransition.isClosing,
                pendingConversationPresentationId == nil || pendingConversationPresentationId == conversation.id {
                 ConversationPage(conversation: conversation,
+                         historyOpenRequestID: conversationHistoryRequestID,
                          isCurrentConversation: { conversations.current === conversation },
                          composerFocusRequestID: composerFocusRequest?.conversationIdentity == ObjectIdentifier(conversation)
                              ? composerFocusRequest?.id
@@ -957,6 +959,7 @@ struct RootView: View {
         compactSidebarCurrentId = id
         guard conversations.currentId != id else {
             compactConversationTransition = .idle
+            openConversation(id)
             setSidebar(false)
             return
         }
@@ -984,7 +987,10 @@ struct RootView: View {
     }
 
     private func openConversation(_ id: UUID) {
-        guard conversations.currentId != id else { return }
+        guard conversations.currentId != id else {
+            conversationHistoryRequestID = UUID()
+            return
+        }
         pendingConversationPresentationId = id
         conversations.open(id)
     }

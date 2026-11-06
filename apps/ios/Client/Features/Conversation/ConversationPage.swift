@@ -36,6 +36,7 @@ struct ConversationPage: View {
     }
 
     let conversation: Conversation
+    let historyOpenRequestID: UUID
     let isCurrentConversation: () -> Bool
     let composerFocusRequestID: UUID?
     let onComposerFocusRequestHandled: (UUID) -> Void
@@ -1065,6 +1066,7 @@ struct ConversationPage: View {
     }
 
     @State private var scroller = ConversationViewportController()
+    @State private var hasOpenedTranscript = false
 
     private func transcript(
         blocks: [ConversationBlock],
@@ -1203,14 +1205,25 @@ struct ConversationPage: View {
                 )
             }
             .onAppear {
-                latestSubmissionID = nil
-                sendHandoff = .idle
-                transcriptWindow.open(total: totalBlockCount)
-                Log.ui.info("ConversationUX.lifecycle conversation=\(conversation.id) phase=viewportOpening target=bottom range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(totalBlockCount) anchor=\(submissionAnchor?.id.uuidString ?? "none") scale=\(displayScale) dynamicType=\(String(describing: dynamicTypeSize)) reduceMotion=\(reduceMotion) reduceTransparency=\(reduceTransparency)")
-                scroller.openAtBottom(conversationID: "\(conversation.id)", onSettled: onInitialTranscriptPresented)
+                guard !hasOpenedTranscript else { return }
+                openTranscriptAtBottom(total: totalBlockCount)
+            }
+            .onChange(of: historyOpenRequestID) { _, _ in
+                navigationFile = nil
+                navigationSkill = nil
+                openTranscriptAtBottom(total: totalBlockCount)
             }
             .onDisappear { scroller.close() }
         }
+    }
+
+    private func openTranscriptAtBottom(total: Int) {
+        hasOpenedTranscript = true
+        latestSubmissionID = nil
+        sendHandoff = .idle
+        transcriptWindow.open(total: total)
+        Log.ui.info("ConversationUX.lifecycle conversation=\(conversation.id) phase=viewportOpening target=bottom range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(total) anchor=\(submissionAnchor?.id.uuidString ?? "none") scale=\(displayScale) dynamicType=\(String(describing: dynamicTypeSize)) reduceMotion=\(reduceMotion) reduceTransparency=\(reduceTransparency)")
+        scroller.openAtBottom(conversationID: "\(conversation.id)", onSettled: onInitialTranscriptPresented)
     }
 
     private func transcriptRows(
