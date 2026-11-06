@@ -640,6 +640,7 @@ final class Service: NSObject, Identifiable {
             }
             let resolved = Resolved(actions: fetched.actions)
             if self.finishManifestResolution(resolutionID, with: resolved) {
+                self.sourceVersion = fetched.version
                 self.setCapabilityState(.ready, reason: reason)
                 Log.service.info("Service.loadManifest resolved domain=\(self.domain)")
             }

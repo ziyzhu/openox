@@ -1077,7 +1077,10 @@ final class ServiceManager {
         return await Self.decodeMCPDefinitions(files, locale: locale)
     }
 
-    struct Fetched { let actions: String }
+    struct Fetched {
+        let actions: String
+        let version: String
+    }
 
     func fetch(domain: String) async -> Fetched? {
         guard let definition = byDomain[domain]?.definition else { return nil }
@@ -1094,7 +1097,7 @@ final class ServiceManager {
             return nil
         }
         Log.service.info("ServiceManager.fetch ok domain=\(domain) actionsBytes=\(source.actions.utf8.count)")
-        return Fetched(actions: source.actions)
+        return Fetched(actions: source.actions, version: source.version)
     }
 
 }
