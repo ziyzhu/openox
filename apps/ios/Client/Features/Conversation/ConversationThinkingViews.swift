@@ -879,7 +879,9 @@ private enum InvocationFormat {
                let repository = serviceManager.repositories.first(where: { $0.id == parts[1] }) {
                 return [Source(label: repository.name, icon: .repository(repository))]
             }
-            if parts.count >= 2, ["history", "conversations"].contains(parts[0]) {
+            if parts.count == 3,
+               ["history", "chats", "conversations"].contains(parts[0]),
+               ["conversation.json", "turns.jsonl", "metadata", "history"].contains(parts[2]) {
                 let id: UUID? = if let uuid = UUID(uuidString: String(parts[1])) {
                     uuid
                 } else if let number = Int(parts[1]), number >= 0, let profileID = StorageRoot.shared.scope.profileID {
