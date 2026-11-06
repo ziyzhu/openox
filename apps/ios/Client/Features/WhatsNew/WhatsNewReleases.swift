@@ -9,6 +9,13 @@ struct WhatsNewRelease: Identifiable {
 
 enum WhatsNew {
     static let releases: [WhatsNewRelease] = [
+        WhatsNewRelease(version: "1.0.23", items: [
+            "See release highlights after updating and browse past releases in Settings.",
+            "Use more built-in website services, including GitHub, Google Drive, Google Calendar, YouTube, and Tailscale.",
+            "Get combined, ranked web search results with duplicate links removed.",
+            "Open conversation history at the latest messages and keep inline browsing in place as the conversation continues.",
+            "Improved connection stability, website verification handoffs, and handling of malformed responses."
+        ]),
         WhatsNewRelease(version: "1.0.22", items: [
             "Open a web address from the message composer in an inline browser, even before setting up a model provider.",
             "Retry a failed reply in the same conversation, keeping its history and completed actions.",

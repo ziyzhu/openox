@@ -48,7 +48,7 @@ try {
   const version = (await run([executable, "--version"], resolve(import.meta.dir, "../.."))).trim();
   if (version !== packageMetadata.version) throw new Error(`installed ox reported version ${JSON.stringify(version)}`);
   const help = await run([executable, "--help"], resolve(import.meta.dir, "../.."));
-  if (!help.includes("Use Ox Profiles, repositories, Hosts, conversations, and VMs")) throw new Error("installed ox help was incomplete");
+  if (!help.includes("Use Ox Profiles, repositories, files, services, Hosts, conversations, and VMs")) throw new Error("installed ox help was incomplete");
   if (!help.includes("conversation watch")) throw new Error("installed ox help omitted conversation commands");
   if (!help.includes("profile skills")) throw new Error("installed ox help omitted Profile commands");
   if (!help.includes("host logs")) throw new Error("installed ox help omitted Host commands");

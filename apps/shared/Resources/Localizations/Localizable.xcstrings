@@ -1,6 +1,11 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "See release highlights after updating and browse past releases in Settings." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新后查看版本亮点，并在设置中浏览历次更新。" } } } },
+    "Use more built-in website services, including GitHub, Google Drive, Google Calendar, YouTube, and Tailscale." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新增更多内置网站服务，包括 GitHub、Google 云端硬盘、Google 日历、YouTube 和 Tailscale。" } } } },
+    "Get combined, ranked web search results with duplicate links removed." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "网页搜索结果现在会合并排序，并去除重复链接。" } } } },
+    "Open conversation history at the latest messages and keep inline browsing in place as the conversation continues." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开历史对话时直接显示最新消息，继续对话时内嵌浏览器保持原位。" } } } },
+    "Improved connection stability, website verification handoffs, and handling of malformed responses." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "改进连接稳定性、网站验证交接，以及对格式异常响应的处理。" } } } },
     "Failed" : { "comment" : "Card shown after a conversation reply that ended with an error.", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "失败" } } } },
     "Retry" : { "comment" : "Button that tries a failed action again.", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重试" } } } },
     "Refresh" : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新" } } } },
