@@ -46,7 +46,12 @@ describe.skipIf(process.platform !== "darwin")("native shared search response co
     const result = run({ pages });
     expect(result.issues).toEqual([]);
     expect(result.merged).toHaveLength(1);
-    expect(result.merged[0].title).toBe("A");
+    expect(result.merged[0].sources[0]).toEqual({ service: "web:a", rank: 1 });
+    expect(Object.keys(result.merged[0]).sort()).toEqual(["score", "sources"]);
+    for (const source of result.merged[0].sources) {
+      expect(Object.keys(source).sort()).toEqual(["rank", "service"]);
+      expect(pages.find(page => page.service === source.service)?.items[source.rank - 1]).toBeDefined();
+    }
     expect(result.merged[0].sources.map((source: { service: string; rank: number }) => [source.service, source.rank]))
       .toEqual([["web:a", 1], ["web:b", 1], ["web:a", 2]]);
     expect(result.merged[0].score).toBeCloseTo(2 / 61, 14);
@@ -84,7 +89,7 @@ describe.skipIf(process.platform !== "darwin")("native shared search response co
     const result = run({ pages });
     expect(result.merged.map((entry: { score: number }) => entry.score)).toEqual([1 / 61, 1 / 62]);
     const weighted = run({ pages: [...pages, page("web:b", [item("https://example.com/two")])], weights: { "web:a": 2, "web:b": 3 } });
-    expect(weighted.merged[0].url).toBe("https://example.com/two");
+    expect(weighted.merged[0].sources[0]).toEqual({ service: "web:b", rank: 1 });
     expect(weighted.merged[0].score).toBeCloseTo(2 / 62 + 3 / 61, 14);
     expect(run({ pages, weights: { "web:a": 0 } }).merged.map((entry: { score: number }) => entry.score)).toEqual([0, 0]);
     expect(run({ pages, weights: { "web:a": -1 } }).merged).toEqual(result.merged);
@@ -97,7 +102,7 @@ describe.skipIf(process.platform !== "darwin")("native shared search response co
     for (let offset = 0; offset < pages.length; offset++) {
       expect(run({ pages: [...pages.slice(offset), ...pages.slice(0, offset)].reverse(), weights }).merged).toEqual(result);
     }
-    expect(result[0].title).toBe("a");
+    expect(result[0].sources[0]).toEqual({ service: "web:a", rank: 1 });
   });
 
   test("empty, partial and failed-engine envelopes retain errors and per-engine pagination", () => {
@@ -111,7 +116,8 @@ describe.skipIf(process.platform !== "darwin")("native shared search response co
     expect(result.issues).toEqual([]);
     expect(result.response).toEqual({ ...response, mergedResults: result.merged });
     const continuation = run({ pages: [page("web:a", [item("https://example.com/next")], null, "unknown")] });
-    expect(continuation.merged.map((entry: { url: string }) => entry.url)).toEqual(["https://example.com/next"]);
+    expect(continuation.response.results[0].items[0].url).toBe("https://example.com/next");
+    expect(continuation.merged).toHaveLength(1);
     expect(continuation.merged[0].sources[0].rank).toBe(1);
   });
 

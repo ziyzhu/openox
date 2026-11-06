@@ -381,7 +381,10 @@ export class AgentFileSystem {
     const result = await executeFileTool(operation, args, toolEnv, context);
     if (result.isError) throw new FileError("not_supported", result.diagnostics?.map(value => value.message).join("\n") ?? "File operation failed", path);
     if (operation === "read") return readPage(result, args, totalLines);
-    return { ...item(getOrThrow(await env.fileInfo(path, context))), ...(operation === "edit" && typeof result.details === "object" ? result.details : {}) };
+    const metadata = item(getOrThrow(await env.fileInfo(path, context)));
+    if (operation !== "edit" || !result.details || typeof result.details !== "object") return metadata;
+    const { patch, firstChangedLine } = result.details as { patch: string; firstChangedLine?: number };
+    return { ...metadata, patch, ...(firstChangedLine === undefined ? {} : { firstChangedLine }) };
   }
 
   private async search(env: MountedExecutionEnv, operation: "glob" | "grep", args: FileRequest, context: Context) {

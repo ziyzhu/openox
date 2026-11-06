@@ -32,7 +32,7 @@ extension OxSearch {
         let snippet: JSONValue
 
         var json: JSONValue {
-            .object(["service": .string(service), "rank": .int(rank), "title": .string(title), "url": url, "snippet": snippet])
+            .object(["service": .string(service), "rank": .int(rank)])
         }
 
         static func precedes(_ lhs: Self, _ rhs: Self) -> Bool {
@@ -74,8 +74,7 @@ extension OxSearch {
             return SearchSource.precedes(lhs.display, rhs.display)
         }
         return ranked.map { result in
-            .object(["title": .string(result.display.title), "url": result.display.url, "snippet": result.display.snippet,
-                     "score": .double(result.score), "sources": .array(result.sources.map(\.json))])
+            .object(["score": .double(result.score), "sources": .array(result.sources.map(\.json))])
         }
     }
 }

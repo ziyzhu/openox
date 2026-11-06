@@ -33,9 +33,6 @@ nonisolated enum OxSearch {
     static let mergedResultSchema: JSONValue = .object([
         "type": .string("object"),
         "properties": .object([
-            "title": .object(["type": .string("string")]),
-            "url": .object(["type": .array([.string("string"), .string("null")])]),
-            "snippet": .object(["type": .array([.string("string"), .string("null")])]),
             "score": .object(["type": .string("number"), "minimum": .int(0), "description": .string("Reciprocal rank fusion retrieval score, not factual confidence.")]),
             "sources": .object([
                 "type": .string("array"), "minItems": .int(1),
@@ -44,16 +41,13 @@ nonisolated enum OxSearch {
                     "properties": .object([
                         "service": .object(["type": .string("string")]),
                         "rank": .object(["type": .string("integer"), "minimum": .int(1)]),
-                        "title": .object(["type": .string("string")]),
-                        "url": .object(["type": .array([.string("string"), .string("null")])]),
-                        "snippet": .object(["type": .array([.string("string"), .string("null")])]),
                     ]),
-                    "required": .array(["service", "rank", "title", "url", "snippet"].map(JSONValue.string)),
+                    "required": .array(["service", "rank"].map(JSONValue.string)),
                     "additionalProperties": .bool(false),
                 ]),
             ]),
         ]),
-        "required": .array(["title", "url", "snippet", "score", "sources"].map(JSONValue.string)),
+        "required": .array(["score", "sources"].map(JSONValue.string)),
         "additionalProperties": .bool(false),
     ])
 
