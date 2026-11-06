@@ -1,0 +1,218 @@
+{
+  "domain": "youtube.com",
+  "name": "YouTube",
+  "description": "Search public videos and read timestamped transcripts from the video transcript panel. Transcript availability depends on the video.",
+  "baseUrl": "https://www.youtube.com/",
+  "actions": [
+    {
+      "id": "searchVideos",
+      "label": "Search videos",
+      "description": "Search YouTube videos. Returns one source results page and a continuation cursor for more results.",
+      "baseUrl": "https://www.youtube.com/results?search_query={query}",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "videoId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "channel": {
+                  "type": "string"
+                },
+                "duration": {
+                  "type": "string"
+                },
+                "views": {
+                  "type": "string"
+                },
+                "published": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "videoId",
+                "title",
+                "url",
+                "channel",
+                "duration",
+                "views",
+                "published"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getTranscript",
+      "label": "Read video transcript",
+      "description": "Open Show transcript under a video and read its timestamped transcript in the currently selected language. Returns unavailable only when the page explicitly says no transcript is available.",
+      "baseUrl": "https://www.youtube.com/watch?v={videoId}",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "videoId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{11}$"
+          }
+        },
+        "required": [
+          "videoId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "videoId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string"
+                },
+                "startSeconds": {
+                  "type": "number"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "timestamp",
+                "startSeconds",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "videoId",
+          "title",
+          "url",
+          "status",
+          "segments",
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "listSessions",
+      "label": "Find signed-in YouTube account",
+      "description": "Discover the authenticated YouTube context; report unknown identity rather than inventing a session.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "login",
+      "label": "Sign in to YouTube",
+      "description": "Open the website-provided Google sign-in flow for user interaction.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      }
+    }
+  ]
+}

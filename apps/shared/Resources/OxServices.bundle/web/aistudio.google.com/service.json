@@ -1,0 +1,227 @@
+{
+  "domain": "aistudio.google.com",
+  "name": "Google AI Studio",
+  "description": "Inspect Gemini projects and monthly spending, and change project spend caps with approval. Does not reveal API keys, buy credits, or change billing plans.",
+  "baseUrl": "https://aistudio.google.com/spend",
+  "actions": [
+    {
+      "id": "listSessions",
+      "label": "List signed-in accounts",
+      "description": "Discover the currently authenticated account in this website context; reject unclassified responses.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "baseUrl": "https://aistudio.google.com/spend",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "login",
+      "label": "Sign in",
+      "description": "Prepare the existing website sign-in page for user interaction.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "baseUrl": "https://aistudio.google.com/projects",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      }
+    },
+    {
+      "id": "listProjects",
+      "label": "List Gemini projects",
+      "description": "List visible project names, key counts, and billing status without exposing API keys.",
+      "baseUrl": "https://aistudio.google.com/projects",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "keyStatus": {
+                  "type": "string"
+                },
+                "billingStatus": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "keyStatus",
+                "billingStatus"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "getSpend",
+      "label": "Get Gemini project spending",
+      "description": "Read current monthly spend, project cap, and prepaid-migration warning for a named project.",
+      "baseUrl": "https://aistudio.google.com/spend",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "spent": {
+            "type": "number"
+          },
+          "monthlyCap": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ]
+          },
+          "prepayWarning": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "project",
+          "spent",
+          "monthlyCap",
+          "currency",
+          "prepayWarning"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "setMonthlySpendCap",
+      "label": "Change Gemini monthly spend cap",
+      "description": "Set a positive USD monthly cap for a named project. Google may allow overages during approximately ten minutes of enforcement delay. Does not purchase credits or change payment plans.",
+      "baseUrl": "https://aistudio.google.com/spend",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          }
+        },
+        "required": [
+          "project",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "spent": {
+            "type": "number"
+          },
+          "monthlyCap": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ]
+          },
+          "prepayWarning": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "project",
+          "spent",
+          "monthlyCap",
+          "currency",
+          "prepayWarning"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true
+    }
+  ]
+}

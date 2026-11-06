@@ -1,0 +1,210 @@
+{
+  "domain": "grokipedia.com",
+  "name": "Grokipedia",
+  "description": "A public encyclopedia by xAI. Search articles with real page-by-page continuation and read article facts and section text. Read-only; no sign-in required.",
+  "baseUrl": "https://grokipedia.com/",
+  "$defs": {
+    "searchItem": {
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string",
+          "description": "Stable article slug; pass to getArticle"
+        },
+        "title": {
+          "type": "string"
+        },
+        "excerpt": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "slug",
+        "title",
+        "excerpt",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "fact": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "section": {
+      "type": "object",
+      "properties": {
+        "heading": {
+          "type": "string",
+          "description": "Empty string for the lead section"
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "heading",
+        "level",
+        "text"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "searchArticles",
+      "label": "Search articles",
+      "description": "Search Grokipedia and return one source page of matching articles. Pass nextCursor to fetch the next source page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cursor": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Source page cursor returned by a previous search"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/searchItem"
+            }
+          },
+          "total": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageCount",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "artificial intelligence"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getArticle",
+      "label": "Read article",
+      "description": "Read a Grokipedia article as structured facts and section text, excluding the potentially very large references list.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Article slug returned by searchArticles"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "factChecked": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/fact"
+            }
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/section"
+            }
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "url",
+          "factChecked",
+          "facts",
+          "sections"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "slug": "Artificial_intelligence"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ]
+}

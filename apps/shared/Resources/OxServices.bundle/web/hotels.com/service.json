@@ -1,0 +1,74 @@
+{
+  "domain": "hotels.com",
+  "name": "Hotels.com",
+  "description": "Read public hotel price search results for exact dates and room occupancy.",
+  "baseUrl": "https://www.hotels.com/",
+  "actions": [
+    {
+      "id": "searchRates",
+      "label": "Search hotel rates",
+      "description": "Read Grand Hyatt Kauai search cards for exact dates and adults per room. Prices are search quotes, not reservations.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "baseUrl": "https://www.hotels.com/Hotel-Search?hotelId=22122&rooms=1&destination=Koloa&regionId=7675&selected=22122&startDate={checkIn}&endDate={checkOut}&adults={adults}&sort=RECOMMENDED&dateSelectedByUser=true",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "checkIn",
+          "checkOut",
+          "adults"
+        ],
+        "properties": {
+          "checkIn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "checkOut": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "adults": {
+            "type": "string",
+            "pattern": "^[1-6](,[1-6]){0,3}$"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor",
+          "url"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

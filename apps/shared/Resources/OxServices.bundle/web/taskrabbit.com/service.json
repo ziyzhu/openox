@@ -1,0 +1,127 @@
+{
+  "domain": "taskrabbit.com",
+  "name": "Taskrabbit",
+  "description": "Read current Taskrabbit bookings and first-page completed history. Booking preparation requires Browser assistance; no automatic charges, confirmations, messages or cancellations.",
+  "baseUrl": "https://www.taskrabbit.com/dashboard/active",
+  "actions": [
+    {
+      "id": "listSessions",
+      "label": "List Taskrabbit sessions",
+      "description": "Discover the signed-in Taskrabbit account.",
+      "baseUrl": "https://www.taskrabbit.com/account",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "login",
+      "label": "Sign in to Taskrabbit",
+      "description": "Open the official Taskrabbit sign-in page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getCurrentTasks",
+      "label": "Read current bookings",
+      "description": "Read the rendered first page. Returns task status, schedule and displayed prices; not a full-history export.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "partial": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "url",
+          "text",
+          "partial"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "baseUrl": "https://www.taskrabbit.com/dashboard/active"
+    },
+    {
+      "id": "getCompletedTasks",
+      "label": "Read recent completed tasks",
+      "description": "Read the rendered first page. Returns task status, schedule and displayed prices; not a full-history export.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "partial": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "url",
+          "text",
+          "partial"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "baseUrl": "https://www.taskrabbit.com/dashboard/completed"
+    }
+  ]
+}

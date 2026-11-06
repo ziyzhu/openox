@@ -1,0 +1,333 @@
+{
+  "domain": "booking.mangomint.com",
+  "name": "Fringe Hair Salon",
+  "description": "Read Fringe Seattle haircut prices and openings, and prepare a booking for user review without submitting it.",
+  "baseUrl": "https://booking.mangomint.com/183341",
+  "actions": [
+    {
+      "id": "getHaircutPrices",
+      "label": "Compare haircut prices",
+      "description": "Read current stylist-specific prices for a selected haircut with no optional conditioning. Regular Haircut uses average length/thickness and basic styling.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "enum": [
+              "MENS haircut",
+              "Haircut"
+            ],
+            "default": "MENS haircut"
+          },
+          "cutStyle": {
+            "type": "string",
+            "enum": [
+              "Scissor Cut",
+              "Clippers",
+              "Precision Cut"
+            ],
+            "default": "Scissor Cut",
+            "description": "Used only for MENS haircut. Haircut uses average length/thickness and basic styling."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          },
+          "cutStyle": {
+            "type": "string"
+          },
+          "stylists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "price": {
+                  "type": "string"
+                },
+                "workDays": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "price",
+                "workDays"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "bookingUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "service",
+          "cutStyle",
+          "stylists",
+          "bookingUrl"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getHaircutAvailability",
+      "label": "Check haircut availability",
+      "description": "Read exact start times for the current Seattle calendar week or up to four weeks ahead, defaulting to James and a mens scissor cut. Stateless read-only queries never reserve appointments.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "enum": [
+              "MENS haircut",
+              "Haircut"
+            ],
+            "default": "MENS haircut"
+          },
+          "cutStyle": {
+            "type": "string",
+            "enum": [
+              "Scissor Cut",
+              "Clippers",
+              "Precision Cut"
+            ],
+            "default": "Scissor Cut",
+            "description": "Used only for MENS haircut. Haircut uses average length/thickness and basic styling."
+          },
+          "stylist": {
+            "type": "string",
+            "default": "James"
+          },
+          "weekOffset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4,
+            "default": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          },
+          "cutStyle": {
+            "type": "string"
+          },
+          "stylist": {
+            "type": "string"
+          },
+          "price": {
+            "type": "string"
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "calendarLabel": {
+            "type": "string"
+          },
+          "weekOffset": {
+            "type": "integer"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dateLabel": {
+                  "type": "string"
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "dateLabel",
+                "times"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "checkedAt": {
+            "type": "string"
+          },
+          "bookingUrl": {
+            "type": "string"
+          },
+          "durationMinutes": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "service",
+          "cutStyle",
+          "stylist",
+          "price",
+          "timeZone",
+          "calendarLabel",
+          "weekOffset",
+          "days",
+          "checkedAt",
+          "bookingUrl",
+          "durationMinutes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "prepareHaircutBooking",
+      "label": "Prepare haircut booking for review",
+      "description": "Select James mens scissor cut with no conditioning for November 7 at 4:30 pm. Stops at contact details and final Book Now review without submitting.",
+      "requireAuth": false,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "enum": [
+              "2026-11-07"
+            ]
+          },
+          "startTime": {
+            "type": "string",
+            "enum": [
+              "4:30 pm"
+            ]
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 254
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 254
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 254
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 254
+          }
+        },
+        "required": [
+          "date",
+          "startTime"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "stylist": {
+            "type": "string"
+          },
+          "price": {
+            "type": "string"
+          },
+          "durationMinutes": {
+            "type": "integer"
+          },
+          "cancellationPolicy": {
+            "type": "string"
+          },
+          "bookingUrl": {
+            "type": "string"
+          },
+          "contactFieldsFilled": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "date",
+          "startTime",
+          "service",
+          "stylist",
+          "price",
+          "durationMinutes",
+          "cancellationPolicy",
+          "bookingUrl",
+          "contactFieldsFilled"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getBookingPageState",
+      "label": "Read booking page state",
+      "description": "Read only public booking step, selected date, and whether final review or confirmation is visible. Does not read contact or card values.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "selectedDate": {
+            "type": "string"
+          },
+          "reviewVisible": {
+            "type": "boolean"
+          },
+          "confirmationVisible": {
+            "type": "boolean"
+          },
+          "calendarVisible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "selectedDate",
+          "reviewVisible",
+          "confirmationVisible",
+          "calendarVisible"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,530 @@
+{
+  "domain": "drive.google.com",
+  "name": "Google Drive",
+  "description": "Account-pinned folder snapshots, guarded folder and UTF-8 text-file creation; preserved rendered search and preview actions. No original-byte download, native export, or atomic filesystem semantics.",
+  "baseUrl": "https://drive.google.com/drive/my-drive",
+  "$defs": {
+    "item": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "owner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "modified": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "size": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "shared": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "owner",
+        "modified",
+        "size",
+        "shared",
+        "url"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "listSessions",
+      "label": "List signed-in accounts",
+      "description": "Discover all currently authenticated shared Google accounts, excluding signed-out accounts.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "baseUrl": "https://drive.google.com/_/og/bscframe",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "login",
+      "label": "Sign in",
+      "description": "Prepare the existing website sign-in page for user interaction.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "baseUrl": "https://drive.google.com/drive/my-drive",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      }
+    },
+    {
+      "id": "searchFiles",
+      "label": "Search Google Drive",
+      "description": "Search currently rendered results on the matching search page. Pass pageUrl=https://drive.google.com/drive/search?q=<encoded query>&authuser=<selected email>. Rejects stale or mismatched routes instead of returning unrelated rows. No exhaustive pagination claim.",
+      "baseUrl": "https://drive.google.com/drive/search?q={query}",
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/item"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "listFiles",
+      "label": "List My Drive files",
+      "description": "List currently rendered top-level My Drive files and folders; does not recurse into folders.",
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/item"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "getFileText",
+      "label": "Read file preview text",
+      "description": "Read the complete available text of a selected Drive file preview; fails when text is unavailable. Does not establish byte equality.",
+      "blocking": true,
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "fileId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "listChildren",
+      "label": "List folder children snapshot",
+      "description": "Fetch the initial server-rendered children for an explicit folder ID (or root). Stable IDs, original names, MIME types and parent IDs. Always partial: no verified server continuation; null cursor is not completeness. Limit truncation is disclosed. Snapshot is a best-effort preflight fingerprint, not an atomic version.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 100
+          }
+        },
+        "required": [
+          "folderId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "mimeType": {
+                  "type": "string"
+                },
+                "parentIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "mimeType",
+                "parentIds",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "coverage": {
+            "type": "string",
+            "enum": [
+              "partial"
+            ]
+          },
+          "completenessReason": {
+            "type": "string"
+          },
+          "folderId": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "snapshot": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "coverage",
+          "completenessReason",
+          "folderId",
+          "accountId",
+          "snapshot"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "createFolder",
+      "label": "Create folder with snapshot preflight",
+      "description": "Create one new folder on the explicitly routed parent page. Requires pageUrl for non-root parents, a fresh listChildren snapshot, and acknowledgement of best-effort duplicate checks. Rejects a changed initial snapshot or an observed same-name item. Not atomic: unseen concurrent duplicates remain possible. Single submit; uncertain outcomes are not retried.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedParentSnapshot": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "conflictAcknowledgement": {
+            "type": "string",
+            "enum": [
+              "bestEffortNotAtomic"
+            ]
+          }
+        },
+        "required": [
+          "parentId",
+          "name",
+          "expectedParentSnapshot",
+          "conflictAcknowledgement"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "mimeType": {
+                "type": "string"
+              },
+              "parentIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "mimeType",
+              "parentIds",
+              "url"
+            ],
+            "additionalProperties": false
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "conflictGuarantee": {
+            "type": "string",
+            "enum": [
+              "bestEffortNotAtomic"
+            ]
+          }
+        },
+        "required": [
+          "item",
+          "accountId",
+          "conflictGuarantee"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "createTextFile",
+      "label": "Create ordinary UTF-8 text file",
+      "description": "Upload one ordinary text/plain file using the observed Drive drop target on the explicitly routed parent page. UTF-8 bytes, maximum 64 KiB, no Google-native conversion. Requires fresh parent snapshot and best-effort conflict acknowledgement; observed duplicate names or changed snapshots reject before one drop. Approval required; uncertain outcomes are never retried.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedParentSnapshot": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "conflictAcknowledgement": {
+            "type": "string",
+            "enum": [
+              "bestEffortNotAtomic"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 65536
+          }
+        },
+        "required": [
+          "parentId",
+          "name",
+          "expectedParentSnapshot",
+          "conflictAcknowledgement",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "mimeType": {
+                "type": "string"
+              },
+              "parentIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "mimeType",
+              "parentIds",
+              "url"
+            ],
+            "additionalProperties": false
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "conflictGuarantee": {
+            "type": "string",
+            "enum": [
+              "bestEffortNotAtomic"
+            ]
+          }
+        },
+        "required": [
+          "item",
+          "accountId",
+          "conflictGuarantee"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

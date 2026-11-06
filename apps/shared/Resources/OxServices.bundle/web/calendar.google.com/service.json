@@ -1,0 +1,201 @@
+{
+  "domain": "calendar.google.com",
+  "name": "Google Calendar",
+  "description": "Read signed-in Google Calendar events and open Calendar to create or edit events.",
+  "baseUrl": "https://calendar.google.com/calendar/u/0/r",
+  "actions": [
+    {
+      "id": "listSessions",
+      "label": "List Calendar sessions",
+      "description": "Discover the account on the current Calendar page.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "login",
+      "label": "Sign in to Google Calendar",
+      "description": "Open Google Calendar sign-in.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      }
+    },
+    {
+      "id": "getCurrentAccount",
+      "label": "Get current Calendar account",
+      "description": "Return the currently signed-in Google Calendar account shown by the interface.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "email"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "listVisibleEvents",
+      "label": "List visible calendar events",
+      "description": "List events rendered in the current Google Calendar date range.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rangeLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "rangeLabel",
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "openCreateEvent",
+      "label": "Open event editor",
+      "description": "Open Google Calendar's new-event editor with optional prefilled details for your review.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "start": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ISO 8601 date or date-time."
+          },
+          "end": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ISO 8601 date or date-time."
+          },
+          "details": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "domain": "resy.com",
+  "name": "Resy",
+  "description": "Find restaurants and open their Resy pages to review live availability and make reservations.",
+  "baseUrl": "https://resy.com/",
+  "actions": [
+    {
+      "id": "searchRestaurants",
+      "label": "Search restaurants",
+      "description": "Search Resy restaurants and return matching venue pages. Availability and reservations remain on Resy for review.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "baseUrl": "https://resy.com/cities/seattle-wa/search?query={query}",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Restaurant name, cuisine, or other search phrase."
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "default": "seattle-wa",
+            "description": "Resy city slug, such as seattle-wa or new-york-ny."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 10,
+            "description": "Maximum number of results."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "city": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "url",
+                "city"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

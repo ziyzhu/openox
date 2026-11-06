@@ -1,0 +1,167 @@
+{
+  "domain": "clubautomation.com",
+  "name": "Club Automation",
+  "description": "Member portal access for club registration and lesson availability.",
+  "baseUrl": "https://tcsp.clubautomation.com/index.php",
+  "actions": [
+    {
+      "id": "listSessions",
+      "label": "Find signed-in membership",
+      "description": "Check the selected club portal for a currently authenticated membership.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "login",
+      "label": "Sign in to club portal",
+      "description": "Open the club member login page for secure user sign-in.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      }
+    },
+    {
+      "id": "getClassAvailability",
+      "label": "Check class availability",
+      "description": "Read class description, dated sessions, instructors, and registration status without registering.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "details"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getClassQuote",
+      "label": "Check class price",
+      "description": "Read the signup price preview for an open class session without selecting a member, adding to cart, or registering.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "details"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "prepareThursdayGroupRegistration",
+      "label": "Prepare Thursday group registration",
+      "description": "Open the November 5 small-group registration and select the signed-in adult for review. Does not register, add to cart, or charge.",
+      "baseUrl": "https://tcsp.clubautomation.com/calendar/event-info?id=1179883",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ready": {
+            "type": "boolean"
+          },
+          "details": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ready",
+          "details"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

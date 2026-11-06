@@ -1,0 +1,222 @@
+{
+  "domain": "fidelity.com",
+  "name": "Fidelity",
+  "description": "Read-only Fidelity Investments portfolio and account balance summaries, with secure user-controlled login. No trading or transfers.",
+  "baseUrl": "https://digital.fidelity.com/ftgw/digital/portfolio/summary",
+  "actions": [
+    {
+      "id": "listSessions",
+      "label": "Find signed-in Fidelity accounts",
+      "description": "Discover the authenticated Fidelity portfolio using its loaded account selector, without exposing account numbers.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "login",
+      "label": "Log in to Fidelity",
+      "description": "Open Fidelity secure login for user-controlled authentication, including passkey and verification options.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "blocking": true,
+      "baseUrl": "https://digital.fidelity.com/ftgw/digital/portfolio/summary"
+    },
+    {
+      "id": "getPortfolioSummary",
+      "label": "Read portfolio summary",
+      "description": "Read displayed total and account balances from the authenticated portfolio. Account numbers are omitted; stock plan values may overlap other accounts.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "totalBalance": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "observedAt": {
+            "type": "string"
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "balance": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "name",
+                "category",
+                "balance"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "totalBalance",
+          "currency",
+          "observedAt",
+          "accounts",
+          "note"
+        ]
+      }
+    },
+    {
+      "id": "listPositions",
+      "label": "Read investment holdings",
+      "description": "Read rendered Fidelity positions with symbols, quantities, values, and unrealized returns. Includes coverage limits; account numbers are omitted.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "baseUrl": "https://digital.fidelity.com/ftgw/digital/portfolio/positions",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "account": {
+                  "type": "string"
+                },
+                "symbol": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "currentValue": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "totalGainLoss": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "totalGainLossPercent": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "pricingNote": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "account",
+                "symbol",
+                "description",
+                "quantity",
+                "currentValue",
+                "totalGainLoss",
+                "totalGainLossPercent",
+                "pricingNote"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "coverage": {
+            "type": "string"
+          },
+          "observedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "coverage",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

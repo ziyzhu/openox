@@ -1,0 +1,105 @@
+{
+  "domain": "lyft.com",
+  "name": "Lyft",
+  "description": "Search Lyft-supported cities and read published local ride options and rider information. No live fares, account history, or ride booking.",
+  "baseUrl": "https://www.lyft.com/rider/cities",
+  "actions": [
+    {
+      "id": "searchCities",
+      "label": "Search supported cities",
+      "description": "Find supported cities by name from Lyft’s public directory. Returns all matches, up to 1000.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getCity",
+      "label": "Read city ride information",
+      "description": "Read published ride options and local rider information using a city URL returned by city search. Not a live fare quote.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^https://"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "information": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "url",
+          "title",
+          "information"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

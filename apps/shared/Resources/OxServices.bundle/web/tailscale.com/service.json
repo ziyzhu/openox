@@ -1,0 +1,510 @@
+{
+  "name": "Tailscale",
+  "domain": "tailscale.com",
+  "baseUrl": "https://tailscale.com/",
+  "description": "Inspect the signed-in Tailscale tailnet and devices, and browse public documentation. Read-only; no tailnet mutations.",
+  "actions": [
+    {
+      "id": "listSessions",
+      "label": "List signed-in accounts",
+      "description": "Discover the currently authenticated account in this website context; reject unclassified responses.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "baseUrl": "https://login.tailscale.com/admin/api/self",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "login",
+      "label": "Sign in",
+      "description": "Prepare the existing website sign-in page for user interaction.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "baseUrl": "https://login.tailscale.com/admin/machines",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      }
+    },
+    {
+      "id": "listDocs",
+      "label": "List documentation",
+      "description": "Browse links from the Tailscale documentation index.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 30
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getDoc",
+      "label": "Read documentation",
+      "description": "Read a public Tailscale documentation page by URL path.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^/docs(?:/|$)"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "url",
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "listDevices",
+      "label": "List devices",
+      "description": "List devices in the selected tailnet. Returns total and truncated when limit omits devices; the source exposes no continuation cursor.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "stableId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "hostname": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "fqdn": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "addresses": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "online": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "lastSeen": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "invalidTags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "os": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "osVersion": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tailscaleVersion": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "keyExpiry": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "authorized": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "stableId",
+                "name",
+                "hostname",
+                "fqdn",
+                "addresses",
+                "online",
+                "lastSeen",
+                "tags",
+                "invalidTags",
+                "os",
+                "osVersion",
+                "tailscaleVersion",
+                "created",
+                "keyExpiry",
+                "authorized",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "total",
+          "truncated"
+        ],
+        "additionalProperties": false
+      },
+      "baseUrl": "https://login.tailscale.com/admin/api/self"
+    },
+    {
+      "id": "getTailnet",
+      "label": "Inspect tailnet",
+      "description": "Read the current account and tailnet identity without switching tailnets.",
+      "baseUrl": "https://login.tailscale.com/admin/api/self",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "loginName": {
+            "type": "string"
+          },
+          "isPersonal": {
+            "type": "boolean"
+          },
+          "hasAdditionalTailnets": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "accountId",
+          "loginName",
+          "isPersonal",
+          "hasAdditionalTailnets"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getDevice",
+      "label": "Inspect device",
+      "description": "Read one device by an ID returned from listDevices. Does not return machine or node keys.",
+      "baseUrl": "https://login.tailscale.com/admin/api/self",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "stableId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "hostname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fqdn": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "online": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "lastSeen": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "invalidTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "os": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "osVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tailscaleVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "keyExpiry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "authorized": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "stableId",
+          "name",
+          "hostname",
+          "fqdn",
+          "addresses",
+          "online",
+          "lastSeen",
+          "tags",
+          "invalidTags",
+          "os",
+          "osVersion",
+          "tailscaleVersion",
+          "created",
+          "keyExpiry",
+          "authorized",
+          "url"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}
