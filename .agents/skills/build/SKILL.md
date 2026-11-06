@@ -13,9 +13,10 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 
 | Command | Purpose |
 | --- | --- |
-| `bun run build:check` | Static/type validation and offline build-tool, packaging and CLI-input checks in `checks/`. |
-| `bun run ci` | Build checks, portable protocol validation, generated resources and package consumers; see [portable checks](portable.md). |
-| `bun run typecheck` | Static checks and five TypeScript projects, including all desktop skill code. |
+| `bun run lint` | Repository source policies, resource validation, five TypeScript projects and offline eval-definition validation. |
+| `bun run build` | Verify generated schemas, generate agent/service resources, and build/verify portable packages and CLI consumers. |
+| `bun run test` | Existing offline build-tool/CLI-input checks and portable protocol validation. |
+| `bun run ci` | Run lint, build and test with frozen dependencies, no `.env` loading and generated-resource drift checks; see [portable checks](portable.md). |
 | `bun run build:host-schema` | Regenerate Host RPC JSON/Swift artifacts. |
 | `bun run build:repository-schema` | Regenerate repository JSON/Swift artifacts. |
 | `bun run build:provider-schema` | Regenerate provider definitions schema. |
@@ -31,10 +32,15 @@ is not enough. Append xcodebuild arguments such as `-derivedDataPath <dir>` to e
 For changes confined to `apps/shared`, `build:macos` compiles the same shared sources without
 a Simulator; use it as the first compile check, then `build:ios` before iOS verification.
 
-`typecheck` validates public/private-content boundaries, iOS Client-Host layering,
-protocol schema consistency, unsafe absolute-path slicing, bundled skill packages and links, translations, provider models,
-and provider definitions before checking TypeScript. `.agents/tsconfig.json`
-includes test, eval, Gym, demo, setup, build, and release code.
+`lint` validates public/private-content boundaries, iOS Client-Host layering,
+platform source ownership, unsafe absolute-path slicing, bundled skill packages and links,
+translations, and provider models. It runs the explicit check list in `scripts/lint.ts`
+against the full repository, then checks TypeScript and eval definitions without generating
+or fixing files. Keep cross-file and resource checks here rather than forcing them into
+per-file JavaScript lint rules. `build` checks schema consistency before generating
+resources and verifying packages; native compilation remains explicit through
+`build:ios` and `build:macos`. `.agents/tsconfig.json` includes test, eval, Gym, demo,
+setup, build, and release code.
 
 ## Maintain generated sources
 
@@ -51,11 +57,11 @@ are new. Preserve existing picker IDs, aliases, variants, intentional token caps
 and regional/subscription boundaries. Change discovery formats, catalogs, rules,
 and data-expressible options in `providers.json`; Swift owns transports, custom
 adapter authentication, and OAuth. Never promote credentials, personal overrides,
-or account-specific availability into bundled defaults. Run `bun run typecheck`
+or account-specific availability into bundled defaults. Run `bun run lint` and `bun run build`
 after provider changes; shared Swift changes require both native builds.
 
 `apps/shared/Resources/OxServices.bundle/` is the single built-in repository source.
-Both native targets compile `apps/shared` and their own platform sources; neither compiles the other app. `typecheck` enforces this boundary and rejects OS conditionals in native Swift sources. Keep shared/platform Swift filenames distinct: localization extraction writes their `.stringsdata` outputs into the same target directory.
+Both native targets compile `apps/shared` and their own platform sources; neither compiles the other app. `lint` enforces this boundary and rejects OS conditionals in native Swift sources. Keep shared/platform Swift filenames distinct: localization extraction writes their `.stringsdata` outputs into the same target directory.
 `build:services` validates it, refreshes its content hash without rewriting service
 files, and generates model-action resources.
 Package builds copy this source.

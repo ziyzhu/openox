@@ -13,14 +13,14 @@ Install [Bun](https://bun.sh/) 1.3 or newer. Check `bun --version` and `ox --hel
 
 ```sh
 bun install
-bun run typecheck
+bun run lint
 (cd apps/cli && bun run build && bun link)
 ox --help
 ox host list --help
 ```
 
 - `bun install` registers the `*.xcstrings` merge driver in the checkout's Git config; it merges string catalog entries by key and falls back to a normal text merge when the same key changed on both sides.
-- Use `bun run typecheck` as the first source check. Use `apps/cli/install.sh` for standalone installation and `bun run --cwd apps/cli package:check` for package checks.
+- Use `bun run lint` as the first source check. `bun run build` generates resources and builds/verifies portable packages; `bun run test` runs offline build-tool and protocol checks. Use `apps/cli/install.sh` for standalone installation and `bun run --cwd apps/cli package:check` for package checks.
 - Run `bun link` inside `apps/cli`, not `bun link @openox/cli` at the workspace root; the latter creates a dependency loop with the existing workspace.
 - If help still lists old top-level `discover`, `logs`, or `service` commands, check `command -v ox`. The current CLI groups those operations under `host`. Resolve stale installations with their original package manager or adjust PATH; do not overwrite an unrelated executable.
 - Rebuild after source changes or switching worktrees. A global source link follows one checkout; concurrent agents should use `bun apps/cli/src/ox.ts` from their own checkout when they cannot share the linked build.
@@ -253,7 +253,7 @@ Additional browser/proxy skills are task-specific, not prerequisites for basic P
 
 ## Preparing a contribution
 
-Keep issues and pull requests focused; describe the problem, changes, and verification. Run `bun run typecheck` for source changes and build each affected native app target; shared native changes require both iOS and macOS builds. Include simulator screenshots or recordings for UI changes. Report blocked or unverified paths explicitly, and keep credentials and diagnostic captures outside Git. Contributors use their own signing identities and containers; maintainer credentials are not required.
+Keep issues and pull requests focused; describe the problem, changes, and verification. Run `bun run lint`, `bun run build`, and `bun run test` for source changes and build each affected native app target; shared native changes require both iOS and macOS builds. Include simulator screenshots or recordings for UI changes. Report blocked or unverified paths explicitly, and keep credentials and diagnostic captures outside Git. Contributors use their own signing identities and containers; maintainer credentials are not required.
 
 ## Completion
 

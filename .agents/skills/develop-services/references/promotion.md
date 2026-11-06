@@ -53,7 +53,7 @@ Verify the affected actions live through Ox, then:
 
 ```bash
 bun run build:services
-bun run typecheck
+bun run lint
 ```
 
 Verify the canonical `apps/shared/Resources/OxServices.bundle` diff contains only the promoted service and expected index changes. Report the promoted files, live verification, authentication boundaries, icon evidence, checks run, and any remaining limitation.

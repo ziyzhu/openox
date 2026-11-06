@@ -1,8 +1,8 @@
 # Portable verification
 
-CI installs with the frozen lockfile and runs build/static checks, controlled CLI/Host
-fixtures, offline build-tool safety checks, eval-definition validation,
-service generation, and package consumer checks. It clears live-target variables and
+CI installs with the frozen lockfile, then runs `lint`, `build`, and `test`.
+These cover static/type checks, eval-definition validation, agent/service generation,
+package consumers, offline build-tool safety checks and controlled CLI/Host fixtures. It clears live-target variables and
 disables `.env` loading. No simulator, credentials, model calls, or publication are required.
 
 The GitHub CI workflow also compiles the iOS and macOS apps unsigned on a macOS runner.

@@ -6,8 +6,10 @@ description: "Validate versioned protocol boundaries and predecessor-to-current 
 # Test
 
 Maintain exactly three suites. Do not create a general unit, UI, smoke, or miscellaneous
-regression suite. Static validation, type checks, generated-artifact consistency,
-packaging and compilation belong to build. Exploratory UI verification belongs to gym.
+regression suite. `bun run test` runs the existing offline build-tool checks and portable
+protocol cases; it does not run storage upgrades or real-provider evals. `bun run lint`
+owns static/type validation; `bun run build` owns generated-artifact consistency,
+packaging and compilation. Exploratory UI verification belongs to gym.
 
 | Suite | Entry point | Evidence |
 | --- | --- | --- |

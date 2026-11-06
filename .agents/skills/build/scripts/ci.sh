@@ -12,7 +12,7 @@ while [ "$#" -gt 0 ]; do
       output="$2"; shift 2 ;;
     -h|--help)
       echo 'Usage: bun run ci [--standalone-only [--out <directory>]]'
-      echo 'Default: build checks, protocol validation, packages, generated artifacts, eval definitions.'
+      echo 'Default: lint, build, and test (portable, credential-free coverage).'
       echo 'No iOS, live Hosts, model calls, credentials, or publication. Standalone mode tests only the current platform.'
       exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -39,15 +39,10 @@ if [ "$standalone" = true ]; then
   exit 0
 fi
 command -v npm >/dev/null || { echo 'Missing prerequisite: npm' >&2; exit 1; }
-bun --no-env-file run build:check
-bun --no-env-file run test:protocol
-bun --no-env-file .agents/skills/evals/scripts/runner.ts --validate
-bun --no-env-file run build:services
+bun --no-env-file run lint
+bun --no-env-file run build
+bun --no-env-file run test
 git diff --exit-code -- apps/shared/Resources/OxServices.bundle \
   apps/shared/Resources/ModelServiceActions.json \
   packages/agent/skills/evolve/references/model-schemas.md
-for package in protocol services; do
-  bun --no-env-file run --cwd "packages/$package" package:check
-done
-bun --no-env-file run --cwd apps/cli package:check
-echo 'PASS build checks and portable protocol validation (storage upgrades and real-provider evals not run)'
+echo 'PASS lint, build, and test (storage upgrades and real-provider evals not run)'

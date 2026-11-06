@@ -6,7 +6,9 @@
   "scripts": {
     "postinstall": "[ ! -f .agents/skills/setup/scripts/git-merge-drivers.ts ] || bun .agents/skills/setup/scripts/git-merge-drivers.ts",
     "ci": "./.agents/skills/build/scripts/ci.sh",
-    "build:check": "bun run typecheck && bun test ./.agents/skills/build/checks",
+    "lint": "bun .agents/skills/build/scripts/lint.ts",
+    "build": "bun .agents/skills/build/scripts/build.ts",
+    "test": "bun test ./.agents/skills/build/checks ./.agents/skills/test/protocol",
     "test:protocol": "bun test ./.agents/skills/test/protocol",
     "generate:ios": "xcodegen generate --spec apps/ios/project.yml",
     "generate:macos": "xcodegen generate --spec apps/macos/project.yml",
@@ -20,8 +22,7 @@
     "sim:website-export": "bun .agents/skills/setup/scripts/website-export.ts",
     "build:provider-schema": "bun .agents/skills/build/scripts/provider-definitions.ts",
     "build:host-schema": "bun .agents/skills/build/scripts/host-rpc-contract.ts --write",
-    "build:repository-schema": "bun .agents/skills/build/scripts/repository-contract.ts --write",
-    "typecheck": "bun .agents/skills/build/scripts/typecheck.ts"
+    "build:repository-schema": "bun .agents/skills/build/scripts/repository-contract.ts --write"
   },
   "dependencies": {
     "typebox": "1.4.3"

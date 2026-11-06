@@ -43,7 +43,6 @@ Profile, simulator or live Host is used. A low score is a behavioral failure; pr
 and harness errors are distinct. Both produce nonzero exit status for required runs.
 Reports remain outside Git and redact loaded API-key values.
 
-After edits run `bun run evals --validate`, `bun run build:check`, and
-`bun run test:protocol`. When prompts change, target the changed behavior and compare
+After edits run `bun run lint`, `bun run build`, and `bun run test`. When prompts change, target the changed behavior and compare
 with `--baseline <ref>` using identical models, cases, limits and enough repetitions
 to expose flakiness. Do not claim statistical improvement from one run.

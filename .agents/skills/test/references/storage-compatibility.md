@@ -30,7 +30,7 @@ Identify:
 
 Before running another checkout or older build against an existing app container, compare its current schema with the stored milestone. Use an isolated numbered QA simulator or a restored upgrade fixture when they differ. If downgrade compatibility is required, design and verify it explicitly; otherwise fail closed with an actionable message that tells the user to reinstall the version that last opened the data or a newer one.
 
-Build inventory-relative paths from traversed entry names, not by slicing absolute URL strings: Foundation enumeration can expand `/var` or `/tmp` aliases to `/private/...`. Verify aliased roots and nested entries while retaining symlink rejection. For URL enumerators, derive relative paths from `pathComponents.suffix(enumerator.level)`. Run `bun run typecheck` to catch the known absolute-path slicing and replacement patterns.
+Build inventory-relative paths from traversed entry names, not by slicing absolute URL strings: Foundation enumeration can expand `/var` or `/tmp` aliases to `/private/...`. Verify aliased roots and nested entries while retaining symlink rejection. For URL enumerators, derive relative paths from `pathComponents.suffix(enumerator.level)`. Run `bun run lint` to catch the known absolute-path slicing and replacement patterns.
 
 Prefer ordered, retry-safe milestones. Stamp a milestone only after all of its operations succeed. Preserve a recoverable source or equivalent destination across interruption. Define collision behavior explicitly; never replace ambiguous user data. Preserve Local Git history, index state, working-tree changes, and detached views unless the migration specifically and safely transforms them.
 
@@ -107,7 +107,7 @@ Run this gate after every coordinator or scoped migrator change, including refac
 1. Select a numbered QA simulator and use its assigned debug port.
 2. Force-build, install, and launch the DEBUG app on that simulator with bundled services.
 3. Run the before/after template matrix on isolated reserved targets, including upgrade and second-launch stability. Store templates, snapshots, and evidence outside the repository. Older-reader checks are optional and require an explicit downgrade-testing request.
-4. Run `bun run typecheck` and the retained portable checks.
+4. Run `bun run lint`, `bun run build`, and `bun run test`.
 5. Confirm the installed app reaches its normal UI and logs `StorageMigrator.prepare done` followed by `HostRuntime storage prepared` and `HostRuntime profile prepared`.
 
 Use the shared `ios-simulator` skill for build/install/launch and container inspection,
