@@ -41,6 +41,10 @@ struct IOSConversationFeedback: ConversationFeedback {
         Haptics.impact(.agentDeltaReceived)
     }
 
+    func startedConversation(firstSubmissionID: UUID) {
+        ConversationReview.recordStart(firstSubmissionID: firstSubmissionID)
+    }
+
     func notifyCompletion(id: UUID, title: String, body: String) {
         guard UIApplication.shared.applicationState != .active else {
             Log.session.info("Conversation.notify skipped id=\(id) reason=active")

@@ -5,6 +5,7 @@ import WebKit
 import PhotosUI
 import QuickLook
 import UniformTypeIdentifiers
+import StoreKit
 
 private struct SidebarScrollLockModifier: ViewModifier {
     @Environment(\.sidebarInteraction) private var sidebarInteraction
@@ -38,6 +39,7 @@ struct ConversationPage: View {
     let conversation: Conversation
     let historyOpenRequestID: UUID
     let isCurrentConversation: () -> Bool
+    let allowsReviewRequest: Bool
     let composerFocusRequestID: UUID?
     let onComposerFocusRequestHandled: (UUID) -> Void
     let onShowSidebar: () -> Void
@@ -63,6 +65,7 @@ struct ConversationPage: View {
     @State private var manualBrowserBeforeSubmissionID: UUID?
     @State private var speechInput = ConversationSpeechInput()
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.requestReview) private var requestReview
     @State private var latestSubmissionID: UUID?
     @State private var sendHandoff = SendHandoff.idle
     @State private var composerInputFrame = CGRect.zero
@@ -420,6 +423,11 @@ struct ConversationPage: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { speechInput.interrupt() }
+        }
+        .onChange(of: reviewRequestMilestone, initial: true) { _, milestone in
+            guard let milestone, reviewRequestMilestone == milestone,
+                  ConversationReview.recordAttempt(milestone) else { return }
+            requestReview()
         }
         .onChange(of: showsComposer) { _, visible in
             if !visible { composerFocused = false }
@@ -1649,6 +1657,18 @@ struct ConversationPage: View {
 
     private func showCopiedToast() {
         toast = Toast(message: L10n.string("Message copied", comment: "Toast shown after the user copies a conversation message to the clipboard."))
+    }
+
+    private var reviewRequestMilestone: Int? {
+        guard allowsReviewRequest, isCurrentConversation(), scenePhase == .active,
+              !conversation.isBusy, conversation.queuedMessages.isEmpty,
+              conversation.notice.errorMessage == nil,
+              modalPresentation == nil, alertPresentation == nil,
+              navigationFile == nil, navigationSkill == nil,
+              !composerFocused, !webInputFocused, !choiceInputFocused,
+              !speechInput.isPresented, editedBlockID == nil,
+              composer.attributedDraft.characters.isEmpty else { return nil }
+        return ConversationReview.eligibleMilestone(in: conversation)
     }
 
     private func send() {

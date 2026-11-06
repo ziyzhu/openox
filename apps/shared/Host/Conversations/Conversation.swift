@@ -1415,6 +1415,9 @@ final class Conversation: Identifiable {
         submissionID: SubmissionID
     ) -> SubmissionReceipt {
         publishFollowIntents([])
+        if document.turns.isEmpty, submissions.isEmpty, scheduleID == nil, scheduleName == nil {
+            feedback.startedConversation(firstSubmissionID: submissionID.rawValue)
+        }
         let posting = !isBusy
         notice = .none
         let latency = TurnLatencyTrace(submissionID: submissionID.rawValue, conversationID: id, kind: "user")

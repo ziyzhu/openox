@@ -830,6 +830,7 @@ struct RootView: View {
                 ConversationPage(conversation: conversation,
                          historyOpenRequestID: conversationHistoryRequestID,
                          isCurrentConversation: { conversations.current === conversation },
+                         allowsReviewRequest: startup == .ready && presentation == nil && (isSplitLayout || !showSidebar),
                          composerFocusRequestID: composerFocusRequest?.conversationIdentity == ObjectIdentifier(conversation)
                              ? composerFocusRequest?.id
                              : nil,
