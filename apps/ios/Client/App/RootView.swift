@@ -964,14 +964,20 @@ struct RootView: View {
             setSidebar(false)
             return
         }
+        Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellClosing")
+        conversations.open(id)
+        guard conversations.currentId != id else {
+            compactConversationTransition = .idle
+            Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellOpening source=memory")
+            setSidebar(false)
+            return
+        }
         pendingConversationPresentationId = id
         compactConversationTransition = .closing(id)
-        Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellClosing")
         setSidebar(false, completionCriteria: .removed) {
             guard compactConversationTransition == .closing(id) else { return }
             compactConversationTransition = .opening(id)
             Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellOpening")
-            conversations.open(id)
         }
     }
 
