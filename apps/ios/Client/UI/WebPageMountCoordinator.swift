@@ -8,7 +8,6 @@ final class WebPageMountCoordinator {
     enum Placement: Equatable {
         case idle
         case inline(UUID)
-        case collapsed(UUID)
         case detached(UUID)
     }
 
@@ -19,16 +18,6 @@ final class WebPageMountCoordinator {
     @ObservationIgnored private var mountedOwnerID: UUID?
     @ObservationIgnored private var revision = 0
     @ObservationIgnored private var unmountWaiters: [CheckedContinuation<Void, Never>] = []
-    @ObservationIgnored private var servicePageCoordinators: [UUID: WebPageMountCoordinator] = [:]
-
-    func coordinator(for pageID: UUID?) -> WebPageMountCoordinator {
-        guard let pageID else { return self }
-        if let coordinator = servicePageCoordinators[pageID] { return coordinator }
-        let coordinator = WebPageMountCoordinator()
-        servicePageCoordinators[pageID] = coordinator
-        return coordinator
-    }
-
     func isInline(page: WebPage?, ownerID: UUID) -> Bool {
         guard placement == .inline(ownerID), let page else { return false }
         return pageID == ObjectIdentifier(page)
@@ -59,7 +48,7 @@ final class WebPageMountCoordinator {
         if !pageChanged, case .detached(let ownerID) = placement, ownerIDs.contains(ownerID) { return }
         if !pageChanged, preferred == previousPreferred {
             switch placement {
-            case .inline(let ownerID), .collapsed(let ownerID):
+            case .inline(let ownerID):
                 if ownerIDs.contains(ownerID) { return }
             case .idle, .detached: break
             }
@@ -81,13 +70,6 @@ final class WebPageMountCoordinator {
             placement = .inline(ownerID)
             Log.webView.info("WebPageMount.inline owner=\(ownerID)")
         }
-    }
-
-    func collapse(page: WebPage, ownerID: UUID) {
-        guard isInline(page: page, ownerID: ownerID) else { return }
-        revision += 1
-        placement = .collapsed(ownerID)
-        Log.webView.info("WebPageMount.collapsed owner=\(ownerID)")
     }
 
     func detach(page: WebPage, ownerID: UUID) async -> Bool {

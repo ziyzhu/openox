@@ -19,7 +19,7 @@ final class ServiceOperations {
     let begin: (String, JSONValue, String) -> UUID
     let finish: (UUID, Result<JSONValue?, Error>) -> Void
     let native: NativeServiceOperations
-    let presentWebsiteLogin: ((Service, Service.ServiceWebPage, ServiceHandoffSession) async -> ServiceHandoffSession.Outcome)?
+    let presentServiceHandoff: ((Service, Service.ServiceWebPage, ServiceHandoffSession) async -> ServiceHandoffSession.Outcome)?
 
     init(
         serviceManager: ServiceManager,
@@ -39,7 +39,7 @@ final class ServiceOperations {
         begin: @escaping (String, JSONValue, String) -> UUID,
         finish: @escaping (UUID, Result<JSONValue?, Error>) -> Void,
         native: NativeServiceOperations,
-        presentWebsiteLogin: ((Service, Service.ServiceWebPage, ServiceHandoffSession) async -> ServiceHandoffSession.Outcome)? = nil
+        presentServiceHandoff: ((Service, Service.ServiceWebPage, ServiceHandoffSession) async -> ServiceHandoffSession.Outcome)? = nil
     ) {
         self.serviceManager = serviceManager
         self.conversationOwner = conversationOwner
@@ -55,7 +55,7 @@ final class ServiceOperations {
         self.begin = begin
         self.finish = finish
         self.native = native
-        self.presentWebsiteLogin = presentWebsiteLogin
+        self.presentServiceHandoff = presentServiceHandoff
     }
 
     static func encodeToJSON<T: Encodable>(_ value: T) throws -> JSONValue {
@@ -223,8 +223,8 @@ final class ServiceOperations {
         )
         Log.service.info("Service.login presenting domain=\(service.domain) page=\(lease.page.logLabel)")
         let outcome: ServiceHandoffSession.Outcome
-        if let presentWebsiteLogin {
-            outcome = await presentWebsiteLogin(service, lease.page, handoff)
+        if let presentServiceHandoff {
+            outcome = await presentServiceHandoff(service, lease.page, handoff)
         } else {
             outcome = await native.presentations.serviceHandoff.present(session: handoff)
         }
@@ -653,14 +653,14 @@ final class ServiceOperations {
         return try Self.encodeToJSON(results)
     }
 
-    func showServicePage(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
+    func showServicePage(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, waitForUserInteraction: Bool = false, purpose: String) async throws -> JSONValue? {
         let (service, actionID) = try await resolveAction(name)
         let input = args ?? .object([:])
         guard service.isWebService,
               await service.resolvedAction(actionID, args: input, session: session, pageURL: pageURL) != nil else {
             throw RuntimeError.bridge("ox.service.showPage: requires a web service action")
         }
-        return try await tracked(Actions.serviceShowPage, .object(["name": .string(name), "input": input, "session": session ?? .null, "pageUrl": pageURL.map(JSONValue.string) ?? .null]), purpose: purpose) {
+        return try await tracked(Actions.serviceShowPage, .object(["name": .string(name), "input": input, "session": session ?? .null, "pageUrl": pageURL.map(JSONValue.string) ?? .null, "waitForUserInteraction": .bool(waitForUserInteraction)]), purpose: purpose) {
             let page = service.servicePages.filter { page in
                 guard let prepared = page.lastInvocation else { return false }
                 return prepared.actionID == actionID && prepared.args == input
@@ -676,6 +676,26 @@ final class ServiceOperations {
                 throw OxFunctionError(code: "page_unavailable", message: "The prepared page changed before presentation.", recovery: "Inspect the current page state. Do not rediscover a different account or repeat a mutation to replace the page.")
             }
             guard lease.page.page.url != nil else { throw Service.EvalError.notReady }
+            if waitForUserInteraction {
+                let handoff = ServiceHandoffSession(
+                    service: service,
+                    servicePage: lease.page,
+                    title: service.title,
+                    navigationTitle: service.title
+                )
+                let outcome: ServiceHandoffSession.Outcome
+                if let presentServiceHandoff {
+                    outcome = await presentServiceHandoff(service, lease.page, handoff)
+                } else {
+                    outcome = await native.presentations.serviceHandoff.present(session: handoff)
+                }
+                try Task.checkCancellation()
+                guard outcome != .failed, lease.isActive else {
+                    throw OxFunctionError(code: "page_unavailable", message: "The live page interaction could not be completed.", recovery: "Inspect the preserved page. Do not reopen automatically or repeat a mutation.")
+                }
+                Log.service.info("Service.showPage interaction domain=\(service.domain) action=\(actionID) session=\(lease.page.logLabel) outcome=\(outcome.rawValue)")
+                return .object(["shown": .bool(true), "completion": .string(outcome.rawValue)])
+            }
             try native.presentServicePage(service, page: lease.page)
             Log.service.info("Service.showPage shown domain=\(service.domain) action=\(actionID) session=\(lease.page.logLabel)")
             return .object(["shown": .bool(true)])

@@ -334,20 +334,18 @@ private struct ServiceInspectorRow: View {
     }
 
     private func finishLogin(_ handoff: ServiceHandoffSession, completed: Bool) {
-        if let page { pageMount.collapse(page: page, ownerID: rowID) }
         if completed { handoff.dismissPresentation() }
         else { handoff.cancel() }
     }
 
     private func finishUserInteraction(completed: Bool) {
-        guard let browserSession, let page else { return }
-        pageMount.collapse(page: page, ownerID: rowID)
+        guard let browserSession else { return }
         browserSession.finishUserInteraction(completed: completed)
     }
 
     private func expandPage() {
         Task { @MainActor in
-            if let page {
+            if let page, isInline {
                 guard await pageMount.detach(page: page, ownerID: rowID) else { return }
             }
             isPresented = true
@@ -846,7 +844,7 @@ struct BlockView: View, Equatable {
                             link: link,
                             conversationID: conversationID,
                             rowID: block.id,
-                            pageMount: browserPageMount.coordinator(for: link.pageID)
+                            pageMount: browserPageMount
                         )
                             .padding(.horizontal, 4)
                     case let .shoveler(shoveler):

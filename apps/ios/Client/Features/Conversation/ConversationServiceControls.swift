@@ -9,42 +9,28 @@ struct ConversationInlineServicePages: View {
     let servicePageOwnerIDs: [UUID]
     @Environment(ServiceManager.self) private var serviceManager
 
-    private var servicePages: [UUID: WebPage] {
-        var pages: [UUID: WebPage] = [:]
-        for link in servicePageLinks.values {
-            guard let pageID = link.pageID,
-                  let service = serviceManager.inspectionService(domain: link.domain),
-                  let page = service.servicePage(id: pageID) else { continue }
-            pages[pageID] = page.page
-        }
-        return pages
+    private var latestPageOwnerID: UUID? {
+        servicePageOwnerIDs.last { servicePageLinks[$0] != nil }
+    }
+
+    private var latestPage: WebPage? {
+        guard let ownerID = latestPageOwnerID, let link = servicePageLinks[ownerID] else { return nil }
+        guard let pageID = link.pageID else { return browserPage }
+        return serviceManager.inspectionService(domain: link.domain)?.servicePage(id: pageID)?.page
     }
 
     var body: some View {
-        Group {
-            browserContent
-            ForEach(servicePages.keys.sorted(by: { $0.uuidString < $1.uuidString }), id: \.self) { pageID in
-                if let page = servicePages[pageID] {
-                    inlinePage(page, mount: browserPageMount.coordinator(for: pageID))
-                }
+        GeometryReader { _ in
+            if let page = latestPage {
+                inlinePage(page, mount: browserPageMount)
             }
         }
-        .onChange(of: servicePageOwnerIDs, initial: true) { _, _ in reconcileServicePages() }
-        .onChange(of: servicePages.mapValues(ObjectIdentifier.init), initial: true) { _, _ in reconcileServicePages() }
+        .onChange(of: latestPageOwnerID, initial: true) { _, _ in reconcilePage() }
+        .onChange(of: latestPage.map(ObjectIdentifier.init), initial: true) { _, _ in reconcilePage() }
     }
 
-    private func reconcileServicePages() {
-        for pageID in Set(servicePageLinks.values.compactMap(\.pageID)) {
-            let ownerIDs = servicePageOwnerIDs.filter { servicePageLinks[$0]?.pageID == pageID }
-            browserPageMount.coordinator(for: pageID).reconcile(page: servicePages[pageID], ownerIDs: ownerIDs)
-        }
-    }
-
-    @ViewBuilder
-    private var browserContent: some View {
-        if let page = browserPage {
-            inlinePage(page, mount: browserPageMount)
-        }
+    private func reconcilePage() {
+        browserPageMount.reconcile(page: latestPage, ownerIDs: latestPageOwnerID.map { [$0] } ?? [])
     }
 
     @ViewBuilder

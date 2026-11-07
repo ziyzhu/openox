@@ -141,8 +141,8 @@ extension Conversation {
         }
     }
 
-    public func showServicePage(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.showServicePage(name: name, args: args, session: session, pageURL: pageURL, purpose: purpose)
+    public func showServicePage(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, waitForUserInteraction: Bool = false, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.showServicePage(name: name, args: args, session: session, pageURL: pageURL, waitForUserInteraction: waitForUserInteraction, purpose: purpose)
     }
 
     public func loginService(domain: String, purpose: String) async throws -> JSONValue? {

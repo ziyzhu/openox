@@ -125,7 +125,8 @@ nonisolated enum BrowserFunctionCatalog {
             label: "Show Page",
             description: "Present Browser's live page using the Host's supported presentation. iOS adds a conversation row; macOS opens a Host window.",
             inputSchema: object(),
-            outputSchema: object(["shown": boolean], required: ["shown"])
+            outputSchema: object(["shown": boolean], required: ["shown"]),
+            hasModelGuidance: true
         ),
         Action(
             id: "executeScript",

@@ -243,6 +243,7 @@ nonisolated enum OxServices {
                                 "input": .object(["type": .string("object"), "description": .string("The same action input, used only to select its execution page.")]),
                                 "session": WebSessionContract.sessionSchema,
                                 "pageUrl": .object(["type": .string("string")]),
+                                "waitForUserInteraction": .object(["type": .string("boolean"), "description": .string("Show Done/Cancel and wait for the user. Defaults to false.")]),
                                 "purpose": .object(["type": .string("string")]),
                             ]),
                             "required": .array([.string("name")]),
@@ -250,7 +251,10 @@ nonisolated enum OxServices {
                         ]),
                         "outputSchema": .object([
                             "type": .string("object"),
-                            "properties": .object(["shown": .object(["type": .string("boolean")])]),
+                            "properties": .object([
+                                "shown": .object(["type": .string("boolean")]),
+                                "completion": .object(["type": .string("string"), "enum": .array([.string("completed"), .string("cancelled")])]),
+                            ]),
                             "required": .array([.string("shown")]),
                             "additionalProperties": .bool(false),
                         ]),
@@ -315,12 +319,13 @@ nonisolated enum OxServices {
             }
             ctx.setObject(detachBlock as AnyObject, forKeyedSubscript: "__nativeServiceDetach" as NSString)
 
-            let showPageBlock: @convention(block) (String, JSValue, JSValue, JSValue, JSValue) -> JSValue = { name, argsValue, sessionValue, pageURLValue, purposeValue in
+            let showPageBlock: @convention(block) (String, JSValue, JSValue, JSValue, JSValue, JSValue) -> JSValue = { name, argsValue, sessionValue, pageURLValue, waitValue, purposeValue in
                 let args = argsValue.isNull || argsValue.isUndefined ? nil : jsValueToJSON(argsValue)
                 let purpose = purposeValue.toString()!
+                let waitForUserInteraction = waitValue.toBool()
                 let session = sessionValue.isNull || sessionValue.isUndefined ? nil : jsValueToJSON(sessionValue)
                 let pageURL = pageURLValue.isNull || pageURLValue.isUndefined ? nil : pageURLValue.toString()
-                return env.call(suspendingTimeout: true) { try await $0.showServicePage(name: name, args: args, session: session, pageURL: pageURL, purpose: purpose) }
+                return env.call(suspendingTimeout: true) { try await $0.showServicePage(name: name, args: args, session: session, pageURL: pageURL, waitForUserInteraction: waitForUserInteraction, purpose: purpose) }
             }
             ctx.setObject(showPageBlock as AnyObject, forKeyedSubscript: "__nativeServiceShowPage" as NSString)
 
@@ -335,7 +340,7 @@ nonisolated enum OxServices {
           delete: (value) => { const options = __oxOptions(value, 'ox.service.delete'); return __nativeServiceDelete(String(options.domain), String(options.purpose)); },
           attach: (value) => { const options = __oxOptions(value, 'ox.service.attach'); return __nativeServiceAttach(String(options.domain), String(options.purpose)); },
           detach: (value) => { const options = __oxOptions(value, 'ox.service.detach'); return __nativeServiceDetach(String(options.domain), String(options.purpose)); },
-          showPage: (value) => { const options = __oxOptions(value, 'ox.service.showPage'); return __nativeServiceShowPage(String(options.name), options.input ?? null, options.session ?? null, options.pageUrl ?? null, String(options.purpose)); }
+          showPage: (value) => { const options = __oxOptions(value, 'ox.service.showPage'); return __nativeServiceShowPage(String(options.name), options.input ?? null, options.session ?? null, options.pageUrl ?? null, options.waitForUserInteraction ?? false, String(options.purpose)); }
         """
     )
 }

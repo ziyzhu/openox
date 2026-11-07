@@ -17,9 +17,9 @@ Preparation actions must leave the actual checkout page human-readable and ready
 
 ## Review and pay
 
-Present material transaction details, then call `await ox.service.showPage({ purpose, name, input, session, pageUrl })` with the preparation action's original qualified name, input, and routing, preserving omitted fields. `session` and `pageUrl` may both be supplied. Do not request separate chat confirmation: the user reviews and commits on the merchant's page. Never substitute a charge or order-submission action. Use the website's login action for authentication and the blocked action's live page for human verification.
+Present material transaction details, then call `await ox.service.showPage({ purpose, name, input, session, pageUrl, waitForUserInteraction: true })` with the preparation action's original qualified name, input, and routing, preserving omitted fields. `session` and `pageUrl` may both be supplied. Do not request separate chat confirmation: the user reviews and commits on the merchant's page. Never substitute a charge or order-submission action. Use the website's login action for authentication and the blocked action's live page for human verification.
 
-If navigation interrupts preparation, show its preserved page without rerunning it or claiming success. No special URL or completion-detection actions are needed. showPage returns immediately; explain the user's step and end the turn without polling or continuing dependent work.
+If navigation interrupts preparation, show its preserved page without rerunning it or claiming success. No special URL or completion-detection actions are needed. Explain the user's step before calling showPage. With `waitForUserInteraction: true`, the call waits for Done/Cancel and returns `completion`. Stop on `cancelled` and do not reopen automatically. On `completed`, inspect fresh order or receipt state before claiming success; Done alone is not proof of payment. Ordinary previews omit the option and return immediately.
 
 ## Verify and recover
 

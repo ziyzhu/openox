@@ -439,7 +439,7 @@ final class Conversation: Identifiable {
                 }
             },
             native: nativeServiceOperations,
-            presentWebsiteLogin: { [unowned self] service, page, session in
+            presentServiceHandoff: { [unowned self] service, page, session in
                 if presentations.browser != nil {
                     return await presentations.serviceHandoff.present(session: session)
                 }
@@ -451,7 +451,6 @@ final class Conversation: Identifiable {
                 )
                 defer {
                     service.conversationHandoffs[page.id] = nil
-                    document.apply(.removeServiceInspector(link))
                 }
                 embedServiceInspector(link)
                 return await session.run()

@@ -306,11 +306,6 @@ struct ConversationPage: View {
         let requestedSourceIDs = projection.sourceBlockIDs
         let blocks = projection.blocks
         let dockedPrompt: Conversation.PendingPrompt? = if case .prompt(let prompt) = activeInteraction { prompt } else { nil }
-        let browserPage = browserPage
-        let servicePageOwnerIDs = blocks.compactMap { block -> UUID? in
-            guard case .agentContent(.serviceInspector(let link)) = block.kind, link.pageID == nil else { return nil }
-            return block.id
-        }
         let transcript = transcript(
             blocks: blocks,
             latestCanvasBlockIDs: projection.latestCanvasBlockIDs,
@@ -319,12 +314,6 @@ struct ConversationPage: View {
             sourceBlockIDs: requestedSourceIDs,
             dockClearance: dockClearance
         )
-            .onChange(of: servicePageOwnerIDs, initial: true) { _, ownerIDs in
-                browserPageMount.reconcile(page: browserPage, ownerIDs: ownerIDs)
-            }
-            .onChange(of: browserPage.map(ObjectIdentifier.init), initial: true) { _, _ in
-                browserPageMount.reconcile(page: browserPage, ownerIDs: servicePageOwnerIDs)
-            }
             .toast($toast, accessibilityIdentifier: A11yID.ConversationControls.toast)
             .task(id: MessageFilesKey(conversation: conversation.id, blocks: conversation.transcriptBlockCount,
                                       isBusy: conversation.isBusy, files: conversation.filesRevision)) {
@@ -1104,7 +1093,7 @@ struct ConversationPage: View {
                     browserPage: browserPage,
                     browserPageMount: browserPageMount,
                     servicePageLinks: Dictionary(uniqueKeysWithValues: blocks.compactMap { block in
-                        guard case .agentContent(.serviceInspector(let link)) = block.kind, link.pageID != nil else { return nil }
+                        guard case .agentContent(.serviceInspector(let link)) = block.kind else { return nil }
                         return (block.id, link)
                     }),
                     servicePageOwnerIDs: blocks.map(\.id)
