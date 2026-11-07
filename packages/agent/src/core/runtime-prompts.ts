@@ -38,7 +38,7 @@ export function failureReceipt(input: { invocations: ReceiptInvocation[]; omitte
 
 export function outputTruncation(input: OutputTruncation) {
   if (typeof input?.path !== "string" || !Number.isSafeInteger(input.maxLines) || input.maxLines < 1 || !Number.isSafeInteger(input.maxBytes) || input.maxBytes < 1) throw new Error("Invalid output truncation state");
-  return `\n[Tool output truncated: showing the tail (${input.maxLines} lines or ${Math.floor(input.maxBytes / 1024)} KiB limit). Full output file: ${input.path}. Read with ox.fs.read({ purpose: 'Read remaining output', path: '${input.path}', offset: 1 }), then continue with nextOffset or search with ox.fs.grep. File expires when this conversation is unloaded.]`;
+  return `\n[Tool output truncated: showing the tail (${input.maxLines} lines or ${Math.floor(input.maxBytes / 1024)} KiB limit). Full output file: ${input.path}. Read with ox.fs.read({ purpose: 'Read remaining output', path: '${input.path}', offset: 1 }), then continue with nextOffset or search with ox.fs.grep. This file preserves emitted output, not content omitted by an upstream tool. Retrieved output is not evidence that all passages were read. File expires when this conversation is unloaded.]`;
 }
 
 export function imageReadGuidance(input: { path: string }) {

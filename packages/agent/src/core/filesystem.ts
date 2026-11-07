@@ -13,7 +13,7 @@ import { decodeBase64 } from "./base64";
 const tools = { read: createReadTool(), write: createWriteTool(), edit: createEditTool() };
 export type FileOperation = "stat" | "list" | "read" | "write" | "edit" | "rm" | "mkdir" | "move" | "copy" | "glob" | "grep";
 export interface FileRequest {
-  path?: string; from?: string; to?: string; recursive?: boolean; purpose?: string; offset?: number; limit?: number; content?: string; base64?: string;
+  path?: string; from?: string; to?: string; recursive?: boolean; purpose?: string; byteOffset?: number; offset?: number; limit?: number; content?: string; base64?: string;
   edits?: { oldText: string; newText: string }[]; pattern?: string; cursor?: string;
   options?: { limit?: number; glob?: string; ignoreCase?: boolean; literal?: boolean; contextLines?: number };
 }
@@ -128,6 +128,7 @@ export function validateFileRequest(operation: FileOperation, args: FileRequest)
   if (destination !== undefined) validateMutation(operation, args, destination);
   if (path.length > 4_096 || path.split("/").length > 64) throw new FileError("invalid", "Virtual path exceeds resource limits", path);
   if (operation === "read") {
+    if (args.byteOffset !== undefined && (!Number.isSafeInteger(args.byteOffset) || args.byteOffset < 0 || args.offset !== undefined || args.limit !== undefined)) throw new FileError("invalid", "Use byteOffset alone, or offset and limit", path);
     limit(args.offset, 1, Number.MAX_SAFE_INTEGER);
     limit(args.limit, 2_000, Number.MAX_SAFE_INTEGER);
   }
@@ -184,8 +185,32 @@ function readPage(result: ToolExecutionResult, args: FileRequest, totalLines: nu
   const clippedLine = result.diagnostics?.some(value => value.code === "truncated" && value.severity === "warn") ?? false;
   const next = (args.offset ?? 1) + text.split("\n").length;
   const truncated = clippedLine || next <= totalLines;
-  const diagnostics = clippedLine ? [{ path: args.path!, message: "One line exceeds the 50 KiB read limit. Its remainder cannot be resumed with line offsets; use a narrower source or explicit conversion." }] : [];
+  const diagnostics = clippedLine ? [{ path: args.path!, message: "One line exceeds the 50 KiB read limit. Its remainder cannot be resumed with line offsets; resume with byteOffset: 0 and nextByteOffset." }] : [];
   return { path: args.path, text, truncated, unsupported: null, nextOffset: truncated && !clippedLine ? next : null, diagnostics };
+}
+async function readBytes(env: MountedExecutionEnv, args: FileRequest, context: Context) {
+  const reader = getOrThrow(await toolEnvironment(env, args, () => {}).openBinaryReader(args.path!, { noFollow: true }, context));
+  try {
+    const info = getOrThrow(await reader.info(context));
+    const offset = args.byteOffset!;
+    if (offset > info.size) throw new FileError("invalid", "Byte offset exceeds source length", args.path);
+    const bytes = getOrThrow(await reader.read(offset, Math.min(8 * 1024, info.size - offset), context));
+    let end = bytes.length;
+    if (offset + end < info.size) {
+      const next = getOrThrow(await reader.read(offset + end, 1, context));
+      if ((next[0]! & 0xc0) === 0x80) {
+        while (end > 0 && (bytes[end - 1]! & 0xc0) === 0x80) end--;
+        end--;
+      }
+    }
+    if (bytes.length > 0 && end <= 0) throw new FileError("not_supported", "Byte reads require valid UTF-8 text", args.path);
+    let text: string;
+    try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes.subarray(0, end)); }
+    catch { throw new FileError("not_supported", "Byte reads require UTF-8 text and a character boundary", args.path); }
+    const truncated = offset + end < info.size;
+    return { path: args.path, text, truncated, unsupported: null, nextOffset: null, diagnostics: [],
+      byteOffset: offset, nextByteOffset: truncated ? offset + end : null, totalBytes: info.size };
+  } finally { await reader.close(context); }
 }
 async function fileCandidates(env: MountedExecutionEnv, root: FileInfo, excluded: Set<string>, position: FilePosition | undefined, context: Context): Promise<Candidates> {
   const pending = [root];
@@ -264,12 +289,12 @@ function searchLines(path: string, text: string, pattern: RE2JS, contextLines: n
 }
 const relativePath = (base: string, path: string) => base && path !== base ? path.slice(base.length + 1) : path;
 const searchBudget = (base: string) => base === "conversations" || base.startsWith("conversations/") ? 16 * 1024 * 1024 : 2 * 1024 * 1024;
-async function grepFiles(env: MountedExecutionEnv, candidates: Candidates, args: FileRequest, match: RE2JS, position: FilePosition | undefined, context: Context) {
+async function grepFiles(env: MountedExecutionEnv, candidates: Candidates, args: FileRequest, match: RE2JS, position: FilePosition | undefined, context: Context, singleFile: boolean) {
   const base = args.path!;
   const options = args.options ?? {};
   const count = options.limit ?? 100;
   const filter = options.glob ? expression(options.glob, true) : undefined;
-  const budget = base === "app/logs.jsonl" && env.mounts.some(mount => mount.path === "app") ? 32 * 1024 * 1024 : searchBudget(base);
+  const budget = singleFile || base === "app/logs.jsonl" && env.mounts.some(mount => mount.path === "app") ? 32 * 1024 * 1024 : searchBudget(base);
   const contextLines = options.contextLines ?? 0;
   const matches: SearchMatch[] = [];
   let scannedFiles = 0;
@@ -376,6 +401,7 @@ export class AgentFileSystem {
       getOrThrow(await env.writeFile(path, bytes, context));
       return item(getOrThrow(await env.fileInfo(path, context)));
     }
+    if (operation === "read" && args.byteOffset !== undefined) return readBytes(env, args, context);
     let totalLines = 0;
     const toolEnv = toolEnvironment(env, args, value => { totalLines = value; });
     const result = await executeFileTool(operation, args, toolEnv, context);
@@ -403,7 +429,7 @@ export class AgentFileSystem {
       candidates.paths = candidates.paths.filter(path => path !== "app/logs.jsonl");
       candidates.diagnostics.push({ path: "app/logs.jsonl", message: "App-wide logs are excluded from directory searches; read or search this path explicitly with approval." });
     }
-    if (operation === "grep") return grepFiles(env, candidates, args, match, position, context);
+    if (operation === "grep") return grepFiles(env, candidates, args, match, position, context, root.kind === "file");
     const paths = candidates.paths.filter(path => match.test(relativePath(base, path)));
     const count = options.limit ?? 100;
     const continuation = paths.length > count ? paths[count - 1]! : candidates.nextPath;
