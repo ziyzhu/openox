@@ -25,6 +25,8 @@ struct IOSConversationExecution: ConversationExecution {
 
 @MainActor
 struct IOSConversationFeedback: ConversationFeedback {
+    static let didComplete = Notification.Name("Conversation.didComplete")
+
     var isBackground: Bool { UIApplication.shared.applicationState == .background }
 
     func notifyAttention(identifier: String, title: String, body: String, isCurrent: @escaping @MainActor () -> Bool) async throws -> Bool {
@@ -47,7 +49,12 @@ struct IOSConversationFeedback: ConversationFeedback {
 
     func notifyCompletion(id: UUID, title: String, body: String) {
         guard UIApplication.shared.applicationState != .active else {
-            Log.session.info("Conversation.notify skipped id=\(id) reason=active")
+            NotificationCenter.default.post(
+                name: Self.didComplete,
+                object: id,
+                userInfo: ["title": title, "body": body]
+            )
+            Log.session.info("Conversation.notify inApp id=\(id)")
             return
         }
         let conversationId = id.uuidString

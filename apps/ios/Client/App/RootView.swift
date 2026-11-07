@@ -532,6 +532,7 @@ struct RootView: View {
     @State private var sharedNoteImportError: String?
     @State private var sharedNoteComposer: (conversation: ObjectIdentifier, composer: ConversationComposerModel)?
     @State private var sidebarInteraction = SidebarInteraction()
+    @State private var completionBanner: (id: UUID, conversationID: UUID, title: String, body: String)?
     @Environment(\.scenePhase) private var scenePhase
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -558,8 +559,55 @@ struct RootView: View {
 
     var body: some View {
         observedRoot
+            .overlay(alignment: .top) {
+                if let banner = completionBanner {
+                    Button {
+                        completionBanner = nil
+                        dismissKeyboard(via: "completionBanner")
+                        openConversationFromSidebar(banner.conversationID)
+                        Log.ui.info("Conversation.banner opened id=\(banner.conversationID)")
+                    } label: {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(banner.title)
+                                    .font(Theme.Fonts.labelMd)
+                                    .lineLimit(1)
+                                Text(banner.body)
+                                    .font(.subheadline)
+                                    .lineLimit(2)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            Image(systemName: "chevron.right")
+                        }
+                        .foregroundStyle(Theme.Colors.onSurface)
+                        .alertGlassPill(in: RoundedRectangle(cornerRadius: Theme.Radius.xl))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("conversation.completionBanner")
+                    .accessibilityHint("Open completed conversation")
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.top, 4)
+                }
+            }
+            .task(id: completionBanner?.id) {
+                guard let banner = completionBanner else { return }
+                try? await Task.sleep(for: .seconds(8))
+                guard !Task.isCancelled, completionBanner?.id == banner.id else { return }
+                completionBanner = nil
+            }
+            .onReceive(NotificationCenter.default.publisher(for: IOSConversationFeedback.didComplete)) { notification in
+                guard scenePhase == .active,
+                      let id = notification.object as? UUID,
+                      id != conversations.currentId,
+                      conversations.contains(id),
+                      let title = notification.userInfo?["title"] as? String,
+                      let body = notification.userInfo?["body"] as? String else { return }
+                completionBanner = (UUID(), id, title, body)
+                Log.ui.info("Conversation.banner shown id=\(id)")
+            }
             .onChange(of: conversations.current.map(ObjectIdentifier.init)) { _, identity in
                 if sharedNoteComposer?.conversation != identity { sharedNoteComposer = nil }
+                if completionBanner?.conversationID == conversations.currentId { completionBanner = nil }
             }
             .alert("Couldn't Attach Shared Files", isPresented: Binding(
                 get: { sharedNoteImportError != nil },
@@ -570,6 +618,7 @@ struct RootView: View {
                 Text(sharedNoteImportError ?? "")
             }
             .onChange(of: scenePhase) { _, phase in
+                if phase != .active { completionBanner = nil }
                 switch phase {
                 case .background:
                     conversations.current?.setTranscriptVisible(false)
@@ -682,11 +731,13 @@ struct RootView: View {
                 AppPresentationCoordinator.shared.unblockBrowser(owner: browserBlockerOwner)
             }
             .onChange(of: storage.switchEpoch) { _, _ in
+                completionBanner = nil
                 Log.ui.info("RootView.profileSwitch epoch=\(storage.switchEpoch) root=\(storage.root.path)")
                 monitorActiveProfile()
                 refreshCompactSidebar()
             }
             .onChange(of: conversations.summaries) { _, _ in
+                if let banner = completionBanner, !conversations.contains(banner.conversationID) { completionBanner = nil }
                 refreshCompactSidebar()
             }
             .onChange(of: AppLocale.shared.language) { _, _ in
