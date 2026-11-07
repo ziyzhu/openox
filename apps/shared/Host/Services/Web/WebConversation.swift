@@ -28,11 +28,34 @@ final class WebConversation {
     let service: Service
     let page: Service.ServiceWebPage
     private let navigationGeneration: Int
-    private(set) var continuation = false
+    private enum State: Equatable {
+        case ready
+        case submitting
+        case responding(submission: String, continuation: Bool)
+        case idle(submission: String, continuation: Bool)
+        case closed
+    }
+    private var state = State.ready
     private(set) var lastUsed = Date()
     private(set) var activeSince = Date()
-    private(set) var isBusy = false
-    private var isClosed = false
+    var isBusy: Bool {
+        switch state {
+        case .submitting, .responding: true
+        case .ready, .idle, .closed: false
+        }
+    }
+    var continuation: Bool {
+        switch state {
+        case .responding(_, let continuation), .idle(_, let continuation): continuation
+        case .ready, .submitting, .closed: false
+        }
+    }
+    private var latestSubmission: String? {
+        switch state {
+        case .responding(let submission, _), .idle(let submission, _): submission
+        case .ready, .submitting, .closed: nil
+        }
+    }
     private var conversationRef: String?
     private struct Submission {
         let nativeID: String
@@ -41,7 +64,6 @@ final class WebConversation {
         var terminal = false
     }
     private var submissions: [String: Submission] = [:]
-    private var latestSubmission: String?
     private var modelID: JSONValue?
     private var accountID: JSONValue?
     private var options: JSONValue?
@@ -94,7 +116,7 @@ final class WebConversation {
     }
 
     var isCurrent: Bool {
-        !isClosed && !isExpired() && service.owns(page) && page.isReady && page.navigationGeneration == navigationGeneration
+        state != .closed && !isExpired() && service.owns(page) && page.isReady && page.navigationGeneration == navigationGeneration
     }
 
     func checkPage() throws {
@@ -152,8 +174,7 @@ final class WebConversation {
                     && ref.objectValue?["name"]?.stringValue == attachments[index].name
                     && ref.objectValue?["mimeType"]?.stringValue == attachments[index].mimeType
               }) else { throw WebsiteProviderError("Website attachments do not match the staged files", kind: .unsupportedInput) }
-        // Admission is synchronous before any await; another submit cannot enter this page.
-        isBusy = true
+        state = .submitting
         activeSince = Date()
         do {
             if !attachments.isEmpty, let selectedSession {
@@ -178,12 +199,11 @@ final class WebConversation {
                 throw WebsiteProviderError("Website reused a submission identity; submission may have occurred")
             }
             submissions[handle] = Submission(nativeID: localID)
-            latestSubmission = handle
+            state = .responding(submission: handle, continuation: canContinue)
             conversationRef = reference
             modelID = fields["modelId"]
             accountID = fields["accountId"]
             options = fields["options"]
-            continuation = canContinue
             output["submissionId"] = .string(handle)
             output["conversationRef"] = .string(id.uuidString)
             Log.service.info("WebConversation.submit session=\(id) submission=\(handle) certainty=\(output["submission"]?.stringValue ?? "uncertain") continuation=\(canContinue) turns=\(messages.count) files=\(attachments.count)")
@@ -242,8 +262,7 @@ final class WebConversation {
             guard retainedBytes + submission.text.utf8.count <= ModelServiceContract.maximumRetainedResponseBytes else { throw WebsiteProviderError("Website response history exceeded the retained size limit") }
             submissions[handle] = submission
             if submission.terminal, handle == latestSubmission {
-                isBusy = false
-                if events.last?.objectValue?["type"]?.stringValue == "failed" { continuation = false }
+                state = .idle(submission: handle, continuation: continuation && events.last?.objectValue?["type"]?.stringValue != "failed")
             }
             output["conversationRef"] = .string(id.uuidString)
             Log.service.debug("WebConversation.read session=\(id) submission=\(handle) after=\(after) events=\(events.count) terminal=\(submission.terminal) bytes=\(submission.text.utf8.count)")
@@ -261,8 +280,7 @@ final class WebConversation {
             throw WebsiteProviderError("Invalid website cancellation receipt")
         }
         if value.objectValue?["status"]?.stringValue == "cancelled", handle == latestSubmission {
-            isBusy = false
-            continuation = false
+            state = .idle(submission: handle, continuation: false)
         }
         Log.service.info("WebConversation.cancel session=\(id) submission=\(handle) status=\(value.objectValue?["status"]?.stringValue ?? "unknown")")
         return value
@@ -271,12 +289,13 @@ final class WebConversation {
     func ownsSubmission(_ handle: String) -> Bool { submissions[handle] != nil }
 
     func close(reason: String = "released") {
-        guard !isClosed else { return }
-        isClosed = true
+        guard state != .closed else { return }
+        let wasBusy = isBusy
+        state = .closed
         service.manager.webConversations.removeValue(forKey: id)
         submissions.removeAll()
         service.closeOwnedPage(page)
-        Log.service.info("WebConversation.close domain=\(service.domain) owner=\(owner.logLabel) session=\(id) busy=\(isBusy) reason=\(reason)")
+        Log.service.info("WebConversation.close domain=\(service.domain) owner=\(owner.logLabel) session=\(id) busy=\(wasBusy) reason=\(reason)")
     }
 }
 
