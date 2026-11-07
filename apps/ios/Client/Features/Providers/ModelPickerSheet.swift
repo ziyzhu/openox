@@ -10,17 +10,19 @@ struct ModelPickerSheet: View {
         NavigationStack {
             ModelPickerContent(
                 title: isChoosingInitialDefault ? "Choose default model" : "Model for this conversation",
-                activeSelection: conversation.modelSelection,
+                activeSelection: conversation.modelSelectionChange?.pendingSelection ?? conversation.modelSelection,
                 scopeDescription: isChoosingInitialDefault
                     ? "Your choice will be used for this conversation and future conversations."
-                    : "Changes apply immediately and stay with this conversation.",
+                    : conversation.isBusy
+                        ? "Changes apply after the current response and stay with this conversation."
+                        : "Changes apply immediately and stay with this conversation.",
                 onClose: { dismiss() }
             ) { client, model, selection in
-                Log.ui.info("ModelPicker.select conversation=\(conversation.id) client=\(client.id) model=\(model.id) region=\(selection.region.rawValue)")
                 if registry.defaultModel == nil {
                     registry.select(model, in: client.id, region: selection.region)
                 }
-                conversation.switchModel(to: client, model: model, selection: selection)
+                let status = conversation.requestModelSelection(.init(client: client, model: model))
+                Log.ui.info("ModelPicker.select conversation=\(conversation.id) client=\(client.id) model=\(model.id) region=\(selection.region.rawValue) status=\(status)")
             }
         }
     }
