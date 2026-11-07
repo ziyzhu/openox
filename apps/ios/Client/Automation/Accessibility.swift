@@ -94,6 +94,7 @@ nonisolated enum A11yID {
         static let skills = "settings.skills"
         static let skillSearch = "settings.skills.search"
         static let skillServiceSearch = "settings.skillServices.search"
+        static let skillServicesClose = "settings.skillServices.close"
         static let skillCreate = "settings.skillCreate"
         static let skillName = "settings.skillName"
         static let skillDescription = "settings.skillDescription"
@@ -211,7 +212,7 @@ nonisolated enum A11yID {
         enum FileItem {
             static let open = "conversation.file.open"
             static let list = "conversation.file.list"
-            static let done = "conversation.file.done"
+            static let close = "conversation.file.close"
             static func item(_ filename: String) -> String { "conversation.file.item.\(filename)" }
         }
 
@@ -293,6 +294,7 @@ nonisolated enum A11yID {
         static func canvasExpand(_ filename: String) -> String { "conversation.canvas.expand.\(filename)" }
 
         static func permissionRequest(_ icon: String) -> String { "conversation.permissionRequest.\(icon)" }
+        static let permissionArgumentsClose = "conversation.permissionArguments.close"
         static func step(_ icon: String) -> String { "conversation.step.\(icon)" }
         static let permissionAcknowledgement = "conversation.permissionAcknowledgement"
         static let choiceAcknowledgement = "conversation.choiceAcknowledgement"
@@ -306,6 +308,7 @@ nonisolated enum A11yID {
         static let back = "serviceHandoff.back"
         static let forward = "serviceHandoff.forward"
         static let done = "serviceHandoff.done"
+        static let close = "serviceHandoff.close"
     }
 
     enum ServiceBrowser {
@@ -314,7 +317,7 @@ nonisolated enum A11yID {
         static let reloadOrStop = "serviceBrowser.reloadOrStop"
         static let share = "serviceBrowser.share"
         static let openInSafari = "serviceBrowser.openInSafari"
-        static let done = "serviceBrowser.done"
+        static let close = "serviceBrowser.close"
         static let startPage = "serviceBrowser.startPage"
         static let startPageEmpty = "serviceBrowser.startPageEmpty"
         static func startPageService(_ domain: String) -> String { "serviceBrowser.startPage.\(domain)" }

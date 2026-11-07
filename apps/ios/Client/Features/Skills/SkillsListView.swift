@@ -493,7 +493,7 @@ private struct SkillServicePicker: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                    SheetDismissToolbarButton(accessibilityIdentifier: A11yID.Settings.skillServicesClose) { dismiss() }
                 }
             }
         }

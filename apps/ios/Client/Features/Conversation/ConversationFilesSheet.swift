@@ -31,8 +31,7 @@ struct ConversationFilesSheet: View {
             .accessibilityIdentifier(A11yID.ConversationControls.FileItem.list)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .accessibilityIdentifier(A11yID.ConversationControls.FileItem.done)
+                    SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ConversationControls.FileItem.close) { dismiss() }
                 }
             }
         }

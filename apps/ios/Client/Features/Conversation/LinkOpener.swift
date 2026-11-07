@@ -88,7 +88,7 @@ struct ServiceBrowserView: View {
     }
 
     private var doneButton: some View {
-        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceBrowser.done) { dismiss() }
+        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceBrowser.close) { dismiss() }
     }
 }
 

@@ -314,8 +314,7 @@ private struct InlineCanvasExpandedView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button("Done", action: dismiss)
-                            .accessibilityIdentifier(A11yID.ServiceInspector.close)
+                        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceInspector.close, action: dismiss)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         FileShareButton(file: file, scope: session.source.scope) {

@@ -190,8 +190,8 @@ struct PermissionRequestCard: View {
                 .navigationTitle("Arguments")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { showingArguments = false }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ConversationControls.permissionArgumentsClose) { showingArguments = false }
                     }
                 }
             }

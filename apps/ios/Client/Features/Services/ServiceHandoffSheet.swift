@@ -49,7 +49,7 @@ struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceHandoff.done) {
+                        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceHandoff.close) {
                             session.dismissPresentation()
                             dismiss()
                         }
