@@ -70,6 +70,11 @@ Object.assign(globalThis, {
     return __oxDurableTimer(() => callback(...args), Math.max(0, Math.min(Number(ms) || 0, 2_147_483_647)));
   },
   clearTimeout: (id: number) => __oxDurableClearTimer(id),
+  setImmediate: (callback: (...args: unknown[]) => void, ...args: unknown[]) => {
+    if (typeof callback !== "function") throw new TypeError("Immediate callback must be a function");
+    return __oxDurableTimer(() => callback(...args), 0);
+  },
+  clearImmediate: (id: number) => __oxDurableClearTimer(id),
   queueMicrotask: (callback: () => void) => {
     if (typeof callback !== "function") throw new TypeError("Microtask must be a function");
     void Promise.resolve().then(callback).catch(error => {
