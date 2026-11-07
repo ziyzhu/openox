@@ -1,5 +1,5 @@
 export { Schedules } from "./profile/schedules";
-export { openProfileRuntime, ProfileRuntime, type ProfileRuntimeOptions, type CommittedEvent } from "./profile/runtime";
+export { openProfileRuntime, ProfileRuntime, type ProfileRuntimeOptions, type ConversationUpdate } from "./profile/runtime";
 export { ProfileFiles, ProfileFile, ProfileIndex, LegacyProfileFile, canonical } from "./profile/files";
 export { profileEnv, profileMounts } from "./profile/filesystem";
 export { mountedFileSystem, type FileBackend, type FileMount, type TextFileMount, type MountedExecutionEnv } from "./core/file-mounts";

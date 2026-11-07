@@ -1,9 +1,8 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import type { Models, AssistantMessage, Message } from "@earendil-works/pi-ai";
-import { Harness, createRegistry, watchEvents, type AgentEvent, type AgentEventStream, type ConversationId,
+import type { Models, Message } from "@earendil-works/pi-ai";
+import { Harness, createRegistry, type ConversationView, type ConversationWatch, type WatchCall, type LiveState, type InboxState, type SettledSubmissionRecord, type ConversationId,
   type Conversation, type EntryDraft, type HarnessSettings, type InputSubmissionDraft, type Registry, type Submission, type SubmissionId } from "@earendil-works/pi-durable";
 import { SqliteStorage, type SqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite";
-import { applyChanges } from "./committed-partial";
 import { ProfileFiles } from "./files";
 import type { FilePayloadStore } from "./file-payloads";
 import { profileMounts } from "./filesystem";
@@ -17,7 +16,7 @@ import { type ProfileFileBackend, type ProfileFileRecord } from "./file-store";
 import type { FileRecord } from "./file-record";
 
 const context = BACKGROUND_CONTEXT;
-export type CommittedEvent = AgentEvent & { partial?: AssistantMessage };
+export type ConversationUpdate = Extract<WatchCall<ConversationView>, { kind: "value" }>;
 export interface ProfileRuntimeOptions {
   database: SqliteDatabase;
   profileID: string;
@@ -31,19 +30,27 @@ export interface ProfileRuntimeOptions {
   createBlobID?(): Promise<string>;
   decodeConversation?(sources: Record<string, FileRecord>, files: ProfileFileRecord[]): Promise<{ entries: EntryDraft[]; expectedContext: Message[]; payloads: FileRecord[] }>;
   beforeProgress?(reference: ConversationReference): Promise<void>;
-  onEvents?(conversationId: ConversationId, events: CommittedEvent[]): Promise<void>;
+  onView?(conversationId: ConversationId, update: ConversationUpdate): Promise<void>;
   onReport?(error: unknown): void;
 }
 interface Projection {
-  stream: AgentEventStream;
-  pending: Set<SubmissionId>;
-  partial?: AssistantMessage;
-  partialPresented?: boolean;
+  stream: ConversationWatch;
+  delivered: ConversationView;
   ending?: string;
-  waiter?: { id?: SubmissionId; delivered: Set<SubmissionId>; resolve(): void; reject(error: Error): void };
+  waiter?: { receipt?: SettledSubmissionRecord; resolve(): void; reject(error: Error): void };
 }
-const isTextDelta = (event: Extract<AgentEvent, { type: "message_update" }>) =>
-  event.changes.every(change => change.type === "text_delta" || change.type === "thinking_delta");
+function settleProjection(projection: Projection) {
+  const receipt = projection.waiter?.receipt;
+  if (!receipt) return;
+  const live = projection.delivered.docs["pi.live"] as LiveState | undefined;
+  const inbox = projection.delivered.docs["pi.inbox"] as InboxState | undefined;
+  const newest = projection.delivered.entries.at(-1)?.id ?? projection.delivered.before ?? 0;
+  const delivered = receipt.status === "done"
+    ? newest >= (receipt.answer ?? receipt.entry ?? 0)
+    : live?.runFailure?.inputs.includes(receipt.id)
+      || (newest >= (receipt.entry ?? 0) && !live?.run?.inputs.includes(receipt.id) && !inbox?.items.some(item => item.id === receipt.id));
+  if (delivered) projection.waiter!.resolve();
+}
 
 export class ProfileRuntime {
   readonly files: ProfileFiles;
@@ -87,7 +94,7 @@ export class ProfileRuntime {
     let harness: Harness | undefined;
     try {
       harness = await Harness.open(await SqliteStorage.open(options.database), { models: options.models, registry,
-        settings: options.settings, env: () => runtime!.env, onReport: options.onReport }, context);
+        settings: options.settings, env: () => runtime!.env, onReport: report => options.onReport?.(report.error) }, context);
       runtime = new ProfileRuntime(harness, registry, options);
       await runtime.files.initialize();
       registry.install(profileTools(runtime.files, runtime.files.physical));
@@ -186,44 +193,27 @@ export class ProfileRuntime {
   private async attach(id: ConversationId) {
     const conversation = await this.conversation(id);
     if (this.projections.has(id)) return;
-    const stream = await watchEvents(this.harness, id, context);
-    const projection: Projection = { stream, pending: new Set([...(stream.snapshot.run?.inputs ?? []), ...stream.snapshot.inbox.map(({ id }) => id)]),
-      partial: stream.snapshot.generation?.message ? structuredClone(stream.snapshot.generation.message) : undefined };
+    const stream = await conversation.watch(context);
+    const projection: Projection = { stream, delivered: stream.value };
     this.projections.set(id, projection);
-    stream.start(async events => {
-      if (events.some(event => event.type === "snapshot")) {
-        throw new Error("Committed event overflow requires snapshot rehydration; this isolated rollout cannot continue safely");
-      }
-      const enriched = events.map(event => {
-        if (event.type === "message_start" && event.message.role === "assistant") {
-          projection.partial = structuredClone(event.message);
-          projection.partialPresented = true;
-        }
-        if (event.type === "message_update" && projection.partial) {
-          applyChanges(projection.partial, event);
-          if (projection.partialPresented && isTextDelta(event)) return event;
-          projection.partialPresented = true;
-          return { ...event, partial: structuredClone(projection.partial) };
-        }
-        return event;
-      });
-      for (const event of events) if (event.type === "submission") projection.pending.add(event.record.id);
-      await this.options.onEvents?.(id, enriched);
-      const waiter = projection.waiter;
-      for (const event of events) {
-        if (event.type === "submission" && (event.record.status === "done" || event.record.status === "unanswered")) {
-          projection.pending.delete(event.record.id);
-          waiter?.delivered.add(event.record.id);
-        }
-      }
-      if (waiter?.id !== undefined && waiter.delivered.has(waiter.id)) waiter.resolve();
+    try {
+      await this.options.onView?.(id, { kind: "value", value: stream.value, ops: [], retired: false });
+    } catch (error) {
+      this.projections.delete(id);
+      await stream.stop();
+      throw error;
+    }
+    stream.start(async update => {
+      if (update.kind === "failed") throw update.error;
+      await this.options.onView?.(id, update);
+      projection.delivered = update.value;
+      settleProjection(projection);
     });
     void stream.closed.then(end => {
-      projection.ending = end.reason;
-      projection.waiter?.reject(end.reason === "listener_error" ? end.error : new Error(`Committed projection closed: ${end.reason}`));
-      if (end.reason === "listener_error") {
+      projection.ending = end.kind;
+      projection.waiter?.reject(end.kind === "listener_error" ? end.error : new Error(`Conversation projection closed: ${end.kind}`));
+      if (end.kind === "listener_error") {
         this.options.onReport?.(end.error);
-        // A projection failure must stop unobserved effects; orderly close never uses abort.
         void (async () => {
           await this.options.beforeProgress?.(this.conversations.reference(id));
           await conversation.abort(context);
@@ -233,32 +223,49 @@ export class ProfileRuntime {
   }
 
   private async observedSubmission(reference: ConversationId | ConversationReference,
-    acquire: (conversation: Conversation, id: ConversationId) => Promise<{ submission: Submission; settled: boolean }>) {
+    acquire: (conversation: Conversation, id: ConversationId) => Promise<Submission>) {
     const id = this.scopedID(reference);
     const conversation = await this.conversation(id);
     await this.observe(id);
     const projection = this.projections.get(id)!;
-    if (projection.ending) throw new Error(`Committed projection closed: ${projection.ending}`);
+    if (projection.ending) throw new Error(`Conversation projection closed: ${projection.ending}`);
     if (projection.waiter) throw new Error("Conversation already has an observed run");
-    const observed = new Promise<void>((resolve, reject) => { projection.waiter = { delivered: new Set(), resolve, reject }; });
+    const observed = new Promise<void>((resolve, reject) => { projection.waiter = { resolve, reject }; });
     void observed.catch(() => {});
     try {
-      const { submission, settled } = await acquire(conversation, id);
-      projection.waiter!.id = submission.id;
-      if (projection.waiter!.delivered.has(submission.id)) projection.waiter!.resolve();
-      const receipt = await submission.wait(context);
-      if (!settled || projection.pending.has(submission.id)) await observed;
-      return { receipt, messages: (await conversation.context(context)).messages.filter(message => message.role !== "system") };
+      const submission = await acquire(conversation, id);
+      const observation = this.harness.observeCommits({
+        advance: publication => {
+          for (const change of publication.changes) {
+            if (change.type === "submission" && change.value.id === submission.id
+              && (change.value.status === "done" || change.value.status === "unanswered")) {
+              projection.waiter!.receipt = change.value;
+              settleProjection(projection);
+            }
+          }
+        },
+        end: end => {
+          if (end.kind === "failed" || end.kind === "listener_error") {
+            projection.waiter?.reject(end.error instanceof Error ? end.error : new Error(String(end.error)));
+          }
+        },
+      });
+      try {
+        const status = await submission.status(context);
+        if (status.status === "done" || status.status === "unanswered") projection.waiter!.receipt = status;
+        this.harness.resume();
+        settleProjection(projection);
+        await observed;
+        return { receipt: projection.waiter!.receipt!, messages: (await conversation.context(context)).messages.filter(message => message.role !== "system") };
+      } finally { observation.detach(); }
     } finally { projection.waiter = undefined; }
   }
 
   async run(reference: ConversationId | ConversationReference, input: InputSubmissionDraft) {
     return this.observedSubmission(reference, async (conversation, id) => {
-      const existing = input.requestId === undefined ? undefined : await this.harness.commit(
-        tx => tx.submissionByRequest(id, input.requestId!), context);
       await this.options.beforeProgress?.(this.conversations.reference(id));
       const submission = await conversation.submit(input, context);
-      return { submission, settled: existing?.status === "done" || existing?.status === "unanswered" };
+      return submission;
     });
   }
 
@@ -269,7 +276,7 @@ export class ProfileRuntime {
       const existing = await submission.status(context);
       if (existing.conversationId !== id) throw new Error("Submission conversation scope mismatch");
       await this.options.beforeProgress?.(this.conversations.reference(id));
-      return { submission, settled: existing.status === "done" || existing.status === "unanswered" };
+      return submission;
     });
   }
 

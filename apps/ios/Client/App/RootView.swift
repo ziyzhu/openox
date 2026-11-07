@@ -200,7 +200,7 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
                 let changesPage = max(abs(translation), predicted) > size.width * 0.3
                 let target = changesPage ? opposite(of: origin) : origin
                 Log.ui.info("RootView.sidebarDrag phase=end origin=\(origin.rawValue) translation=\(Int(translation)) predicted=\(Int(predicted)) target=\(target.rawValue)")
-                settle(on: target)
+                settle(on: target, velocity: value.velocity.width)
             }
     }
 
@@ -217,8 +217,15 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
         page == .sidebar ? .workspace : .sidebar
     }
 
-    private func settle(on target: CompactPage) {
-        let animation = reduceMotion ? Theme.Animation.press : RootView.sidebarSettleAnimation
+    private func settle(on target: CompactPage, velocity: CGFloat) {
+        let destination = target == .sidebar ? size.width : 0
+        let distance = destination - travel
+        let initialVelocity = abs(distance) > 1 ? min(10, max(-10, velocity / distance)) : 0
+        let animation = reduceMotion ? Theme.Animation.press : Animation.interpolatingSpring(
+            duration: 0.42,
+            bounce: 0,
+            initialVelocity: initialVelocity
+        )
         withAnimation(animation, completionCriteria: .logicallyComplete) {
             page = target
             dragPhase = .idle

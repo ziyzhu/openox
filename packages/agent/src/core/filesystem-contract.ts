@@ -20,7 +20,7 @@ const cursor = { ...string("Continuation from the previous page of this same ope
 const diagnostics = array(object({ path, message: string("Why this path could not be read completely or searched.") }, ["path", "message"]));
 const tools = { read: createReadTool(), write: createWriteTool(), edit: createEditTool() };
 export const filesystemInputs = Object.fromEntries(Object.entries(tools).map(([name, tool]) => [name, {
-  ...tool.parameters, ...input(tool.parameters.properties, tool.parameters.required),
+  ...tool.parameters, ...input(tool.parameters.properties as Record<string, unknown>, tool.parameters.required as string[]),
 }]));
 const schemas = {
   stat: { inputSchema: input({ path }, ["path"]), outputSchema: item },

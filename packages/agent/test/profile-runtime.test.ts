@@ -9,7 +9,7 @@ import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promise
 import { join } from "node:path";
 import { FileError, getOrThrow } from "@earendil-works/pi-durable/env";
 import { profileEnv } from "../src/profile/filesystem";
-import { openProfileRuntime, type ProfileRuntime, type CommittedEvent, type ProfileRuntimeOptions,
+import { openProfileRuntime, type ProfileRuntime, type ConversationUpdate, type ProfileRuntimeOptions,
   canonical, type FileOperation, type FileRequest,
   type ConversationReference, type ConversationHistoryCursor, type ConversationListCursor, type ConversationIndexCursor } from "../src/index";
 import { IOSAgentAdapter } from "../src/adapters/ios/agent";
@@ -25,13 +25,13 @@ type FixtureOptions = Partial<ProfileRuntimeOptions> & {
   authorizeFile?(id: ConversationId, action: "write" | "edit", path: string): Promise<void>;
   onSkillActivation?(id: ConversationId, callID: string, name: string): Promise<string>;
 };
-async function fixture(profileID = "fixture", onEvents: (id: ConversationId, events: CommittedEvent[]) => Promise<void> = async () => {}, overrides: FixtureOptions = {}) {
+async function fixture(profileID = "fixture", onView: (id: ConversationId, update: ConversationUpdate) => Promise<void> = async () => {}, overrides: FixtureOptions = {}) {
   const models = createModels();
   const faux = fauxProvider({ provider: "fixture", models: [{ id: "mock" }], tokensPerSecond: 100_000 });
   faux.setResponses(Array.from({ length: 4 }, () => fauxAssistantMessage([{ type: "text", text: "hello" }])));
   models.setProvider(faux.provider);
   const session = await openProfileRuntime({ database: backend().db, profileID, models, registry: createRegistry(),
-    createBlobID: async () => crypto.randomUUID(), onEvents,
+    createBlobID: async () => crypto.randomUUID(), onView,
     settings: { retry: { enabled: false }, compaction: { enabled: false } }, ...overrides });
   session.registry.install(defineExtension({ name: "fixture-filesystem", tools: [defineTool({
     name: "execute", description: "Invoke the fixture's ox.fs adapter", parameters: Type.Object({ operation: Type.String(), args: Type.Any() }),
@@ -64,14 +64,14 @@ test("core entry does not install host globals or runtime shims", async () => {
   expect(code, error).toBe(0);
 });
 
-test("in-process host executes an unbound Pi conversation and delivers committed events", async () => {
-  const events: CommittedEvent[] = [];
-  const session = await fixture("fixture", async (_, frames) => { events.push(...frames); });
+test("in-process host executes an unbound Pi conversation and delivers conversation views", async () => {
+  const events: ConversationUpdate[] = [];
+  const session = await fixture("fixture", async (_, frames) => { events.push(frames); });
   const handle = await conversation(session);
   const result = await session.run(handle.id, { type: "input", content: "hello", requestId: "one" });
   expect(result.receipt.status).toBe("done");
   expect(result.messages.at(-1)?.role).toBe("assistant");
-  expect(events.some(event => event.type === "run_end")).toBe(true);
+  expect(events.some(update => !update.value.docs["pi.live"]?.run && update.value.entries.some(entry => entry.kind === "pi.assistant"))).toBe(true);
 });
 
 test("Profile runtimes with colliding numeric conversation IDs isolate models, files, observers and close", async () => {
@@ -90,7 +90,7 @@ test("Profile runtimes with colliding numeric conversation IDs isolate models, f
   expect(await second.files.read("MEMORY.md")).toBe("still open");
 });
 
-test("completed request IDs deduplicate without waiting for a nonexistent second run_end", async () => {
+test("completed request IDs deduplicate without waiting for a nonexistent second view", async () => {
   const session = await fixture(); const handle = await conversation(session);
   const input = { type: "input" as const, content: "hello", requestId: "same" };
   const first = await session.run(handle.id, input);
@@ -98,13 +98,13 @@ test("completed request IDs deduplicate without waiting for a nonexistent second
   expect(again.receipt.id).toBe(first.receipt.id);
 });
 
-test("concurrent observer attachment creates one committed delivery stream", async () => {
-  const events: CommittedEvent[] = [];
-  const session = await fixture("fixture", async (_, frames) => { events.push(...frames); });
+test("concurrent observer attachment creates one conversation watch", async () => {
+  const events: ConversationUpdate[] = [];
+  const session = await fixture("fixture", async (_, frames) => { events.push(frames); });
   const handle = await conversation(session);
   await Promise.all([session.observe(handle.id), session.observe(handle.id)]);
   await session.run(handle.id, { type: "input", content: "hello" });
-  expect(events.filter(event => event.type === "run_end")).toHaveLength(1);
+  expect(events.filter(update => !update.value.docs["pi.live"]?.run && update.value.entries.some(entry => entry.kind === "pi.assistant"))).toHaveLength(1);
 });
 
 test("multiple conversations in one Profile runtime route events by Pi identity", async () => {

@@ -30,6 +30,7 @@ export const LegacyProfileFile = defineDocFamily<{ path: string; size: number; s
 
 const FilesystemBinding = defineDoc<{ backend: string }>({
   kind: "ox.filesystem", version: 1, scope: "session", initial: () => ({ backend: "" }),
+  checkpointWhen: () => false,
 });
 
 function owned(path: string) {

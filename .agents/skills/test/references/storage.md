@@ -206,6 +206,13 @@ Overwrite, edit, filename reuse and physical-backend orphan collection are refus
 `F_FULLFSYNC` has an explicit supported-platform fallback; simulator passes do not
 establish physical-device power-loss durability.
 
+Pi Durable 1.4.0 automatically upgrades SQLite schema 1 to 2 when opening storage,
+rebuilding the task table to support sleeping tasks. Pi Durable 1.3.0 and earlier
+reject the upgraded database; downgrade requires a retained predecessor snapshot.
+Pi Durable 1.5.0 keeps SQLite schema 2 but migrates `pi.live` to version 3,
+`pi.generation` tasks to version 2, and `pi.tool` tasks to version 3. Older
+Pi runtimes cannot read or resume these newer document/task versions. Streaming
+progress is held in memory for up to one second before storage publication.
 Pi's nine tables own history, documents and execution. `ox.profile` v1 provides
 an index/integrity binding, not a competing manifest. `ox.file` v1 holds UTF-8
 memory/skill documents. `ox.filesystem` v1 binds the backend as

@@ -74,13 +74,14 @@ struct ThinkingRow: View {
     private var showsLoader: Bool {
         isLive && label == L10n.string("Plowing…")
     }
+    private var accessibilityLabel: String { showsLoader ? L10n.string("Thinking") : label }
 
     var body: some View {
         Group {
             if trace.isEmpty {
                 rowHeader
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(label)
+                    .accessibilityLabel(accessibilityLabel)
                     .accessibilityIdentifier(A11yID.ConversationControls.activity)
             } else {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
@@ -88,7 +89,7 @@ struct ThinkingRow: View {
                         rowHeader
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(label)
+                    .accessibilityLabel(accessibilityLabel)
                     if !sources.isEmpty {
                         SourceChipList(sources: sources) { source in
                             SourceChipButton(source: source, accessibilityIdentifier: "conversation.source.\(source.id)") {
@@ -145,11 +146,14 @@ struct ThinkingRow: View {
     private var rowHeader: some View {
         HStack(alignment: .top, spacing: Theme.Spacing.sm) {
             if showsLoader {
-                CellularAutomatonLoader.small
-                    .frame(height: singleLineHeight)
-                    .opacity(allowsLoader ? 1 : 0)
-                    .accessibilityHidden(!allowsLoader)
-                    .transition(.opacity)
+                HStack(spacing: Theme.Spacing.sm) {
+                    CellularAutomatonLoader.small
+                        .frame(height: singleLineHeight)
+                    ShimmerText(text: AttributedString(L10n.string("Thinking")), lineLimit: 1)
+                }
+                .opacity(allowsLoader ? 1 : 0)
+                .accessibilityHidden(!allowsLoader)
+                .transition(.opacity)
             } else if !label.isEmpty {
                 if isLive {
                     ShimmerText(text: AttributedString(label), lineLimit: 1)

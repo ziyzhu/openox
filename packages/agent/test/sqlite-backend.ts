@@ -14,6 +14,7 @@ export function backend(file = ":memory:") {
       return value;
     });
     const statement = connection.query(sql);
+    if (op === "runCounted") return statement.run(...bindings as never[]).changes;
     if (op === "run") { statement.run(...bindings as never[]); return null; }
     if (op === "get") return statement.get(...bindings as never[]);
     return statement.all(...bindings as never[]);

@@ -30,7 +30,7 @@ nonisolated final class DurableDatabase {
             try check(sqlite3_exec(connection, sql, nil, nil, nil))
             return NSNull()
         }
-        guard ["run", "get", "all"].contains(op) else { throw failure("Unknown SQL operation") }
+        guard ["run", "runCounted", "get", "all"].contains(op) else { throw failure("Unknown SQL operation") }
         var statement: OpaquePointer?
         try sql.withCString { text in
             var tail: UnsafePointer<CChar>?
@@ -50,7 +50,7 @@ nonisolated final class DurableDatabase {
             let code = sqlite3_step(statement)
             if code == SQLITE_DONE { break }
             try check(code, allowed: SQLITE_ROW)
-            if op != "run" {
+            if op == "get" || op == "all" {
                 var row: [String: Any] = [:]
                 for column in 0..<sqlite3_column_count(statement) {
                     row[String(cString: sqlite3_column_name(statement, column))] = try value(at: column, in: statement)
@@ -58,6 +58,7 @@ nonisolated final class DurableDatabase {
                 rows.append(row)
             }
         }
+        if op == "runCounted" { return Int(sqlite3_changes(connection)) }
         if op == "get" { return rows.first.map { $0 as Any } ?? NSNull() }
         return op == "all" ? rows : NSNull()
     }

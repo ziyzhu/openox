@@ -1,6 +1,6 @@
 import { build } from "esbuild";
 import ts from "typescript";
-import { copyFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { nativeGuidanceSource } from "./native-guidance";
 
@@ -20,7 +20,7 @@ function usesNodeRuntime(text: string) {
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const destination = `${root}apps/shared/Resources/PiDurable.bundle`;
-const packages = { durable: "1.3.0", ai: "1.3.0", chord: "1.3.0" };
+const packages = { durable: "1.5.0", ai: "1.5.0", chord: "1.5.0" };
 for (const [key, version] of Object.entries(packages)) {
   const name = key === "chord" ? key : `pi-${key}`;
   const metadata = await Bun.file(new URL("../package.json", import.meta.resolve(`@earendil-works/${name}`))).json();
@@ -48,10 +48,17 @@ const promptResult = await build({
   bundle: true, platform: "browser", format: "iife", globalName: "OxPrompts",
   target: "es2022", minify: true, legalComments: "eof", write: false, metafile: true, outdir: destination,
 });
+const extractionResult = await build({
+  absWorkingDir: root, entryPoints: { "web-extraction": "packages/agent/src/adapters/ios/web-extraction.ts" },
+  bundle: true, platform: "neutral", mainFields: ["main", "module"], conditions: ["node"],
+  alias: { linkedom: `${root}packages/agent/node_modules/linkedom/worker.js` },
+  format: "iife", globalName: "OxWebExtraction", target: "es2022", minify: true,
+  legalComments: "eof", write: false, metafile: true, outdir: destination,
+});
 await mkdir(destination, { recursive: true });
 await Promise.all(["harness-proof.js", "agent-files.json", "default-soul.md"].map(name => rm(`${destination}/${name}`, { force: true })));
 const bundles: Record<string, { bytes: number; sha256: string }> = {};
-for (const generated of [result, promptResult]) for (const file of generated.outputFiles) {
+for (const generated of [result, promptResult, extractionResult]) for (const file of generated.outputFiles) {
   const name = file.path.split("/").at(-1)!;
   const output = Object.entries(generated.metafile.outputs).find(([path]) => path.endsWith(`/${name}`))![1];
   const inputs = Object.entries(output.inputs).filter(([, contribution]) => contribution.bytesInOutput > 0).map(([path]) => path);
@@ -76,6 +83,18 @@ if (!await Bun.file(guidancePath).exists() || await Bun.file(guidancePath).text(
 }
 const resources: Record<string, { bytes: number; sha256: string }> = {};
 await copyFile(`${root}packages/agent/UPSTREAM_LICENSE.txt`, `${destination}/UPSTREAM_LICENSE.txt`);
+const extractionPackages = new Set(Object.keys(extractionResult.metafile.inputs)
+  .flatMap(path => path.match(/^(.*\/node_modules\/(?:@[^/]+\/)?[^/]+)\//)?.[1] ?? []));
+const extractionLicenses: string[] = [];
+for (const path of [...extractionPackages].sort()) {
+  const metadata = await Bun.file(`${root}${path}/package.json`).json();
+  for (const file of await readdir(`${root}${path}`, { withFileTypes: true })) {
+    if (file.isFile() && /^(licen[cs]e|copying)(\.|$)/i.test(file.name)) {
+      extractionLicenses.push(`${metadata.name}@${metadata.version}\n\n${await Bun.file(`${root}${path}/${file.name}`).text()}`);
+    }
+  }
+}
+await writeFile(`${destination}/WEB_EXTRACTION_LICENSES.txt`, extractionLicenses.join("\n\n---\n\n"));
 await writeFile(`${destination}/manifest.json`, JSON.stringify({
   format: 1, purpose: "isolated-native-rollout", packages, bundles, resources,
 }, null, 2) + "\n");

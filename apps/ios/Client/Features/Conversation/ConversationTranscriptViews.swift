@@ -360,11 +360,12 @@ private struct ServiceInspectorRow: View {
 }
 
 struct ActivityBubble: View {
-    private let label = L10n.string("Plowing…")
+    private let label = L10n.string("Thinking")
 
     var body: some View {
         HStack(spacing: Theme.Spacing.sm) {
             CellularAutomatonLoader.small
+            ShimmerText(text: AttributedString(label), lineLimit: 1)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)

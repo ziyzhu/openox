@@ -53,13 +53,14 @@ export class ConversationIndexer {
     this.harness = harness;
     this.profileID = profileID;
     this.onReport = onReport;
-    this.unsubscribe = harness.subscribeCommits(publication => {
+    const observation = harness.observeCommits({ advance: publication => {
       for (const change of publication.changes) {
         const id = changedConversation(change);
         if (id !== undefined) this.dirty.add(id);
       }
       if (this.dirty.size) this.schedule();
-    });
+    }, end: end => { if (end.kind === "failed" || end.kind === "listener_error") onReport(end.error); } });
+    this.unsubscribe = () => observation.detach();
   }
 
   async close() {

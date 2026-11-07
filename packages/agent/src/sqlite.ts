@@ -34,6 +34,7 @@ export function nativeDatabase(request: SqlRequest): SqliteDatabase {
   const direct: SqliteExecutor = {
     async exec(sql) { await request("exec", sql, []); },
     async run(sql, ...params) { await request("run", sql, params.map(encode)); },
+    async runCounted(sql, ...params) { return await request("runCounted", sql, params.map(encode)) as number; },
     async get<T extends object>(sql: string, ...params: SqliteValue[]) {
       return decodeRow(await request("get", sql, params.map(encode))) as T | undefined;
     },
@@ -44,6 +45,7 @@ export function nativeDatabase(request: SqlRequest): SqliteDatabase {
   return {
     exec: sql => enqueue(() => direct.exec(sql)),
     run: (sql, ...params) => enqueue(() => direct.run(sql, ...params)),
+    runCounted: (sql, ...params) => enqueue(() => direct.runCounted(sql, ...params)),
     get: <T extends object>(sql: string, ...params: SqliteValue[]) => enqueue(() => direct.get<T>(sql, ...params)),
     all: <T extends object>(sql: string, ...params: SqliteValue[]) => enqueue(() => direct.all<T>(sql, ...params)),
     transaction: callback => enqueue(async () => {
@@ -61,6 +63,7 @@ export function nativeDatabase(request: SqlRequest): SqliteDatabase {
       const tx: SqliteExecutor = {
         exec: sql => track(() => direct.exec(sql)),
         run: (sql, ...params) => track(() => direct.run(sql, ...params)),
+        runCounted: (sql, ...params) => track(() => direct.runCounted(sql, ...params)),
         get: <T extends object>(sql: string, ...params: SqliteValue[]) => track(() => direct.get<T>(sql, ...params)),
         all: <T extends object>(sql: string, ...params: SqliteValue[]) => track(() => direct.all<T>(sql, ...params)),
       };

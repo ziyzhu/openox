@@ -63,6 +63,7 @@ final class ServiceWebsiteDataCoordinator {
         configuration.websiteDataStore = dataStore()
         configuration.defaultNavigationPreferences.allowsContentJavaScript = true
         configuration.defaultNavigationPreferences.preferredContentMode = .desktop
+        configuration.applicationNameForUserAgent = "Version/\(ProcessInfo.processInfo.operatingSystemVersion.majorVersion).0 Safari/605.1.15"
         return configuration
     }
 

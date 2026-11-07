@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { SqliteStorage } from "@earendil-works/pi-durable/storage/sqlite";
 import { registerStorageConformance } from "@earendil-works/pi-durable/testing";
 import type { SqliteExecutor } from "@earendil-works/pi-durable/storage/sqlite";
@@ -8,7 +9,7 @@ import { backend } from "./sqlite-backend";
 registerStorageConformance({ describe, expect, it }, "asynchronous native facade", async use => {
   const { db } = backend();
   const storage = await SqliteStorage.open(db);
-  try { await use(storage); } finally { await storage.close({ abortSignal: undefined, value: () => undefined, toString: () => "test" }); }
+  try { await use(storage); } finally { await storage.close(BACKGROUND_CONTEXT); }
 });
 
 it("excludes unrelated work across awaits and expires escaped handles", async () => {

@@ -10407,6 +10407,16 @@
         }
       }
     },
+    "Thinking" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "思考中"
+          }
+        }
+      }
+    },
     "Thinking level" : {
       "extractionState" : "manual",
       "localizations" : {
