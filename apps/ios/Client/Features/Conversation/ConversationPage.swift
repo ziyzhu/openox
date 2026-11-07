@@ -1133,14 +1133,9 @@ struct ConversationPage: View {
             }
             .onScrollPhaseChange { old, new in
                 scroller.phaseChanged(from: old, to: new)
-                if new == .interacting {
-                    requestEarlierReveal(blocks: blocks)
-                }
-                if new == .idle,
-                   let anchor = transcriptWindow.applyPendingEarlier() {
-                    scroller.preservePageAnchor(anchor)
-                    logTranscriptWindow(reason: "earlier", total: totalBlockCount)
-                }
+                guard new == .idle, transcriptWindow.hasEarlier, scroller.beginEarlierReveal(after: old) else { return }
+                transcriptWindow.revealEarlier()
+                logTranscriptWindow(reason: "earlier", total: totalBlockCount)
             }
             .onScrollTargetVisibilityChange(idType: UUID.self, threshold: 0.01) {
                 scroller.visibleTargetsChanged($0)
@@ -1251,7 +1246,7 @@ struct ConversationPage: View {
                     onChooseModel: { modalPresentation = .modelPicker }
                 )
             }
-            earlierWindowBoundary(blocks: blocks)
+            earlierWindowBoundary
             let anchorIndex = renderedBlocks.firstIndex { $0.id == anchoredTurnID }
             let hasAnchor = latestSubmissionID != nil && submissionAnchor != nil && (anchoredQueuedMessage != nil || anchorIndex != nil)
             VStack(spacing: 0) {
@@ -1443,31 +1438,15 @@ struct ConversationPage: View {
         if anyInputFocused { prepareComposerSubmission() }
     }
 
-    private func earlierWindowBoundary(blocks: [ConversationBlock]) -> some View {
+    private var earlierWindowBoundary: some View {
         ZStack {
-            if transcriptWindow.isLoadingEarlier {
+            if transcriptWindow.hasEarlier {
                 CellularAutomatonLoader.small
                     .accessibilityLabel("Loading earlier messages…")
             }
         }
             .frame(maxWidth: .infinity)
             .frame(height: transcriptWindow.hasEarlier ? 44 : 0)
-            .onScrollVisibilityChange(threshold: 0.01) { visible in
-                transcriptWindow.setEarlierBoundaryVisible(visible)
-                if visible { requestEarlierReveal(blocks: blocks) }
-            }
-    }
-
-    private func requestEarlierReveal(blocks: [ConversationBlock]) {
-        transcriptWindow.requestEarlier(
-            anchor: readerAnchor(in: blocks),
-            isUserScrolling: scroller.isUserScrolling
-        )
-    }
-
-    private func readerAnchor(in blocks: [ConversationBlock]) -> UUID? {
-        if let visible = scroller.visibleBlockID { return visible }
-        return blocks.first?.id
     }
 
     private func logTranscriptWindow(reason: String, total: Int) {

@@ -128,6 +128,7 @@ final class ConversationViewportController {
         case followingBottom
         case sending(UUID)
         case followingTurn(UUID)
+        case revealingEarlier(content: CGFloat, top: CGFloat)
         case reading
     }
 
@@ -222,7 +223,7 @@ final class ConversationViewportController {
         switch presentation {
         case .sending(let targetID), .followingTurn(let targetID):
             guard targetID == id else { return }
-        case .opening, .followingBottom, .reading: return
+        case .opening, .followingBottom, .revealingEarlier, .reading: return
         }
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
@@ -247,10 +248,14 @@ final class ConversationViewportController {
         }
     }
 
-    func preservePageAnchor(_ id: UUID) {
-        presentation = .reading
-        position.scrollTo(id: id, anchor: .top)
-        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=pageAnchor target=\(id) anchor=top \(logSnapshot)")
+    func beginEarlierReveal(after phase: ScrollPhase) -> Bool {
+        guard phase.isUserDriven,
+              case .reading = presentation,
+              let frame = pendingFrame ?? frame,
+              frame.visualTop < frame.container * 2 else { return false }
+        presentation = .revealingEarlier(content: frame.content, top: frame.visualTop)
+        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=revealEarlier phase=begin \(logSnapshot)")
+        return true
     }
 
     func focusChanged(_ focused: Bool, slack: CGFloat, source: String) {
@@ -311,7 +316,7 @@ final class ConversationViewportController {
         guard old != new else { return }
         if new.isUserDriven {
             switch presentation {
-            case .followingBottom, .followingTurn, .sending: presentation = .reading
+            case .followingBottom, .followingTurn, .sending, .revealingEarlier: presentation = .reading
             case .opening, .reading: break
             }
             viewportHold = nil
@@ -323,8 +328,23 @@ final class ConversationViewportController {
     }
 
     func geometryChanged(_ new: Frame) {
+        keepEarlierRevealInPlace(new)
         pendingFrame = new
         geometryFrameDriver.schedule()
+    }
+
+    private func keepEarlierRevealInPlace(_ frame: Frame) {
+        guard case .revealingEarlier(let content, let top) = presentation else { return }
+        let growth = frame.content - content
+        guard abs(growth) > 0.5 else { return }
+        let target = top + growth
+        presentation = .revealingEarlier(content: frame.content, top: target)
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            position.scrollTo(y: target)
+        }
+        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=revealEarlier growth=\(Int(growth)) targetTop=\(Int(target)) \(logSnapshot)")
     }
 
     private func commitPendingGeometry() {
@@ -444,7 +464,7 @@ final class ConversationViewportController {
     private var pinsEnd: Bool {
         switch presentation {
         case .opening, .followingBottom: return true
-        case .sending, .followingTurn, .reading: break
+        case .sending, .followingTurn, .revealingEarlier, .reading: break
         }
         if case .tail(let hold) = viewportHold { return hold.pinsEnd }
         if case .promptBottom = viewportHold { return true }

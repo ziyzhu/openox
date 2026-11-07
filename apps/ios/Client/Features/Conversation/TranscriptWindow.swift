@@ -1,23 +1,11 @@
 import Foundation
 
 struct TranscriptWindow: Equatable {
-    private enum EarlierRequest: Equatable {
-        case idle
-        case pending(UUID)
-    }
-
     static let batchSize = 8
 
     private(set) var range = 0..<0
-    private var earlierBoundaryVisible = false
-    private var earlierRequest = EarlierRequest.idle
 
     var hasEarlier: Bool { range.lowerBound > 0 }
-
-    var isLoadingEarlier: Bool {
-        if case .pending = earlierRequest { return hasEarlier }
-        return false
-    }
 
     func resolvedRange(total: Int) -> Range<Int> {
         guard !range.isEmpty, range.lowerBound < total else { return Self.tailRange(total: total) }
@@ -26,8 +14,6 @@ struct TranscriptWindow: Equatable {
 
     mutating func open(total: Int) {
         range = Self.tailRange(total: total)
-        earlierBoundaryVisible = false
-        earlierRequest = .idle
     }
 
     mutating func reconcile(total: Int) {
@@ -44,35 +30,16 @@ struct TranscriptWindow: Equatable {
 
     @discardableResult
     mutating func anchor(on id: UUID, in blockIDs: [UUID], startingAt lowerBound: Int) -> Bool {
-        earlierRequest = .idle
         guard let index = blockIDs.firstIndex(of: id) else { return false }
         range = min(range.lowerBound, lowerBound + index)..<max(range.upperBound, lowerBound + blockIDs.count)
         return true
     }
 
-    mutating func setEarlierBoundaryVisible(_ visible: Bool) {
-        earlierBoundaryVisible = visible
-    }
-
-    mutating func requestEarlier(anchor: UUID?, isUserScrolling: Bool) {
-        guard earlierBoundaryVisible,
-              isUserScrolling,
-              case .idle = earlierRequest,
-              let anchor else { return }
-        earlierRequest = .pending(anchor)
-    }
-
-    mutating func applyPendingEarlier() -> UUID? {
-        guard case .pending(let anchor) = earlierRequest else { return nil }
-        earlierRequest = .idle
-        guard hasEarlier else { return nil }
-        let previousLowerBound = range.lowerBound
-        range = max(0, previousLowerBound - Self.batchSize)..<range.upperBound
-        return range.lowerBound == previousLowerBound ? nil : anchor
+    mutating func revealEarlier() {
+        range = max(0, range.lowerBound - Self.batchSize)..<range.upperBound
     }
 
     mutating func showLatest(total: Int) {
-        earlierRequest = .idle
         range = Self.tailRange(total: total)
     }
 
