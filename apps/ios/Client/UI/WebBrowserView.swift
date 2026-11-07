@@ -298,7 +298,7 @@ struct WebBrowserView: View {
                 }
             } label: {
                 domainLabel
-                    .font(.system(size: isCompact ? 13 : 17, weight: isCompact ? .medium : .regular))
+                    .font(isCompact ? Font.footnote.weight(.medium) : Theme.Fonts.bodyMd)
                     .padding(.horizontal, isCompact ? 24 : 0)
                     .frame(maxWidth: isCompact ? nil : .infinity, minHeight: 44)
                     .contentShape(Rectangle())

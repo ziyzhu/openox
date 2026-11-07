@@ -163,7 +163,7 @@ struct ProviderAuthenticationView: View {
     private func membershipCard(_ account: any SubscriptionAccount) -> some View {
         HStack(spacing: Theme.Spacing.sm) {
             Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 18, weight: .semibold))
+                .font(Theme.Fonts.bodyMd.weight(.semibold))
                 .foregroundStyle(Theme.Colors.primary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: client.id == "chatgpt" ? String(localized: "Using ChatGPT plan") : plan.map { "\(account.providerName) \($0)" } ?? "Logged in to \(account.providerName)")

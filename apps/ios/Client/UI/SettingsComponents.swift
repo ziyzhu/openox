@@ -176,7 +176,7 @@ struct SettingsErrorMessage: View {
     var body: some View {
         HStack(alignment: .top, spacing: Theme.Spacing.sm) {
             Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .semibold))
+                .font(Theme.Fonts.bodySm.weight(.semibold))
                 .foregroundStyle(Theme.Colors.error)
             Text(verbatim: message)
                 .font(Theme.Fonts.bodySm)
@@ -196,7 +196,7 @@ struct SettingsNoticeMessage: View {
     var body: some View {
         HStack(alignment: .top, spacing: Theme.Spacing.sm) {
             Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .semibold))
+                .font(Theme.Fonts.bodySm.weight(.semibold))
                 .foregroundStyle(Theme.Colors.primary)
             Text(LocalizedStringKey(message))
                 .font(Theme.Fonts.bodySm)

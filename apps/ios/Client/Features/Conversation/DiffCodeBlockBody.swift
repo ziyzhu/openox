@@ -46,7 +46,7 @@ private struct DiffFileSection: View {
                 HStack(alignment: .center, spacing: Theme.Spacing.sm) {
                     Image(systemName: "chevron.right")
                         .rotationEffect(.degrees(expanded ? 90 : 0))
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Theme.Fonts.captionSm)
                     VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                         Text(verbatim: file.path ?? L10n.string("File"))
                             .font(Theme.Fonts.captionMd)
