@@ -145,15 +145,18 @@ struct ThinkingRow: View {
 
     private var rowHeader: some View {
         HStack(alignment: .top, spacing: Theme.Spacing.sm) {
+            if isLive {
+                CellularAutomatonLoader.small
+                    .frame(height: singleLineHeight)
+                    .opacity(allowsLoader ? 1 : 0)
+                    .accessibilityHidden(!allowsLoader)
+                    .transition(.opacity)
+            }
             if showsLoader {
-                HStack(spacing: Theme.Spacing.sm) {
-                    CellularAutomatonLoader.small
-                        .frame(height: singleLineHeight)
-                    ShimmerText(text: AttributedString(L10n.string("Thinking")), lineLimit: 1)
-                }
-                .opacity(allowsLoader ? 1 : 0)
-                .accessibilityHidden(!allowsLoader)
-                .transition(.opacity)
+                ShimmerText(text: AttributedString(L10n.string("Thinking")), lineLimit: 1)
+                    .opacity(allowsLoader ? 1 : 0)
+                    .accessibilityHidden(!allowsLoader)
+                    .transition(.opacity)
             } else if !label.isEmpty {
                 if isLive {
                     ShimmerText(text: AttributedString(label), lineLimit: 1)
