@@ -1,6 +1,6 @@
 ---
 name: develop-services
-description: Build or update Ox services through an Ox conversation on a simulator, improve the shared authoring loop, notify developers of improvement opportunities, and promote verified Local web services into the built-in repository when requested. Use for development-driven service evolution and dogfooding the workflow users run directly in Ox.
+description: Build or update Ox services through an Ox conversation on a simulator, improve the shared authoring loop, notify developers of improvement opportunities, promote verified Local web services into the built-in repository when requested, and sync a device's Local overrides into the built-in bundle. Use for development-driven service evolution and dogfooding the workflow users run directly in Ox.
 ---
 
 # Develop services
@@ -55,6 +55,18 @@ ox --host <ws-url> --conversation <full-id> vm call ox.fs.read --args '{"purpose
 5. Avoid concurrent Local edits during export. Compare directory listings, file sizes, and modification times before and after; retry changed files and report that the API does not provide an atomic snapshot. Report exported paths, file count, and any incomplete files. For a complete repository, run `ox --repository <desktop-export-path> repository validate`; validation does not replace live service verification.
 
 Copying out does not change source selection, reload attachments, or require a Files picker. `ox repository` operates on desktop paths or repository URLs; it cannot directly open an iPhone's virtual path. `ox.fs.copy` is not a device-to-desktop transfer command. Keep service repairs authored through Ox rather than editing the exported copy into a second implementation.
+
+## Sync Local into the built-in bundle
+
+Use this when the user asks to bring a device's Local services into `apps/shared/Resources/OxServices.bundle/`. The request authorizes updating built-in services that Local overrides; each Local-only service still needs the user's explicit approval by name before it is added. Local skills and non-service files are reported, not synced.
+
+1. Export the device's `repositories/local/` and `repositories/bundled/` with the copy workflow above into separate directories. The device's bundled copy is the base its Local overrides were forked from, unless the app was updated after the fork.
+2. Classify each Local service directory: overlap when the checkout bundle has the same identity, otherwise Local-only. Report both lists before changing files.
+3. Exclude services that are currently broken: a `validationError` in `ox --host <ws-url> service list --json`, a failed `ox --repository <export> repository validate`, or recent `Service.dispatcher unavailable`, `installation=missing`, or handler errors for the domain in `ox --host <ws-url> host logs --level error --grep <domain>`. Return those to Ox for repair instead of shipping them.
+4. For each overlap, compare the device bundled base with the checkout's file. If identical, the Local file replaces the checkout file. If the checkout changed since that build, merge with `git merge-file -p <checkout-file> <device-bundled-file> <local-file>` and show the user every conflict and every hunk where Local removes checkout-only changes. Never drop newer built-in fixes silently. Keep the built-in `faviconUrl` unless the Local icon is newly verified.
+5. Ask the user which Local-only services to add, listing each with its description and actions. Add approved ones through `references/promotion.md`, including its icon workflow, and register them in the bundle's `repository.json`.
+6. Run `bun run build:services` and `bun run lint`, and confirm the bundle diff contains only the synced services and index changes.
+7. Report per service: replaced, merged, conflicted, skipped as broken, or awaiting approval, plus which actions lack the live verification `references/promotion.md` requires. Leave the device's Local source and source selections unchanged.
 
 ## Deliver the service
 
