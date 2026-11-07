@@ -40,7 +40,9 @@ window.ox.install(({ action, request }) => {
 });
 ```
 
-`request({ path, method?, query?, json? })` returns decoded JSON, or null for an empty successful response. The default method is GET. Paths resolve against `baseUrl` and must stay within its origin and path prefix. Use a trailing slash on `baseUrl`. Query values are URL-encoded; null values are omitted. Supply JSON bodies through `json`; the Host sets the content type. Other response formats and custom request headers are not supported in this first version.
+`request({ path, method?, query?, headers?, json? })` returns decoded JSON, or null for an empty successful response. The default method is GET. Paths resolve against `baseUrl` and must stay within its origin and path prefix. Use a trailing slash on `baseUrl`. Query values are URL-encoded; null values are omitted. Supply JSON bodies through `json`; the Host sets the content type. Other response formats are not supported.
+
+Use `headers` as an object of string values for non-secret metadata such as `headers: { "X-Device-Platform": "ios", "Accept": "application/vnd.example+json" }`. Names must be valid HTTP header names and unique ignoring case; values cannot contain control characters except horizontal tabs. The Host rejects authentication, cookie, content-type, routing, and transport headers: `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `Host`, `Content-Type`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Keep-Alive`, `TE`, `Trailer`, `Upgrade`, `Proxy-Connection`, `Accept-Encoding`, `WWW-Authenticate`, and `Proxy-Authenticate`. The configured API-key header is also reserved, including for capabilities with `requireAuth: false`. Never put credentials or session tokens in custom headers; configure authentication through the service login interface.
 
 Declare approval for mutations. The Host rejects POST, PUT, PATCH, and DELETE from capabilities without `requireApproval: true`. It does not retry requests automatically or follow redirects. HTTP and decoding failures throw. Never blindly repeat a mutation after an uncertain result; inspect resulting state first.
 

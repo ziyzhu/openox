@@ -127,15 +127,36 @@ final class APIService {
             }
         }
         guard let destination = components.url else { throw APIServiceError.invalidRequest }
-        guard await WebFetchURLPolicy.allowsResolved(destination) else { throw APIServiceError.destinationDenied }
         var request = URLRequest(url: destination)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let value = raw["headers"] {
+            guard let headers = value.objectValue else { throw APIServiceError.invalidRequest }
+            var reserved: Set<String> = ["authorization", "proxy-authorization", "cookie", "set-cookie", "host",
+                "content-type", "content-length", "transfer-encoding", "connection", "keep-alive", "te", "trailer",
+                "upgrade", "proxy-connection", "accept-encoding", "www-authenticate", "proxy-authenticate"]
+            if case .apiKey(let location, let name) = authorization.auth, location == "header" {
+                reserved.insert(name.lowercased())
+            }
+            let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!#$%&'*+-.^_`|~")
+            var names = Set<String>()
+            for (name, value) in headers {
+                let normalized = name.lowercased()
+                guard !name.isEmpty, name.unicodeScalars.allSatisfy(allowed.contains),
+                      !reserved.contains(normalized), names.insert(normalized).inserted,
+                      let value = value.stringValue,
+                      value.unicodeScalars.allSatisfy({ $0.value == 9 || $0.value >= 32 && $0.value != 127 }) else {
+                    throw APIServiceError.invalidRequest
+                }
+                request.setValue(value, forHTTPHeaderField: name)
+            }
+        }
         if let json = raw["json"] {
             guard !["GET", "HEAD"].contains(method) else { throw APIServiceError.invalidRequest }
             request.httpBody = try await json.encoded()
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
+        guard await WebFetchURLPolicy.allowsResolved(destination) else { throw APIServiceError.destinationDenied }
         if authenticated { request = try await authorization.prepare(request) }
         let response = try await APIServiceHTTP.send(request)
         Log.service.info("APIService.request service=\(definition.domain) method=\(method) status=\(response.status) bytes=\(response.data.count)")
