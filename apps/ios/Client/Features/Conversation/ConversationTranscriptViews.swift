@@ -13,7 +13,7 @@ private struct AttachmentThumb: View {
             style: .transcript,
             previewSourceID: sourceID
         )
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .onTapGesture { onOpen(attachment, sourceID) }
         .accessibilityAddTraits(.isButton)
     }
@@ -561,7 +561,7 @@ private struct SkillBubble: View {
             Text(verbatim: "/\(skill.displayName)")
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, Theme.Spacing.lg)
                 .padding(.vertical, Theme.Spacing.md)
                 .conversationCardOutline(cornerRadius: Theme.Radius.xl)
                 .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
@@ -583,7 +583,7 @@ private struct ScheduleBubble: View {
         Label(title, systemImage: "clock")
             .font(Theme.Fonts.bodyMd)
             .foregroundStyle(Theme.Colors.onSurface)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, Theme.Spacing.lg)
             .padding(.vertical, Theme.Spacing.md)
             .conversationCardOutline(cornerRadius: Theme.Radius.xl)
             .accessibilityElement(children: .ignore)

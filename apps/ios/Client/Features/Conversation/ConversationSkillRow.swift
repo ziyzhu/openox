@@ -39,7 +39,7 @@ struct ConversationSkillRow: View {
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .accessibilityHidden(true)
             }
-            .padding(14)
+            .padding(Theme.Spacing.lg)
             .conversationCardOutline(cornerRadius: Theme.Radius.xl)
             .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.xl))
         }

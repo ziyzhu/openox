@@ -31,7 +31,7 @@ struct ConversationScheduleRow: View {
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .accessibilityHidden(true)
             }
-            .padding(14)
+            .padding(Theme.Spacing.lg)
             .conversationCardOutline(cornerRadius: Theme.Radius.xl)
             .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.xl))
         }
@@ -82,7 +82,7 @@ private struct ConversationScheduleDetails: View {
                         .font(Theme.Fonts.caption)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(14)
+                        .padding(Theme.Spacing.lg)
                         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)

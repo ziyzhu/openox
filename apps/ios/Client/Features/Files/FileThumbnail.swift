@@ -22,7 +22,7 @@ struct FileThumbnail: View {
         var cornerRadius: CGFloat {
             switch self {
             case .composer: 7
-            case .transcript: 12
+            case .transcript: Theme.Radius.md
             case .row: Theme.Radius.sm
             case .library: Theme.Radius.lg
             }

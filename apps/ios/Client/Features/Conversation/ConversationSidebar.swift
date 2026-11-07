@@ -435,7 +435,7 @@ private struct SidebarRowButtonStyle: ButtonStyle {
             .padding(.horizontal, Theme.Spacing.sm)
             .padding(.vertical, 9)
             .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                     .fill(Theme.Colors.onSurface.opacity(tinted ? 0.08 : 0))
             }
             .padding(.horizontal, edgeInset - Theme.Spacing.sm)

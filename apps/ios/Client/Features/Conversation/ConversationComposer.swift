@@ -1120,8 +1120,8 @@ private struct PendingAttachmentChip: View {
             onRemove: onRemove
         ) {
             CellularAutomatonLoader.small
-                .frame(width: 28, height: 28)
-                .background(Theme.Colors.conversationSurface, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .frame(width: FileThumbnail.Style.composer.size, height: FileThumbnail.Style.composer.size)
+                .background(Theme.Colors.conversationSurface, in: RoundedRectangle(cornerRadius: FileThumbnail.Style.composer.cornerRadius, style: .continuous))
         }
     }
 }
