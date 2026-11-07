@@ -345,11 +345,19 @@ private struct SkillImportModifier: ViewModifier {
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
                         .presentationBackground(Theme.Colors.background)
+                        .alert("Couldn't import skill", isPresented: Binding(
+                            get: { coordinator.errorMessage != nil },
+                            set: { if !$0 { coordinator.dismissError() } }
+                        )) {
+                            Button("OK", role: .cancel) { coordinator.dismissError() }
+                        } message: {
+                            Text(coordinator.errorMessage ?? "")
+                        }
                 }
             }
             .alert("Couldn't import skill", isPresented: Binding(
-                get: { coordinator.errorMessage != nil },
-                set: { if !$0 { coordinator.dismissError() } }
+                get: { coordinator.proposal == nil && coordinator.errorMessage != nil },
+                set: { if !$0, coordinator.proposal == nil { coordinator.dismissError() } }
             )) {
                 Button("OK", role: .cancel) { coordinator.dismissError() }
             } message: {
@@ -384,11 +392,19 @@ private struct ConversationImportModifier: ViewModifier {
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
                         .presentationBackground(Theme.Colors.background)
+                        .alert("Couldn't import conversation", isPresented: Binding(
+                            get: { coordinator.errorMessage != nil },
+                            set: { if !$0 { coordinator.dismissError() } }
+                        )) {
+                            Button("OK", role: .cancel) { coordinator.dismissError() }
+                        } message: {
+                            Text(coordinator.errorMessage ?? "")
+                        }
                 }
             }
             .alert("Couldn't import conversation", isPresented: Binding(
-                get: { coordinator.errorMessage != nil },
-                set: { if !$0 { coordinator.dismissError() } }
+                get: { coordinator.proposal == nil && coordinator.errorMessage != nil },
+                set: { if !$0, coordinator.proposal == nil { coordinator.dismissError() } }
             )) {
                 Button("OK", role: .cancel) { coordinator.dismissError() }
             } message: {

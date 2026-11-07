@@ -557,22 +557,42 @@ private nonisolated extension Message {
 @MainActor
 @Observable
 final class ConversationImportCoordinator {
-    private(set) var proposal: ConversationImportProposal?
+    private enum State {
+        case idle
+        case loading(Task<Void, Never>)
+        case reviewing(ConversationImportProposal)
+        case saving(ConversationImportProposal)
+        case imported(UUID)
+    }
+
+    private var state = State.idle
     private(set) var errorMessage: String?
-    private(set) var isLoading = false
-    private(set) var isSaving = false
-    private(set) var importedConversationID: UUID?
-    @ObservationIgnored private var operation: Task<Void, Never>?
+    var proposal: ConversationImportProposal? {
+        switch state {
+        case .reviewing(let proposal), .saving(let proposal): proposal
+        case .idle, .loading, .imported: nil
+        }
+    }
+    var isLoading: Bool {
+        if case .loading = state { true } else { false }
+    }
+    var isSaving: Bool {
+        if case .saving = state { true } else { false }
+    }
+    var importedConversationID: UUID? {
+        if case .imported(let id) = state { id } else { nil }
+    }
 
     func receive(_ url: URL) {
-        operation?.cancel()
+        guard !isSaving else {
+            errorMessage = "Wait for the current conversation import to finish."
+            Log.ui.info("ConversationImport.rejected reason=saving source=\(url.lastPathComponent)")
+            return
+        }
+        if case .loading(let operation) = state { operation.cancel() }
         let request = UUID()
-        isLoading = true
-        isSaving = false
-        proposal = nil
         errorMessage = nil
-        importedConversationID = nil
-        operation = Task {
+        state = .loading(Task {
             do {
                 let proposal = try await Task.detached(priority: .userInitiated) {
                     guard ["conversation", "chat"].contains(url.pathExtension.lowercased()) else { throw ConversationPackageError.invalidArchive }
@@ -586,34 +606,27 @@ final class ConversationImportCoordinator {
                     return try ConversationPackageCodec.decode(data, sourceName: url.lastPathComponent)
                 }.value
                 guard !Task.isCancelled else { return }
-                self.proposal = proposal
-                isLoading = false
+                state = .reviewing(proposal)
                 Log.ui.info("ConversationImport.ready request=\(request) title=\(proposal.header.title) source=\(proposal.sourceName)")
-            } catch is CancellationError {
             } catch {
                 guard !Task.isCancelled else { return }
-                isLoading = false
+                state = .idle
                 errorMessage = error.localizedDescription
                 Log.ui.error("ConversationImport.open request=\(request) source=\(url.lastPathComponent) failed=\(error.localizedDescription)")
             }
-        }
+        })
     }
 
     func install(using conversations: ConversationManager) {
-        guard let proposal else { return }
-        isSaving = true
-        operation = Task {
+        guard case .reviewing(let proposal) = state else { return }
+        state = .saving(proposal)
+        Task {
             do {
                 let conversation = try await conversations.importPackage(proposal.payload)
-                guard !Task.isCancelled else { return }
-                self.proposal = nil
-                isSaving = false
-                importedConversationID = conversation.id
+                state = .imported(conversation.id)
                 Log.ui.info("ConversationImport.saved conversation=\(conversation.id) title=\(proposal.header.title)")
-            } catch is CancellationError {
             } catch {
-                guard !Task.isCancelled else { return }
-                isSaving = false
+                state = .reviewing(proposal)
                 errorMessage = error.localizedDescription
                 Log.ui.error("ConversationImport.save title=\(proposal.header.title) failed=\(error.localizedDescription)")
             }
@@ -621,10 +634,13 @@ final class ConversationImportCoordinator {
     }
 
     func dismissProposal() {
-        guard !isSaving else { return }
-        proposal = nil
+        guard case .reviewing = state else { return }
+        state = .idle
     }
 
     func dismissError() { errorMessage = nil }
-    func consumeImportedConversation() { importedConversationID = nil }
+    func consumeImportedConversation() {
+        guard case .imported = state else { return }
+        state = .idle
+    }
 }

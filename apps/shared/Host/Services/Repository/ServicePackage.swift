@@ -119,12 +119,29 @@ nonisolated struct ServiceImportProposal: Identifiable, Sendable {
 @MainActor
 @Observable
 final class ServiceImportCoordinator {
+    private enum State {
+        case idle
+        case loading(Task<Void, Never>)
+        case reviewing(ServiceImportProposal)
+        case saving(ServiceImportProposal)
+        case imported(String)
+    }
+
     let manager: ServiceManager
-    private(set) var proposal: ServiceImportProposal?
+    private var state = State.idle
     private(set) var errorMessage: String?
-    private(set) var importedDomain: String?
-    private(set) var isSaving = false
-    @ObservationIgnored private var operation: Task<Void, Never>?
+    var proposal: ServiceImportProposal? {
+        switch state {
+        case .reviewing(let proposal), .saving(let proposal): proposal
+        case .idle, .loading, .imported: nil
+        }
+    }
+    var isSaving: Bool {
+        if case .saving = state { true } else { false }
+    }
+    var importedDomain: String? {
+        if case .imported(let domain) = state { domain } else { nil }
+    }
 
     init(manager: ServiceManager) {
         self.manager = manager
@@ -133,13 +150,12 @@ final class ServiceImportCoordinator {
     func receive(_ url: URL) {
         guard !isSaving else {
             errorMessage = "Wait for the current service import to finish."
+            Log.ui.info("ServiceImport.rejected reason=saving source=\(url.lastPathComponent)")
             return
         }
-        operation?.cancel()
-        proposal = nil
+        if case .loading(let operation) = state { operation.cancel() }
         errorMessage = nil
-        importedDomain = nil
-        operation = Task {
+        state = .loading(Task {
             do {
                 let proposal = try await Task.detached(priority: .userInitiated) {
                     guard url.pathExtension.lowercased() == "service" else {
@@ -158,36 +174,31 @@ final class ServiceImportCoordinator {
                     )
                 }.value
                 guard !Task.isCancelled else { return }
-                self.proposal = proposal
+                state = .reviewing(proposal)
                 Log.ui.info("ServiceImport.ready id=\(proposal.payload.domain) source=\(proposal.sourceName)")
-            } catch is CancellationError {
             } catch {
                 guard !Task.isCancelled else { return }
+                state = .idle
                 errorMessage = error.localizedDescription
                 Log.ui.error("ServiceImport.open source=\(url.lastPathComponent) failed=\(error.localizedDescription)")
             }
-        }
+        })
     }
 
     func install(replacing: Bool) {
-        guard let proposal else { return }
-        isSaving = true
-        operation = Task {
+        guard case .reviewing(let proposal) = state else { return }
+        state = .saving(proposal)
+        Task {
             do {
                 try await manager.importServicePackage(
                     proposal.payload,
                     replacing: replacing,
                     locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
                 )
-                guard !Task.isCancelled else { return }
-                self.proposal = nil
-                importedDomain = proposal.payload.domain
-                isSaving = false
+                state = .imported(proposal.payload.domain)
                 Log.ui.info("ServiceImport.saved id=\(proposal.payload.domain) replaced=\(replacing)")
-            } catch is CancellationError {
             } catch {
-                guard !Task.isCancelled else { return }
-                isSaving = false
+                state = .reviewing(proposal)
                 errorMessage = error.localizedDescription
                 Log.ui.error("ServiceImport.save id=\(proposal.payload.domain) failed=\(error.localizedDescription)")
             }
@@ -195,8 +206,8 @@ final class ServiceImportCoordinator {
     }
 
     func dismissProposal() {
-        guard !isSaving else { return }
-        proposal = nil
+        guard case .reviewing = state else { return }
+        state = .idle
     }
 
     func dismissError() {
@@ -204,6 +215,7 @@ final class ServiceImportCoordinator {
     }
 
     func dismissSuccess() {
-        importedDomain = nil
+        guard case .imported = state else { return }
+        state = .idle
     }
 }

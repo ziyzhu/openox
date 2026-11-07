@@ -110,11 +110,19 @@ private struct OxApplicationView: View {
                     ServiceImportView(proposal: proposal, coordinator: serviceImports)
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
+                        .alert("Couldn't import service", isPresented: Binding(
+                            get: { serviceImports.errorMessage != nil },
+                            set: { if !$0 { serviceImports.dismissError() } }
+                        )) {
+                            Button("OK", role: .cancel) { serviceImports.dismissError() }
+                        } message: {
+                            Text(serviceImports.errorMessage ?? "")
+                        }
                 }
             }
             .alert("Couldn't import service", isPresented: Binding(
-                get: { serviceImports.errorMessage != nil },
-                set: { if !$0 { serviceImports.dismissError() } }
+                get: { serviceImports.proposal == nil && serviceImports.errorMessage != nil },
+                set: { if !$0, serviceImports.proposal == nil { serviceImports.dismissError() } }
             )) {
                 Button("OK", role: .cancel) { serviceImports.dismissError() }
             } message: {

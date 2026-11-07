@@ -119,22 +119,42 @@ final class SkillImportCoordinator {
         case copy
     }
 
-    private(set) var proposal: SkillImportProposal?
+    private enum State {
+        case idle
+        case loading(Task<Void, Never>)
+        case reviewing(SkillImportProposal)
+        case saving(SkillImportProposal)
+        case imported(Skill)
+    }
+
+    private var state = State.idle
     private(set) var errorMessage: String?
-    private(set) var isLoading = false
-    private(set) var isSaving = false
-    private(set) var importedSkill: Skill?
-    @ObservationIgnored private var operation: Task<Void, Never>?
+    var proposal: SkillImportProposal? {
+        switch state {
+        case .reviewing(let proposal), .saving(let proposal): proposal
+        case .idle, .loading, .imported: nil
+        }
+    }
+    var isLoading: Bool {
+        if case .loading = state { true } else { false }
+    }
+    var isSaving: Bool {
+        if case .saving = state { true } else { false }
+    }
+    var importedSkill: Skill? {
+        if case .imported(let skill) = state { skill } else { nil }
+    }
 
     func receive(_ url: URL) {
-        operation?.cancel()
+        guard !isSaving else {
+            errorMessage = "Wait for the current skill import to finish."
+            Log.ui.info("SkillImport.rejected reason=saving source=\(url.lastPathComponent)")
+            return
+        }
+        if case .loading(let operation) = state { operation.cancel() }
         let request = UUID()
-        isLoading = true
-        isSaving = false
-        proposal = nil
         errorMessage = nil
-        importedSkill = nil
-        operation = Task {
+        state = .loading(Task {
             do {
                 let proposal = try await Task.detached(priority: .userInitiated) {
                     guard url.pathExtension.lowercased() == "skill" else {
@@ -150,28 +170,26 @@ final class SkillImportCoordinator {
                     return try SkillPackageCodec.decode(data, sourceName: url.lastPathComponent)
                 }.value
                 guard !Task.isCancelled else { return }
-                self.proposal = proposal
-                self.isLoading = false
+                state = .reviewing(proposal)
                 Log.ui.info("SkillImport.ready request=\(request) name=\(proposal.skill.name) source=\(proposal.sourceName)")
-            } catch is CancellationError {
             } catch {
                 guard !Task.isCancelled else { return }
-                isLoading = false
+                state = .idle
                 errorMessage = error.localizedDescription
                 Log.ui.error("SkillImport.open request=\(request) source=\(url.lastPathComponent) failed=\(error.localizedDescription)")
             }
-        }
+        })
     }
 
     func install(_ resolution: Resolution) {
-        guard let proposal,
-              let scope = StorageRoot.currentScope,
+        guard case .reviewing(let proposal) = state else { return }
+        guard let scope = StorageRoot.currentScope,
               scope.profileID != nil else {
             errorMessage = "Your Profile is still opening. Try again in a moment."
             return
         }
-        isSaving = true
-        operation = Task {
+        state = .saving(proposal)
+        Task {
             do {
                 let repository = ProfileRepository.shared
                 var skill = proposal.skill
@@ -199,16 +217,11 @@ final class SkillImportCoordinator {
                     resources: proposal.skill.resources,
                     in: scope
                 )
-                guard !Task.isCancelled else { return }
-                self.proposal = nil
-                isSaving = false
-                importedSkill = saved
+                state = .imported(saved)
                 Skills.shared.refresh()
                 Log.ui.info("SkillImport.saved name=\(saved.name) resolution=\(String(describing: resolution))")
-            } catch is CancellationError {
             } catch {
-                guard !Task.isCancelled else { return }
-                isSaving = false
+                state = .reviewing(proposal)
                 errorMessage = error.localizedDescription
                 Log.ui.error("SkillImport.save name=\(proposal.skill.name) failed=\(error.localizedDescription)")
             }
@@ -216,8 +229,8 @@ final class SkillImportCoordinator {
     }
 
     func dismissProposal() {
-        guard !isSaving else { return }
-        proposal = nil
+        guard case .reviewing = state else { return }
+        state = .idle
     }
 
     func dismissError() {
@@ -225,6 +238,7 @@ final class SkillImportCoordinator {
     }
 
     func consumeImportedSkill() {
-        importedSkill = nil
+        guard case .imported = state else { return }
+        state = .idle
     }
 }
