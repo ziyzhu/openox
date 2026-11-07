@@ -82,7 +82,7 @@ struct SettingsSheet: View {
                                     HStack {
                                         Text(verbatim: missing.name ?? String(localized: "Profile"))
                                         Spacer()
-                                        Text("Locate folder…")
+                                        Text("Locate Folder…")
                                     }.settingsRowPadding()
                                 }
                                 .buttonStyle(.plain)
@@ -97,7 +97,7 @@ struct SettingsSheet: View {
                                 Button {
                                     creatingProfile = true
                                 } label: {
-                                    Label("Create new", systemImage: "plus")
+                                    Label("Create New", systemImage: "plus")
                                 }
                                 .accessibilityIdentifier(A11yID.Settings.profileCreate)
 
@@ -105,7 +105,7 @@ struct SettingsSheet: View {
                                     locatingProfileID = nil
                                     openingProfile = true
                                 } label: {
-                                    Label("Open existing", systemImage: "folder")
+                                    Label("Open Existing", systemImage: "folder")
                                 }
                                 .accessibilityIdentifier(A11yID.Settings.profileOpen)
 

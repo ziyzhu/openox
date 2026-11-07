@@ -77,7 +77,7 @@ struct ProfileFilesPage: View {
                                 Button { perform(grant.id) { profileId in
                                     try await store.assign(grant.id, profileId: profileId)
                                 } } label: {
-                                    SettingsDisclosureRow(title: LocalizedStringKey(grant.name), value: Text("Use in this Profile"))
+                                    SettingsDisclosureRow(title: LocalizedStringKey(grant.name), value: Text("Use in This Profile"))
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityIdentifier("profile.files.assign.\(grant.id)")
@@ -124,7 +124,7 @@ struct ProfileFilesPage: View {
                 .ignoresSafeArea()
                 .onDisappear { try? FileManager.default.removeItem(at: file.url.deletingLastPathComponent()) }
         }
-        .alert("Couldn't access folder", isPresented: Binding(
+        .alert("Couldn't Access Folder", isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
         )) { Button("OK", role: .cancel) { errorMessage = nil } } message: {
             Text(errorMessage ?? "")

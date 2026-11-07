@@ -13,7 +13,7 @@ struct RemoteMCPDetailRequest: Hashable {
         id = trimmed
         self.endpoint = trimmed
         transport = nil
-        name = URL(string: trimmed)?.host ?? String(localized: "Connect remote MCP")
+        name = URL(string: trimmed)?.host ?? String(localized: "Connect Remote MCP")
         description = trimmed
     }
 }
@@ -130,7 +130,7 @@ struct ServiceExplorerView: View {
                 ContentLoadingView(label: "Loading services…")
             } else if let serviceLoadFailure {
                 ContentUnavailableView {
-                    Label("Couldn't load services", systemImage: "exclamationmark.triangle")
+                    Label("Couldn't Load Services", systemImage: "exclamationmark.triangle")
                 } description: {
                     Text(serviceLoadFailure)
                 } actions: {
@@ -183,7 +183,7 @@ struct ServiceExplorerView: View {
             }
         }
         .oxSearchable(text: $query, isPresented: $searchPresented, prompt: Text("Search services"), accessibilityIdentifier: A11yID.ConversationControls.Attach.search)
-        .alert("Connect remote MCP", isPresented: $connectingMCP) {
+        .alert("Connect Remote MCP", isPresented: $connectingMCP) {
             TextField("https://example.com/mcp", text: $mcpEndpoint)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -313,7 +313,7 @@ struct ServiceExplorerView: View {
             HStack(spacing: Theme.Spacing.md) {
                 ghostAvatar(icon: "plus")
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Connect remote MCP")
+                    Text("Connect Remote MCP")
                         .font(Theme.Fonts.bodyMd)
                         .foregroundStyle(Theme.Colors.onSurface)
                     Text("Add an MCP server by endpoint")

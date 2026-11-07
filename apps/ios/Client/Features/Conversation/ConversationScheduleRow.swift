@@ -105,7 +105,7 @@ private struct ConversationScheduleDetails: View {
                     }
                 }
                 Section {
-                    Button("Delete schedule", role: .destructive) { confirmsDelete = true }
+                    Button("Delete Schedule", role: .destructive) { confirmsDelete = true }
                         .accessibilityIdentifier("\(identifier).delete")
                 }
                 .disabled(isUpdating)
@@ -146,7 +146,7 @@ private struct ConversationScheduleDetails: View {
                 .presentationBackground(Theme.Colors.background)
         }
         .confirmationDialog("Delete this schedule?", isPresented: $confirmsDelete, titleVisibility: .visible) {
-            Button("Delete schedule", role: .destructive) {
+            Button("Delete Schedule", role: .destructive) {
                 update {
                     try await OxClient.shared.deleteSchedule(scheduleID)
                     dismiss()

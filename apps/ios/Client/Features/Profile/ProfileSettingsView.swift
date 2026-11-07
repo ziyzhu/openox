@@ -398,7 +398,7 @@ private struct ProfileContentDestination: View {
                 MemoryEditorView(memory: memory)
             case .failed(let message):
                 ContentUnavailableView {
-                    Label("Couldn't load Profile", systemImage: "exclamationmark.triangle")
+                    Label("Couldn't Load Profile", systemImage: "exclamationmark.triangle")
                 } description: {
                     Text(verbatim: message)
                 } actions: {

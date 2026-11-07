@@ -364,11 +364,11 @@ struct ModelPickerContent: View {
                             }
                         }
                         .disabled(providerModelsLoading)
-                        .accessibilityLabel(providerModelsLoading ? "Loading models…" : "Load models")
+                        .accessibilityLabel(providerModelsLoading ? "Loading models…" : "Load Models")
                     }
                 }
             }
-            .alert("Load models", isPresented: Binding(
+            .alert("Load Models", isPresented: Binding(
                 get: { providerModelsError != nil },
                 set: { if !$0 { providerModelsError = nil } }
             )) {
@@ -464,7 +464,7 @@ struct ModelPickerContent: View {
         if customModels.isEmpty {
             Button { discoverCustomModels() } label: {
                 HStack(spacing: Theme.Spacing.sm) {
-                    Text(customModelsLoading ? "Loading models…" : "Load models")
+                    Text(customModelsLoading ? "Loading models…" : "Load Models")
                         .font(Theme.Fonts.bodyMd)
                     Spacer(minLength: 0)
                     if customModelsLoading {

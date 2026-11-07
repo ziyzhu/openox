@@ -84,7 +84,7 @@ struct ProviderAuthenticationView: View {
         }
         .alert("Sign out of \(client.displayName)?", isPresented: $showSignOutConfirm) {
             Button("Cancel", role: .cancel) {}
-            Button("Sign out", role: .destructive) {
+            Button("Sign Out", role: .destructive) {
                 if let account = client.subscriptionAccount { signOut(account) }
             }
         } message: {
@@ -176,7 +176,7 @@ struct ProviderAuthenticationView: View {
                 }
             }
             Spacer()
-            Button("Sign out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+            Button("Sign Out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
                 showSignOutConfirm = true
             }
             .labelStyle(.iconOnly)

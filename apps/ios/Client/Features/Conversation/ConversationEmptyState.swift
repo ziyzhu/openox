@@ -48,7 +48,7 @@ struct ConversationEmptyState: View {
                 .font(Theme.Fonts.headline)
                 .foregroundStyle(Theme.Colors.onSurface)
                 .multilineTextAlignment(.center)
-            Button("Choose model", action: onChooseModel)
+            Button("Choose Model", action: onChooseModel)
                 .font(Theme.Fonts.labelMd)
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.Colors.primary)

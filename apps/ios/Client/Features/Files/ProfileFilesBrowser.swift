@@ -116,7 +116,7 @@ private struct ProfileFilesBrowser: ViewModifier {
                     FilePreviewPresentation(file: selected.file, scope: selected.scope)
                 }
             }
-            .alert("Couldn't open file", isPresented: Binding(
+            .alert("Couldn't Open File", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
             )) {

@@ -161,7 +161,7 @@ private struct SecretEntryDetailView: View {
                             Divider().settingsContentInset()
                         }
                         Button(role: .destructive) { confirmingDelete = true } label: {
-                            Text("Delete secret")
+                            Text("Delete Secret")
                                 .font(Theme.Fonts.bodyMd)
                                 .foregroundStyle(Theme.Colors.error)
                                 .settingsRowPadding()

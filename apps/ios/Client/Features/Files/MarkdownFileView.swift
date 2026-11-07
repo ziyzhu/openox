@@ -112,7 +112,7 @@ struct MarkdownFileView: View {
             changes += 1
             Log.ui.info("MarkdownFileView.fileChanged filename=\(file.fileName) changes=\(changes)")
         }
-        .alert("Couldn't save Markdown", isPresented: Binding(
+        .alert("Couldn't Save Markdown", isPresented: Binding(
             get: { saveError != nil },
             set: { if !$0 { saveError = nil } }
         )) {

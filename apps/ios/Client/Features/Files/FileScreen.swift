@@ -254,7 +254,7 @@ struct FileZoomPreviewScreen: View {
             Button {
                 previewURL = snapshot.url
             } label: {
-                Label("Open file", systemImage: "doc")
+                Label("Open File", systemImage: "doc")
             }
             .buttonStyle(.bordered)
             .accessibilityLabel(file.userFacingName)

@@ -118,7 +118,7 @@ struct ActionSettingsView: View {
                 .scaledToFill()
                 .frame(width: 32, height: 32)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
-            Text("Built into Ox")
+            Text("Built Into Ox")
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
             Spacer(minLength: 0)
@@ -235,7 +235,7 @@ struct BuiltInActionSettingsView: View {
         }
         .scrollIndicators(.hidden)
         .background(Theme.Colors.background)
-        .navigationTitle("Built into Ox")
+        .navigationTitle("Built Into Ox")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

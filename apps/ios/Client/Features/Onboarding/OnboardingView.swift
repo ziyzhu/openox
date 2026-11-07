@@ -53,7 +53,7 @@ struct OnboardingView: View {
                             Log.ui.info("Onboarding.done")
                             onDone()
                         } label: {
-                            Text("Get started")
+                            Text("Get Started")
                         }
                         .buttonStyle(OnboardingCTAButton())
                         .accessibilityIdentifier(A11yID.Onboarding.complete)

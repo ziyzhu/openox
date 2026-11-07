@@ -170,7 +170,7 @@ private struct FileMutationAlerts: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .alert("Rename file", isPresented: presented { if case .renaming = $0 { true } else { false } }) {
+            .alert("Rename File", isPresented: presented { if case .renaming = $0 { true } else { false } }) {
                 TextField("Name", text: renameDraft)
                     .accessibilityIdentifier(A11yID.Files.renameName)
                 Button("Cancel", role: .cancel) { mutation = nil }
@@ -183,7 +183,7 @@ private struct FileMutationAlerts: ViewModifier {
                 .disabled(!canSubmitRename)
                 .accessibilityIdentifier(A11yID.Files.renameSubmit)
             }
-            .alert("Rename file", isPresented: presented { if case .renameFailed = $0 { true } else { false } }) {
+            .alert("Rename File", isPresented: presented { if case .renameFailed = $0 { true } else { false } }) {
                 Button("OK", role: .cancel) { mutation = nil }
                     .accessibilityIdentifier(A11yID.Files.renameFailureDismiss)
             } message: {
@@ -201,7 +201,7 @@ private struct FileMutationAlerts: ViewModifier {
             } message: {
                 Text("This deletes the file. Existing conversation references will show it as deleted.")
             }
-            .alert("Couldn't delete file", isPresented: presented { if case .deleteFailed = $0 { true } else { false } }) {
+            .alert("Couldn't Delete File", isPresented: presented { if case .deleteFailed = $0 { true } else { false } }) {
                 Button("OK", role: .cancel) { mutation = nil }
                     .accessibilityIdentifier(A11yID.Files.deleteFailureDismiss)
             } message: {

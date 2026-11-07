@@ -64,7 +64,7 @@ struct ServiceDetailView: View {
             } message: {
                 Text("Permanently deletes this service's editable source from Local. Website logins and data are kept.")
             }
-            .alert("Couldn't delete Local service", isPresented: Binding(
+            .alert("Couldn't Delete Local Service", isPresented: Binding(
                 get: { localServiceDeleteError != nil },
                 set: { if !$0 { localServiceDeleteError = nil } }
             )) {
@@ -133,7 +133,7 @@ struct ServiceDetailView: View {
             }
         }
         .alert("Clear website data?", isPresented: $confirmClearWebData) {
-            Button("Clear data", role: .destructive) {
+            Button("Clear Data", role: .destructive) {
                 Task { await service.clearWebData() }
             }
             Button("Cancel", role: .cancel) {}
@@ -156,7 +156,7 @@ struct ServiceDetailView: View {
         } message: {
             Text("Removes this server, its discovered tools, and its local authorization from Ox. The server does not receive a revocation request.")
         }
-        .alert("Couldn't remove MCP server", isPresented: Binding(
+        .alert("Couldn't Remove MCP Server", isPresented: Binding(
             get: { mcpRemovalError != nil },
             set: { if !$0 { mcpRemovalError = nil } }
         )) {
@@ -351,7 +351,7 @@ struct ServiceDetailView: View {
             SettingsSection(layout: .group) {
                 VStack(spacing: 0) {
                     if canInspectPage {
-                        manageRow("Inspect service page", tint: AnyShapeStyle(Theme.Colors.onSurface)) {
+                        manageRow("Inspect Service Page", tint: AnyShapeStyle(Theme.Colors.onSurface)) {
                             inspectPage()
                         }
                         .accessibilityIdentifier(A11yID.ConversationControls.Attach.inspectPage(service.domain))
@@ -379,7 +379,7 @@ struct ServiceDetailView: View {
         }
         if capabilities.supportsWebsiteDataManagement {
             SettingsSection(layout: .row) {
-                manageRow("Clear website data", tint: AnyShapeStyle(Theme.Colors.error), role: .destructive) {
+                manageRow("Clear Website Data", tint: AnyShapeStyle(Theme.Colors.error), role: .destructive) {
                     confirmClearWebData = true
                 }
                 .accessibilityIdentifier(A11yID.ConversationControls.Attach.clearWebData(service.domain))
@@ -389,7 +389,7 @@ struct ServiceDetailView: View {
             SettingsSection(layout: .group) {
                 VStack(spacing: 0) {
                     if capabilities.supportsRemoteManagement {
-                        manageRow("Remove MCP server", tint: AnyShapeStyle(Theme.Colors.error), role: .destructive) {
+                        manageRow("Remove MCP Server", tint: AnyShapeStyle(Theme.Colors.error), role: .destructive) {
                             confirmRemoveMCP = true
                         }
                         .accessibilityIdentifier(A11yID.ConversationControls.Attach.disconnectMCP(service.domain))
@@ -398,7 +398,7 @@ struct ServiceDetailView: View {
                         if capabilities.supportsRemoteManagement {
                             Divider().settingsContentInset()
                         }
-                        manageRow("Delete Local service", tint: AnyShapeStyle(Theme.Colors.error), role: .destructive) {
+                        manageRow("Delete Local Service", tint: AnyShapeStyle(Theme.Colors.error), role: .destructive) {
                             confirmDeleteLocalService = true
                         }
                         .accessibilityIdentifier(A11yID.ConversationControls.Attach.deleteLocalService(service.domain))

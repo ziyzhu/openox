@@ -79,7 +79,7 @@ struct SkillsListView: View {
         .oxSearchable(text: $query, prompt: Text("Search skills"), accessibilityIdentifier: A11yID.Settings.skillSearch)
         .onChange(of: Skills.shared.repositorySkills) { _, _ in skills.refresh() }
         .onChange(of: Skills.shared.all) { _, _ in skills.refresh() }
-        .alert("Could not update skill", isPresented: Binding(get: { skills.errorMessage != nil }, set: { if !$0 { skills.dismissError() } })) {
+        .alert("Couldn't Update Skill", isPresented: Binding(get: { skills.errorMessage != nil }, set: { if !$0 { skills.dismissError() } })) {
             Button("OK") { skills.dismissError() }
         } message: { Text(verbatim: skills.errorMessage ?? "") }
         .navigationDestination(item: $editing) { draft in
@@ -423,7 +423,7 @@ struct SkillEditorView: View {
             Chip(fill: Theme.Colors.surface) {
                 Image(systemName: "plus")
                     .font(Theme.Icons.xs)
-                Text("Add service")
+                Text("Add Service")
                     .font(Theme.Fonts.labelMd)
             }
         }

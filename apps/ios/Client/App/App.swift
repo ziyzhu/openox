@@ -110,7 +110,7 @@ private struct OxApplicationView: View {
                     ServiceImportView(proposal: proposal, coordinator: serviceImports)
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
-                        .alert("Couldn't import service", isPresented: Binding(
+                        .alert("Couldn't Import Service", isPresented: Binding(
                             get: { serviceImports.errorMessage != nil },
                             set: { if !$0 { serviceImports.dismissError() } }
                         )) {
@@ -120,7 +120,7 @@ private struct OxApplicationView: View {
                         }
                 }
             }
-            .alert("Couldn't import service", isPresented: Binding(
+            .alert("Couldn't Import Service", isPresented: Binding(
                 get: { serviceImports.proposal == nil && serviceImports.errorMessage != nil },
                 set: { if !$0, serviceImports.proposal == nil { serviceImports.dismissError() } }
             )) {
@@ -128,7 +128,7 @@ private struct OxApplicationView: View {
             } message: {
                 Text(serviceImports.errorMessage ?? "")
             }
-            .alert("Service imported", isPresented: Binding(
+            .alert("Service Imported", isPresented: Binding(
                 get: { serviceImports.importedDomain != nil },
                 set: { if !$0 { serviceImports.dismissSuccess() } }
             )) {

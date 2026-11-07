@@ -100,7 +100,7 @@ private struct WhatsNewPage: View {
                 Log.ui.info("WhatsNew.done version=\(release.version)")
                 onDone()
             } label: {
-                Text("Got it")
+                Text("Got It")
             }
             .buttonStyle(OnboardingCTAButton())
             .accessibilityIdentifier(A11yID.WhatsNew.done(release.version))
