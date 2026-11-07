@@ -55,14 +55,14 @@ private struct DiffFileSection: View {
                         if file.change == .renamed, let oldPath = file.oldPath {
                             Text(verbatim: oldPath)
                                 .font(Theme.Fonts.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
                     }
                     Spacer(minLength: Theme.Spacing.sm)
                     if file.change != .modified {
-                        changeLabel.font(Theme.Fonts.caption).foregroundStyle(.secondary)
+                        changeLabel.font(Theme.Fonts.caption).foregroundStyle(Theme.Colors.onSurfaceMuted)
                     }
                     if !isStreaming, file.additions + file.deletions > 0 {
                         DiffChangeCounts(additions: file.additions, deletions: file.deletions)
@@ -81,12 +81,12 @@ private struct DiffFileSection: View {
                 if file.change == .binary {
                     Text("Binary file changed")
                         .font(Theme.Fonts.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .padding(.horizontal, Theme.Spacing.lg)
                 } else if file.hunks.allSatisfy({ $0.lines.isEmpty }) {
                     Text(isStreaming ? "Receiving changes…" : "No text changes")
                         .font(Theme.Fonts.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .padding(.horizontal, Theme.Spacing.lg)
                 } else {
                     ForEach(file.hunks) { hunk in
@@ -175,7 +175,7 @@ private struct DiffHunkBody: View {
                                     }
                                 }
                                 .font(Font(font))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             }
                         }
                         .accessibilityHidden(true)

@@ -164,7 +164,7 @@ struct ThinkingRow: View {
                 } else {
                     Text(label)
                         .font(Theme.Fonts.bodyMd)
-                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .contentTransition(.opacity)
@@ -174,7 +174,7 @@ struct ThinkingRow: View {
             if !isLive {
                 Image(systemName: "chevron.right")
                     .font(Theme.Icons.sm)
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .frame(height: singleLineHeight)
                     .transition(.opacity)
             }
@@ -278,7 +278,7 @@ private struct ThinkingSheet: View {
                     if let omitted = trace.omittedInvocations, omitted > 0 {
                         Text("Details omitted for \(omitted) additional Actions.")
                             .font(Theme.Fonts.captionMd)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .padding(.vertical, Theme.Spacing.md)
                             .accessibilityIdentifier("conversation.trace.omitted")
                     }
@@ -348,7 +348,7 @@ private struct TraceRow: View {
                 SelectableText(
                     plain: reasoning.text,
                     font: MarkdownText.bodyFont,
-                    color: Theme.Colors.conversationSecondary.uiColor,
+                    color: Theme.Colors.onSurfaceMuted.uiColor,
                     lineSpacing: 1
                 )
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -367,7 +367,7 @@ private struct TraceRow: View {
                             Spacer(minLength: 0)
                             Image(systemName: "chevron.right")
                                 .font(Theme.Icons.sm)
-                                .foregroundStyle(Theme.Colors.conversationSecondary)
+                                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         }
                         .frame(minHeight: 22)
                         .contentShape(
@@ -417,7 +417,7 @@ private struct TraceRow: View {
                 node()
                 if !isLast {
                     Rectangle()
-                        .fill(Theme.Colors.conversationSecondary.dynamic.opacity(0.25))
+                        .fill(Theme.Colors.onSurfaceMuted.dynamic.opacity(0.25))
                         .frame(width: 2)
                         .frame(maxHeight: .infinity)
                         .padding(.bottom, Theme.Spacing.xs)
@@ -435,7 +435,7 @@ private struct TraceRow: View {
 private struct ReasoningNode: View {
     var body: some View {
         Circle()
-            .fill(Theme.Colors.conversationSecondary.dynamic.opacity(0.5))
+            .fill(Theme.Colors.onSurfaceMuted.dynamic.opacity(0.5))
             .frame(width: 8, height: 8)
             .frame(width: 22, height: 22)
     }
@@ -444,12 +444,12 @@ private struct ReasoningNode: View {
 private struct InvocationNode: View {
     let invocation: Invocation
 
-    private var tint: Color { invocation.isFailed ? Theme.Colors.error.dynamic : Theme.Colors.conversationSecondary.dynamic }
+    private var tint: Color { invocation.isFailed ? Theme.Colors.error.dynamic : Theme.Colors.onSurfaceMuted.dynamic }
 
     var body: some View {
         Group {
             if invocation.isRunning {
-                CellularAutomatonLoader(size: 14, tint: Theme.Colors.conversationSecondary.dynamic)
+                CellularAutomatonLoader(size: 14, tint: Theme.Colors.onSurfaceMuted.dynamic)
             } else {
                 OxActionIcon(InvocationFormat.iconKind(invocation), size: 15)
                     .foregroundStyle(tint)
@@ -472,19 +472,19 @@ private struct SourceChip: View {
                 EmptyView()
             case .skill:
                 Image(systemName: "doc.text")
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .frame(width: 16, height: 20)
             case .file:
                 Image(systemName: "doc")
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .frame(width: 16, height: 20)
             case .repository:
                 Image(systemName: "shippingbox")
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .frame(width: 16, height: 20)
             case .conversation:
                 Image(systemName: "bubble.left.and.bubble.right")
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .frame(width: 16, height: 20)
             case .domain(let domain):
                 DomainFavicon(domain: domain, size: 16)
@@ -493,14 +493,14 @@ private struct SourceChip: View {
             }
             Text(label)
                 .font(Theme.Fonts.caption)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .frame(maxWidth: 240, alignment: .leading)
         }
         .padding(.leading, 8)
         .padding(.trailing, 10)
-        .chipSurface(Theme.Colors.conversationSecondary.opacity(0.1))
+        .chipSurface(Theme.Colors.onSurfaceMuted.opacity(0.1))
     }
 }
 
@@ -623,7 +623,7 @@ private struct SourceFileView: View {
                         if truncated {
                             Text("This file preview was shortened.")
                                 .font(Theme.Fonts.captionMd)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         }
                         CodeBlockView(code: text, accessibilityIdentifier: "conversation.source.file.content")
                     }
@@ -712,7 +712,7 @@ private struct InvocationDetailView: View {
                     section(invocation.preview?.argumentsTruncated == true ? "Input preview" : "Input") {
                         Text(verbatim: invocation.name)
                             .font(Theme.Fonts.captionMd)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .textSelection(.enabled)
                             .accessibilityIdentifier("conversation.invocation.function")
                         if invocation.preview?.argumentsTruncated == true { previewNotice }
@@ -738,7 +738,7 @@ private struct InvocationDetailView: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
             Text(title)
                 .font(Theme.Fonts.captionMd)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -750,7 +750,7 @@ private struct InvocationDetailView: View {
             if invocation.preview?.argumentsTruncated == true {
                 Text("Input not retained.")
                     .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
             } else {
                 emptyValue
             }
@@ -768,7 +768,7 @@ private struct InvocationDetailView: View {
             if invocation.preview?.resultTruncated == true {
                 Text("Result not retained.")
                     .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
             } else {
                 emptyValue
             }
@@ -779,7 +779,7 @@ private struct InvocationDetailView: View {
                 CellularAutomatonLoader.small
                 Text("Running…", comment: "Shown in a step's detail while the action is still in flight.")
                     .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
         }
     }
@@ -787,14 +787,14 @@ private struct InvocationDetailView: View {
     private var previewNotice: some View {
         Text("This value was shortened or omitted. Its complete contents were not saved.")
             .font(Theme.Fonts.captionMd)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.Colors.onSurfaceMuted)
             .accessibilityIdentifier("conversation.invocation.previewNotice")
     }
 
     private var emptyValue: some View {
         Text("Empty", comment: "Placeholder for a step that took no input or produced no output.")
             .font(Theme.Fonts.bodySm)
-            .foregroundStyle(Theme.Colors.conversationSecondary)
+            .foregroundStyle(Theme.Colors.onSurfaceMuted)
     }
 }
 

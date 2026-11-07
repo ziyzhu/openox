@@ -10,7 +10,7 @@ struct ProfileMigrationProgressView: View {
                 .accessibilityIdentifier(automationID + ".loader")
             Text(verbatim: stage)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .lineLimit(1)
         }
         .padding(24)

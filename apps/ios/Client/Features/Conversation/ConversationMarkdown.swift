@@ -24,7 +24,7 @@ struct StreamingMarkdownText: View {
                 MarkdownRenderBlockView(
                     block: block,
                     textColor: Theme.Colors.onSurface,
-                    subtleColor: Theme.Colors.conversationSecondary,
+                    subtleColor: Theme.Colors.onSurfaceMuted,
                     availableWidth: availableWidth,
                     accessibilityIdentifier: "\(accessibilityIdentifier).block.\(index)",
                     fadeKey: snapshot.fadeKey,
@@ -355,7 +355,7 @@ struct MarkdownText: View {
         _ source: String,
         accessibilityIdentifier: String,
         textColor: DynamicColor = Theme.Colors.onSurface,
-        subtleColor: DynamicColor = Theme.Colors.conversationSecondary
+        subtleColor: DynamicColor = Theme.Colors.onSurfaceMuted
     ) {
         self.source = source
         self.accessibilityIdentifier = accessibilityIdentifier
@@ -537,7 +537,7 @@ private struct MarkdownBlockView: View {
                 .padding(.leading, 11)
                 .overlay(alignment: .leading) {
                     Rectangle()
-                        .fill(Theme.Colors.conversationSecondary)
+                        .fill(Theme.Colors.onSurfaceMuted)
                         .frame(width: 3)
                 }
         case let .table(header, rows):

@@ -217,13 +217,13 @@ struct ProfileSettingsView: View {
             Spacer(minLength: 0)
             Text(verbatim: profile.name)
                 .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .lineLimit(1)
                 .truncationMode(.middle)
             if profile.location != .external {
                 Image(systemName: "chevron.right")
                     .font(Theme.Icons.xs)
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
         }
         .settingsRowPadding()

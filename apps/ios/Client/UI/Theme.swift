@@ -38,12 +38,9 @@ enum Theme {
     enum Colors {
         static let primary         = DynamicColor(light: 0xFFA500, dark: 0xF5A030)
         static let primaryPressed  = DynamicColor(light: 0xD87A0A, dark: 0xC77410)
-        static let composerSend    = DynamicColor(light: 0xFF9500, dark: 0xFF9500)
         static let surface         = DynamicColor(light: 0xFFFFFF, dark: 0x1C1C1E)
         static let surfaceSunken   = DynamicColor(light: 0xF2F2F7, dark: 0x2C2C2E)
-        static let chipOnBackground = DynamicColor(light: 0xF2F2F7, dark: 0x2C2C2E)
         static let conversationSurface     = DynamicColor(light: 0xFFFFFF, dark: 0x0A0A0A)
-        static let conversationSecondary = DynamicColor(light: 0x666666, dark: 0x9A9A9A)
         static let conversationCodeSurface = DynamicColor(light: 0xF8F8F8, dark: surface.dark)
         static let conversationCodeBorder = DynamicColor(light: 0xE6E6E6, dark: surface.dark)
         static let conversationInlineCode = DynamicColor(light: 0x909090, dark: 0x9A9A9A)
@@ -51,7 +48,7 @@ enum Theme {
         static let bubble          = DynamicColor(light: 0xF3F3F3, dark: 0x1C1C1E)
         static let background      = DynamicColor(light: 0xF2F2F7, dark: 0x0A0A0A)
         static let onSurface       = DynamicColor(light: 0x000000, dark: 0xECECEC)
-        static let onSurfaceMuted  = DynamicColor(light: 0x8E8E93, dark: 0x9A9A9A)
+        static let onSurfaceMuted  = DynamicColor(light: 0x666666, dark: 0x9A9A9A)
         static let onPrimary       = DynamicColor(light: 0xFFFFFF, dark: 0xFFFFFF)
         static let error           = DynamicColor(light: 0xB8422E, dark: 0xE25A45)
     }

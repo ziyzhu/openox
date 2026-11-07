@@ -5,7 +5,7 @@ struct OxChipButton: ButtonStyle {
 
     var filled: Bool = true
     var primaryFill = Theme.Colors.primary
-    var secondaryFill = Theme.Colors.chipOnBackground
+    var secondaryFill = Theme.Colors.surfaceSunken
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(Theme.Fonts.labelMd)

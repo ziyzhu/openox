@@ -114,14 +114,14 @@ struct SettingsSelectionPickerView<Value: Hashable>: View {
                 if let subtitle = option.subtitle {
                     Text(LocalizedStringKey(subtitle))
                         .font(Theme.Fonts.caption)
-                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 }
             }
             Spacer(minLength: 0)
             if !option.children.isEmpty {
                 Image(systemName: "chevron.right")
                     .font(Theme.Icons.xs)
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
             } else if selection == option.value {
                 Image(systemName: "checkmark")
                     .font(.system(.subheadline, weight: .semibold))

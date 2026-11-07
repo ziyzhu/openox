@@ -153,7 +153,7 @@ struct ProfileFilesPage: View {
                 } label: {
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 22))
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.Colors.error)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }

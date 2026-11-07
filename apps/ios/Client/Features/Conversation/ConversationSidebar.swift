@@ -173,7 +173,7 @@ struct ConversationSidebar: View {
                 if contentState == .ready, ordered.isEmpty, !canLoadMore {
                     Text(LocalizedStringKey(query.isEmpty ? "Empty" : "No conversations found"))
                         .font(Theme.Fonts.bodyMd)
-                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .padding(.horizontal, edgeInset)
                         .padding(.vertical, 11)
                 } else if contentState == .ready {
@@ -216,7 +216,7 @@ struct ConversationSidebar: View {
                 .frame(width: 20, height: 20)
             Text("Loading your conversations…")
                 .font(Theme.Fonts.captionSm)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
         }
         .padding(.horizontal, edgeInset)
         .padding(.vertical, Theme.Spacing.sm)
@@ -296,13 +296,13 @@ private struct SidebarRow: View {
                     if meta.scheduleID != nil {
                         Image(systemName: "clock")
                             .font(.system(.body, weight: .medium))
-                            .foregroundStyle(Theme.Colors.conversationSecondary)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .accessibilityHidden(true)
                     }
                     if meta.isFavorite {
                         Image(systemName: "pin.fill")
                             .font(.system(.caption, weight: .medium))
-                            .foregroundStyle(Theme.Colors.conversationSecondary)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .accessibilityHidden(true)
                     }
                 }
@@ -373,7 +373,7 @@ private struct SidebarRow: View {
         case .idle(.stopped):
             Text("Stopped")
                 .font(Theme.Fonts.captionSm)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .lineLimit(1)
                 .accessibilityHidden(true)
         case .running(.thinking), .running(.streaming):

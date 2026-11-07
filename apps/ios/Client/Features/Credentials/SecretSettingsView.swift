@@ -17,7 +17,7 @@ struct SecretSettingsView: View {
                 VStack(spacing: 0) {
                     if entries.isEmpty {
                         Text("No secrets saved")
-                            .foregroundStyle(Theme.Colors.conversationSecondary)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .settingsRowPadding()
                     }
                     ForEach(Array(entries.enumerated()), id: \.element.key) { index, entry in
@@ -64,13 +64,13 @@ struct SecretSettingsView: View {
                     if !available {
                         Text("Unavailable")
                             .font(Theme.Fonts.caption)
-                            .foregroundStyle(Theme.Colors.conversationSecondary)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     }
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
                     .font(Theme.Icons.xs)
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
             .settingsRowPadding()
             .contentShape(Rectangle())
@@ -130,7 +130,7 @@ private struct SecretEntryDetailView: View {
                                             }
                                         }
                                         .scrollIndicators(.hidden)
-                                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                                         .frame(minWidth: 0, maxWidth: .infinity)
                                     }
                                     .settingsRowPadding()
@@ -138,7 +138,7 @@ private struct SecretEntryDetailView: View {
                                 }
                             } else {
                                 Text("Unavailable")
-                                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
                                     .settingsRowPadding()
                             }
                         }

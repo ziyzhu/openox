@@ -183,7 +183,7 @@ private struct ServicePickerPanel: View {
                 Spacer(minLength: 0)
                 OxActionIcon(.services, size: 20)
             }
-            .foregroundStyle(Theme.Colors.conversationSecondary)
+            .foregroundStyle(Theme.Colors.onSurfaceMuted)
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.top, Theme.Spacing.sm)
             .padding(.bottom, 2)
@@ -201,7 +201,7 @@ private struct ServicePickerPanel: View {
                 MonoRepositoryLoadingStatus(
                     minHeight: rowHeight,
                     accessibilityIdentifier: A11yID.ConversationControls.mentionLoading,
-                    secondaryColor: Theme.Colors.conversationSecondary
+                    secondaryColor: Theme.Colors.onSurfaceMuted
                 )
                     .frame(minHeight: 72)
             } else {
@@ -210,7 +210,7 @@ private struct ServicePickerPanel: View {
                     Text("No services found")
                         .font(Theme.Fonts.bodySm)
                 }
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .frame(maxWidth: .infinity, minHeight: 72, alignment: .center)
             }
         } else {
@@ -223,7 +223,7 @@ private struct ServicePickerPanel: View {
                 MonoRepositoryLoadingStatus(
                     minHeight: rowHeight,
                     accessibilityIdentifier: A11yID.ConversationControls.mentionLoading,
-                    secondaryColor: Theme.Colors.conversationSecondary
+                    secondaryColor: Theme.Colors.onSurfaceMuted
                 )
             }
         }
@@ -308,7 +308,7 @@ private struct SlashPickerPanel: View {
                 .layoutPriority(1)
             Text(verbatim: skill.description)
                 .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)

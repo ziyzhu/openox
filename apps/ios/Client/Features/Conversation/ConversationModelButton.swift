@@ -15,7 +15,7 @@ struct ConversationModelButton: View {
                     .minimumScaleFactor(0.8)
                 Image(systemName: "chevron.down")
                     .font(Theme.Icons.xs)
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
             .padding(.horizontal, 14)
             .frame(height: size)

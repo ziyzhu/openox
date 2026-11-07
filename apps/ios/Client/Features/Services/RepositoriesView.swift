@@ -123,20 +123,20 @@ struct RepositoriesView: View {
                             .lineLimit(1)
                         Text(verbatim: repositorySubtitle(repository))
                             .font(Theme.Fonts.caption)
-                            .foregroundStyle(Theme.Colors.conversationSecondary)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .lineLimit(1)
                             .truncationMode(.middle)
                         if let description = repository.provenance.skillOwnershipDescription {
                             Text(description)
                                 .font(Theme.Fonts.caption)
-                                .foregroundStyle(Theme.Colors.conversationSecondary)
+                                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
                         .font(Theme.Icons.xs)
-                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 }
                 .contentShape(Rectangle())
             }
@@ -158,7 +158,7 @@ struct RepositoriesView: View {
         } label: {
             Image(systemName: repository.isEnabled ? "checkmark.square.fill" : "square")
                 .font(.system(size: 21, weight: .medium))
-                .foregroundStyle(repository.isEnabled ? Theme.Colors.primary : Theme.Colors.conversationSecondary)
+                .foregroundStyle(repository.isEnabled ? Theme.Colors.primary : Theme.Colors.onSurfaceMuted)
                 .frame(width: 44, height: 44, alignment: .leading)
                 .contentShape(Rectangle())
         }
@@ -241,7 +241,7 @@ struct RepositoriesView: View {
                     .font(Theme.Icons.xs)
             }
             .font(Theme.Fonts.bodySm)
-            .foregroundStyle(Theme.Colors.conversationSecondary)
+            .foregroundStyle(Theme.Colors.onSurfaceMuted)
         }
         .disabled(isBusy)
         .accessibilityLabel(Text(verbatim: conflict.serviceID))
@@ -552,7 +552,7 @@ struct RepositoryDetailView: View {
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
                         .font(Theme.Icons.xs)
-                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 }
                 .contentShape(Rectangle())
                 .settingsRowPadding()
@@ -561,7 +561,7 @@ struct RepositoryDetailView: View {
         } else {
             Text(verbatim: reference.id)
                 .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .settingsRowPadding()
         }
@@ -631,7 +631,7 @@ struct RepositoryDetailView: View {
             Spacer(minLength: 0)
             Text(verbatim: value)
                 .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .lineLimit(2)
                 .multilineTextAlignment(.trailing)
                 .truncationMode(.middle)

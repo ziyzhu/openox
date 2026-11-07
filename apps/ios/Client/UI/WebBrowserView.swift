@@ -281,7 +281,7 @@ struct WebBrowserView: View {
     private var domainLabel: some View {
         let host = currentURL?.host(percentEncoded: false) ?? fallbackHost
         return Text(host.isEmpty ? String(localized: "Website address") : host)
-            .foregroundStyle(host.isEmpty ? .secondary : .primary)
+            .foregroundStyle(host.isEmpty ? Theme.Colors.onSurfaceMuted : Theme.Colors.onSurface)
             .lineLimit(1)
     }
 
@@ -332,7 +332,7 @@ struct WebBrowserView: View {
                     address = ""
                 } label: {
                     controlSymbol("xmark.circle.fill", width: 40, font: .body)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 }
                 .accessibilityLabel("Clear address")
                 .accessibilityIdentifier(identifier("clearAddress"))

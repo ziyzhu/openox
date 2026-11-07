@@ -48,7 +48,7 @@ struct ActionPolicyPicker: View {
                         .font(Theme.Icons.xs)
                 }
                 .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
         }
     }
@@ -124,10 +124,10 @@ struct ActionSettingsView: View {
             Spacer(minLength: 0)
             Text(serviceManager.resolvedSourcePolicy(for: "ox")?.title ?? "Default")
                 .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
             Image(systemName: "chevron.right")
                 .font(Theme.Icons.xs)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
         }
         .settingsRowPadding()
         .contentShape(Rectangle())
@@ -142,10 +142,10 @@ struct ActionSettingsView: View {
             Spacer(minLength: 0)
             Text(serviceManager.resolvedSourcePolicy(for: ActionPolicyConfiguration.sourceID(forServiceNamespace: service.definition.actionNamespace))?.title ?? "Default")
                 .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
             Image(systemName: "chevron.right")
                 .font(Theme.Icons.xs)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
         }
         .settingsRowPadding()
         .contentShape(Rectangle())

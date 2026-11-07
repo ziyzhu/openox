@@ -68,7 +68,7 @@ struct MarkdownEmbedView: View {
             Image(systemName: FileCardFormat(file: FileItem(fileName: removedName, directory: URL(fileURLWithPath: "/"))).symbol)
         }
         .font(Theme.Fonts.bodyMd)
-        .foregroundStyle(Theme.Colors.conversationSecondary)
+        .foregroundStyle(Theme.Colors.onSurfaceMuted)
         .lineLimit(1)
         .truncationMode(.middle)
         .frame(minHeight: Theme.Size.minimumTouchTarget)

@@ -102,7 +102,7 @@ private enum MermaidDiagrams {
         func hex(_ color: DynamicColor) -> String { String(format: "#%06X", color.hex(for: colorScheme)) }
         let background = hex(Theme.Colors.conversationSurface)
         return "html{background:\(background)}.pele{--pele-bg:\(background);--pele-fg:\(hex(Theme.Colors.onSurface));"
-            + "--pele-muted:\(hex(Theme.Colors.onSurfaceMuted));--pele-line:\(hex(Theme.Colors.conversationSecondary));"
+            + "--pele-muted:\(hex(Theme.Colors.onSurfaceMuted));--pele-line:\(hex(Theme.Colors.onSurfaceMuted));"
             + "--pele-surface:\(hex(Theme.Colors.surface));--pele-surface-alt:\(hex(Theme.Colors.surfaceSunken));"
             + "--pele-border:\(hex(Theme.Colors.onSurfaceMuted));--pele-accent:\(hex(Theme.Colors.primary))}"
     }

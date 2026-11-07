@@ -210,7 +210,7 @@ struct ServiceDetailView: View {
                     Spacer(minLength: 0)
                     Text(verbatim: service.isMCPService ? service.url : service.domain)
                         .font(Theme.Fonts.bodySm)
-                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .multilineTextAlignment(.trailing)
                         .accessibilityIdentifier(A11yID.ConversationControls.Attach.domain(service.domain))
                 }
@@ -243,13 +243,13 @@ struct ServiceDetailView: View {
                             if let status = repositoryStatus(repository) {
                                 Text(verbatim: status)
                                     .font(Theme.Fonts.bodySm)
-                                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
                                     .lineLimit(1)
                             }
                         }
                         Image(systemName: "chevron.right")
                             .font(Theme.Icons.xs)
-                            .foregroundStyle(Theme.Colors.conversationSecondary)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     }
                     .settingsRowPadding()
                     .contentShape(Rectangle())
@@ -331,7 +331,7 @@ struct ServiceDetailView: View {
                 Divider().padding(.vertical, 4)
                 Text(attachPermissionDescription)
                     .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -453,7 +453,7 @@ struct ServiceDetailView: View {
                     Divider().padding(.vertical, 4)
                     Text(desc)
                         .font(Theme.Fonts.bodySm)
-                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if isStandard || action.requireAuth {

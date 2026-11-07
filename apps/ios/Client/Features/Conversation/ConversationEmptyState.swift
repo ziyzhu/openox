@@ -77,7 +77,7 @@ struct ConversationEmptyState: View {
                 .foregroundStyle(Theme.Colors.onSurface)
             Text("This conversation won’t be saved by Ox or synced with iCloud. Temporary mode changes Ox’s storage only; your selected model’s data policy still applies.")
                 .font(Theme.Fonts.bodyMd)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 340)
         }

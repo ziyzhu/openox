@@ -247,7 +247,7 @@ struct SettingsSheet: View {
                         Text("Version \(appVersion) (\(appBuild))")
                             .font(Theme.Fonts.caption)
                     }
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .accessibilityElement(children: .combine)
@@ -398,7 +398,7 @@ struct SettingsSheet: View {
         HStack(spacing: Theme.Spacing.md) {
             Image(systemName: profileIcon(profile.location))
                 .font(.system(.body, weight: .medium))
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 1) {
                 Text(verbatim: profile.name)
@@ -406,7 +406,7 @@ struct SettingsSheet: View {
                     .foregroundStyle(Theme.Colors.onSurface)
                 Text(profileLocation(profile.location))
                     .font(Theme.Fonts.caption)
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
             Spacer(minLength: 0)
             if profile.id == storage.activeId {
@@ -416,7 +416,7 @@ struct SettingsSheet: View {
             }
             Image(systemName: "chevron.right")
                 .font(Theme.Icons.xs)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
         }
         .settingsRowPadding()
         .contentShape(Rectangle())

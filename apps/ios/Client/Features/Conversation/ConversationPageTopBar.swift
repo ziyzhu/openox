@@ -80,7 +80,7 @@ struct ConversationModelAccessNotice: View {
                 Text(verbatim: L10n.string("Choose a model"))
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right")
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
             .font(Theme.Fonts.bodySm)
             .foregroundStyle(Theme.Colors.onSurface)

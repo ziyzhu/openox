@@ -34,31 +34,31 @@ private struct ConversationFileRow: View {
             } else {
                 Image(systemName: "trash")
                     .font(.title3)
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .frame(width: 44, height: 44)
                     .background(Theme.Colors.conversationSurface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             }
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text(file.userFacingName)
                     .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(file.exists ? Theme.Colors.onSurface : Theme.Colors.conversationSecondary)
+                    .foregroundStyle(file.exists ? Theme.Colors.onSurface : Theme.Colors.onSurfaceMuted)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 if let typeName = file.userFacingTypeName, file.exists {
                     Text(typeName)
                         .font(Theme.Fonts.caption)
-                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 } else if !file.exists {
                     Text("Deleted file")
                         .font(Theme.Fonts.caption)
-                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 }
             }
             Spacer(minLength: Theme.Spacing.sm)
             if file.exists {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
@@ -96,7 +96,7 @@ struct TurnEndingCard: View {
         TurnEndingCard(
             title: Text("Stopped"),
             systemImage: "stop.fill",
-            iconTint: Theme.Colors.conversationSecondary,
+            iconTint: Theme.Colors.onSurfaceMuted,
             message: L10n.string("This reply was stopped before it finished.", comment: "Description on a stopped conversation reply card."),
             accessibilityIdentifier: "conversation.stopped",
             action: onResume.map {
@@ -166,7 +166,7 @@ struct TurnEndingCard: View {
                 if let message {
                     Text(message)
                         .font(Theme.Fonts.bodySm)
-                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
                         .accessibilityIdentifier("\(accessibilityIdentifier).message")
@@ -208,7 +208,7 @@ private struct TranscriptStatusDivider: View {
             line
         }
         .font(Theme.Fonts.caption)
-        .foregroundStyle(Theme.Colors.conversationSecondary)
+        .foregroundStyle(Theme.Colors.onSurfaceMuted)
         .padding(.horizontal, 4)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
@@ -217,7 +217,7 @@ private struct TranscriptStatusDivider: View {
 
     private var line: some View {
         Rectangle()
-            .fill(Theme.Colors.conversationSecondary.opacity(0.2))
+            .fill(Theme.Colors.onSurfaceMuted.opacity(0.2))
             .frame(height: 1)
     }
 }
@@ -633,7 +633,7 @@ struct QueuedBubble: View {
                     Image(systemName: "xmark.circle.fill")
                 }
                 .font(Theme.Fonts.caption)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
             .buttonStyle(.plain)
             .padding(.trailing, 4)
@@ -996,7 +996,7 @@ struct ResponseFooterBlockView: View, Equatable {
     private func controlIcon(systemName: String) -> some View {
         Image(systemName: systemName)
             .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(Theme.Colors.conversationSecondary)
+            .foregroundStyle(Theme.Colors.onSurfaceMuted)
             .frame(width: 18, height: 28)
             .frame(width: 28, height: Theme.Size.minimumTouchTarget, alignment: .leading)
             .contentShape(Rectangle())

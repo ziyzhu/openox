@@ -19,7 +19,7 @@ struct CodeBlockHeader<Controls: View>: View {
                 } else {
                     Text(document.files.count == 1 ? "1 file" : "\(document.files.count) files")
                         .font(Theme.Fonts.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 }
             }
             controls()

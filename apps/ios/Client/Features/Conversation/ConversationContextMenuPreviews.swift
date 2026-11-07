@@ -32,7 +32,7 @@ struct ConversationContextMenuPreview: View {
                     }
                 }
                 .font(Theme.Fonts.caption)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
         }
         .accessibilityElement(children: .combine)
@@ -66,7 +66,7 @@ struct MessageContextMenuPreview: View {
                         FileThumbnail(attachment: file, style: .row)
                         Text(file.userFacingName)
                             .font(Theme.Fonts.bodySm)
-                            .foregroundStyle(Theme.Colors.conversationSecondary)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .lineLimit(2)
                     }
                 }
@@ -74,7 +74,7 @@ struct MessageContextMenuPreview: View {
                 if attachments.count > 2 {
                     Text("\(attachments.count - 2) more attachments")
                         .font(Theme.Fonts.caption)
-                        .foregroundStyle(Theme.Colors.conversationSecondary)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 }
             }
         }

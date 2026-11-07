@@ -594,12 +594,12 @@ struct ConversationComposer: View, Equatable {
         } label: {
             followIntentTitle(intent)
                 .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.conversationSecondary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .lineLimit(1)
                 .padding(.horizontal, Theme.Spacing.md)
                 .frame(height: Theme.Size.chipHeight)
                 .overlay {
-                    Capsule().strokeBorder(Theme.Colors.conversationSecondary.opacity(0.4), lineWidth: 1)
+                    Capsule().strokeBorder(Theme.Colors.onSurfaceMuted.opacity(0.4), lineWidth: 1)
                 }
                 .contentShape(Capsule())
         }
@@ -646,7 +646,7 @@ struct ConversationComposer: View, Equatable {
                 Image(systemName: OxActionIconKind.files.systemImage)
                 Text("Files")
                 Text(verbatim: "· \(conversationFiles.count)")
-                    .foregroundStyle(Theme.Colors.conversationSecondary)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
             .font(Theme.Fonts.labelMd)
             .foregroundStyle(Theme.Colors.onSurface)
@@ -805,7 +805,7 @@ struct ConversationComposer: View, Equatable {
     @ViewBuilder
     private var trailingControl: some View {
         if isEditingMessage, canSubmit {
-            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.ConversationControls.send, fill: Theme.Colors.composerSend, action: submit)
+            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.ConversationControls.send, fill: Theme.Colors.primary, action: submit)
         } else if isEditingMessage {
             EmptyView()
         } else if composer.isImporting, isBusy {
@@ -819,7 +819,7 @@ struct ConversationComposer: View, Equatable {
         } else if composer.canSubmit, composer.websiteURL != nil {
             composerButton(systemName: "globe", label: String(localized: "Open website"), id: A11yID.ConversationControls.openWebsite, action: submit)
         } else if composer.canSubmit {
-            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.ConversationControls.send, fill: Theme.Colors.composerSend, action: submit)
+            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.ConversationControls.send, fill: Theme.Colors.primary, action: submit)
         } else if isBusy, !composer.suppressesStopControl {
             composerButton(systemName: "stop.fill", label: A11yLabel.stop, id: A11yID.ConversationControls.stop, event: .stop, action: onStop)
         } else if composer.isEmpty {
@@ -831,7 +831,7 @@ struct ConversationComposer: View, Equatable {
         switch speech.state {
         case .idle: .clear
         case .recording(.cancel): Theme.Colors.error.color(for: colorScheme)
-        default: Theme.Colors.composerSend.color(for: colorScheme)
+        default: Theme.Colors.primary.color(for: colorScheme)
         }
     }
 
@@ -938,7 +938,7 @@ struct ConversationComposer: View, Equatable {
                 Log.ui.info("ConversationComposer.detachService domain=\(picked.domain)")
                 onRemoveService(picked)
             },
-            fill: Theme.Colors.chipOnBackground,
+            fill: Theme.Colors.surfaceSunken,
             surfaceOpacity: 0
         )
         .glassEffect(.regular.interactive(), in: Capsule())
@@ -949,7 +949,7 @@ struct ConversationComposer: View, Equatable {
         systemName: String,
         label: String,
         id: String,
-        fill: DynamicColor = Theme.Colors.composerSend,
+        fill: DynamicColor = Theme.Colors.primary,
         event: Haptics.Event? = nil,
         action: @escaping () -> Void
     ) -> some View {
@@ -1147,7 +1147,7 @@ private struct ComposerAttachmentChip<Preview: View>: View {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 16, weight: .semibold))
                     .symbolRenderingMode(.palette)
-                    .foregroundStyle(Theme.Colors.conversationSecondary, Theme.Colors.surface)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted, Theme.Colors.surface)
                     .frame(
                         width: Theme.Size.minimumTouchTarget,
                         height: Theme.Size.minimumTouchTarget
