@@ -803,6 +803,30 @@ final class ServiceManager {
         }
     }
 
+    func serviceForAttachment(domain: String) async throws -> Service {
+        if service(domain: domain) != nil {
+            return try await serviceForCaller(domain: domain, reason: .attach)
+        }
+        if try await repository.localServiceKind(domain) != nil {
+            return try await serviceForCaller(domain: domain, reason: .attach)
+        }
+        let identifier = ServiceSearchIndex.normalizedDomainIdentifier(domain)
+        let matches = services.filter {
+            ($0.isWebService || $0.isAPIService) && ServiceSearchIndex.normalizedDomainIdentifier($0.domain) == identifier
+        }
+        if matches.count == 1, let match = matches.first {
+            Log.service.info("ServiceManager.attach resolved requested=\(domain) domain=\(match.domain)")
+            return try await serviceForCaller(domain: match.domain, reason: .attach)
+        }
+        let suggestions = matches.isEmpty ? await search(domain, filter: .all).prefix(5).map(\.service) : matches
+        let available = suggestions.map { "\($0.title) (\($0.domain))" }.joined(separator: ", ")
+        throw OxFunctionError(
+            code: matches.isEmpty ? "service_not_found" : "invalid_argument",
+            message: "No unique service match for '\(domain)'." + (available.isEmpty ? "" : " Available candidates: \(available)."),
+            recovery: "Use ox.service.find with the service name or task, then attach its exact returned domain. A domain lookup miss does not establish that support is missing."
+        )
+    }
+
     func serviceForCaller(domain: String, reason: Service.CapabilityReason) async throws -> Service {
         let service = service(domain: domain)
         if let service, !service.isWebService && !service.isAPIService {

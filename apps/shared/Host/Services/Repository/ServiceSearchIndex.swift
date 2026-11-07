@@ -415,7 +415,7 @@ actor ServiceSearchIndex {
         return scores
     }
 
-    private static func normalizedDomainIdentifier(_ value: String) -> String {
+    static func normalizedDomainIdentifier(_ value: String) -> String {
         var result = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !result.contains(where: \.isWhitespace) else { return result }
         if let scheme = result.range(of: "://") { result = String(result[scheme.upperBound...]) }
