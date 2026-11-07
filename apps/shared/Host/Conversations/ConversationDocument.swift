@@ -15,6 +15,7 @@ nonisolated enum ConversationDocumentEvent {
     case recordToolExchange(ToolCall, ToolResultMessage, id: StepID = StepID())
     case embedServiceControl(ServiceControl)
     case embedServiceInspector(ServiceInspectorLink)
+    case removeServiceInspector(ServiceInspectorLink)
     case embedShoveler(Shoveler)
     case embedVideo(VideoWidget)
     case embedImage(ImageWidget)
@@ -391,6 +392,12 @@ nonisolated struct ConversationDocument: Sendable {
             reconcileTail()
         case let .embedServiceInspector(link):
             embedServiceInspector(link)
+            reconcileTail()
+        case let .removeServiceInspector(link):
+            mutateExecution { execution in
+                guard let index = execution.effects.lastIndex(of: .serviceInspector(link)) else { return }
+                execution.effects.remove(at: index)
+            }
             reconcileTail()
         case let .embedShoveler(shoveler):
             embedShoveler(shoveler)

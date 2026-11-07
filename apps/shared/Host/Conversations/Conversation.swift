@@ -444,12 +444,16 @@ final class Conversation: Identifiable {
                     return await presentations.serviceHandoff.present(session: session)
                 }
                 service.conversationHandoffs[page.id] = (id, session)
-                defer { service.conversationHandoffs[page.id] = nil }
-                embedServiceInspector(ServiceInspectorLink(
+                let link = ServiceInspectorLink(
                     domain: service.domain,
                     serviceName: service.title,
                     pageID: page.id
-                ))
+                )
+                defer {
+                    service.conversationHandoffs[page.id] = nil
+                    document.apply(.removeServiceInspector(link))
+                }
+                embedServiceInspector(link)
                 return await session.run()
             }
         )
