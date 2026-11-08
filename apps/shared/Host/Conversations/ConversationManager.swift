@@ -359,20 +359,6 @@ final class ConversationManager {
         return conversation
     }
 
-    func startConversation(prompt: String, title: String, requestedBy caller: Conversation) throws -> UUID {
-        guard caller.scope == repositoryScope, caller.scope == storage.scope,
-              contains(caller.id) else {
-            throw RuntimeError.bridge("ox.conversation.start: the calling conversation must belong to the active Profile.")
-        }
-        let conversation = makeConversation()
-        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !title.isEmpty { conversation.rename(to: title) }
-        register(conversation, as: ConversationID(conversation.id))
-        conversation.enqueue(prompt)
-        Log.session.info("bridge.conversation.start caller=\(caller.id) target=\(conversation.id)")
-        return conversation.id
-    }
-
     func readableConversationState(_ id: ConversationID, in scope: ProfileScope) -> ConversationState? {
         guard scope == repositoryScope, scope == storage.scope, contains(id.rawValue),
               let conversation = records[id]?.hydration.conversation, !conversation.isTemporary else { return nil }

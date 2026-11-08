@@ -89,7 +89,7 @@ nonisolated enum Actions {
     static let userProgress = "ox.user.progress"
 
     static let builtIn = [
-        conversationStart, conversationDelete, providerDefault, providerList, providerGet, providerModels, providerGenerate, providerValidate, providerSave, providerDelete,
+        conversationDelete, providerDefault, providerList, providerGet, providerModels, providerGenerate, providerValidate, providerSave, providerDelete,
         providerAuthenticate, providerDeauthenticate, secretList, secretAdd, secretDelete,
         appInfo, appProfile, appProfiles, appNotifications, appLanguage, appSetLanguage,
         appModel, appDefaultModel, appSetModel, appSetDefaultModel, appActionPolicies, appRepositories,
