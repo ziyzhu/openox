@@ -1,5 +1,6 @@
 {
   "domain": "hotels.com",
+  "faviconUrl": "https://openox.ai/assets/services/hotels.com/favicon.png",
   "name": "Hotels.com",
   "description": "Read public hotel price search results for exact dates and room occupancy.",
   "baseUrl": "https://www.hotels.com/",

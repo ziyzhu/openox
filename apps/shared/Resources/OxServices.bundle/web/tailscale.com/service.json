@@ -1,6 +1,7 @@
 {
   "name": "Tailscale",
   "domain": "tailscale.com",
+  "faviconUrl": "https://openox.ai/assets/services/tailscale.com/favicon.png",
   "baseUrl": "https://tailscale.com/",
   "description": "Inspect the signed-in Tailscale tailnet and devices, and browse public documentation. Read-only; no tailnet mutations.",
   "actions": [

@@ -1,5 +1,6 @@
 {
   "domain": "docs.google.com",
+  "faviconUrl": "https://openox.ai/assets/services/docs.google.com/favicon.png",
   "name": "Google Forms",
   "description": "Read the signed-in Google Forms home screen and open new or existing forms for editing.",
   "baseUrl": "https://docs.google.com/forms/u/0/",

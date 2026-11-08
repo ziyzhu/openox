@@ -1,5 +1,6 @@
 {
   "domain": "aistudio.google.com",
+  "faviconUrl": "https://openox.ai/assets/services/aistudio.google.com/favicon.png",
   "name": "Google AI Studio",
   "description": "Inspect Gemini projects and monthly spending, and change project spend caps with approval. Does not reveal API keys, buy credits, or change billing plans.",
   "baseUrl": "https://aistudio.google.com/spend",

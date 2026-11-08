@@ -1,5 +1,6 @@
 {
   "domain": "deepseek.com",
+  "faviconUrl": "https://openox.ai/assets/services/deepseek.com/favicon.png",
   "name": "DeepSeek Research & News",
   "description": "Read public DeepSeek news and research links through normal rendered pages, without direct HTML fetch requests. Does not access DeepSeek chat accounts.",
   "baseUrl": "https://www.deepseek.com/en/news/",

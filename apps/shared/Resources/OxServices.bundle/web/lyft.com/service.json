@@ -1,5 +1,6 @@
 {
   "domain": "lyft.com",
+  "faviconUrl": "https://openox.ai/assets/services/lyft.com/favicon.png",
   "name": "Lyft",
   "description": "Search Lyft-supported cities and read published local ride options and rider information. No live fares, account history, or ride booking.",
   "baseUrl": "https://www.lyft.com/rider/cities",

@@ -1,5 +1,6 @@
 {
   "domain": "grokipedia.com",
+  "faviconUrl": "https://openox.ai/assets/services/grokipedia.com/favicon.png",
   "name": "Grokipedia",
   "description": "A public encyclopedia by xAI. Search articles with real page-by-page continuation and read article facts and section text. Read-only; no sign-in required.",
   "baseUrl": "https://grokipedia.com/",

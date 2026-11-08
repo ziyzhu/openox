@@ -1,5 +1,6 @@
 {
   "domain": "myworkdayjobs.com",
+  "faviconUrl": "https://openox.ai/assets/services/myworkdayjobs.com/favicon.png",
   "name": "Workday Jobs",
   "description": "Inspect and fill Workday candidate application drafts with approval, without submitting. Current execution site: NVIDIA. Other employers are not yet verified.",
   "baseUrl": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/job/US-WA-Seattle/Senior-Software-Engineer--AI-Networking_JR2021027-1",

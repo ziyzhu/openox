@@ -1,5 +1,6 @@
 {
   "domain": "fidelity.com",
+  "faviconUrl": "https://openox.ai/assets/services/fidelity.com/favicon.png",
   "name": "Fidelity",
   "description": "Read-only Fidelity Investments portfolio and account balance summaries, with secure user-controlled login. No trading or transfers.",
   "baseUrl": "https://digital.fidelity.com/ftgw/digital/portfolio/summary",

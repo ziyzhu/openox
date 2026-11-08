@@ -1,5 +1,6 @@
 {
   "domain": "booking.mangomint.com",
+  "faviconUrl": "https://openox.ai/assets/services/booking.mangomint.com/favicon.png",
   "name": "Fringe Hair Salon",
   "description": "Read Fringe Seattle haircut prices and openings, and prepare a booking for user review without submitting it.",
   "baseUrl": "https://booking.mangomint.com/183341",

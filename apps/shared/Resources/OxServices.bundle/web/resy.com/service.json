@@ -1,5 +1,6 @@
 {
   "domain": "resy.com",
+  "faviconUrl": "https://openox.ai/assets/services/resy.com/favicon.png",
   "name": "Resy",
   "description": "Find restaurants and open their Resy pages to review live availability and make reservations.",
   "baseUrl": "https://resy.com/",

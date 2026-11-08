@@ -1,5 +1,6 @@
 {
   "domain": "anthropic.com",
+  "faviconUrl": "https://openox.ai/assets/services/anthropic.com/favicon.png",
   "name": "Anthropic Research & Engineering",
   "description": "Read public Anthropic engineering posts and research articles. Handles server-rendered content hidden for entrance animations; no account access.",
   "baseUrl": "https://www.anthropic.com/engineering",

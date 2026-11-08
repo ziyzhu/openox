@@ -1,5 +1,6 @@
 {
   "domain": "calendar.google.com",
+  "faviconUrl": "https://openox.ai/assets/services/calendar.google.com/favicon.png",
   "name": "Google Calendar",
   "description": "Read signed-in Google Calendar events and open Calendar to create or edit events.",
   "baseUrl": "https://calendar.google.com/calendar/u/0/r",

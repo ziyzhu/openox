@@ -1,5 +1,6 @@
 {
   "domain": "luma.com",
+  "faviconUrl": "https://openox.ai/assets/services/luma.com/favicon.png",
   "name": "Luma",
   "description": "Browse public Seattle Luma events and your signed-in upcoming or past Luma events, with attendance and registration status.",
   "baseUrl": "https://luma.com/home",

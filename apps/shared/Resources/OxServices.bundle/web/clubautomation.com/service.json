@@ -1,5 +1,6 @@
 {
   "domain": "clubautomation.com",
+  "faviconUrl": "https://openox.ai/assets/services/clubautomation.com/favicon.png",
   "name": "Club Automation",
   "description": "Member portal access for club registration and lesson availability.",
   "baseUrl": "https://tcsp.clubautomation.com/index.php",

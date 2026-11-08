@@ -1,5 +1,6 @@
 {
   "domain": "taskrabbit.com",
+  "faviconUrl": "https://openox.ai/assets/services/taskrabbit.com/favicon.png",
   "name": "Taskrabbit",
   "description": "Read current Taskrabbit bookings and first-page completed history. Booking preparation requires Browser assistance; no automatic charges, confirmations, messages or cancellations.",
   "baseUrl": "https://www.taskrabbit.com/dashboard/active",

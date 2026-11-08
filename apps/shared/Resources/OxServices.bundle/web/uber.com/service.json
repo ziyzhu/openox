@@ -1,5 +1,6 @@
 {
   "domain": "uber.com",
+  "faviconUrl": "https://openox.ai/assets/services/uber.com/favicon.png",
   "name": "Uber",
   "description": "Read past and upcoming rides, view basic rider profile, search pickup and drop-off locations, and open Uber for manual booking. No ride requests or cancellations.",
   "baseUrl": "https://riders.uber.com/trips",
