@@ -9,6 +9,13 @@ struct WhatsNewRelease: Identifiable {
 
 enum WhatsNew {
     static let releases: [WhatsNewRelease] = [
+        WhatsNewRelease(version: "1.0.24", items: [
+            "See when another conversation finishes with a tappable banner that opens its reply.",
+            "Keep the latest website page open when switching conversations, with clearer Done and Cancel controls for handoffs.",
+            "Change models during a reply and apply your choice to the next turn.",
+            "Use expanded website actions for Chase travel, Google Drive documents, Airbnb wishlists, and Google Maps reviews.",
+            "Improved conversation scrolling, package imports, website sign-in, and text sizing, with haptic feedback when you tap Send."
+        ]),
         WhatsNewRelease(version: "1.0.23", items: [
             "See release highlights after updating and browse past releases in Settings.",
             "Use more built-in website services, including GitHub, Google Drive, Google Calendar, YouTube, and Tailscale.",

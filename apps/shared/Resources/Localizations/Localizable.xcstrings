@@ -1,6 +1,11 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "See when another conversation finishes with a tappable banner that opens its reply." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "其他对话完成后会显示横幅，轻点即可打开回复。" } } } },
+    "Keep the latest website page open when switching conversations, with clearer Done and Cancel controls for handoffs." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "切换对话后仍保留最近打开的网页，接管操作的“完成”和“取消”按钮也更清晰。" } } } },
+    "Change models during a reply and apply your choice to the next turn." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "回复进行中也能选择模型，所选模型将在下一轮生效。" } } } },
+    "Use expanded website actions for Chase travel, Google Drive documents, Airbnb wishlists, and Google Maps reviews." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "扩展了 Chase 旅行、Google 云端硬盘文档、Airbnb 心愿单和 Google 地图评论的网站操作。" } } } },
+    "Improved conversation scrolling, package imports, website sign-in, and text sizing, with haptic feedback when you tap Send." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "改进了对话滚动、导入、网站登录和文字大小适配，并在轻点发送时提供触感反馈。" } } } },
     "See release highlights after updating and browse past releases in Settings." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新后查看版本亮点，并在设置中浏览历次更新。" } } } },
     "Use more built-in website services, including GitHub, Google Drive, Google Calendar, YouTube, and Tailscale." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新增更多内置网站服务，包括 GitHub、Google 云端硬盘、Google 日历、YouTube 和 Tailscale。" } } } },
     "Get combined, ranked web search results with duplicate links removed." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "网页搜索结果现在会合并排序，并去除重复链接。" } } } },
