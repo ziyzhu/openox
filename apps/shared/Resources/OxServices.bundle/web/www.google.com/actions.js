@@ -278,6 +278,18 @@ function directionsUrl({ origin, destination, originPlaceId, destinationPlaceId,
     return `${ORIGIN}/maps/dir/?${params}`;
 }
 window.ox.install(({ action }) => {
+    action("listPlaceReviews", {async invoke({query,limit=8}) {
+        const place = await waitFor(() => parsePlaceDetails(document, location.href), 12000);
+        if (!document.querySelector('.jftiEf[data-review-id]')) {
+            const tab = [...document.querySelectorAll('[role="tab"]')].find(e => /^Reviews for /i.test(e.getAttribute('aria-label') || ''));
+            if (!tab) throw new Error('Review tab unavailable for this place');
+            tab.click();
+        }
+        await waitFor(() => document.querySelector('.jftiEf[data-review-id]'), 12000);
+        const cards = [...document.querySelectorAll('.jftiEf[data-review-id]')].slice(0,limit);
+        for (const card of cards) { const more = [...card.querySelectorAll('button')].find(b=>b.textContent.trim()==='More'); if (more) more.click(); }
+        return {name:place.name,url:location.href,items:cards.map(e=>({id:e.getAttribute('data-review-id')||'',author:cleanText(e.querySelector('.d4r55')?.textContent),rating:e.querySelector('[role="img"][aria-label*="star"]')?.getAttribute('aria-label')||'',date:cleanText(e.querySelector('.rsqaWe')?.textContent),text:cleanText(e.querySelector('.wiI7pd')?.textContent)})),nextCursor:null};
+    }});
     action("searchPlaces", {
         async invoke({ query, limit = 10, cursor = "" } = {}) {
             if (!cleanText(query))

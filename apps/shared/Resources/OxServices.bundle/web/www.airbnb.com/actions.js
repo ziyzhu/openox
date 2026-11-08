@@ -183,9 +183,32 @@ window.ox.install(({ action }) => {
             const v = j?.data?.viewer;
             if (v === null && !j.errors?.length)
                 return [];
-            if (!v?.trips || !v?.id)
-                throw Error('Airbnb current account identity unavailable');
-            return [{ id: String(v.id), label: String(v.id), url: ORIGIN + '/trips' }];
+            if (!v?.trips || j.errors?.length)
+                throw Error('Airbnb current account response unavailable');
+            const home = await fetch(ORIGIN + '/', { credentials: 'include', cache: 'no-store' });
+            if (!home.ok || new URL(home.url).origin !== ORIGIN)
+                throw Error('Airbnb identity page HTTP ' + home.status);
+            const doc = new DOMParser().parseFromString(await home.text(), 'text/html');
+            const node = doc.querySelector('#data-injector-instances');
+            if (!node) throw Error('Airbnb identity bootstrap unavailable');
+            const bootstrap = JSON.parse(node.textContent);
+            const niobe = bootstrap.root?.find(x => x?.[0] === 'NiobeClientToken');
+            const flags = [];
+            const ids = new Set();
+            const walk = (value, visit) => {
+                if (!value || typeof value !== 'object') return;
+                visit(value);
+                for (const child of Object.values(value))
+                    if (child && typeof child === 'object') walk(child, visit);
+            };
+            walk(niobe?.[1], x => { if (typeof x.hasLoggedIn === 'boolean') flags.push(x.hasLoggedIn); });
+            if (flags.length && flags.every(x => x === false)) return [];
+            if (!flags.includes(true)) throw Error('Airbnb login state unavailable');
+            const hydrated = bootstrap.root?.find(x => x?.[0] === 'JotaiDefaultStoreToken:HydratedState');
+            walk(hydrated?.[1], x => { if (typeof x.userId === 'string' && /^\d+$/.test(x.userId)) ids.add(x.userId); });
+            if (ids.size !== 1) throw Error('Airbnb current account identity unavailable');
+            const id = [...ids][0];
+            return [{ id, label: id, url: ORIGIN + '/trips' }];
         } });
     action("searchStays", {
         async invoke({ query, checkIn, checkOut, adults = 1, children = 0, infants = 0, pets = 0, minBathrooms, freeParking = false, maxPrice, cursor, limit = 18, } = {}) {
@@ -421,6 +444,13 @@ window.ox.install(({ action }) => {
             return { items, nextCursor };
         },
     });
+
+    action('getCheckoutPayment',{async invoke({listingId},context){
+      if(location.pathname!=='/book/stays/'+listingId)throw Error('The selected session page is not the requested checkout; no navigation or payment changes made');
+      if(!context?.session)throw Error('Selected Airbnb account required');
+      const home=await fetch(ORIGIN+'/',{credentials:'include',cache:'no-store'});if(!home.ok||new URL(home.url).origin!==ORIGIN)throw Error('Account verification unavailable');const d=new DOMParser().parseFromString(await home.text(),'text/html');const b=JSON.parse(d.querySelector('#data-injector-instances')?.textContent||'null');const hydrated=b?.root?.find(x=>x?.[0]==='JotaiDefaultStoreToken:HydratedState');const ids=new Set();const walk=x=>{if(!x||typeof x!=='object')return;if(typeof x.userId==='string'&&/^\d+$/.test(x.userId))ids.add(x.userId);for(const v of Object.values(x))if(v&&typeof v==='object')walk(v);};walk(hydrated?.[1]);if(ids.size!==1||![...ids].includes(context.session.id))throw Error('Checkout account mismatch');
+      const deadline=Date.now()+10000;let radio;while(Date.now()<deadline){radio=document.querySelector('input[name="payment-option"]:checked');if(radio)break;await new Promise(r=>setTimeout(r,100));}if(!radio)throw Error('No selected saved-card option is visible; no card fields inspected');const label=[...document.querySelectorAll('label[for]')].find(e=>e.htmlFor===radio.id);if(!label)throw Error('Selected payment label unavailable');const last4=(label.innerText||'').trim();if(!/^\d{4}$/.test(last4))throw Error('Payment label is not a masked saved-card identifier');const brand=label.querySelector('img[alt]')?.alt;if(!brand)throw Error('Selected card brand not visible');const plan=[...document.querySelectorAll('input[type="radio"]:checked')].filter(e=>e.name!=='payment-option').map(e=>e.getAttribute('aria-label')||[...document.querySelectorAll('label[for]')].find(l=>l.htmlFor===e.id)?.innerText||'').find(t=>/^Pay /.test(t.trim()));return {brand,last4,payNowText:plan?.trim()||null};
+    }});
     action("prepareCheckout", {
         async invoke(args = {}) {
             const listingId = stayId(args.listingId);
@@ -644,4 +674,11 @@ window.ox.install(({ action }) => {
             };
         },
     });
+
+    const wishlistWait = async (fn, label) => {const end=Date.now()+15000;while(Date.now()<end){const v=fn();if(v)return v;await new Promise(r=>setTimeout(r,150));}throw Error('Wishlist UI unavailable: '+label);};
+    const openWishlistPicker = async (listingId) => {if(location.pathname!='/rooms/'+listingId)throw Error('Wrong listing page');const b=await wishlistWait(()=>Array.from(document.querySelectorAll('button')).find(e=>e.getAttribute('aria-label')==='Save to wishlist'),'save control');b.click();return wishlistWait(()=>Array.from(document.querySelectorAll('[role=dialog]')).find(d=>d.querySelector('button[aria-label="Create new wishlist"]')),'wishlist picker');};
+    action('createWishlistFromStay',{async invoke({name,listingId}){const picker=await openWishlistPicker(listingId);const exists=Array.from(picker.querySelectorAll('button')).some(b=>(b.getAttribute('aria-label')||'').startsWith('Wishlist for '+name+','));if(exists)throw Error('Wishlist already exists; not creating duplicate');await wishlistWait(()=>Array.from(picker.querySelectorAll('button')).some(b=>(b.getAttribute('aria-label')||'').startsWith('Wishlist for ')),'loaded wishlists');picker.querySelector('button[aria-label="Create new wishlist"]').click();const input=await wishlistWait(()=>document.getElementById('name-list-input-save-to-list-modal'),'name input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,name);input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));const form=input.closest('[role=dialog]');const create=await wishlistWait(()=>Array.from(form.querySelectorAll('button')).find(b=>b.textContent.trim()==='Create'&&!b.disabled),'create button');create.click();await wishlistWait(()=>!document.getElementById('name-list-input-save-to-list-modal'),'create outcome');return {name,listingId,status:'submitted; verify wishlist membership'};}});
+    action('saveStayToWishlist',{async invoke({name,listingId}){const picker=await openWishlistPicker(listingId);await wishlistWait(()=>Array.from(picker.querySelectorAll('button')).some(b=>(b.getAttribute('aria-label')||'').startsWith('Wishlist for '+name+',')),'target wishlist');const matches=Array.from(picker.querySelectorAll('button')).filter(b=>(b.getAttribute('aria-label')||'').startsWith('Wishlist for '+name+','));if(matches.length!==1)throw Error('Wishlist missing or ambiguous');matches[0].click();await wishlistWait(()=>!document.contains(picker),'save outcome');return {name,listingId,status:'submitted; verify wishlist membership'};}});
+action('getWishlistDialog',{async invoke(){if(!document.querySelector('button[aria-label="Create new wishlist"]')){const b=Array.from(document.querySelectorAll('button')).find(e=>e.getAttribute('aria-label')==='Save to wishlist');if(b)b.click();}const p=await wishlistWait(()=>document.querySelector('button[aria-label="Create new wishlist"]'),'picker');p.click();await wishlistWait(()=>Array.from(document.querySelectorAll('[role=dialog] input')).length,'input');return {dialogs:JSON.stringify(Array.from(document.querySelectorAll('[role=dialog]')).map(d=>({text:d.innerText.slice(0,2000),inputs:Array.from(d.querySelectorAll('input')).map(i=>({id:i.id,type:i.type})),buttons:Array.from(d.querySelectorAll('button')).map(b=>({text:b.innerText,label:b.getAttribute('aria-label')}))})))}}});
+action('removeWishlistStay',{async invoke({wishlistId,listingId}){if(location.pathname!='/wishlists/'+wishlistId)throw Error('Wrong wishlist');const find=()=>Array.from(document.querySelectorAll('[data-testid="card-container"]')).filter(c=>Array.from(c.querySelectorAll('a[href]')).some(a=>new URL(a.href).pathname==='/rooms/'+listingId));const cards=await wishlistWait(()=>{const c=find();return c.length?c:null},'listing card');if(cards.length!==1)throw Error('Ambiguous listing card');const bs=Array.from(cards[0].querySelectorAll('button')).filter(b=>(b.getAttribute('aria-label')||'').startsWith('Remove from wishlist:'));if(bs.length!==1)throw Error('Ambiguous remove control');bs[0].click();return {listingId,status:'removal submitted; verify saved state before retry'};}});
 });

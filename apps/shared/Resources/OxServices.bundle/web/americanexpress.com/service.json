@@ -184,7 +184,9 @@
       },
       "defaultArgs": {},
       "requireApproval": false,
-      "requireAuth": false
+      "requireAuth": false,
+      "baseUrl": "https://www.americanexpress.com/en-us/account/login?DestPage=https://www.americanexpress.com/en-us/travel&inav=en_us_menu_login",
+      "blocking": true
     },
     {
       "id": "listSessions",

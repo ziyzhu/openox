@@ -139,10 +139,14 @@ window.ox.install(({ action }) => {
         return a[0]?.digitalAccountIdentifier ?? null;
     };
     action('login', { async invoke() {
-            const destination = START_URL;
-            if (location.href !== new URL(destination, location.href).href)
-                location.assign(destination);
-            return null;
+            const deadline = Date.now() + 18000;
+            while (Date.now() < deadline) {
+                const ready = [...document.querySelectorAll('#userId-input-field-input, #signin-button')].some(e => { const r=e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+                if (ready) return null;
+                if (/security check|verify you are human|access denied/i.test(document.body?.innerText || '')) throw Error('Website verification or access restriction requires user review.');
+                await new Promise(resolve => setTimeout(resolve, 250));
+            }
+            throw Error('Chase login page did not present usable sign-in controls.');
         } });
     action('listSessions', { async invoke() {
             accountsCache = null;
@@ -167,13 +171,13 @@ window.ox.install(({ action }) => {
                 accountsCache = accts;
                 console.log(`getTravelProfile: ${accts.length} accounts`);
                 return {
-                    loyaltyProfileIdentifier: j?.loyaltyProfileIdentifier ?? null,
-                    enterprisePartyIdentifier: j?.enterprisePartyIdentifier ?? null,
-                    onlineProfileIdentifier: j?.onlineProfileIdentifier ?? null,
+                    loyaltyProfileIdentifier: text(j?.loyaltyProfileIdentifier),
+                    enterprisePartyIdentifier: text(j?.enterprisePartyIdentifier),
+                    onlineProfileIdentifier: text(j?.onlineProfileIdentifier),
                     accounts: accts.map((a) => ({
                         digitalAccountIdentifier: a?.digitalAccountIdentifier ?? null,
-                        accountNicknameText: a?.accountNicknameText ?? null,
-                        last4AccountNumber: a?.last4AccountNumber ?? null,
+                        accountNicknameText: text(a?.accountNicknameText),
+                        last4AccountNumber: text(a?.last4AccountNumber),
                         rewardsBalanceAmount: a?.rewardsBalanceAmount ?? null,
                         cardCreditLimitAmount: a?.cardSpendControl?.cardCreditLimitAmount ?? null,
                         availableCreditAmount: a?.cardSpendControl?.availableCreditAmount ?? null,
@@ -338,4 +342,28 @@ window.ox.install(({ action }) => {
             }
         },
     });
+
+    action('getRoundTripOptions', { async invoke(args, {session}) {
+        const profile = await get('/travel-profiles?all-accounts-hidden-indicator=true');
+        if (!session || String(profile.onlineProfileIdentifier) !== session.id) throw Error('Chase account selection changed.');
+        if(args.returnDate <= args.departureDate) throw Error('Return must follow departure.');
+        const lookup = async (code, allowCity) => {
+            const j = await post('/autosuggest/search', {sq:{st:code,sf:['arrival-airport']},sel:false,rec:null,c:'flights'});
+            if(!Array.isArray(j.s)) throw Error('Airport lookup response is incomplete.');
+            const all=j.s.flatMap(x=>[x,...(x.sl||[])]);
+            const x=all.find(x=>x.cd===code && (allowCity ? x.iaa : !x.iaa)) || all.find(x=>x.cd===code);
+            if(!x) throw Error('Airport '+code+' was not found.');
+            return {code:x.cd,type:x.iaa?'City':'Airport',name:x.n,shortName:x.n,country:x.c,cityName:x.cn,stateCode:x.sc,countryCode:x.cc,locationId:x.lId,timeZone:x.tzi?.tz};
+        };
+        const from=await lookup(args.origin,false),to=await lookup(args.destination,args.destination==='DFW');
+        const created=await post('/flight/search/roundtrip',{currency:'USD',journeys:[{departure:from,arrival:to,travelDate:{date:args.departureDate,timeWindow:0}},{arrival:from,departure:to,travelDate:{date:args.returnDate,timeWindow:0}}],passengers:[{count:1,type:'Adult'}],filters:{connection:{nonStopOnly:true,maximumConnectingPoints:3},airlines:{allow:[],onlineConnectionOnly:false},unrestrictedFaresOnly:false,refundableOnly:false,brandedFares:true,upsell:false,timeFilters:[],excludeBasicEconomy:false},journeyType:'roundtrip',cabinType:'Economy',isMixAndMatch:true});
+        if(!created.sessionId)throw Error('Flight search did not return a search identifier.');
+        const req={sessionId:created.sessionId,journeyType:'outbound',outBoundFareOptionId:'',paging:{pageSize:args.limit||10,pageNumber:1,orderBy:'recommended'},facets:null,isMixAndMatch:true,comboFares:true,quickSortingOptions:['recommended','price Asc','journeyTime Asc']};
+        let j; const deadline=Date.now()+18000;
+        do{j=await post('/proxy/api/air/v1.0/search/legwiseResults',req);if(Array.isArray(j.itineraries)&&j.itineraries.length)break;if(/complete|finished/i.test(String(j.status)))break;await new Promise(r=>setTimeout(r,350));}while(Date.now()<deadline);
+        if(!Array.isArray(j?.itineraries))throw Error('Flight results schema not available.');
+        if(!j.itineraries.length&&!/complete|finished/i.test(String(j.status)))throw Error('Flight results are still loading.');
+        const items=j.itineraries.map(i=>{const journey=i.journeys?.[0],segments=journey?.segments||[],first=segments[0]?.flight,last=segments.at(-1)?.flight;if(!first||!last)throw Error('Incomplete flight journey.');return {airline:first.marketingCarrier?.name||first.operatingCarrier?.name||'',departure:first.departure.dateTime,arrival:last.arrival.dateTime,origin:first.departure.airport.code,destination:last.arrival.airport.code,durationMinutes:journey.durationInMinutes,stops:Math.max(0,segments.length-1),fares:(i.fareOptions||[]).filter(f=>typeof f.displayPrice?.total?.payable?.options?.cashOnly?.value==='number').map(f=>({name:f.fareFamily?.name||f.fareCategory||'',cash:f.displayPrice.total.payable.options.cashOnly.value}))};});
+        return {currency:j.currency||'USD',priceBasis:'Starting round-trip fares for outbound choices; return flight selection not yet confirmed.',resultCount:j.resultCount||items.length,status:String(j.status||''),items,nextCursor:null};
+    }});
 });

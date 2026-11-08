@@ -306,6 +306,86 @@
       },
       "requireApproval": false,
       "requireAuth": false
+    },
+    {
+      "id": "listPlaceReviews",
+      "label": "Read place reviews",
+      "description": "Reads a bounded sample of currently rendered public Google Maps reviews. Not a complete or newest-first review audit; no pagination exposed.",
+      "baseUrl": "https://www.google.com/maps/search/?api=1&query={query}&hl=en",
+      "blocking": true,
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 8
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "author": {
+                  "type": "string"
+                },
+                "rating": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "author",
+                "rating",
+                "date",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "name",
+          "url",
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
     }
   ],
   "faviconUrl": "https://openox.ai/assets/services/www.google.com/favicon.png"

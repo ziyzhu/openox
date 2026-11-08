@@ -1,4 +1,6 @@
 window.ox.install(({action}) => {
+ action('listSessions',{async invoke(){const end=Date.now()+12000;while(Date.now()<end){const links=Array.from(document.querySelectorAll('a[href]'));const login=links.find(a=>new URL(a.href,location.href).pathname==='/login/' && /log in/i.test(a.innerText));if(login || (location.pathname.startsWith('/login') && document.querySelector('#login-password-visibility-toggle')))return [];if(document.querySelector('shreddit-post')) break;await new Promise(r=>setTimeout(r,200));}throw new Error('Reddit account identity discovery is not yet verified. Preserve login and inspect account controls before enabling protected actions.');}});
+ action('login',{async invoke(){const end=Date.now()+12000;while(Date.now()<end){if(location.pathname.startsWith('/login') && document.querySelector('#login-password-visibility-toggle'))return null;await new Promise(r=>setTimeout(r,200));}throw new Error('Reddit login controls did not load; user sign-in was not prepared.');}});
   const clean = s => (s || '').replace(/\s+/g, ' ').trim();
   function postPath(raw) {
     let u;

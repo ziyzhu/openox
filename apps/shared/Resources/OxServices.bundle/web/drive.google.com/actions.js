@@ -1,3 +1,33 @@
+async function createDriveMarkdownFile(args,context){
+ const target=driveFolderURL(args.parentId,context.session.id);if(location.pathname.replace(/^\/drive\/u\/\d+\//,'/drive/')!==target.pathname)throw Error('Parent page mismatch: route pageUrl to requested parent');
+ if(!args.name.trim()||args.name!==args.name.trim()||/[\u0000-\u001f]/.test(args.name)||!args.name.endsWith('.md'))throw Error('Use an exact nonblank .md filename without control characters');
+ const bytes=new TextEncoder().encode(args.text);if(bytes.byteLength>65536)throw Error('UTF-8 content exceeds 64 KiB upload bound');
+ const before=await folderSnapshot(args.parentId,context);if(before.snapshot!==args.expectedParentSnapshot)throw Error('Conflict: parent snapshot changed; nothing uploaded');if(before.items.some(i=>i.name===args.name))throw Error('Conflict: same-name child observed; nothing uploaded');
+ if([...document.querySelectorAll('[role="dialog"]')].some(driveVisible))throw Error('Unexpected dialog; nothing uploaded');
+ const targets=[...document.querySelectorAll('[jscontroller="y9Qy5d"][jsaction]')].filter(e=>(e.getAttribute('jsaction')||'').includes('drop:swrgtc'));if(targets.length!==1)throw Error('Observed upload drop target unavailable or ambiguous');
+ const dt=new DataTransfer();dt.items.add(new File([bytes],args.name,{type:'text/markdown'}));
+ await assertSelectedAccount(context);const latest=await folderSnapshot(args.parentId,context);if(latest.snapshot!==before.snapshot)throw Error('Conflict immediately before upload; nothing uploaded');
+ targets[0].dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));
+ const end=Date.now()+25000;while(Date.now()<end){const after=await folderSnapshot(args.parentId,context);const added=after.items.filter(i=>i.name===args.name&&!before.items.some(b=>b.id===i.id));if(added.length===1){if(added[0].mimeType!=='text/markdown')throw Error('Unexpected upload MIME type; inspect created resource without retry');return {item:added[0],accountId:after.accountId,conflictGuarantee:'bestEffortNotAtomic'};}if(added.length>1)throw Error('Uncertain upload outcome: multiple new same-name items; do not retry');await new Promise(r=>setTimeout(r,300));}
+ throw Error('Uncertain upload outcome after one drop; inspect listChildren and upload UI without retrying');
+}
+
+
+async function createDriveWordFile(args,context){
+ const target=driveFolderURL(args.parentId,context.session.id);if(location.pathname.replace(/^\/drive\/u\/\d+\//,'/drive/')!==target.pathname)throw Error('Parent page mismatch: route pageUrl to requested parent');
+ if(!args.name.trim()||args.name!==args.name.trim()||/[\u0000-\u001f]/.test(args.name)||!args.name.endsWith('.docx'))throw Error('Use an exact nonblank .docx filename without control characters');
+ const bytes=Uint8Array.from(atob(args.base64),c=>c.charCodeAt(0));if(bytes.byteLength>196608)throw Error('DOCX exceeds upload bound');
+ const before=await folderSnapshot(args.parentId,context);if(before.snapshot!==args.expectedParentSnapshot)throw Error('Conflict: parent snapshot changed; nothing uploaded');if(before.items.some(i=>i.name===args.name))throw Error('Conflict: same-name child observed; nothing uploaded');
+ if([...document.querySelectorAll('[role="dialog"]')].some(driveVisible))throw Error('Unexpected dialog; nothing uploaded');
+ const targets=[...document.querySelectorAll('[jscontroller="y9Qy5d"][jsaction]')].filter(e=>(e.getAttribute('jsaction')||'').includes('drop:swrgtc'));if(targets.length!==1)throw Error('Observed upload drop target unavailable or ambiguous');
+ const dt=new DataTransfer();dt.items.add(new File([bytes],args.name,{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
+ await assertSelectedAccount(context);const latest=await folderSnapshot(args.parentId,context);if(latest.snapshot!==before.snapshot)throw Error('Conflict immediately before upload; nothing uploaded');
+ targets[0].dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));
+ const end=Date.now()+25000;while(Date.now()<end){const after=await folderSnapshot(args.parentId,context);const added=after.items.filter(i=>i.name===args.name&&!before.items.some(b=>b.id===i.id));if(added.length===1){if(added[0].mimeType!=='application/vnd.openxmlformats-officedocument.wordprocessingml.document')throw Error('Unexpected upload MIME type; inspect created resource without retry');return {item:added[0],accountId:after.accountId,conflictGuarantee:'bestEffortNotAtomic'};}if(added.length>1)throw Error('Uncertain upload outcome: multiple new same-name items; do not retry');await new Promise(r=>setTimeout(r,300));}
+ throw Error('Uncertain upload outcome after one drop; inspect listChildren and upload UI without retrying');
+}
+
+
 
 async function createDriveTextFile(args,context){
  const target=driveFolderURL(args.parentId,context.session.id);if(location.pathname.replace(/^\/drive\/u\/\d+\//,'/drive/')!==target.pathname)throw Error('Parent page mismatch: route pageUrl to requested parent');
@@ -167,13 +197,23 @@ async function assertSelectedAccount(context){
   };
   const currentSignedIn = () => !!document.querySelector('[role="main"], a[href*="accounts.google.com/SignOutOptions"], [aria-label*="Google Account"]') && !/ServiceLogin|accounts\.google\.com\/signin/.test(location.href);
   window.ox.install(({ action: registerAction }) => {
-const protectedActionIds=new Set(["searchFiles","listFiles","getFileText","listChildren","createFolder","createTextFile"]);
+const protectedActionIds=new Set(["searchFiles","listFiles","getFileText","listChildren","createFolder","createTextFile","createWordFile","openWordInDocs","createMarkdownFile","openMarkdownInDocs"]);
 const action=(id,handler)=>registerAction(id,protectedActionIds.has(id)?{...handler,async invoke(args,context){await assertSelectedAccount(context);return handler.invoke(args,context);}}:handler);
 action('listSessions',{async invoke(){return discoverAuthenticatedSessions();}});
 action('login',{async invoke(){return null;}});
 action('listChildren',{async invoke(args,context){const s=await folderSnapshot(args.folderId,context);const limit=args.limit||100;return {...s,items:s.items.slice(0,limit),completenessReason:s.completenessReason+(s.items.length>limit?' Caller limit truncates this initial snapshot.':'')};}});
 action('createFolder',{async invoke(args,context){return createDriveFolder(args,context);}});
 action('createTextFile',{async invoke(args,context){return createDriveTextFile(args,context);}});
+action('createWordFile',{async invoke(args,context){return createDriveWordFile(args,context);}});
+action('createMarkdownFile',{async invoke(args,context){return createDriveMarkdownFile(args,context);}});
+action('openMarkdownInDocs',{async invoke({fileId},context){if(!location.pathname.includes('/d/'+encodeURIComponent(fileId)+'/'))throw Error('Markdown preview mismatch');const b=await driveWait(()=>[...document.querySelectorAll('[role="button"]')].find(e=>driveVisible(e)&&e.textContent.includes('Open with Google Docs')),'Google Docs importer unavailable');await assertSelectedAccount(context);driveClick(b);return null;}});
+action('openWordInDocs',{async invoke(args,context){
+ if(!location.pathname.includes('/d/'+encodeURIComponent(args.fileId)+'/'))throw Error('File preview mismatch');
+ const b=await driveWait(()=>[...document.querySelectorAll('[role="button"]')].find(e=>driveVisible(e)&&e.textContent.includes('Open with Google Docs')),'Google Docs opener unavailable');
+ let opened='';const old=window.open;window.open=function(url){opened=String(url||'');return null;};
+ try{driveClick(b);const end=Date.now()+8000;while(Date.now()<end&&!opened)await new Promise(r=>setTimeout(r,100));}finally{window.open=old;}
+ const u=new URL(opened,location.href);if(u.hostname!=='docs.google.com'||!u.pathname.startsWith('/document/'))throw Error('Editor route unavailable after opener; inspect without replay');return {url:u.href};
+}});
     action("getFileText", {async invoke(args){
       if(!location.pathname.includes('/d/'+encodeURIComponent(args.fileId)+'/'))throw Error('File preview does not match requested ID');
       const end=Date.now()+15000;let previous='',stableSince=0;

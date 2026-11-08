@@ -1,6 +1,7 @@
 {
   "domain": "drive.google.com",
   "name": "Google Drive",
+  "faviconUrl": "https://openox.ai/assets/services/drive.google.com/favicon.png",
   "description": "Account-pinned folder snapshots, guarded folder and UTF-8 text-file creation; preserved rendered search and preview actions. No original-byte download, native export, or atomic filesystem semantics.",
   "baseUrl": "https://drive.google.com/drive/my-drive",
   "$defs": {
@@ -524,6 +525,258 @@
           "conflictGuarantee"
         ],
         "additionalProperties": false
+      }
+    },
+    {
+      "id": "createWordFile",
+      "label": "Upload Word document",
+      "description": "Upload one DOCX document for subsequent Google Docs conversion. Single guarded drop; does not share or convert. Inspect uncertain outcomes without retry.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedParentSnapshot": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "conflictAcknowledgement": {
+            "type": "string",
+            "enum": [
+              "bestEffortNotAtomic"
+            ]
+          },
+          "base64": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 262144
+          }
+        },
+        "required": [
+          "parentId",
+          "name",
+          "expectedParentSnapshot",
+          "conflictAcknowledgement",
+          "base64"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "mimeType": {
+                "type": "string"
+              },
+              "parentIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "mimeType",
+              "parentIds",
+              "url"
+            ],
+            "additionalProperties": false
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "conflictGuarantee": {
+            "type": "string",
+            "enum": [
+              "bestEffortNotAtomic"
+            ]
+          }
+        },
+        "required": [
+          "item",
+          "accountId",
+          "conflictGuarantee"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "openWordInDocs",
+      "label": "Open Word in Google Docs",
+      "description": "Invoke the observed Google Docs opener for one uploaded Word file and return its editor URL; no sharing. May enter an editable document.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "fileId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "createMarkdownFile",
+      "label": "Upload Markdown file",
+      "description": "Upload one UTF-8 .md source for Google Docs native Markdown import. Guarded single upload; no conversion or sharing.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedParentSnapshot": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "conflictAcknowledgement": {
+            "type": "string",
+            "enum": [
+              "bestEffortNotAtomic"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 65536
+          }
+        },
+        "required": [
+          "parentId",
+          "name",
+          "expectedParentSnapshot",
+          "conflictAcknowledgement",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "mimeType": {
+                "type": "string"
+              },
+              "parentIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "mimeType",
+              "parentIds",
+              "url"
+            ],
+            "additionalProperties": false
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "conflictGuarantee": {
+            "type": "string",
+            "enum": [
+              "bestEffortNotAtomic"
+            ]
+          }
+        },
+        "required": [
+          "item",
+          "accountId",
+          "conflictGuarantee"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "openMarkdownInDocs",
+      "label": "Import Markdown in Google Docs",
+      "description": "Use the observed Open with Google Docs control on a selected Markdown file. Google handles import/conversion; no sharing or source deletion. Verify resulting file type and content after navigation.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "fileId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
       }
     }
   ]

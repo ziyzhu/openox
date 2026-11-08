@@ -159,7 +159,8 @@
           "text"
         ],
         "additionalProperties": false
-      }
+      },
+      "blocking": true
     },
     {
       "id": "listSessions",
@@ -214,5 +215,6 @@
         "type": "null"
       }
     }
-  ]
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/youtube.com/favicon.png"
 }

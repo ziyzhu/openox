@@ -358,7 +358,7 @@
       "id": "listThreads",
       "label": "Browse mailbox threads",
       "description": "Lists one page of conversations from a selected account and mailbox such as Inbox, Starred, Sent, Drafts, Spam, Trash, or All Mail.",
-      "baseUrl": "https://mail.google.com/mail/u/0/?authuser={accountId}",
+      "baseUrl": "https://mail.google.com/mail/u/?authuser={accountId}",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -402,7 +402,7 @@
       "id": "searchThreads",
       "label": "Search Gmail",
       "description": "Searches a selected account with Gmail keywords and operators, returning matching conversations.",
-      "baseUrl": "https://mail.google.com/mail/u/0/?authuser={accountId}",
+      "baseUrl": "https://mail.google.com/mail/u/?authuser={accountId}",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -466,13 +466,13 @@
       },
       "requireApproval": false,
       "requireAuth": true,
-      "baseUrl": "https://mail.google.com/mail/_/bscframe"
+      "baseUrl": "https://mail.google.com/mail/u/?authuser={accountId}"
     },
     {
       "id": "createDraft",
       "label": "Create Gmail draft",
       "description": "Creates and opens a new Gmail draft with recipients, subject, and plain-text body.",
-      "baseUrl": "https://mail.google.com/mail/u/0/?authuser={accountId}#inbox",
+      "baseUrl": "https://mail.google.com/mail/u/?authuser={accountId}",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -518,7 +518,7 @@
       "id": "updateDraft",
       "label": "Update Gmail draft",
       "description": "Reopens a Gmail draft and replaces any provided recipients, subject, or plain-text body.",
-      "baseUrl": "https://mail.google.com/mail/u/0/?authuser={accountId}#drafts",
+      "baseUrl": "https://mail.google.com/mail/u/?authuser={accountId}",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -571,7 +571,7 @@
       "id": "sendDraft",
       "label": "Send Gmail draft",
       "description": "Sends an existing Gmail draft after confirming it has recipients, a subject, and a body.",
-      "baseUrl": "https://mail.google.com/mail/u/0/?authuser={accountId}#drafts",
+      "baseUrl": "https://mail.google.com/mail/u/?authuser={accountId}",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -633,7 +633,7 @@
       "id": "discardDraft",
       "label": "Discard Gmail draft",
       "description": "Permanently discards an existing Gmail draft.",
-      "baseUrl": "https://mail.google.com/mail/u/0/?authuser={accountId}#drafts",
+      "baseUrl": "https://mail.google.com/mail/u/?authuser={accountId}",
       "inputSchema": {
         "type": "object",
         "properties": {

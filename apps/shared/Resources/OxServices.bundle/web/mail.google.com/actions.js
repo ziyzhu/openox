@@ -104,7 +104,9 @@ window.ox.install(({ action }) => {
         const accounts = await availableAccounts();
         if (accounts.length === 0)
             throw new Error("No signed-in Gmail accounts are available");
-        const selected = new URL(location.href).searchParams.get("authuser");
+        await ensureMailbox();
+        const label = document.querySelector('a[aria-label^="Google Account:"]')?.getAttribute("aria-label") || "";
+        const selected = label.match(/\(([^\s()]+@[^\s()]+)\)/)?.[1];
         if (!selected || !selected.includes("@"))
             throw new Error("Select a Gmail session before account-sensitive actions");
         if (accountId && accountId.toLowerCase() !== selected.toLowerCase())
@@ -172,9 +174,9 @@ window.ox.install(({ action }) => {
             if (!id || rows.has(id))
                 continue;
             const row = element.closest('tr, [role="row"]') || element;
-            const rects = row.getClientRects?.();
-            if (rects && rects.length === 0)
-                continue;
+            let hidden = false;
+            for (let p = row; p; p = p.parentElement) { if (getComputedStyle(p).display === "none") { hidden = true; break; } }
+            if (hidden) continue;
             rows.set(id, row);
         }
         return [...rows.entries()].map(([id, row]) => ({ id, row }));

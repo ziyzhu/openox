@@ -106,10 +106,14 @@ window.ox.install(({ action }) => {
     };
     const profileId = async () => profileIdCache ?? (await fetchProfile(), profileIdCache);
     action('login', { async invoke() {
-            const destination = LOGIN_URL;
-            if (location.href !== new URL(destination, location.href).href)
-                location.assign(destination);
-            return null;
+            const deadline = Date.now() + 18000;
+            while (Date.now() < deadline) {
+                const ready = [...document.querySelectorAll("#eliloUserID, #loginSubmit, #axp-travel-search-hotels_searchButton")].some(e => { const r=e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+                if (ready) return null;
+                if (/security check|verify you are human|access denied/i.test(document.body?.innerText || '')) throw Error('Website verification or access restriction requires user review.');
+                await new Promise(resolve => setTimeout(resolve, 250));
+            }
+            throw Error('Travel login page did not present usable sign-in controls.');
         } });
     action('listSessions', { async invoke() {
             profileIdCache = null;

@@ -1,10 +1,64 @@
 {
   "domain": "reddit.com",
   "name": "Reddit",
-  "description": "Search public posts and read posts and a bounded snapshot of comments.",
+  "description": "Search public Reddit posts and read posts and a bounded comment snapshot. Includes sign-in setup; signed-in account discovery remains unverified.",
   "baseUrl": "https://www.reddit.com/",
   "faviconUrl": "https://openox.ai/assets/services/reddit.com/favicon.png",
   "actions": [
+    {
+      "id": "listSessions",
+      "label": "Find signed-in Reddit accounts",
+      "description": "Detects explicit signed-out state; refuses unverified account identity.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "login",
+      "label": "Sign in to Reddit",
+      "description": "Prepare Reddit login controls for user sign-in.",
+      "baseUrl": "https://www.reddit.com/login/",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      }
+    },
     {
       "id": "search",
       "label": "Search posts",

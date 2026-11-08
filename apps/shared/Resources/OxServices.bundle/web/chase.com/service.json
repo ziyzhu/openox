@@ -317,7 +317,9 @@
       },
       "defaultArgs": {},
       "requireApproval": false,
-      "requireAuth": false
+      "requireAuth": false,
+      "baseUrl": "https://secure.chase.com/web/auth/nav?navKey=chaseTravelHome&treatment=chase",
+      "blocking": true
     },
     {
       "id": "listSessions",
@@ -782,6 +784,135 @@
       "defaultArgs": {},
       "requireApproval": false,
       "requireAuth": true
+    },
+    {
+      "id": "getRoundTripOptions",
+      "label": "Compare round-trip flights",
+      "description": "Search round-trip flights and return outbound choices with starting round-trip cash fares. A return-flight selection is still required to confirm the final price. Dallas DFW includes all Dallas airports when the location service provides a city group.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "destination": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "departureDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "returnDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "default": 10
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "departureDate",
+          "returnDate"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "priceBasis": {
+            "type": "string"
+          },
+          "resultCount": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "airline": {
+                  "type": "string"
+                },
+                "departure": {
+                  "type": "string"
+                },
+                "arrival": {
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string"
+                },
+                "destination": {
+                  "type": "string"
+                },
+                "durationMinutes": {
+                  "type": "number"
+                },
+                "stops": {
+                  "type": "integer"
+                },
+                "fares": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "cash": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "cash"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "airline",
+                "departure",
+                "arrival",
+                "origin",
+                "destination",
+                "durationMinutes",
+                "stops",
+                "fares"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "currency",
+          "priceBasis",
+          "resultCount",
+          "status",
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
     }
   ],
   "locales": {
@@ -828,6 +959,10 @@
         "listSessions": {
           "label": "列出已登录账号",
           "description": "发现当前已通过身份验证的账号。错误不代表没有账号。"
+        },
+        "getRoundTripOptions": {
+          "label": "比较往返航班",
+          "description": "搜索往返航班，返回去程选项和往返现金起价；需选择返程后确认最终价格。"
         }
       }
     }
