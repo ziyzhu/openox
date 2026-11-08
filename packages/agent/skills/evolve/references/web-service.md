@@ -69,7 +69,7 @@ For page-owned actions, start from the action base page, serialize shared SPA na
 
 The handler's second argument contains only `session`; it does not provide a diagnostic callback. Use `console.log(JSON.stringify({ action: "example", phase: "waitingForControls", expectedControls: 2, observedControls: 0 }))` for concise phase-change diagnostics. Include only action ID, safe route, status, and counts; exclude credentials, field values, private bodies, and opaque tokens. Throw a clear error when readiness or success cannot be established; logs alone do not verify the action.
 
-Ordinary website links do not show the live document being inspected. Use `ox.web.browser.showPage` for Browser's page or `ox.service.showPage` with the original action name, input, and routing for an existing service page; follow their inspected contracts. If the user's visible page conflicts with observations, show the actual page and inspect fresh evidence. For human verification or payment, follow `references/web-handoffs.md`; never invent URL/state actions or rerun a mutation to present its page. Return opaque identifiers rather than credential-grade card, bank, government-ID, verification, or reusable-token values.
+For live-page handoffs, follow `references/web-handoffs.md`. If the user's visible page conflicts with observations, show the actual page and inspect fresh evidence. Return opaque identifiers rather than credential-grade card, bank, government-ID, verification, or reusable-token values.
 
 ## Verify and finish
 
