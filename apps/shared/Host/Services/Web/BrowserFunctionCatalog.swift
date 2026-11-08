@@ -123,9 +123,22 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "showPage",
             label: "Show Page",
-            description: "Present Browser's live page using the Host's supported presentation. iOS adds a conversation row; macOS opens a Host window.",
-            inputSchema: object(),
-            outputSchema: object(["shown": boolean], required: ["shown"]),
+            description: "Present Browser's live page using the Host's supported presentation. iOS adds a conversation row; macOS opens a Host window. With waitForUserInteraction, first clear capture and injected scripts, then wait until the user taps Done or Cancel.",
+            inputSchema: object([
+                "waitForUserInteraction": .object([
+                    "type": .string("boolean"),
+                    "description": .string("Show Done/Cancel and wait for the user. Requires instructions. Defaults to false."),
+                ]),
+                "instructions": string(description: "What the user must do on the page before tapping Done.", minimum: 1, maximum: 1_000),
+            ]),
+            outputSchema: object([
+                "shown": boolean,
+                "completion": .object([
+                    "type": .string("string"),
+                    "enum": .array([.string("completed"), .string("cancelled")]),
+                    "description": .string("Present only when waiting: completed means the user tapped Done; cancelled means the user tapped Cancel or closed the page."),
+                ]),
+            ], required: ["shown"]),
             hasModelGuidance: true
         ),
         Action(
@@ -165,17 +178,6 @@ nonisolated enum BrowserFunctionCatalog {
                 "attached": boolean,
                 "file": nullableString,
             ], required: ["url", "contentType", "pages", "bytes", "attached", "file"])
-        ),
-        Action(
-            id: "waitForUserInteraction",
-            label: "Wait for User Interaction",
-            description: "Pause automation and let the user complete a human-only step only after capture and injected scripts are cleared from Browser.",
-            inputSchema: object(
-                ["instructions": string(minimum: 1, maximum: 1_000)],
-                required: ["instructions"]
-            ),
-            outputSchema: object(["completed": boolean], required: ["completed"]),
-            hasModelGuidance: true
         ),
         Action(
             id: "injectScript",

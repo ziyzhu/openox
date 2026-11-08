@@ -104,7 +104,8 @@ nonisolated enum OxWeb {
             let browser: @convention(block) (String, JSValue) -> JSValue = { action, options in
                 var fields = jsValueToJSON(options)?.objectValue ?? [:]
                 let purpose = fields.removeValue(forKey: "purpose")?.stringValue ?? ""
-                return env.call(suspendingTimeout: action == "waitForUserInteraction" || action == "waitForNavigation") {
+                let waitsForUser = action == "showPage" && fields["waitForUserInteraction"]?.boolValue == true
+                return env.call(suspendingTimeout: waitsForUser || action == "waitForNavigation") {
                     try await $0.browserOperation(action: action, arguments: .object(fields), purpose: purpose)
                 }
             }
@@ -124,7 +125,6 @@ nonisolated enum OxWeb {
             showPage: (value) => __nativeWebBrowser('showPage', __oxOptions(value, 'ox.web.browser.showPage')),
             executeScript: (value) => __nativeWebBrowser('executeScript', __oxOptions(value, 'ox.web.browser.executeScript')),
             exportPdf: (value) => __nativeWebBrowser('exportPdf', __oxOptions(value, 'ox.web.browser.exportPdf')),
-            waitForUserInteraction: (value) => __nativeWebBrowser('waitForUserInteraction', __oxOptions(value, 'ox.web.browser.waitForUserInteraction')),
             injectScript: (value) => __nativeWebBrowser('injectScript', __oxOptions(value, 'ox.web.browser.injectScript')),
             clearScripts: (value) => __nativeWebBrowser('clearScripts', __oxOptions(value, 'ox.web.browser.clearScripts')),
             startCapture: (value) => __nativeWebBrowser('startCapture', __oxOptions(value, 'ox.web.browser.startCapture')),

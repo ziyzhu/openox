@@ -229,8 +229,12 @@ final class ServiceOperations {
             outcome = await native.presentations.serviceHandoff.present(session: handoff)
         }
         try Task.checkCancellation()
+        Log.service.info("Service.login interaction domain=\(service.domain) page=\(lease.page.logLabel) outcome=\(outcome.rawValue)")
+        if outcome == .cancelled {
+            throw OxFunctionError(code: "handoff_incomplete", message: "The user tapped Cancel or closed the login page before finishing sign-in.", recovery: "Tell the user login was not completed. Do not reopen automatically; ask whether they want to try again. The page is preserved.")
+        }
         guard outcome == .completed, lease.isActive else {
-            throw OxFunctionError(code: "handoff_incomplete", message: "Login interaction was cancelled or unavailable.", recovery: "Do not reopen automatically. Ask the user whether to continue; the page is preserved.")
+            throw OxFunctionError(code: "page_unavailable", message: "The login page could not be presented or was closed by the app.", recovery: "Do not reopen automatically. Report the failure and ask the user whether to continue; the page is preserved.")
         }
         if lease.page.page.url?.host.map(service.isServiceHost) != true {
             let clock = ContinuousClock()
@@ -766,7 +770,7 @@ final class ServiceOperations {
         let control = ServiceControl.login(domain: service.domain, serviceName: service.title)
         Log.session.info("bridge.service.login handoff domain=\(service.domain) auth=\(service.loginState.rawValue)")
         guard await presentControl(control, service) != nil else {
-            throw OxFunctionError(code: "handoff_incomplete", message: "The user cancelled or access setup failed.", recovery: "Do not reopen login automatically. Ask the user whether to continue, then inspect the service's login state before trying again.")
+            throw OxFunctionError(code: "handoff_incomplete", message: "Login did not finish: the user tapped Cancel or closed the login page, or sign-in did not complete. \(service.title) is still not signed in.", recovery: "Tell the user login was not completed. Do not reopen login automatically; ask whether they want to try again, then inspect the service's login state before retrying.")
         }
         try Task.checkCancellation()
         return service.accessResult()

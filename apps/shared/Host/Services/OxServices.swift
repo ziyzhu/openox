@@ -243,7 +243,7 @@ nonisolated enum OxServices {
                                 "input": .object(["type": .string("object"), "description": .string("The same action input, used only to select its execution page.")]),
                                 "session": WebSessionContract.sessionSchema,
                                 "pageUrl": .object(["type": .string("string")]),
-                                "waitForUserInteraction": .object(["type": .string("boolean"), "description": .string("Show Done/Cancel and wait for the user. Defaults to false.")]),
+                                "waitForUserInteraction": .object(["type": .string("boolean"), "description": .string("Show Done/Cancel and wait for the user. completion is completed when the user taps Done and cancelled when the user taps Cancel or closes the page. Defaults to false.")]),
                                 "purpose": .object(["type": .string("string")]),
                             ]),
                             "required": .array([.string("name")]),

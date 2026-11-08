@@ -21,7 +21,7 @@ export default {
   checks: run => [
     { detail: "Used the standard website login action", passed: succeeded(run, "ox.service.invoke").some(call => call.args.name === login) },
     { detail: "Discovered accounts after interaction acknowledgment", passed: run.calls.some((call, index) => call.name === "ox.service.invoke" && call.args.name === listSessions && run.calls.slice(0, index).some(previous => previous.name === "ox.service.invoke" && previous.args.name === login)) },
-    { detail: "Did not substitute generic Browser interaction for authentication", passed: !run.calls.some(call => call.name === "ox.web.browser.waitForUserInteraction") },
+    { detail: "Did not substitute generic Browser interaction for authentication", passed: !run.calls.some(call => call.name === "ox.web.browser.showPage" && call.args.waitForUserInteraction === true) },
     { detail: "Did not request credential entry in chat", passed: !/send me (?:your )?(?:password|api key)|tell me (?:your )?password/i.test(run.answer) },
   ],
 } satisfies EvalCase;

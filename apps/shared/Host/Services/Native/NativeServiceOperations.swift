@@ -129,8 +129,30 @@ final class NativeServiceOperations {
                 .waitForNavigation(timeoutMilliseconds: fields["timeoutMs"]?.intValue ?? 15_000)
             return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
         case ("ios:browser", "showPage"):
+            guard fields["waitForUserInteraction"]?.boolValue == true else {
+                try await presentBrowser(browser)
+                return .object(["shown": .bool(true)])
+            }
+            guard let instructions = fields["instructions"]?.stringValue, !instructions.isEmpty else {
+                throw RuntimeError.bridge("ox.web.browser.showPage requires instructions when waitForUserInteraction is true.")
+            }
+            let session = serviceManager.browserActionSessions.session(for: browser, ownerID: id)
+            try await session.prepareForUserInteraction()
             try await presentBrowser(browser)
-            return .object(["shown": .bool(true)])
+            let completed: Bool
+            if presentations.browser != nil {
+                let done = L10n.string("Done")
+                let answer = try await choose(Prompt(
+                    body: instructions,
+                    options: [done, L10n.string("Cancel")],
+                    purpose: purpose ?? L10n.string("Wait for browser interaction")
+                ))
+                completed = answer == done
+            } else {
+                completed = try await session.waitForUserInteraction()
+            }
+            Log.service.info("Browser.showPage interaction completion=\(completed ? "completed" : "cancelled")")
+            return .object(["shown": .bool(true), "completion": .string(completed ? "completed" : "cancelled")])
         case ("ios:browser", "executeScript"):
             guard let script = fields["script"]?.stringValue else {
                 throw RuntimeError.bridge("ox.web.browser.executeScript requires Browser to be available to an active caller.")
@@ -157,23 +179,6 @@ final class NativeServiceOperations {
                 "attached": .bool(true),
                 "file": file.map { .string($0.fileName) } ?? .null,
             ])
-        case ("ios:browser", "waitForUserInteraction"):
-            let session = serviceManager.browserActionSessions.session(for: browser, ownerID: id)
-            try await session.prepareForUserInteraction()
-            try await presentBrowser(browser)
-            if presentations.browser != nil {
-                let done = L10n.string("Done")
-                let answer = try await choose(Prompt(
-                    body: fields["instructions"]?.stringValue
-                        ?? L10n.string("Complete the requested step in Browser, then confirm when finished."),
-                    options: [done, L10n.string("Cancel")],
-                    purpose: purpose ?? L10n.string("Wait for browser interaction")
-                ))
-                guard answer == done else { throw CancellationError() }
-            } else {
-                try await session.waitForUserInteraction()
-            }
-            return .object(["completed": .bool(true)])
         case ("ios:browser", "injectScript"):
             guard let source = fields["script"]?.stringValue,
                   let domains = fields["domains"]?.arrayValue?.compactMap(\.stringValue) else {
