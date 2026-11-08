@@ -110,7 +110,6 @@ protocol ConversationFeedback {
     var isBackground: Bool { get }
     func notifyAttention(identifier: String, title: String, body: String, isCurrent: @escaping @MainActor () -> Bool) async throws -> Bool
     func dismissAttention(identifier: String)
-    func receivedAgentDelta()
     func startedConversation(firstSubmissionID: UUID)
     func notifyCompletion(id: UUID, title: String, body: String)
 }

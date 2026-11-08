@@ -706,7 +706,6 @@ final class Conversation: Identifiable {
     @ObservationIgnored private lazy var stream = ConversationAssistantStream(
         conversation: self,
         execution: execution,
-        feedback: feedback,
         showText: { [unowned self] text in
             if isSelected { activeLatency?.mark(.firstTextVisible) }
             growAgentText(text)
@@ -1158,23 +1157,17 @@ final class Conversation: Identifiable {
         switch event {
         case .textDelta(let index, let delta, _):
             guard !delta.isEmpty else { return }
-            stream.registerDelta()
             activeRun?.backgroundExecution?.updatePhase(.responding)
             stream.appendDelta(delta, block: index)
-        case .thinkingDelta(_, let delta, _):
-            guard !delta.isEmpty else { return }
-            stream.registerDelta()
         case .toolCallDelta:
-            stream.registerDelta()
             stream.flush()
             setRunPhase(.thinking)
         case .start(let partial):
-            if !partial.content.isEmpty { stream.registerDelta() }
             if partial.content.contains(where: { if case .text(let text) = $0 { return !text.text.isEmpty }; return false }) {
                 activeRun?.backgroundExecution?.updatePhase(.responding)
             }
             stream.reconcile(partial)
-        case .textEnd, .thinkingEnd, .toolCallEnd, .done, .failed:
+        case .thinkingDelta, .textEnd, .thinkingEnd, .toolCallEnd, .done, .failed:
             break
         }
     }
@@ -1746,7 +1739,6 @@ final class Conversation: Identifiable {
         submissionPresentation = .running
         submission.latency.mark(.runStarted)
         Log.session.info("Conversation.runOne start id=\(id) client=\(client.id) model=\(model.id)")
-        stream.armHaptic()
         if activeRun?.id == runID { activeRun?.activeSubmission = submission }
         var submissionResult: ConversationRunResult?
         defer {

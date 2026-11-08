@@ -26,8 +26,6 @@ struct MacConversationFeedback: ConversationFeedback {
 
     func dismissAttention(identifier: String) {}
 
-    func receivedAgentDelta() {}
-
     func notifyCompletion(id: UUID, title: String, body: String) {
         Log.session.info("Conversation.notify skipped id=\(id) reason=headless")
     }

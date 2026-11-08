@@ -39,10 +39,6 @@ struct IOSConversationFeedback: ConversationFeedback {
         NotificationProvider.shared.dismiss(identifier: identifier)
     }
 
-    func receivedAgentDelta() {
-        Haptics.impact(.agentDeltaReceived)
-    }
-
     func startedConversation(firstSubmissionID: UUID) {
         ConversationReview.recordStart(firstSubmissionID: firstSubmissionID)
     }

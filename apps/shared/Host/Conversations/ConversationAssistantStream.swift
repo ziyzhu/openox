@@ -3,11 +3,6 @@ import QuartzCore
 
 @MainActor
 final class ConversationAssistantStream {
-    private enum HapticPhase {
-        case waitingForDelta
-        case deltaReceived
-    }
-
     private enum Delivery {
         case delivered
         case pending
@@ -16,7 +11,6 @@ final class ConversationAssistantStream {
 
     private unowned let conversation: Conversation
     private let execution: any ConversationExecution
-    private let feedback: any ConversationFeedback
     private let showText: (String) -> Void
     private let replaceText: (String) -> Void
     private let finishTurn: (AssistantMessage) -> Void
@@ -24,20 +18,17 @@ final class ConversationAssistantStream {
     private lazy var frameDriver = execution.frameDriver(handler: { [weak self] timestamp in self?.onFrame(at: timestamp) })
     private var text = ""
     private var textBlockIndex: Int?
-    private var hapticPhase = HapticPhase.waitingForDelta
     private var delivery = Delivery.delivered
 
     init(
         conversation: Conversation,
         execution: any ConversationExecution,
-        feedback: any ConversationFeedback,
         showText: @escaping (String) -> Void,
         replaceText: @escaping (String) -> Void,
         finishTurn: @escaping (AssistantMessage) -> Void
     ) {
         self.conversation = conversation
         self.execution = execution
-        self.feedback = feedback
         self.showText = showText
         self.replaceText = replaceText
         self.finishTurn = finishTurn
@@ -52,16 +43,6 @@ final class ConversationAssistantStream {
             stopLink()
             finalizeHidden()
         }
-    }
-
-    func armHaptic() {
-        hapticPhase = .waitingForDelta
-    }
-
-    func registerDelta() {
-        guard hapticPhase == .waitingForDelta else { return }
-        hapticPhase = .deltaReceived
-        if conversation.isSelected { feedback.receivedAgentDelta() }
     }
 
     func reset() {
