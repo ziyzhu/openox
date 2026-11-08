@@ -70,7 +70,10 @@ nonisolated struct ServiceDefinition: Sendable {
                   : Self.isServiceHost(host, domain: domain) else {
             throw ValidationError.invalid("baseUrl")
         }
-        let faviconURL = try Self.faviconURL(object["faviconUrl"]?.stringValue)
+        guard let faviconValue = object["faviconUrl"]?.stringValue else {
+            throw ValidationError.missing("faviconUrl")
+        }
+        let faviconURL = try Self.faviconURL(faviconValue)
         let rawActions = object["actions"]?.arrayValue ?? []
         let actions = try rawActions.map { value in
             guard let action = Manifest.Action(value, serviceDomain: api ? nil : domain, serviceBaseURL: baseURL),

@@ -3,6 +3,7 @@
   "name": "Example",
   "description": "A minimal remote service. Read the current example page.",
   "baseUrl": "https://example.com/",
+  "faviconUrl": "https://www.iana.org/_img/bookmark_icon.ico",
   "actions": [
     {
       "id": "getPage",

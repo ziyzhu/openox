@@ -4,6 +4,8 @@ Human verification on a service action's page and payment use ordinary service a
 
 ## Bot control
 
+Before requesting user interaction, verify the actual live document contains the intended challenge or review step and the controls the user needs. Preparation handlers must establish this from current page evidence before returning; a fetch response, URL, page title, or generic nonblank page is insufficient. If readiness cannot be verified, report the preparation failure and preserve the page instead of prompting the user to fix an unknown page. Do not replay a mutation to obtain that evidence.
+
 1. Identify the exact observed response showing that the originating action is blocked by human verification. Generic HTTP, parsing, authentication, and application failures are not bot control.
 2. Leave the browser-navigable challenge on the action's live page. A challenge returned only to fetch/XHR is not automatically in the visible document. Prepare the visible challenge without an unsafe repeat of the originating effect.
 3. Call `ox.service.showPage` with the same qualified action name, input, and routing used for invocation, preserving omitted fields. For a challenge on Browser's page during exploration, call `ox.web.browser.showPage` instead. Present the actual live challenge and explain what the user needs to do. For service pages, set `waitForUserInteraction: true` and inspect fresh state after Done; stop on Cancel. For Browser pages, end the turn until the user reports completion. Do not bypass protection, ask for challenge answers or tokens, or treat presentation as completion. Showing a service page does not invoke, navigate, reload, or create a replacement.

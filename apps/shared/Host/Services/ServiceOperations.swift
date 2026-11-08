@@ -214,7 +214,8 @@ final class ServiceOperations {
             throw OxFunctionError(code: "page_unavailable", message: "Login preparation has no idle live page.", recovery: "Inspect the page and preparation failure before retrying login.")
         }
         defer { lease.release() }
-        guard lease.page.page.url != nil else { throw Service.EvalError.notReady }
+        try await requirePresentablePage(service: service, page: lease.page)
+        guard lease.isActive else { throw Service.EvalError.contextInvalidated }
         let handoff = ServiceHandoffSession(
             service: service,
             servicePage: lease.page,
@@ -684,7 +685,10 @@ final class ServiceOperations {
             guard lease.page === page, page.lastInvocation?.id == prepared.id else {
                 throw OxFunctionError(code: "page_unavailable", message: "The prepared page changed before presentation.", recovery: "Inspect the current page state. Do not rediscover a different account or repeat a mutation to replace the page.")
             }
-            guard lease.page.page.url != nil else { throw Service.EvalError.notReady }
+            try await self.requirePresentablePage(service: service, page: lease.page)
+            guard lease.isActive, page.lastInvocation?.id == prepared.id else {
+                throw Service.EvalError.contextInvalidated
+            }
             if waitForUserInteraction {
                 let handoff = ServiceHandoffSession(
                     service: service,
@@ -709,6 +713,30 @@ final class ServiceOperations {
             Log.service.info("Service.showPage shown domain=\(service.domain) action=\(actionID) session=\(lease.page.logLabel)")
             return .object(["shown": .bool(true)])
         }
+    }
+
+    private func requirePresentablePage(service: Service, page: Service.ServiceWebPage) async throws {
+        let generation = page.navigationGeneration
+        guard service.owns(page),
+              let scheme = page.page.url?.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              !page.page.isLoading, !page.page.isBlockedByScreenTime else {
+            throw OxFunctionError(code: "page_unavailable", message: "The live page is unavailable, blocked, or still loading.", recovery: "Inspect the preserved page and verify the intended user step before requesting interaction. Do not repeat a mutation to prepare another page.")
+        }
+        let ready = try await service.evalAsync(page, """
+        return document.readyState !== 'loading' && Boolean(document.body && (
+          document.body.innerText.trim() ||
+          Array.from(document.body.querySelectorAll('button,input:not([type="hidden"]),select,textarea,iframe,canvas,img,svg,video,object,embed'))
+            .some(element => element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }))
+        ));
+        """, context: "handoff-preflight", timeout: 3)
+        guard service.owns(page), page.navigationGeneration == generation,
+              !page.page.isLoading, !page.page.isBlockedByScreenTime else {
+            throw Service.EvalError.contextInvalidated
+        }
+        guard ready as? Bool == true else {
+            throw OxFunctionError(code: "page_unavailable", message: "The live page has no loaded content for the user.", recovery: "Inspect and repair page preparation before requesting interaction. Do not repeat a mutation or treat an empty page as a login or verification step.")
+        }
+        Log.service.info("Service.handoff preflight domain=\(service.domain) page=\(page.logLabel) nav=\(generation) ready=true")
     }
 
     private func invokeStandardServiceAction(_ service: Service, actionID: String, purpose: String) async throws -> JSONValue? {

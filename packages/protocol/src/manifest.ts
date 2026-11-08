@@ -288,7 +288,7 @@ function hasExactClosedObjectShape(schema: JSONSchema, expected: Record<string, 
 export type ManifestProfile = "builtin" | "repository";
 
 const RepositoryExtensionsSchema = Type.Object({
-  faviconUrl: Type.Optional(Type.String({ pattern: "^https://" })),
+  faviconUrl: Type.String({ pattern: "^https://" }),
 });
 
 export type ValidateServiceResult =
