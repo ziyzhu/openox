@@ -304,7 +304,8 @@ struct ConversationPage: View {
         let totalBlockCount = projection.totalBlockCount
         let requestedSourceRange = projection.sourceRange
         let requestedSourceIDs = projection.sourceBlockIDs
-        let blocks = projection.blocks
+        let blocks = projection.blocks.filter { !isEndedHandoff($0) }
+        let endedHandoffCount = projection.blocks.count - blocks.count
         let dockedPrompt: Conversation.PendingPrompt? = if case .prompt(let prompt) = activeInteraction { prompt } else { nil }
         let transcript = transcript(
             blocks: blocks,
@@ -315,6 +316,10 @@ struct ConversationPage: View {
             dockClearance: dockClearance
         )
             .toast($toast, accessibilityIdentifier: A11yID.ConversationControls.toast)
+            .onChange(of: endedHandoffCount) { old, new in
+                guard new > old else { return }
+                viewportLayout.holdAnchorFloor(scroller.anchorContentHeight)
+            }
             .task(id: MessageFilesKey(conversation: conversation.id, blocks: conversation.transcriptBlockCount,
                                       isBusy: conversation.isBusy, files: conversation.filesRevision)) {
                 guard !conversation.isBusy else { return }
@@ -961,6 +966,12 @@ struct ConversationPage: View {
             return nil
         }
         return Block(id: block.sourceBlockID, createdAt: block.createdAt, kind: kind)
+    }
+
+    private func isEndedHandoff(_ block: ConversationBlock) -> Bool {
+        guard case .agentContent(.serviceInspector(let link)) = block.kind, link.isHandoff == true else { return false }
+        guard let pageID = link.pageID, let service = serviceManager.inspectionService(domain: link.domain) else { return true }
+        return !service.isHandoffActive(pageID: pageID)
     }
 
     @ViewBuilder

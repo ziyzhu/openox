@@ -435,6 +435,13 @@ final class Service: NSObject, Identifiable {
     private(set) var auth: Auth = .unknown
     private(set) var capabilityState: CapabilityState = .unloaded
     var conversationHandoffs: [UUID: (ownerID: UUID, session: ServiceHandoffSession)] = [:]
+
+    func isHandoffActive(pageID: UUID) -> Bool {
+        switch conversationHandoffs[pageID]?.session.phase {
+        case .ready, .running: true
+        case .completed, .cancelled, .failed, nil: false
+        }
+    }
     @ObservationIgnored var authenticationWaiters: [AuthenticationWaiter] = []
     @ObservationIgnored let access = ServiceAccess()
     @ObservationIgnored var ownedPages: [ObjectIdentifier: OwnedPage] = [:]

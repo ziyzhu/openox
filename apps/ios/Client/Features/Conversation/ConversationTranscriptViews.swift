@@ -228,6 +228,7 @@ private struct ServiceInspectorRow: View {
     let rowID: UUID
     let pageMount: WebPageMountCoordinator
     @Environment(ServiceManager.self) private var serviceManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isPresented = false
 
     private var service: Service? { serviceManager.inspectionService(domain: link.domain) }
@@ -334,13 +335,24 @@ private struct ServiceInspectorRow: View {
     }
 
     private func finishLogin(_ handoff: ServiceHandoffSession, completed: Bool) {
-        if completed { handoff.dismissPresentation() }
-        else { handoff.cancel() }
+        withAnimation(reduceMotion ? nil : Theme.Animation.handoff) {
+            if completed { handoff.dismissPresentation() }
+            else { handoff.cancel() }
+            collapsePage()
+        }
     }
 
     private func finishUserInteraction(completed: Bool) {
         guard let browserSession else { return }
-        browserSession.finishUserInteraction(completed: completed)
+        withAnimation(reduceMotion ? nil : Theme.Animation.handoff) {
+            browserSession.finishUserInteraction(completed: completed)
+            collapsePage()
+        }
+    }
+
+    private func collapsePage() {
+        guard let page else { return }
+        pageMount.collapse(page: page, ownerID: rowID)
     }
 
     private func expandPage() {

@@ -9,6 +9,7 @@ final class WebPageMountCoordinator {
         case idle
         case inline(UUID)
         case detached(UUID)
+        case collapsed(UUID)
     }
 
     private(set) var placement: Placement = .idle
@@ -45,12 +46,13 @@ final class WebPageMountCoordinator {
             clear()
             return
         }
-        if !pageChanged, case .detached(let ownerID) = placement, ownerIDs.contains(ownerID) { return }
-        if !pageChanged, preferred == previousPreferred {
+        if !pageChanged {
             switch placement {
-            case .inline(let ownerID):
+            case .detached(let ownerID), .collapsed(let ownerID):
                 if ownerIDs.contains(ownerID) { return }
-            case .idle, .detached: break
+            case .inline(let ownerID):
+                if preferred == previousPreferred, ownerIDs.contains(ownerID) { return }
+            case .idle: break
             }
         }
         activate(page: page, ownerID: preferred)
@@ -86,6 +88,13 @@ final class WebPageMountCoordinator {
     func restore(page: WebPage, ownerID: UUID) {
         guard pageID == ObjectIdentifier(page), placement == .detached(ownerID) else { return }
         activate(page: page, ownerID: ownerID)
+    }
+
+    func collapse(page: WebPage, ownerID: UUID) {
+        guard isInline(page: page, ownerID: ownerID) else { return }
+        revision += 1
+        placement = .collapsed(ownerID)
+        Log.webView.info("WebPageMount.collapse owner=\(ownerID)")
     }
 
     func clear() {

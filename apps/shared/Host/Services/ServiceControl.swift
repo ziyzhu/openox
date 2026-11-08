@@ -4,6 +4,7 @@ nonisolated struct ServiceInspectorLink: Codable, Equatable, Sendable {
     let domain: String
     let serviceName: String
     var pageID: UUID? = nil
+    var isHandoff: Bool? = nil
 }
 
 nonisolated enum ServiceControl: Equatable, Sendable {

@@ -19,6 +19,10 @@ final class ConversationViewportLayout {
         if !focused { anchorFloor = contentFloorHeight }
     }
 
+    func holdAnchorFloor(_ height: CGFloat) {
+        anchorFloor = max(anchorFloor, height)
+    }
+
     func slack(anchorContentHeight: CGFloat?) -> CGFloat {
         anchorContentHeight.map { max(0, anchorFloor - $0) } ?? 0
     }

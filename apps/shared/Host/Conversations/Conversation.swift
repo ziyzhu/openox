@@ -447,7 +447,8 @@ final class Conversation: Identifiable {
                 let link = ServiceInspectorLink(
                     domain: service.domain,
                     serviceName: service.title,
-                    pageID: page.id
+                    pageID: page.id,
+                    isHandoff: true
                 )
                 defer {
                     service.conversationHandoffs[page.id] = nil
