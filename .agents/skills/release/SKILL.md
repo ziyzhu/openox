@@ -6,6 +6,9 @@ description: Prepare and verify OpenOx iOS App Store, npm, and standalone CLI re
 # Release
 
 Run from the selected OpenOx checkout on `main` and follow its `AGENTS.md`.
+Before preparing a release, inspect `git status` and run `git pull --ff-only`
+to update `main` before release inspection or changes. Preserve local work; if
+the pull cannot fast-forward, resolve that before continuing release preparation.
 Choose the storage compatibility, App Store, or package workflow below. A requested
 App Store release authorizes preparation, build/upload, release-note translation,
 application of the approved English promotional text, and staging within the
