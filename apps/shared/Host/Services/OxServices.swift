@@ -136,11 +136,12 @@ nonisolated enum OxServices {
                             "type": .string("object"),
                             "properties": .object([
                                 "kind": .object(["type": .string("string"), "const": .string("mcp")]),
+                                "name": .object(["type": .string("string"), "minLength": .int(1), "description": .string("Explicit service display name chosen from the product name or user request; do not derive it from the endpoint hostname.")]),
                                 "endpoint": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(2048), "description": .string("Public HTTPS MCP endpoint without credentials. Required for MCP; omit domain.")]),
                                 "transport": .object(["type": .string("string"), "enum": .array([.string("auto"), .string("streamable-http"), .string("sse")])]),
                                 "faviconUrl": .object(["type": .string("string"), "format": .string("uri"), "pattern": .string("^https://"), "maxLength": .int(2048), "description": .string("Optional public HTTPS PNG, JPEG, or ICO URL for this MCP connection.")]),
                             ]),
-                            "required": .array([.string("kind"), .string("endpoint")]),
+                            "required": .array([.string("kind"), .string("name"), .string("endpoint")]),
                             "additionalProperties": .bool(false),
                         ]),
                         "outputSchema": .object(["anyOf": .array([sourceSchema, snapshotSchema])]),
@@ -288,7 +289,7 @@ nonisolated enum OxServices {
 
             let createBlock: @convention(block) (JSValue, JSValue) -> JSValue = { optionsValue, purposeValue in
                 let fields = jsValueToJSON(optionsValue)?.objectValue ?? [:]
-                return env.call(suspendingTimeout: true) { try await $0.createService(kind: fields["kind"]?.stringValue ?? "", domain: fields["domain"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, faviconURL: fields["faviconUrl"], purpose: purposeValue.toString()!) }
+                return env.call(suspendingTimeout: true) { try await $0.createService(kind: fields["kind"]?.stringValue ?? "", domain: fields["domain"]?.stringValue ?? "", name: fields["name"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, faviconURL: fields["faviconUrl"], purpose: purposeValue.toString()!) }
             }
             ctx.setObject(createBlock as AnyObject, forKeyedSubscript: "__nativeServiceCreate" as NSString)
 

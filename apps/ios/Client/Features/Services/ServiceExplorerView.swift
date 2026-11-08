@@ -451,6 +451,7 @@ private struct RemoteMCPDetailView: View {
         do {
             let service = try await serviceManager.connectRemoteMCP(
                 request.endpoint,
+                name: request.name,
                 transport: request.transport
             )
             guard !Task.isCancelled else { return }

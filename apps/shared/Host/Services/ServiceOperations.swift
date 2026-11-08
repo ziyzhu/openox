@@ -259,11 +259,12 @@ final class ServiceOperations {
         }
     }
 
-    func createService(kind: String, domain: String, endpoint: String?, transport: String?, faviconURL: JSONValue?, purpose: String) async throws -> JSONValue? {
-        guard kind == "mcp", domain.isEmpty, let endpoint else {
-            throw RuntimeError.bridge("ox.service.create: MCP requires endpoint and no domain. Create web/API source with ox.fs under repositories/local/.")
+    func createService(kind: String, domain: String, name: String, endpoint: String?, transport: String?, faviconURL: JSONValue?, purpose: String) async throws -> JSONValue? {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard kind == "mcp", domain.isEmpty, !name.isEmpty, let endpoint else {
+            throw RuntimeError.bridge("ox.service.create: MCP requires a nonempty name, endpoint, and no domain. Create web/API source with ox.fs under repositories/local/.")
         }
-        return try await saveMCP(endpoint: endpoint, transport: transport, faviconURL: faviconURL, replacing: nil, purpose: purpose)
+        return try await saveMCP(endpoint: endpoint, transport: transport, faviconURL: faviconURL, replacing: nil, name: name, purpose: purpose)
     }
 
     func updateService(domain: String, fields: [String: JSONValue], purpose: String) async throws -> JSONValue? {
@@ -325,6 +326,9 @@ final class ServiceOperations {
     }
 
     private func saveMCP(endpoint: String, transport: String?, faviconURL: JSONValue?, replacing: Service?, name: String? = nil, purpose: String) async throws -> JSONValue? {
+        guard let connectionName = name ?? replacing?.definition.name else {
+            throw RuntimeError.bridge("MCP requires a name.")
+        }
         let endpoint = try RemoteMCPService.endpoint(endpoint)
         guard transport == nil || transport == "auto" || RemoteMCPTransport(rawValue: transport!) != nil else {
             throw RuntimeError.bridge("MCP transport must be 'auto', 'streamable-http', or 'sse'.")
@@ -352,6 +356,7 @@ final class ServiceOperations {
         return try await tracked(action, args, purpose: purpose) {
             let service = try await self.serviceManager.connectRemoteMCP(
                 endpoint.absoluteString,
+                name: connectionName,
                 transport: resolvedTransport,
                 faviconURL: resolvedFaviconURL,
                 replacing: replacing

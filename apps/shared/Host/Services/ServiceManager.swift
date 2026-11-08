@@ -318,6 +318,7 @@ final class ServiceManager {
 
     func connectRemoteMCP(
         _ rawEndpoint: String,
+        name: String,
         transport: RemoteMCPTransport? = nil,
         faviconURL: URL? = nil,
         replacing: Service? = nil
@@ -338,7 +339,7 @@ final class ServiceManager {
                 mcpEndpoint: endpoint,
                 domain: id,
                 transport: transport,
-                name: replacing?.definition.name,
+                name: name,
                 repositoryID: Repository.localID,
                 faviconURL: faviconURL
             ),
@@ -349,7 +350,7 @@ final class ServiceManager {
             try await repository.saveMCPService(
                 MCPCatalogManifest(
                     id: id,
-                    name: replacing?.definition.name ?? endpoint.host ?? id,
+                    name: name,
                     endpoint: endpoint,
                     faviconUrl: faviconURL?.absoluteString,
                     transport: service.definition.mcpTransport

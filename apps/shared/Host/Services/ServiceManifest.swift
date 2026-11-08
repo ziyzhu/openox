@@ -166,16 +166,15 @@ nonisolated struct ServiceDefinition: Sendable {
         mcpEndpoint endpoint: URL,
         domain: String,
         transport: RemoteMCPTransport?,
-        name: String? = nil,
+        name: String,
         description: String? = nil,
         repositoryID: String? = nil,
         faviconURL: URL? = nil
     ) {
-        let resolvedName = name ?? endpoint.host ?? "Remote MCP"
         let resolvedDescription = description ?? "Remote MCP server at \(endpoint.host ?? endpoint.absoluteString)"
         self.manifest = .object([
             "domain": .string(domain),
-            "name": .string(resolvedName),
+            "name": .string(name),
             "description": .string(resolvedDescription),
             "baseUrl": .string(endpoint.absoluteString),
             "actions": .array([]),
@@ -183,7 +182,7 @@ nonisolated struct ServiceDefinition: Sendable {
         self.source = .mcp(endpoint: endpoint, transport: transport, icon: .fallback)
         self.repositoryID = repositoryID
         self.domain = domain
-        self.name = resolvedName
+        self.name = name
         self.description = resolvedDescription
         self.baseURL = endpoint
         self.faviconURL = faviconURL
