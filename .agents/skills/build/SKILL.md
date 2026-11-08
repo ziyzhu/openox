@@ -34,7 +34,7 @@ a Simulator; use it as the first compile check, then `build:ios` before iOS veri
 
 `lint` validates public/private-content boundaries, iOS Client-Host layering,
 platform source ownership, unsafe absolute-path slicing, bundled skill packages and links,
-translations, and provider models. It runs the explicit check list in `scripts/lint.ts`
+translations, provider models, and bundled service manifests/installers. It runs the explicit check list in `scripts/lint.ts`
 against the full repository, then checks TypeScript and eval definitions without generating
 or fixing files. Keep cross-file and resource checks here rather than forcing them into
 per-file JavaScript lint rules. `build` checks schema consistency before generating
@@ -65,7 +65,7 @@ Both native targets compile `apps/shared` and their own platform sources; neithe
 `build:services` validates it, refreshes its content hash without rewriting service
 files, and generates model-action resources.
 Package builds copy this source.
-It is a build operation, not live service verification. Bundled installers register handlers through `window.ox.install`; the Host runtime owns dispatch and error logging. Do not replace `window.ox` or retain a second dispatcher.
+Build and lint use the protocol package's manifest and installer validators; Ox runs the same validators from `PiDurable.bundle/service-validation.js` in JavaScriptCore. Keep contract rules there, not in parallel Swift validators. Native filesystem and network-policy checks remain in Swift. These checks are not live service verification. Bundled installers register handlers through `window.ox.install`; the Host runtime owns dispatch and error logging. Do not replace `window.ox` or retain a second dispatcher.
 Native targets default to MainActor with approachable concurrency. Use worker actors or `@concurrent` async helpers for CPU work and synchronous I/O; `nonisolated async` and inherited `Task` closures alone do not establish an off-main boundary. Publish observable state on MainActor after validating the captured scope or revision.
 Do not overwrite unrelated repository or generated changes.
 `PiDurable.bundle` and `ModelGuidance.generated.swift` are ignored build outputs: edit bundled packages in `packages/agent/skills/`, then run `build:agent` before native builds. The package exports normal System skill packages. Hosts receive a scoped `skillPackages` snapshot from the trusted runtime and resolve them through the normal skills catalog and filesystem. Skill activation loads workflow context; runtime permissions are independent of activation. Xcode Cloud installs the pinned Bun version and generates it in `ci_post_clone.sh`; the target rejects missing or empty runtime resources. Verify the built `.app` when changing this packaging path. Dependency upgrades also require a native launch and Mock turn: Node VM realms expose globals absent from bare JavaScriptCore, and upstream UUID generation and duration metrics need native secure-random and monotonic-clock bridges. Keep `whatwg-url` on 14.x until its newer `webidl-conversions` dependency supports runtimes without `SharedArrayBuffer`; do not substitute a fake shared-memory implementation.

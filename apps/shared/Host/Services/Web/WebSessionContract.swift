@@ -10,42 +10,6 @@ nonisolated enum WebSessionContract {
             && definition.actionIndex[loginAction] != nil
     }
 
-    static func validate(_ actions: [Manifest.Action], isWeb: Bool) throws {
-        guard isWeb else { return }
-        let list = actions.first { $0.id == listAction }
-        let login = actions.first { $0.id == loginAction }
-        guard !actions.contains(where: { ["getSignInUrl", "getSignInState"].contains($0.id) }) else {
-            throw ServiceDefinition.ValidationError.invalid("unsupported web authentication actions: use the latest Evolve skill to implement listSessions and login")
-        }
-        guard list != nil || login != nil || actions.contains(where: \.requireAuth) else { return }
-        guard let list, let login,
-              !list.requireAuth, !login.requireAuth,
-              !list.requireApproval, !login.requireApproval,
-              list.inputSchema?.objectValue?["type"]?.stringValue == "object",
-              list.inputSchema?.objectValue?["additionalProperties"]?.boolValue == false,
-              (list.inputSchema?.objectValue?["properties"]?.objectValue ?? [:]).isEmpty,
-              (list.inputSchema?.objectValue?["required"]?.arrayValue ?? []).isEmpty,
-              list.outputSchema?.objectValue?["type"]?.stringValue == "array",
-              validSessionSchema(list.outputSchema?.objectValue?["items"]),
-              login.inputSchema?.objectValue?["type"]?.stringValue == "object",
-              login.inputSchema?.objectValue?["additionalProperties"]?.boolValue == false,
-              (login.inputSchema?.objectValue?["properties"]?.objectValue ?? [:]).isEmpty,
-              (login.inputSchema?.objectValue?["required"]?.arrayValue ?? []).isEmpty,
-              login.outputSchema?.objectValue?["type"]?.stringValue == "null" else {
-            throw ServiceDefinition.ValidationError.invalid("session actions: provide listSessions and login as the web authentication contract; discovery and login cannot require authentication; listSessions and login must accept empty closed objects, listSessions must return authenticated session descriptors and login must return null")
-        }
-    }
-
-    private static func validSessionSchema(_ value: JSONValue?) -> Bool {
-        guard let object = value?.objectValue,
-              object["type"]?.stringValue == "object",
-              object["additionalProperties"]?.boolValue == false,
-              let properties = object["properties"]?.objectValue,
-              Set(properties.keys) == Set(["id", "label", "url"]),
-              Set(object["required"]?.arrayValue?.compactMap(\.stringValue) ?? []) == Set(properties.keys) else { return false }
-        return properties.values.allSatisfy { $0.objectValue?["type"]?.stringValue == "string" }
-    }
-
     static let sessionSchema: JSONValue = .object([
         "type": .string("object"),
         "properties": .object([

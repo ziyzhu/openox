@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
-  validateServiceManifest,
+  validateRepositoryManifest,
   type Manifest,
 } from "@openox/protocol/manifest";
 import { inspectInstaller } from "@openox/protocol/installer";
@@ -40,18 +40,9 @@ async function loadManifest(
   } catch (e) {
     return { error: `${domain} service.json parse error: ${(e as Error).message}` };
   }
-  const extension = validateServiceManifest(raw, "repository");
-  if (!extension.ok) return { error: `invalid manifest: ${extension.errors.join("; ")}` };
-  const { faviconUrl, ...source } = raw as Manifest;
-  const result = validateServiceManifest(source);
+  const result = validateRepositoryManifest(raw, domain);
   if (!result.ok) return { error: `invalid manifest: ${result.errors.join("; ")}` };
-  if ((result.manifest.kind === "api") !== domain.startsWith("api:")) {
-    return { error: `manifest kind does not match dir "${domain}"` };
-  }
-  if (result.manifest.domain !== domain.replace(/^api:/, "")) {
-    return { error: `manifest domain "${result.manifest.domain}" does not match dir "${domain}"` };
-  }
-  return { ...result.manifest, ...(faviconUrl ? { faviconUrl } : {}) };
+  return result.manifest;
 }
 
 export async function buildService(domain: string, root = BUILTIN_REPOSITORY_ROOT): Promise<

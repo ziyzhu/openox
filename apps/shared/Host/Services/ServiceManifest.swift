@@ -46,6 +46,7 @@ nonisolated struct ServiceDefinition: Sendable {
         repositoryID: String = Repository.bundledID,
         provenance: Repository.Descriptor.Provenance = .bundled
     ) throws {
+        try ServiceSourceValidation.validateManifest(manifest)
         guard let object = manifest.objectValue else { throw ValidationError.invalid("root") }
         guard let domain = object["domain"]?.stringValue?.lowercased(), !domain.isEmpty else {
             throw ValidationError.missing("domain")
@@ -101,9 +102,6 @@ nonisolated struct ServiceDefinition: Sendable {
             actionIndex[action.id] = action
         }
         guard object["skills"] == nil else { throw ValidationError.invalid("skills belong in the repository") }
-        try WebSessionContract.validate(actions, isWeb: !api)
-        try ModelServiceContract.validate(actions, definitions: object["$defs"]?.objectValue ?? [:], isWeb: !api)
-        try WebConversationContract.validate(actions, definitions: object["$defs"]?.objectValue ?? [:], isWeb: !api)
         self.manifest = manifest
         self.source = .repository(id: repositoryID, provenance: provenance)
         self.repositoryID = repositoryID

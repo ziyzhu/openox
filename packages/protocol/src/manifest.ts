@@ -1,5 +1,6 @@
-import { Type, type Static, type TSchema } from "typebox";
-import { Value } from "typebox/value";
+import { type Static, type TSchema } from "typebox";
+import * as Type from "typebox/type";
+import { Errors } from "typebox/value";
 import { validateModelActions, validateConversationAction, CONVERSATION_ACTION_ID, MODEL_GENERATION_ACTION_IDS } from "./model-actions.ts";
 
 const HOST_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
@@ -301,13 +302,13 @@ export function validateServiceManifest(input: unknown, profile: ManifestProfile
   const repository = profile === "repository";
   if (repository && input && typeof input === "object" && !Array.isArray(input)) {
     const { faviconUrl, ...rest } = input as Record<string, unknown>;
-    for (const e of Value.Errors(RepositoryExtensionsSchema, { faviconUrl })) {
+    for (const e of Errors(RepositoryExtensionsSchema, { faviconUrl })) {
       at(e.instancePath.replace(/^\//, "").replace(/\//g, "."), e.message);
     }
     input = rest;
   }
 
-  for (const e of Value.Errors(ServiceManifestSchema, input)) {
+  for (const e of Errors(ServiceManifestSchema, input)) {
     const path = e.instancePath === "" ? "root" : e.instancePath.replace(/^\//, "").replace(/\//g, ".");
     at(path, e.message);
   }
@@ -415,6 +416,26 @@ export function validateServiceManifest(input: unknown, profile: ManifestProfile
   return { ok: true, manifest: m };
 }
 
+export function validateRepositoryManifest(input: unknown, identity?: string):
+  | { ok: true; manifest: Manifest }
+  | { ok: false; errors: string[] } {
+  const repository = validateServiceManifest(input, "repository");
+  if (!repository.ok) return repository;
+  const { faviconUrl, ...source } = input as Manifest;
+  const result = validateServiceManifest(source);
+  if (!result.ok) return result;
+  const manifest = { ...result.manifest, faviconUrl };
+  if (identity !== undefined) {
+    if ((manifest.kind === "api") !== identity.startsWith("api:")) {
+      return { ok: false, errors: [`manifest kind does not match dir "${identity}"`] };
+    }
+    if (manifest.domain !== identity.replace(/^api:/, "")) {
+      return { ok: false, errors: [`manifest domain "${manifest.domain}" does not match dir "${identity}"`] };
+    }
+  }
+  return { ok: true, manifest };
+}
+
 function toTypeBox(schema: JSONSchema): TSchema {
   const s = schema as Record<string, unknown>;
 
@@ -488,7 +509,7 @@ export function validateAgainstSchema(
   const refs = Object.fromEntries(Object.entries(allDefs).map(([id, definition]) => [id, toTypeBox(definition)]));
   const compiled = toTypeBox(schema);
   const errs: string[] = [];
-  for (const e of Value.Errors(refs, compiled, value)) {
+  for (const e of Errors(refs, compiled, value)) {
     errs.push(`${e.instancePath || "/"} ${e.message}`);
     if (errs.length >= 3) break;
   }

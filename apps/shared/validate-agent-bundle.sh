@@ -4,7 +4,7 @@ set -eu
 shared="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 resources="$shared/Resources/PiDurable.bundle"
 
-for resource in harness.js harness-storage.js prompts.js web-extraction.js manifest.json UPSTREAM_LICENSE.txt WEB_EXTRACTION_LICENSES.txt; do
+for resource in harness.js harness-storage.js prompts.js web-extraction.js service-validation.js manifest.json UPSTREAM_LICENSE.txt WEB_EXTRACTION_LICENSES.txt; do
   if [ ! -s "$resources/$resource" ]; then
     echo "error: Missing or empty PiDurable.bundle/$resource. Run bun run build:agent before building Ox." >&2
     exit 1

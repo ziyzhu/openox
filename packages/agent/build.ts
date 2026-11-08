@@ -48,6 +48,11 @@ const promptResult = await build({
   bundle: true, platform: "browser", format: "iife", globalName: "OxPrompts",
   target: "es2022", minify: true, legalComments: "eof", write: false, metafile: true, outdir: destination,
 });
+const validationResult = await build({
+  absWorkingDir: root, entryPoints: { "service-validation": "packages/agent/src/adapters/ios/service-validation.ts" },
+  bundle: true, platform: "browser", format: "iife", globalName: "OxServiceValidation",
+  target: "es2022", minify: true, legalComments: "eof", write: false, metafile: true, outdir: destination,
+});
 const extractionResult = await build({
   absWorkingDir: root, entryPoints: { "web-extraction": "packages/agent/src/adapters/ios/web-extraction.ts" },
   bundle: true, platform: "neutral", mainFields: ["main", "module"], conditions: ["node"],
@@ -58,7 +63,7 @@ const extractionResult = await build({
 await mkdir(destination, { recursive: true });
 await Promise.all(["harness-proof.js", "agent-files.json", "default-soul.md"].map(name => rm(`${destination}/${name}`, { force: true })));
 const bundles: Record<string, { bytes: number; sha256: string }> = {};
-for (const generated of [result, promptResult, extractionResult]) for (const file of generated.outputFiles) {
+for (const generated of [result, promptResult, extractionResult, validationResult]) for (const file of generated.outputFiles) {
   const name = file.path.split("/").at(-1)!;
   const output = Object.entries(generated.metafile.outputs).find(([path]) => path.endsWith(`/${name}`))![1];
   const inputs = Object.entries(output.inputs).filter(([, contribution]) => contribution.bytesInOutput > 0).map(([path]) => path);

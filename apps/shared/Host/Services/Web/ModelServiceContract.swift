@@ -9,41 +9,7 @@ nonisolated enum ModelServiceContract {
     static let resume = "continueModelGeneration"
     static let read = "readModelGeneration"
     static let cancel = "cancelModelGeneration"
-    static let requiredActionIDs: Set<String> = [list, start, read, cancel]
     static let generationIDs: Set<String> = [start, resume, read, cancel]
-    static let actionIDs = generationIDs.union([list])
-
-    static let schemas: [String: JSONValue] = {
-        guard let url = Bundle.main.url(forResource: "ModelServiceActions", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let value = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
-            fatalError("Missing ModelServiceActions.json")
-        }
-        return value
-    }()
-
-    static func validate(_ actions: [Manifest.Action], definitions: [String: JSONValue], isWeb: Bool) throws {
-        guard actions.contains(where: { generationIDs.contains($0.id) }) else { return }
-        guard isWeb else { throw ServiceDefinition.ValidationError.invalid("model Actions require a web service") }
-        for id in actionIDs {
-            guard let action = actions.first(where: { $0.id == id }) else {
-                if requiredActionIDs.contains(id) { throw ServiceDefinition.ValidationError.invalid("standard model Action \(id)") }
-                continue
-            }
-            guard !action.blocking,
-                  let expected = schemas[id]?.objectValue,
-                  try normalized(action.inputSchema ?? .null, definitions: definitions) == normalized(expected["inputSchema"] ?? .null),
-                  try normalized(action.outputSchema ?? .null, definitions: definitions) == normalized(expected["outputSchema"] ?? .null) else {
-                throw ServiceDefinition.ValidationError.invalid("standard model Action \(id)")
-            }
-        }
-        guard Set(actions.filter { generationIDs.contains($0.id) }.map { $0.raw["baseUrl"]?.stringValue ?? "" }).count == 1 else {
-            throw ServiceDefinition.ValidationError.invalid("model generation Actions must share a baseUrl")
-        }
-        guard !actions.contains(where: { generationIDs.contains($0.id) && ($0.raw["baseUrl"]?.stringValue?.contains(where: { $0 == "{" || $0 == "}" }) == true) }) else {
-            throw ServiceDefinition.ValidationError.invalid("model generation baseUrl must be literal")
-        }
-    }
 
     static func normalized(_ value: JSONValue, definitions: [String: JSONValue] = [:], depth: Int = 0) throws -> JSONValue {
         guard depth <= 32 else { throw ServiceDefinition.ValidationError.invalid("recursive model schema") }
