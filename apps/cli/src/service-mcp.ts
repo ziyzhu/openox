@@ -31,9 +31,11 @@ export async function serveServiceMCP(endpoint: string | undefined, timeoutMs: n
         const domain = String(service.domain);
         const definitions = object(service.manifest) && object(service.manifest.$defs) ? service.manifest.$defs : {};
         for (const action of service.actions) {
-          if (!object(action) || typeof action.id !== "string" || !object(action.inputSchema) || !object(action.outputSchema)) {
+          if (!object(action) || typeof action.id !== "string" || !object(action.inputSchema)
+            || (action.outputSchema !== null && !object(action.outputSchema))) {
             throw new Error(`Host returned an invalid action contract for ${domain}`);
           }
+          const outputSchema = action.outputSchema === null ? { type: "null" } : action.outputSchema;
           const target = `${domain}:${action.id}`;
           const suffix = createHash("sha256").update(target).digest("hex").slice(0, 16);
           const name = `${target.replace(/[^a-zA-Z0-9_.-]/g, "_").slice(0, 110)}_${suffix}`;
@@ -60,10 +62,10 @@ export async function serveServiceMCP(endpoint: string | undefined, timeoutMs: n
             },
             outputSchema: {
               type: "object",
-              properties: { value: action.outputSchema },
+              properties: { value: outputSchema },
               required: ["value"],
               additionalProperties: false,
-              $defs: { ...definitions, ...(object(action.outputSchema.$defs) ? action.outputSchema.$defs : {}) },
+              $defs: { ...definitions, ...(object(outputSchema.$defs) ? outputSchema.$defs : {}) },
             },
           };
           if (next.has(name)) throw new Error(`Duplicate MCP tool name for ${target}`);
