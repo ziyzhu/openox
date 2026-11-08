@@ -567,18 +567,15 @@ struct RootView: View {
                         openConversationFromSidebar(banner.conversationID)
                         Log.ui.info("Conversation.banner opened id=\(banner.conversationID)")
                     } label: {
-                        HStack(spacing: Theme.Spacing.sm) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(banner.title)
-                                    .font(Theme.Fonts.labelMd)
-                                    .lineLimit(1)
-                                Text(banner.body)
-                                    .font(.subheadline)
-                                    .lineLimit(2)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            Image(systemName: "chevron.right")
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(verbatim: banner.title)
+                                .font(Theme.Fonts.labelMd)
+                                .lineLimit(1)
+                            Text(verbatim: banner.body)
+                                .font(.subheadline)
+                                .lineLimit(2)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .foregroundStyle(Theme.Colors.onSurface)
                         .alertGlassPill(in: RoundedRectangle(cornerRadius: Theme.Radius.xl))
                     }
@@ -602,7 +599,7 @@ struct RootView: View {
                       conversations.contains(id),
                       let title = notification.userInfo?["title"] as? String,
                       let body = notification.userInfo?["body"] as? String else { return }
-                completionBanner = (UUID(), id, title, body)
+                completionBanner = (UUID(), id, title, completionPreview(body))
                 Log.ui.info("Conversation.banner shown id=\(id)")
             }
             .onChange(of: conversations.current.map(ObjectIdentifier.init)) { _, identity in
@@ -641,6 +638,15 @@ struct RootView: View {
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.protectedDataDidBecomeAvailableNotification)) { _ in
                 if case .failed(_, .whenAvailable) = startup { bootstrap() }
             }
+    }
+
+    private func completionPreview(_ source: String) -> String {
+        guard let parsed = try? AttributedString(markdown: source) else { return source }
+        return parsed.runs[\.presentationIntent]
+            .map { _, range in String(parsed[range].characters) }
+            .joined(separator: " ")
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
     }
 
     private var rootLayout: some View {
