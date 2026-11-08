@@ -933,11 +933,6 @@ struct ConversationComposer: View, Equatable {
             service: picked,
             title: picked.title,
             onOpen: { onOpenService(picked) },
-            showsAuthStatus: true,
-            onRemove: {
-                Log.ui.info("ConversationComposer.detachService domain=\(picked.domain)")
-                onRemoveService(picked)
-            },
             fill: Theme.Colors.surfaceSunken,
             surfaceOpacity: 0
         )
