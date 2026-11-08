@@ -805,7 +805,7 @@ struct ConversationComposer: View, Equatable {
     @ViewBuilder
     private var trailingControl: some View {
         if isEditingMessage, canSubmit {
-            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.ConversationControls.send, fill: Theme.Colors.primary, action: submit)
+            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.ConversationControls.send, fill: Theme.Colors.primary, event: .send, action: submit)
         } else if isEditingMessage {
             EmptyView()
         } else if composer.isImporting, isBusy {
@@ -819,7 +819,7 @@ struct ConversationComposer: View, Equatable {
         } else if composer.canSubmit, composer.websiteURL != nil {
             composerButton(systemName: "globe", label: String(localized: "Open website"), id: A11yID.ConversationControls.openWebsite, action: submit)
         } else if composer.canSubmit {
-            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.ConversationControls.send, fill: Theme.Colors.primary, action: submit)
+            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.ConversationControls.send, fill: Theme.Colors.primary, event: .send, action: submit)
         } else if isBusy, !composer.suppressesStopControl {
             composerButton(systemName: "stop.fill", label: A11yLabel.stop, id: A11yID.ConversationControls.stop, event: .stop, action: onStop)
         } else if composer.isEmpty {
