@@ -53,8 +53,8 @@ Access to each secret is a permission policy. Every resolution of a reference ch
 
 ## Secret references
 
-- An action marks input fields that accept a secret with a schema keyword naming the required type, such as `"account": { "x-ox-secret": "account" }`. The Host rejects references in unmarked fields.
-- The agent passes the secret key as the field's plain string value, taken from `ox.secret.list`. It can omit the field when exactly one saved secret of that type matches the service's `serviceID`; the Host asks the user when several match.
+- A reference is a self-describing input value: `{ $secret: "<key>" }` for the whole secret or `{ $secret: "<key>", field: "<name>" }` for one field, with the key taken from `ox.secret.list`. Actions declare nothing; any input field can hold a reference.
+- Before dispatch the Host replaces each reference with stand-ins: an object of per-field stand-ins for a whole secret, or a single stand-in for one field. Reference values skip the field's schema type check; the Host validates the reference shape and that the key names a typed secret instead.
 - `ox.secret.list` adds `type` and `serviceID` to each item. Permission rules are not exposed to the agent.
 - The handler receives the field as per-field stand-ins, such as `input.account.username` and `input.account.password`. Stand-ins are opaque strings valid only for the current invocation or login attempt; logging or returning them reveals nothing.
 - Only the Host turns a stand-in into a value, after the permission policy and destination check pass:
@@ -62,7 +62,7 @@ Access to each secret is a permission policy. Every resolution of a reference ch
   - api: the existing installer `request` replaces stand-ins in `body`, `query`, or `headers` before sending, after checking the destination against the service base URL.
   - mcp and ios: the Host replaces stand-ins in call arguments at dispatch.
 - No function returns plain-text values to service code.
-- Sensitive action outputs returned as references, so one action can pass a value to another without exposing it, are follow-up scope; they would reuse `x-ox-secret` on output fields, ask on every use, and live only for the conversation.
+- Sensitive action outputs returned as references, so one action can pass a value to another without exposing it, are follow-up scope; the agent would receive them as `{ $secret: "<conversation-scoped id>" }`, each use would ask, and they would live only for the conversation.
 
 ## Guardrails
 
@@ -77,7 +77,7 @@ Web values land in the page's DOM, which page-world code, including handlers, ca
 
 Build on the current account-aware contract: `listSessions` returns logged-in accounts as `{ id, label, url }` descriptors; `login` prepares the login flow and returns `null`. Inspection exposes `access.checkAccess` and `access.requestAccess`; direct invocation remains supported. The Host selects and revalidates the account; handlers check the account on the page only when the page or endpoint might act as a different account.
 
-Change the standard `login` input from a closed empty object to `{ account? }`, with `account` marked `"x-ox-secret": "account"`. Services without auto-login ignore `account` and keep manual login. Services with auto-login own the website-specific workflow: focusing fields, calling `context.secret.type`, advancing username-first and password-next steps, submitting, and handling identity-provider transitions. Do not require `login` to return a declarative workflow.
+Change the standard `login` input from a closed empty object to `{ account? }`, where `account` is an `account` secret reference. When `account` is omitted and exactly one saved `account` secret matches the service's `serviceID`, the Host uses it; when several match, the Host asks the user. Services without auto-login ignore `account` and keep manual login. Services with auto-login own the website-specific workflow: focusing fields, calling `context.secret.type`, advancing username-first and password-next steps, submitting, and handling identity-provider transitions. Do not require `login` to return a declarative workflow.
 
 ```js
 async invoke(input, context) {
@@ -127,7 +127,7 @@ Reuse allowed saved secrets through `request` stand-ins. Otherwise render native
 - [ ] Land the separate removal of `session` from the web handler context.
 - [ ] Add `type`, `serviceID`, and `access` to `SecretEntry`; extend `ox.secret.list`; verify predecessor compatibility of `secret.index`.
 - [ ] Add the permission policy resolution, combined approval card, and Settings rules UI with stable identifiers, localization, accessible labels, and equal outer padding.
-- [ ] Add `x-ox-secret` to protocol schema sources, native validation, and generated contracts; implement stand-ins and Host resolution for web `context.secret.type` and API `request`.
+- [ ] Add `$secret` reference handling to invocation validation and the protocol schema sources and generated contracts; implement stand-ins and Host resolution for web `context.secret.type` and API `request`.
 - [ ] Add redaction, page-inspection lock, and optional origin blocking; prove them with controlled forms before production persistence. Consult current Apple WebKit documentation and keep platform adapters under their apps.
 - [ ] Change `login` input to `{ account? }`, implement attempt-scoped stand-ins across navigation, capture, verification, remember prompt, and reuse after expiry. Update Evolve's `web-authentication.md` and representative services together.
 - [ ] Add identity-provider resolution, multiple saved accounts, and provider/destination mismatch handling.
@@ -135,7 +135,7 @@ Reuse allowed saved secrets through `request` stand-ins. Otherwise render native
 
 ## Verification and completion
 
-Use E2E coverage, not new unit tests. Exercise policy resolution (action over service over ask, block over allow, combined approval, always-approve scope, Profile isolation, revoked rules), references in unmarked fields, forged and expired stand-ins, wrong-origin typing, frames, redirects, multi-step and dynamic forms, navigation mid-attempt, MFA, rejection and retry, remember acceptance and decline, expiry, cancellation, concurrent attempts, process termination, saved replacement, identity-provider transitions and account choice, provider success without destination success, manual-only `login`, and reopening the selected account's page. Check actual model outputs, action results, errors, and logs for values, including encoded forms.
+Use E2E coverage, not new unit tests. Exercise policy resolution (action over service over ask, block over allow, combined approval, always-approve scope, Profile isolation, revoked rules), malformed references, unknown or untyped keys, wrong-type secrets at resolution, forged and expired stand-ins, wrong-origin typing, frames, redirects, multi-step and dynamic forms, navigation mid-attempt, MFA, rejection and retry, remember acceptance and decline, expiry, cancellation, concurrent attempts, process termination, saved replacement, identity-provider transitions and account choice, provider success without destination success, manual-only `login`, and reopening the selected account's page. Check actual model outputs, action results, errors, and logs for values, including encoded forms.
 
 Verify predecessor-written storage with the changed build and changed-build storage with the predecessor. Keep credentials out of Profile export/import according to existing backup behavior. Build iOS and macOS for shared native changes, run protocol and storage checks, and capture simulator screenshots or video for approval cards, handoff, remember prompts, and Settings.
 
