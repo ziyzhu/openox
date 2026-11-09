@@ -1,105 +1,142 @@
 # Remembered service login
 
-Goal: establish an account-type secret and extend the existing web `login` flow to optionally log in automatically using authorized saved credentials. Capture credentials during manual login, verify success, offer to remember them, and reuse them when the intended account is no longer logged in. Hosts own credential handling, permissions, verification, and persistence. Users enter values only; Ox defines credential fields. Models and service code receive status and references, never credential values.
+Goal: let actions use saved secrets through references, starting with the web `login` action logging in automatically with a saved account. Capture credentials during manual login, verify success, offer to remember them, and reuse them when the intended account is no longer logged in. Secrets are never exposed to Ox as plain text: models, action inputs, results, logs, and service code see only references. The Host resolves a reference only after the secret's permission policy allows it, and only at a Host-owned point that delivers the value to an allowed destination.
 
-Status: the current codebase implements `listSessions`, `login`, account routing, live-page handoffs, access helpers, and selected-session availability checks; these are the foundation, not completed remembered login. Account secrets, optional auto-login support, and their verification remain unimplemented. Extend existing secrets, bindings, and login orchestration rather than building a separate authentication system. API credential UX improvements are follow-up scope; preserve current API and managed OAuth behavior throughout.
+Status: the current codebase implements `listSessions`, `login`, account routing, live-page handoffs, access helpers, and selected-session availability checks; these are the foundation, not completed remembered login. Typed secrets, secret references, per-secret permission policies, `context.secret`, and their verification remain unimplemented. Removing `session` from the web handler context is in progress separately; after it lands, the handler context holds only `secret`. API credential UX improvements are follow-up scope; preserve current API and managed OAuth behavior throughout.
 
 ## Data model
 
-Extend existing secret metadata with:
-- `key`: opaque stable identifier; service IDs and email addresses are not unique secret keys.
-- `serviceID`: credential owner, such as `web:google.com` or `api:example.com`.
-- `displayName`: human-readable account label; not proof of identity.
-- `type`: `account`, `apiKey`, or `token` for typed entries.
-- Values remain separately stored in secure credential storage. Fixed payloads are `{ username, password }`, `{ apiKey }`, and `{ token }`, respectively. Preserve the existing `apiKey` field name.
+Extend `SecretEntry` in `secret.index` with optional fields so existing files load unchanged, the index stays at version 1, and the predecessor ignores the new fields:
 
-Secret types describe stored data, not authentication mechanisms. An `account` can support website login or HTTP Basic through separately authorized bindings. API keys may be sent in headers, query parameters, or Bearer authorization according to consumer configuration; token transport does not change the stored type. Matching types never grant cross-consumer access.
+```swift
+nonisolated struct SecretEntry: Codable, Sendable {
+    let key: String
+    var displayName: String
+    let origin: SecretEntryOrigin
+    let usePolicy: SecretUsePolicy
+    var type: SecretType?
+    var serviceID: String?
+    var access: [SecretAccess]?
+}
 
-Existing entries can contain arbitrary nonempty flat string dictionaries. Preserve them and their consumers without guessing types, renaming fields, or dropping extra fields. Whether these remain untyped or receive an explicit custom type is deferred; neither option blocks adding account secrets. Untyped/custom entries are not eligible for automatic website filling. Do not require a wholesale store conversion or replace the general secret editor to deliver auto-login.
+nonisolated enum SecretType: String, Codable, Sendable {
+    case account
+    case apiKey
+    case token
+}
 
-Keep managed provider, API, and MCP authorization records on their existing storage paths, including managed keys, access/refresh tokens, expiry, scopes, identity, and client-registration data. They are not static user-entered token secrets. Preserve legacy migration owners and publication-only policy independently of secret type.
+nonisolated struct SecretAccess: Codable, Sendable {
+    let consumer: String
+    var origins: [String]
+    var policy: ActionPolicy
+}
+```
 
-Extend existing bindings to express:
-- `serviceID`: destination service.
-- `authServiceID`: service performing authentication; equal to `serviceID` for direct login.
-- `secretKey?`: selected credential reference; absent when there is nothing reusable to save.
-- `accountIdentity?`: verified account identifier when available, scoped to its issuer/service.
-- `displayName?`: account label, including for connections without a secret.
-- `allowedOrigins`: exact HTTPS credential destinations, enforced by the Host.
-- `configurationFingerprint`: detects changes that invalidate credential authorization.
+- `key` is an opaque stable identifier; service IDs and email addresses are not unique keys. `displayName` is a label, not proof of identity.
+- `serviceID` is the credential owner, such as `web:google.com` or `api:example.com`. For identity-provider login it is the provider, never the destination.
+- `type` describes stored data, not an authentication mechanism. Values stay in secure credential storage with fixed payloads `{ username, password }`, `{ apiKey }`, and `{ token }`. Preserve the existing `apiKey` field name.
+- Untyped entries keep working for their existing consumers but cannot be used by reference. Do not guess types, rename fields, drop extra fields, or require a store conversion.
+- `publicationOnly` entries never receive `access` rules.
+- `SecretBinding` stays as is for providers, API service auth, and repository publication. Managed provider, API, and MCP authorization records stay on their existing storage paths.
 
-Keep service bindings in the existing Host credential index (`secret.index`), not repository manifests. Preserve existing provider and publication consumers and their policies. Adapt existing storage field names where possible rather than mechanically replacing all consumers. A secret can serve several destination bindings; each destination selects a specific provider account. Initially keep one selected account per destination; switching replaces the selection without deleting other saved credentials.
+## Permission policy
 
-Use an in-memory login attempt with attempt ID, destination `serviceID`, current `authServiceID`, selected secret reference, optional typed staged values, and explicit state. Associate staged values with the verified document/frame origin and authentication step, not merely the destination service. A session means a logged-in account. A saved account secret can exist while its account is logged out, and a logged-in account can exist without a saved secret. Keep cookies and other website data in existing website storage; neither a secret reference nor a session ID creates an isolated website-data store.
+Access to each secret is a permission policy. Every resolution of a reference checks it, separately from the action's own Action policy; both must pass.
+
+- `consumer` is a service (`web:example.com`) or an action (`web:example.com:login`). Resolution uses the action rule, then the service rule, then `ask`. An action rule can narrow or widen its service rule.
+- `origins` lists exact HTTPS destinations allowed to receive the value. The Host checks them on every resolution.
+- `policy` reuses `ActionPolicy` (`ask`, `allow`, `block`). With no matching rule the Host asks; a secret is never allowed by default.
+- When both the action and the secret ask, show one approval card covering both, keeping the call one conversation step. "Always approve" writes an `allow` rule for that action and destination only; widening to a service is a Settings choice.
+- Rules never cross services: a destination using an identity provider's account needs its own rule naming the provider origins.
+- Rules are Profile-scoped and never expose a secret to another Profile.
+- Settings lists each secret's rules with consumer, origins, and policy; users can change or revoke a rule without deleting the secret. Deleting the secret still requires confirmation.
+
+## Secret references
+
+- An action marks input fields that accept a secret with a schema keyword naming the required type, such as `"account": { "x-ox-secret": "account" }`. The Host rejects references in unmarked fields.
+- The agent passes the secret key as the field's plain string value, taken from `ox.secret.list`. It can omit the field when exactly one saved secret of that type matches the service's `serviceID`; the Host asks the user when several match.
+- `ox.secret.list` adds `type` and `serviceID` to each item. Permission rules are not exposed to the agent.
+- The handler receives the field as per-field stand-ins, such as `input.account.username` and `input.account.password`. Stand-ins are opaque strings valid only for the current invocation or login attempt; logging or returning them reveals nothing.
+- Only the Host turns a stand-in into a value, after the permission policy and destination check pass:
+  - web: `context.secret.type(standIn)` inserts the value at the focused element using native text insertion, after checking the focused element's frame origin. The handler owns focusing, clicking, waiting, and navigation; the Host does not locate or choreograph fields.
+  - api: the existing installer `request` replaces stand-ins in `body`, `query`, or `headers` before sending, after checking the destination against the service base URL.
+  - mcp and ios: the Host replaces stand-ins in call arguments at dispatch.
+- No function returns plain-text values to service code.
+- Sensitive action outputs returned as references, so one action can pass a value to another without exposing it, are follow-up scope; they would reuse `x-ox-secret` on output fields, ask on every use, and live only for the conversation.
+
+## Guardrails
+
+Web values land in the page's DOM, which page-world code, including handlers, can read back; the site needs to read its own fields, so this cannot be blocked in the page. The Host controls every exit to the model:
+
+- Redact resolved values, including base64 and URL-encoded forms, from action results, errors, and logs before they reach the model.
+- While an action holds a resolved secret or a login attempt is active, Ox page inspection and screenshots refuse that page.
+- Optionally block requests to origins outside the secret's `origins` during the call using `WKContentRuleList`, per service, since some logins load resources from other domains.
+- Log attempt IDs, stages, secret keys, bounded consumer and origin identifiers, policy decisions, verification outcomes, durations, and cleanup reasons. Never log values, stand-in resolutions, credential-bearing scripts, cookies, tokens, or sensitive URL components. Clear in-memory values promptly without claiming guaranteed zeroization.
 
 ## Service authentication contract
 
-Build on the current account-aware contract: `listSessions` returns logged-in accounts as `{ id, label, url }` descriptors; `login` prepares the login flow and returns `null`. IDs identify accounts and independent tenant scope, not page positions or tokens. Inspection exposes `access.checkAccess` and `access.requestAccess`; the Host dispatches discovery and login through those helpers, while direct action invocation remains supported for compatibility. Website login arguments belong in `requestAccess.input`; optional top-level `pageUrl` selects an initial service-domain URL, not an authenticated account. The Host currently presents the prepared live page for manual interaction. `requestAccess` reports acknowledged completion, not authenticated success. Preserve these public contracts while adding Host orchestration.
+Build on the current account-aware contract: `listSessions` returns logged-in accounts as `{ id, label, url }` descriptors; `login` prepares the login flow and returns `null`. Inspection exposes `access.checkAccess` and `access.requestAccess`; direct invocation remains supported. The Host selects and revalidates the account; handlers check the account on the page only when the page or endpoint might act as a different account.
 
-Extend the existing `login` action with optional auto-login support, not a separate auto-login action. Services without that support retain manual login. The service owns the website-specific workflow: locating fields, requesting filling, advancing username-first/password-next steps, submitting forms, and handling IdP transitions or human challenges. The Host supplies an attempt-scoped fill capability that validates the actual document/frame origin, resolves authorized credential values, fills the requested fields, and returns status without values. Define the capability contract and its interaction with navigation and credential-bearing document restrictions before implementation; no specific fill API is settled. Do not require `login` to return a declarative description of the whole workflow. Never pass credentials in action inputs, results, or the service-visible `{ session }` context. No new web `auth` method array is required for this scope.
+Change the standard `login` input from a closed empty object to `{ account? }`, with `account` marked `"x-ox-secret": "account"`. Services without auto-login ignore `account` and keep manual login. Services with auto-login own the website-specific workflow: focusing fields, calling `context.secret.type`, advancing username-first and password-next steps, submitting, and handling identity-provider transitions. Do not require `login` to return a declarative workflow.
 
-Add an optional saved-account reference at the Host access-request boundary. `secretId` is the proposed public name; settle it consistently with the existing storage reference `secretKey` without requiring a storage-wide rename. A reference selects a saved credential, not a logged-in session, and never grants permission by itself. The Host resolves and authorizes the reference for the attempt; service code receives only the restricted fill capability. Without a reference, preserve manual login and any separately authorized saved-account selection through existing bindings.
+```js
+async invoke(input, context) {
+  usernameInput.focus()
+  await context.secret.type(input.account.username)
+  nextButton.click()
+  await waitFor(() => passwordInput)
+  passwordInput.focus()
+  await context.secret.type(input.account.password)
+  submitButton.click()
+  return null
+}
+```
 
-After automatic or manual login, use fresh `listSessions` evidence to establish that the intended account is logged in. Define stable account identification and the evidence required to match a restored account to its binding. Descriptor shape, routing URL, submission, or user acknowledgment alone does not prove that identity or that subsequent actions execute as that account. Resolve ambiguity with the user and distinguish user-confirmed selection from machine-verified identity.
+Stand-ins for a login attempt stay valid across full-page navigations within that attempt; the Host resumes the handler on the next page. Define resumption with the existing context-invalidation handling before implementation.
 
-Legacy web `getSignInUrl`/`getSignInState` actions are unsupported by current native and protocol validation; do not restore them for remembered login. Protected actions use `requireAuth: true`, which requires a selected session. Discovery and login require `requireAuth: false` and `requireApproval: false`. Before ordinary selected-session actions, the Host reruns read-only `listSessions` in the selected page and rejects descriptors not present in the fresh result. Preserve those checks and Action policies. Descriptor availability does not prove every endpoint uses the intended account/tenant; retain actual-account checks for sensitive work. Invocation and live-page presentation already accept `session` or `pageUrl`; preserve consistent routing through both.
+After automatic or manual login, use fresh `listSessions` evidence to establish that the intended account is logged in. Record a verified `accountIdentity` with the secret's access rule when available, scoped to its issuer. Descriptor shape, routing URL, submission, or acknowledgment alone does not prove identity. Resolve ambiguity with the user and distinguish user-confirmed selection from machine-verified identity.
 
-Do not put saved account selections, secret references, or credential values in manifests. Declarations, descriptors, and redirects alone never authorize access to credentials. Preserve the existing API `auth` object and configuration.
+Legacy `getSignInUrl`/`getSignInState` stay unsupported. Protected actions use `requireAuth: true`; discovery and login require `requireAuth: false` and `requireApproval: false`. Preserve pre-dispatch `listSessions` revalidation and Action policies. Do not put secret keys, selections, or values in manifests.
 
 ## Web flow
 
-1. Discover logged-in accounts through `listSessions`. Reuse the intended account when available and establish that dependent actions execute as that account; do not silently substitute another logged-in account.
-2. Otherwise invoke `login` to prepare the flow and resolve the actual authentication service and bound account. Federated login uses the provider's service and credentials, not the destination's password entry.
-3. When `login` supports auto-login and an authorized saved account secret is available, supply the attempt-scoped Host-backed fill capability. The service locates fields, requests filling, advances steps, and submits; the Host validates the active document/frame origin immediately before each fill and never returns credential values. Resolve ambiguous account selection or unfamiliar credential destinations with the user. Stop automatic retries after rejection.
-4. Without optional auto-login support or usable credentials, or when a human step is required, show the existing live-page login handoff. Capture relevant username/password inputs during this active attempt, before submission clears them. Support username-first and password-next pages, dynamic forms, and observable autofill. Do not collect unrelated fields, OTPs, recovery codes, or QR payloads as passwords.
-5. Stage captured values in Host memory. Retain them through pending MFA, but discard on rejected authentication, cancellation, timeout, teardown, or process exit. A retry begins new staging; do not carry rejected values into it.
-6. Refresh `listSessions` and verify that the intended destination account is logged in, using reliable account identity evidence. Ask the user when identity remains ambiguous; record user-confirmed selection distinctly from machine-verified identity. Submission, navigation, or acknowledgment alone is not verified login.
-7. After verified success with reusable captured values, ask “Remember this login?” Identify the credential-owning website and account. Save and bind only on acceptance; otherwise discard staged values and retain the browser session. Preserve an old saved credential until replacement succeeds and is accepted.
-8. For an existing saved credential, reuse it without another remember prompt. An explicit account change updates the destination selection only after successful verification/confirmation.
+1. Discover logged-in accounts through `listSessions`. Reuse the intended account when available; do not silently substitute another logged-in account.
+2. Otherwise invoke `login` with the intended account's key, or without it to let the Host match by `serviceID`. Federated login uses the provider's secret, not a destination-owned copy.
+3. When `login` supports auto-login and the secret's policy allows it, the handler drives the page and calls `context.secret.type`. The Host checks policy and frame origin on every call. Stop automatic retries after rejection.
+4. Without auto-login support, an allowed secret, or when a human step is required, show the existing live-page handoff. During handoff offer a native "Fill saved login" action that applies the same policy and origin checks. Capture relevant username/password inputs during the active attempt before submission clears them; never collect OTPs, recovery codes, or QR payloads as passwords.
+5. Stage captured values in Host memory through pending MFA; discard on rejection, cancellation, timeout, teardown, or process exit. A retry starts new staging.
+6. Refresh `listSessions` and verify the intended destination account. Submission, navigation, or acknowledgment alone is not verified login.
+7. After verified success with reusable captured values, ask "Remember this login?" naming the credential-owning website and account. Save as a typed `account` secret with an `allow` rule for this `login` action and origin only on acceptance; otherwise discard staged values and keep the browser session. Preserve an old secret until its replacement is verified and accepted.
+8. Reuse an existing secret without another remember prompt.
 
-For IdP login, keep the account secret owned by the IdP and bind the destination to the selected provider account; never copy the provider password into a destination-owned secret. Define how service-owned `login` orchestration requests an IdP transition using `authServiceID` and obtains the appropriately scoped fill capability, without treating that request or a redirect as credential authorization. The Host authorizes the provider/account and exact credential origin separately, reuses an existing provider login when appropriate, or fills the authorized provider account secret. Resolve provider account choice rather than silently accepting a different active account. Match provider and destination identities separately; they need not share IDs or labels. Verify the destination through fresh destination `listSessions` after the return. A remember prompt identifies the provider and provider account. Current handoff recovery can navigate an off-domain page back to the service entry point; that navigation is not identity evidence, and the automatic flow must not interrupt a pending provider redirect or challenge.
+For identity-provider login, the provider owns the secret; the destination's `login` requests the transition, and the Host resolves the provider secret under a rule naming the provider origins. A redirect never authorizes credentials. Resolve provider account choice explicitly, match provider and destination identities separately, and verify the destination through fresh destination `listSessions`. The automatic flow must not interrupt a pending provider redirect or challenge.
 
-OTP, QR, passkeys, device approval, and inaccessible forms hand off when necessary. If nothing reusable was captured, create no secret and show no credential-saving prompt. System passkey private keys remain system-owned. Identity-provider success is not sufficient proof that the destination login completed.
+OTP, QR, passkeys, device approval, click-only keypads, and inaccessible forms hand off. If nothing reusable was captured, create no secret and show no prompt. System passkey private keys remain system-owned.
 
-## Session scope and credential exposure
+## Session scope
 
-Coordinate with `plans/browser.md`: current website sessions are shared, and Profile isolation is separately planned. Establish credential/binding scope and Profile access rules before changing persistence; do not silently expose remembered credentials across Profiles. Session isolation and multiple concurrent accounts are not delivered by account bindings alone.
-
-Verify the destination account before dependent work when evidence exists. A different active account requires account selection or handoff, not silent use or global cookie deletion. Do not promise simultaneous isolated provider sessions in the first implementation.
-
-Use Host-owned capture and filling, with frame/document provenance and lifecycle cleanup. Inspect arbitrary script execution, DOM results, screenshots, network diagnostics, and error paths for credential exposure. An isolated capture script alone does not prevent page scripts from reading their own form fields. Restrict model/service inspection of credential-bearing documents during login and verify the chosen enforcement through E2E tests; do not rely on redaction alone.
-
-Log attempt IDs, stages, bounded service/origin identifiers, verification outcomes, durations, and cleanup reasons. Never log values, credential-bearing scripts, cookies, tokens, or sensitive URL components. Clear in-memory references promptly without claiming guaranteed zeroization of managed strings.
+Coordinate with `plans/browser.md`: website sessions are shared and Profile isolation is separately planned. A different active account requires account selection or handoff, not silent use or global cookie deletion. Do not promise simultaneous isolated provider sessions in the first implementation.
 
 ## API follow-up
 
-Reuse authorized saved credentials. Otherwise render native inputs derived from the existing API auth configuration: key, token, or username/password. Use fixed `apiKey`, `token`, or `account` payloads for new typed service entry. Preserve existing arbitrary-field secrets and the general editor; do not replace other consumers' editors as part of auto-login.
-
-Stage values and inject them through existing Host request authorization. Verify using a service-specific safe authenticated read; a public success response is insufficient. Do not use a mutation as a credential probe. A rejection discards staging; network failure or ambiguous authorization leaves verification unresolved, with retry/cancel and bounded expiry.
-
-After verification, ask “Remember this connection?” Save on acceptance. On decline, retain credentials only for the explicitly authorized operation in progress, then discard. Define that operation's lifetime so an attachment or background schedule cannot retain ephemeral credentials indefinitely. Refuse persistence-dependent background work until remembered credentials are available.
-
-Keep OAuth's managed authorization, token storage, refresh, and revocation path. Use OpenOx-registered OAuth applications. Authorizing an OAuth connection includes its token retention; do not treat managed tokens as user-entered JSON or capture identity-provider passwords from external authorization sessions.
+Reuse allowed saved secrets through `request` stand-ins. Otherwise render native inputs from the existing API auth configuration and save typed `apiKey`, `token`, or `account` entries. Preserve arbitrary-field secrets and the general editor. Verify with a service-specific safe authenticated read, never a mutation. After verification, ask "Remember this connection?"; on decline, keep values only for the authorized operation in progress with a bounded lifetime. Keep OAuth's managed authorization, refresh, and revocation path with OpenOx-registered applications.
 
 ## Implementation sequence
 
-- [ ] Reproduce current web/API login and inspect credential entry, handoff completion, global website data, account detection, permissions, script execution, and output/log exposure. Use disposable accounts and controlled local fixtures with diagnostics outside Git.
-- [ ] Settle Profile scope, stable account/tenant matching from `listSessions`, the optional saved-account reference and its public name, the attempt-scoped Host-backed fill capability within service-owned `login`, and authorized IdP transitions. Preserve existing `requireAuth`, fresh discovery, access-helper, Action-policy, and live-page routing behavior; verify them rather than rebuilding them. Update protocol schema sources, native validation, generated contracts, Evolve's `packages/agent/skills/evolve/references/web-authentication.md` and related web-service guidance, and representative services together. Update Evolve's `SKILL.md` only if its workflow or reference descriptions change; do not document an illustrative fill API as implemented.
-- [ ] Prove Host capture/fill and cleanup with controlled forms before changing production credential persistence. Consult current Apple WebKit documentation and keep platform adapters under their respective apps.
-- [ ] Add typed `account` secrets and extend existing bindings without requiring conversion of all existing entries. Preserve `{ apiKey }`, `{ token }`, arbitrary flat-string entries, existing consumer policies, and separate managed authorization records. Use existing migration owners for any necessary storage changes; unknown legacy shapes must not be guessed or discarded.
-- [ ] Extend `login` with optional service-owned auto-login orchestration through the Host-backed fill capability and manual fallback. Complete direct web capture → fresh `listSessions` verification → remember choice → saved reuse after account expiry, including safe replacement and cancellation.
-- [ ] Add IdP resolution, multiple saved accounts, per-destination selection, and provider/destination mismatch handling. Use `authServiceID` consistently in service-owned login orchestration, Host attempts, and bindings; no IdP declaration alone grants access to its credentials.
-- [ ] Follow-up: complete API typed inputs, authenticated verification, remember choice, and ephemeral-operation cleanup; do not block web auto-login on this work.
-- [ ] Update settings to show saved accounts and connected services, select/replace credentials, and forget credentials with destructive-action confirmation. Add stable control identifiers, localization, accessible labels, and equal outer padding.
+- [ ] Reproduce current web/API login and inspect credential entry, handoff completion, account detection, permissions, script execution, and output/log exposure with disposable accounts and local fixtures, diagnostics outside Git.
+- [ ] Land the separate removal of `session` from the web handler context.
+- [ ] Add `type`, `serviceID`, and `access` to `SecretEntry`; extend `ox.secret.list`; verify predecessor compatibility of `secret.index`.
+- [ ] Add the permission policy resolution, combined approval card, and Settings rules UI with stable identifiers, localization, accessible labels, and equal outer padding.
+- [ ] Add `x-ox-secret` to protocol schema sources, native validation, and generated contracts; implement stand-ins and Host resolution for web `context.secret.type` and API `request`.
+- [ ] Add redaction, page-inspection lock, and optional origin blocking; prove them with controlled forms before production persistence. Consult current Apple WebKit documentation and keep platform adapters under their apps.
+- [ ] Change `login` input to `{ account? }`, implement attempt-scoped stand-ins across navigation, capture, verification, remember prompt, and reuse after expiry. Update Evolve's `web-authentication.md` and representative services together.
+- [ ] Add identity-provider resolution, multiple saved accounts, and provider/destination mismatch handling.
+- [ ] Follow-up: API typed inputs and verification, mcp/ios resolution, and sensitive output references.
 
 ## Verification and completion
 
-Use E2E coverage, not new unit tests. Exercise direct and multi-step login, autofill, dynamic forms, redirects/popups/frames, wrong-origin filling, forged capture messages, MFA, rejection/retry, remember acceptance/decline, expiry, cancellation, concurrent attempts, process termination, saved replacement, shared-provider accounts, session/account mismatch, and connections with no secret. Exercise stale or forged session descriptors, stable account/tenant matching after expiry, account changes through shared cookies, manual-only `login`, access-helper/direct-invocation parity, and reopening the selected account's live page. Exercise IdP transitions, unauthorized provider origins, provider account choice, already-authenticated providers, pending redirects/challenges, distinct provider/destination identities, and provider success without destination success. Check actual model/service outputs and logs for credential values.
+Use E2E coverage, not new unit tests. Exercise policy resolution (action over service over ask, block over allow, combined approval, always-approve scope, Profile isolation, revoked rules), references in unmarked fields, forged and expired stand-ins, wrong-origin typing, frames, redirects, multi-step and dynamic forms, navigation mid-attempt, MFA, rejection and retry, remember acceptance and decline, expiry, cancellation, concurrent attempts, process termination, saved replacement, identity-provider transitions and account choice, provider success without destination success, manual-only `login`, and reopening the selected account's page. Check actual model outputs, action results, errors, and logs for values, including encoded forms.
 
-For the API follow-up, exercise each API credential type, public-endpoint false positives, invalid credentials, forbidden responses, network failure, safe verification, redirects, configuration changes, OAuth refresh/revocation, and ephemeral credential expiry. Confirm login permission does not authorize unrelated service mutations.
+Verify predecessor-written storage with the changed build and changed-build storage with the predecessor. Keep credentials out of Profile export/import according to existing backup behavior. Build iOS and macOS for shared native changes, run protocol and storage checks, and capture simulator screenshots or video for approval cards, handoff, remember prompts, and Settings.
 
-Verify predecessor-written storage with the changed build and changed-build storage with the predecessor. Report actual upgrade/downgrade behavior and unresolved incompatibilities before release. Keep credentials out of Profile export/import according to existing backup behavior; verify it rather than assuming new metadata is excluded.
-
-Build both iOS and macOS for shared native changes and run applicable protocol/storage checks. Capture simulator screenshots or video for login handoff, account choice, remember prompts, API inputs, and settings. Report LOC delta, file tree diff, call stack diff, cyclomatic complexity, and performance implications for implementation reviews. Limit capture work to active attempts and remove observers/tasks when they end.
-
-Core scope is done when an account secret can restore the intended logged-in account through optional auto-login in `login`, manual-only services still work, arbitrary existing secrets and managed credentials remain usable, the selected account can be reused after expiry, a different provider account cannot be silently substituted, unsuccessful/unremembered credentials leave no persisted values, interactive methods still complete through handoff, and existing services and stored connections remain usable.
+Core scope is done when a saved account secret restores the intended logged-in account through `login` without exposing its value to Ox, every resolution is governed by the secret's permission policy, manual-only services still work, existing secrets and managed credentials remain usable, a different provider account cannot be silently substituted, and unremembered credentials leave no persisted values.
