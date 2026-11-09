@@ -10,9 +10,9 @@
     },
     {
       "id": "login",
-      "description": "Prepare and present the website's live login page, then wait for the user to tap Done. Required alongside listSessions. Returns interaction: completed and authentication: unverified only after Done; cancellation throws. The user has already finished interacting when this call returns: do not ask them to sign in or say done again. Discover fresh sessions before continuing the original task; completion is not proof of authentication. Explain the sign-in step before invoking. Never request credentials in chat or replay writes after login.",
-      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
-      "outputSchema": { "type": "object", "properties": { "interaction": { "type": "string", "enum": ["completed"] }, "authentication": { "type": "string", "enum": ["unverified"] } }, "required": ["interaction", "authentication"], "additionalProperties": false },
+      "description": "Log in to the website. Pass account as { $secret: key } from ox.service.inspect secrets to log in automatically with that saved login; use the only associated login by default, ask the user to pick when several exist, and omit account when none exists or the user asks to log in manually. Without account, or when automatic login cannot finish, the live login page is presented until the user taps Done; cancellation throws. Returns interaction: automatic with authentication: verified after a verified automatic login, otherwise interaction: completed with authentication: unverified. When it returns, the user has finished interacting: do not ask them to sign in or say done again. Discover fresh sessions before continuing the original task. Explain the sign-in step before invoking. Never request credentials in chat or replay writes after login.",
+      "inputSchema": { "type": "object", "properties": { "account": { "type": "object", "description": "Saved login reference { $secret: key } from ox.service.inspect secrets." } }, "additionalProperties": false },
+      "outputSchema": { "type": "object", "properties": { "interaction": { "type": "string", "enum": ["completed", "automatic"] }, "authentication": { "type": "string", "enum": ["unverified", "verified"] } }, "required": ["interaction", "authentication"], "additionalProperties": false },
       "requireApproval": false,
       "requireAuth": false
     },

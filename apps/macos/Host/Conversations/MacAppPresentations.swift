@@ -12,14 +12,23 @@ final class MacAppPresentations: ServiceHandoffPresenting, ProviderAuthenticatin
             messages: AppPresentations.unavailable.messages,
             providerAuthentication: self,
             browser: { [windows] service, page in windows.open(.init(service: service, session: page)) },
-            secretEntry: { key in
+            secretEntry: { spec in
                 do {
+                    let target = spec.serviceDomain ?? spec.key
                     let entry = try await MacCredentialPrompt.enter(
-                        title: "Save secret: \(key)",
-                        message: "Enter a JSON object with string fields, such as {\"apiKey\":\"value\"}. The secret stays in this Host's Keychain, outside the conversation."
+                        title: spec.type == .account ? "Save login for \(target)" : "Save secret for \(target)",
+                        username: spec.type == .account,
+                        message: "Ox stores this in this Host's Keychain and uses it only for \(target). It never enters the conversation.",
+                        prefill: spec.prefill.isEmpty ? nil : (spec.prefill["username"] ?? "", spec.prefill["password"] ?? "")
                     )
                     try Task.checkCancellation()
-                    try Secret.set(key: key, displayName: key, value: entry.secret)
+                    let values: [String: String] = switch spec.type {
+                    case .account: ["username": entry.username ?? "", "password": entry.secret]
+                    case .apiKey: ["apiKey": entry.secret]
+                    case .token: ["token": entry.secret]
+                    }
+                    try Secret.setTyped(key: spec.key, displayName: spec.displayName(values: values), type: spec.type,
+                                        serviceID: spec.serviceID, values: values)
                     return true
                 } catch is CancellationError { return false }
             },

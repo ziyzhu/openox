@@ -251,6 +251,7 @@ nonisolated struct ServiceDefinition: Sendable {
                     guard id == WebSessionContract.loginAction else { return action }
                     var contract = action.raw
                     contract["description"] = expected["description"]
+                    contract["inputSchema"] = expected["inputSchema"]
                     contract["outputSchema"] = expected["outputSchema"]
                     return Manifest.Action(.object(contract))
                 }
@@ -332,6 +333,11 @@ nonisolated struct ServiceDefinition: Sendable {
 
     var mcpTransport: RemoteMCPTransport? {
         if case .mcp(_, let transport, _) = source { transport } else { nil }
+    }
+
+    func inputSchema(for action: Manifest.Action) -> JSONValue? {
+        guard action.id == WebSessionContract.loginAction, !isAPI, !isIOS, !isMCP else { return action.inputSchema }
+        return standardServiceActions.first { $0.id == action.id }?.inputSchema ?? action.inputSchema
     }
 
     func action(_ id: String, includingStandard: Bool = false) -> Manifest.Action? {

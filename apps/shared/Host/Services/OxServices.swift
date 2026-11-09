@@ -97,7 +97,14 @@ nonisolated enum OxServices {
                                 "actions": .object(["type": .string("object"), "additionalProperties": .object(["type": .string("object"), "description": .string("Complete action inputSchema and outputSchema with metadata.")])]),
                                 "standardActions": .object(["type": .string("array"), "items": .object(["type": .string("string")]), "description": .string("Available standard action IDs; their contracts are supplied upfront.")]),
                                 "nextCursor": .object(["type": .string("string"), "description": .string("Continuation cursor; absent after the last page.")]),
-                            ]), "required": .array(["service", "standardActions", "actions"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                                "secrets": .object(["type": .string("array"), "description": .string("Typed saved secrets associated with this service: owned by it or granted to it. Metadata only."), "items": .object([
+                                    "type": .string("object"), "properties": .object([
+                                        "key": .object(["type": .string("string")]),
+                                        "displayName": .object(["type": .string("string")]),
+                                        "type": .object(["type": .string("string"), "enum": .array(["account", "apiKey", "token"].map(JSONValue.string))]),
+                                    ]), "required": .array(["key", "displayName", "type"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                                ])]),
+                            ]), "required": .array(["service", "standardActions", "actions", "secrets"].map(JSONValue.string)), "additionalProperties": .bool(false),
                         ]),
                     ])
                 ),

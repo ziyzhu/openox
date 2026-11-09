@@ -7,7 +7,7 @@ enum ConsoleBridge: WebViewBridge {
     static func handle(message: WKScriptMessage, tag: String) {
         let body = message.body as? [String: Any] ?? [:]
         let level = body["level"] as? String ?? "log"
-        let msg = LogPrivacy.text(body["msg"] as? String ?? "")
+        let msg = LogPrivacy.text(SecretAttempt.redactLive(body["msg"] as? String ?? ""))
         switch level {
         case "error": Log.webView.error("ConsoleBridge domain=\(tag) \(msg)")
         case "warn":  Log.webView.warning("ConsoleBridge domain=\(tag) \(msg)")

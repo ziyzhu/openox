@@ -52,7 +52,7 @@ Access to each secret is a permission policy. Every retrieval checks it, separat
 - Rules name who may use a secret, not where it may go: the destination is always the owning service's domain.
 - When both the action and the secret ask, show one approval card covering both, keeping the call one conversation step. "Always approve" writes an `allow` rule for that action only; widening to a service is a Settings choice.
 - A destination using a sign-in provider's account needs its own rule; rules never carry over between consumers.
-- Rules are Profile-scoped and never expose a secret to another Profile.
+- Secrets and their rules are stored app-wide with Action policies in `Configuration/secrets.json`; Profile scoping would require moving both and is not planned.
 - Settings lists each secret's rules with consumer and policy; users can change or revoke a rule without deleting the secret. Deleting the secret still requires confirmation.
 
 ## Secret references
@@ -77,7 +77,7 @@ Access to each secret is a permission policy. Every retrieval checks it, separat
 After retrieval the value is in service code, so the Host constrains where it can go and every exit to the model:
 
 - API handlers run in a bare `JSContext` whose only network path is `request`, which is bound to the service `baseUrl`. Verify no other path exists.
-- Web values can be sent by page-world code. During an attempt holding a retrieved secret, optionally block requests to origins outside the owning service's domain using `WKContentRuleList`, per service, since some logins load resources from other domains.
+- Web values can be sent by page-world code. While a page holds a retrieved secret, a `WKContentRuleList` blocks third-party `fetch` and `ping` requests outside the owning service's domain; document navigations and form posts are unaffected.
 - Redact retrieved values, including base64 and URL-encoded forms, from action results, errors, and logs before they reach the model.
 - While an action holds a retrieved secret or a login attempt is active, Ox page inspection and screenshots refuse that page.
 - Log attempt IDs, stages, secret keys, bounded consumer and origin identifiers, policy decisions, verification outcomes, durations, and cleanup reasons. Never log values, credential-bearing scripts, cookies, tokens, or sensitive URL components. Clear in-memory values promptly without claiming guaranteed zeroization.
@@ -131,7 +131,7 @@ Legacy `getSignInUrl`/`getSignInState` stay unsupported. Protected actions use `
 1. Discover logged-in accounts through `listSessions`. Reuse the intended account when available; do not silently substitute another logged-in account.
 2. Otherwise invoke `login`, choosing `account` from `ox.service.inspect` by the agent guidance: the one associated `account` secret, the user's pick when several exist, or none for manual login or when the user explicitly declines saved logins. Federated login uses the provider's secret, not a destination-owned copy.
 3. When `account` is passed and `login` supports auto-login, the handler calls `context.secret(input.account)` and drives the page. The Host checks ownership, frame origin, and policy at retrieval. Stop automatic retries after rejection.
-4. Without `account`, auto-login support, or an allowed secret, or when a human step is required, show the existing live-page handoff. During handoff offer a native "Fill saved login" action that fills the page's `username`/`email` and `current-password` fields after the same ownership, origin, and policy checks. Capture the login during the active attempt as described in Login capture.
+4. Without `account`, auto-login support, or an allowed secret, or when a human step is required, show the existing live-page handoff. When automatic login reaches a human step, hand off the page exactly as it is; never navigate away from a challenge. Capture the login during the active attempt as described in Login capture.
 5. Stage captured values in Host memory through pending MFA; discard on rejection, cancellation, timeout, teardown, or process exit. A retry starts new staging.
 6. Refresh `listSessions` and verify the intended destination account. Submission, navigation, or acknowledgment alone is not verified login.
 7. After verified success with reusable captured values, ask "Remember this login?" in the canonical entry card, naming the credential-owning website and account with the captured values prefilled. Save as a typed `account` secret owned by that website's service with an `allow` rule for this `login` action only on acceptance; otherwise discard staged values and keep the browser session. Preserve an old secret until its replacement is verified and accepted.
@@ -147,10 +147,10 @@ A provider is an ordinary web service with `listSessions` and `login`, such as `
 
 1. The agent passes `account: { $secret: "<provider secret>" }` chosen from the destination's `ox.service.inspect`. That secret has an access rule naming the destination's `login`.
 2. The destination's `login` reads `input.account.serviceID`, clicks the matching provider button or navigates to the provider, and goes no further. It cannot retrieve the value, because it is not the owning service.
-3. When the attempt's page navigates or opens a popup to the owning provider's domain, the Host runs the provider service's `login` on that page with the same input. Only provider code on the provider's domain can retrieve the value. A redirect alone never authorizes credentials.
+3. Because pages belong to one service, the Host signs in through the provider's own page: it runs the provider service's `login` step loop there with the same input, verifies the provider account through the provider's `listSessions`, then reruns the destination's `login` so the provider redirect completes with the shared website session. Only provider code on the provider's domain can retrieve the value. A redirect alone never authorizes credentials.
 4. The provider's `login` handles its own screens: when its `listSessions` already shows the secret's account it retrieves nothing, and on an account chooser it picks the matching account. Consent screens that grant a site access hand off to the user.
 5. When the page returns to the destination origin, the Host runs the destination's `listSessions` to verify the intended account. Provider success alone is not destination success. Provider and destination identities are matched separately.
-6. Popups belong to the same attempt with the same input and checks. Handoff recovery must not navigate back to the destination while the attempt is on a provider page or a pending challenge.
+6. When the provider still needs a choice or consent on return, or the destination does not verify within a bounded number of reruns, the page hands off to the user.
 
 Without a provider service, or before it is verified, the hop hands off to the user. Capture still works on provider pages that mark `autocomplete` fields and saves the secret under the provider's `serviceID`.
 

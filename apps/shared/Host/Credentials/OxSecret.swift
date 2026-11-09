@@ -14,14 +14,18 @@ nonisolated enum OxSecret {
                             "key": .object(["type": .string("string")]), "displayName": .object(["type": .string("string")]),
                             "fields": .object(["type": .string("array"), "items": .object(["type": .string("string")]), "description": .string("Sorted top-level field names only; empty when unavailable. Never secret values.")]),
                             "available": .object(["type": .string("boolean")]),
-                        ]), "required": .array(["key", "displayName", "fields", "available"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                            "type": .object(["enum": .array(["account", "apiKey", "token"].map(JSONValue.string) + [.null]), "description": .string("Typed payload; null means the entry needs setup in Settings and cannot be referenced.")]),
+                            "serviceID": .object(["type": .array([.string("string"), .string("null")]), "description": .string("Owning service, such as web:accounts.google.com.")]),
+                        ]), "required": .array(["key", "displayName", "fields", "available", "type", "serviceID"].map(JSONValue.string)), "additionalProperties": .bool(false),
                     ])]),
                 ])),
                 ("ox.secret.add", .object([
                     "description": .string(ModelGuidance.text("ox.secret.add")),
                     "inputSchema": .object(["type": .string("object"), "properties": .object([
                         "key": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(128)]),
-                    ]), "required": .array([.string("key")])]),
+                        "type": .object(["type": .string("string"), "enum": .array(["account", "apiKey", "token"].map(JSONValue.string))]),
+                        "serviceID": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(300)]),
+                    ]), "required": .array(["key", "type"].map(JSONValue.string))]),
                     "outputSchema": .object([
                         "type": .string("object"), "properties": .object([
                             "key": .object(["type": .string("string")]), "status": .object(["type": .string("string"), "enum": .array(["saved", "cancelled"].map(JSONValue.string))]),

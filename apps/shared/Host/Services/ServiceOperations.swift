@@ -20,6 +20,7 @@ final class ServiceOperations {
     let finish: (UUID, Result<JSONValue?, Error>) -> Void
     let native: NativeServiceOperations
     let presentServiceHandoff: ((Service, Service.ServiceWebPage, ServiceHandoffSession) async -> ServiceHandoffSession.Outcome)?
+    let rememberSecret: ((SecretEntrySpec) async -> Bool)?
 
     init(
         serviceManager: ServiceManager,
@@ -39,7 +40,8 @@ final class ServiceOperations {
         begin: @escaping (String, JSONValue, String) -> UUID,
         finish: @escaping (UUID, Result<JSONValue?, Error>) -> Void,
         native: NativeServiceOperations,
-        presentServiceHandoff: ((Service, Service.ServiceWebPage, ServiceHandoffSession) async -> ServiceHandoffSession.Outcome)? = nil
+        presentServiceHandoff: ((Service, Service.ServiceWebPage, ServiceHandoffSession) async -> ServiceHandoffSession.Outcome)? = nil,
+        rememberSecret: ((SecretEntrySpec) async -> Bool)? = nil
     ) {
         self.serviceManager = serviceManager
         self.conversationOwner = conversationOwner
@@ -56,6 +58,7 @@ final class ServiceOperations {
         self.finish = finish
         self.native = native
         self.presentServiceHandoff = presentServiceHandoff
+        self.rememberSecret = rememberSecret
     }
 
     static func encodeToJSON<T: Encodable>(_ value: T) throws -> JSONValue {
@@ -120,7 +123,7 @@ final class ServiceOperations {
             _ = try service.executionURL(defaultURL: baseURL, session: session, pageURL: pageURL)
         }
         let qualifiedName = service.definition.qualifiedActionName(actionID)
-        guard let action = service.definition.action(actionID), let inputSchema = action.inputSchema else {
+        guard let action = service.definition.action(actionID), let inputSchema = service.definition.inputSchema(for: action) else {
             throw Service.InvokeError.unknown(qualifiedName)
         }
         if service.isWebService, actionID == "search", service.definition.standardServiceActions.contains(where: { $0.id == actionID }),
@@ -137,10 +140,16 @@ final class ServiceOperations {
             "session": session ?? .null,
             "pageUrl": pageURL.map(JSONValue.string) ?? .null,
         ])
+        let prepared = try SecretAttempt.prepare(input)
+        if !prepared.keys.isEmpty, hostStandard {
+            throw RuntimeError.bridge("Secret references are not supported for this action")
+        }
+        input = prepared.args
         let inputViolations = JSONSchemaValidator.validate(
             input,
             against: inputSchema,
-            definitions: service.definition.definitions
+            definitions: service.definition.definitions,
+            allowingSecretReferences: !prepared.keys.isEmpty
         )
         guard inputViolations.isEmpty else {
             throw Service.InvokeError.invalidInput(qualifiedName, inputViolations)
@@ -160,6 +169,22 @@ final class ServiceOperations {
                 guard violations.isEmpty else { throw Service.InvokeError.invalidOutput(qualifiedName, violations) }
                 return value
             }
+            let secrets = prepared.keys.isEmpty ? nil : SecretAttempt(consumer: qualifiedName, keys: prepared.keys) { use, label in
+                do {
+                    try await self.requireApproval(
+                        action: use.action,
+                        defaultPolicy: .ask,
+                        purpose: purpose,
+                        prompt: L10n.string("Allow \(qualifiedName) to use the saved secret \(label)?\nOnly the service that owns it can read it, on its own domain. It never enters the conversation.")
+                    )
+                    return true
+                } catch {
+                    return false
+                }
+            }
+            if let secrets, await !secrets.authorize() {
+                throw OxFunctionError(code: "permission_denied", message: "\(qualifiedName): the user did not allow this action to use the saved secret.", recovery: "Stop. Do not retry with the same secret unless the user asks; offer manual login instead.")
+            }
             let approve: @MainActor (String, Any?) async -> Bool = { name, args in
                 guard service.isWebService,
                       name == service.definition.qualifiedActionName(WebSessionContract.listAction),
@@ -171,86 +196,64 @@ final class ServiceOperations {
                     return false
                 }
             }
+            if let secrets, WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction,
+               await self.hasIntendedSession(service: service, secrets: secrets, approve: approve) {
+                Log.service.info("Service.login automatic skipped domain=\(service.domain) reason=signed-in")
+                return .object(["interaction": .string("automatic"), "authentication": .string("verified")])
+            }
             if service.definition.supportsConversation, actionID == WebConversationContract.actionID {
                 let attachments = try await resolveConversationAttachments(input.objectValue?["attachments"]?.arrayValue ?? [])
                 return try await serviceManager.invokeConversation(service: service, args: input, owner: conversationOwner, attachments: attachments, session: session, pageURL: pageURL, approve: approve)
             }
             let result: Result<JSONValue, Error>
             if let implementation = service.apiService {
-                result = await implementation.invoke(service: service, actionID: actionID, args: input, approve: approve)
+                result = await implementation.invoke(service: service, actionID: actionID, args: input, secrets: secrets, approve: approve)
             } else if let implementation = service.iOSService {
+                let dispatched = try await secrets?.substitute(input, caller: service.definition.actionNamespace) ?? input
                 result = await implementation.invoke(
-                    service: service, actionID: actionID, args: input, purpose: purpose,
+                    service: service, actionID: actionID, args: dispatched, purpose: purpose,
                     approve: approve,
                     nativeInvocation: { _, id, args, purpose in
                         try await self.native.invoke(service: service, actionID: id, args: args, purpose: purpose)
                     }
                 )
             } else if let implementation = service.remoteMCPService {
+                let dispatched = try await secrets?.substitute(input, caller: service.definition.actionNamespace) ?? input
                 result = await implementation.invoke(
-                    service: service, actionID: actionID, args: input,
+                    service: service, actionID: actionID, args: dispatched,
                     approve: approve, readFile: { try await self.readMCPFile($0, purpose) }, receiveFiles: receiveFiles
                 )
+            } else if let secrets, actionID == WebSessionContract.loginAction,
+                      secrets.owners.contains(where: { $0 != service.definition.actionNamespace }) {
+                result = .success(.null)
             } else {
                 result = await service.invokeAction(
                     actionID,
                     args: input,
                     session: session,
                     pageURL: pageURL,
+                    secrets: secrets,
                     approve: approve
                 )
             }
-            let value = try result.get()
-            if WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction {
-                try await self.presentLogin(service: service, actionID: actionID, input: input, session: session, pageURL: pageURL)
-                return .object(["interaction": .string("completed"), "authentication": .string("unverified")])
+            let raw: JSONValue
+            do { raw = try result.get() } catch {
+                if WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction,
+                   secrets == nil, self.redirectProvider(for: service) != nil {
+                    return try await self.completeLogin(service: service, secrets: nil, input: input, session: session,
+                                                        pageURL: pageURL, approve: approve)
+                }
+                secrets?.releaseRendering()
+                throw error
             }
+            let value = secrets?.redact(raw) ?? raw
+            if WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction {
+                return try await self.completeLogin(service: service, secrets: secrets, input: input, session: session,
+                                                    pageURL: pageURL, approve: approve)
+            }
+            secrets?.releaseRendering()
             return value
         }
-    }
-
-    private func presentLogin(service: Service, actionID: String, input: JSONValue, session: JSONValue?, pageURL: String?) async throws {
-        guard let action = await service.resolvedAction(actionID, args: input, session: session, pageURL: pageURL),
-              let lease = try await serviceManager.actionScheduler.reserveForPresentation(action, allowUnready: true) else {
-            throw OxFunctionError(code: "page_unavailable", message: "Login preparation has no idle live page.", recovery: "Inspect the page and preparation failure before retrying login.")
-        }
-        defer { lease.release() }
-        try await requirePresentablePage(service: service, page: lease.page)
-        guard lease.isActive else { throw Service.EvalError.contextInvalidated }
-        let handoff = ServiceHandoffSession(
-            service: service,
-            servicePage: lease.page,
-            title: service.title,
-            navigationTitle: String(localized: "Log in")
-        )
-        Log.service.info("Service.login presenting domain=\(service.domain) page=\(lease.page.logLabel)")
-        let outcome: ServiceHandoffSession.Outcome
-        if let presentServiceHandoff {
-            outcome = await presentServiceHandoff(service, lease.page, handoff)
-        } else {
-            outcome = await native.presentations.serviceHandoff.present(session: handoff)
-        }
-        try Task.checkCancellation()
-        Log.service.info("Service.login interaction domain=\(service.domain) page=\(lease.page.logLabel) outcome=\(outcome.rawValue)")
-        if outcome == .cancelled {
-            throw OxFunctionError(code: "handoff_incomplete", message: "The user tapped Cancel or closed the login page before finishing sign-in.", recovery: "Tell the user login was not completed. Do not reopen automatically; ask whether they want to try again. The page is preserved.")
-        }
-        guard outcome == .completed, lease.isActive else {
-            throw OxFunctionError(code: "page_unavailable", message: "The login page could not be presented or was closed by the app.", recovery: "Do not reopen automatically. Report the failure and ask the user whether to continue; the page is preserved.")
-        }
-        if lease.page.page.url?.host.map(service.isServiceHost) != true {
-            let clock = ContinuousClock()
-            let deadline = clock.now.advanced(by: .seconds(15))
-            while lease.isActive, lease.page.navigationPhase.load != nil, clock.now < deadline {
-                try await Task.sleep(for: .milliseconds(50))
-            }
-            try Task.checkCancellation()
-            guard lease.isActive,
-                  await service.navigate(action.baseURL, in: lease.page) != nil else {
-                throw OxFunctionError(code: "page_unavailable", message: "The login interaction finished, but its target page could not be resumed.", recovery: "Inspect the preserved page. Do not assume authentication succeeded or repeat a mutation.")
-            }
-        }
-        Log.service.info("Service.login acknowledged domain=\(service.domain) page=\(lease.page.logLabel) verified=false")
     }
 
     func validateService(domain: String, purpose: String) async throws -> JSONValue? {
@@ -589,10 +592,20 @@ final class ServiceOperations {
                 }
                 return (action.id, detail)
             })
+            try Secret.inferMissingTypes()
+            let secrets = try Secret.associatedEntries(namespace: definition.actionNamespace)
+                .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
             var result: [String: JSONValue] = [
                 "service": try self.serviceSnapshot(service),
                 "standardActions": .array(standard.map { .string($0.id) }),
                 "actions": .object(details),
+                "secrets": .array(secrets.map { entry in
+                    .object([
+                        "key": .string(entry.key),
+                        "displayName": .string(entry.displayName),
+                        "type": .string(entry.type?.rawValue ?? ""),
+                    ])
+                }),
             ]
             if start + page.count < actions.count, let last = page.last {
                 result["nextCursor"] = .string(definition.qualifiedActionName(last.id))
@@ -716,7 +729,7 @@ final class ServiceOperations {
         }
     }
 
-    private func requirePresentablePage(service: Service, page: Service.ServiceWebPage) async throws {
+    func requirePresentablePage(service: Service, page: Service.ServiceWebPage) async throws {
         let generation = page.navigationGeneration
         guard service.owns(page),
               let scheme = page.page.url?.scheme?.lowercased(), ["http", "https"].contains(scheme),

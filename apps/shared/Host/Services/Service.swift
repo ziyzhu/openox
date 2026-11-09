@@ -389,6 +389,7 @@ final class Service: NSObject, Identifiable {
         var navigationFailure: String?
         var pendingEvaluations: [UUID: PendingEvaluation] = [:]
         var scriptMode: ScriptMode?
+        var secretAttempt: SecretAttempt?
 
         init(page: WebPage, navigationDecider: NavigationDecider, userContentController: WKUserContentController, actions: String) {
             self.page = page
@@ -727,6 +728,7 @@ final class Service: NSObject, Identifiable {
             actions: actions
         )
         navigationDecider.servicePage = servicePage
+        ucc.addScriptMessageHandler(SecretBridge(service: self, page: servicePage), contentWorld: .page, name: SecretBridge.channelName)
         Log.webView.info("Service.makePage domain=\(self.domain) contentMode=desktop ua=system")
         #if targetEnvironment(simulator)
         page.isInspectable = true

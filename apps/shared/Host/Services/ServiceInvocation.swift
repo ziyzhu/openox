@@ -35,6 +35,7 @@ extension Service {
         session requestedSession: JSONValue? = nil,
         pageURL: String? = nil,
         in ownedPage: ServiceWebPage? = nil,
+        secrets: SecretAttempt? = nil,
         approve: (@MainActor (_ action: String, _ args: Any?) async -> Bool)? = nil
     ) async -> Result<JSONValue, Error> {
         let name = "\(domain):\(actionId)"
@@ -49,11 +50,12 @@ extension Service {
         guard let action = definition.action(actionId, includingStandard: true) else {
             return .failure(InvokeError.unknown(name))
         }
-        guard let inputSchema = action.inputSchema, let outputSchema = action.outputSchema else {
+        guard let inputSchema = definition.inputSchema(for: action), let outputSchema = action.outputSchema else {
             return .failure(InvokeError.invalidContract(name))
         }
         let definitions = definition.definitions
-        let inputViolations = JSONSchemaValidator.validate(args, against: inputSchema, definitions: definitions)
+        let inputViolations = JSONSchemaValidator.validate(args, against: inputSchema, definitions: definitions,
+                                                           allowingSecretReferences: secrets != nil)
         if !inputViolations.isEmpty {
             Log.service.error("Service.invoke invalid-input name=\(name) violations=\(InvokeError.describe(inputViolations))")
             return .failure(InvokeError.invalidInput(name, inputViolations))
@@ -120,6 +122,12 @@ extension Service {
         let source = "return await window.ox.callServiceAction(\(idJSON), \(argsJSON));"
 
         func evaluate(in session: ServiceWebPage, startingNavigation: Int) async -> Result<JSONValue, Error> {
+            defer {
+                if session.secretAttempt === secrets {
+                    session.secretAttempt = nil
+                    SecretRequestGuard.remove(from: session)
+                }
+            }
             guard owns(session), session.navigationGeneration == startingNavigation else {
                 Log.service.error("Service.invoke stale-admission id=\(invocation) name=\(name) session=\(session.logLabel) nav=\(startingNavigation)->\(session.navigationGeneration) state=\(resolutionState.logLabel)")
                 return .failure(EvalError.contextInvalidated)
@@ -157,6 +165,7 @@ extension Service {
                     guard session.navigationGeneration == startingNavigation else { throw EvalError.contextInvalidated }
                 }
                 session.lastInvocation = (invocationID, actionId, args, requestedSession, pageURL, selectedSession, Date())
+                session.secretAttempt = secrets
                 let raw = try await evalAsync(session, source, context: "invoke:\(invocation)")
                 let value = raw.map(JSONValue.from) ?? .null
                 if WebSessionContract.isEnabled(definition), actionId == WebSessionContract.listAction {
@@ -168,7 +177,7 @@ extension Service {
                     return .failure(InvokeError.invalidOutput(name, outputViolations))
                 }
                 Log.service.info("Service.invoke result id=\(invocation) name=\(name) session=\(session.logLabel) nav=\(startingNavigation)->\(session.navigationGeneration)/\(session.finishedNavigationGeneration) ms=\(elapsedMs()) value=\(value.logShape)")
-                return .success(value)
+                return .success(secrets?.redact(value) ?? value)
             } catch EvalError.contextInvalidated {
                 if WebSessionContract.isEnabled(definition), actionId == WebSessionContract.loginAction,
                    session.navigationGeneration != startingNavigation {
@@ -178,8 +187,9 @@ extension Service {
                 Log.service.warning("Service.invoke interrupted-navigation id=\(invocation) name=\(name) session=\(session.logLabel) nav=\(startingNavigation)->\(session.navigationGeneration)/\(session.finishedNavigationGeneration) state=\(resolutionState.logLabel) ms=\(elapsedMs())")
                 return .failure(EvalError.contextInvalidated)
             } catch {
-                Log.service.error("Service.invoke error id=\(invocation) name=\(name) session=\(session.logLabel) nav=\(startingNavigation)->\(session.navigationGeneration)/\(session.finishedNavigationGeneration) state=\(resolutionState.logLabel) ms=\(elapsedMs()) error=\(LogPrivacy.text(error.localizedDescription))")
-                return .failure(error)
+                let message = secrets?.redact(error.localizedDescription) ?? error.localizedDescription
+                Log.service.error("Service.invoke error id=\(invocation) name=\(name) session=\(session.logLabel) nav=\(startingNavigation)->\(session.navigationGeneration)/\(session.finishedNavigationGeneration) state=\(resolutionState.logLabel) ms=\(elapsedMs()) error=\(LogPrivacy.text(message))")
+                return .failure(secrets == nil ? error : RuntimeError.bridge(message))
             }
         }
 

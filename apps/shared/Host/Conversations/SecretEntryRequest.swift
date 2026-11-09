@@ -1,6 +1,24 @@
 import Foundation
 import Observation
 
+nonisolated struct SecretEntrySpec: Sendable, Equatable {
+    let key: String
+    let type: SecretType
+    let serviceID: String?
+    var prefill: [String: String] = [:]
+
+    var serviceDomain: String? {
+        serviceID.map { $0.split(separator: ":", maxSplits: 1).last.map(String.init) ?? $0 }
+    }
+
+    func displayName(values: [String: String]) -> String {
+        if type == .account, let username = values["username"], !username.isEmpty {
+            return String(username.prefix(80))
+        }
+        return String((serviceDomain ?? key).prefix(80))
+    }
+}
+
 @MainActor
 @Observable
 final class SecretEntryRequest: Identifiable, Equatable {
@@ -11,16 +29,19 @@ final class SecretEntryRequest: Identifiable, Equatable {
     }
 
     nonisolated let id = UUID()
-    let key: String
+    let spec: SecretEntrySpec
     private(set) var state = State.editing
     private(set) var error: String?
     @ObservationIgnored private var task: Task<Void, Never>?
-    private let save: (String, String) async throws -> Void
+    private let save: ([String: String]) async throws -> Void
 
-    init(key: String) {
-        self.key = key
-        save = { displayName, value in
-            try Secret.set(key: key, displayName: displayName, value: value)
+    var key: String { spec.key }
+
+    init(spec: SecretEntrySpec, save: (([String: String]) async throws -> Void)? = nil) {
+        self.spec = spec
+        self.save = save ?? { values in
+            try Secret.setTyped(key: spec.key, displayName: spec.displayName(values: values), type: spec.type,
+                                serviceID: spec.serviceID, values: values)
         }
     }
 
@@ -28,14 +49,14 @@ final class SecretEntryRequest: Identifiable, Equatable {
         lhs.id == rhs.id
     }
 
-    func submit(displayName: String, value: String, onSaved: @escaping () -> Void) {
+    func submit(values: [String: String], onSaved: @escaping () -> Void) {
         guard state == .editing else { return }
         state = .saving
         error = nil
         task = Task {
             do {
                 try Task.checkCancellation()
-                try await save(displayName, value)
+                try await save(values)
                 try Task.checkCancellation()
                 state = .finished
                 task = nil

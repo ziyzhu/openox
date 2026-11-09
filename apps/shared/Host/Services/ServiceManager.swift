@@ -282,13 +282,15 @@ final class ServiceManager {
     }
 
     func actionPolicy(for action: String, default actionDefault: ActionPolicy) -> ActionPolicy {
-        actionPolicies.policy(for: action, default: actionDefault)
+        if let use = SecretUse(action: action) { return use.policy() }
+        return actionPolicies.policy(for: action, default: actionDefault)
     }
 
     func explicitActionPolicy(for action: String) -> ActionPolicy? { actionPolicies.actions[action] }
 
     @discardableResult
     func setActionPolicy(_ policy: ActionPolicy?, for action: String) -> Bool {
+        if let use = SecretUse(action: action) { return policy == .allow && use.allow() }
         guard actionPolicies.actions[action] != policy else { return true }
         guard updateActionPolicies({ $0.actions[action] = policy }) else { return false }
         Log.service.info("ServiceManager.actionPolicy action=\(action) policy=\(policy?.rawValue ?? "inherited")")

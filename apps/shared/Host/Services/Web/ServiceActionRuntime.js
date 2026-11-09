@@ -37,12 +37,18 @@
         throw error;
       }
     };
+    const secret = async ref => {
+      const channel = window.webkit?.messageHandlers?.oxSecret;
+      if (!channel) throw new Error("secret retrieval is unavailable");
+      return await channel.postMessage({ ref });
+    };
+    const context = Object.freeze({ secret });
     const callServiceAction = async (name, args = {}) => {
       if (installation.state !== "ready") throw new Error("service installer has not completed");
       const handler = actions.get(name);
       if (!handler) throw new Error(`unknown action: ${name}`);
       try {
-        return await handler(args ?? {}, Object.freeze({}));
+        return await handler(args ?? {}, context);
       } catch (error) {
         log(`action ${JSON.stringify(name)} threw: ${String(error?.stack ?? error?.message ?? error)}`);
         throw new Error(`action ${JSON.stringify(name)} failed: ${String(error?.message ?? error)}`);

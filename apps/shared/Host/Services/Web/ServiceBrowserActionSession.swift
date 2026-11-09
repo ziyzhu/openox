@@ -66,7 +66,11 @@ final class ServiceBrowserActionSession {
 
     func inspectionPage() async throws -> Service.ServiceWebPage {
         guard let action = await service.inspectionAction() else { throw Service.EvalError.notActive }
-        return try await page(for: action)
+        let page = try await page(for: action)
+        guard page.secretAttempt?.holdsValues != true else {
+            throw OxFunctionError(code: "page_locked", message: "This page holds a saved secret during a login.", recovery: "Wait for the login to finish before inspecting the page.")
+        }
+        return page
     }
 
     func navigate(_ url: URL, timeout: TimeInterval = 15) async throws -> URL {
@@ -524,7 +528,7 @@ final class ServiceBrowserActionSession {
     }
 
     private func appendCapturedEvent(_ event: JSONValue) {
-        capturedEvents.append(event)
+        capturedEvents.append(SecretAttempt.redactLive(event))
         if capturedEvents.count > 500 {
             let removed = capturedEvents.count - 500
             capturedEvents.removeFirst(removed)

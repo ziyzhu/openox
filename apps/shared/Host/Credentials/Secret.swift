@@ -19,11 +19,47 @@ nonisolated enum SecretUsePolicy: String, Codable, Sendable {
     case publicationOnly
 }
 
+nonisolated enum SecretType: String, Codable, Sendable, CaseIterable, Identifiable {
+    case account
+    case apiKey
+    case token
+
+    var id: String { rawValue }
+
+    var fields: [String] {
+        switch self {
+        case .account: ["username", "password"]
+        case .apiKey: ["apiKey"]
+        case .token: ["token"]
+        }
+    }
+
+    static func matching(_ names: some Collection<String>) -> SecretType? {
+        let names = Set(names)
+        return allCases.first { Set($0.fields) == names }
+    }
+}
+
+nonisolated struct SecretAccess: Codable, Sendable, Equatable {
+    let consumer: String
+    var policy: ActionPolicy
+}
+
 nonisolated struct SecretEntry: Codable, Sendable {
     let key: String
     var displayName: String
     let origin: SecretEntryOrigin
     let usePolicy: SecretUsePolicy
+    var type: SecretType?
+    var serviceID: String?
+    var access: [SecretAccess]?
+    var accountIdentity: String?
+
+    func isAssociated(with namespace: String) -> Bool {
+        serviceID == namespace || (access ?? []).contains {
+            $0.consumer == namespace || $0.consumer.hasPrefix("\(namespace):")
+        }
+    }
 }
 
 nonisolated struct SecretBinding: Codable, Sendable {
@@ -39,6 +75,7 @@ nonisolated struct SecretIndex: Codable, Sendable {
     var version = 1
     var entries: [SecretEntry] = []
     var bindings: [SecretBinding] = []
+    var neverRemember: [String]?
 
     static func load() throws -> Self {
         let value = try JSONDecoder().decode(Self.self, from: Data(contentsOf: AppStoragePaths.secretIndex))
@@ -64,6 +101,13 @@ nonisolated struct SecretIndex: Codable, Sendable {
         for entry in entries {
             try Secret.validateKey(entry.key)
             try Secret.validateDisplayName(entry.displayName)
+            let access = entry.access ?? []
+            guard entry.serviceID.map({ !$0.isEmpty }) ?? true,
+                  access.allSatisfy({ !$0.consumer.isEmpty }),
+                  Set(access.map(\.consumer)).count == access.count,
+                  access.isEmpty || entry.usePolicy == .reusable else {
+                throw RuntimeError.bridge("Secret access metadata is invalid")
+            }
         }
         guard bindings.allSatisfy({ keys.contains($0.secretKey) && !$0.consumerID.isEmpty && !$0.destination.isEmpty }) else {
             throw RuntimeError.bridge("Secret binding metadata is invalid")
@@ -108,20 +152,29 @@ nonisolated enum Secret {
     }
 
     static func set(key: String, displayName: String, value: String, origin: SecretEntryOrigin = .named,
-                    usePolicy: SecretUsePolicy = .reusable) throws {
+                    usePolicy: SecretUsePolicy = .reusable, type: SecretType? = nil, serviceID: String? = nil) throws {
         try validateKey(key)
         if key.hasPrefix("ox."), case .named = origin {
             throw RuntimeError.bridge("Secret key is reserved")
         }
         try validateDisplayName(displayName)
         let fields = try validateJSON(value)
+        let inferred = SecretType.matching(fields.keys)
+        if let type, type != inferred {
+            throw RuntimeError.bridge("Secret value must contain exactly the \(type.rawValue) fields")
+        }
         try lock.withLock { _ in
             var current = try index()
             if let position = current.entries.firstIndex(where: { $0.key == key }) {
                 guard current.entries[position].usePolicy == usePolicy else {
                     throw RuntimeError.bridge("Secret entry policy cannot be changed")
                 }
+                if let existing = current.entries[position].type, existing != inferred {
+                    throw RuntimeError.bridge("Secret value must contain exactly the \(existing.rawValue) fields")
+                }
                 current.entries[position].displayName = displayName
+                current.entries[position].type = inferred
+                if let serviceID { current.entries[position].serviceID = serviceID }
                 for binding in current.bindings where binding.secretKey == key {
                     guard binding.requiredFields.allSatisfy({ fields[$0] is String }) else {
                         throw RuntimeError.bridge("Secret value is missing fields required by a consumer")
@@ -129,7 +182,8 @@ nonisolated enum Secret {
                 }
             } else {
                 current.entries.append(SecretEntry(key: key, displayName: displayName,
-                                                  origin: origin, usePolicy: usePolicy))
+                                                  origin: origin, usePolicy: usePolicy,
+                                                  type: inferred, serviceID: serviceID))
             }
             try Credentials.setSecretChecked(value, for: "secret:\(key)",
                                              accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
@@ -137,6 +191,119 @@ nonisolated enum Secret {
                 throw RuntimeError.bridge("Secret entry could not be verified")
             }
             try save(current)
+        }
+    }
+
+    static func setTyped(key: String, displayName: String, type: SecretType, serviceID: String?,
+                         values: [String: String], origin: SecretEntryOrigin = .named,
+                         usePolicy: SecretUsePolicy = .reusable) throws {
+        guard Set(values.keys) == Set(type.fields), type.fields.allSatisfy({ !(values[$0] ?? "").isEmpty }) else {
+            throw RuntimeError.bridge("Enter every \(type.rawValue) field")
+        }
+        let data = try JSONSerialization.data(withJSONObject: values, options: [.sortedKeys])
+        try set(key: key, displayName: displayName, value: String(decoding: data, as: UTF8.self),
+                origin: origin, usePolicy: usePolicy, type: type, serviceID: serviceID)
+    }
+
+    static func fields(key: String) throws -> [String: String]? {
+        guard let value = try value(key: key) else { return nil }
+        guard let object = try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: String] else {
+            throw RuntimeError.bridge("Secret value is unavailable")
+        }
+        return object
+    }
+
+    static func inferMissingTypes() throws {
+        try lock.withLock { _ in
+            var current = try index()
+            var changed = 0
+            for position in current.entries.indices where current.entries[position].type == nil {
+                guard let value = try Credentials.secretChecked(for: "secret:\(current.entries[position].key)"),
+                      let object = try? JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: String],
+                      let type = SecretType.matching(object.keys) else { continue }
+                current.entries[position].type = type
+                changed += 1
+            }
+            guard changed > 0 else { return }
+            try save(current)
+            Log.app.info("Secret.inferTypes typed=\(changed)")
+        }
+    }
+
+    static func mapFields(key: String, type: SecretType, from mapping: [String: String]) throws {
+        try lock.withLock { _ in
+            var current = try index()
+            guard let position = current.entries.firstIndex(where: { $0.key == key }),
+                  current.entries[position].type == nil,
+                  let raw = try Credentials.secretChecked(for: "secret:\(key)"),
+                  let stored = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: String] else {
+                throw RuntimeError.bridge("Secret entry does not need setup")
+            }
+            var values: [String: String] = [:]
+            for field in type.fields {
+                guard let source = mapping[field], let value = stored[source], !value.isEmpty else {
+                    throw RuntimeError.bridge("Choose a stored field for \(field)")
+                }
+                values[field] = value
+            }
+            for binding in current.bindings where binding.secretKey == key {
+                guard binding.requiredFields.allSatisfy({ values[$0] != nil }) else {
+                    throw RuntimeError.bridge("This mapping drops a field a connection requires")
+                }
+            }
+            let data = try JSONSerialization.data(withJSONObject: values, options: [.sortedKeys])
+            let value = String(decoding: data, as: UTF8.self)
+            try Credentials.setSecretChecked(value, for: "secret:\(key)",
+                                             accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
+            current.entries[position].type = type
+            try save(current)
+            Log.app.info("Secret.mapFields key=\(key) type=\(type.rawValue)")
+        }
+    }
+
+    static func associatedEntries(namespace: String) throws -> [SecretEntry] {
+        try entries().filter { $0.type != nil && $0.usePolicy == .reusable && $0.isAssociated(with: namespace) }
+    }
+
+    static func setAccess(key: String, consumer: String, policy: ActionPolicy?) throws {
+        try lock.withLock { _ in
+            var current = try index()
+            guard let position = current.entries.firstIndex(where: { $0.key == key }),
+                  current.entries[position].usePolicy == .reusable else {
+                throw RuntimeError.bridge("Secret entry was not found")
+            }
+            var access = current.entries[position].access ?? []
+            access.removeAll { $0.consumer == consumer }
+            if let policy { access.append(SecretAccess(consumer: consumer, policy: policy)) }
+            current.entries[position].access = access.isEmpty ? nil : access.sorted { $0.consumer < $1.consumer }
+            try save(current)
+            Log.app.info("Secret.access key=\(key) consumer=\(consumer) policy=\(policy?.rawValue ?? "removed")")
+        }
+    }
+
+    static func recordAccountIdentity(key: String, identity: String) throws {
+        try lock.withLock { _ in
+            var current = try index()
+            guard let position = current.entries.firstIndex(where: { $0.key == key }),
+                  current.entries[position].accountIdentity != identity else { return }
+            current.entries[position].accountIdentity = identity
+            try save(current)
+            Log.app.info("Secret.accountIdentity key=\(key) recorded=true")
+        }
+    }
+
+    static func isNeverRemembered(_ serviceID: String) -> Bool {
+        ((try? index())?.neverRemember ?? []).contains(serviceID)
+    }
+
+    static func neverRemember(_ serviceID: String) throws {
+        try lock.withLock { _ in
+            var current = try index()
+            var sites = Set(current.neverRemember ?? [])
+            guard sites.insert(serviceID).inserted else { return }
+            current.neverRemember = sites.sorted()
+            try save(current)
+            Log.app.info("Secret.neverRemember serviceID=\(serviceID)")
         }
     }
 

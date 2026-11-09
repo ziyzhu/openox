@@ -7,6 +7,7 @@ extension Conversation {
         return try await tracked(operation, arguments, purpose: purpose) {
             switch name {
             case "list":
+                try Secret.inferMissingTypes()
                 return .array(try Secret.userManagedEntries().map { entry in
                     let value = try Credentials.secretChecked(for: "secret:\(entry.key)")
                     let fieldNames: [String]
@@ -23,18 +24,28 @@ extension Conversation {
                         "displayName": .string(entry.displayName),
                         "fields": .array(fieldNames.map(JSONValue.string)),
                         "available": .bool(value != nil),
+                        "type": entry.type.map { .string($0.rawValue) } ?? .null,
+                        "serviceID": entry.serviceID.map(JSONValue.string) ?? .null,
                     ])
                 })
             case "add":
                 guard let key = fields["key"]?.stringValue else { throw RuntimeError.bridge("Secret key is required") }
                 try Secret.validateKey(key)
                 guard !key.hasPrefix("ox.") else { throw RuntimeError.bridge("Secret key is reserved") }
+                guard let type = fields["type"]?.stringValue.flatMap(SecretType.init(rawValue:)) else {
+                    throw RuntimeError.bridge("Secret type must be account, apiKey, or token")
+                }
+                let serviceID = fields["serviceID"]?.stringValue
+                if let serviceID, serviceID.isEmpty || serviceID.count > 300 {
+                    throw RuntimeError.bridge("Invalid secret serviceID")
+                }
+                let spec = SecretEntrySpec(key: key, type: type, serviceID: serviceID)
                 if let presenter = presentations.secretEntry {
-                    let saved = try await presenter(key)
+                    let saved = try await presenter(spec)
                     return .object(["key": .string(key), "status": .string(saved ? "saved" : "cancelled")])
                 }
                 let status = await awaitPrompt(prompt: "Save a secret: \(key)",
-                                               options: ["Saved", "Cancelled"], secretEntry: SecretEntryRequest(key: key))
+                                               options: ["Saved", "Cancelled"], secretEntry: SecretEntryRequest(spec: spec))
                 return .object(["key": .string(key), "status": .string(status == "Saved" ? "saved" : "cancelled")])
             case "delete":
                 guard let key = fields["key"]?.stringValue,

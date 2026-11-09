@@ -33,6 +33,7 @@ describe.skipIf(process.platform !== "darwin")("native shared search response co
       "xcrun", "swiftc", "-o", executable,
       join(root, "apps/shared/Platform/Models/JSONValue.swift"),
       join(root, "apps/shared/Platform/Models/JSONSchemaValidator.swift"),
+      join(root, "apps/shared/Platform/Models/SecretReference.swift"),
       join(root, "apps/shared/Host/Services/Web/WebSearchMerge.swift"),
       join(directory, "OxSearch.swift"), join(directory, "main.swift"),
     ]);

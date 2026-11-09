@@ -9,10 +9,11 @@ nonisolated enum JSONSchemaValidator {
     static func validate(
         _ value: JSONValue,
         against schema: JSONValue,
-        definitions: [String: JSONValue]
+        definitions: [String: JSONValue],
+        allowingSecretReferences references: Bool = false
     ) -> [Violation] {
         var violations: [Violation] = []
-        check(value, schema: schema, definitions: definitions, path: "$", depth: 0, violations: &violations)
+        check(value, schema: schema, definitions: definitions, path: "$", depth: 0, references: references, violations: &violations)
         return Array(violations.prefix(3))
     }
 
@@ -22,9 +23,11 @@ nonisolated enum JSONSchemaValidator {
         definitions: [String: JSONValue],
         path: String,
         depth: Int,
+        references: Bool,
         violations: inout [Violation]
     ) {
         guard violations.count < 3 else { return }
+        if references, SecretReference(value) != nil { return }
         guard depth < 128 else {
             violations.append(Violation(path: path, message: "schema nesting exceeds 128 levels"))
             return
@@ -46,27 +49,27 @@ nonisolated enum JSONSchemaValidator {
                 violations.append(Violation(path: path, message: "unresolved reference \(reference)"))
                 return
             }
-            check(value, schema: target, definitions: definitions, path: path, depth: depth + 1, violations: &violations)
+            check(value, schema: target, definitions: definitions, path: path, depth: depth + 1, references: references, violations: &violations)
             if violations.count >= 3 { return }
         }
 
         if let variants = object["allOf"]?.arrayValue {
             for variant in variants {
-                check(value, schema: variant, definitions: definitions, path: path, depth: depth + 1, violations: &violations)
+                check(value, schema: variant, definitions: definitions, path: path, depth: depth + 1, references: references, violations: &violations)
                 if violations.count >= 3 { return }
             }
         }
 
         if let variants = object["anyOf"]?.arrayValue {
             let matches = variants.contains {
-                validate($0, value: value, definitions: definitions, path: path, depth: depth + 1).isEmpty
+                validate($0, value: value, definitions: definitions, path: path, depth: depth + 1, references: references).isEmpty
             }
             if !matches { violations.append(Violation(path: path, message: "does not match any allowed schema")) }
         }
 
         if let variants = object["oneOf"]?.arrayValue {
             let matches = variants.filter {
-                validate($0, value: value, definitions: definitions, path: path, depth: depth + 1).isEmpty
+                validate($0, value: value, definitions: definitions, path: path, depth: depth + 1, references: references).isEmpty
             }.count
             if matches != 1 { violations.append(Violation(path: path, message: "matches \(matches) oneOf schemas")) }
         }
@@ -96,11 +99,11 @@ nonisolated enum JSONSchemaValidator {
             }
             for (name, child) in fields {
                 if let childSchema = properties[name] {
-                    check(child, schema: childSchema, definitions: definitions, path: propertyPath(path, name), depth: depth + 1, violations: &violations)
+                    check(child, schema: childSchema, definitions: definitions, path: propertyPath(path, name), depth: depth + 1, references: references, violations: &violations)
                 } else if object["additionalProperties"]?.boolValue == false {
                     violations.append(Violation(path: propertyPath(path, name), message: "is not declared"))
                 } else if let additional = object["additionalProperties"], additional.objectValue != nil {
-                    check(child, schema: additional, definitions: definitions, path: propertyPath(path, name), depth: depth + 1, violations: &violations)
+                    check(child, schema: additional, definitions: definitions, path: propertyPath(path, name), depth: depth + 1, references: references, violations: &violations)
                 }
                 if violations.count >= 3 { return }
             }
@@ -108,7 +111,7 @@ nonisolated enum JSONSchemaValidator {
 
         if case .array(let values) = value, let itemSchema = object["items"] {
             for (index, child) in values.enumerated() {
-                check(child, schema: itemSchema, definitions: definitions, path: "\(path)[\(index)]", depth: depth + 1, violations: &violations)
+                check(child, schema: itemSchema, definitions: definitions, path: "\(path)[\(index)]", depth: depth + 1, references: references, violations: &violations)
                 if violations.count >= 3 { return }
             }
         }
@@ -151,10 +154,11 @@ nonisolated enum JSONSchemaValidator {
         value: JSONValue,
         definitions: [String: JSONValue],
         path: String,
-        depth: Int
+        depth: Int,
+        references: Bool
     ) -> [Violation] {
         var violations: [Violation] = []
-        check(value, schema: schema, definitions: definitions, path: path, depth: depth, violations: &violations)
+        check(value, schema: schema, definitions: definitions, path: path, depth: depth, references: references, violations: &violations)
         return violations
     }
 

@@ -8,6 +8,7 @@
     "ios:messages",
     "ios:notifications",
     "ios:reminders",
+    "web:accounts.google.com",
     "web:aistudio.google.com",
     "web:amazon.com",
     "web:americanexpress.com",

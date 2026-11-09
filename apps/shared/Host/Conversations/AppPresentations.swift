@@ -43,7 +43,7 @@ struct AppPresentations {
     let messages: any MessageComposing
     var providerAuthentication: (any ProviderAuthenticating)? = nil
     var browser: (@MainActor (Service, Service.ServiceWebPage) -> Void)? = nil
-    var secretEntry: (@MainActor (String) async throws -> Bool)? = nil
+    var secretEntry: (@MainActor (SecretEntrySpec) async throws -> Bool)? = nil
     var serviceControl: (@MainActor (Conversation, ServiceControl) async -> JSONValue?)? = nil
 
     static let unavailable = AppPresentations(

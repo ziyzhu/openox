@@ -1,0 +1,29 @@
+{
+  "domain": "accounts.google.com",
+  "faviconUrl": "https://openox.ai/assets/services/google.com/favicon.png",
+  "name": "Google Account",
+  "description": "Sign in to Google accounts used by Google services and by websites that offer Sign in with Google.",
+  "baseUrl": "https://accounts.google.com/robots.txt",
+  "actions": [
+    {
+      "id": "listSessions",
+      "label": "List signed-in accounts",
+      "description": "Discover currently authenticated Google accounts, excluding signed-out accounts.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "baseUrl": "https://accounts.google.com/robots.txt",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "outputSchema": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["id", "label", "url"], "properties": { "id": { "type": "string", "minLength": 1 }, "label": { "type": "string", "minLength": 1 }, "url": { "type": "string", "minLength": 1 } } } }
+    },
+    {
+      "id": "login",
+      "label": "Sign in",
+      "description": "Sign in to a Google account, automatically with a saved Google login or by preparing the sign-in page.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "baseUrl": "https://accounts.google.com/AddSession",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "outputSchema": { "type": "null" }
+    }
+  ]
+}

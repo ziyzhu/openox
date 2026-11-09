@@ -455,6 +455,12 @@ final class Conversation: Identifiable {
                 }
                 embedServiceInspector(link)
                 return await session.run()
+            },
+            rememberSecret: { [unowned self] spec in
+                if let present = presentations.secretEntry { return (try? await present(spec)) ?? false }
+                let status = await awaitPrompt(prompt: "Remember this login?", options: ["Saved", "Cancelled"],
+                                               secretEntry: SecretEntryRequest(spec: spec))
+                return status == "Saved"
             }
         )
     }

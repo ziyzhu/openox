@@ -61,7 +61,8 @@ enum MacCredentialPrompt {
         return index
     }
 
-    static func enter(title: String, username: Bool = false, message: String = "Enter credentials on this Host. They are stored securely and are not sent to the conversation.") async throws -> (secret: String, username: String?) {
+    static func enter(title: String, username: Bool = false, message: String = "Enter credentials on this Host. They are stored securely and are not sent to the conversation.",
+                      prefill: (username: String, secret: String)? = nil) async throws -> (secret: String, username: String?) {
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = message
@@ -76,6 +77,10 @@ enum MacCredentialPrompt {
         let fields = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: username ? 60 : 24))
         fields.addSubview(secret)
         if username { fields.addSubview(name) }
+        if let prefill {
+            name.stringValue = prefill.username
+            secret.stringValue = prefill.secret
+        }
         alert.accessoryView = fields
         let owner = MacInteractionWindow(title: title, size: NSSize(width: 440, height: 180), view: Text("Authentication stays on this Host.").padding(24)) { NSApplication.shared.endSheet(alert.window, returnCode: NSApplication.ModalResponse.abort.rawValue) }
         defer {
