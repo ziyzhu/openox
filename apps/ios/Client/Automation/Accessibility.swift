@@ -83,6 +83,16 @@ nonisolated enum A11yID {
         static let customProviderKey = "settings.customProviderKey"
         static let language = "settings.language"
         static let hostEnabled = "settings.host.enabled"
+        static let hostPicker = "settings.host.picker"
+        static let hostLocal = "settings.host.local"
+        static let hostAdd = "settings.host.add"
+        static let hostAddName = "settings.host.add.name"
+        static let hostAddEndpoint = "settings.host.add.endpoint"
+        static let hostAddCancel = "settings.host.add.cancel"
+        static let hostAddConfirm = "settings.host.add.confirm"
+        static let hostRemoveConfirm = "settings.host.remove.confirm"
+        static func hostRemote(_ id: String) -> String { "settings.host.remote.\(id)" }
+        static func hostRemove(_ id: String) -> String { "settings.host.remove.\(id)" }
         static let actions = "settings.actions"
         static let services = "settings.services"
         static let builtInActions = "settings.actions.builtIn"

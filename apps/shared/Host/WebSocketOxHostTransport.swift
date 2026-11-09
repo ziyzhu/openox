@@ -10,7 +10,7 @@ final class WebSocketOxHostTransport {
               let value = url.port.flatMap(UInt16.init(exactly:)), value > 0 else { return nil }
         return NWEndpoint.Port(rawValue: value)
     }()
-    nonisolated static let defaultPort = configuredPort ?? NWEndpoint.Port(rawValue: 9876)!
+    nonisolated static let defaultPort = configuredPort ?? NWEndpoint.Port(rawValue: HostConfiguration.defaultPort)!
 
     private struct Client {
         let connection: NWConnection

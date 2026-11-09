@@ -1,11 +1,12 @@
 import { validateResponse } from "@openox/protocol";
 
-const DEFAULT_ENDPOINT = "ws://127.0.0.1:9876";
+export const DEFAULT_HOST_PORT = 9876;
+const DEFAULT_ENDPOINT = `ws://127.0.0.1:${DEFAULT_HOST_PORT}`;
 
-export function hostEndpoint(): string {
-  const value = process.env.OX_HOST_ENDPOINT ?? process.env.OX_DEBUG_ENDPOINT ?? DEFAULT_ENDPOINT;
+export function hostEndpoint(value = process.env.OX_HOST_ENDPOINT ?? process.env.OX_DEBUG_ENDPOINT ?? DEFAULT_ENDPOINT): string {
   const url = new URL(value);
-  if (!["ws:", "wss:"].includes(url.protocol) || !url.port) throw new Error("Ox Host endpoint must be a ws:// or wss:// URL with a port");
+  if (!["ws:", "wss:"].includes(url.protocol)) throw new Error("Ox Host endpoint must be a ws:// or wss:// URL");
+  if (url.protocol === "ws:" && !url.port) url.port = String(DEFAULT_HOST_PORT);
   return url.toString();
 }
 
@@ -37,8 +38,8 @@ export class HostConnection {
 
   private readonly endpoint: string;
 
-  constructor(endpoint = hostEndpoint()) {
-    this.endpoint = endpoint;
+  constructor(endpoint?: string) {
+    this.endpoint = hostEndpoint(endpoint);
   }
 
   request(method: string, params: Record<string, unknown>, timeoutMs: number): Promise<unknown> {

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { hostEndpoint } from "./host-connection.ts";
+import { DEFAULT_HOST_PORT, hostEndpoint } from "./host-connection.ts";
 import { HostRPCClient } from "./host-rpc.ts";
 import { fail, type CliContext } from "./lib.ts";
 
@@ -23,7 +23,7 @@ export async function discover(args: string[], context: CliContext): Promise<voi
       return;
     } else fail(`unknown option: ${argument}`);
   }
-  const selected = normalizedEndpoint(context.host ?? hostEndpoint());
+  const selected = normalizedEndpoint(hostEndpoint(context.host));
   const candidates = new Map<string, HostCandidate>();
   candidates.set(selected, { endpoint: selected, label: "configured Host", kind: "unknown", source: "configuration" });
   let warning = "";
@@ -40,13 +40,17 @@ export async function discover(args: string[], context: CliContext): Promise<voi
       const { stdout } = await promisify(execFile)(tailscale, ["status", "--json"], { timeout: timeoutMs, maxBuffer: 1024 * 1024 });
       const status = JSON.parse(stdout) as { Peer?: Record<string, { OS?: string; DNSName?: string; TailscaleIPs?: string[]; Online?: boolean }> };
       for (const peer of Object.values(status.Peer ?? {})) {
-        if (peer.OS !== "iOS" || (!all && !peer.Online)) continue;
+        if (!all && !peer.Online) continue;
+        const name = peer.DNSName?.replace(/\.$/, "");
         const address = peer.TailscaleIPs?.find(ip => !ip.includes(":"));
-        if (!address) continue;
-        const endpoint = `ws://${address}:9876`;
-        if (!candidates.has(endpoint)) candidates.set(endpoint, {
-          endpoint, label: peer.DNSName?.replace(/\.$/, "") ?? address, kind: "ios-device", source: "tailscale",
-        });
+        const kind = peer.OS === "iOS" ? "ios-device" : peer.OS?.toLowerCase() ?? "unknown";
+        const peerCandidates = [
+          ...(address ? [{ endpoint: `ws://${address}:${DEFAULT_HOST_PORT}`, source: "tailscale" }] : []),
+          ...(name && peer.OS !== "iOS" ? [{ endpoint: `wss://${name}`, source: "tailscale-https" }] : []),
+        ];
+        for (const { endpoint, source } of peerCandidates) {
+          if (!candidates.has(endpoint)) candidates.set(endpoint, { endpoint, label: name ?? address ?? endpoint, kind, source });
+        }
       }
     } catch {
       warning = [warning, "Tailscale discovery unavailable; connect Tailscale or pass --host explicitly"].filter(Boolean).join("; ");

@@ -1,6 +1,18 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Checking…" : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在检查…" } } } },
+    "Reachable · %@ %@" : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "可连接 · %@ %@" } } } },
+    "This iPad" : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此 iPad" } } } },
+    "This iPhone" : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此 iPhone" } } } },
+    "Ox uses the Host on this device by default. Add a remote Host by its Tailscale address, such as ws://my-mac.tailnet.ts.net:9876. Long-press a remote Host to remove it." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Ox 默认使用此设备上的主机。可通过 Tailscale 地址添加远程主机，例如 ws://my-mac.tailnet.ts.net:9876。长按远程主机可将其移除。" } } } },
+    "Add Remote Host" : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加远程主机" } } } },
+    "Ox Host" : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Ox 主机" } } } },
+    "Remove this Host?" : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "要移除此主机吗？" } } } },
+    "Use a ws://, wss://, or https:// address. ws:// uses port 9876 when none is given." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请使用 ws://、wss:// 或 https:// 地址。ws:// 未指定端口时使用 9876。" } } } },
+    "Couldn't Add Host" : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法添加主机" } } } },
+    "This Host is already added, or the configuration couldn't be saved." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此主机已添加，或无法保存配置。" } } } },
+    "ws://my-mac.tailnet.ts.net:9876" : { "extractionState" : "manual", "shouldTranslate" : false },
     "See when another conversation finishes with a tappable banner that opens its reply." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "其他对话完成后会显示横幅，轻点即可打开回复。" } } } },
     "Keep the latest website page open when switching conversations, with clearer Done and Cancel controls for handoffs." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "切换对话后仍保留最近打开的网页，接管操作的“完成”和“取消”按钮也更清晰。" } } } },
     "Change models during a reply and apply your choice to the next turn." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "回复进行中也能选择模型，所选模型将在下一轮生效。" } } } },
