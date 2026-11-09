@@ -1,6 +1,11 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Sign in to supported websites with saved accounts, with handoffs when verification needs your help." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "使用已保存的账号登录支持的网站，需要你完成验证时会交由你接管。" } } } },
+    "Manage saved accounts, API keys, and tokens with per-service access controls, without sharing their values with the model." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "管理已保存的账号、API 密钥和令牌，按服务设置访问权限，无需将凭据内容发送给模型。" } } } },
+    "Use new USPS Informed Delivery and Expedia car search services, plus expanded actions for shopping, travel, Google Forms, and social websites." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新增 USPS Informed Delivery 和 Expedia 租车搜索服务，并扩展购物、旅行、Google 表单和社交网站操作。" } } } },
+    "Keep web addresses opened from the composer in the conversation context, with clearer explanations when a page cannot load." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "从输入框打开的网址会保留在对话上下文中，网页无法加载时也会显示更清晰的原因。" } } } },
+    "Use full-screen websites without blocked header taps, and close pages from the More menu." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "修复全屏网页顶部控件无法点击的问题，并可从“更多”菜单关闭网页。" } } } },
     "Checking…" : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在检查…" } } } },
     "Reachable · %@ %@" : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "可连接 · %@ %@" } } } },
     "This iPad" : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此 iPad" } } } },

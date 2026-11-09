@@ -9,6 +9,13 @@ struct WhatsNewRelease: Identifiable {
 
 enum WhatsNew {
     static let releases: [WhatsNewRelease] = [
+        WhatsNewRelease(version: "1.0.25", items: [
+            "Sign in to supported websites with saved accounts, with handoffs when verification needs your help.",
+            "Manage saved accounts, API keys, and tokens with per-service access controls, without sharing their values with the model.",
+            "Use new USPS Informed Delivery and Expedia car search services, plus expanded actions for shopping, travel, Google Forms, and social websites.",
+            "Keep web addresses opened from the composer in the conversation context, with clearer explanations when a page cannot load.",
+            "Use full-screen websites without blocked header taps, and close pages from the More menu."
+        ]),
         WhatsNewRelease(version: "1.0.24", items: [
             "See when another conversation finishes with a tappable banner that opens its reply.",
             "Keep the latest website page open when switching conversations, with clearer Done and Cancel controls for handoffs.",
