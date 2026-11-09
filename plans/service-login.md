@@ -108,7 +108,7 @@ Legacy `getSignInUrl`/`getSignInState` stay unsupported. Protected actions use `
 1. Discover logged-in accounts through `listSessions`. Reuse the intended account when available; do not silently substitute another logged-in account.
 2. Otherwise invoke `login` with the intended account's key, or without it to let the Host match by `serviceID`. Federated login uses the provider's secret, not a destination-owned copy.
 3. When `login` supports auto-login and the secret's policy allows it, the handler drives the page and calls `context.secret.type`. The Host checks policy and frame origin on every call. Stop automatic retries after rejection.
-4. Without auto-login support, an allowed secret, or when a human step is required, show the existing live-page handoff. During handoff offer a native "Fill saved login" action that applies the same policy and origin checks. Capture relevant username/password inputs during the active attempt before submission clears them; never collect OTPs, recovery codes, or QR payloads as passwords.
+4. Without auto-login support, an allowed secret, or when a human step is required, show the existing live-page handoff. During handoff offer a native "Fill saved login" action that applies the same policy and origin checks. Capture the login during the active attempt as described in Login capture.
 5. Stage captured values in Host memory through pending MFA; discard on rejection, cancellation, timeout, teardown, or process exit. A retry starts new staging.
 6. Refresh `listSessions` and verify the intended destination account. Submission, navigation, or acknowledgment alone is not verified login.
 7. After verified success with reusable captured values, ask "Remember this login?" in the canonical entry card, naming the credential-owning website and account with the captured values prefilled. Save as a typed `account` secret with an `allow` rule for this `login` action and origin only on acceptance; otherwise discard staged values and keep the browser session. Preserve an old secret until its replacement is verified and accepted.
@@ -117,6 +117,16 @@ Legacy `getSignInUrl`/`getSignInState` stay unsupported. Protected actions use `
 For identity-provider login, the provider owns the secret; the destination's `login` requests the transition, and the Host resolves the provider secret under a rule naming the provider origins. A redirect never authorizes credentials. Resolve provider account choice explicitly, match provider and destination identities separately, and verify the destination through fresh destination `listSessions`. The automatic flow must not interrupt a pending provider redirect or challenge.
 
 OTP, QR, passkeys, device approval, click-only keypads, and inaccessible forms hand off. If nothing reusable was captured, create no secret and show no prompt. System passkey private keys remain system-owned.
+
+## Login capture
+
+Capture relies only on standard `autocomplete` tokens, so it does not depend on forms, submit events, or field guessing:
+
+- The username is the value of a field whose `autocomplete` tokens include `username` or `email`; when both exist, `username` wins. The password is the value of a field whose tokens include `current-password`. Match tokens, so `username webauthn` counts.
+- Read values on `change` and `blur` of those fields and on `pagehide`; the last value wins. Keep the username across username-first steps within the attempt.
+- Capture succeeds only when a username and a `current-password` value exist in the same attempt. `one-time-code`, `new-password`, and unmarked fields are never read. Sites that do not mark both fields are unsupported for capture; users can still save with `ox.secret.add` and AutoFill.
+- Run capture in a named `WKContentWorld` whose message handler is registered only in that world, so page scripts cannot call it or forge captures. Values go straight to Swift and never reach service code or the model.
+- Install capture only for an active login attempt, remove listeners when it ends, and discard values on rejection, cancellation, timeout, teardown, or process exit.
 
 ## Session scope
 
@@ -141,7 +151,7 @@ Reuse allowed saved secrets through `request` stand-ins. Otherwise render native
 
 ## Verification and completion
 
-Use E2E coverage, not new unit tests. Exercise load-time typing of exact-match entries, "Needs setup" mapping and deletion with bindings still working, policy resolution (action over service over ask, block over allow, combined approval, always-approve scope, Profile isolation, revoked rules), malformed references, unknown or untyped keys, wrong-type secrets at resolution, forged and expired stand-ins, wrong-origin typing, frames, redirects, multi-step and dynamic forms, navigation mid-attempt, MFA, rejection and retry, remember acceptance and decline, expiry, cancellation, concurrent attempts, process termination, saved replacement, identity-provider transitions and account choice, provider success without destination success, manual-only `login`, and reopening the selected account's page. Check actual model outputs, action results, errors, and logs for values, including encoded forms.
+Use E2E coverage, not new unit tests. Exercise load-time typing of exact-match entries, "Needs setup" mapping and deletion with bindings still working, policy resolution (action over service over ask, block over allow, combined approval, always-approve scope, Profile isolation, revoked rules), malformed references, unknown or untyped keys, wrong-type secrets at resolution, forged and expired stand-ins, wrong-origin typing, capture with `username` and `email` tokens, username-first capture, formless logins, pages missing either token, `one-time-code` fields, page scripts posting forged captures, frames, redirects, multi-step and dynamic forms, navigation mid-attempt, MFA, rejection and retry, remember acceptance and decline, expiry, cancellation, concurrent attempts, process termination, saved replacement, identity-provider transitions and account choice, provider success without destination success, manual-only `login`, and reopening the selected account's page. Check actual model outputs, action results, errors, and logs for values, including encoded forms.
 
 Verify predecessor-written storage with the changed build and changed-build storage with the predecessor. Keep credentials out of Profile export/import according to existing backup behavior. Build iOS and macOS for shared native changes, run protocol and storage checks, and capture simulator screenshots or video for approval cards, handoff, remember prompts, and Settings.
 
