@@ -1,6 +1,5 @@
 import Foundation
 import CryptoKit
-import Synchronization
 
 public struct OpenAIResponsesTransport: ProviderClient {
     public let id: String
@@ -79,28 +78,21 @@ public struct OpenAIResponsesTransport: ProviderClient {
             let request = try webSocketRequest(endpoint: endpoint, cacheKey: sessionID)
             let lease = await OpenAIResponsesWebSocketPool.shared.acquire(request: request, sessionID: sessionID,
                 accountID: webSocketAccountID(endpoint: endpoint, accountHeader: accountHeader))
+            let (pong, completion) = AsyncThrowingStream<Void, Error>.makeStream()
             let pingTimeout = Task {
                 do { try await Task.sleep(for: .seconds(5)) } catch { return }
                 Log.network.warning("\(displayName).warmup timeout stage=ping seconds=5 session=\(sessionID)")
+                completion.finish(throwing: URLError(.timedOut))
                 lease.task.cancel(with: .goingAway, reason: nil)
             }
             defer { pingTimeout.cancel() }
             do {
                 try await withTaskCancellationHandler {
                     try Task.checkCancellation()
-                    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                        let pending = Mutex<CheckedContinuation<Void, Error>?>(continuation)
-                        lease.task.sendPing { error in
-                            let continuation = pending.withLock { pending in
-                                let continuation = pending
-                                pending = nil
-                                return continuation
-                            }
-                            guard let continuation else { return }
-                            if let error { continuation.resume(throwing: error) }
-                            else { continuation.resume() }
-                        }
+                    lease.task.sendPing { error in
+                        completion.finish(throwing: error)
                     }
+                    for try await _ in pong {}
                 } onCancel: {
                     lease.task.cancel(with: .goingAway, reason: nil)
                 }
