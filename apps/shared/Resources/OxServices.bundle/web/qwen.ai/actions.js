@@ -1,21 +1,52 @@
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 async function wait(fn,ms=12000){const end=Date.now()+ms;do{const v=fn();if(v)return v;await pause(120);}while(Date.now()<end);throw Error('Qwen interface not ready');}
 let apiCache=null;
-async function api(){if(apiCache)return apiCache;const s=await wait(()=>[...document.scripts].find(x=>x.src.includes('/qwen-chat-fe/')&&x.src.endsWith('/js/main.js')));const m=await import(s.src);const identityClient=typeof m.eq==='function'&&String(m.eq).includes('"/auths/"')?m.eq:null;const requestClient=typeof m.aH==='function'&&String(m.aH).includes('responseType')?m.aH:null;if(typeof identityClient!=='function'||typeof requestClient!=='function')throw Error('Qwen website request clients changed');apiCache={module:m,identityClient,requestClient};return apiCache;}
+async function api(){if(apiCache)return apiCache;const s=await wait(()=>[...document.scripts].find(x=>x.src.includes('/qwen-chat-fe/')&&x.src.endsWith('/js/main.js')));const m=await import(s.src);const identities=Object.values(m).filter(v=>typeof v==='function'&&String(v).includes('"/auths/"'));const requests=Object.values(m).filter(v=>typeof v==='function'&&String(v).includes('responseType'));const identityClient=identities.length===1?identities[0]:null;const requestClient=requests.length===1?requests[0]:null;if(typeof identityClient!=='function'||typeof requestClient!=='function')throw Error('Qwen website request clients changed');apiCache={module:m,identityClient,requestClient};return apiCache;}
 async function identity(){const {identityClient}=await api();const j=await identityClient(false);if(j?.success===true&&typeof j.data?.id==='string'&&j.data.id)return j.data;if(j?.success===false&&(j.data?.code==='Unauthorized'||j.data?.code==='unauthorized'))return null;throw Error('Unexpected Qwen identity response');}
 async function request(path,params){const {requestClient}=await api();const j=await requestClient(path,{method:'GET',params,toast:false});if(j?.success!==true)throw Error('Qwen read failed: '+String(j?.data?.code||'unexpected response'));return j.data;}
 async function list(page){const a=await request('/chats/',{page,exclude_project:true});if(!Array.isArray(a))throw Error('Unexpected Qwen history');return a;}
 window.ox.install(({action})=>{
 registerModelActions(action);
-action('login', { async invoke() {
-        if (document.querySelector('[role="dialog"] input[type="email"], [role="dialog"] input[type="password"]'))
-            return null;
-        const button = [...document.querySelectorAll('button')].find(e => !e.closest('form,[role="dialog"]') && e.getClientRects().length && e.textContent.trim() === 'Log in');
-        if (!button)
-            throw Error('Qwen login control unavailable');
-        button.click();
-        return null;
-    } });
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const usable = element => {
+  if (!element || element.disabled || element.readOnly || element.type === "hidden") return false;
+  if (element.closest("[hidden], [aria-hidden='true'], [inert]")) return false;
+  const style = getComputedStyle(element);
+  return style.display !== "none" && style.visibility !== "hidden";
+};
+
+const waitForStep = async (detectors, timeout = 15000) => {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    for (const [kind, detect] of Object.entries(detectors)) {
+      const match = detect();
+      if (match) return { kind, match };
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  return { kind: "unknown", match: null };
+};
+
+const typeInto = (field, value) => {
+  field.focus();
+  field.select?.();
+  if (!document.execCommand("insertText", false, value) || field.value !== value) {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value").set.call(field, value);
+    field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+  }
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+};
+
+const pageError = (root = document) => [...root.querySelectorAll("[role='alert'], [aria-live='assertive'], [aria-live='polite']")]
+  .filter(usable)
+  .map(element => cleanText(element.innerText))
+  .filter(Boolean)
+  .join(" | ")
+  .slice(0, 200);
+const qwenButton=label=>[...document.querySelectorAll('button')].find(e=>usable(e)&&cleanText(e.textContent)===label);
+const qwenLoginStep=async()=>waitForStep({challenge:()=>[...document.querySelectorAll('input[autocomplete="one-time-code"],iframe[src*="captcha"]')].find(usable),credentials:()=>{const username=document.querySelector('input[placeholder="Enter Your Email"]'),password=document.querySelector('input[placeholder="Enter Your Password"]'),root=username?.closest('form'),submit=root?[...root.querySelectorAll('button')].find(e=>!e.closest('[hidden],[aria-hidden="true"]')&&getComputedStyle(e).display!=='none'&&cleanText(e.textContent)==='Log in'):null;return usable(username)&&usable(password)&&submit&&root?.contains(password)?{root,username,password,submit}:null;},passwordOption:()=>qwenButton('Log in with a password'),emailOption:()=>qwenButton('Log in with Email'),open:()=>location.pathname!=='/auth'?qwenButton('Log in'):null});
+action('login',{async invoke(input,context){const step=await qwenLoginStep();if(step.kind==='unknown'&&!input?.account)throw Error('Qwen login screen not recognized; automatic sign-in stopped.');if(step.kind==='open'){step.match.click();return null;}if(!input?.account||input.account.serviceID!=='web:qwen.ai')return null;if(step.kind==='emailOption'||step.kind==='passwordOption'){step.match.click();return null;}if(step.kind!=='credentials')return null;if(pageError(step.match.root))throw Error('Qwen sign-in reports an error; stopped without retrying.');const account=await context.secret(input.account);typeInto(step.match.username,account.username);typeInto(step.match.password,account.password);const ready=await waitForStep({submit:()=>usable(step.match.submit)?step.match.submit:null},5000);if(ready.kind!=='submit')throw Error('Qwen login button unavailable.');ready.match.click();return null;}});
 action('listSessions', { async invoke() {
         const u = await identity();
         if (!u)

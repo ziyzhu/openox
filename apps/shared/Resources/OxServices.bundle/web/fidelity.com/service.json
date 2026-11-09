@@ -47,7 +47,7 @@
     {
       "id": "login",
       "label": "Log in to Fidelity",
-      "description": "Open Fidelity secure login for user-controlled authentication, including passkey and verification options.",
+      "description": "Use a saved Fidelity username and password, choosing the different-username form instead of trusting a remembered account; leave passkeys and security checks to the user.",
       "inputSchema": {
         "type": "object",
         "properties": {},

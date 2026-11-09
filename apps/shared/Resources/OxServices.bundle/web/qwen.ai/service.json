@@ -7,7 +7,7 @@
     {
       "id": "login",
       "label": "Log in",
-      "description": "Prepare website login for the user. Completion does not verify authentication.",
+      "description": "Use a saved Qwen account through the email and password sign-in options; leave verification codes, security checks, and other providers to the user.",
       "inputSchema": {
         "type": "object",
         "properties": {},

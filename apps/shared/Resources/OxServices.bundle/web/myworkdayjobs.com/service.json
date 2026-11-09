@@ -47,7 +47,7 @@
     {
       "id": "login",
       "label": "Sign in",
-      "description": "Prepare the existing website sign-in page for user interaction.",
+      "description": "Use a saved Workday candidate account through the email sign-in chooser and password form; keep the selected employer portal and leave security checks to the user.",
       "requireAuth": false,
       "requireApproval": false,
       "baseUrl": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/login",
@@ -58,7 +58,8 @@
       },
       "outputSchema": {
         "type": "null"
-      }
+      },
+      "blocking": true
     },
     {
       "id": "getApplication",

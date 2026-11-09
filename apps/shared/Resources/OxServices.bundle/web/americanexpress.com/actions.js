@@ -185,16 +185,57 @@ window.ox.install(({ action }) => {
         return j;
     };
     const profileId = async () => profileIdCache ?? (await fetchProfile(), profileIdCache);
-    action('login', { async invoke() {
-            const deadline = Date.now() + 18000;
-            while (Date.now() < deadline) {
-                const ready = [...document.querySelectorAll("#eliloUserID, #loginSubmit, #axp-travel-search-hotels_searchButton")].some(e => { const r=e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
-                if (ready) return null;
-                if (/security check|verify you are human|access denied/i.test(document.body?.innerText || '')) throw Error('Website verification or access restriction requires user review.');
-                await new Promise(resolve => setTimeout(resolve, 250));
-            }
-            throw Error('Travel login page did not present usable sign-in controls.');
-        } });
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const usable = element => {
+  if (!element || element.disabled || element.readOnly || element.type === "hidden") return false;
+  if (element.closest("[hidden], [aria-hidden='true'], [inert]")) return false;
+  const style = getComputedStyle(element);
+  return style.display !== "none" && style.visibility !== "hidden";
+};
+
+const waitForStep = async (detectors, timeout = 15000) => {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    for (const [kind, detect] of Object.entries(detectors)) {
+      const match = detect();
+      if (match) return { kind, match };
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  return { kind: "unknown", match: null };
+};
+
+const typeInto = (field, value) => {
+  field.focus();
+  field.select?.();
+  if (!document.execCommand("insertText", false, value) || field.value !== value) {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value").set.call(field, value);
+    field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+  }
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+};
+
+const pageError = (root = document) => [...root.querySelectorAll("[role='alert'], [aria-live='assertive'], [aria-live='polite']")]
+  .filter(usable)
+  .map(element => cleanText(element.innerText))
+  .filter(Boolean)
+  .join(" | ")
+  .slice(0, 200);
+const loginStep = async () => waitForStep({challenge:()=>document.querySelector('input[autocomplete="one-time-code"], iframe[src*="captcha"]') || (/security check|verify you are human|enter.{0,20}(verification|security) code/i.test(document.body?.innerText||'') ? document.body : null),credentials:()=>{if(!location.pathname.includes('/account/login'))return null;const username=document.getElementById('eliloUserID'),password=document.getElementById('eliloPassword'),submit=document.getElementById('loginSubmit');return usable(username)&&usable(password)&&usable(submit)&&username.closest('form')?.contains(password)&&username.closest('form')?.contains(submit)?{username,password,submit,form:username.closest('form')}:null;},signedIn:()=>!location.pathname.includes('/account/login')&&document.getElementById('gnav_logout')});
+    action('login', { async invoke(input, context) {
+        const step=await loginStep();
+        if(step.kind==='unknown') throw Error('Amex sign-in screen not recognized; automatic login stopped.');
+        if(step.kind!=='credentials') return null;
+        if(!input?.account || input.account.serviceID!=='web:americanexpress.com') return null;
+        if(pageError(step.match.form)) throw Error('Amex sign-in form reports an error; automatic login stopped without retrying.');
+        const account=await context.secret(input.account);
+        typeInto(step.match.username,account.username);
+        typeInto(step.match.password,account.password);
+        if(!usable(step.match.submit)) throw Error('Amex login button is unavailable.');
+        step.match.submit.click();
+        return null;
+    }});
     action('listSessions', { async invoke() {
             profileIdCache = null;
             if (location.hostname === 'global.americanexpress.com') {

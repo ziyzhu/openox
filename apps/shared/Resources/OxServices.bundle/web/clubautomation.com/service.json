@@ -46,7 +46,7 @@
     {
       "id": "login",
       "label": "Sign in to club portal",
-      "description": "Open the club member login page for secure user sign-in.",
+      "description": "Use a saved account on the inspected password form; leave security checks and unsupported steps to the user.",
       "requireAuth": false,
       "requireApproval": false,
       "inputSchema": {
@@ -145,6 +145,111 @@
       "inputSchema": {
         "type": "object",
         "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ready": {
+            "type": "boolean"
+          },
+          "details": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ready",
+          "details"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "listClasses",
+      "label": "Find drop-in classes",
+      "description": "Find currently listed drop-in classes by name without registering.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "query",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "baseUrl": "https://tcsp.clubautomation.com/calendar/classes"
+    },
+    {
+      "id": "prepareClassRegistration",
+      "label": "Prepare lesson registration",
+      "description": "Open a specific dated lesson and select the sole approved profile for user review without registering or charging.",
+      "baseUrl": "https://tcsp.clubautomation.com/calendar/event-info?id={id}",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "scheduleId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "required": [
+          "id",
+          "scheduleId"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {

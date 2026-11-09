@@ -65,14 +65,59 @@ async function openChannel(serverId, channelId) {
 }
 
 window.ox.install(({ action }) => {
-  action('login', { async invoke() {
-          const destination = 'https://discord.com/login';
-          if (location.href !== new URL(destination, location.href).href)
-              location.assign(destination);
-          return null;
-      } });
+  const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
 
-  action('listSessions', { async invoke() {
+const usable = element => {
+  if (!element || element.disabled || element.readOnly || element.type === "hidden") return false;
+  if (element.closest("[hidden], [aria-hidden='true'], [inert]")) return false;
+  const style = getComputedStyle(element);
+  return style.display !== "none" && style.visibility !== "hidden";
+};
+
+const waitForStep = async (detectors, timeout = 15000) => {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    for (const [kind, detect] of Object.entries(detectors)) {
+      const match = detect();
+      if (match) return { kind, match };
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  return { kind: "unknown", match: null };
+};
+
+const typeInto = (field, value) => {
+  field.focus();
+  field.select?.();
+  if (!document.execCommand("insertText", false, value) || field.value !== value) {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value").set.call(field, value);
+    field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+  }
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+};
+
+const pageError = (root = document) => [...root.querySelectorAll("[role='alert'], [aria-live='assertive'], [aria-live='polite']")]
+  .filter(usable)
+  .map(element => cleanText(element.innerText))
+  .filter(Boolean)
+  .join(" | ")
+  .slice(0, 200);
+const discordLoginStep=async()=>waitForStep({challenge:()=>[...document.querySelectorAll('input[autocomplete="one-time-code"],iframe[src*="captcha"]')].find(usable),credentials:()=>{const username=document.querySelector('input[name="email"]'),password=document.querySelector('input[name="password"]'),submit=document.querySelector('button[type="submit"]'),form=username?.closest('form');return usable(username)&&usable(password)&&usable(submit)&&form?.contains(password)&&form?.contains(submit)?{username,password,submit,form}:null;},signedIn:()=>document.querySelector('[aria-label="User area"]')});
+action('login', {async invoke(input,context){
+const step=await discordLoginStep();
+if(step.kind==='unknown'&&!input?.account)throw Error('Discord login controls did not become ready; automatic sign-in stopped.');
+if(step.kind!=='credentials')return null;
+if(!input?.account||input.account.serviceID!=='web:discord.com')return null;
+if(pageError(step.match.form))throw Error('Discord sign-in form reports an error; automatic sign-in stopped without retrying.');
+const account=await context.secret(input.account);
+typeInto(step.match.username,account.username);
+typeInto(step.match.password,account.password);
+if(!usable(step.match.submit))throw Error('Discord login button unavailable.');
+step.match.submit.click();
+return null;
+}});
+
+action('listSessions', { async invoke() {
           await waitFor(() => signedInRoot() || loginVisible(), 'Discord account page not ready');
           if (loginVisible() && !signedInRoot())
               return [];

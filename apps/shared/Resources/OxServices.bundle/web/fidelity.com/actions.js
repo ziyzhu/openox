@@ -10,7 +10,7 @@ window.ox.install(({ action }) => {
      const rows=[...document.querySelectorAll('.acct-selector__acct-list a[id]')].filter(x=>!groupIds.has(x.id) && /balance:/.test(text(x)));
      const logout=[...document.querySelectorAll('a')].some(x=>text(x)==='Log Out');
      if(all && rows.length && logout && /balance:\s*\$[0-9]/.test(text(all))) return {all,rows};
-     if(document.querySelector('#dom-username-input') && document.querySelector('#dom-pswd-input') && document.querySelector('#dom-login-button')) return null;
+     if((document.querySelector('#dom-username-input') || document.querySelector('#dom-select-username')) && document.querySelector('#dom-pswd-input') && document.querySelector('#dom-login-button')) return null;
      await new Promise(r=>setTimeout(r,200));
    }
    throw new Error('Fidelity portfolio or signed-out login state did not become ready. Authentication, verification, or page structure needs inspection.');
@@ -22,7 +22,46 @@ window.ox.install(({ action }) => {
  }
  function balance(el) {const match=text(el).match(/balance:\s*\$([0-9,]+(?:\.[0-9]+)?)/);if(!match)throw new Error('Fidelity balance format unavailable');return Number(match[1].replace(/,/g,''));}
  action('listSessions',{async invoke(){const s=await state();return s?[await descriptor(s)]:[];}});
- action('login',{async invoke(){const s=await state();if(!s)return null; /* Preserve existing authentication rather than forcing a new login. */ return null;}});
+ const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const usable = element => {
+  if (!element || element.disabled || element.readOnly || element.type === "hidden") return false;
+  if (element.closest("[hidden], [aria-hidden='true'], [inert]")) return false;
+  const style = getComputedStyle(element);
+  return style.display !== "none" && style.visibility !== "hidden";
+};
+
+const waitForStep = async (detectors, timeout = 15000) => {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    for (const [kind, detect] of Object.entries(detectors)) {
+      const match = detect();
+      if (match) return { kind, match };
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  return { kind: "unknown", match: null };
+};
+
+const typeInto = (field, value) => {
+  field.focus();
+  field.select?.();
+  if (!document.execCommand("insertText", false, value) || field.value !== value) {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value").set.call(field, value);
+    field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+  }
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+};
+
+const pageError = (root = document) => [...root.querySelectorAll("[role='alert'], [aria-live='assertive'], [aria-live='polite']")]
+  .filter(usable)
+  .map(element => cleanText(element.innerText))
+  .filter(Boolean)
+  .join(" | ")
+  .slice(0, 200);
+const fidelityLoginStep=async()=>waitForStep({challenge:()=>[...document.querySelectorAll('input[autocomplete="one-time-code"],iframe[src*="captcha"]')].find(usable),anotherUsername:()=>{const select=document.getElementById('dom-select-username');if(!usable(select))return null;const index=[...select.options].findIndex(o=>cleanText(o.textContent)==='Enter different username');return index>=0?{select,index}:null;},credentials:()=>{const username=document.getElementById('dom-username-input'),password=document.getElementById('dom-pswd-input'),submit=document.getElementById('dom-login-button'),root=username?.closest('form');return usable(username)&&usable(password)&&usable(submit)&&root?.contains(password)&&root?.contains(submit)?{username,password,submit,root}:null;},signedIn:()=>document.querySelector('.acct-selector__acct-list #allaccounts')});
+action('login',{async invoke(input,context){const step=await fidelityLoginStep();if(step.kind==='unknown'&&!input?.account)throw Error('Fidelity login screen not recognized; automatic login stopped.');if(!input?.account||input.account.serviceID!=='web:fidelity.com')return null;if(step.kind==='anotherUsername'){step.match.select.selectedIndex=step.match.index;step.match.select.dispatchEvent(new Event('change',{bubbles:true}));return null;}if(step.kind!=='credentials')return null;if(pageError(step.match.root))throw Error('Fidelity sign-in reports an error; stopped without retrying.');const account=await context.secret(input.account);if(!step.match.username.isConnected||!step.match.password.isConnected)return null;typeInto(step.match.username,account.username);typeInto(step.match.password,account.password);if(!usable(step.match.submit))throw Error('Fidelity login button unavailable.');step.match.submit.click();return null;}});
+
  action('getPortfolioSummary',{async invoke(){
    const s=await state();if(!s)throw new Error('Fidelity sign-in required');
    let category='Other';const accounts=[];

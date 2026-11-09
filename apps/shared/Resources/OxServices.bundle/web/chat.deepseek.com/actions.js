@@ -106,13 +106,46 @@ async function serverHistory(conversationId){const c=await client();const r=awai
 window.ox.install(({action})=>{
  action('searchConversations',{async invoke(args){return searchHistory(args);}});
  action('getConversation',{async invoke({conversationId}){return serverHistory(conversationId);}});
- action('login', { async invoke() {
-         const destination = 'https://chat.deepseek.com/sign_in';
-         if (location.href !== new URL(destination, location.href).href)
-             location.assign(destination);
-         return null;
-     } });
- action('listSessions', { async invoke() {
+ const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const usable = element => {
+  if (!element || element.disabled || element.readOnly || element.type === "hidden") return false;
+  if (element.closest("[hidden], [aria-hidden='true'], [inert]")) return false;
+  const style = getComputedStyle(element);
+  return style.display !== "none" && style.visibility !== "hidden";
+};
+
+const waitForStep = async (detectors, timeout = 15000) => {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    for (const [kind, detect] of Object.entries(detectors)) {
+      const match = detect();
+      if (match) return { kind, match };
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  return { kind: "unknown", match: null };
+};
+
+const typeInto = (field, value) => {
+  field.focus();
+  field.select?.();
+  if (!document.execCommand("insertText", false, value) || field.value !== value) {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value").set.call(field, value);
+    field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+  }
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+};
+
+const pageError = (root = document) => [...root.querySelectorAll("[role='alert'], [aria-live='assertive'], [aria-live='polite']")]
+  .filter(usable)
+  .map(element => cleanText(element.innerText))
+  .filter(Boolean)
+  .join(" | ")
+  .slice(0, 200);
+const deepSeekLoginStep=async()=>waitForStep({challenge:()=>[...document.querySelectorAll('input[autocomplete="one-time-code"],iframe[src*="captcha"]')].find(usable),credentials:()=>{if(location.pathname!=='/sign_in')return null;const root=document.querySelector('.ds-auth-form__main-hero'),username=root?.querySelector('input[placeholder="Phone number / email address"]'),password=root?.querySelector('input[type="password"]'),buttons=[...root?.querySelectorAll('[role="button"],button')||[]].filter(e=>usable(e)&&cleanText(e.textContent)==='Log in');return usable(username)&&usable(password)&&buttons.length===1?{root,username,password,submit:buttons[0]}:null;}});
+action('login',{async invoke(input,context){const step=await deepSeekLoginStep();if(step.kind==='unknown'&&!input?.account)throw Error('DeepSeek login screen not ready; automatic sign-in stopped.');if(step.kind!=='credentials')return null;if(!input?.account||input.account.serviceID!=='web:chat.deepseek.com')return null;if(pageError(step.match.root))throw Error('DeepSeek login reports an error; stopped without retrying.');const account=await context.secret(input.account);typeInto(step.match.username,account.username);typeInto(step.match.password,account.password);if(!usable(step.match.submit))throw Error('DeepSeek login button unavailable.');step.match.submit.click();return null;}});
+action('listSessions', { async invoke() {
          const s = await identity();
          if (!s.signedIn)
              return [];

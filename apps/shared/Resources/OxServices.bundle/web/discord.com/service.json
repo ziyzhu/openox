@@ -7,7 +7,7 @@
     {
       "id": "login",
       "label": "Log in",
-      "description": "Prepare website login for the user. Completion does not verify authentication.",
+      "description": "Sign in using a saved Discord account when provided; leave captcha, two-factor authentication, passkeys, and unsupported steps to the user.",
       "baseUrl": "https://discord.com/login",
       "inputSchema": {
         "type": "object",

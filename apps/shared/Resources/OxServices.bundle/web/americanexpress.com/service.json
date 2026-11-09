@@ -173,7 +173,7 @@
     {
       "id": "login",
       "label": "Log in",
-      "description": "Prepare website login for the user. Completion does not verify authentication.",
+      "description": "Sign in using a saved Amex account when provided; hand security checks and unsupported screens to the user.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -438,10 +438,6 @@
           "segments"
         ],
         "additionalProperties": false
-      },
-      "defaultArgs": {
-        "tripId": "ZO-AX1055-23480",
-        "bookingDate": "2026-06-06"
       },
       "requireApproval": false,
       "requireAuth": true
@@ -977,7 +973,7 @@
         },
         "login": {
           "label": "登录",
-          "description": "为用户准备网站登录。完成交互不代表已通过身份验证。"
+          "description": "提供已保存的运通账号时自动登录；安全验证及不支持的页面由用户完成。"
         },
         "listSessions": {
           "label": "列出已登录账号",

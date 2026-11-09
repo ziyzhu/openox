@@ -148,7 +148,7 @@
     {
       "id": "login",
       "label": "Log in",
-      "description": "Prepare website login for the user. Completion does not verify authentication.",
+      "description": "Use a saved Instagram account on the password form, preserving the existing account-switch preparation without signing out; leave security checks to the user.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -688,7 +688,7 @@
         },
         "login": {
           "label": "登录",
-          "description": "为用户准备网站登录。完成交互不代表已通过身份验证。"
+          "description": "使用已保存的 Instagram 账号在密码表单中登录；保留原有账号切换准备流程而不退出登录，安全验证由用户完成。"
         },
         "listSessions": {
           "label": "列出已登录账号",

@@ -138,17 +138,46 @@ window.ox.install(({ action }) => {
         const a = await accounts();
         return a[0]?.digitalAccountIdentifier ?? null;
     };
-    action('login', { async invoke() {
-            const deadline = Date.now() + 18000;
-            while (Date.now() < deadline) {
-                const ready = [...document.querySelectorAll('#userId-input-field-input, #signin-button')].some(e => { const r=e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
-                if (ready) return null;
-                if (/security check|verify you are human|access denied/i.test(document.body?.innerText || '')) throw Error('Website verification or access restriction requires user review.');
-                await new Promise(resolve => setTimeout(resolve, 250));
-            }
-            throw Error('Chase login page did not present usable sign-in controls.');
-        } });
-    const discoverAuthenticatedSessions = async () => {
+    const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const usable = element => {
+  if (!element || element.disabled || element.readOnly || element.type === "hidden") return false;
+  if (element.closest("[hidden], [aria-hidden='true'], [inert]")) return false;
+  const style = getComputedStyle(element);
+  return style.display !== "none" && style.visibility !== "hidden";
+};
+
+const waitForStep = async (detectors, timeout = 15000) => {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    for (const [kind, detect] of Object.entries(detectors)) {
+      const match = detect();
+      if (match) return { kind, match };
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  return { kind: "unknown", match: null };
+};
+
+const typeInto = (field, value) => {
+  field.focus();
+  field.select?.();
+  if (!document.execCommand("insertText", false, value) || field.value !== value) {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value").set.call(field, value);
+    field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+  }
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+};
+
+const pageError = (root = document) => [...root.querySelectorAll("[role='alert'], [aria-live='assertive'], [aria-live='polite']")]
+  .filter(usable)
+  .map(element => cleanText(element.innerText))
+  .filter(Boolean)
+  .join(" | ")
+  .slice(0, 200);
+const chaseLoginStep=async()=>waitForStep({challenge:()=>[...document.querySelectorAll('input[autocomplete="one-time-code"],iframe[src*="captcha"]')].find(usable),credentials:()=>{const username=document.getElementById('userId-text-input-field'),password=document.getElementById('password-text-input-field'),submit=document.getElementById('signin-button'),root=username?.closest('form');return usable(username)&&usable(password)&&usable(submit)&&root?.contains(password)&&root?.contains(submit)?{username,password,submit,root}:null;}});
+action('login',{async invoke(input,context){const step=await chaseLoginStep();if(step.kind==='unknown'&&!input?.account)throw Error('Chase sign-in controls did not become ready; automatic sign-in stopped.');if(step.kind!=='credentials')return null;if(!input?.account||input.account.serviceID!=='web:chase.com')return null;if(pageError(step.match.root))throw Error('Chase sign-in reports an error; stopped without retrying.');const account=await context.secret(input.account);typeInto(step.match.username,account.username);typeInto(step.match.password,account.password);if(!usable(step.match.submit))throw Error('Chase sign-in button unavailable.');step.match.submit.click();return null;}});
+const discoverAuthenticatedSessions = async () => {
             accountsCache = null;
             let j;
             try {

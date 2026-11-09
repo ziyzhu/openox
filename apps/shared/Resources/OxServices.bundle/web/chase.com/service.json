@@ -306,7 +306,7 @@
     {
       "id": "login",
       "label": "Log in",
-      "description": "Prepare website login for the user. Completion does not verify authentication.",
+      "description": "Use a saved Chase account on the official public password form without logging out of existing sessions; leave security verification and passwordless sign-in to the user.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -318,7 +318,7 @@
       "defaultArgs": {},
       "requireApproval": false,
       "requireAuth": false,
-      "baseUrl": "https://secure.chase.com/web/auth/nav?navKey=chaseTravelHome&treatment=chase",
+      "baseUrl": "https://www.chase.com/",
       "blocking": true
     },
     {
@@ -954,7 +954,7 @@
         },
         "login": {
           "label": "登录",
-          "description": "为用户准备网站登录。完成交互不代表已通过身份验证。"
+          "description": "在 Chase 官方公开密码表单中使用已保存的账号登录，不退出已有会话；安全验证及无密码登录由用户完成。"
         },
         "listSessions": {
           "label": "列出已登录账号",

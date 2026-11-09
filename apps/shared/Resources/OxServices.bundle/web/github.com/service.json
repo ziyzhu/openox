@@ -221,7 +221,7 @@
     {
       "id": "login",
       "label": "Sign in to GitHub",
-      "description": "Open GitHub sign-in.",
+      "description": "Use a saved account on the inspected password form; leave security checks and unsupported steps to the user.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false
@@ -230,7 +230,8 @@
         "type": "null"
       },
       "requireApproval": false,
-      "requireAuth": false
+      "requireAuth": false,
+      "baseUrl": "https://github.com/login"
     },
     {
       "id": "getCurrentUser",
@@ -2337,7 +2338,7 @@
       "actions": {
         "login": {
           "label": "登录 GitHub",
-          "description": "打开 GitHub 登录页。"
+          "description": "在已验证的密码表单中使用已保存的账号；安全验证及不支持的步骤由用户完成。"
         },
         "listSessions": {
           "label": "列出 GitHub 会话",

@@ -18,15 +18,46 @@ async function searchTitles({query,cursor='1'}){if(!query.trim())throw Error('Se
 
 window.ox.install(({action})=>{
 action('searchConversations',{invoke:searchTitles});
-action('login', { async invoke() {
-        if (document.querySelector('[role="dialog"] input[type="email"], [role="dialog"] input[type="password"]'))
-            return null;
-        const button = [...document.querySelectorAll('button')].find(e => !e.closest('form,[role="dialog"]') && e.getClientRects().length && e.textContent.trim() === 'Sign in');
-        if (!button)
-            throw Error('Z.ai sign-in control unavailable');
-        button.click();
-        return null;
-    } });
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const usable = element => {
+  if (!element || element.disabled || element.readOnly || element.type === "hidden") return false;
+  if (element.closest("[hidden], [aria-hidden='true'], [inert]")) return false;
+  const style = getComputedStyle(element);
+  return style.display !== "none" && style.visibility !== "hidden";
+};
+
+const waitForStep = async (detectors, timeout = 15000) => {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    for (const [kind, detect] of Object.entries(detectors)) {
+      const match = detect();
+      if (match) return { kind, match };
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  return { kind: "unknown", match: null };
+};
+
+const typeInto = (field, value) => {
+  field.focus();
+  field.select?.();
+  if (!document.execCommand("insertText", false, value) || field.value !== value) {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value").set.call(field, value);
+    field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+  }
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+};
+
+const pageError = (root = document) => [...root.querySelectorAll("[role='alert'], [aria-live='assertive'], [aria-live='polite']")]
+  .filter(usable)
+  .map(element => cleanText(element.innerText))
+  .filter(Boolean)
+  .join(" | ")
+  .slice(0, 200);
+const zaiButton=label=>[...document.querySelectorAll('button')].find(e=>usable(e)&&cleanText(e.textContent)===label);
+const zaiLoginStep=async()=>waitForStep({challenge:()=>[...document.querySelectorAll('input[autocomplete="one-time-code"],iframe[src*="captcha"]')].find(usable),credentials:()=>{const username=document.querySelector('input[name="email"]'),password=document.querySelector('input[name="current-password"]'),root=username?.closest('form'),submit=root?[...root.querySelectorAll('button')].find(e=>cleanText(e.textContent)==='Sign in'&&!e.closest('[hidden],[aria-hidden="true"]')):null;return usable(username)&&usable(password)&&submit&&root?.contains(password)?{username,password,submit,root}:null;},emailOption:()=>zaiButton('Continue with Email'),open:()=>location.pathname!=='/auth'?zaiButton('Sign in'):null});
+action('login',{async invoke(input,context){const step=await zaiLoginStep();if(step.kind==='unknown'&&!input?.account)throw Error('Z.ai login screen not recognized; automatic sign-in stopped.');if(step.kind==='open'){step.match.click();return null;}if(!input?.account||input.account.serviceID!=='web:chat.z.ai')return null;if(step.kind==='emailOption'){step.match.click();return null;}if(step.kind!=='credentials')return null;if(pageError(step.match.root))throw Error('Z.ai login reports an error; stopped without retrying.');const account=await context.secret(input.account);typeInto(step.match.username,account.username);typeInto(step.match.password,account.password);const ready=await waitForStep({submit:()=>usable(step.match.submit)?step.match.submit:null},5000);if(ready.kind!=='submit')throw Error('Z.ai login button unavailable.');ready.match.click();return null;}});
 action('listSessions', { async invoke() {
         const u = await identity();
         if (!u)

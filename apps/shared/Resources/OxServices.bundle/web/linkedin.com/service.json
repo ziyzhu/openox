@@ -137,7 +137,7 @@
     {
       "id": "login",
       "label": "Log in",
-      "description": "Prepare website login for the user. Completion does not verify authentication.",
+      "description": "Use a saved LinkedIn account, switching from a remembered account to the full login form when needed; leave security checks to the user.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -147,7 +147,9 @@
         "type": "null"
       },
       "requireApproval": false,
-      "requireAuth": false
+      "requireAuth": false,
+      "baseUrl": "https://www.linkedin.com/login/",
+      "blocking": true
     },
     {
       "id": "listSessions",
@@ -711,7 +713,7 @@
         },
         "login": {
           "label": "登录",
-          "description": "为用户准备网站登录。完成交互不代表已通过身份验证。"
+          "description": "使用已保存的 LinkedIn 账号登录，必要时从已记住的账号切换到完整登录表单；安全验证由用户完成。"
         },
         "listSessions": {
           "label": "列出已登录账号",

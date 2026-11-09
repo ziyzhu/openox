@@ -7,7 +7,7 @@
     {
       "id": "login",
       "label": "Log in",
-      "description": "Prepare website login for the user. Completion does not verify authentication.",
+      "description": "Use a saved Z.ai account through the email sign-in chooser and password form; leave security checks and other providers to the user.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -17,7 +17,8 @@
         "type": "null"
       },
       "requireAuth": false,
-      "requireApproval": false
+      "requireApproval": false,
+      "blocking": true
     },
     {
       "id": "listSessions",

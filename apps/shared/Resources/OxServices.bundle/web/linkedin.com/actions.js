@@ -307,13 +307,59 @@ window.ox.install(({ action }) => {
         return cachedMe;
     };
     const PROFILE_DECO = "com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-101";
-    action('login', { async invoke() {
-            const destination = "https://www.linkedin.com/login";
-            if (location.href !== new URL(destination, location.href).href)
-                location.assign(destination);
-            return null;
-        } });
-    action('listSessions', { async invoke() {
+    const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const usable = element => {
+  if (!element || element.disabled || element.readOnly || element.type === "hidden") return false;
+  if (element.closest("[hidden], [aria-hidden='true'], [inert]")) return false;
+  const style = getComputedStyle(element);
+  return style.display !== "none" && style.visibility !== "hidden";
+};
+
+const waitForStep = async (detectors, timeout = 15000) => {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    for (const [kind, detect] of Object.entries(detectors)) {
+      const match = detect();
+      if (match) return { kind, match };
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  return { kind: "unknown", match: null };
+};
+
+const typeInto = (field, value) => {
+  field.focus();
+  field.select?.();
+  if (!document.execCommand("insertText", false, value) || field.value !== value) {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value").set.call(field, value);
+    field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+  }
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+};
+
+const pageError = (root = document) => [...root.querySelectorAll("[role='alert'], [aria-live='assertive'], [aria-live='polite']")]
+  .filter(usable)
+  .map(element => cleanText(element.innerText))
+  .filter(Boolean)
+  .join(" | ")
+  .slice(0, 200);
+const activeLoginNode=e=>{if(!usable(e))return false;for(let a=e.parentElement;a;a=a.parentElement){const s=getComputedStyle(a);if(s.display==='none'||s.visibility==='hidden')return false;}return true;};
+const linkedInLoginStep=async()=>waitForStep({challenge:()=>[...document.querySelectorAll('input[autocomplete="one-time-code"],iframe[src*="captcha"]')].find(activeLoginNode),credentials:()=>{const users=[...document.querySelectorAll('input[autocomplete="username"]')].filter(activeLoginNode);if(users.length!==1)return null;const username=users[0];let root=username.parentElement;for(let n=0;n<10&&root&&root!==document.body;n++,root=root.parentElement){const passwords=[...root.querySelectorAll('input[type="password"]')].filter(activeLoginNode),buttons=[...root.querySelectorAll('button')].filter(e=>activeLoginNode(e)&&cleanText(e.textContent)==='Sign in');if(passwords.length===1&&buttons.length===1)return {username,password:passwords[0],submit:buttons[0],root};}return null;},anotherAccount:()=>[...document.querySelectorAll('a')].find(e=>activeLoginNode(e)&&cleanText(e.textContent)==='Sign in using another account')});
+action('login',{async invoke(input,context){
+const step=await linkedInLoginStep();
+if(step.kind==='unknown'&&!input?.account)throw Error('LinkedIn login screen not recognized; automatic sign-in stopped.');
+if(!input?.account||input.account.serviceID!=='web:linkedin.com')return null;
+if(step.kind==='anotherAccount'){step.match.click();return null;}
+if(step.kind!=='credentials')return null;
+if(pageError(step.match.root))throw Error('LinkedIn sign-in reports an error; automatic sign-in stopped without retrying.');
+const account=await context.secret(input.account);
+typeInto(step.match.username,account.username);
+typeInto(step.match.password,account.password);
+if(!activeLoginNode(step.match.submit))throw Error('LinkedIn Sign in button unavailable.');
+step.match.submit.click();return null;
+}});
+action('listSessions', { async invoke() {
             cachedMe = null;
             let u;
             try {
