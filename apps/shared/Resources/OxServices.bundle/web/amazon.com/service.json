@@ -2178,6 +2178,49 @@
       },
       "requireApproval": false,
       "requireAuth": false
+    },
+    {
+      "id": "prepareRetailCheckout",
+      "label": "Prepare retail checkout",
+      "description": "Opens the regular retail checkout for the expected selected cart items without placing an order or charging payment.",
+      "baseUrl": "https://www.amazon.com/gp/cart/view.html",
+      "blocking": true,
+      "requireAuth": true,
+      "requireApproval": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedAsins"
+        ],
+        "properties": {
+          "expectedAsins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "stage",
+          "summary"
+        ],
+        "properties": {
+          "stage": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   ],
   "locales": {

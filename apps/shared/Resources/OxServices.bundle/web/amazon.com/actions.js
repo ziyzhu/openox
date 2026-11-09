@@ -271,7 +271,7 @@ window.ox.install(({ action }) => {
     };
     const enc = encodeURIComponent;
     const formBody = (pairs) => pairs.map(([k, v]) => k + "=" + enc(v)).join("&");
-    const postForm = (url, csrf, pairs) => retryFetch(url, {
+    const postForm = (url, csrf, pairs) => fetch(url, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -289,26 +289,35 @@ window.ox.install(({ action }) => {
         }
         return doc;
     };
-    const GATED_PATH = "/gp/css/order-history";
+    const GATED_PATH = "/gp/css/homepage.html";
     action('login', { async invoke() {
-            if (!location.pathname.startsWith('/ap/signin'))
-                location.assign(ORIGIN + '/ap/signin');
+            if (location.pathname.startsWith('/ap/signin') && document.querySelector('form[name=signIn]')) return null;
+            const r = await fetch(ORIGIN + '/gp/css/order-history', { credentials: 'include', cache: 'no-store' });
+            if (!r.ok) throw Error('Amazon login entry HTTP ' + r.status);
+            const target = new URL(r.url);
+            if (target.origin !== ORIGIN) throw Error('Unexpected Amazon login origin');
+            const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+            if (target.pathname.startsWith('/ap/signin') && !doc.querySelector('form[name=signIn]'))
+                throw Error('Amazon did not provide a usable sign-in form');
+            location.assign(target.href);
             return null;
         } });
     action('listSessions', { async invoke() {
             const r = await fetch(ORIGIN + GATED_PATH, { credentials: 'include', cache: 'no-store' });
-            if (!r.ok)
-                throw Error('Amazon account HTTP ' + r.status);
+            if (!r.ok) throw Error('Amazon account HTTP ' + r.status);
             const u = new URL(r.url);
-            if (u.origin !== ORIGIN)
-                throw Error('Unexpected Amazon account origin');
-            if (u.pathname.startsWith('/ap/signin'))
-                return [];
-            const d = new DOMParser().parseFromString(await r.text(), 'text/html');
-            const id = d.querySelector('[data-csa-c-customer-id]')?.getAttribute('data-csa-c-customer-id');
-            if (!id)
+            if (u.origin !== ORIGIN) throw Error('Unexpected Amazon account origin');
+            const html = await r.text();
+            const d = new DOMParser().parseFromString(html, 'text/html');
+            if (u.pathname.startsWith('/ap/signin') || d.querySelector('form[name="signIn"]')) return [];
+            const label = clean(d.querySelector('#nav-link-accountList-nav-line-1')?.textContent);
+            const ids = [...html.matchAll(/customerI[dD]["']?\s*:\s*["']([A-Z0-9]+)["']/g)].map(m => m[1]);
+            const unique = [...new Set(ids.filter(id => id.length > 5 && id !== '0'))];
+            const attrId = d.querySelector('[data-csa-c-customer-id]')?.getAttribute('data-csa-c-customer-id');
+            if (attrId && !unique.includes(attrId)) unique.push(attrId);
+            if (!d.querySelector('.ya-card-row') || !label || /hello,?\s*sign in/i.test(label) || unique.length !== 1)
                 throw Error('Amazon current account identity unavailable');
-            return [{ id, label: clean(d.querySelector('#nav-link-accountList-nav-line-1')?.textContent) || id, url: ORIGIN + GATED_PATH }];
+            return [{ id: unique[0], label, url: ORIGIN + GATED_PATH }];
         } });
     action("searchProducts", {
         async invoke({ query, cursor, limit = 20, department, sort = "featured" } = {}) {
@@ -413,17 +422,13 @@ window.ox.install(({ action }) => {
             if (!asin)
                 throw new Error("getOffer requires an ASIN or product URL");
             const doc = await fetchDoc(`/dp/${asin}`);
-            const merchantInfo = clean(doc.querySelector("#merchant-info")?.textContent);
-            const shipsBlob = clean(doc.querySelector("#shipsFromSoldByInsideBuyBox_feature_div")?.textContent ||
-                doc.querySelector("#fulfillerInfoFeature_feature_div")?.textContent ||
-                doc.querySelector("#merchantInfoFeature_feature_div")?.textContent ||
-                doc.querySelector("#tabular-buybox-container")?.textContent ||
-                "");
-            const soldBy = clean(doc.querySelector("#sellerProfileTriggerId")?.textContent) ||
+            const merchantInfo = firstText(doc, ["#merchant-info", "#merchantInfoFeature_feature_div"]);
+            const shipsBlob = firstText(doc, ["#shipsFromSoldByInsideBuyBox_feature_div", "#fulfillerInfoFeature_feature_div", "#merchantInfoFeature_feature_div", "#tabular-buybox-container"]);
+            const soldBy = /shipped and sold by Amazon\.com/i.test(shipsBlob) ? "Amazon.com" : clean(doc.querySelector("#sellerProfileTriggerId")?.textContent) ||
                 extractSoldBy(shipsBlob) ||
                 extractSoldBy(merchantInfo) ||
-                null;
-            const shipsFrom = extractShipsFrom(shipsBlob) || extractShipsFrom(merchantInfo) || null;
+                (/shipped and sold by Amazon\.com/i.test(shipsBlob) ? "Amazon.com" : null);
+            const shipsFrom = extractShipsFrom(shipsBlob) || extractShipsFrom(merchantInfo) || (/shipped and sold by Amazon\.com/i.test(shipsBlob) ? "Amazon.com" : null);
             if (!soldBy && !shipsFrom && !merchantInfo) {
                 console.log("getOffer: no buy box facts for " + asin);
                 throw new Error(`getOffer: no buy box facts for ${asin} (page may be gated or ASIN invalid)`);
@@ -1017,6 +1022,38 @@ window.ox.install(({ action }) => {
                 console.log("addToCart: FAIL title=" + clean(m.querySelector("title")?.textContent) + " h1=" + clean(m.querySelector("h1")?.textContent) + " body=" + clean(m.querySelector("body")?.textContent).slice(0, 240));
             }
             return { ok, asin, quantity: qty, cartCount: Number.isFinite(count) ? count : null };
+        },
+    });
+    action('prepareRetailCheckout', {
+        async invoke({ expectedAsins }) {
+            if (!Array.isArray(expectedAsins) || expectedAsins.length < 1) throw Error("prepareRetailCheckout: expectedAsins must contain at least 1 item");
+            const deadline = Date.now() + 15000;
+            while (!document.querySelector('#sc-active-cart') && Date.now() < deadline)
+                await new Promise(r => setTimeout(r, 150));
+            const cart = document.querySelector('#sc-active-cart');
+            if (!cart) throw Error('Retail cart not ready');
+            const items = [...cart.querySelectorAll('.sc-list-item[data-asin]')].filter(e => !e.querySelector('input[type="checkbox"][name^="submit.changeSelection"]') || e.querySelector('input[type="checkbox"][name^="submit.changeSelection"]').checked);
+            const actual = items.map(e => e.getAttribute('data-asin')).sort();
+            if (JSON.stringify(actual) !== JSON.stringify([...expectedAsins].sort())) throw Error('Selected retail cart items differ from the expected purchase');
+            const buttons = [...document.querySelectorAll('input[name="proceedToRetailCheckout"]')];
+            if (buttons.length !== 1 || !buttons[0].form || buttons[0].form.method.toLowerCase() !== 'get') throw Error('Retail checkout entry form unavailable');
+            const form = buttons[0].form;
+            const target = new URL(form.action, location.href);
+            if (target.origin !== ORIGIN || !target.pathname.startsWith('/checkout/')) throw Error('Unexpected checkout route');
+            const data = new FormData(form);
+            data.append(buttons[0].name, buttons[0].value);
+            for (const [key, value] of data) target.searchParams.append(key, String(value));
+            const r = await fetch(target.href, { credentials: 'include', cache: 'no-store' });
+            if (!r.ok) throw Error('Checkout entry HTTP ' + r.status);
+            const dest = new URL(r.url);
+            if (dest.origin !== ORIGIN) throw Error('Unexpected checkout response origin');
+            const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+            doc.querySelectorAll('script,style').forEach(e => e.remove());
+            const summaryRoot = doc.querySelector('#subtotals-marketplace-table') || doc.querySelector('#subtotals') || doc.querySelector('[data-testid="order-summary"]');
+            const summary = summaryRoot ? visibleText(summaryRoot).split(/(?=Items:|Shipping|Estimated tax|Order total)/).map(clean).filter(Boolean) : [];
+            const stage = dest.pathname.startsWith('/ap/signin') ? 'signInRequired' : 'checkoutOpened';
+            location.assign(r.url);
+            return { stage, summary };
         },
     });
     const loadCheckout = async (brand) => {

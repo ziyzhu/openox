@@ -191,7 +191,8 @@
         "type": "null"
       },
       "requireApproval": false,
-      "requireAuth": false
+      "requireAuth": false,
+      "baseUrl": "https://www.facebook.com/"
     },
     {
       "id": "listSessions",
@@ -229,7 +230,8 @@
         }
       },
       "requireApproval": false,
-      "requireAuth": false
+      "requireAuth": false,
+      "baseUrl": "https://www.facebook.com/"
     },
     {
       "id": "listGroupPosts",
@@ -406,6 +408,127 @@
       "requireApproval": false,
       "requireAuth": true,
       "baseUrl": "https://www.facebook.com/"
+    },
+    {
+      "id": "getMessageAccess",
+      "label": "Check Messenger access",
+      "description": "Open Messenger and report whether encrypted chat history needs restoration.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "baseUrl": "https://www.facebook.com/",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requiresRestore": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "preview": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url",
+                "preview"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "requiresRestore",
+          "status",
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "listFriendsFeed",
+      "label": "Read friends feed",
+      "description": "Read a bounded snapshot of posts rendered in Facebook’s friends-only feed; timestamps and completeness may be unavailable.",
+      "baseUrl": "https://www.facebook.com/?filter=friends&sk=h_chr",
+      "blocking": true,
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "author": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "timeLabel": {
+                  "type": "string"
+                },
+                "imageDescriptions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "author",
+                "message",
+                "url",
+                "timeLabel",
+                "imageDescriptions"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "coverage": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "coverage"
+        ],
+        "additionalProperties": false
+      }
     }
   ],
   "faviconUrl": "https://openox.ai/assets/services/www.facebook.com/favicon.png"

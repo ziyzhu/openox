@@ -1,3 +1,4 @@
+(() => {
 const cookie = name => {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]*)`));
@@ -196,12 +197,27 @@ window.ox.install(({ action }) => {
         return out;
     };
     action('login', { async invoke() {
-            const destination = "https://www.instagram.com/accounts/login/";
-            if (location.href !== new URL(destination, location.href).href)
-                location.assign(destination);
-            return null;
-        } });
-    action('listSessions', { async invoke() {
+        const visible = e => !!e && e.getClientRects().length > 0;
+        const ready = () => [...document.querySelectorAll('input[type=password]')].some(visible) && [...document.querySelectorAll('button,[role=button],input[type=submit]')].some(e => visible(e) && (e.type === 'submit' || /^log in$/i.test(e.innerText.trim())));
+        const findSwitch = () => [...document.querySelectorAll('[role=button]')].find(e => visible(e) && e.innerText.trim() === 'Switch accounts');
+        const deadline = Date.now() + 18000;
+        let openedMenu = false, openedSwitch = false, openedAnother = false;
+        while (Date.now() < deadline) {
+            const picker = [...document.querySelectorAll('[role=dialog]')].find(e => visible(e) && [...e.querySelectorAll('[role=button],button,a')].some(c => visible(c) && c.innerText.trim() === 'Log into an Existing Account'));
+            if (ready() || picker) return null;
+            const another = [...document.querySelectorAll('[role=button],button,a')].find(e => visible(e) && e.innerText.trim() === 'Use another profile');
+            if (another && !openedAnother) { another.click(); openedAnother = true; }
+            const switcher = findSwitch();
+            if (switcher && !openedSwitch) { switcher.click(); openedSwitch = true; }
+            else if (!openedMenu && !openedSwitch) {
+                const menu = [...document.querySelectorAll('a')].find(e => visible(e) && e.querySelector('[aria-label=Settings]'));
+                if (menu) { menu.click(); openedMenu = true; }
+            }
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        throw Error('Instagram sign-in controls did not appear; account switching was not completed.');
+    } });
+    const discoverAuthenticatedSessions = async () => {
             const r = await fetch('/', { credentials: 'include', cache: 'no-store' });
             if (!r.ok)
                 throw Error('Instagram account HTTP ' + r.status);
@@ -228,7 +244,82 @@ window.ox.install(({ action }) => {
             if (typeof viewer?.id !== 'string' || !/^[1-9][0-9]+$/.test(viewer.id) || viewer.data?.id !== viewer.id)
                 throw Error('Instagram current account identity unavailable');
             return [{ id: viewer.id, label: viewer.data.username || viewer.id, url: 'https://www.instagram.com/' }];
-        } });
+
+    };
+    action('listSessions', { invoke: discoverAuthenticatedSessions });
+    action('logout', { async invoke(args) {
+        const sessions=await discoverAuthenticatedSessions();if(sessions.length!==1)throw Error('A single authenticated Instagram account is required.');const session=sessions[0];
+        const r = await fetch('/', {credentials:'include',cache:'no-store'});
+        if(!r.ok) throw Error('Cannot verify current account before sign-out.');
+        const d = new DOMParser().parseFromString(await r.text(),'text/html');
+        const pending=[...d.scripts].filter(s=>s.type==='application/json' && s.textContent.includes('PolarisViewer')).map(s=>JSON.parse(s.textContent));
+        const viewers=[];
+        while(pending.length){const n=pending.pop();if(Array.isArray(n)&&n[0]==='PolarisViewer')viewers.push(n[2]);else if(n&&typeof n==='object')pending.push(...Object.values(n));}
+        if(viewers.length!==1 || viewers[0]?.id!==session.id)throw Error('Current account changed; sign-out stopped.');
+        const visible=e=>!!e && e.getClientRects().length>0;
+        const close=[...document.querySelectorAll('[role=dialog] [role=button], [role=dialog] button')].find(e=>visible(e)&&e.querySelector('[aria-label=Close]'));
+        if(close)close.click();
+        const deadline=Date.now()+12000;let opened=false;
+        while(Date.now()<deadline){
+          const targets=[...document.querySelectorAll('[role=button]')].filter(e=>visible(e)&&e.innerText.trim()==='Log out');
+          if(targets.length===1){await inboxIdentity(session);targets[0].click();return {requested:true};}
+          if(!opened){const menu=[...document.querySelectorAll('a')].find(e=>visible(e)&&e.querySelector('[aria-label=Settings]'));if(menu){menu.click();opened=true;}}
+          await new Promise(resolve=>setTimeout(resolve,200));
+        }
+        throw Error('Instagram Log out control was not available; no logout click was made.');
+    } });
+    const inboxIdentity = async session => {
+        if(!session?.id || !session?.label)throw Error('Select an authenticated Instagram account.');
+        const r=await fetch('/',{credentials:'include',cache:'no-store'});
+        if(!r.ok)throw Error('Instagram identity HTTP '+r.status);
+        const d=new DOMParser().parseFromString(await r.text(),'text/html');
+        const pending=[...d.scripts].filter(s=>s.type==='application/json'&&s.textContent.includes('PolarisViewer')).map(s=>JSON.parse(s.textContent));const viewers=[];
+        while(pending.length){const n=pending.pop();if(Array.isArray(n)&&n[0]==='PolarisViewer')viewers.push(n[2]);else if(n&&typeof n==='object')pending.push(...Object.values(n));}
+        if(viewers.length!==1||viewers[0]?.id!==session.id||viewers[0]?.data?.username!==session.label)throw Error('Instagram account changed; action stopped.');
+    };
+    const waitInbox = async session => {
+        const end=Date.now()+20000;
+        while(Date.now()<end){
+            const headings=[...document.querySelectorAll('h1,h2,[role=heading]')];
+            const own=headings.find(e=>e.innerText.trim()===session.label);
+            const businessTabs=[...document.querySelectorAll('[role=tab]')].map(e=>e.innerText.trim());
+            if(own&&(headings.some(e=>e.innerText.trim()==='Messages')||(businessTabs.includes('Primary')&&businessTabs.includes('General'))))return own;
+            await new Promise(r=>setTimeout(r,200));
+        }
+        throw Error('Instagram inbox did not load for the selected account.');
+    };
+    action('listInbox',{async invoke(args){
+        const sessions=await discoverAuthenticatedSessions();if(sessions.length!==1)throw Error('A single authenticated Instagram account is required.');const session=sessions[0];
+        await inboxIdentity(session);await waitInbox(session);
+        const close=[...document.querySelectorAll('[role=dialog] [role=button], [role=dialog] button')].find(e=>e.querySelector('[aria-label=Close]'));
+        if(close)close.click();
+        const end=Date.now()+12000;let rows=[];
+        while(Date.now()<end){
+          const sample=[...document.querySelectorAll('[role=button]')].find(e=>e.querySelector('img')&&e.innerText.includes('·'));
+          if(sample){let container=sample.parentElement;for(let i=0;container&&i<7;i++,container=container.parentElement){if(container.querySelectorAll('[role=button]').length>1&&!container.querySelector('h1,h2,[role=heading]')){rows=[...container.querySelectorAll('[role=button]')].filter(e=>e.querySelector('img')&&e.innerText.trim());break;}}}
+          if(rows.length)break;
+          await new Promise(r=>setTimeout(r,200));
+        }
+        if(!rows.length)throw Error('No verified conversation list was found; an empty inbox cannot be inferred.');
+        const limit=Math.min(30,Math.max(1,Number(args.limit)||20));
+        const items=rows.slice(0,limit).map(e=>{const lines=e.innerText.split('\n').map(s=>s.trim()).filter(Boolean);return {title:lines[0]||'',preview:lines.slice(1).join(' ')};});
+        await inboxIdentity(session);
+        return {account:session.label,items,nextCursor:null,coverage:'visible_recent_previews_only; tab='+([...document.querySelectorAll('[role=tab]')].find(e=>e.getAttribute('aria-selected')==='true')?.innerText.trim()||'inbox')+'; older messages, other tabs, thread details, and requests not checked'};
+    }});
+    action('switchAccount',{async invoke({username}){
+        const sessions=await discoverAuthenticatedSessions();if(sessions.length!==1)throw Error('A single authenticated Instagram account is required.');const session=sessions[0];
+        await inboxIdentity(session);const own=await waitInbox(session);const target=normalizeUsername(username);
+        if(target===session.label)return {requested:false,username:target};
+        const picker=own.closest('[role=button]');if(!picker)throw Error('Account picker button unavailable.');
+        if(![...document.querySelectorAll('[role=dialog]')].some(e=>e.innerText.includes('Log into an Existing Account')))picker.click();
+        const end=Date.now()+8000;
+        while(Date.now()<end){
+          const nodes=[...document.querySelectorAll('[role=dialog] [role=button]')].filter(e=>!e.closest('[aria-hidden=true],[inert]')&&e.innerText.trim()===target&&!([...e.querySelectorAll('[role=button]')].some(c=>c.innerText.trim()===target)));
+          if(nodes.length===1){await inboxIdentity(session);nodes[0].click();return {requested:true,username:target};}
+          await new Promise(r=>setTimeout(r,200));
+        }
+        const labels=[...document.querySelectorAll('[role=dialog] [role=button]')].map(e=>e.innerText.trim()).filter(t=>/^[A-Za-z0-9_.]{1,30}$/.test(t));throw Error('Account selection unavailable or ambiguous. Available account controls: '+[...new Set(labels)].join(', '));
+    }});
     action("getProfile", {
         async invoke({ username } = {}) {
             const u = await fetchProfile(username || "");
@@ -342,3 +433,5 @@ window.ox.install(({ action }) => {
         },
     });
 });
+
+})();

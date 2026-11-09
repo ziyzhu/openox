@@ -1,0 +1,106 @@
+{
+  "domain": "usps.com",
+  "name": "USPS Informed Delivery",
+  "description": "Start secure Informed Delivery sign-in or enrollment on USPS.",
+  "baseUrl": "https://reg.usps.com/informeddelivery/welcome",
+  "faviconUrl": "https://openox.ai/assets/services/usps.com/favicon.png",
+  "actions": [
+    {
+      "id": "login",
+      "label": "Sign in or enroll",
+      "description": "Open the official Informed Delivery account entry for private sign-in or signup.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "null"
+      }
+    },
+    {
+      "id": "listSessions",
+      "label": "Check USPS account access",
+      "description": "Detect the signed-out enrollment entry; other account states require identity verification.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      "baseUrl": "https://informeddelivery.usps.com/portal/dashboard?mode=id-login"
+    },
+    {
+      "id": "getEnrollmentStatus",
+      "label": "Check Informed Delivery enrollment",
+      "description": "Read dashboard readiness and mail/package counts without opening mail images.",
+      "baseUrl": "https://informeddelivery.usps.com/portal/dashboard?mode=id-login",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dashboardAvailable",
+          "mailpieces",
+          "packages",
+          "url"
+        ],
+        "properties": {
+          "dashboardAvailable": {
+            "type": "boolean"
+          },
+          "mailpieces": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "packages": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

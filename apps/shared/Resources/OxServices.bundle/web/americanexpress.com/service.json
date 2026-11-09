@@ -1,7 +1,7 @@
 {
   "domain": "americanexpress.com",
   "name": "Amex Travel",
-  "description": "A travel-booking service for cardmembers. View your traveler profile, saved loyalty programs, and detailed flight, hotel, and car bookings. Read-only; sign-in required.",
+  "description": "Read-only Amex Travel profiles, loyalty programs, trips, and adult roundtrip flight searches with fare-brand comparisons. Sign-in required; flight actions use the newer booking-app session.",
   "baseUrl": "https://www.americanexpress.com/en-us/travel",
   "$defs": {
     "loyalty": {
@@ -445,12 +445,519 @@
       },
       "requireApproval": false,
       "requireAuth": true
+    },
+    {
+      "id": "listFlightOffers",
+      "label": "Search roundtrip flights",
+      "description": "Read adult roundtrip flight offers using the current booking results route, avoiding the legacy prebooking redirect. Prices are starting roundtrip totals; no return flight or fare is selected. Location identifiers must match the selected airports/cities. Reports partial coverage of the loaded results.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "destination": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "originId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Amex location identifier from the selected airport/city, e.g. ZAPRT-GEONAMES-SEA."
+          },
+          "destinationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Amex location identifier from the selected airport/city."
+          },
+          "originType": {
+            "type": "string",
+            "enum": [
+              "AIRPORT_CODE",
+              "CITY_CODE"
+            ]
+          },
+          "destinationType": {
+            "type": "string",
+            "enum": [
+              "AIRPORT_CODE",
+              "CITY_CODE"
+            ]
+          },
+          "departureDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "returnDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "adults": {
+            "type": "string",
+            "pattern": "^[1-9]$",
+            "description": "Adult traveler count as a URL-safe digit."
+          },
+          "cabinClass": {
+            "type": "string",
+            "enum": [
+              "ECONOMY",
+              "PREMIUM_ECONOMY",
+              "BUSINESS",
+              "FIRST"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "airline": {
+            "type": "string",
+            "description": "Optional case-insensitive airline filter over loaded results."
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "originId",
+          "destinationId",
+          "originType",
+          "destinationType",
+          "departureDate",
+          "returnDate",
+          "adults",
+          "cabinClass",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "flightKey": {
+                  "type": "string"
+                },
+                "airline": {
+                  "type": "string"
+                },
+                "departureTime": {
+                  "type": "string"
+                },
+                "arrivalTime": {
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string"
+                },
+                "destination": {
+                  "type": "string"
+                },
+                "duration": {
+                  "type": "string"
+                },
+                "stops": {
+                  "type": "string"
+                },
+                "priceFrom": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "priceBasis": {
+                  "type": "string"
+                },
+                "fareOptionsLabel": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "flightKey",
+                "airline",
+                "departureTime",
+                "arrivalTime",
+                "origin",
+                "destination",
+                "duration",
+                "stops",
+                "priceFrom",
+                "currency",
+                "priceBasis",
+                "fareOptionsLabel"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "loadedCount": {
+            "type": "integer"
+          },
+          "totalCount": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "coverage": {
+            "type": "string",
+            "enum": [
+              "partial",
+              "complete"
+            ]
+          },
+          "sourceUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "loadedCount",
+          "totalCount",
+          "coverage",
+          "sourceUrl"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "baseUrl": "https://www.travel.americanexpress.com/en-us/book/flights/search-results?adults={adults}&cabinClass={cabinClass}&children=0&childrenAges=&departureDate={departureDate}&destinationId={destinationId}&destinationLocationType={destinationType}&destinationName={destination}&destinationValue={destination}&inLapInfants=0&inSeatInfants=0&originId={originId}&originLocationType={originType}&originName={origin}&originValue={origin}&page=1&pageSize=50&returnDate={returnDate}&type=ROUND_TRIP"
+    },
+    {
+      "id": "getFlightFareOptions",
+      "label": "Read flight fare options",
+      "description": "Expand fare brands for a flightKey returned by the matching flight search. Reads prices and fare features only; never selects a fare or return flight.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "destination": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "originId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Amex location identifier from the selected airport/city, e.g. ZAPRT-GEONAMES-SEA."
+          },
+          "destinationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Amex location identifier from the selected airport/city."
+          },
+          "originType": {
+            "type": "string",
+            "enum": [
+              "AIRPORT_CODE",
+              "CITY_CODE"
+            ]
+          },
+          "destinationType": {
+            "type": "string",
+            "enum": [
+              "AIRPORT_CODE",
+              "CITY_CODE"
+            ]
+          },
+          "departureDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "returnDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "adults": {
+            "type": "string",
+            "pattern": "^[1-9]$",
+            "description": "Adult traveler count as a URL-safe digit."
+          },
+          "cabinClass": {
+            "type": "string",
+            "enum": [
+              "ECONOMY",
+              "PREMIUM_ECONOMY",
+              "BUSINESS",
+              "FIRST"
+            ]
+          },
+          "flightKey": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "originId",
+          "destinationId",
+          "originType",
+          "destinationType",
+          "departureDate",
+          "returnDate",
+          "adults",
+          "cabinClass",
+          "flightKey"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "flightKey": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "price": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "priceBasis": {
+                  "type": "string"
+                },
+                "features": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "price",
+                "currency",
+                "priceBasis",
+                "features"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "returnFlightSelected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "flightKey",
+          "items",
+          "nextCursor",
+          "returnFlightSelected"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "baseUrl": "https://www.travel.americanexpress.com/en-us/book/flights/search-results?adults={adults}&cabinClass={cabinClass}&children=0&childrenAges=&departureDate={departureDate}&destinationId={destinationId}&destinationLocationType={destinationType}&destinationName={destination}&destinationValue={destination}&inLapInfants=0&inSeatInfants=0&originId={originId}&originLocationType={originType}&originName={origin}&originValue={origin}&page=1&pageSize=50&returnDate={returnDate}&type=ROUND_TRIP"
+    },
+    {
+      "id": "searchFlightLocations",
+      "label": "Find flight airports and cities",
+      "description": "Find verified Amex location identifiers for flight searches.",
+      "baseUrl": "https://www.travel.americanexpress.com/en-us/book/flights/search-results",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "default": 20
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "city": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "AIRPORT_CODE",
+                    "CITY_CODE"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "name",
+                "city",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "listAnnualMembershipFees",
+      "label": "Read annual membership fee history",
+      "description": "Read membership-fee transactions for the selected card and year. Verifies visible card identity; makes no account changes. Historical fee dates do not confirm a future renewal date.",
+      "baseUrl": "https://global.americanexpress.com/activity",
+      "blocking": true,
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lastDigits": {
+            "type": "string",
+            "pattern": "^[0-9]{4,5}$"
+          },
+          "year": {
+            "type": "integer",
+            "minimum": 2000,
+            "maximum": 2100
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 10
+          }
+        },
+        "required": [
+          "cardName",
+          "lastDigits",
+          "year"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cardName": {
+            "type": "string"
+          },
+          "lastDigits": {
+            "type": "string"
+          },
+          "year": {
+            "type": "integer"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dateLabel": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "currency": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dateLabel",
+                "description",
+                "amount",
+                "currency"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "coverage": {
+            "type": "string"
+          },
+          "futureRenewalConfirmed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cardName",
+          "lastDigits",
+          "year",
+          "items",
+          "nextCursor",
+          "coverage",
+          "futureRenewalConfirmed"
+        ],
+        "additionalProperties": false
+      }
     }
   ],
   "locales": {
     "zh-Hans": {
       "name": "运通旅行",
-      "description": "面向持卡人的旅行预订服务。查看旅客资料、已保存的常旅客计划，以及机票、酒店和租车预订详情。只读，需登录。",
+      "description": "只读查看运通旅行旅客资料、常旅客计划、行程及成人往返航班票价。需登录；航班操作使用新版预订应用会话。",
       "actions": {
         "getProfile": {
           "label": "获取旅客档案",
@@ -475,6 +982,22 @@
         "listSessions": {
           "label": "列出已登录账号",
           "description": "发现当前已通过身份验证的账号。错误不代表没有账号。"
+        },
+        "listFlightOffers": {
+          "label": "搜索往返航班",
+          "description": "通过当前预订结果页面读取成人往返航班报价，避开旧版预订跳转。价格为往返起价，尚未选择返程或票价；报告已加载结果的覆盖范围。"
+        },
+        "getFlightFareOptions": {
+          "label": "读取航班票价选项",
+          "description": "展开搜索结果中指定航班的票价品牌、价格及规则。只读，不选择票价或返程。"
+        },
+        "searchFlightLocations": {
+          "label": "查找航班机场和城市",
+          "description": "查询用于航班搜索的运通地点标识。"
+        },
+        "listAnnualMembershipFees": {
+          "label": "读取会员年费记录",
+          "description": "读取所选卡片指定年份的会员年费记录；验证卡片身份，不更改账户。历史费用日期不能确认未来续费日期。"
         }
       }
     }

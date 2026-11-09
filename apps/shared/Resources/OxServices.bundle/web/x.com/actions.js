@@ -505,32 +505,12 @@ window.ox.install(({ action }) => {
             throw new Error("Could not detect logged-in x.com user (no AppTabBar handle in /home)");
         return own;
     };
-    action('login', { async invoke() {
-            const destination = "https://x.com/i/flow/login";
-            if (location.href !== new URL(destination, location.href).href)
-                location.assign(destination);
-            return null;
-        } });
-    action('listSessions', { async invoke() {
-            const response = await fetch('/', { credentials: 'include', cache: 'no-store' });
-            if (!response.ok || new URL(response.url).hostname !== 'x.com')
-                throw Error('X account page HTTP ' + response.status);
-            const page = new DOMParser().parseFromString(await response.text(), 'text/html');
-            const form = page.querySelector('form input[autocomplete="username"]')?.form;
-            if (form && new URL(form.getAttribute('action') || '/', response.url).pathname === '/i/jf/onboarding/web' && form.querySelector('input[name="mode"]')?.value === 'login')
-                return [];
-            const ct0 = getCt0();
-            const op = await resolveUserOp('Viewer');
-            const d = await graphqlGet(op, 'Viewer', { withCommunitiesMemberships: true }, ct0);
-            if (d?.__http_error === 401)
-                return [];
-            if (d?.__http_error)
-                throw Error('X account HTTP ' + d.__http_error);
-            const u = d?.data?.viewer?.user_results?.result;
-            if (!u?.rest_id)
-                throw Error('X account identity unavailable');
-            return [{ id: String(u.rest_id), label: u.legacy?.screen_name || u.core?.screen_name || String(u.rest_id), url: 'https://x.com/home' }];
-        } });
+    action("listSessions", { async invoke() {
+        const own = await fetchOwnHandle();
+        if (!own) throw new Error("X account identity could not be verified");
+        return [{id:own.toLowerCase(),label:"@"+own,url:"https://x.com/home"}];
+    }});
+    action("login", { async invoke() { location.assign("https://x.com/i/flow/login"); return null; }});
     action("getProfile", {
         async invoke({ username } = {}) {
             const ct0 = requireCt0();
@@ -575,6 +555,12 @@ window.ox.install(({ action }) => {
             const row = tweetRow(result, new Set());
             if (!row)
                 throw new Error(`getTweet: post ${id} could not be parsed`);
+            const tw = result.tweet || result;
+            const articleResults = tw.article?.article_results?.result;
+            if (articleResults) {
+                const article = extractArticleBody(articleResults);
+                row.article = { title: articleResults.title || "(Untitled)", author: row.author, content: article.content, url: row.url, cover_image_url: article.cover_image_url, media_urls: article.media_urls };
+            }
             return row;
         },
     });
@@ -684,7 +670,7 @@ window.ox.install(({ action }) => {
                 if (cursor)
                     vars.cursor = cursor;
                 return graphqlPost(op, "SearchTimeline", vars, ct0);
-            }, (d) => d?.data?.search_by_raw_query?.search_timeline?.timeline?.instructions || [], "searchPosts");
+            }, (d) => d?.data?.search_by_raw_query?.search_timeline?.timeline?.instructions || [], `searchTweets ${JSON.stringify(rawQuery)}`);
     };
     action("searchTweets", { invoke: searchPosts });
     action("search", {
@@ -1064,8 +1050,7 @@ window.ox.install(({ action }) => {
         const owner = ownerResult.core?.screen_name || ownerResult.legacy?.screen_name || ownerResult.screen_name || "";
         return { id, name, description: String(result.description || ""), owner: String(owner), member_count: Number(result.member_count) || 0, subscriber_count: Number(result.subscriber_count) || 0, private: result.mode === "private", url: "https://x.com/i/lists/" + id };
     };
-    const walkObjects = (root, visit) => {
-        const seen = new Set();
+    const walkObjects = (root, visit) => {        const seen = new Set();
         const walk = (value) => {
             if (!value || typeof value !== "object" || seen.has(value)) return;
             seen.add(value); visit(value);

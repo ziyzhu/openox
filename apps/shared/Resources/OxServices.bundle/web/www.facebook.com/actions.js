@@ -416,6 +416,34 @@ const marketplaceListings = (payloads) => {
     return [...byId.values()];
 };
 window.ox.install(({ action }) => {
+    action('listFriendsFeed',{async invoke({limit=15}){
+        const sessions=await discoverAuthenticatedSessions();if(sessions.length!==1)throw Error('A single authenticated Facebook account is required');const session=sessions[0];
+        const verify=()=>{const u=window.require('CurrentUserInitialData');if(String(u.ACCOUNT_ID||u.USER_ID)!==session?.id)throw Error('Facebook account changed.');};
+        verify();const route=new URL(location.href);if(route.searchParams.get('filter')!=='friends'||route.searchParams.get('sk')!=='h_chr')throw Error('Not on Facebook friends-only feed.');
+        const controls=()=>[...document.querySelectorAll('[role=button][aria-label]')].filter(e=>(e.getAttribute('aria-label')||'').startsWith('Actions for this post by ')&&!e.closest('[aria-hidden=true],[inert]'));
+        const end=Date.now()+20000;while(Date.now()<end&&!controls().length)await new Promise(r=>setTimeout(r,250));
+        if(!controls().length)throw Error('No verified loaded friends-feed posts; cannot infer an empty feed.');
+        const rows=[];
+        for(const button of controls()){
+            let card=button.parentElement;
+            for(let i=0;card&&i<14;i++,card=card.parentElement){
+                const labels=[...card.querySelectorAll('[aria-label]')].map(e=>e.getAttribute('aria-label')||'');
+                const actionCount=labels.filter(s=>s.startsWith('Actions for this post by ')).length;
+                if(actionCount>1){card=null;break;}
+                if(card.querySelector('h3')&&labels.some(s=>s.startsWith('Comment on ')||s.startsWith('React to ')))break;
+            }
+            if(!card)continue;
+            const author=(button.getAttribute('aria-label')||'').replace('Actions for this post by ','');
+            const links=[...card.querySelectorAll('a[href]')];const permalink=links.find(a=>/\/posts\/|\/permalink\/|story_fbid=/.test(a.href))||links.find(a=>/\/photo[/?]/.test(a.href));
+            let url='';if(permalink){const u=new URL(permalink.href);for(const k of [...u.searchParams.keys()])if(!['story_fbid','id','fbid'].includes(k))u.searchParams.delete(k);url=u.href;}
+            const cleanTime=s=>s.replace(/[\u034f\u200b-\u200f\u202a-\u202e\u2060-\u206f]/g,'').trim();
+            const time=links.find(a=>/^\d+\s*[smhdwy]$/i.test(cleanTime(a.innerText)));
+            rows.push({author,message:card.innerText.split('\n').map(s=>s.trim()).filter(s=>s&&s!=='Facebook').join('\n').slice(0,5000),url,timeLabel:time?cleanTime(time.innerText):'',imageDescriptions:[...card.querySelectorAll('img[alt]')].map(e=>e.alt).filter(s=>s&&!s.includes('profile picture'))});
+            if(rows.length>=Math.min(30,Math.max(1,Number(limit)||15)))break;
+        }
+        verify();if(!rows.length)throw Error('Friends-feed post extraction did not establish content.');
+        return {items:rows,nextCursor:null,coverage:'currently_loaded_friends_only_feed_snapshot; no complete date range or pagination established; image descriptions are website-provided alt text'};
+    }});
     const docIds = Object.fromEntries(Object.entries(operationBaselines).map(([name, baseline]) => [name, baseline.docId]));
     const moduleToken = (name) => {
         try {
@@ -519,29 +547,27 @@ window.ox.install(({ action }) => {
     };
     const variables = (operation) => clone(operationBaselines[operation].variables);
     action('login', { async invoke() {
-            const destination = "https://www.facebook.com/login/";
-            if (location.href !== new URL(destination, location.href).href)
-                location.assign(destination);
-            return null;
-        } });
-    action('listSessions', { async invoke() {
-            const r = await fetch('/me', { credentials: 'include', cache: 'no-store' });
-            if (!r.ok)
-                throw Error('Facebook account HTTP ' + r.status);
-            const u = new URL(r.url);
-            if (u.origin !== 'https://www.facebook.com')
-                throw Error('Unexpected Facebook account origin');
-            if (/^\/login(?:\/|$)/.test(u.pathname))
-                return [];
-            const d = new DOMParser().parseFromString(await r.text(), 'text/html');
-            const scripts = [...d.scripts].map(s => s.textContent).join('\n');
-            if (/"ACCOUNT_ID"\s*:\s*"0"/.test(scripts) && /"USER_ID"\s*:\s*"0"/.test(scripts) && d.querySelector('form input[type="password"]'))
-                return [];
-            const match = scripts.match(/"ACCOUNT_ID"\s*:\s*"([1-9][0-9]+)"/);
-            if (!match)
-                throw Error('Facebook current account identity unavailable');
-            return [{ id: match[1], label: match[1], url: 'https://www.facebook.com/' }];
-        } });
+ const end=Date.now()+15000;
+ while(Date.now()<end){
+ const pw=document.querySelector('input[type="password"]');
+ if(pw&&pw.getBoundingClientRect().width>0)return null;
+ const d=document.querySelector('[role="dialog"][aria-label="Your profile"]');
+ if(d&&d.getBoundingClientRect().width>0&&d.innerText.includes('Log out'))return null;
+ const b=document.querySelector('[aria-label="Account, your profile"]');
+ if(b&&b.getAttribute('aria-expanded')!=='true')b.click();
+ await new Promise(r=>setTimeout(r,250));
+ }
+ throw Error('Facebook sign-in or account-selection controls unavailable');
+ } });
+    const discoverAuthenticatedSessions = async () => {
+const end=Date.now()+15000;while(Date.now()<end){
+try {const u=window.require('CurrentUserInitialData');const id=String(u?.ACCOUNT_ID||u?.USER_ID||'');if(/^[1-9][0-9]+$/.test(id))return [{id,label:u.NAME||id,url:'https://www.facebook.com/'}];}catch{}
+if(document.querySelector('input[type="password"]')&&/login/.test(location.pathname))return [];
+await new Promise(r=>setTimeout(r,250));}
+throw Error('Facebook current account identity unavailable');
+
+    };
+    action('listSessions', { invoke: discoverAuthenticatedSessions });
     action("listGroupPosts", {
         async invoke({ groupId, cursor, limit } = {}) {
             const operation = cursor
@@ -613,4 +639,5 @@ window.ox.install(({ action }) => {
             return { items: marketplaceListings(payloads), nextCursor: nextCursor(payloads, feed) };
         },
     });
+action('getMessageAccess',{async invoke(args){const sessions=await discoverAuthenticatedSessions();if(sessions.length!==1)throw Error('A single authenticated Facebook account is required');const session=sessions[0];const u=window.require('CurrentUserInitialData');if(String(u.ACCOUNT_ID||u.USER_ID)!==session.id)throw Error('Facebook account changed');const end=Date.now()+15000;while(Date.now()<end){const d=document.querySelector('[role="dialog"][aria-label="Messenger"]');if(d&&d.getBoundingClientRect().width>0&&d.querySelector('a[href*="/messages/e2ee/t/"]')){const restore=d.innerText.includes('Chat history is missing');const current=await discoverAuthenticatedSessions();if(current.length!==1||current[0].id!==session.id)throw Error('Facebook account changed');return {requiresRestore:restore,status:restore?'Enter your PIN or use a one-time code to restore encrypted chat history.':'Messenger chat list is available.',items:[...d.querySelectorAll('a[href*="/messages/e2ee/t/"]')].slice(0,10).map(a=>({url:a.href,preview:a.innerText.trim()}))};}const b=document.querySelector('[aria-label^="Messenger,"]')||document.querySelector('[aria-label="Messenger"]');if(b&&b.getAttribute('aria-expanded')!=='true')b.click();await new Promise(r=>setTimeout(r,250));}throw Error('Messenger did not become ready');}});
 });

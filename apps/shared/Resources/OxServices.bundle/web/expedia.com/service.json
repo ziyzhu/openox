@@ -1,0 +1,80 @@
+{
+  "domain": "expedia.com",
+  "name": "Expedia",
+  "description": "Read public rental-car search results without booking.",
+  "baseUrl": "https://www.expedia.com/Cars",
+  "faviconUrl": "https://openox.ai/assets/services/expedia.com/favicon.png",
+  "actions": [
+    {
+      "id": "readCarResults",
+      "label": "Compare rental car offers",
+      "description": "Reads public rental search results from the supplied observed search pageUrl. Does not reserve cars.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pickupDate",
+          "returnDate"
+        ],
+        "properties": {
+          "pickupDate": {
+            "type": "string"
+          },
+          "returnDate": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "default": 40
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "context": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "summary": {
+                  "type": "string"
+                },
+                "detailsUrl": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "summary",
+                "detailsUrl"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "coverage": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "context",
+          "items",
+          "nextCursor",
+          "coverage"
+        ]
+      },
+      "baseUrl": "https://www.expedia.com/carsearch?locn=Miami%2C%20FL%2C%20United%20States%20of%20America%20(MIA-Miami%20Intl.)&pickupIATACode=MIA&olat=25.79509&olon=-80.27843&dpln=4278605&date1={pickupDate}&date2={returnDate}&time1=1000AM&time2=0200PM&aarpcr=off"
+    }
+  ]
+}

@@ -148,7 +148,7 @@ window.ox.install(({ action }) => {
             }
             throw Error('Chase login page did not present usable sign-in controls.');
         } });
-    action('listSessions', { async invoke() {
+    const discoverAuthenticatedSessions = async () => {
             accountsCache = null;
             let j;
             try {
@@ -161,7 +161,9 @@ window.ox.install(({ action }) => {
             if (!j?.onlineProfileIdentifier)
                 throw Error('Chase Travel account identity unavailable');
             return [{ id: String(j.onlineProfileIdentifier), label: 'Chase Travel ' + String(j.onlineProfileIdentifier), url: EXECUTION_URL }];
-        } });
+
+    };
+    action('listSessions', { invoke: discoverAuthenticatedSessions });
     action("getTravelProfile", {
         async invoke() {
             try {
@@ -344,6 +346,9 @@ window.ox.install(({ action }) => {
     });
 
     action('getRoundTripOptions', { async invoke(args) {
+        const sessions=await discoverAuthenticatedSessions();if(sessions.length!==1)throw Error('A single authenticated Chase account is required.');const session=sessions[0];
+        const profile = await get('/travel-profiles?all-accounts-hidden-indicator=true');
+        if (!session || String(profile.onlineProfileIdentifier) !== session.id) throw Error('Chase account selection changed.');
         if(args.returnDate <= args.departureDate) throw Error('Return must follow departure.');
         const lookup = async (code, allowCity) => {
             const j = await post('/autosuggest/search', {sq:{st:code,sf:['arrival-airport']},sel:false,rec:null,c:'flights'});
@@ -362,6 +367,7 @@ window.ox.install(({ action }) => {
         if(!Array.isArray(j?.itineraries))throw Error('Flight results schema not available.');
         if(!j.itineraries.length&&!/complete|finished/i.test(String(j.status)))throw Error('Flight results are still loading.');
         const items=j.itineraries.map(i=>{const journey=i.journeys?.[0],segments=journey?.segments||[],first=segments[0]?.flight,last=segments.at(-1)?.flight;if(!first||!last)throw Error('Incomplete flight journey.');return {airline:first.marketingCarrier?.name||first.operatingCarrier?.name||'',departure:first.departure.dateTime,arrival:last.arrival.dateTime,origin:first.departure.airport.code,destination:last.arrival.airport.code,durationMinutes:journey.durationInMinutes,stops:Math.max(0,segments.length-1),fares:(i.fareOptions||[]).filter(f=>typeof f.displayPrice?.total?.payable?.options?.cashOnly?.value==='number').map(f=>({name:f.fareFamily?.name||f.fareCategory||'',cash:f.displayPrice.total.payable.options.cashOnly.value}))};});
+        const current=await discoverAuthenticatedSessions();if(current.length!==1||current[0].id!==session.id)throw Error('Chase account changed during search.');
         return {currency:j.currency||'USD',priceBasis:'Starting round-trip fares for outbound choices; return flight selection not yet confirmed.',resultCount:j.resultCount||items.length,status:String(j.status||''),items,nextCursor:null};
     }});
 });

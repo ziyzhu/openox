@@ -1,8 +1,7 @@
 {
   "domain": "docs.google.com",
-  "faviconUrl": "https://openox.ai/assets/services/docs.google.com/favicon.png",
-  "name": "Google Forms",
-  "description": "Read the signed-in Google Forms home screen and open new or existing forms for editing.",
+  "name": "Google Docs and Forms",
+  "description": "Read Google Forms and convert an existing uploaded Word document to native Google Docs without sharing.",
   "baseUrl": "https://docs.google.com/forms/u/0/",
   "actions": [
     {
@@ -11,7 +10,6 @@
       "description": "Discover the currently authenticated account in this website context; reject unclassified responses.",
       "requireAuth": false,
       "requireApproval": false,
-      "baseUrl": "https://docs.google.com/forms/u/0/",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -50,7 +48,6 @@
       "description": "Prepare the existing website sign-in page for user interaction.",
       "requireAuth": false,
       "requireApproval": false,
-      "baseUrl": "https://docs.google.com/forms/u/0/",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -161,6 +158,640 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "id": "convertWordDocument",
+      "label": "Save as Google Docs",
+      "description": "Convert the selected existing Word file to a new native Google Doc using its observed File menu. Does not share or delete the source. Single submission; inspect Drive state if navigation interrupts the response.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "sourceId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "conversionRequested"
+            ]
+          },
+          "sourceId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "sourceId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getEditorStatus",
+      "label": "Inspect document editor status",
+      "description": "Read current document title, conversion dialogs and document links without changing content.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "dialogs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "title",
+          "url",
+          "dialogs",
+          "links",
+          "messages"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getDocumentText",
+      "label": "Read document text",
+      "description": "Read current saved text and hyperlink targets from the selected document HTML model.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "documentId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "hyperlinks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fontFamilies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "text",
+          "hyperlinks"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "replaceDocumentText",
+      "label": "Replace exact document text",
+      "description": "Replace one exact text string in place with a prechecked expected occurrence count using Find and replace. Preserves unrelated text. Inspect state before retrying an uncertain outcome.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "find": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 6000
+          },
+          "replacement": {
+            "type": "string",
+            "maxLength": 6000
+          },
+          "expectedCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "documentId",
+          "find",
+          "replacement",
+          "expectedCount"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "replaced": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "replaced",
+          "verified"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "formatInlineLink",
+      "label": "Format inline hyperlink",
+      "description": "Replace one unique visible label plus URL reference with a native clickable text hyperlink. Verifies selected anchor before applying once; preserves the URL and unrelated text.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "find": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "documentId",
+          "find",
+          "label",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "verified": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "verified",
+          "label",
+          "url"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "refreshEditor",
+      "label": "Refresh saved document editor",
+      "description": "Reload the current saved document editor without changing content; clears stale menu and link-preview state.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "documentId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      }
+    },
+    {
+      "id": "setDocumentArial",
+      "label": "Apply Arial throughout document",
+      "description": "Select all document content and apply Arial, retaining sizes, links and other formatting. Verify saved text unchanged and Arial selected.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "documentId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "font": {
+            "type": "string"
+          },
+          "textUnchanged": {
+            "type": "boolean"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "font",
+          "textUnchanged",
+          "verified"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "convertMarkdownDocument",
+      "label": "Save Markdown as Google Docs",
+      "description": "Use the observed Save as Google Docs command on an opened Markdown file. Native Google import renders headings, tables and inline hyperlinks; source remains unchanged.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "sourceId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "conversionRequested"
+            ]
+          },
+          "sourceId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "sourceId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "prepareDocumentSharing",
+      "label": "Prepare document sharing",
+      "description": "Open sharing on the selected document and stage exact email recipients. Does not send invitations or change permissions. Return visible controls for review.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 3
+            }
+          }
+        },
+        "required": [
+          "documentId",
+          "emails"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label",
+                "text",
+                "role"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "text",
+          "controls"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "listDocumentPermissions",
+      "label": "Read document access",
+      "description": "Read current permissions using the official Drive v3 API through the signed-in Google sharing client. Verify selected account owns the document.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "documentId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "email",
+                "role",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "shareDocumentEditor",
+      "label": "Share document with an editor",
+      "description": "Grant one exact email Editor access via official Drive v3 permissions.create and request an email invitation. Precheck current access, submit once, and verify resulting writer permission. Does not change link visibility or other permissions.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "email": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 320
+          }
+        },
+        "required": [
+          "documentId",
+          "email"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "alreadyEditor"
+            ]
+          },
+          "notificationRequested": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "email",
+          "role",
+          "status",
+          "notificationRequested"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "deleteDocumentTable",
+      "label": "Remove one verified document table",
+      "description": "Delete one table identified by a unique exact cell label through the native Format Table menu; verify all text outside the target table remains.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "documentId",
+          "cellLabel"
+        ],
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cellLabel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "verified"
+        ],
+        "properties": {
+          "verified": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "id": "replaceDocumentMarkdown",
+      "label": "Rewrite document from Markdown",
+      "description": "Replace the content of an existing native Google Doc through the official Drive media update Markdown importer. Precheck exact saved text and ownership; verify required text, native links and unchanged sharing. Never retry an uncertain upload.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "documentId",
+          "markdown",
+          "expectedText",
+          "requiredFragments"
+        ],
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "markdown": {
+            "type": "string",
+            "minLength": 100,
+            "maxLength": 100000
+          },
+          "expectedText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200000
+          },
+          "requiredFragments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "documentId",
+          "verified",
+          "sharingUnchanged"
+        ],
+        "properties": {
+          "documentId": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "sharingUnchanged": {
+            "type": "boolean"
+          }
+        }
+      }
     }
-  ]
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/docs.google.com/favicon.png"
 }
