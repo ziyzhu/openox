@@ -77,24 +77,16 @@ struct ServiceBrowserView: View {
 
     var body: some View {
         NavigationStack {
-            ServiceBrowserContent(session: session)
-                .navigationTitle("")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) { doneButton }
-                }
+            ServiceBrowserContent(session: session, close: (A11yID.ServiceBrowser.close, { dismiss() }))
         }
         .onDisappear(perform: session.stop)
-    }
-
-    private var doneButton: some View {
-        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceBrowser.close) { dismiss() }
     }
 }
 
 struct ServiceBrowserContent: View {
     let session: ServiceBrowserSession
     var showsBrowserBar = true
+    var close: (accessibilityIdentifier: String, action: @MainActor () -> Void)? = nil
     @State private var toast: Toast?
 
     var body: some View {
@@ -109,6 +101,7 @@ struct ServiceBrowserContent: View {
                 _ = session.navigate(to: url)
             }),
             showsBrowserBar: showsBrowserBar,
+            close: close,
             navigate: { session.navigate(to: $0) },
             goBack: session.goBack,
             goForward: session.goForward,
@@ -121,60 +114,6 @@ struct ServiceBrowserContent: View {
         }
         .onChange(of: toast?.id) { _, _ in
             if toast == nil { session.dismissNavigationNotice() }
-        }
-    }
-}
-
-struct ConversationBrowserCard: View {
-    let session: ServiceBrowserSession
-    let inlinePageAnchorID: UUID
-    let close: () -> Void
-    @State private var presentation: Presentation = .inline
-
-    private enum Presentation {
-        case inline
-        case expanded
-        case collapsing
-    }
-
-    var body: some View {
-        LivePageCard(
-            service: nil,
-            fallbackSystemImage: "globe",
-            title: String(localized: "Browser"),
-            subtitle: session.page.url?.host ?? session.serviceDomain,
-            mount: nil,
-            inlinePageAnchorID: presentation == .inline ? inlinePageAnchorID : nil,
-            browserSession: session,
-            isPresented: presentation != .inline,
-            placeholder: .invitation(String(localized: "View live page")),
-            activate: nil,
-            expand: { presentation = .expanded },
-            cancel: close,
-            accessibilityIdentifier: "conversation.browser",
-            expandAccessibilityIdentifier: "conversation.browser.expand",
-            cancelAccessibilityIdentifier: "conversation.browser.close"
-        )
-        .fullScreenCover(isPresented: Binding(
-            get: { presentation == .expanded },
-            set: { presentation = $0 ? .expanded : .collapsing }
-        ), onDismiss: {
-            presentation = .inline
-        }) {
-            NavigationStack {
-                if presentation == .expanded {
-                    ServiceBrowserContent(session: session)
-                        .navigationTitle("")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                SheetDismissToolbarButton(accessibilityIdentifier: "conversation.browser.collapse") {
-                                    presentation = .collapsing
-                                }
-                            }
-                        }
-                }
-            }
         }
     }
 }

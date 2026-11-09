@@ -7,6 +7,7 @@ final class ConversationSubmissionQueue {
     struct Submission {
         enum Kind: Equatable {
             case user
+            case browse(URL)
             case system(resume: TurnID?)
         }
 
@@ -27,8 +28,10 @@ final class ConversationSubmissionQueue {
         var state: State
 
         var needsPosting: Bool {
-            guard case .user = kind else { return false }
-            return state == .queued
+            switch kind {
+            case .user, .browse: state == .queued
+            case .system: false
+            }
         }
 
         var queuedMessage: Conversation.QueuedMessage? {

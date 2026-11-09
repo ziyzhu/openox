@@ -141,6 +141,25 @@ extension Conversation {
         return result
     }
 
+    func recordDurableTurns(_ turns: [Turn]) async throws {
+        try await durablePreparation?.value
+        guard let route = durableRoute else { throw RuntimeError.bridge("Pi conversation is not attached") }
+        _ = try await prepareDurableConversation(configuration: agentConfiguration(client: client, model: model))
+        let encoder = JSONEncoder()
+        let entries = try turns.map { turn -> JSONValue in
+            .object([
+                "kind": .string("ox.native.turn"),
+                "data": .object(["turn": try JSONDecoder().decode(JSONValue.self, from: encoder.encode(turn))]),
+                "model": .array(ConversationProjection.makeWireMessages(from: [turn]).map {
+                    DurableMessageCodec.message($0, provider: client.id, profileID: scope.profileID)
+                }),
+            ])
+        }
+        _ = try await route.session.runtime.command(.object([
+            "action": .string("conversationRecord"), "conversationID": .int(route.conversationID), "entries": .array(entries),
+        ]))
+    }
+
     func canonicalMessages() async throws -> [Message] {
         try await durablePreparation?.value
         guard let route = durableRoute else { throw RuntimeError.bridge("Pi conversation is not attached") }

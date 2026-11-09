@@ -51,12 +51,13 @@ export function conversationEvents(conversation: Conversation) {
       entries = [...recovered, ...entries];
     }
     const fresh = entries.filter(entry => entry.id > newest!);
-    if (!running && (live?.run || fresh.some(entry => entry.model?.some(message => message.role === "assistant")))) {
+    const relayed = fresh.filter(entry => entry.kind !== "ox.native.turn");
+    if (!running && (live?.run || relayed.some(entry => entry.model?.some(message => message.role === "assistant")))) {
       events.push({ type: "run_start" });
       running = true;
     }
     for (const entry of fresh) {
-      for (const message of entry.model ?? []) {
+      for (const message of entry.kind === "ox.native.turn" ? [] : entry.model ?? []) {
         if (message.role === "assistant") {
           if (assistant) finish();
           begin(entry.byTaskId ?? entry.id);

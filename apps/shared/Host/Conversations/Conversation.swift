@@ -570,6 +570,7 @@ final class Conversation: Identifiable {
     @ObservationIgnored private var filesRefreshTask: Task<Void, Never>?
     @ObservationIgnored private var referencedFilesCache: ReferencedFilesCache?
     var transcript: [Block] { document.projection }
+    var turns: [Turn] { document.turns }
     var transcriptBlockCount: Int { document.blockCount }
     var referencedFiles: [FileItem] {
         let key = ReferencedFilesCache.Key(references: document.fileReferencesRevision, files: filesRevision)
@@ -941,7 +942,7 @@ final class Conversation: Identifiable {
         switch activeRun?.activeSubmission?.kind {
         case let .system(.some(target)):
             document.apply(.resumeAgentTurn(id: target))
-        case .user, .system, nil:
+        case .user, .browse, .system, nil:
             document.apply(.beginAgentTurn(at: Date()))
         }
     }
@@ -1410,11 +1411,17 @@ final class Conversation: Identifiable {
     }
 
     @discardableResult
+    func enqueuePage(_ url: URL) -> SubmissionReceipt {
+        enqueue(url.absoluteString, attachments: [], skillInvocation: nil, kind: .browse(url), submissionID: SubmissionID())
+    }
+
+    @discardableResult
     private func enqueue(
         _ intent: String,
         attachments: [FileItem],
         skillInvocation: UserSkillInvocation?,
         scheduleName: String? = nil,
+        kind: Submission.Kind = .user,
         submissionID: SubmissionID
     ) -> SubmissionReceipt {
         publishFollowIntents([])
@@ -1439,7 +1446,7 @@ final class Conversation: Identifiable {
         }
         submissions.append(Submission(
             id: submissionID,
-            kind: .user,
+            kind: kind,
             text: intent,
             attachments: attachments,
             skillInvocation: skillInvocation,
@@ -1751,6 +1758,12 @@ final class Conversation: Identifiable {
             settleModelSelectionChange(runID: runID,
                 succeeded: submissionResult?.outcome == .completed && !Task.isCancelled)
             if activeRun?.id == runID { activeRun?.activeSubmission = nil }
+        }
+        if case .browse(let url) = submission.kind {
+            let failure = await runPage(url)
+            submission.latency.finish(outcome: failure == nil ? "completed" : "error", client: client.id, model: model.id)
+            submissions.resolve(submission, error: failure, failureKind: nil, cancelled: Task.isCancelled)
+            return
         }
         do {
             try Task.checkCancellation()

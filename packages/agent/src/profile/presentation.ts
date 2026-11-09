@@ -153,13 +153,25 @@ export class ApplicationPresentation {
     return { conversationID: conversation.id, reference: this.runtime.conversations.reference(conversation.id) };
   }
   async populate(reference: ConversationReference, entries: EntryDraft[]) {
+    await this.append(reference, entries, async (tx, id) => {
+      if ((await ledger(tx, id)).some(entry => entry.model?.length)) throw new Error("Only an empty conversation can receive imported turns");
+    });
+  }
+  async record(reference: ConversationReference, entries: EntryDraft[]) {
+    await this.append(reference, entries, async (tx, id) => {
+      for (const status of ["pending", "running", "waiting", "completing"] as const) {
+        if ((await tx.scanTasks({ conversationId: id, status }, 1)).items.length) throw new Error("Conversation must be idle to record turns");
+      }
+    });
+  }
+  private async append(reference: ConversationReference, entries: EntryDraft[], admit: (tx: Tx, id: ConversationId) => Promise<void>) {
     if (!Array.isArray(entries) || entries.some(entry => entry.kind !== "ox.native.turn" || entry.head !== undefined || entry.edits !== undefined)) throw new Error("Imported entries require native turns without foreign identities");
     await this.runtime.prepareConversation(reference);
     const id = this.runtime.conversations.id(reference), conversation = await this.runtime.harness.conversation(id, context);
     if (!conversation) throw new Error("Conversation not found");
     const frozen = JSON.parse(JSON.stringify(entries)) as EntryDraft[];
     await conversation.commit(async tx => {
-      if ((await ledger(tx, id)).some(entry => entry.model?.length)) throw new Error("Only an empty conversation can receive imported turns");
+      await admit(tx, id);
       let latest: number | null = null;
       for (const entry of frozen) latest = (await tx.appendEntry(id, entry)).id;
       await presentation(tx, id, { unread: false }, latest, true);

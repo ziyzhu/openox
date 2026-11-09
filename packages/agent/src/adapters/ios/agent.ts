@@ -51,6 +51,7 @@ type Command = CommandScope & (
   | ({ action: "conversationCreate"; entries?: EntryDraft[] } & ApplicationPresentationChange)
   | ({ action: "applicationSave" } & ApplicationPresentationChange)
   | { action: "conversationPopulate"; entries: EntryDraft[] }
+  | { action: "conversationRecord"; entries: EntryDraft[] }
   | { action: "conversationFork"; entryID: EntryId; title?: string }
   | { action: "applicationList"; limit?: number; listCursor?: ConversationIndexCursor | null }
   | { action: "conversationList"; limit?: number; listCursor?: ConversationListCursor | null }
@@ -209,6 +210,12 @@ export class IOSAgentAdapter {
         return { files: Object.values((await session.files.state()).files).filter(file => file.hidden) };
       case "conversationCreate": return application.create(args);
       case "conversationPopulate": await application.populate(required(), args.entries); return {};
+      case "conversationRecord": {
+        const target = attached();
+        await this.guardProgress(target);
+        await application.record(target, args.entries);
+        return {};
+      }
       case "conversationFork": return this.fork(required(), args.entryID, args.title);
       case "applicationLoad": return application.load(required());
       case "applicationList": return application.list(args.limit, args.listCursor ?? undefined);

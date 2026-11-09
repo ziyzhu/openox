@@ -7,6 +7,46 @@ nonisolated enum WebExecutionLimits {
 }
 
 extension Conversation {
+    func runPage(_ url: URL) async -> String? {
+        let purpose = L10n.string("Open website")
+        let navigation: JSONValue = .object(["purpose": .string(purpose), "url": .string(url.absoluteString)])
+        let source = """
+        const page = await ox.web.browser.navigate(\(navigation.jsonString()));
+        await ox.web.browser.showPage(\(JSONValue.object(["purpose": .string(purpose)]).jsonString()));
+        return page;
+        """
+        let call = ToolCall(id: UUID().uuidString, name: ConversationTool.schema.name,
+                            arguments: .object(["purpose": .string(purpose), "source": .string(source)]))
+        Log.session.info("Conversation.runPage start id=\(id) host=\(url.host ?? "?")")
+        await receiveAgentEvent(.runStarted(turnID: nil))
+        await receiveAgentEvent(.generationStarted(model: model.id, turnID: nil))
+        await receiveAgentEvent(.toolExecutionStart(toolCall: call))
+        let result: ToolResultMessage
+        do {
+            let output = try await ConversationTool(conversation: self).execute(toolCallId: call.id, args: call.arguments)
+            result = ToolResultMessage(toolCallId: call.id, toolName: call.name, content: output.content,
+                                       diagnostics: output.diagnostics, isError: output.isError, truncated: output.truncated)
+        } catch {
+            result = ToolResultMessage(toolCallId: call.id, toolName: call.name,
+                                       content: ToolResult(text: error.localizedDescription).content, isError: true)
+        }
+        await receiveAgentEvent(.toolExecutionEnd(toolCall: call, result: result))
+        let stopped = Task.isCancelled
+        var assistant = AssistantMessage(model: model.id, content: [.toolCall(call)])
+        if stopped { assistant.stopReason = .aborted }
+        await receiveAgentEvent(.generationFinished(message: assistant, toolResults: [result]))
+        await receiveAgentEvent(.runFinished(ConversationRunResult(outcome: stopped ? .aborted : .completed)))
+        let recorded = Array(turns.suffix(2))
+        do {
+            try await Task { try await recordDurableTurns(recorded) }.value
+        } catch {
+            Log.session.error("Conversation.runPage record failed id=\(id) error=\(error.localizedDescription)")
+            return error.localizedDescription
+        }
+        Log.session.info("Conversation.runPage end id=\(id) navigated=\(!result.isError) stopped=\(stopped)")
+        return nil
+    }
+
     public func browserOperation(action: String, arguments: JSONValue, purpose: String) async throws -> JSONValue? {
         guard let catalogAction = BrowserFunctionCatalog.action(id: action) else {
             throw RuntimeError.bridge("ox.web.browser: unknown action '\(action)'")

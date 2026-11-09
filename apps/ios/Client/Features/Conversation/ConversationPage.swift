@@ -61,8 +61,6 @@ struct ConversationPage: View {
     }
 
     @State var composer = ConversationComposerModel()
-    @State private var manualBrowserSession: ServiceBrowserSession?
-    @State private var manualBrowserBeforeSubmissionID: UUID?
     @State private var speechInput = ConversationSpeechInput()
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.requestReview) private var requestReview
@@ -433,9 +431,6 @@ struct ConversationPage: View {
             sendHandoff = .idle
             scroller.cancelSendHandoff()
             speechInput.cancel(reason: "conversationChanged")
-            manualBrowserSession?.stop()
-            manualBrowserSession = nil
-            manualBrowserBeforeSubmissionID = nil
             cancelEditing(reason: "conversationChanged", keepFocus: false)
         }
         .onChange(of: editedBlockID) { _, blockID in
@@ -465,7 +460,6 @@ struct ConversationPage: View {
             speechInput.cancel(reason: "pageDisappear")
             if !isCurrentConversation() {
                 composer.discardDraft()
-                manualBrowserSession?.stop()
             }
             ClientAutomation.setEditDraft = nil
         }
@@ -670,16 +664,11 @@ struct ConversationPage: View {
     }
 
     private func openWebsite(_ url: URL) {
-        Log.ui.info("ConversationPage.openWebsite conversation=\(conversation.id) host=\(url.host ?? "?") disposition=inline")
+        Log.ui.info("ConversationPage.openWebsite conversation=\(conversation.id) host=\(url.host ?? "?") disposition=browse")
         prepareComposerSubmission()
         composer.discardDraft()
-        manualBrowserBeforeSubmissionID = nil
-        if let manualBrowserSession {
-            _ = manualBrowserSession.navigate(to: url)
-        } else {
-            manualBrowserSession = ServiceBrowserSession(url: url, serviceManager: serviceManager)
-        }
-        DispatchQueue.main.async { scroller.rideToBottom() }
+        sendTranscriptTail = scroller.transcriptTail
+        holdForSend(conversation.enqueuePage(url))
     }
 
     private func effectiveComposerHeight(floatsTopStrip: Bool) -> CGFloat {
@@ -790,29 +779,6 @@ struct ConversationPage: View {
         submissionAnchor?.id
     }
 
-    private var manualBrowserAnchorID: UUID? {
-        manualBrowserBeforeSubmissionID.flatMap { conversation.anchor(forSubmissionID: $0)?.id }
-    }
-
-    @ViewBuilder
-    private var manualBrowserCard: some View {
-        if let manualBrowserSession {
-            ConversationBrowserCard(session: manualBrowserSession, inlinePageAnchorID: conversation.id) {
-                manualBrowserSession.stop()
-                self.manualBrowserSession = nil
-                manualBrowserBeforeSubmissionID = nil
-            }
-            .padding(.top, ConversationTranscriptMetrics.blockSpacing)
-            .onGeometryChange(for: CGFloat?.self) { geometry in
-                guard sendHandoff == .idle,
-                      manualBrowserAnchorID == nil || manualBrowserAnchorID == anchoredTurnID else { return nil }
-                return geometry.frame(in: .global).maxY
-            } action: {
-                guard let bottom = $0 else { return }
-                scroller.transcriptTail = bottom
-            }
-        }
-    }
 
     private var anchoredQueuedMessage: Conversation.QueuedMessage? {
         guard case .queued(let id) = submissionAnchor else { return nil }
@@ -981,7 +947,7 @@ struct ConversationPage: View {
         identified: Bool = true,
         recordsTail: Bool = false
     ) -> some View {
-        let measuresTail = recordsTail && sendHandoff == .idle && !(manualBrowserSession != nil && manualBrowserAnchorID == nil)
+        let measuresTail = recordsTail && sendHandoff == .idle
         let row = conversationBlockHost(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
             .padding(.top, block.spacingBefore)
             .onGeometryChange(for: CGFloat?.self) {
@@ -991,9 +957,6 @@ struct ConversationPage: View {
                 scroller.transcriptTail = bottom
             }
 
-        if identified, block.id == manualBrowserAnchorID {
-            manualBrowserCard
-        }
         if identified {
             row.id(block.id)
         } else {
@@ -1050,9 +1013,6 @@ struct ConversationPage: View {
 
     @ViewBuilder
     private func queuedRow(_ queued: Conversation.QueuedMessage, identified: Bool = true) -> some View {
-        if identified, queued.id == manualBrowserAnchorID {
-            manualBrowserCard
-        }
         let row = QueuedBubble(
             message: queued,
             onOpenAttachment: { file, sourceID in openAttachment(file, sourceID: sourceID) },
@@ -1109,19 +1069,6 @@ struct ConversationPage: View {
                     }),
                     servicePageOwnerIDs: blocks.map(\.id)
                 )
-                if let manualBrowserSession, let anchor = anchors[conversation.id] {
-                    GeometryReader { geometry in
-                        let frame = geometry[anchor]
-                        ServiceBrowserContent(session: manualBrowserSession, showsBrowserBar: false)
-                            .frame(width: frame.width, height: frame.height)
-                            .clipShape(UnevenRoundedRectangle(
-                                bottomLeadingRadius: Theme.Radius.lg,
-                                bottomTrailingRadius: Theme.Radius.lg
-                            ))
-                            .position(x: frame.midX, y: frame.midY)
-                    }
-                    .clipped()
-                }
             }
             .contentMargins(.bottom, dockClearance, for: .scrollContent)
             .onScrollGeometryChange(for: ConversationViewportController.Frame?.self) { geo in
@@ -1238,7 +1185,7 @@ struct ConversationPage: View {
         let holdsHistory = holdsTranscript
         let historyTail = sendTranscriptTail
         return VStack(spacing: 0) {
-            if conversation.canChangeRetention, manualBrowserSession == nil {
+            if conversation.canChangeRetention {
                 ConversationEmptyState(
                     isModelConfigured: isModelConfigured,
                     isTemporary: conversation.isTemporary,
@@ -1263,9 +1210,6 @@ struct ConversationPage: View {
                     activityRow(blocks: renderedBlocks)
                     turnEndingRow
                     queuedRows
-                }
-                if hasAnchor, manualBrowserAnchorID == anchoredTurnID {
-                    manualBrowserCard
                 }
             }
             .scrollTargetLayout()
@@ -1329,9 +1273,6 @@ struct ConversationPage: View {
                     guard !Task.isCancelled else { return }
                     await scrollToTurn(submissionID)
                 }
-            }
-            if manualBrowserAnchorID == nil {
-                manualBrowserCard
             }
             Color.clear
                 .frame(height: 1)
@@ -1707,16 +1648,17 @@ struct ConversationPage: View {
             attachments: message.attachments,
             skillInvocation: skillInvocation
         )
-        if manualBrowserSession != nil, manualBrowserAnchorID == nil {
-            manualBrowserBeforeSubmissionID = receipt.id
-        }
+        holdForSend(receipt)
+        Log.ui.info("ConversationPage.send conversation=\(conversation.id) draft=\(message.id) submission=\(receipt.id) disposition=\(receipt.disposition.rawValue) chars=\(message.text.count) attachments=\(message.attachments.count)")
+    }
+
+    private func holdForSend(_ receipt: Conversation.SubmissionReceipt) {
         latestSubmissionID = receipt.id
         submissionFrame = .null
         sendFlightBubble = nil
         sendFlightPath = nil
         sendHandoff = .waitingForAnchor(submissionID: receipt.id, origin: composerInputFrame.origin)
         scroller.holdForSend(receipt.id)
-        Log.ui.info("ConversationPage.send conversation=\(conversation.id) draft=\(message.id) submission=\(receipt.id) disposition=\(receipt.disposition.rawValue) chars=\(message.text.count) attachments=\(message.attachments.count)")
     }
 
     private func submitSkill(_ skill: Skill, argument: String) {
