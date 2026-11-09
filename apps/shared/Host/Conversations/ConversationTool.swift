@@ -49,20 +49,24 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
     }
 
     func execute(toolCallId: String, args: JSONValue) async throws -> ToolResult {
+        try await execute(toolCallId: toolCallId, args: args, failureNote: nil)
+    }
+
+    func execute(toolCallId: String, args: JSONValue, failureNote: (@MainActor (String) -> String?)?) async throws -> ToolResult {
         guard let source = args.objectValue?["source"]?.stringValue else {
             Log.session.warning("tool.execute rejected: missing 'source' (id=\(toolCallId))")
             return ToolResult(text: "missing 'source'", isError: true)
         }
         Log.session.info("tool.execute id=\(toolCallId) purpose=\(LogPrivacy.text(args.objectValue?["purpose"]?.stringValue ?? "", limit: 80)) source=\(LogPrivacy.text(source, limit: 4_096))")
-        return try await execute(source: source)
+        return try await execute(source: source, failureNote: failureNote)
     }
 
     @MainActor
-    private func execute(source: String) async throws -> ToolResult {
+    private func execute(source: String, failureNote: (@MainActor (String) -> String?)?) async throws -> ToolResult {
         guard let session = conversation else { return ToolResult(text: "Conversation is no longer available", isError: true) }
         session.beginExecution(source: source)
         do {
-            return try await execute(source: source, in: session)
+            return try await execute(source: source, in: session, failureNote: failureNote)
         } catch {
             session.finishExecution(output: error.localizedDescription, isError: true)
             throw error
@@ -70,7 +74,7 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
     }
 
     @MainActor
-    private func execute(source: String, in session: Conversation) async throws -> ToolResult {
+    private func execute(source: String, in session: Conversation, failureNote: (@MainActor (String) -> String?)?) async throws -> ToolResult {
         let output: ModelOutput
         let diagnosticContent: JSONValue?
         var logs: [VirtualMachineLog]
@@ -100,6 +104,7 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
         diagnosticContent = output.truncated ? nil : await logOutput(logs: logs, error: failure)
         let failed = failure != nil
         Log.session.info("tool.output maxBytes=\(JavaScriptOutputLimits.maxBytes) maxLines=\(JavaScriptOutputLimits.maxLines) outputBytes=\(output.text.utf8.count) truncated=\(output.truncated)")
+        if failed, let note = failureNote?(failure ?? output.text) { try? session.appendReportedProgress(note) }
         session.finishExecution(output: output.text, isError: failed)
         return ToolResult(
             content: [.text(TextContent(output.text))] + attachments.files.map(ContentBlock.attachment),

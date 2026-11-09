@@ -23,7 +23,10 @@ extension Conversation {
         await receiveAgentEvent(.toolExecutionStart(toolCall: call))
         let result: ToolResultMessage
         do {
-            let output = try await ConversationTool(conversation: self).execute(toolCallId: call.id, args: call.arguments)
+            let host = url.host(percentEncoded: false) ?? url.absoluteString
+            let output = try await ConversationTool(conversation: self).execute(toolCallId: call.id, args: call.arguments) {
+                Task.isCancelled ? nil : Self.pageFailureNote($0, host: host)
+            }
             result = ToolResultMessage(toolCallId: call.id, toolName: call.name, content: output.content,
                                        diagnostics: output.diagnostics, isError: output.isError, truncated: output.truncated)
         } catch {
@@ -45,6 +48,18 @@ extension Conversation {
         }
         Log.session.info("Conversation.runPage end id=\(id) navigated=\(!result.isError) stopped=\(stopped)")
         return nil
+    }
+
+    private static func pageFailureNote(_ failure: String, host: String) -> String {
+        let line = failure.prefix { $0 != "\n" }
+        let message = (try? JSONDecoder().decode(JSONValue.self, from: Data(line.utf8)))?.objectValue?["message"]?.stringValue ?? String(line)
+        if message.contains("requires an absolute public HTTPS URL") {
+            return L10n.string("Couldn’t open \(host). Only HTTPS websites can be opened.")
+        }
+        let parts = message.components(separatedBy: "requested URL: ")
+        let reason = parts.count == 2 ? parts[1].trimmingCharacters(in: .whitespacesAndNewlines) : ""
+        guard !reason.isEmpty else { return L10n.string("Couldn’t open \(host).") }
+        return L10n.string("Couldn’t open \(host). \(reason.hasSuffix(".") ? reason : reason + ".")")
     }
 
     public func browserOperation(action: String, arguments: JSONValue, purpose: String) async throws -> JSONValue? {
