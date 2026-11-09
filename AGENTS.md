@@ -71,4 +71,5 @@ After you push a change:
 1. Always require user confirmation before destructive actions.
 1. Hosted service and model-provider icons live only in the `openox-service-assets-prod` S3 bucket.
 1. Reuse the fixed `ox-1`–`ox-5` simulator pool for all simulator work.
+1. Secrets should never be exposed to Ox as plain text, only via references.
 
