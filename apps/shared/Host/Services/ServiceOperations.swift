@@ -182,7 +182,8 @@ final class ServiceOperations {
                     return false
                 }
             }
-            if let secrets, await !secrets.authorize() {
+            let lazyApproval = WebSessionContract.isEnabled(service.definition) && actionID == WebSessionContract.loginAction
+            if let secrets, !lazyApproval, await !secrets.authorize() {
                 throw OxFunctionError(code: "permission_denied", message: "\(qualifiedName): the user did not allow this action to use the saved secret.", recovery: "Stop. Do not retry with the same secret unless the user asks; offer manual login instead.")
             }
             let approve: @MainActor (String, Any?) async -> Bool = { name, args in
@@ -223,8 +224,7 @@ final class ServiceOperations {
                     service: service, actionID: actionID, args: dispatched,
                     approve: approve, readFile: { try await self.readMCPFile($0, purpose) }, receiveFiles: receiveFiles
                 )
-            } else if let secrets, actionID == WebSessionContract.loginAction,
-                      secrets.owners.contains(where: { $0 != service.definition.actionNamespace }) {
+            } else if secrets != nil, lazyApproval {
                 result = .success(.null)
             } else {
                 result = await service.invokeAction(

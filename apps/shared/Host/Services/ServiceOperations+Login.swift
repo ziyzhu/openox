@@ -11,6 +11,9 @@ extension ServiceOperations {
             let verified = await completeAutomaticLogin(service: service, secrets: secrets, input: input, pageURL: pageURL, approve: approve)
             secrets.releaseRendering()
             if verified { return Self.loginResult(interaction: "automatic", verified: true) }
+            if secrets.denied {
+                throw OxFunctionError(code: "permission_denied", message: "\(service.title) login: the user did not allow this action to use the saved login.", recovery: "Stop. Do not retry with the same login unless the user asks; offer manual login instead.")
+            }
         }
         if let provider = loginProvider(for: service, secrets: secrets) {
             return try await completeProviderChain(service: service, provider: provider, secrets: secrets, input: input,
@@ -64,7 +67,7 @@ extension ServiceOperations {
             }
         } else {
             verified = await runLoginSteps(service: service, secrets: secrets, input: input, pageURL: pageURL,
-                                           approve: approve, started: true)
+                                           approve: approve, started: false)
         }
         if verified { secrets.recordSuccess() }
         else if secrets.stepEnd == .stalled { secrets.recordRejection() }
@@ -76,8 +79,8 @@ extension ServiceOperations {
                                approve: @escaping @MainActor (String, Any?) async -> Bool, started: Bool) async -> Bool {
         secrets.stepEnd = .running
         if !started {
-            guard case .success = await service.invokeAction(WebSessionContract.loginAction, args: input, pageURL: pageURL,
-                                                              secrets: secrets, approve: approve) else { return false }
+            guard await runLoginStep(service: service, secrets: secrets, input: input, pageURL: pageURL, in: nil,
+                                     approve: approve) else { return false }
         }
         var observed = 0
         var previousURL: URL?
@@ -99,15 +102,34 @@ extension ServiceOperations {
                 break
             }
             previousURL = url
-            guard case .success = await service.invokeAction(WebSessionContract.loginAction, args: input, in: page,
-                                                              secrets: secrets, approve: approve) else {
+            guard await runLoginStep(service: service, secrets: secrets, input: input, pageURL: nil, in: page,
+                                     approve: approve) else {
                 secrets.stepEnd = .finished
                 break
             }
             Log.service.info("Service.login step domain=\(service.domain) step=\(step) retrievals=\(secrets.retrievals) path=\(page.page.url?.path ?? "?")")
         }
         if secrets.stepEnd == .running { secrets.stepEnd = .finished }
+        guard secrets.retrievals > 0 else {
+            return await hasIntendedSession(service: service, secrets: secrets, in: loginPage(service), approve: approve)
+        }
         return await settledSession(service: service, secrets: secrets, page: loginPage(service), approve: approve)
+    }
+
+    private func runLoginStep(service: Service, secrets: SecretAttempt, input: JSONValue, pageURL: String?,
+                              in page: Service.ServiceWebPage?,
+                              approve: @escaping @MainActor (String, Any?) async -> Bool) async -> Bool {
+        for _ in 0..<2 {
+            let result = await service.invokeAction(WebSessionContract.loginAction, args: input, pageURL: pageURL, in: page,
+                                                    secrets: secrets, approve: approve)
+            guard !secrets.awaitingApproval.isEmpty else {
+                if case .success = result { return true }
+                return false
+            }
+            guard await secrets.authorizePending() else { return false }
+            Log.service.info("Service.login step approved domain=\(service.domain)")
+        }
+        return false
     }
 
     private func returnToDestination(service: Service, secrets: SecretAttempt?, input: JSONValue, pageURL: String?,

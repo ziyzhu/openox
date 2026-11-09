@@ -61,6 +61,7 @@ nonisolated enum SecretAttemptError: LocalizedError {
     case notOwner
     case wrongOrigin
     case denied
+    case approvalRequired
 
     var errorDescription: String? {
         switch self {
@@ -70,6 +71,7 @@ nonisolated enum SecretAttemptError: LocalizedError {
         case .notOwner: "Only the service that owns this secret can retrieve it."
         case .wrongOrigin: "Secret retrieval is allowed only on the owning service's domain."
         case .denied: "The user did not allow this action to use the secret."
+        case .approvalRequired: "Waiting for the user to allow this action to use the secret."
         }
     }
 }
@@ -81,6 +83,8 @@ final class SecretAttempt {
     let keys: Set<String>
     private let approve: (SecretUse, String) async -> Bool
     private var approved: Set<String> = []
+    private(set) var awaitingApproval: Set<String> = []
+    private(set) var denied = false
     private var released: Set<String> = []
     private(set) var retrievals = 0
     var stepEnd = LoginStepEnd.finished
@@ -184,6 +188,21 @@ final class SecretAttempt {
         return true
     }
 
+    func authorizePending() async -> Bool {
+        let pending = awaitingApproval.sorted()
+        awaitingApproval.removeAll()
+        for key in pending where !approved.contains(key) {
+            guard let entry = try? Secret.entry(key: key),
+                  await approve(SecretUse(key: key, consumer: consumer), entry.displayName) else {
+                denied = true
+                Log.service.info("SecretAttempt.authorize id=\(id.uuidString.prefix(8)) key=\(key) consumer=\(consumer) answer=denied")
+                return false
+            }
+            approved.insert(key)
+        }
+        return true
+    }
+
     func retrieve(_ value: JSONValue, caller namespace: String, host: String?) async throws -> JSONValue {
         guard let reference = SecretReference(value) else { throw SecretAttemptError.invalidReference }
         guard keys.contains(reference.key) else { throw SecretAttemptError.notPassed }
@@ -192,8 +211,18 @@ final class SecretAttempt {
         }
         guard owner == namespace else { throw SecretAttemptError.notOwner }
         if let host, !Self.host(host, isWithin: owner) { throw SecretAttemptError.wrongOrigin }
-        guard approved.contains(reference.key),
-              SecretUse(key: reference.key, consumer: consumer).policy() != .block else { throw SecretAttemptError.denied }
+        switch SecretUse(key: reference.key, consumer: consumer).policy() {
+        case .block:
+            denied = true
+            throw SecretAttemptError.denied
+        case .allow:
+            approved.insert(reference.key)
+        case .ask where !approved.contains(reference.key):
+            awaitingApproval.insert(reference.key)
+            throw SecretAttemptError.approvalRequired
+        case .ask:
+            break
+        }
         guard let fields = try Secret.fields(key: reference.key), Set(fields.keys) == Set(type.fields) else {
             throw SecretAttemptError.unavailable
         }
