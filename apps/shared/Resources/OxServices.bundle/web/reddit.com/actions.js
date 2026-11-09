@@ -1,7 +1,46 @@
 window.ox.install(({action}) => {
  action('listSessions',{async invoke(){const end=Date.now()+12000;while(Date.now()<end){const links=Array.from(document.querySelectorAll('a[href]'));const login=links.find(a=>new URL(a.href,location.href).pathname==='/login/' && /log in/i.test(a.innerText));if(login || (location.pathname.startsWith('/login') && document.querySelector('#login-password-visibility-toggle')))return [];if(document.querySelector('shreddit-post')) break;await new Promise(r=>setTimeout(r,200));}throw new Error('Reddit account identity discovery is not yet verified. Preserve login and inspect account controls before enabling protected actions.');}});
- action('login',{async invoke(){const end=Date.now()+12000;while(Date.now()<end){if(location.pathname.startsWith('/login') && document.querySelector('#login-password-visibility-toggle'))return null;await new Promise(r=>setTimeout(r,200));}throw new Error('Reddit login controls did not load; user sign-in was not prepared.');}});
-  const clean = s => (s || '').replace(/\s+/g, ' ').trim();
+ const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const usable = element => {
+  if (!element || element.disabled || element.readOnly || element.type === "hidden") return false;
+  if (element.closest("[hidden], [aria-hidden='true'], [inert]")) return false;
+  const style = getComputedStyle(element);
+  return style.display !== "none" && style.visibility !== "hidden";
+};
+
+const waitForStep = async (detectors, timeout = 15000) => {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    for (const [kind, detect] of Object.entries(detectors)) {
+      const match = detect();
+      if (match) return { kind, match };
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  return { kind: "unknown", match: null };
+};
+
+const typeInto = (field, value) => {
+  field.focus();
+  field.select?.();
+  if (!document.execCommand("insertText", false, value) || field.value !== value) {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value").set.call(field, value);
+    field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+  }
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+};
+
+const pageError = (root = document) => [...root.querySelectorAll("[role='alert'], [aria-live='assertive'], [aria-live='polite']")]
+  .filter(usable)
+  .map(element => cleanText(element.innerText))
+  .filter(Boolean)
+  .join(" | ")
+  .slice(0, 200);
+const redditActive=e=>{if(!usable(e))return false;for(let a=e,n=0;a&&n<40;n++){const s=getComputedStyle(a);if(s.display==='none'||s.visibility==='hidden'||a.hidden||a.getAttribute('aria-hidden')==='true')return false;a=a.assignedSlot||a.parentElement||a.getRootNode()?.host;}return true;};
+const redditLoginStep=async()=>waitForStep({challenge:()=>[...document.querySelectorAll('faceplate-form#login-app-otp,faceplate-form#login-backup-otp,input[autocomplete="one-time-code"],iframe[src*="captcha"]')].find(redditActive),credentials:()=>{const root=document.querySelector('faceplate-form#login'),userHost=root?.querySelector('#login-username'),passwordHost=root?.querySelector('#login-password'),username=userHost?.shadowRoot?.querySelector('input[name="username"]'),password=passwordHost?.shadowRoot?.querySelector('input[name="password"]'),submit=root?[...root.querySelectorAll('button')].find(e=>cleanText(e.textContent)==='Log In'):null;return redditActive(userHost)&&redditActive(passwordHost)&&redditActive(username)&&redditActive(password)&&submit?{root,username,password,submit}:null;}});
+action('login',{async invoke(input,context){const step=await redditLoginStep();if(step.kind==='unknown'&&!input?.account)throw Error('Reddit sign-in controls did not become ready.');if(step.kind!=='credentials')return null;if(!input?.account||input.account.serviceID!=='web:reddit.com')return null;if(pageError(step.match.root))throw Error('Reddit sign-in reports an error; stopped without retrying.');const account=await context.secret(input.account);typeInto(step.match.username,account.username);typeInto(step.match.password,account.password);const ready=await waitForStep({submit:()=>redditActive(step.match.submit)?step.match.submit:null},5000);if(ready.kind!=='submit')throw Error('Reddit login button unavailable.');ready.match.click();return null;}});
+const clean = s => (s || '').replace(/\s+/g, ' ').trim();
   function postPath(raw) {
     let u;
     try { u = new URL(raw); } catch { throw Error('Invalid Reddit post URL'); }

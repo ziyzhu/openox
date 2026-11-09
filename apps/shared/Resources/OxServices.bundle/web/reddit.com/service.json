@@ -46,7 +46,7 @@
     {
       "id": "login",
       "label": "Sign in to Reddit",
-      "description": "Prepare Reddit login controls for user sign-in.",
+      "description": "Use a saved Reddit account on the official web-component password form; leave captcha, one-time codes, SSO, and unknown steps to the user.",
       "baseUrl": "https://www.reddit.com/login/",
       "requireAuth": false,
       "requireApproval": false,
@@ -57,7 +57,8 @@
       },
       "outputSchema": {
         "type": "null"
-      }
+      },
+      "blocking": true
     },
     {
       "id": "search",
