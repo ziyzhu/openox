@@ -35,9 +35,14 @@ nonisolated struct SecretAccess: Codable, Sendable {
 - `key` is an opaque stable identifier; service IDs and email addresses are not unique keys. `displayName` is a label, not proof of identity.
 - `serviceID` is the credential owner, such as `web:google.com` or `api:example.com`. For identity-provider login it is the provider, never the destination.
 - `type` describes stored data, not an authentication mechanism. Values stay in secure credential storage with fixed payloads `{ username, password }`, `{ apiKey }`, and `{ token }`. Preserve the existing `apiKey` field name.
-- Untyped entries keep working for their existing consumers but cannot be used by reference. Do not guess types, rename fields, drop extra fields, or require a store conversion.
+- Every secret is typed; no consumer reads fields beyond these payloads. New entries always carry `type`, and arbitrary-field entry is removed.
+- An existing entry whose field names exactly equal one type's payload gains that type on load. Any other entry is untyped and shown as "Needs setup" in Settings, where the user picks a type and maps stored fields to its slots, or deletes it; mapping rewrites the value to the fixed payload and is refused if it drops a field an existing binding requires. Until then its existing bindings keep working, and it cannot be used by reference.
 - `publicationOnly` entries never receive `access` rules.
 - `SecretBinding` stays as is for providers, API service auth, and repository publication. Managed provider, API, and MCP authorization records stay on their existing storage paths.
+
+## Secret entry
+
+One canonical card collects every secret, in the conversation dock, Settings, and macOS: the `serviceID` icon, one sentence naming the website or service and what Ox will do with it, one grouped block of the type's fixed fields, and two equal-width buttons, "Don't Save" and "Save". `account` shows an editable username and a masked password; `apiKey` and `token` show one masked field. Prefilled values stay fully masked. `ox.secret.add` requires `type` and accepts `serviceID`; Settings adds by picking a type first. The macOS JSON prompt and the Settings field editor are removed.
 
 ## Permission policy
 
@@ -106,7 +111,7 @@ Legacy `getSignInUrl`/`getSignInState` stay unsupported. Protected actions use `
 4. Without auto-login support, an allowed secret, or when a human step is required, show the existing live-page handoff. During handoff offer a native "Fill saved login" action that applies the same policy and origin checks. Capture relevant username/password inputs during the active attempt before submission clears them; never collect OTPs, recovery codes, or QR payloads as passwords.
 5. Stage captured values in Host memory through pending MFA; discard on rejection, cancellation, timeout, teardown, or process exit. A retry starts new staging.
 6. Refresh `listSessions` and verify the intended destination account. Submission, navigation, or acknowledgment alone is not verified login.
-7. After verified success with reusable captured values, ask "Remember this login?" naming the credential-owning website and account. Save as a typed `account` secret with an `allow` rule for this `login` action and origin only on acceptance; otherwise discard staged values and keep the browser session. Preserve an old secret until its replacement is verified and accepted.
+7. After verified success with reusable captured values, ask "Remember this login?" in the canonical entry card, naming the credential-owning website and account with the captured values prefilled. Save as a typed `account` secret with an `allow` rule for this `login` action and origin only on acceptance; otherwise discard staged values and keep the browser session. Preserve an old secret until its replacement is verified and accepted.
 8. Reuse an existing secret without another remember prompt.
 
 For identity-provider login, the provider owns the secret; the destination's `login` requests the transition, and the Host resolves the provider secret under a rule naming the provider origins. A redirect never authorizes credentials. Resolve provider account choice explicitly, match provider and destination identities separately, and verify the destination through fresh destination `listSessions`. The automatic flow must not interrupt a pending provider redirect or challenge.
@@ -119,13 +124,14 @@ Coordinate with `plans/browser.md`: website sessions are shared and Profile isol
 
 ## API follow-up
 
-Reuse allowed saved secrets through `request` stand-ins. Otherwise render native inputs from the existing API auth configuration and save typed `apiKey`, `token`, or `account` entries. Preserve arbitrary-field secrets and the general editor. Verify with a service-specific safe authenticated read, never a mutation. After verification, ask "Remember this connection?"; on decline, keep values only for the authorized operation in progress with a bounded lifetime. Keep OAuth's managed authorization, refresh, and revocation path with OpenOx-registered applications.
+Reuse allowed saved secrets through `request` stand-ins. Otherwise render native inputs from the existing API auth configuration and save typed `apiKey`, `token`, or `account` entries. Verify with a service-specific safe authenticated read, never a mutation. After verification, ask "Remember this connection?"; on decline, keep values only for the authorized operation in progress with a bounded lifetime. Keep OAuth's managed authorization, refresh, and revocation path with OpenOx-registered applications.
 
 ## Implementation sequence
 
 - [ ] Reproduce current web/API login and inspect credential entry, handoff completion, account detection, permissions, script execution, and output/log exposure with disposable accounts and local fixtures, diagnostics outside Git.
 - [ ] Land the separate removal of `session` from the web handler context.
-- [ ] Add `type`, `serviceID`, and `access` to `SecretEntry`; extend `ox.secret.list`; verify predecessor compatibility of `secret.index`.
+- [ ] Add `type`, `serviceID`, and `access` to `SecretEntry`; type matching entries on load; extend `ox.secret.list` and require `type` in `ox.secret.add`; verify predecessor compatibility of `secret.index`.
+- [ ] Replace the dock card, Settings editor, and macOS prompt with the canonical entry card, and add "Needs setup" field mapping in Settings.
 - [ ] Add the permission policy resolution, combined approval card, and Settings rules UI with stable identifiers, localization, accessible labels, and equal outer padding.
 - [ ] Add `$secret` reference handling to invocation validation and the protocol schema sources and generated contracts; implement stand-ins and Host resolution for web `context.secret.type` and API `request`.
 - [ ] Add redaction, page-inspection lock, and optional origin blocking; prove them with controlled forms before production persistence. Consult current Apple WebKit documentation and keep platform adapters under their apps.
@@ -135,7 +141,7 @@ Reuse allowed saved secrets through `request` stand-ins. Otherwise render native
 
 ## Verification and completion
 
-Use E2E coverage, not new unit tests. Exercise policy resolution (action over service over ask, block over allow, combined approval, always-approve scope, Profile isolation, revoked rules), malformed references, unknown or untyped keys, wrong-type secrets at resolution, forged and expired stand-ins, wrong-origin typing, frames, redirects, multi-step and dynamic forms, navigation mid-attempt, MFA, rejection and retry, remember acceptance and decline, expiry, cancellation, concurrent attempts, process termination, saved replacement, identity-provider transitions and account choice, provider success without destination success, manual-only `login`, and reopening the selected account's page. Check actual model outputs, action results, errors, and logs for values, including encoded forms.
+Use E2E coverage, not new unit tests. Exercise load-time typing of exact-match entries, "Needs setup" mapping and deletion with bindings still working, policy resolution (action over service over ask, block over allow, combined approval, always-approve scope, Profile isolation, revoked rules), malformed references, unknown or untyped keys, wrong-type secrets at resolution, forged and expired stand-ins, wrong-origin typing, frames, redirects, multi-step and dynamic forms, navigation mid-attempt, MFA, rejection and retry, remember acceptance and decline, expiry, cancellation, concurrent attempts, process termination, saved replacement, identity-provider transitions and account choice, provider success without destination success, manual-only `login`, and reopening the selected account's page. Check actual model outputs, action results, errors, and logs for values, including encoded forms.
 
 Verify predecessor-written storage with the changed build and changed-build storage with the predecessor. Keep credentials out of Profile export/import according to existing backup behavior. Build iOS and macOS for shared native changes, run protocol and storage checks, and capture simulator screenshots or video for approval cards, handoff, remember prompts, and Settings.
 
