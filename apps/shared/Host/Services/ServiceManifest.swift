@@ -247,7 +247,12 @@ nonisolated struct ServiceDefinition: Sendable {
                 guard let expected = value.objectValue, let id = expected["id"]?.stringValue,
                       let action = actionIndex[id] else { return nil }
                 if [WebSessionContract.listAction, WebSessionContract.loginAction].contains(id) {
-                    return WebSessionContract.isEnabled(self) ? action : nil
+                    guard WebSessionContract.isEnabled(self) else { return nil }
+                    guard id == WebSessionContract.loginAction else { return action }
+                    var contract = action.raw
+                    contract["description"] = expected["description"]
+                    contract["outputSchema"] = expected["outputSchema"]
+                    return Manifest.Action(.object(contract))
                 }
                 if id == "search" {
                     var contract = action.raw

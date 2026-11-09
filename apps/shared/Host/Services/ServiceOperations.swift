@@ -203,6 +203,7 @@ final class ServiceOperations {
             let value = try result.get()
             if WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction {
                 try await self.presentLogin(service: service, actionID: actionID, input: input, session: session, pageURL: pageURL)
+                return .object(["interaction": .string("completed"), "authentication": .string("unverified")])
             }
             return value
         }

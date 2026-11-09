@@ -10,9 +10,9 @@
     },
     {
       "id": "login",
-      "description": "Prepare and present the website's live login page for the user. Required alongside listSessions. Returns null after interaction; acknowledgment is not authentication. Discover sessions afterward. Never request credentials in chat or replay writes after login.",
+      "description": "Prepare and present the website's live login page, then wait for the user to tap Done. Required alongside listSessions. Returns interaction: completed and authentication: unverified only after Done; cancellation throws. The user has already finished interacting when this call returns: do not ask them to sign in or say done again. Discover fresh sessions before continuing the original task; completion is not proof of authentication. Explain the sign-in step before invoking. Never request credentials in chat or replay writes after login.",
       "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
-      "outputSchema": { "type": "null" },
+      "outputSchema": { "type": "object", "properties": { "interaction": { "type": "string", "enum": ["completed"] }, "authentication": { "type": "string", "enum": ["unverified"] } }, "required": ["interaction", "authentication"], "additionalProperties": false },
       "requireApproval": false,
       "requireAuth": false
     },
