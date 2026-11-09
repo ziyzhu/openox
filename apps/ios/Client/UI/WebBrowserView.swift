@@ -25,10 +25,10 @@ struct WebBrowserView: View {
         case invalid
         case blocked
 
-        var message: LocalizedStringKey {
+        var message: String {
             switch self {
-            case .invalid: "Enter a valid website address."
-            case .blocked: "Couldn’t open this address in this session."
+            case .invalid: String(localized: "Enter a valid website address.")
+            case .blocked: String(localized: "Couldn't open this address in this session.")
             }
         }
     }
@@ -149,14 +149,7 @@ struct WebBrowserView: View {
                     }
                 }
             }
-            .alert("Couldn’t Load Page", isPresented: Binding(
-                get: { addressError != nil },
-                set: { if !$0 { addressError = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                if let addressError { Text(addressError.message) }
-            }
+            .errorAlert("Couldn't Load Page", message: addressError?.message) { addressError = nil }
             .toolbarBackground(.hidden, for: .navigationBar)
     }
 
@@ -177,7 +170,7 @@ struct WebBrowserView: View {
     @ViewBuilder private var errorOverlay: some View {
         if let errorMessage, !page.isLoading {
             ContentUnavailableView {
-                Label("Couldn’t Load Page", systemImage: "wifi.exclamationmark")
+                Label("Couldn't Load Page", systemImage: "wifi.exclamationmark")
             } description: {
                 Text(errorMessage)
             } actions: {

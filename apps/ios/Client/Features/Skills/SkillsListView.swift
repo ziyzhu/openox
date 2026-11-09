@@ -79,9 +79,7 @@ struct SkillsListView: View {
         .oxSearchable(text: $query, prompt: Text("Search skills"), accessibilityIdentifier: A11yID.Settings.skillSearch)
         .onChange(of: Skills.shared.repositorySkills) { _, _ in skills.refresh() }
         .onChange(of: Skills.shared.all) { _, _ in skills.refresh() }
-        .alert("Couldn't Update Skill", isPresented: Binding(get: { skills.errorMessage != nil }, set: { if !$0 { skills.dismissError() } })) {
-            Button("OK") { skills.dismissError() }
-        } message: { Text(verbatim: skills.errorMessage ?? "") }
+        .errorAlert("Couldn't Update Skill", message: skills.errorMessage) { skills.dismissError() }
         .navigationDestination(item: $editing) { draft in
             SkillEditorView(draft: draft, skills: skills, profileID: profileID)
                 .id(draft.id)

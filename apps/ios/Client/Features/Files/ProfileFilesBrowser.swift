@@ -116,14 +116,7 @@ private struct ProfileFilesBrowser: ViewModifier {
                     FilePreviewPresentation(file: selected.file, scope: selected.scope)
                 }
             }
-            .alert("Couldn't Open File", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK", role: .cancel) { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? "")
-            }
+            .errorAlert("Couldn't Open File", message: $errorMessage)
     }
 
     private func openSelection(_ url: URL) {

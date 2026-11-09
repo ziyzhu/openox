@@ -3267,7 +3267,7 @@
         }
       }
     },
-    "Couldn’t Load Page" : {
+    "Couldn't Load Page" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
@@ -3300,7 +3300,7 @@
         }
       }
     },
-    "Couldn’t open this address in this session." : {
+    "Couldn't open this address in this session." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
@@ -7130,7 +7130,7 @@
         }
       }
     },
-    "Ox Couldn’t Open Your Data" : {
+    "Ox Couldn't Open Your Data" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

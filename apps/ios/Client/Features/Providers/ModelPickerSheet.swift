@@ -370,14 +370,7 @@ struct ModelPickerContent: View {
                     }
                 }
             }
-            .alert("Load Models", isPresented: Binding(
-                get: { providerModelsError != nil },
-                set: { if !$0 { providerModelsError = nil } }
-            )) {
-                Button("OK", role: .cancel) { providerModelsError = nil }
-            } message: {
-                Text(verbatim: providerModelsError ?? "")
-            }
+            .errorAlert("Load Models", message: $providerModelsError)
         } label: {
             selectionRow("Model", selectedModel?.displayName ?? "No models available", indicator: "chevron.right")
         }

@@ -124,11 +124,7 @@ struct ProfileFilesPage: View {
                 .ignoresSafeArea()
                 .onDisappear { try? FileManager.default.removeItem(at: file.url.deletingLastPathComponent()) }
         }
-        .alert("Couldn't Access Folder", isPresented: Binding(
-            get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
-        )) { Button("OK", role: .cancel) { errorMessage = nil } } message: {
-            Text(errorMessage ?? "")
-        }
+        .errorAlert("Couldn't Access Folder", message: $errorMessage)
         .alert(Text("Unmount \(pendingUnmount?.name ?? "")?"), isPresented: Binding(
             get: { pendingUnmount != nil }, set: { if !$0 { pendingUnmount = nil } }
         ), presenting: pendingUnmount) { grant in

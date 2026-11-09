@@ -64,14 +64,7 @@ struct ServiceDetailView: View {
             } message: {
                 Text("Permanently deletes this service's editable source from Local. Website logins and data are kept.")
             }
-            .alert("Couldn't Delete Local Service", isPresented: Binding(
-                get: { localServiceDeleteError != nil },
-                set: { if !$0 { localServiceDeleteError = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(localServiceDeleteError ?? "")
-            }
+            .errorAlert("Couldn't Delete Local Service", message: $localServiceDeleteError)
     }
 
     private var content: some View {
@@ -156,14 +149,7 @@ struct ServiceDetailView: View {
         } message: {
             Text("Removes this server, its discovered tools, and its local authorization from Ox. The server does not receive a revocation request.")
         }
-        .alert("Couldn't Remove MCP Server", isPresented: Binding(
-            get: { mcpRemovalError != nil },
-            set: { if !$0 { mcpRemovalError = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(mcpRemovalError ?? "")
-        }
+        .errorAlert("Couldn't Remove MCP Server", message: $mcpRemovalError)
         .task(id: service.id) {
             _ = await service.loadManifest(reason: .serviceDetail)
         }

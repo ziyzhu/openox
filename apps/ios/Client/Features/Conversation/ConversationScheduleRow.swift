@@ -156,14 +156,7 @@ private struct ConversationScheduleDetails: View {
         } message: {
             Text("Future runs will stop. Your conversations will be kept.")
         }
-        .alert("Couldn't Update Schedule", isPresented: Binding(
-            get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { errorMessage = nil }
-                .accessibilityIdentifier("\(identifier).errorDismiss")
-        } message: {
-            Text(errorMessage ?? "")
-        }
+        .errorAlert("Couldn't Update Schedule", message: $errorMessage, dismissIdentifier: "\(identifier).errorDismiss")
     }
 
     private var identifier: String { A11yID.ConversationControls.Message.schedule(scheduleID.uuidString) }

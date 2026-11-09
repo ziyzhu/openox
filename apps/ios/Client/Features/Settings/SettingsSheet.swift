@@ -310,14 +310,7 @@ struct SettingsSheet: View {
         .sheet(isPresented: $creatingProfile) {
             ProfileCreationSheet()
         }
-        .alert("Open Profile", isPresented: Binding(
-            get: { profileOpenErrorMessage != nil },
-            set: { if !$0 { profileOpenErrorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { profileOpenErrorMessage = nil }
-        } message: {
-            Text(profileOpenErrorMessage ?? "")
-        }
+        .errorAlert("Open Profile", message: $profileOpenErrorMessage)
     }
 
     private var capabilitiesSettingsSection: some View {

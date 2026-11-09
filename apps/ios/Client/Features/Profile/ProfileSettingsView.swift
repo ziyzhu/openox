@@ -145,14 +145,7 @@ struct ProfileSettingsView: View {
                 Text("A Profile named “\(StorageRoot.cleanName(nameDraft))” already exists. Choose a different name.")
             }
         }
-        .alert("Profile", isPresented: Binding(
-            get: { operationErrorMessage != nil },
-            set: { if !$0 { operationErrorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { operationErrorMessage = nil }
-        } message: {
-            Text(operationErrorMessage ?? "")
-        }
+        .errorAlert("Profile", message: $operationErrorMessage)
         .alert(
             "\(profile?.location == .external ? "Close" : "Delete") \(profile?.name ?? "")?",
             isPresented: $confirmingDelete

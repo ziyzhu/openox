@@ -112,14 +112,7 @@ struct MarkdownFileView: View {
             changes += 1
             Log.ui.info("MarkdownFileView.fileChanged filename=\(file.fileName) changes=\(changes)")
         }
-        .alert("Couldn't Save Markdown", isPresented: Binding(
-            get: { saveError != nil },
-            set: { if !$0 { saveError = nil } }
-        )) {
-            Button("OK", role: .cancel) { saveError = nil }
-        } message: {
-            Text(saveError ?? "")
-        }
+        .errorAlert("Couldn't Save Markdown", message: $saveError)
     }
 
     private func load() async {

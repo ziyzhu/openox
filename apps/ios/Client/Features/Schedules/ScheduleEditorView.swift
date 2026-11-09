@@ -119,14 +119,7 @@ struct ScheduleEditorView: View {
                     .accessibilityIdentifier(A11yID.Settings.scheduleSave)
             }
         }
-        .alert("Couldn't Save Schedule", isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { errorMessage = nil }
-        } message: {
-            Text(errorMessage ?? "")
-        }
+        .errorAlert("Couldn't Save Schedule", message: $errorMessage)
     }
 
     private var recurrence: ScheduleRecurrence {

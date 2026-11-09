@@ -520,14 +520,7 @@ struct RepositoryDetailView: View {
         } message: {
             Text("This disconnects the repository from Ox. Its files, website logins, and data are kept. Delete the folder in Files only when you no longer need it.")
         }
-        .alert("Export Local Repository", isPresented: Binding(
-            get: { localExportError != nil },
-            set: { if !$0 { localExportError = nil } }
-        )) {
-            Button("OK") { localExportError = nil }
-        } message: {
-            Text(localExportError ?? "")
-        }
+        .errorAlert("Export Local Repository", message: $localExportError)
     }
 
     private func lastSyncedText(_ repository: Repository.Descriptor) -> String {

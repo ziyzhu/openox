@@ -268,9 +268,7 @@ private struct RemoteHostCreationSheet: View {
                         .accessibilityIdentifier(A11yID.Settings.hostAddConfirm)
                 }
             }
-            .alert("Couldn't Add Host", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-                Button("OK", role: .cancel) { errorMessage = nil }
-            } message: { Text(errorMessage ?? "") }
+            .errorAlert("Couldn't Add Host", message: $errorMessage)
         }
     }
 

@@ -345,23 +345,11 @@ private struct SkillImportModifier: ViewModifier {
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
                         .presentationBackground(Theme.Colors.background)
-                        .alert("Couldn't Import Skill", isPresented: Binding(
-                            get: { coordinator.errorMessage != nil },
-                            set: { if !$0 { coordinator.dismissError() } }
-                        )) {
-                            Button("OK", role: .cancel) { coordinator.dismissError() }
-                        } message: {
-                            Text(coordinator.errorMessage ?? "")
-                        }
+                        .errorAlert("Couldn't Import Skill", message: coordinator.errorMessage) { coordinator.dismissError() }
                 }
             }
-            .alert("Couldn't Import Skill", isPresented: Binding(
-                get: { coordinator.proposal == nil && coordinator.errorMessage != nil },
-                set: { if !$0, coordinator.proposal == nil { coordinator.dismissError() } }
-            )) {
-                Button("OK", role: .cancel) { coordinator.dismissError() }
-            } message: {
-                Text(coordinator.errorMessage ?? "")
+            .errorAlert("Couldn't Import Skill", message: coordinator.proposal == nil ? coordinator.errorMessage : nil) {
+                coordinator.dismissError()
             }
             .onChange(of: coordinator.proposal?.id) { _, proposal in
                 if proposal != nil { onProposalPresented() }
@@ -392,23 +380,11 @@ private struct ConversationImportModifier: ViewModifier {
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
                         .presentationBackground(Theme.Colors.background)
-                        .alert("Couldn't Import Conversation", isPresented: Binding(
-                            get: { coordinator.errorMessage != nil },
-                            set: { if !$0 { coordinator.dismissError() } }
-                        )) {
-                            Button("OK", role: .cancel) { coordinator.dismissError() }
-                        } message: {
-                            Text(coordinator.errorMessage ?? "")
-                        }
+                        .errorAlert("Couldn't Import Conversation", message: coordinator.errorMessage) { coordinator.dismissError() }
                 }
             }
-            .alert("Couldn't Import Conversation", isPresented: Binding(
-                get: { coordinator.proposal == nil && coordinator.errorMessage != nil },
-                set: { if !$0, coordinator.proposal == nil { coordinator.dismissError() } }
-            )) {
-                Button("OK", role: .cancel) { coordinator.dismissError() }
-            } message: {
-                Text(coordinator.errorMessage ?? "")
+            .errorAlert("Couldn't Import Conversation", message: coordinator.proposal == nil ? coordinator.errorMessage : nil) {
+                coordinator.dismissError()
             }
             .onChange(of: coordinator.proposal?.id) { _, proposal in
                 if proposal != nil { onProposalPresented() }
@@ -463,7 +439,7 @@ struct RootView: View {
 
         var title: LocalizedStringKey {
             switch self {
-            case .manual, .whenAvailable: "Ox Couldn’t Open Your Data"
+            case .manual, .whenAvailable: "Ox Couldn't Open Your Data"
             case .updateBuild: "Update Ox to Continue"
             case .locateFolder, .missingFolder: "Profile Folder Not Found"
             }
@@ -606,14 +582,7 @@ struct RootView: View {
                 if sharedNoteComposer?.conversation != identity { sharedNoteComposer = nil }
                 if completionBanner?.conversationID == conversations.currentId { completionBanner = nil }
             }
-            .alert("Couldn't Attach Shared Files", isPresented: Binding(
-                get: { sharedNoteImportError != nil },
-                set: { if !$0 { sharedNoteImportError = nil } }
-            )) {
-                Button("OK", role: .cancel) { sharedNoteImportError = nil }
-            } message: {
-                Text(sharedNoteImportError ?? "")
-            }
+            .errorAlert("Couldn't Attach Shared Files", message: $sharedNoteImportError)
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active { completionBanner = nil }
                 switch phase {
@@ -1011,9 +980,7 @@ struct RootView: View {
                 bootstrap()
             } catch { profileLocationError = error.localizedDescription }
         }
-        .alert("Couldn't Locate Profile", isPresented: Binding(get: { profileLocationError != nil }, set: { if !$0 { profileLocationError = nil } })) {
-            Button("OK", role: .cancel) { profileLocationError = nil }
-        } message: { Text(profileLocationError ?? "") }
+        .errorAlert("Couldn't Locate Profile", message: $profileLocationError)
     }
 
     private func switchStartupProfile(to profile: Profile) {
