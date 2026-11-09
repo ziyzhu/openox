@@ -177,8 +177,9 @@
   "actions": [
     {
       "id": "login",
+      "baseUrl": "https://news.ycombinator.com/login",
       "label": "Log in",
-      "description": "Prepare website login for the user. Completion does not verify authentication.",
+      "description": "Sign in automatically with a saved Hacker News login, or prepare the login page for manual sign-in. Completion does not verify authentication.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -628,7 +629,7 @@
         },
         "login": {
           "label": "登录",
-          "description": "为用户准备网站登录。完成交互不代表已通过身份验证。"
+          "description": "使用已保存的 Hacker News 登录信息自动登录，或为用户准备手动登录页面。完成交互不代表已通过身份验证。"
         },
         "listSessions": {
           "label": "列出已登录账号",

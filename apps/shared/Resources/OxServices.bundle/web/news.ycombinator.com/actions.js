@@ -24,6 +24,45 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const usable = element => {
+  if (!element || element.disabled || element.readOnly || element.type === "hidden") return false;
+  if (element.closest("[hidden], [aria-hidden='true'], [inert]")) return false;
+  const style = getComputedStyle(element);
+  return style.display !== "none" && style.visibility !== "hidden";
+};
+
+const waitForStep = async (detectors, timeout = 15000) => {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    for (const [kind, detect] of Object.entries(detectors)) {
+      const match = detect();
+      if (match) return { kind, match };
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  return { kind: "unknown", match: null };
+};
+
+const typeInto = (field, value) => {
+  field.focus();
+  field.select?.();
+  if (!document.execCommand("insertText", false, value) || field.value !== value) {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value").set.call(field, value);
+    field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+  }
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+};
+
+const pageError = (root = document) => [...root.querySelectorAll("[role='alert'], [aria-live='assertive'], [aria-live='polite']")]
+  .filter(usable)
+  .map(element => cleanText(element.innerText))
+  .filter(Boolean)
+  .join(" | ")
+  .slice(0, 200);
+
+
 window.ox.install(({ action }) => {
     const fetchDoc = async (path) => {
         const html = await (await retryFetch(path, { credentials: "include" })).text();
@@ -95,10 +134,40 @@ window.ox.install(({ action }) => {
             comments: r.comments, hidden: false,
         };
     };
-    action('login', { async invoke() {
-            const destination = "https://news.ycombinator.com/login";
-            if (location.href !== new URL(destination, location.href).href)
-                location.assign(destination);
+    action('login', { async invoke(input = {}, context) {
+            const step = await waitForStep({
+                signedIn: () => location.pathname !== '/login' && usable(document.querySelector('#me')) && document.querySelector('#me')?.textContent?.trim() ? document.querySelector('#me') : null,
+                login: () => {
+                    if (location.pathname !== '/login') return null;
+                    const form = [...document.forms].find(f => f.querySelector('input[name="acct"][autocomplete="username"]')
+                        && f.querySelector('input[name="pw"][type="password"][autocomplete="current-password"]')
+                        && [...f.querySelectorAll('input[type="submit"]')].some(e => usable(e) && cleanText(e.value).toLowerCase() === 'login'));
+                    if (!form || !usable(form)) return null;
+                    const username = form.querySelector('input[name="acct"][autocomplete="username"]');
+                    const password = form.querySelector('input[name="pw"][autocomplete="current-password"]');
+                    const submit = [...form.querySelectorAll('input[type="submit"]')].find(e => usable(e) && cleanText(e.value).toLowerCase() === 'login');
+                    return usable(username) && usable(password) && submit ? { form, username, password, submit } : null;
+                },
+                recovery: () => location.pathname === '/forgot' && [...document.forms].find(f => usable(f.querySelector('input[name="s"]')) && usable(f.querySelector('input[type="submit"]'))) || null,
+                entry: () => {
+                    if (location.pathname !== '/' && location.pathname !== '/news') return null;
+                    return [...document.querySelectorAll('a[href]')].find(a => usable(a) && cleanText(a.textContent) === 'login' && new URL(a.href).pathname === '/login') || null;
+                },
+            });
+            if (step.kind === 'unknown') throw new Error('Hacker News sign-in controls did not appear');
+            if (step.kind === 'signedIn' || step.kind === 'recovery') return null;
+            if (step.kind === 'entry') {
+                step.match.click();
+                return null;
+            }
+            if (!input.account || input.account.serviceID !== 'web:news.ycombinator.com') return null;
+            const { form, username, password, submit } = step.match;
+            const error = pageError(form);
+            if (error) throw new Error('Hacker News sign-in reported: ' + error);
+            const credentials = await context.secret(input.account);
+            typeInto(username, credentials.username);
+            typeInto(password, credentials.password);
+            submit.click();
             return null;
         } });
     action('listSessions', { async invoke() {
