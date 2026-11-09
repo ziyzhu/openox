@@ -304,6 +304,14 @@ private struct ServiceInspectorRow: View {
                 NavigationStack {
                     ServicePageInspector(service: service, browserSessionID: conversationID, pageID: link.pageID, handoff: handoff)
                 }
+                .onAppear {
+                    if let page { pageMount.didMount(page: page, ownerID: rowID) }
+                }
+                .background {
+                    WebPageDismantleSignal {
+                        if let page { pageMount.didUnmount(page: page, ownerID: rowID) }
+                    }
+                }
             }
         }
         .onAppear {

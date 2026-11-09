@@ -17,6 +17,7 @@ struct ServicePageInspector: View {
                     page: page,
                     mode: .inspection,
                     fallbackHost: service.domain,
+                    close: (A11yID.ServiceInspector.close, { dismiss() }),
                     navigate: { url in
                         guard let servicePage else { return false }
                         return await service.navigate(url, in: servicePage) != nil

@@ -105,10 +105,11 @@ final class WebPageMountCoordinator {
     }
 
     func didMount(page: WebPage, ownerID: UUID) {
-        guard isInline(page: page, ownerID: ownerID) else { return }
+        guard pageID == ObjectIdentifier(page),
+              placement == .inline(ownerID) || placement == .detached(ownerID) else { return }
         mountedPageID = ObjectIdentifier(page)
         mountedOwnerID = ownerID
-        Log.webView.info("WebPageMount.mounted owner=\(ownerID)")
+        Log.webView.info("WebPageMount.mounted owner=\(ownerID) placement=\(String(describing: placement))")
     }
 
     func didUnmount(page: WebPage, ownerID: UUID) {
@@ -148,5 +149,29 @@ struct MountedWebPageView: View {
             .onDisappear {
                 mount.coordinator.didUnmount(page: mount.page, ownerID: mount.ownerID)
             }
+    }
+}
+
+struct WebPageDismantleSignal: UIViewRepresentable {
+    let dismantle: @MainActor () -> Void
+
+    func makeUIView(context: Context) -> UIView { UIView() }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.dismantle = dismantle
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(dismantle: dismantle) }
+
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        coordinator.dismantle()
+    }
+
+    final class Coordinator {
+        var dismantle: @MainActor () -> Void
+
+        init(dismantle: @escaping @MainActor () -> Void) {
+            self.dismantle = dismantle
+        }
     }
 }

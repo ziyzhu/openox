@@ -72,6 +72,7 @@ struct WebBrowserView: View {
     var errorMessage: String? = nil
     var startPage: AnyView? = nil
     var showsBrowserBar = true
+    var close: (accessibilityIdentifier: String, action: @MainActor () -> Void)? = nil
     let navigate: @MainActor (URL) async -> Bool
     let goBack: @MainActor () -> Void
     let goForward: @MainActor () -> Void
@@ -150,6 +151,7 @@ struct WebBrowserView: View {
                 }
             }
             .errorAlert("Couldn't Load Page", message: addressError?.message) { addressError = nil }
+            .toolbar(close == nil ? .automatic : .hidden, for: .navigationBar)
             .toolbarBackground(.hidden, for: .navigationBar)
     }
 
@@ -180,6 +182,8 @@ struct WebBrowserView: View {
     }
 
     private var isCompact: Bool { scrollChrome.isCompact && !addressFocused }
+
+    private var shareURL: URL? { mode.allowsSharing ? currentURL : nil }
 
     private var browserBar: some View {
         GlassEffectContainer(spacing: 8) {
@@ -231,18 +235,27 @@ struct WebBrowserView: View {
                 .glassEffectID("cancelEditing", in: barNamespace)
                 .glassEffectTransition(reduceMotion ? .identity : .materialize)
                 .transition(.identity)
-            } else if mode.allowsSharing, let currentURL {
+            } else if shareURL != nil || close != nil {
                 Menu {
-                    ShareLink(item: currentURL) {
-                        Label("Share", systemImage: "square.and.arrow.up")
+                    if let shareURL {
+                        ShareLink(item: shareURL) {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
+                        .accessibilityIdentifier(identifier("share"))
+                        Button {
+                            UIApplication.shared.open(shareURL)
+                        } label: {
+                            Label("Open in Safari", systemImage: "safari")
+                        }
+                        .accessibilityIdentifier(identifier("openInSafari"))
+                        Divider()
                     }
-                    .accessibilityIdentifier(identifier("share"))
-                    Button {
-                        UIApplication.shared.open(currentURL)
-                    } label: {
-                        Label("Open in Safari", systemImage: "safari")
+                    if let close {
+                        Button(action: close.action) {
+                            Label("Close", systemImage: "xmark")
+                        }
+                        .accessibilityIdentifier(close.accessibilityIdentifier)
                     }
-                    .accessibilityIdentifier(identifier("openInSafari"))
                 } label: {
                     controlSymbol("ellipsis")
                 }

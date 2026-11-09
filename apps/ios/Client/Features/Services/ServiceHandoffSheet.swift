@@ -34,6 +34,10 @@ struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
                 page: session.page,
                 mode: mode,
                 fallbackHost: session.serviceDomain,
+                close: (A11yID.ServiceHandoff.close, {
+                    session.dismissPresentation()
+                    dismiss()
+                }),
                 navigate: { session.navigate(to: $0) },
                 goBack: { session.goBack() },
                 goForward: { session.goForward() },
@@ -45,16 +49,6 @@ struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
                     }
                 }
             )
-                .navigationTitle("")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ServiceHandoff.close) {
-                            session.dismissPresentation()
-                            dismiss()
-                        }
-                    }
-                }
         }
         .onAppear {
             Log.ui.info("ServiceSessionSheet visible domain=\(session.serviceDomain) attempt=\(session.id.uuidString.prefix(8)) title=\(session.navigationTitle) uptime=\(ProcessInfo.processInfo.systemUptime)")
