@@ -83,8 +83,8 @@ extension Service {
         guard WebSessionContract.isEnabled(definition) else {
             throw RuntimeError.bridge("Session routing requires listSessions/login")
         }
-        let sessionURL = try session.map { try WebSessionContract.destination($0, domain: domain) }
+        if let session { _ = try WebSessionContract.destination(session, domain: domain) }
         if let pageURL { return try WebSessionContract.destination(pageURL, domain: domain) }
-        return sessionURL ?? defaultURL
+        return defaultURL
     }
 }

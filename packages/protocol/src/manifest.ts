@@ -244,7 +244,7 @@ export function validateStandardActions(actions: StandardAction[]): string[] {
       if (i >= 0 && actions[i]!.requireApproval) at(`actions[${i}]`, "session discovery and login cannot require approval");
     }
     if (!hasExactClosedObjectShape(actions[sessionsIdx]!.inputSchema, {})) {
-      at(`actions[${sessionsIdx}].inputSchema`, "must be a closed empty object; target routing belongs in pageUrl or session");
+      at(`actions[${sessionsIdx}].inputSchema`, "must be a closed empty object; target routing uses baseUrl or pageUrl");
     }
     const output = actions[sessionsIdx]!.outputSchema;
     const item = output.items as JSONSchema | undefined;
@@ -252,7 +252,7 @@ export function validateStandardActions(actions: StandardAction[]): string[] {
       at(`actions[${sessionsIdx}].outputSchema`, "must return an array of closed session descriptors requiring id, label and url strings");
     }
     if (loginIdx >= 0 && !hasExactClosedObjectShape(actions[loginIdx]!.inputSchema, {})) {
-      at(`actions[${loginIdx}].inputSchema`, "must be a closed empty object; target routing belongs in pageUrl or session");
+      at(`actions[${loginIdx}].inputSchema`, "must be a closed empty object; target routing uses baseUrl or pageUrl");
     }
     if (loginIdx >= 0 && actions[loginIdx]!.outputSchema.type !== "null") {
       at(`actions[${loginIdx}].outputSchema`, "login preparation must return null; user completion does not verify authentication");

@@ -102,6 +102,7 @@ extension Service {
                 }
             }
             destination = try executionURL(defaultURL: actionBaseURL, session: selectedSession, pageURL: pageURL)
+            Log.service.info("Service.invoke routing id=\(invocation) name=\(name) source=\(pageURL == nil ? "manifest" : "pageUrl") selectedSession=\(selectedSession != nil) destination=\(LogPrivacy.url(destination.absoluteString))")
             try Task.checkCancellation()
         } catch { return .failure(error) }
         let pageAction = Action(

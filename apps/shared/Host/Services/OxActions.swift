@@ -29,7 +29,7 @@ nonisolated enum OxActions {
                             "session": WebSessionContract.sessionSchema,
                             "pageUrl": .object([
                                 "type": .string("string"),
-                                "description": .string("Initial target URL within the service domain, independent of the selected session/account context."),
+                                "description": .string("Optional execution URL override within the service domain. Otherwise use the input-resolved action/service baseUrl, not session.url."),
                             ]),
                             "purpose": .object([
                                 "type": .string("string"),
