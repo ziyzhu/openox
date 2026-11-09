@@ -117,9 +117,7 @@ extension Service {
             .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
         let idJSON = (try? JSONEncoder().encode(actionId))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
-        let sessionJSON = selectedSession.flatMap { try? JSONEncoder().encode($0) }
-            .flatMap { String(data: $0, encoding: .utf8) } ?? "null"
-        let source = "return await window.ox.callServiceAction(\(idJSON), \(argsJSON), { session: \(sessionJSON) });"
+        let source = "return await window.ox.callServiceAction(\(idJSON), \(argsJSON));"
 
         func evaluate(in session: ServiceWebPage, startingNavigation: Int) async -> Result<JSONValue, Error> {
             guard owns(session), session.navigationGeneration == startingNavigation else {
@@ -148,7 +146,7 @@ extension Service {
                     guard owns(session), session.navigationGeneration == startingNavigation else {
                         throw EvalError.contextInvalidated
                     }
-                    let probe = "return await window.ox.callServiceAction('listSessions', {}, { session: \(sessionJSON) });"
+                    let probe = "return await window.ox.callServiceAction('listSessions', {});"
                     let rawSessions = try await evalAsync(session, probe, context: "sessions:\(invocation)")
                     let sessions = rawSessions.map(JSONValue.from) ?? .null
                     try WebSessionContract.validateSessions(sessions, domain: domain)

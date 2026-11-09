@@ -343,9 +343,7 @@ window.ox.install(({ action }) => {
         },
     });
 
-    action('getRoundTripOptions', { async invoke(args, {session}) {
-        const profile = await get('/travel-profiles?all-accounts-hidden-indicator=true');
-        if (!session || String(profile.onlineProfileIdentifier) !== session.id) throw Error('Chase account selection changed.');
+    action('getRoundTripOptions', { async invoke(args) {
         if(args.returnDate <= args.departureDate) throw Error('Return must follow departure.');
         const lookup = async (code, allowCity) => {
             const j = await post('/autosuggest/search', {sq:{st:code,sf:['arrival-airport']},sel:false,rec:null,c:'flights'});

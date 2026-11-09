@@ -1,6 +1,5 @@
 
 async function discoverAuthenticatedSessions(){const r=await fetch('https://luma.com/home',{credentials:'include',cache:'no-store'});if(r.status===401)return [];if(!r.ok)throw Error('Luma identity HTTP '+r.status);const doc=new DOMParser().parseFromString(await r.text(),'text/html');const node=doc.getElementById('__NEXT_DATA__');if(!node)throw Error('Luma bootstrap identity missing');const p=JSON.parse(node.textContent).props;if(!p||!Object.prototype.hasOwnProperty.call(p,'initialUserData'))throw Error('Unclassified Luma bootstrap');const u=p.initialUserData?.user;if(u&&typeof u.api_id==='string'&&u.api_id&&typeof u.name==='string')return [{id:u.api_id,label:u.name,url:'https://luma.com/home'}];if(p.initialUserData===null)return [];throw Error('Unclassified Luma identity');}
-async function assertSelectedAccount(context){const list=await discoverAuthenticatedSessions();if(!context?.session||!list.some(s=>s.id===context.session.id))throw Error('Selected account is unavailable or changed; rediscover sessions');}
 const cleanText = value => String(value ?? '').replace(/\s+/g, ' ').trim();
 
 const lumaHeaders = pageUrl => ({
@@ -38,9 +37,7 @@ const readEvents = async (endpoint, pageUrl) => {
   return { items: data.entries.map(eventItem), nextCursor: data.has_more && typeof data.next_cursor === 'string' ? data.next_cursor : null };
 };
 
-window.ox.install(({ action: registerAction }) => {
-const protectedActionIds=new Set(["listMyEvents"]);
-const action=(id,handler)=>registerAction(id,protectedActionIds.has(id)?{...handler,async invoke(args,context){await assertSelectedAccount(context);return handler.invoke(args,context);}}:handler);
+window.ox.install(({ action }) => {
 action('listSessions',{async invoke(){return discoverAuthenticatedSessions();}});
 action('login',{async invoke(){return null;}});
   action('listSeattleEvents', {

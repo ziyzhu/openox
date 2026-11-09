@@ -1,11 +1,8 @@
 
 async function discoverAuthenticatedSessions(){const deadline=Date.now()+12000;while(Date.now()<deadline){const el=[...document.querySelectorAll('[aria-label]')].find(e=>/Google Account:/i.test(e.getAttribute('aria-label')||''));const label=el?.getAttribute('aria-label')||'';const match=label.match(/Google Account:\s*(.*?)\s*\(([^)]+@[^)]+)\)/is);if(match){const email=match[2].trim();return [{id:email,label:match[1].trim()+' ('+email+')',url:"https://docs.google.com/forms/u/0/"}];}if(location.hostname==='accounts.google.com')return [];await new Promise(r=>setTimeout(r,200));}throw Error('Google account identity unavailable; refusing to infer authentication from page presence');}
-async function assertSelectedAccount(context){const list=await discoverAuthenticatedSessions();if(!context?.session||!list.some(s=>s.id===context.session.id))throw Error('Selected account is unavailable or changed; rediscover sessions');}
 const clean=v=>String(v??"").replace(/\s+/g," ").trim();
 const account=()=>{const e=[...document.querySelectorAll("[aria-label]")].find(x=>/Google Account:/i.test(x.getAttribute("aria-label")||""));if(!e)return null;const s=e.getAttribute("aria-label")||"";const m=s.match(/Google Account:\s*(.*?)\s*\(([^)]+@[^)]+)\)/is);return m?{name:clean(m[1]),email:clean(m[2])}:{name:null,email:null};};
-window.ox.install(({ action: registerAction }) => {
-const protectedActionIds=new Set(["getCurrentAccount","listRecentForms","openBlankForm"]);
-const action=(id,handler)=>registerAction(id,protectedActionIds.has(id)?{...handler,async invoke(args,context){await assertSelectedAccount(context);return handler.invoke(args,context);}}:handler);
+window.ox.install(({ action }) => {
 action('listSessions',{async invoke(){return discoverAuthenticatedSessions();}});
 action('login',{async invoke(){return null;}});
  action("getCurrentAccount",{async invoke(){const a=account();if(!a)throw new Error("Google Forms is not signed in.");return a;}});

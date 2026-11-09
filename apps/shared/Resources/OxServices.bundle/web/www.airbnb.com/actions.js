@@ -445,10 +445,8 @@ window.ox.install(({ action }) => {
         },
     });
 
-    action('getCheckoutPayment',{async invoke({listingId},context){
+    action('getCheckoutPayment',{async invoke({listingId}){
       if(location.pathname!=='/book/stays/'+listingId)throw Error('The selected session page is not the requested checkout; no navigation or payment changes made');
-      if(!context?.session)throw Error('Selected Airbnb account required');
-      const home=await fetch(ORIGIN+'/',{credentials:'include',cache:'no-store'});if(!home.ok||new URL(home.url).origin!==ORIGIN)throw Error('Account verification unavailable');const d=new DOMParser().parseFromString(await home.text(),'text/html');const b=JSON.parse(d.querySelector('#data-injector-instances')?.textContent||'null');const hydrated=b?.root?.find(x=>x?.[0]==='JotaiDefaultStoreToken:HydratedState');const ids=new Set();const walk=x=>{if(!x||typeof x!=='object')return;if(typeof x.userId==='string'&&/^\d+$/.test(x.userId))ids.add(x.userId);for(const v of Object.values(x))if(v&&typeof v==='object')walk(v);};walk(hydrated?.[1]);if(ids.size!==1||![...ids].includes(context.session.id))throw Error('Checkout account mismatch');
       const deadline=Date.now()+10000;let radio;while(Date.now()<deadline){radio=document.querySelector('input[name="payment-option"]:checked');if(radio)break;await new Promise(r=>setTimeout(r,100));}if(!radio)throw Error('No selected saved-card option is visible; no card fields inspected');const label=[...document.querySelectorAll('label[for]')].find(e=>e.htmlFor===radio.id);if(!label)throw Error('Selected payment label unavailable');const last4=(label.innerText||'').trim();if(!/^\d{4}$/.test(last4))throw Error('Payment label is not a masked saved-card identifier');const brand=label.querySelector('img[alt]')?.alt;if(!brand)throw Error('Selected card brand not visible');const plan=[...document.querySelectorAll('input[type="radio"]:checked')].filter(e=>e.name!=='payment-option').map(e=>e.getAttribute('aria-label')||[...document.querySelectorAll('label[for]')].find(l=>l.htmlFor===e.id)?.innerText||'').find(t=>/^Pay /.test(t.trim()));return {brand,last4,payNowText:plan?.trim()||null};
     }});
     action("prepareCheckout", {

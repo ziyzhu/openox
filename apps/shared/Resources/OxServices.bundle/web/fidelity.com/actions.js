@@ -23,9 +23,8 @@ window.ox.install(({ action }) => {
  function balance(el) {const match=text(el).match(/balance:\s*\$([0-9,]+(?:\.[0-9]+)?)/);if(!match)throw new Error('Fidelity balance format unavailable');return Number(match[1].replace(/,/g,''));}
  action('listSessions',{async invoke(){const s=await state();return s?[await descriptor(s)]:[];}});
  action('login',{async invoke(){const s=await state();if(!s)return null; /* Preserve existing authentication rather than forcing a new login. */ return null;}});
- action('getPortfolioSummary',{async invoke(args,{session}){
+ action('getPortfolioSummary',{async invoke(){
    const s=await state();if(!s)throw new Error('Fidelity sign-in required');
-   const current=await descriptor(s);if(!session || session.id!==current.id)throw new Error('Fidelity selected portfolio changed; rediscover sessions');
    let category='Other';const accounts=[];
    for(const row of document.querySelectorAll('.acct-selector__acct-list a[id]')) {
      if(groupIds.has(row.id)){if(row.id!=='allaccounts')category=text(row).split(',')[0];continue;}
@@ -36,9 +35,8 @@ window.ox.install(({ action }) => {
    }
    return {totalBalance:balance(s.all),currency:'USD',observedAt:new Date().toISOString(),accounts,note:'Displayed Fidelity values; stock-plan and investment balances may overlap. Not a real-time quote or an additive account total.'};
  }});
- action('listPositions',{async invoke(args,{session}) {
+ action('listPositions',{async invoke() {
    const s=await state();if(!s)throw new Error('Fidelity sign-in required');
-   if(!session || session.id!==(await descriptor(s)).id)throw new Error('Selected Fidelity portfolio changed');
    if(location.pathname!=='/ftgw/digital/portfolio/positions'){
      throw new Error('Invoke listPositions with pageUrl https://digital.fidelity.com/ftgw/digital/portfolio/positions to select the holdings page.');
    }
