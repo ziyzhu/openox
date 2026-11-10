@@ -115,10 +115,9 @@ struct ThinkingRow: View {
         .onAppear {
             let now = Date()
             if isLive {
-                let labels = trace.entries.map(previewLabel)
                 animationPhase = .live(LiveAnimation(
-                    label: labels.first ?? liveTargetLabel,
-                    pending: Array(labels.dropFirst()),
+                    label: liveTargetLabel,
+                    pending: [],
                     appearedAt: now,
                     lastAdvance: now,
                     sourceLive: true
