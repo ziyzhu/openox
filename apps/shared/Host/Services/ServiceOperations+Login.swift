@@ -150,18 +150,27 @@ extension ServiceOperations {
                                        session: JSONValue?, pageURL: String?,
                                        approve: @escaping @MainActor (String, Any?) async -> Bool) async throws -> JSONValue {
         Log.service.info("Service.login chain domain=\(service.domain) provider=\(provider.domain)")
+        var providerTrace: JSONValue?
         if !(await settledSession(service: provider, secrets: secrets, approve: approve)) {
-            _ = try await handOffLogin(service: provider, secrets: secrets, input: .object([:]), session: nil, pageURL: nil,
-                                       prepare: true, rememberFor: service, approve: approve)
+            let result = try await handOffLogin(service: provider, secrets: secrets, input: .object([:]), session: nil, pageURL: nil,
+                                               prepare: true, rememberFor: service, approve: approve)
+            providerTrace = result.objectValue?["loginTrace"]
             guard await settledSession(service: provider, secrets: secrets, approve: approve) else {
                 throw OxFunctionError(code: "handoff_incomplete", message: "Sign-in to \(provider.title) did not complete, so \(service.title) is still not signed in.", recovery: "Tell the user sign-in was not completed. Do not reopen it automatically; ask whether they want to try again.")
             }
         }
         if await returnToDestination(service: service, secrets: secrets, input: input, pageURL: pageURL, approve: approve) {
-            return Self.loginResult(interaction: "completed", verified: true)
+            return Self.loginResult(interaction: "completed", verified: true, trace: providerTrace)
         }
-        return try await handOffLogin(service: service, secrets: secrets, input: input, session: session, pageURL: pageURL,
-                                      prepare: true, approve: approve)
+        let result = try await handOffLogin(service: service, secrets: secrets, input: input, session: session, pageURL: pageURL,
+                                           prepare: true, approve: approve)
+        guard let providerTrace else { return result }
+        let destinationTrace = result.objectValue?["loginTrace"]?.objectValue
+        let steps = (providerTrace.objectValue?["steps"]?.arrayValue ?? []) + (destinationTrace?["steps"]?.arrayValue ?? [])
+        return result.merging(["loginTrace": .object([
+            "steps": .array(steps),
+            "truncated": .bool(providerTrace.objectValue?["truncated"]?.boolValue == true || destinationTrace?["truncated"]?.boolValue == true)
+        ])])
     }
 
     private func handOffLogin(service: Service, secrets: SecretAttempt?, input: JSONValue, session: JSONValue?, pageURL: String?,
@@ -170,16 +179,19 @@ extension ServiceOperations {
         if prepare, loginPage(service)?.page.url?.host.map(service.isServiceHost) != true {
             _ = await service.invokeAction(WebSessionContract.loginAction, args: .object([:]), pageURL: pageURL, approve: approve)
         }
-        if let capture = try await presentLogin(service: service, input: .object([:]), session: session, pageURL: pageURL) {
-            await offerToRemember(capture, service: service, also: destination)
-            capture.discard()
-        }
+        let capture = try await presentLogin(service: service, input: .object([:]), session: session, pageURL: pageURL)
+        await offerToRemember(capture, service: service, also: destination)
+        let trace = capture.trace
+        Log.service.info("Service.login trace domain=\(service.domain) steps=\(capture.steps.count) truncated=\(capture.truncated)")
+        await capture.discard()
         let verified = await settledSession(service: service, secrets: secrets, approve: approve)
-        return Self.loginResult(interaction: "completed", verified: verified)
+        return Self.loginResult(interaction: "completed", verified: verified, trace: trace)
     }
 
-    private static func loginResult(interaction: String, verified: Bool) -> JSONValue {
-        .object(["interaction": .string(interaction), "authentication": .string(verified ? "verified" : "unverified")])
+    private static func loginResult(interaction: String, verified: Bool, trace: JSONValue? = nil) -> JSONValue {
+        var result: [String: JSONValue] = ["interaction": .string(interaction), "authentication": .string(verified ? "verified" : "unverified")]
+        if let trace { result["loginTrace"] = trace }
+        return .object(result)
     }
 
     func loginPage(_ service: Service) -> Service.ServiceWebPage? {
@@ -236,7 +248,7 @@ extension ServiceOperations {
         return false
     }
 
-    private func presentLogin(service: Service, input: JSONValue, session: JSONValue?, pageURL: String?) async throws -> LoginCapture? {
+    private func presentLogin(service: Service, input: JSONValue, session: JSONValue?, pageURL: String?) async throws -> LoginCapture {
         let actionID = WebSessionContract.loginAction
         guard let action = await service.resolvedAction(actionID, args: input, session: session, pageURL: pageURL),
               let lease = try await serviceManager.actionScheduler.reserveForPresentation(action, allowUnready: true) else {
@@ -252,15 +264,15 @@ extension ServiceOperations {
             navigationTitle: String(localized: "Log in")
         )
         Log.service.info("Service.login presenting domain=\(service.domain) page=\(lease.page.logLabel)")
-        let capture = rememberSecret == nil ? nil : LoginCapture()
-        await capture?.install(on: lease.page)
-        defer { capture?.remove() }
+        let capture = LoginCapture()
+        await capture.install(on: lease.page, credentials: rememberSecret != nil)
         let outcome: ServiceHandoffSession.Outcome
         if let presentServiceHandoff {
             outcome = await presentServiceHandoff(service, lease.page, handoff)
         } else {
             outcome = await native.presentations.serviceHandoff.present(session: handoff)
         }
+        await capture.remove()
         try Task.checkCancellation()
         Log.service.info("Service.login interaction domain=\(service.domain) page=\(lease.page.logLabel) outcome=\(outcome.rawValue)")
         if outcome == .cancelled {
