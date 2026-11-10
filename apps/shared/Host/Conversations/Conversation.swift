@@ -129,6 +129,11 @@ final class Conversation: Identifiable {
 
     func resumeAfterForeground() {
         guard execution.foregroundExecutionAvailable else { return }
+        if let runID = backgroundExpiredRun {
+            backgroundExpiredRun = nil
+            Log.session.info("Conversation.resumeAfterBackgroundExpiry id=\(id) run=\(runID.rawValue)")
+            enqueueSystemEvent(.object(["type": .string("backgroundInterrupted")]), source: .backgroundInterrupted)
+        }
         startWorker()
         scheduleModelPreparation()
     }
@@ -683,6 +688,7 @@ final class Conversation: Identifiable {
     }
 
     private var activeRun: Run?
+    @ObservationIgnored private var backgroundExpiredRun: RunID?
     @ObservationIgnored private lazy var submissions = ConversationSubmissionQueue(
         conversation: self,
         responseText: { [unowned self] submissionID in document.responseText(forSubmissionID: submissionID) }
@@ -1745,6 +1751,7 @@ final class Conversation: Identifiable {
     private func expireBackgroundExecution(runID: RunID) {
         guard activeRun?.id == runID else { return }
         Log.session.warning("Conversation.backgroundLeaseExpired id=\(id) run=\(runID.rawValue)")
+        backgroundExpiredRun = runID
         stream.flush()
         stopCurrentTurn()
     }
@@ -1820,7 +1827,7 @@ final class Conversation: Identifiable {
                 .joined(separator: ",")
             Log.session.info("Conversation.runOne service=\(definition.domain) actions=[\(actions)]")
         }
-        let turnID = transcript.last(where: { $0.isUserInitiated })?.id
+        let turnID = if case .system = submission.kind { submission.id.rawValue } else { transcript.last(where: { $0.isUserInitiated })?.id }
         submission.latency.bindTurn(turnID)
         submission.latency.mark(.agentSubmitted)
         let result: ConversationRunResult

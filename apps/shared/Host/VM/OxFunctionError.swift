@@ -105,6 +105,10 @@ nonisolated struct OxFunctionError: LocalizedError, Sendable {
             }
             return Self(code: guidance.0, message: error.localizedDescription, recovery: guidance.1)
         }
+        if case DefuddleError.emptyContent = error {
+            return Self(code: "no_readable_content", message: error.localizedDescription,
+                        recovery: "The page likely renders its text with JavaScript. Do not fetch this URL again. Use the site's service actions, find another source, or inspect the rendered page with ox.web.browser when building or repairing a service.")
+        }
         return Self(code: "operation_failed", message: error.localizedDescription,
                     recovery: "Inspect the relevant resource and help before deciding how to proceed. Effects may have occurred; verify state before retrying a write. Do not repeat a cancelled or denied user interaction.")
     }

@@ -6,10 +6,12 @@ import Observation
 final class ConversationServiceAttachments {
     enum SystemEvent {
         case serviceLogin(String)
+        case backgroundInterrupted
 
         var logLabel: String {
             switch self {
             case .serviceLogin(let domain): "serviceLogin:\(domain)"
+            case .backgroundInterrupted: "backgroundInterrupted"
             }
         }
     }
@@ -187,7 +189,7 @@ final class ConversationServiceAttachments {
         Log.session.info("Conversation.loginService done id=\(id) domain=\(domain) ok=\(ok) auth=\(service.loginState.rawValue)")
         if ok, resumes {
             resumeAgent(
-                .object(["type": .string("serviceSignIn"), "domain": .string(domain), "access": result ?? .null]),
+                .object(["type": .string("serviceLogin"), "domain": .string(domain), "authorized": .bool(!service.isWebService)]),
                 .serviceLogin(domain)
             )
         }

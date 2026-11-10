@@ -1,13 +1,15 @@
-export type RuntimeEvent = { type: "serviceLogin"; domain: string; authorized: boolean };
+export type RuntimeEvent = { type: "serviceLogin"; domain: string; authorized: boolean } | { type: "backgroundInterrupted" };
 export interface ReceiptInvocation { id: string; name: string; state: "succeeded" | "failed" | "running" }
 export interface OutputTruncation { path: string; maxLines: number; maxBytes: number }
 
 export function runtimeEvent(event: RuntimeEvent) {
-  if (typeof event?.domain !== "string") throw new Error("Runtime event requires a service domain");
-  switch (event.type) {
+  switch (event?.type) {
     case "serviceLogin":
+      if (typeof event.domain !== "string") throw new Error("Runtime event requires a service domain");
       if (typeof event.authorized !== "boolean") throw new Error("Login event requires authorization state");
       return `[system] The user just ${event.authorized ? "authorized" : "logged in to"} ${event.domain}. Continue the task that needed it.`;
+    case "backgroundInterrupted":
+      return "[system] iOS stopped the previous run while Ox was in the background. Continue the task from where it stopped. Verify the outcome of any interrupted call before retrying writes.";
     default: throw new Error("Unknown runtime event");
   }
 }
