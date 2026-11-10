@@ -1,0 +1,246 @@
+{
+  "domain": "robinhood.com",
+  "name": "Robinhood Banking",
+  "description": "Read-only balances for the brokerage account displayed on Robinhood’s website, with manual sign-in. Separate Robinhood Banking app balances are not supported. No transfers or trading.",
+  "baseUrl": "https://robinhood.com/account/investing",
+  "faviconUrl": "https://openox.ai/assets/services/robinhood.com/favicon.png",
+  "actions": [
+    {
+      "id": "listSessions",
+      "label": "Find signed-in Robinhood accounts",
+      "description": "Discover the signed-in brokerage account from its loaded account page, using an opaque account fingerprint and displayed account holder name.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "login",
+      "label": "Log in to Robinhood",
+      "description": "Present the Robinhood login form for manual sign-in, including device verification and passkeys.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "blocking": true,
+      "baseUrl": "https://robinhood.com/login/"
+    },
+    {
+      "id": "getBalances",
+      "label": "Read Robinhood balances",
+      "description": "Read the currently displayed brokerage portfolio value, individual cash, withdrawable cash, and deposit balances. These are not separate Robinhood Banking checking or savings balances.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "accountType": {
+            "type": "string"
+          },
+          "accountLabel": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "portfolioValue": {
+            "type": "number"
+          },
+          "individualCash": {
+            "type": "number"
+          },
+          "withdrawableCash": {
+            "type": "number"
+          },
+          "pendingDeposits": {
+            "type": "number"
+          },
+          "instantDeposits": {
+            "type": "number"
+          },
+          "instantDepositsUsed": {
+            "type": "number"
+          },
+          "observedAt": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountType",
+          "accountLabel",
+          "currency",
+          "portfolioValue",
+          "individualCash",
+          "withdrawableCash",
+          "pendingDeposits",
+          "instantDeposits",
+          "instantDepositsUsed",
+          "observedAt",
+          "sourceUrl",
+          "scope"
+        ]
+      }
+    },
+    {
+      "id": "checkCreditCardAccess",
+      "label": "Check credit-card API access",
+      "description": "Test whether the existing Robinhood web session can identify its matching credit customer and read a minimal balance and transaction query. Does not expose tokens or card numbers.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "identityAccepted": {
+            "type": "boolean"
+          },
+          "identityMatchesWebAccount": {
+            "type": "boolean"
+          },
+          "creditCustomerCount": {
+            "type": "integer"
+          },
+          "balanceReadable": {
+            "type": "boolean"
+          },
+          "transactionsReadable": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "observedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "identityAccepted",
+          "identityMatchesWebAccount",
+          "creditCustomerCount",
+          "balanceReadable",
+          "transactionsReadable",
+          "scope",
+          "observedAt"
+        ]
+      }
+    },
+    {
+      "id": "getCreditCardAccessDetails",
+      "label": "Read credit-card access details",
+      "description": "Read the matching credit customer’s roles, capabilities, and authentication conditions using the existing web session. No credential values, card numbers, or account changes.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "feature": {
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string"
+                },
+                "mode": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "feature",
+                "scope",
+                "mode"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "authConditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "roles",
+          "capabilities",
+          "authConditions",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}
