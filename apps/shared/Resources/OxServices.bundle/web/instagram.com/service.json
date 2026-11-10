@@ -164,6 +164,7 @@
     },
     {
       "id": "listSessions",
+      "baseUrl": "https://www.instagram.com/robots.txt",
       "label": "List signed-in accounts",
       "description": "Discover currently authenticated accounts. Errors do not establish absence.",
       "inputSchema": {
@@ -648,6 +649,261 @@
         "required": [
           "requested",
           "username"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "listStoryTray",
+      "label": "List current story tray",
+      "description": "List loaded followed-account story tray entries without opening stories. Ranked tray is not a complete friends list.",
+      "baseUrl": "https://www.instagram.com/",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 40
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "latest": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "seen": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "username",
+                "id",
+                "latest",
+                "seen"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "viewStory",
+      "label": "View an account’s story",
+      "description": "Open the first story from a loaded home tray account. May register a story view. Does not react or send messages. Returns currently rendered story text and media only.",
+      "baseUrl": "https://www.instagram.com/",
+      "blocking": true,
+      "requireAuth": true,
+      "requireApproval": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.]{1,30}$"
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "alt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url",
+                "alt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "video": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "url",
+          "text",
+          "images",
+          "video"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getStoryPage",
+      "label": "Read current story page",
+      "description": "Inspect rendered story page without clicking or advancing.",
+      "baseUrl": "https://www.instagram.com/",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "alt": {
+                  "type": "string"
+                },
+                "width": {
+                  "type": "number"
+                },
+                "height": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "url",
+                "alt",
+                "width",
+                "height"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "url",
+          "text",
+          "controls",
+          "images"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "confirmStoryView",
+      "label": "Confirm story view",
+      "description": "Confirm Instagram’s View story prompt and read the rendered story. Registers a view; no messages or reactions.",
+      "baseUrl": "https://www.instagram.com/",
+      "requireAuth": true,
+      "requireApproval": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "alt": {
+                  "type": "string"
+                },
+                "width": {
+                  "type": "number"
+                },
+                "height": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "url",
+                "alt",
+                "width",
+                "height"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "url",
+          "text",
+          "controls",
+          "images"
         ],
         "additionalProperties": false
       }

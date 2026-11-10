@@ -231,7 +231,7 @@
       },
       "requireApproval": false,
       "requireAuth": false,
-      "baseUrl": "https://www.facebook.com/"
+      "baseUrl": "https://www.facebook.com/?filter=friends&sk=h_chr"
     },
     {
       "id": "listGroupPosts",

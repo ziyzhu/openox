@@ -88,16 +88,19 @@ window.ox.install(({ action }) => {
             throw new Error(`${path}: GitHub did not return search data`);
         let payload;
         try {
-            payload = JSON.parse(embedded)?.payload ?? {};
+            const root = JSON.parse(embedded)?.payload;
+            payload = root?.blackbirdSearchRoute ?? root;
+            if (!payload) throw new Error("Missing GitHub search route data");
         }
         catch {
             throw new Error(`${path}: GitHub returned malformed search data`);
         }
-        const results = payload.results ?? payload.searchResults?.results ?? payload.search?.results ?? [];
+        if (type === "code" && payload.logged_in === false) throw new Error("GitHub code search requires sign-in");
+        const results = payload.results ?? payload.searchResults?.results ?? payload.search?.results;
         if (!Array.isArray(results))
             throw new Error(`${path}: GitHub returned an unsupported search result shape`);
         const next = doc.querySelector('a[rel="next"]')?.getAttribute("href");
-        return { results, nextCursor: results.length > 0 && next ? String(page + 1) : null };
+        return { results, nextCursor: results.length > 0 && (next || Number(payload.page_count) > page) ? String(page + 1) : null };
     };
     const splitNwo = (nwo) => {
         const [owner, repo] = nwo.split("/");

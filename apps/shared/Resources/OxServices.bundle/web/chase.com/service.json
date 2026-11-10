@@ -1,8 +1,8 @@
 {
   "domain": "chase.com",
   "name": "Chase Travel",
-  "description": "A travel-rewards service for cardmembers. View your travel profile, Ultimate Rewards points, travel credits, trips, recent searches, featured deals, and cart. Read-only; sign-in required.",
-  "baseUrl": "https://secure.chase.com/robots.txt",
+  "description": "Chase Travel profiles, rewards, trips, flight comparisons, and approval-gated cart preparation. Final review and payment remain with the user.",
+  "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel",
   "$defs": {
     "statementCredit": {
       "type": "object",
@@ -358,7 +358,8 @@
       },
       "defaultArgs": {},
       "requireApproval": false,
-      "requireAuth": false
+      "requireAuth": false,
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel"
     },
     {
       "id": "getTravelProfile",
@@ -443,7 +444,8 @@
       },
       "defaultArgs": {},
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel"
     },
     {
       "id": "getStatementCredits",
@@ -490,7 +492,8 @@
       },
       "defaultArgs": {},
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel"
     },
     {
       "id": "listTrips",
@@ -541,7 +544,8 @@
       },
       "defaultArgs": {},
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel"
     },
     {
       "id": "listRecentHotelSearches",
@@ -575,7 +579,8 @@
       },
       "defaultArgs": {},
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel"
     },
     {
       "id": "listRecentFlightSearches",
@@ -609,7 +614,8 @@
       },
       "defaultArgs": {},
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel"
     },
     {
       "id": "listDeals",
@@ -652,7 +658,8 @@
       },
       "defaultArgs": {},
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel"
     },
     {
       "id": "searchHotels",
@@ -747,7 +754,8 @@
         "additionalProperties": false
       },
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel"
     },
     {
       "id": "getCartCount",
@@ -783,7 +791,8 @@
       },
       "defaultArgs": {},
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel"
     },
     {
       "id": "getRoundTripOptions",
@@ -912,13 +921,695 @@
           "nextCursor"
         ],
         "additionalProperties": false
+      },
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel"
+    },
+    {
+      "id": "getPairedFlightOptions",
+      "label": "Verify paired round-trip prices",
+      "description": "Read return flights priced against a specific outbound flight and fare. Makes no cart, booking, or payment changes. Returns same-brand pair prices, not outbound starting quotes.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "destination": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "departureDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "returnDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "default": 10
+          },
+          "outboundTime": {
+            "type": "string",
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$"
+          },
+          "airline": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fareName": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "departureDate",
+          "returnDate",
+          "outboundTime",
+          "airline",
+          "fareName"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "outbound": {
+            "type": "object",
+            "properties": {
+              "departure": {
+                "type": "string"
+              },
+              "arrival": {
+                "type": "string"
+              },
+              "origin": {
+                "type": "string"
+              },
+              "destination": {
+                "type": "string"
+              },
+              "flightNumber": {
+                "type": "string"
+              },
+              "airline": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "departure",
+              "arrival",
+              "origin",
+              "destination",
+              "flightNumber",
+              "airline"
+            ],
+            "additionalProperties": false
+          },
+          "outboundFare": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "flight": {
+                  "type": "object",
+                  "properties": {
+                    "departure": {
+                      "type": "string"
+                    },
+                    "arrival": {
+                      "type": "string"
+                    },
+                    "origin": {
+                      "type": "string"
+                    },
+                    "destination": {
+                      "type": "string"
+                    },
+                    "flightNumber": {
+                      "type": "string"
+                    },
+                    "airline": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "departure",
+                    "arrival",
+                    "origin",
+                    "destination",
+                    "flightNumber",
+                    "airline"
+                  ],
+                  "additionalProperties": false
+                },
+                "fareName": {
+                  "type": "string"
+                },
+                "cash": {
+                  "type": "number"
+                },
+                "rawTotal": {
+                  "type": "number"
+                },
+                "mixedFare": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "flight",
+                "fareName",
+                "cash",
+                "rawTotal",
+                "mixedFare"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "resultCount": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "searchId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "outbound",
+          "outboundFare",
+          "currency",
+          "items",
+          "nextCursor",
+          "resultCount",
+          "status",
+          "searchId"
+        ],
+        "additionalProperties": false
+      },
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel"
+    },
+    {
+      "id": "prepareFlightCart",
+      "label": "Prepare selected flights for checkout",
+      "description": "Select a specific nonstop outbound and return fare under a price cap, add it once to an empty trip cart, and stop before payment. Never submits an order or charge. Leaves the actual booking page available for review.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "baseUrl": "https://travelsecure.chase.com/results/flights/outbound?ssid={searchId}",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "searchId": {
+            "type": "string",
+            "minLength": 10
+          },
+          "outboundTime": {
+            "type": "string",
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$"
+          },
+          "returnTime": {
+            "type": "string",
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$"
+          },
+          "airline": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fareName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maximumCash": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "searchId",
+          "outboundTime",
+          "returnTime",
+          "airline",
+          "fareName",
+          "maximumCash"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "stage": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "orderSubmitted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stage",
+          "path",
+          "summary",
+          "controls",
+          "orderSubmitted"
+        ]
+      }
+    },
+    {
+      "id": "prepareFlightReview",
+      "label": "Open flight checkout for review",
+      "description": "Verify the existing one-flight Saver round-trip cart and cash price, then open checkout once. Never submit payment or a booking. Return usable review controls and required traveler fields.",
+      "baseUrl": "https://travelsecure.chase.com/checkout/trip-cart",
+      "blocking": true,
+      "requireAuth": true,
+      "requireApproval": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "departureDate": {
+            "type": "string"
+          },
+          "returnDate": {
+            "type": "string"
+          },
+          "maximumCash": {
+            "type": "number",
+            "minimum": 0
+          },
+          "fareName": {
+            "type": "string"
+          },
+          "outboundFlight": {
+            "type": "string"
+          },
+          "returnFlight": {
+            "type": "string"
+          },
+          "travelerName": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "departureDate",
+          "returnDate",
+          "maximumCash",
+          "fareName",
+          "outboundFlight",
+          "returnFlight"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "tag": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "hasValue": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "tag",
+                "id",
+                "name",
+                "type",
+                "label",
+                "required",
+                "hasValue"
+              ]
+            }
+          },
+          "readable": {
+            "type": "boolean"
+          },
+          "orderSubmitted": {
+            "type": "boolean"
+          },
+          "reviewUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "amount",
+          "currency",
+          "controls",
+          "fields",
+          "readable",
+          "orderSubmitted",
+          "reviewUrl"
+        ]
+      }
+    },
+    {
+      "id": "prepareFlightPaymentReview",
+      "label": "Prepare flight payment review",
+      "description": "Continue the selected saved traveler to the payment-and-review step, without submitting payment, accepting paid extras, or booking. Verify readable controls and return the amount for user review.",
+      "baseUrl": "https://travelsecure.chase.com/checkout/traveler-info",
+      "blocking": true,
+      "requireAuth": true,
+      "requireApproval": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "travelerName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maximumCash": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "travelerName",
+          "maximumCash"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "travelerName": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "readable": {
+            "type": "boolean"
+          },
+          "orderSubmitted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "amount",
+          "currency",
+          "travelerName",
+          "controls",
+          "readable",
+          "orderSubmitted"
+        ]
+      }
+    },
+    {
+      "id": "getFlightCartReview",
+      "label": "Review saved flight cart",
+      "description": "Read and verify the current saved flight cart and render its real, legible merchant review page. Does not add, remove, book, or pay for anything.",
+      "baseUrl": "https://travelsecure.chase.com/checkout/trip-cart",
+      "blocking": true,
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "outboundFlight": {
+            "type": "string"
+          },
+          "returnFlight": {
+            "type": "string"
+          },
+          "maximumCash": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "outboundFlight",
+          "returnFlight",
+          "maximumCash"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "fareLabels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "readable": {
+            "type": "boolean"
+          },
+          "checkoutButton": {
+            "type": "string"
+          },
+          "cancellation": {
+            "type": "string"
+          },
+          "booked": {
+            "type": "boolean"
+          },
+          "cartItems": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "amount",
+          "currency",
+          "fareLabels",
+          "readable",
+          "checkoutButton",
+          "cancellation",
+          "booked",
+          "cartItems"
+        ]
+      }
+    },
+    {
+      "id": "openTravelCart",
+      "label": "Open authenticated Travel cart",
+      "description": "Launch the normal Travel cart from signed-in Chase home, preserving the same authenticated account context. Does not add, remove, book, or pay for anything.",
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "launched": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "launched"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getCheckoutState",
+      "label": "Inspect checkout readiness",
+      "description": "Read the current checkout step, required-field completion, control rendering, and validation messages. Never reads credential or payment field values and never submits anything.",
+      "baseUrl": "https://travelsecure.chase.com/checkout/traveler-info",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "tag": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "usable": {
+                  "type": "boolean"
+                },
+                "fontSize": {
+                  "type": "string"
+                },
+                "width": {
+                  "type": "number"
+                },
+                "height": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "tag",
+                "label",
+                "usable",
+                "fontSize",
+                "width",
+                "height"
+              ]
+            }
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "hasValue": {
+                  "type": "boolean"
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "invalid": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "type",
+                "hasValue",
+                "required",
+                "invalid"
+              ]
+            }
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "headings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requestPaths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "storageKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "path",
+          "controls",
+          "fields",
+          "messages",
+          "headings",
+          "requestPaths",
+          "storageKeys"
+        ]
       }
     }
   ],
   "locales": {
     "zh-Hans": {
       "name": "大通旅行",
-      "description": "面向持卡人的旅行积分服务。查看旅行资料、Ultimate Rewards 积分、旅行额度、行程、近期搜索、精选优惠和购物车。只读，需登录。",
+      "description": "查看旅行资料、积分、行程和航班报价，并在授权后准备购物车。最终审核与付款由用户完成。",
       "actions": {
         "getTravelProfile": {
           "label": "获取旅行档案",
@@ -963,6 +1654,34 @@
         "getRoundTripOptions": {
           "label": "比较往返航班",
           "description": "搜索往返航班，返回去程选项和往返现金起价；需选择返程后确认最终价格。"
+        },
+        "getPairedFlightOptions": {
+          "label": "核实往返航班组合价格",
+          "description": "查询指定去程航班和舱等对应的返程组合报价，不更改购物车、预订或付款。"
+        },
+        "prepareFlightCart": {
+          "label": "准备航班购物车",
+          "description": "在价格上限内选择指定直飞往返航班，向空购物车添加一次，并在付款前停止，不提交订单或付款。"
+        },
+        "prepareFlightReview": {
+          "label": "打开航班结账审核",
+          "description": "核实现有单个往返航班购物车和现金总价，打开结账页面供用户审核，不提交预订或付款。"
+        },
+        "prepareFlightPaymentReview": {
+          "label": "准备航班付款审核",
+          "description": "将已选旅客推进至付款与审核页面，不付款、不接受付费附加项目、不提交预订，并核实可读控件与金额。"
+        },
+        "getFlightCartReview": {
+          "label": "审核已保存航班购物车",
+          "description": "只读核实当前已保存的航班购物车和可读的商户审核页面，不添加、删除、预订或付款。"
+        },
+        "openTravelCart": {
+          "label": "打开已登录旅行购物车",
+          "description": "从已登录的 Chase 旅行主页打开正常购物车并保持相同账户上下文，不添加、删除、预订或付款。"
+        },
+        "getCheckoutState": {
+          "label": "检查结账准备状态",
+          "description": "只读检查当前结账步骤、必填字段完成情况、控件显示和校验信息，不读取凭据或支付字段的值，不提交任何内容。"
         }
       }
     }

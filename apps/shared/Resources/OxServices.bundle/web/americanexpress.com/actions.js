@@ -174,6 +174,30 @@ window.ox.install(({ action }) => {
         return {flightKey:args.flightKey,items:brands.map(b=>({name:nodeText(b,'fare-brand-name'),price:money(b),currency:'USD',priceBasis:'Starting roundtrip total; return not selected',features:[...b.querySelectorAll('[data-testid="fare-feature-item"]')].map(e=>[...new Set(e.innerText.split('\n').map(s=>s.trim()).filter(Boolean))].join('; '))})),nextCursor:null,returnFlightSelected:false};
     }});
 
+    const overviewCards = async () => {
+        const deadline=Date.now()+20000;
+        while(Date.now()<deadline){
+            if(document.getElementById('loginSubmit')||document.getElementById('eliloUserID')) throw Error('American Express is signed out');
+            const tiles=[...document.querySelectorAll('[data-testid="product-button"]')];
+            if(tiles.length && document.getElementById('gnav_logout')) {
+                const cards=tiles.filter(e=>e.querySelector('[data-locator-id="credo_card_bal_title"]')?.textContent.trim()==='Total Balance').map(e=>{
+                    const name=e.querySelector('[data-locator-id="credo_card_name"]')?.textContent.trim();
+                    const mask=e.querySelector('[data-locator-id="credo_card_acct_num"]')?.textContent.replace(/[^0-9]/g,'');
+                    const raw=e.querySelector('[data-testid="balance-value"]')?.textContent.trim();
+                    if(!name||!mask||!raw||!/^[-$0-9,.\s]+$/.test(raw))throw Error('Card tile balance or identity is incomplete');
+                    const balance=Number(raw.replace(/[$,\s]/g,''));
+                    if(!Number.isFinite(balance))throw Error('Card balance could not be parsed');
+                    return {name,mask,balance,currency:'USD'};
+                });
+                if(!cards.length)throw Error('No card balance tiles available');
+                return cards;
+            }
+            await new Promise(r=>setTimeout(r,200));
+        }
+        throw Error('Amex overview account tiles unavailable; no balances verified');
+    };
+    action('listCardBalances',{async invoke(){return {items:await overviewCards(),nextCursor:null};}});
+
     let profileIdCache = null;
     const fetchProfile = async () => {
         const j = await call("/profile_mgmt/profiles/inquiry_results", profileHeaders(), {
@@ -238,6 +262,11 @@ const loginStep = async () => waitForStep({challenge:()=>document.querySelector(
     }});
     action('listSessions', { async invoke() {
             profileIdCache = null;
+            if (location.hostname === 'global.americanexpress.com' && location.pathname === '/overview') {
+                const cards=await overviewCards();
+                const identity=cards.map(c=>c.name+':'+c.mask).sort().join('|');
+                return [{id:'cards:'+identity,label:'American Express cards '+cards.map(c=>c.mask).join(', '),url:'https://global.americanexpress.com/overview'}];
+            }
             if (location.hostname === 'global.americanexpress.com') {
                 const deadline=Date.now()+15000;
                 while(Date.now()<deadline){

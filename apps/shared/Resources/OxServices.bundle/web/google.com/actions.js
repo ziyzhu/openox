@@ -223,6 +223,60 @@ window.ox.install(({ action }) => {
             throw new Error("Google search results did not become recognizable; absence of results is unverified");
         },
     });
+
+    action("searchFlights", {
+        async invoke({query, limit = 10}) {
+            if (!query.trim()) throw new Error("Flight query must not be blank");
+            const deadline = Date.now() + 25000;
+            while (Date.now() < deadline) {
+                ensureSearchPage(document, location.href);
+                if (!location.pathname.startsWith('/travel/flights')) throw new Error('Not a Google Flights results page');
+                const links = [...document.querySelectorAll('li [role="link"][aria-label]')].filter(e => /Select flight$/.test(e.getAttribute('aria-label') || ''));
+                const items = [], seen = new Set();
+                for (const link of links) {
+                    const row = link.closest('li');
+                    const summary = cleanText(link.getAttribute('aria-label'));
+                    if (seen.has(summary)) continue;
+                    const price = row.querySelector('[role="text"][data-gs][aria-label]');
+                    const airline = summary.match(/flight with (.*?)\. Leaves /i);
+                    const times = summary.match(/Leaves (.*?) and arrives at (.*?)\. Total duration /i);
+                    const duration = summary.match(/Total duration (.*?)\./i);
+                    if (!price || !airline || !times || !duration) continue;
+                    const bag = row.querySelector('[aria-label*="Learn more about baggage allowance"]');
+                    seen.add(summary);
+                    items.push({airlines:airline[1],departure:times[1],arrival:times[2],duration:duration[1],stops:cleanText(row.querySelector('.EfT7Ae')?.textContent),priceText:cleanText(price.textContent),priceLabel:cleanText(price.getAttribute('aria-label')),baggage:bag ? cleanText(bag.getAttribute('aria-label')).replace(/ Learn more about baggage allowance$/, '') : null,summary});
+                    if (items.length >= limit) break;
+                }
+                const combos = [...document.querySelectorAll('[role="combobox"]')].filter(e=>e.getClientRects().length).map(e=>cleanText(e.innerText));
+                const currency = [...document.querySelectorAll('button,[role="button"]')].find(e=>/^Currency/.test(cleanText(e.innerText)));
+                const val = sel => document.querySelector(sel)?.value || '';
+                const interpretedSearch = {title:document.title,origin:document.querySelector('input[aria-label^="Where from?"]')?.getAttribute('aria-label') || '',destination:document.querySelector('input[aria-label^="Where to?"]')?.getAttribute('aria-label') || '',departureDate:val('input[placeholder="Departure"]'),returnDate:val('input[placeholder="Return"]'),tripType:combos.find(x=>/^(One way|Round trip|Multi-city)$/.test(x)) || '',passengers:cleanText(document.querySelector('button[aria-label*="change number of passengers"]')?.getAttribute('aria-label')).replace(/, change number of passengers\.$/, ''),cabin:combos.find(x=>/Economy|Business|First|Premium/.test(x)) || '',currency:cleanText(currency?.innerText).replace(/^Currency\s*/, '')};
+                if (items.length && interpretedSearch.origin && interpretedSearch.destination && interpretedSearch.departureDate) return {items,nextCursor:null,url:location.href,interpretedSearch,coverage:'partial',fareNotice:'Displayed snapshot in Google ranking order. Prices include required taxes and fees for the interpreted trip and passengers; optional baggage fees may apply. Round-trip quotes cover the trip, not a standalone outbound fare. Verify dates and passenger/cabin interpretation. Prices can change.'};
+                const body = document.body.innerText;
+                if (/No flights found|No results found/.test(body) && interpretedSearch.origin && interpretedSearch.destination && interpretedSearch.departureDate) return {items:[],nextCursor:null,url:location.href,interpretedSearch,coverage:'unknown',fareNotice:'Google displayed no flights for its interpretation of the query; verify the route, dates, and filters.'};
+                await new Promise(resolve=>setTimeout(resolve,200));
+            }
+            throw new Error('Google Flights results did not become recognizable; query may be ambiguous, unsupported, or still loading. Use explicit route, dates and trip type.');
+        }
+    });
+
+
+    action("getFlightQuote", {
+        async invoke({itinerary}) {
+            if (new URL(location.href).searchParams.get('tfs') !== itinerary) throw new Error('Itinerary routing mismatch');
+            const deadline = Date.now()+22000;
+            while (Date.now()<deadline) {
+                ensureSearchPage(document,location.href);
+                const quotes = [...document.querySelectorAll('button[aria-label^="Continue to book with "]')].map(e=>cleanText(e.getAttribute('aria-label'))).map(label=>label.match(/^Continue to book with (.*?) for (.+)$/)).filter(Boolean).map(m=>({providerAndFare:m[1],priceLabel:m[2]}));
+                const flights = [...document.querySelectorAll('[role="listitem"]')].filter(e=>e.querySelector('button[aria-label^="Flight details."]')).map(e=>{const text=cleanText(e.textContent);return {summary:cleanText(e.querySelector('button[aria-label^="Flight details."]').getAttribute('aria-label')).replace(/^Flight details\. /,''),flightNumbers:[...new Set([...text.matchAll(/(?:^|[^A-Z])([A-Z0-9]{2}\s+\d{1,4})(?!\d)/g)].map(m=>m[1]))]};});
+                const fareBrands = [...document.querySelectorAll('h3')].filter(e=>e.parentElement.parentElement.querySelector('button[aria-label^="Continue to book with "]')).map(e=>({name:cleanText(e.textContent),priceText:cleanText(e.parentElement.querySelector('span')?.textContent),features:[...e.parentElement.parentElement.querySelectorAll('li')].map(x=>cleanText(x.textContent))}));
+                if (quotes.length && flights.length) return {url:location.href,title:document.title,flights,quotes:[...new Map(quotes.map(q=>[q.providerAndFare+'|'+q.priceLabel,q])).values()],fareBrands,notice:'Google Flights quotes only, including required taxes and fees for the selected passengers. Optional extras may cost more. No seller checkout or final availability verified. No booking performed.'};
+                await new Promise(r=>setTimeout(r,200));
+            }
+            throw new Error('Google Flights booking summary or quotes did not become recognizable');
+        }
+    });
+
     action("listSuggestions", {
         async invoke({ query } = {}) {
             if (!query)

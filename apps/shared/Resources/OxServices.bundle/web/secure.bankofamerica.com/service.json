@@ -208,7 +208,7 @@
         },
         "login": {
           "label": "登录",
-          "description": "为用户准备网站登录。完成交互不代表已通过身份验证。"
+          "description": "在官方密码表单中使用已保存的美国银行账号登录；通行密钥及安全验证由用户完成。"
         },
         "listSessions": {
           "label": "列出已登录账号",
@@ -245,7 +245,7 @@
     {
       "id": "login",
       "label": "Log in",
-      "description": "Prepare website login for the user. Completion does not verify authentication.",
+      "description": "Sign in with a saved Bank of America account on the official password form; leave passkeys and security verification to the user.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -255,7 +255,9 @@
         "type": "null"
       },
       "requireApproval": false,
-      "requireAuth": false
+      "requireAuth": false,
+      "baseUrl": "https://secure.bankofamerica.com/auth/signon/",
+      "blocking": true
     },
     {
       "id": "listSessions",

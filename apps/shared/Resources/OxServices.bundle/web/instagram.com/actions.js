@@ -237,14 +237,21 @@ const instagramChoice=label=>[...document.querySelectorAll('[role="button"],butt
 const instagramLoginStep=async()=>waitForStep({challenge:()=>[...document.querySelectorAll('input[autocomplete="one-time-code"],iframe[src*="captcha"]')].find(usable),credentials:()=>{const username=document.querySelector('input[name="username"]'),password=document.querySelector('input[name="password"]'),root=username?.closest('form'),submit=root?.querySelector('button[type="submit"]');return usable(username)&&usable(password)&&submit&&root?.contains(password)?{username,password,submit,root}:null;},existingAccount:()=>{const d=document.querySelector('[role="dialog"]');return d?[...d.querySelectorAll('[role="button"],button,a')].find(e=>usable(e)&&cleanText(e.textContent)==='Log into an Existing Account'):null;},switchAccounts:()=>instagramChoice('Switch accounts'),menu:()=>[...document.querySelectorAll('a')].find(e=>usable(e)&&e.querySelector('[aria-label="Settings"]'))});
 const prepareInstagramLogin=async()=>{
         const visible = usable;
-        const ready = () => [...document.querySelectorAll('input[type=password]')].some(visible) && [...document.querySelectorAll('button,[role=button],input[type=submit]')].some(e => visible(e) && (e.type === 'submit' || /^log in$/i.test(e.innerText.trim())));
-        const findSwitch = () => [...document.querySelectorAll('[role=button]')].find(e => visible(e) && e.innerText.trim() === 'Switch accounts');
+        const ready = () => [...document.querySelectorAll('input[type=password]')].filter(visible).some(password => {
+            const root=password.closest('form')||password.closest('[role=dialog]');
+            const username=[...root?.querySelectorAll('input[name=username]')||[]].find(visible);
+            const submit=root?.querySelector('button[type=submit],input[type=submit]');
+            if(!username||!submit||submit.closest('[hidden],[aria-hidden=true],[inert]'))return false;
+            const style=getComputedStyle(submit);
+            return style.display!=='none'&&style.visibility!=='hidden';
+        });
+        const findSwitch = () => [...document.querySelectorAll('[role=button]')].find(e => visible(e) && e.textContent.trim() === 'Switch accounts');
         const deadline = Date.now() + 18000;
         let openedMenu = false, openedSwitch = false, openedAnother = false;
         while (Date.now() < deadline) {
-            const picker = [...document.querySelectorAll('[role=dialog]')].find(e => visible(e) && [...e.querySelectorAll('[role=button],button,a')].some(c => visible(c) && c.innerText.trim() === 'Log into an Existing Account'));
+            const picker = [...document.querySelectorAll('[role=dialog]')].find(e => visible(e) && [...e.querySelectorAll('[role=button],button,a')].some(c => visible(c) && c.textContent.trim() === 'Log into an Existing Account'));
             if (ready() || picker) return null;
-            const another = [...document.querySelectorAll('[role=button],button,a')].find(e => visible(e) && e.innerText.trim() === 'Use another profile');
+            const another = [...document.querySelectorAll('[role=button],button,a')].find(e => visible(e) && e.textContent.trim() === 'Use another profile');
             if (another && !openedAnother) { another.click(); openedAnother = true; }
             const switcher = findSwitch();
             if (switcher && !openedSwitch) { switcher.click(); openedSwitch = true; }
@@ -321,9 +328,9 @@ const discoverAuthenticatedSessions = async () => {
         const end=Date.now()+20000;
         while(Date.now()<end){
             const headings=[...document.querySelectorAll('h1,h2,[role=heading]')];
-            const own=headings.find(e=>e.innerText.trim()===session.label);
-            const businessTabs=[...document.querySelectorAll('[role=tab]')].map(e=>e.innerText.trim());
-            if(own&&(headings.some(e=>e.innerText.trim()==='Messages')||(businessTabs.includes('Primary')&&businessTabs.includes('General'))))return own;
+            const own=headings.find(e=>cleanText(e.textContent)===session.label);
+            const businessTabs=[...document.querySelectorAll('[role=tab]')].map(e=>cleanText(e.textContent));
+            if(own&&(headings.some(e=>cleanText(e.textContent)==='Messages')||(businessTabs.includes('Primary')&&businessTabs.includes('General'))))return own;
             await new Promise(r=>setTimeout(r,200));
         }
         throw Error('Instagram inbox did not load for the selected account.');
@@ -360,6 +367,11 @@ const discoverAuthenticatedSessions = async () => {
         }
         const labels=[...document.querySelectorAll('[role=dialog] [role=button]')].map(e=>e.innerText.trim()).filter(t=>/^[A-Za-z0-9_.]{1,30}$/.test(t));throw Error('Account selection unavailable or ambiguous. Available account controls: '+[...new Set(labels)].join(', '));
     }});
+
+    action('listStoryTray',{async invoke({limit=30}){const end=Date.now()+18000;while(Date.now()<end){const rows=[...document.querySelectorAll('[aria-label^="Story by "]')];if(rows.length)return {items:rows.slice(0,limit).map(e=>({username:(e.getAttribute('aria-label').match(/^Story by (.*), (?:not seen|seen)$/)||[])[1]||e.innerText.trim(),id:e.getAttribute('aria-label'),latest:null,seen:null})),nextCursor:null};await new Promise(r=>setTimeout(r,200));}throw Error('Story tray controls did not load; coverage unavailable.');}});
+    action('viewStory',{async invoke({username}){const end=Date.now()+18000;let target;while(Date.now()<end){target=[...document.querySelectorAll('[role="button"],button')].find(e=>(e.getAttribute('aria-label')||'').startsWith('Story by '+username+', '));if(target)break;await new Promise(r=>setTimeout(r,200));}if(!target)throw Error('Requested account is not in the loaded story buttons; no view opened.');target.click();const deadline=Date.now()+18000;let confirmed=false;while(Date.now()<deadline){if(location.pathname.startsWith('/stories/'+username+'/')){const confirmation=[...document.querySelectorAll('button,[role=button],a')].find(e=>usable(e)&&e.textContent.trim()==='View story');if(confirmation&&!confirmed){confirmation.click();confirmed=true;}const ready=!!document.querySelector('[aria-label="Pause"],[aria-label="Play"],[placeholder^="Reply to"]');const imgs=[...document.images].filter(e=>e.naturalWidth>300&&e.naturalHeight>300&&usable(e));const vids=[...document.querySelectorAll('video')].filter(usable);if(ready&&!document.body.innerText.includes('View as ')&&document.body.innerText.trim().startsWith(username+'\n')&&(imgs.length||vids.length)){const pause=[...document.querySelectorAll('[aria-label="Pause"]')].map(e=>e.closest('button,[role="button"]')).find(Boolean);if(pause)pause.click();vids.forEach(v=>v.pause());return {url:location.href,text:(document.querySelector('main')?.innerText||document.body.innerText).slice(0,5000),images:imgs.map(e=>({url:e.currentSrc||e.src,alt:e.alt||''})),video:vids.length>0};}}await new Promise(r=>setTimeout(r,100));}throw Error('Story view was requested but rendered media could not be verified. Inspect current state before retrying.');}});
+    action('getStoryPage',{async invoke(){return {url:location.href,text:document.body.innerText.slice(-6000),controls:[...document.querySelectorAll('[aria-label]')].map(e=>e.getAttribute('aria-label')).slice(-50),images:[...document.images].filter(e=>e.naturalWidth>300&&usable(e)).map(e=>({url:e.currentSrc||e.src,alt:e.alt||'',width:e.clientWidth,height:e.clientHeight}))};}});
+    action('confirmStoryView',{async invoke(){if(!location.pathname.startsWith('/stories/'))throw Error('Not a story page');const end=Date.now()+15000;let clicked=false;while(Date.now()<end){const b=[...document.querySelectorAll('button,[role=button],a')].find(e=>usable(e)&&e.textContent.trim()==='View story');if(b&&!clicked){b.click();clicked=true;}const images=[...document.images].filter(e=>e.naturalWidth>300&&usable(e));if(clicked&&!document.body.innerText.includes('View as ')&&(images.length||document.querySelector('[aria-label="Video player"]'))){document.querySelector('video')?.pause();const pause=document.querySelector('[aria-label="Pause"]')?.closest('button,[role=button]');if(pause)pause.click();return {url:location.href,text:document.body.innerText.slice(-6000),controls:[...document.querySelectorAll('[aria-label]')].map(e=>e.getAttribute('aria-label')).slice(-50),images:images.map(e=>({url:e.currentSrc||e.src,alt:e.alt||'',width:e.clientWidth,height:e.clientHeight}))};}await new Promise(r=>setTimeout(r,150));}throw Error('Story confirmation outcome uncertain; do not repeat without inspection');}});
     action("getProfile", {
         async invoke({ username } = {}) {
             const u = await fetchProfile(username || "");

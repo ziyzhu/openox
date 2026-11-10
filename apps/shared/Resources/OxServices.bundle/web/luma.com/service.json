@@ -258,6 +258,150 @@
           }
         }
       }
+    },
+    {
+      "id": "getEvent",
+      "label": "Get event details",
+      "description": "Read public event title, start, end, address, and description from its Luma page.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "start",
+          "end",
+          "location",
+          "description",
+          "url"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "end": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "getRegistration",
+      "label": "Read event registration",
+      "description": "Read current signed-in attendance status from a direct event URL.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "eventUrl"
+        ],
+        "properties": {
+          "eventUrl": {
+            "type": "string",
+            "pattern": "^https://luma\\.com/[^/?#]+$"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "url",
+          "status",
+          "details"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "registerFreeEvent",
+      "label": "Register for free event",
+      "description": "Submit a verified free One-Click RSVP once, reject paid or custom-question events, and verify server status. Invoke on the exact event page.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "eventUrl",
+          "expectedTitle"
+        ],
+        "properties": {
+          "eventUrl": {
+            "type": "string",
+            "pattern": "^https://luma\\.com/[^/?#]+$"
+          },
+          "expectedTitle": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "url",
+          "status",
+          "details"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string"
+          }
+        }
+      }
     }
   ]
 }

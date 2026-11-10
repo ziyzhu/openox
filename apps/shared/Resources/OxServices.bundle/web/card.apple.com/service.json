@@ -1,0 +1,63 @@
+{
+  "domain": "card.apple.com",
+  "name": "Apple Card",
+  "description": "Apple Card web account access. Sign in and discover the authenticated card account. Read-only balance support requires authenticated verification; no payment actions.",
+  "baseUrl": "https://card.apple.com/",
+  "faviconUrl": "https://openox.ai/assets/services/card.apple.com/favicon.png",
+  "actions": [
+    {
+      "id": "listSessions",
+      "label": "Find signed-in Apple Card account",
+      "description": "Discover the authenticated Apple Card account from the live application store; confirmed signed-out pages return no sessions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "login",
+      "label": "Sign in to Apple Card",
+      "description": "Open Apple’s embedded Apple Account sign-in for manual authentication. No passwords are handled by this service.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "blocking": true
+    }
+  ]
+}

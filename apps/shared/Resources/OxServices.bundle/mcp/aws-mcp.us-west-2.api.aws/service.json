@@ -1,0 +1,7 @@
+{
+  "endpoint" : "https://aws-mcp.us-west-2.api.aws/mcp",
+  "faviconUrl" : "https://openox.ai/assets/services/aws-mcp.us-west-2.api.aws/favicon.png",
+  "id" : "aws-mcp.us-west-2.api.aws",
+  "name" : "aws-mcp.us-west-2.api.aws",
+  "transport" : "streamable-http"
+}

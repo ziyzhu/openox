@@ -561,7 +561,11 @@ window.ox.install(({ action }) => {
  } });
     const discoverAuthenticatedSessions = async () => {
 const end=Date.now()+15000;while(Date.now()<end){
-try {const u=window.require('CurrentUserInitialData');const id=String(u?.ACCOUNT_ID||u?.USER_ID||'');if(/^[1-9][0-9]+$/.test(id))return [{id,label:u.NAME||id,url:'https://www.facebook.com/'}];}catch{}
+const pending=[...document.scripts].filter(s=>s.type==='application/json'&&s.textContent.includes('CurrentUserInitialData')).flatMap(s=>{try{return [JSON.parse(s.textContent)];}catch{return [];}});const users=[];let visited=0;
+while(pending.length&&visited++<150000){const n=pending.pop();if(Array.isArray(n)&&n[0]==='CurrentUserInitialData')users.push(n[2]);else if(n&&typeof n==='object')pending.push(...Object.values(n));}
+const identities=users.filter(u=>/^[1-9][0-9]+$/.test(String(u?.ACCOUNT_ID||u?.USER_ID||'')));const ids=[...new Set(identities.map(u=>String(u.ACCOUNT_ID||u.USER_ID)))];
+if(ids.length===1){const u=identities[0];return [{id:ids[0],label:u.NAME||ids[0],url:'https://www.facebook.com/'}];}
+if(ids.length>1)throw Error('Facebook current account identity is ambiguous');
 if(document.querySelector('input[type="password"]')&&/login/.test(location.pathname))return [];
 await new Promise(r=>setTimeout(r,250));}
 throw Error('Facebook current account identity unavailable');

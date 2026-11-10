@@ -1,7 +1,7 @@
 {
   "domain": "americanexpress.com",
   "name": "Amex Travel",
-  "description": "Read-only Amex Travel profiles, loyalty programs, trips, and adult roundtrip flight searches with fare-brand comparisons. Sign-in required; flight actions use the newer booking-app session.",
+  "description": "Read-only American Express card balances and membership fees, plus Amex Travel profiles, loyalty programs, trips, and flight searches. Sign-in required.",
   "baseUrl": "https://www.americanexpress.com/en-us/travel",
   "$defs": {
     "loyalty": {
@@ -947,6 +947,59 @@
           "futureRenewalConfirmed"
         ],
         "additionalProperties": false
+      }
+    },
+    {
+      "id": "listCardBalances",
+      "label": "List credit card balances",
+      "description": "Read current total balances of credit and charge cards on the account overview. Excludes deposit accounts; fails if card tiles are unavailable.",
+      "baseUrl": "https://global.americanexpress.com/overview",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "mask",
+                "balance",
+                "currency"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "mask": {
+                  "type": "string"
+                },
+                "balance": {
+                  "type": "number"
+                },
+                "currency": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        }
       }
     }
   ],

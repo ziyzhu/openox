@@ -1,7 +1,7 @@
 {
   "domain": "google.com",
   "name": "Google",
-  "description": "A web search engine. Find news, images, videos, and query suggestions. No sign-in required.",
+  "description": "Search the public web, news, images, videos, suggestions, and live Google Flights fares. No sign-in required.",
   "baseUrl": "https://www.google.com/",
   "$defs": {
     "nullableString": {
@@ -178,8 +178,90 @@
       "label": "Search",
       "description": "Search the public web. Returns a bounded result window, not exhaustive coverage. Consent and human verification are reported as failures.",
       "baseUrl": "https://www.google.com/search?q={query}&hl=en&num=10",
-      "inputSchema": {"type":"object","properties":{"query":{"type":"string","minLength":1,"maxLength":1000},"limit":{"type":"integer","minimum":1,"maximum":50,"default":10},"cursor":{"type":"string","minLength":1}},"required":["query"],"additionalProperties":false},
-      "outputSchema": {"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string","minLength":1},"url":{"type":["string","null"]},"snippet":{"type":["string","null"]}},"required":["title","url","snippet"],"additionalProperties":false}},"nextCursor":{"type":["string","null"]},"scope":{"type":"string","minLength":1},"coverage":{"type":"string","enum":["complete","partial","unknown"]}},"required":["items","nextCursor","scope","coverage"],"additionalProperties":false},
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "snippet": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "title",
+                "url",
+                "snippet"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          },
+          "coverage": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "partial",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "scope",
+          "coverage"
+        ],
+        "additionalProperties": false
+      },
       "requireAuth": false,
       "requireApproval": false
     },
@@ -337,14 +419,285 @@
       },
       "requireApproval": false,
       "requireAuth": false
+    },
+    {
+      "id": "searchFlights",
+      "label": "Search Google Flights",
+      "description": "Read live Google Flights results for a natural-language query specifying route, travel dates, trip type, cabin and passengers. Returns displayed departing options and quoted fares; round-trip prices are not independently bookable outbound fares. Bounded snapshot only; no booking or price tracking.",
+      "baseUrl": "https://www.google.com/travel/flights?hl=en&q={query}",
+      "blocking": true,
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Explicit flight request, e.g. Flights from SEA to SFO on December 10 2026 one way for 1 adult economy. Include both dates for round trips. Google interprets the query; inspect interpretedSearch."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "airlines": {
+                  "type": "string"
+                },
+                "departure": {
+                  "type": "string"
+                },
+                "arrival": {
+                  "type": "string"
+                },
+                "duration": {
+                  "type": "string"
+                },
+                "stops": {
+                  "type": "string"
+                },
+                "priceText": {
+                  "type": "string"
+                },
+                "priceLabel": {
+                  "type": "string"
+                },
+                "baggage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "airlines",
+                "departure",
+                "arrival",
+                "duration",
+                "stops",
+                "priceText",
+                "priceLabel",
+                "baggage",
+                "summary"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "url": {
+            "type": "string"
+          },
+          "interpretedSearch": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "origin": {
+                "type": "string"
+              },
+              "destination": {
+                "type": "string"
+              },
+              "departureDate": {
+                "type": "string"
+              },
+              "returnDate": {
+                "type": "string"
+              },
+              "tripType": {
+                "type": "string"
+              },
+              "passengers": {
+                "type": "string"
+              },
+              "cabin": {
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "title",
+              "origin",
+              "destination",
+              "departureDate",
+              "returnDate",
+              "tripType",
+              "passengers",
+              "cabin",
+              "currency"
+            ],
+            "additionalProperties": false
+          },
+          "coverage": {
+            "type": "string",
+            "enum": [
+              "partial",
+              "unknown"
+            ]
+          },
+          "fareNotice": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "url",
+          "interpretedSearch",
+          "coverage",
+          "fareNotice"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getFlightQuote",
+      "label": "Read Google Flights itinerary quote",
+      "description": "Read selected flight numbers, times, booking providers, fare brands and restrictions from a Google Flights booking-summary itinerary. Takes the public tfs itinerary value from a Google Flights URL. Does not continue to a seller, reserve or book.",
+      "baseUrl": "https://www.google.com/travel/flights/booking?tfs={itinerary}&hl=en",
+      "blocking": true,
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itinerary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 12000,
+            "description": "Public tfs itinerary value from a discovered Google Flights booking-summary URL."
+          }
+        },
+        "required": [
+          "itinerary"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "flights": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "summary": {
+                  "type": "string"
+                },
+                "flightNumbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "summary",
+                "flightNumbers"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "quotes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "providerAndFare": {
+                  "type": "string"
+                },
+                "priceLabel": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "providerAndFare",
+                "priceLabel"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "fareBrands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "priceText": {
+                  "type": "string"
+                },
+                "features": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "priceText",
+                "features"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "notice": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "title",
+          "flights",
+          "quotes",
+          "fareBrands",
+          "notice"
+        ],
+        "additionalProperties": false
+      }
     }
   ],
   "locales": {
     "zh-Hans": {
       "name": "谷歌",
-      "description": "网页搜索引擎。查找新闻、图片、视频和查询建议。无需登录。",
+      "description": "搜索公开网页、新闻、图片、视频、查询建议和 Google 航班实时票价。无需登录。",
       "actions": {
-        "search": {"label": "搜索", "description": "搜索公开网页。仅返回有限结果；同意请求或人机验证将报告为失败。"},
+        "search": {
+          "label": "搜索",
+          "description": "搜索公开网页。仅返回有限结果；同意请求或人机验证将报告为失败。"
+        },
         "listSuggestions": {
           "label": "自动补全建议",
           "description": "为未输入完整的查询提供搜索建议。"
@@ -360,6 +713,14 @@
         "searchVideos": {
           "label": "搜索视频",
           "description": "查找视频及其来源、创作者、时长和预览。"
+        },
+        "searchFlights": {
+          "label": "搜索 Google 航班",
+          "description": "根据包含航线、日期、行程类型、舱位和人数的自然语言查询读取实时航班及报价。往返报价不代表单独购买去程的价格。仅返回有限快照；不订票或跟踪价格。"
+        },
+        "getFlightQuote": {
+          "label": "读取 Google 航班行程报价",
+          "description": "使用 Google 航班摘要网址中的公开 tfs 行程值读取航班号、时间、卖家、票价品牌和限制。不跳转至卖家、不预订或购买。"
         }
       }
     }
