@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "prompt-workbench",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["--watch", "packages/agent/workbench/server.ts"],
+      "port": 4377
+    }
+  ]
+}

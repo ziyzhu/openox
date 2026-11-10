@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prompt Workbench</title>
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e2e1dc; --accent: #2f5bd3;
+  --add-bg: #dff3e3; --add-ink: #145c26; --del-bg: #fbe1df; --del-ink: #8a1c13; --error: #b3261e; --warning: #9a6200; --info: #3d5a99;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace; --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #161615; --panel: #1f1f1d; --ink: #ecebe6; --muted: #9b9a93; --line: #34332f; --accent: #8aa8ff;
+    --add-bg: #173a22; --add-ink: #a6e3b4; --del-bg: #4a1d19; --del-ink: #f5b3ab; --error: #ff8a80; --warning: #f0b45a; --info: #9fb7f0; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); font: 13px/1.45 var(--sans); }
+body { display: grid; grid-template-rows: auto 1fr; }
+header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+header h1 { font-size: 14px; margin: 0 8px 0 0; }
+header label { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); }
+header select { font: inherit; }
+#totals { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+#app { display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: 0; }
+@media (max-width: 900px) { #app { grid-template-columns: 200px minmax(0, 1fr); } }
+#app.wide-bottom #work { grid-template-rows: 30% 70%; }
+nav { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
+nav input { margin: 8px; padding: 6px 8px; font: inherit; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
+#list { overflow: auto; padding-bottom: 16px; }
+.group { padding: 10px 12px 4px; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.item { display: flex; gap: 6px; align-items: center; padding: 3px 12px 3px 16px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item:hover { background: var(--bg); }
+.item.selected { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.item.absent { opacity: .45; }
+.item .name { overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+.badge { font-size: 10px; padding: 0 5px; border-radius: 8px; color: #fff; flex: none; }
+.badge.error { background: var(--error); } .badge.warning { background: var(--warning); } .badge.info { background: var(--info); }
+#work { display: grid; grid-template-rows: 58% 42%; min-height: 0; min-width: 0; }
+#editors { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 0; }
+.pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--line); }
+.pane-head { padding: 8px 12px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; background: var(--panel); }
+.pane-head h2 { font-size: 13px; margin: 0; }
+.meta { color: var(--muted); font-size: 12px; }
+.tag { font-size: 11px; padding: 0 6px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); }
+.pane-body { flex: 1; overflow: auto; min-height: 0; }
+pre, textarea { margin: 0; padding: 12px; font: 12.5px/1.5 var(--mono); white-space: pre-wrap; word-break: break-word; }
+textarea { width: 100%; height: 100%; border: 0; resize: none; background: var(--panel); color: var(--ink); outline: none; }
+textarea:disabled { color: var(--muted); }
+button { font: inherit; padding: 3px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .4; cursor: default; }
+button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.spacer { flex: 1; }
+#bottom { display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--line); }
+#tabs { display: flex; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--line); background: var(--panel); align-items: center; }
+#panel { flex: 1; overflow: auto; min-height: 0; }
+ins { background: var(--add-bg); color: var(--add-ink); text-decoration: none; }
+del { background: var(--del-bg); color: var(--del-ink); }
+.line { display: block; padding: 0 12px; }
+.line.add { background: var(--add-bg); color: var(--add-ink); }
+.line.del { background: var(--del-bg); color: var(--del-ink); }
+.line.skip { color: var(--muted); font-style: italic; }
+.section-title { padding: 8px 12px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); }
+.finding { padding: 4px 12px; display: flex; gap: 8px; cursor: pointer; min-width: 0; }
+.finding > :last-child { min-width: 0; overflow-wrap: anywhere; }
+.finding:hover { background: var(--panel); }
+.finding .sev { width: 64px; flex: none; font-weight: 600; }
+.sev.error { color: var(--error); } .sev.warning { color: var(--warning); } .sev.info { color: var(--info); }
+.finding .unit { color: var(--accent); flex: none; }
+table { border-collapse: collapse; width: 100%; }
+td { padding: 3px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.ok { color: var(--add-ink); } td.missing { color: var(--error); font-weight: 600; }
+.link { color: var(--accent); cursor: pointer; margin-right: 8px; }
+.empty { padding: 24px; color: var(--muted); }
+#error { color: var(--error); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Prompt workbench</h1>
+  <label>Display <select id="v-presentation" data-testid="variant-presentation"><option value="conversation-bubbles">iOS bubbles</option><option value="text">Text</option></select></label>
+  <label>Storage <select id="v-storage" data-testid="variant-storage"><option value="persisted">Saved</option><option value="temporary">Temporary</option><option value="temporaryProfile">Temporary, no external files</option></select></label>
+  <label><input type="checkbox" id="v-language" data-testid="variant-language">Fixed language</label>
+  <label><input type="checkbox" id="v-services" data-testid="variant-services">Services</label>
+  <label><input type="checkbox" id="v-files" data-testid="variant-files">Files</label>
+  <label><input type="checkbox" id="v-folders" data-testid="variant-folders">Folders</label>
+  <label><input type="checkbox" id="v-multiHost" data-testid="variant-multihost">Two hosts</label>
+  <label><input type="checkbox" id="v-identity" data-testid="variant-identity">Claude subscription</label>
+  <label><input type="checkbox" id="v-isolated" data-testid="variant-isolated">Isolated</label>
+  <span id="error"></span>
+  <span id="totals"></span>
+</header>
+<div id="app">
+  <nav>
+    <input id="search" type="search" placeholder="Filter sections" data-testid="unit-filter">
+    <div id="list"></div>
+  </nav>
+  <div id="work">
+    <div id="editors">
+      <section class="pane">
+        <div class="pane-head">
+          <h2>Current</h2><span id="unit-title" class="meta"></span>
+          <span class="spacer"></span>
+          <button id="toggle-diff" data-testid="toggle-unit-diff">Diff with draft</button>
+        </div>
+        <div class="pane-head"><span id="unit-source" class="meta"></span><span id="unit-tags"></span><span id="unit-size" class="meta"></span></div>
+        <div class="pane-body"><pre id="current" data-testid="current-text"></pre></div>
+      </section>
+      <section class="pane">
+        <div class="pane-head">
+          <h2>Draft</h2><span id="draft-status" class="meta"></span>
+          <span class="spacer"></span>
+          <button id="start-draft" data-testid="start-draft">Start from current</button>
+          <button id="delete-draft" data-testid="delete-draft">Delete draft</button>
+        </div>
+        <div class="pane-head"><span id="draft-size" class="meta"></span></div>
+        <div class="pane-body"><textarea id="draft" spellcheck="true" data-testid="draft-editor"></textarea></div>
+      </section>
+    </div>
+    <div id="bottom">
+      <div id="tabs">
+        <button data-tab="checks" data-testid="tab-checks">Checks</button>
+        <button data-tab="next" data-testid="tab-new-prompt">New prompt</button>
+        <button data-tab="diff" data-testid="tab-prompt-diff">Prompt diff</button>
+        <button data-tab="old" data-testid="tab-current-prompt">Current prompt</button>
+        <span class="spacer"></span>
+        <button id="grow" data-testid="toggle-panel-size">Enlarge</button>
+      </div>
+      <div id="panel"></div>
+    </div>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const store = {
+  get(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } },
+  set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
+};
+const state = { units: [], byId: new Map(), selected: store.get("selected", "rules"), tab: store.get("tab", "checks"), unitDiff: false, render: null, variant: store.get("variant", {}) };
+const variantKeys = ["presentation", "storage", "language", "services", "files", "folders", "multiHost", "identity", "isolated"];
+const tokens = chars => Math.round(chars / 4);
+const size = text => `${text.length.toLocaleString()} chars · ≈${tokens(text.length).toLocaleString()} tok`;
+const delta = (a, b) => { const d = b - a; return d === 0 ? "±0" : (d > 0 ? "+" : "−") + Math.abs(d).toLocaleString(); };
+const el = (tag, props = {}, ...children) => { const node = Object.assign(document.createElement(tag), props); node.append(...children); return node; };
+
+function readVariant() {
+  const value = {};
+  for (const key of variantKeys) { const input = $(`v-${key}`); value[key] = input.type === "checkbox" ? input.checked : input.value; }
+  return value;
+}
+function writeVariant(value) {
+  for (const key of variantKeys) { const input = $(`v-${key}`); if (value[key] === undefined) continue; if (input.type === "checkbox") input.checked = value[key]; else input.value = value[key]; }
+}
+
+function lcs(a, b) {
+  const n = a.length, m = b.length;
+  if (n * m > 6e6) return [...a.map(v => ["del", v]), ...b.map(v => ["add", v])];
+  const w = m + 1, dp = new Uint32Array((n + 1) * w);
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) dp[i * w + j] = a[i] === b[j] ? dp[(i + 1) * w + j + 1] + 1 : Math.max(dp[(i + 1) * w + j], dp[i * w + j + 1]);
+  const ops = []; let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) { ops.push(["same", a[i]]); i++; j++; }
+    else if (dp[(i + 1) * w + j] >= dp[i * w + j + 1]) ops.push(["del", a[i++]]);
+    else ops.push(["add", b[j++]]);
+  }
+  while (i < n) ops.push(["del", a[i++]]);
+  while (j < m) ops.push(["add", b[j++]]);
+  return ops;
+}
+
+function wordDiff(a, b) {
+  const pre = el("pre");
+  for (const [op, value] of lcs(a.split(/(\s+)/), b.split(/(\s+)/))) pre.append(op === "same" ? value : el(op === "add" ? "ins" : "del", { textContent: value }));
+  return pre;
+}
+
+function lineDiff(a, b) {
+  const pre = el("pre", { style: "padding: 8px 0" });
+  const ops = lcs(a.split("\n"), b.split("\n"));
+  for (let index = 0; index < ops.length;) {
+    if (ops[index][0] === "same") {
+      let end = index; while (end < ops.length && ops[end][0] === "same") end++;
+      const run = ops.slice(index, end);
+      const keep = run.length > 8 ? [...run.slice(0, index === 0 ? 0 : 3), null, ...run.slice(end === ops.length ? run.length : -3)] : run;
+      for (const op of keep) pre.append(op ? el("span", { className: "line", textContent: `  ${op[1]}\n` }) : el("span", { className: "line skip", textContent: `  … ${run.length - (index === 0 ? 0 : 3) - (end === ops.length ? 0 : 3)} unchanged lines\n` }));
+      index = end;
+    } else {
+      const [op, value] = ops[index++];
+      pre.append(el("span", { className: `line ${op}`, textContent: `${op === "add" ? "+" : "−"} ${value}\n` }));
+    }
+  }
+  return pre;
+}
+
+function fullText(r) {
+  return [r.identity && `── System block: provider identity ──\n${r.identity}`, `── System prompt ──\n${r.system}`, `── Tool: execute (description) ──\n${r.execute}`].filter(Boolean).join("\n\n");
+}
+
+function findingsFor(id) { return (state.render?.findings ?? []).filter(finding => finding.unit === id); }
+
+function renderList() {
+  const query = $("search").value.trim().toLowerCase();
+  const list = $("list"); list.replaceChildren();
+  let group = null;
+  for (const unit of state.units) {
+    if (query && !`${unit.id} ${unit.title} ${unit.current} ${unit.draft ?? ""}`.toLowerCase().includes(query)) continue;
+    if (unit.group !== group) { group = unit.group; list.append(el("div", { className: "group", textContent: group })); }
+    const found = findingsFor(unit.id);
+    const worst = ["error", "warning", "info"].find(severity => found.some(finding => finding.severity === severity));
+    const absent = (unit.scope === "system" || unit.scope === "execute") && state.render && !state.render.appears[unit.id];
+    const item = el("div", { className: `item${unit.id === state.selected ? " selected" : ""}${absent ? " absent" : ""}`, title: `${unit.id}${absent ? " — not in this variant" : ""}` },
+      unit.draft !== null ? el("span", { className: "dot", title: "Has draft" }) : el("span", { style: "width:7px" }),
+      el("span", { className: "name", textContent: unit.title }));
+    if (worst) item.append(el("span", { className: `badge ${worst}`, textContent: String(found.length) }));
+    item.dataset.testid = `unit-${unit.id}`;
+    item.onclick = () => select(unit.id);
+    list.append(item);
+  }
+}
+
+function renderUnit() {
+  const unit = state.byId.get(state.selected) ?? state.units[0];
+  if (!unit) return;
+  state.selected = unit.id;
+  $("unit-title").textContent = `${unit.title} · ${unit.id}`;
+  $("unit-source").textContent = unit.source;
+  const absent = (unit.scope === "system" || unit.scope === "execute") && state.render && !state.render.appears[unit.id];
+  $("unit-tags").replaceChildren(el("span", { className: "tag", textContent: unit.scope }), " ",
+    ...(unit.editable ? [] : [el("span", { className: "tag", textContent: "read-only" }), " "]),
+    ...(absent ? [el("span", { className: "tag", textContent: "not in this variant" })] : []));
+  $("unit-size").textContent = size(unit.current);
+  $("toggle-diff").classList.toggle("active", state.unitDiff);
+  const body = $("current").parentElement;
+  body.replaceChildren(state.unitDiff && unit.draft !== null ? wordDiff(unit.current, unit.draft) : Object.assign($("current"), { textContent: unit.current }));
+  const draft = $("draft");
+  if (document.activeElement !== draft || draft.dataset.unit !== unit.id) draft.value = unit.draft ?? "";
+  draft.dataset.unit = unit.id;
+  draft.disabled = !unit.editable;
+  draft.placeholder = unit.editable ? "No draft yet. Type here or start from the current text." : "Generated example; not editable.";
+  $("start-draft").disabled = !unit.editable || unit.draft !== null;
+  $("delete-draft").disabled = unit.draft === null;
+  $("draft-size").textContent = unit.draft === null ? "" : `${size(unit.draft)} · ${delta(unit.current.length, unit.draft.length)} chars${unit.draft === "" ? " · empty draft removes this text" : ""}`;
+}
+
+function renderTotals() {
+  const r = state.render; if (!r) return;
+  const sys = x => x.identity.length + x.system.length;
+  const drafts = state.units.filter(unit => unit.draft !== null).length;
+  $("totals").textContent = `System ${sys(r.old).toLocaleString()} → ${sys(r.next).toLocaleString()} (${delta(sys(r.old), sys(r.next))}) · Execute ${r.old.execute.length.toLocaleString()} → ${r.next.execute.length.toLocaleString()} (${delta(r.old.execute.length, r.next.execute.length)}) · ≈${tokens(sys(r.next) + r.next.execute.length).toLocaleString()} tok · ${drafts} drafts`;
+}
+
+function renderChecks() {
+  const r = state.render; const panel = el("div");
+  const order = { error: 0, warning: 1, info: 2 };
+  const findings = [...r.findings].sort((a, b) => order[a.severity] - order[b.severity]);
+  panel.append(el("div", { className: "section-title", textContent: `Findings (${findings.length})` }));
+  if (!findings.length) panel.append(el("div", { className: "empty", textContent: "No findings." }));
+  for (const finding of findings) {
+    const row = el("div", { className: "finding" }, el("span", { className: `sev ${finding.severity}`, textContent: finding.severity }),
+      el("span", { className: "meta", textContent: finding.check }), ...(finding.unit ? [el("span", { className: "unit", textContent: finding.unit })] : []), el("span", { textContent: finding.message }));
+    if (finding.unit) row.onclick = () => select(finding.unit);
+    panel.append(row);
+  }
+  const missing = r.coverage.filter(item => !item.units.length).length;
+  panel.append(el("div", { className: "section-title", textContent: `Invariant coverage (${r.coverage.length - missing}/${r.coverage.length}) — keyword match, edit invariants.json to refine` }));
+  const table = el("table");
+  for (const item of r.coverage) {
+    const where = el("td");
+    for (const id of item.units) where.append(Object.assign(el("span", { className: "link", textContent: id }), { onclick: () => select(id) }));
+    table.append(el("tr", {}, el("td", { className: item.units.length ? "ok" : "missing", textContent: item.units.length ? "✓" : "missing" }), el("td", { textContent: item.fact }), where));
+  }
+  panel.append(table);
+  return panel;
+}
+
+function renderPanel() {
+  for (const button of document.querySelectorAll("#tabs [data-tab]")) button.classList.toggle("active", button.dataset.tab === state.tab);
+  const r = state.render; if (!r) return;
+  const views = {
+    checks: () => renderChecks(),
+    next: () => el("pre", { textContent: fullText(r.next) }),
+    old: () => el("pre", { textContent: fullText(r.old) }),
+    diff: () => fullText(r.old) === fullText(r.next) ? el("div", { className: "empty", textContent: "No differences in this variant." }) : lineDiff(fullText(r.old), fullText(r.next)),
+  };
+  $("panel").replaceChildren(views[state.tab]());
+}
+
+function select(id) { state.selected = id; store.set("selected", id); renderList(); renderUnit(); }
+
+async function api(path, options) {
+  const response = await fetch(path, options);
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error ?? response.statusText);
+  return body;
+}
+
+async function refresh() {
+  try {
+    state.variant = readVariant(); store.set("variant", state.variant);
+    state.render = await api("/api/render", { method: "POST", body: JSON.stringify(state.variant) });
+    $("error").textContent = "";
+  } catch (error) { $("error").textContent = error.message; }
+  renderTotals(); renderList(); renderUnit(); renderPanel();
+}
+
+async function load() {
+  const { units } = await api("/api/units");
+  state.units = units; state.byId = new Map(units.map(unit => [unit.id, unit]));
+  await refresh();
+}
+
+let saveTimer = null;
+async function saveDraft(unit, text) {
+  $("draft-status").textContent = "Saving…";
+  try { await api(`/api/drafts/${encodeURIComponent(unit.id)}`, { method: "PUT", body: text }); $("draft-status").textContent = "Saved"; }
+  catch (error) { $("draft-status").textContent = `Not saved: ${error.message}`; }
+  await refresh();
+}
+
+$("draft").addEventListener("input", event => {
+  const unit = state.byId.get(event.target.dataset.unit); if (!unit?.editable) return;
+  unit.draft = event.target.value; $("draft-status").textContent = "Editing…";
+  renderUnit();
+  clearTimeout(saveTimer); saveTimer = setTimeout(() => saveDraft(unit, unit.draft), 500);
+});
+$("start-draft").onclick = () => { const unit = state.byId.get(state.selected); unit.draft = unit.current; $("draft").value = unit.current; saveDraft(unit, unit.current); };
+$("delete-draft").onclick = async () => {
+  const unit = state.byId.get(state.selected);
+  if (!confirm(`Delete the draft for ${unit.id}? This removes ${unit.id}.md and cannot be undone.`)) return;
+  clearTimeout(saveTimer);
+  await api(`/api/drafts/${encodeURIComponent(unit.id)}`, { method: "DELETE" });
+  unit.draft = null; $("draft").value = ""; $("draft-status").textContent = "Deleted";
+  await refresh();
+};
+$("toggle-diff").onclick = () => { state.unitDiff = !state.unitDiff; renderUnit(); };
+$("search").oninput = renderList;
+$("grow").onclick = () => { const wide = $("app").classList.toggle("wide-bottom"); $("grow").textContent = wide ? "Shrink" : "Enlarge"; };
+for (const button of document.querySelectorAll("#tabs [data-tab]")) button.onclick = () => { state.tab = button.dataset.tab; store.set("tab", state.tab); renderPanel(); };
+for (const key of variantKeys) $(`v-${key}`).onchange = refresh;
+writeVariant(state.variant);
+load();
+</script>
+</body>
+</html>
