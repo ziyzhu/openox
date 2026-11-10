@@ -121,15 +121,33 @@ nonisolated private struct RemoteMCPHTTPResponse: Sendable {
 enum RemoteMCPOAuth {
     private static let redirectURI = "http://localhost:49213/oauth/callback"
     private static let maxResponseBytes = 1 * 1_024 * 1_024
+    private static var refreshTasks: [String: (id: UUID, task: Task<String?, Error>)] = [:]
 
     static func accessToken(endpoint: URL, forceRefresh: Bool = false) async throws -> String? {
-        guard var credential = load(endpoint: endpoint), let tokens = credential.tokens else { return nil }
+        let key = account(endpoint: endpoint)
+        if let pending = refreshTasks[key] {
+            Log.service.info("RemoteMCPOAuth.refresh joined endpoint=\(LogPrivacy.url(endpoint.absoluteString))")
+            return try await pending.task.value
+        }
+        guard let credential = load(endpoint: endpoint), let tokens = credential.tokens else { return nil }
         guard forceRefresh || tokens.needsRefresh else { return tokens.accessToken }
         guard let refreshToken = tokens.refreshToken else { return forceRefresh ? nil : tokens.accessToken }
-        credential.tokens = try await refresh(refreshToken: refreshToken, credential: credential)
-        save(credential, endpoint: endpoint)
-        Log.service.info("RemoteMCPOAuth.refresh completed endpoint=\(LogPrivacy.url(endpoint.absoluteString))")
-        return credential.tokens?.accessToken
+        let id = UUID()
+        let task = Task {
+            defer { if Self.refreshTasks[key]?.id == id { Self.refreshTasks[key] = nil } }
+            var refreshed = credential
+            refreshed.tokens = try await Self.refresh(refreshToken: refreshToken, credential: credential)
+            guard Self.refreshTasks[key]?.id == id else { throw CancellationError() }
+            Self.save(refreshed, endpoint: endpoint)
+            Log.service.info("RemoteMCPOAuth.refresh completed endpoint=\(LogPrivacy.url(endpoint.absoluteString))")
+            return refreshed.tokens?.accessToken
+        }
+        refreshTasks[key] = (id, task)
+        return try await task.value
+    }
+
+    private static func cancelRefresh(endpoint: URL) {
+        refreshTasks.removeValue(forKey: account(endpoint: endpoint))?.task.cancel()
     }
 
     static func authorize(endpoint: URL, challenge: RemoteMCPAuthorizationChallenge) async throws -> String {
@@ -198,12 +216,14 @@ enum RemoteMCPOAuth {
             throw RemoteMCPError.oauth("The OAuth callback was invalid.")
         }
         credential.tokens = try await exchange(code: code, verifier: pkce.verifier, credential: credential)
+        cancelRefresh(endpoint: endpoint)
         save(credential, endpoint: endpoint)
         Log.service.info("RemoteMCPOAuth.authorize completed issuer=\(LogPrivacy.url(server.issuer.absoluteString))")
         return credential.tokens!.accessToken
     }
 
     static func clear(endpoint: URL) {
+        cancelRefresh(endpoint: endpoint)
         Credentials.clearSecret(for: account(endpoint: endpoint))
     }
 
