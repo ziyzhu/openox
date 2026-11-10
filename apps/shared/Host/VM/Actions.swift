@@ -117,7 +117,12 @@ nonisolated enum Actions {
 
     static func defaultPolicy(for action: String) -> ActionPolicy {
         guard builtIn.contains(action) else { return .ask }
-        return action.hasSuffix(".delete") || action == fsRm || action == providerGenerate || action == appLogs || [scheduleCreate, scheduleEnable, scheduleRun].contains(action) ? .ask : .allow
+        let asking = [
+            fsRm, providerGenerate, providerDeauthenticate, appLogs,
+            repositoryConnect, repositoryDisconnect,
+            scheduleCreate, scheduleEnable, scheduleRun,
+        ]
+        return action.hasSuffix(".delete") || asking.contains(action) ? .ask : .allow
     }
 
     static func label(for action: String) -> String? {

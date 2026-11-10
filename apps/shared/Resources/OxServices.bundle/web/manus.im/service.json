@@ -897,7 +897,7 @@
         "additionalProperties": false
       },
       "requireAuth": true,
-      "requireApproval": false,
+      "requireApproval": true,
       "baseUrl": "https://manus.im/app"
     },
     {
