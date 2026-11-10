@@ -510,7 +510,7 @@ nonisolated struct ToolResultParts {
     let truncated: Bool
     let media: [TransientAttachment]
 
-    init(_ result: ToolResultMessage, label: String) {
+    init(_ result: ToolResultMessage, label: String, logs: Bool) {
         let fileReferences = result.content.compactMap { block -> String? in
             guard case .attachment(let file) = block else { return nil }
             return FilePromptReference.text(for: file)
@@ -539,8 +539,16 @@ nonisolated struct ToolResultParts {
         }
         attachments.append(contentsOf: result.transientAttachments)
         media = attachments
+        guard logs else { return }
         let mediaBytes = media.reduce(0) { $0 + $1.data.count }
         Log.network.info("\(label): model input tool=\(result.toolName) id=\(result.toolCallId) textChars=\(text.count) truncated=\(truncated) media=\(media.count) mediaBytes=\(mediaBytes)")
+    }
+}
+
+nonisolated extension Array where Element == Message {
+    var newToolResultIDs: Set<String> {
+        let start = lastIndex { if case .assistant = $0 { true } else { false } }.map { $0 + 1 } ?? startIndex
+        return Set(self[start...].compactMap { if case .toolResult(let result) = $0 { result.toolCallId } else { nil } })
     }
 }
 

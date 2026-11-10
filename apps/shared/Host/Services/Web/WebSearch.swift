@@ -5,7 +5,7 @@ extension Conversation {
         let options = arguments.objectValue ?? [:]
         let query = options["query"]?.stringValue ?? ""
         let domains = options["domains"]?.arrayValue?.compactMap(\.stringValue)
-            ?? ["search.brave.com", "duckduckgo.com", "google.com", "reddit.com", "x.com", "en.wikipedia.org"]
+            ?? ["duckduckgo.com", "google.com", "reddit.com", "x.com", "en.wikipedia.org"]
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw OxSearch.failure("invalid_argument", "Search query must not be blank.")
         }
@@ -28,7 +28,7 @@ extension Conversation {
         var recorded = options
         recorded["domains"] = .array(domains.map(JSONValue.string))
         return try await tracked(Actions.webSearch, .object(recorded), purpose: purpose, groupsCalls: true) {
-            let outcomes = try await withThrowingTaskGroup(of: (Int, Result<JSONValue, OxFunctionError>).self) { group in
+            let outcomes = try await withThrowingTaskGroup(of: (Int, Result<JSONValue, OxFunctionError>)?.self) { group in
                 for (index, domain) in domains.enumerated() {
                     let service = "web:\(domain)"
                     group.addTask {
@@ -43,7 +43,20 @@ extension Conversation {
                     }
                 }
                 var outcomes = [Result<JSONValue, OxFunctionError>?](repeating: nil, count: domains.count)
-                for try await (index, outcome) in group { outcomes[index] = outcome }
+                var graceStarted = false
+                for try await event in group {
+                    guard case let (index, outcome)? = event else { break }
+                    outcomes[index] = outcome
+                    if outcomes.allSatisfy({ $0 != nil }) { break }
+                    if case .success = outcome, !graceStarted {
+                        graceStarted = true
+                        group.addTask {
+                            try await Task.sleep(for: OxSearch.slowDomainGrace)
+                            return nil
+                        }
+                    }
+                }
+                group.cancelAll()
                 return outcomes
             }
             var results: [JSONValue] = []
@@ -53,7 +66,11 @@ extension Conversation {
                 switch outcome {
                 case .success(let page): results.append(page)
                 case .failure(let failure): errors.append(.object(["service": .string(service), "code": .string(failure.code), "message": .string(failure.message), "recovery": .string(failure.recovery)]))
-                case nil: break
+                case nil:
+                    Log.session.warning("bridge.web.search service=\(service) code=timed_out graceSeconds=\(OxSearch.slowDomainGrace.components.seconds)")
+                    errors.append(.object(["service": .string(service), "code": .string("timed_out"),
+                                           "message": .string("Search did not finish within \(OxSearch.slowDomainGrace.components.seconds) seconds after the first domain returned."),
+                                           "recovery": .string("Search this domain alone if its results are needed.")]))
                 }
             }
             guard !results.isEmpty else {
@@ -119,6 +136,8 @@ extension Conversation {
 }
 
 extension OxSearch {
+    static let slowDomainGrace = Duration.seconds(4)
+
     static func failure(_ code: String, _ message: String) -> OxFunctionError {
         OxFunctionError(code: code, message: message, recovery: "Inspect the service search contract before retrying.")
     }

@@ -284,6 +284,7 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
             pendingSystem = []
         }
 
+        let newToolResultIDs = messages.newToolResultIDs
         for message in messages {
             switch message {
             case .system(let system):
@@ -295,7 +296,7 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
                 flushSystem()
                 append(role: "assistant", content: assistantContent(assistant))
             case .toolResult(let result):
-                append(role: "user", content: [try toolResultContent(result)])
+                append(role: "user", content: [try toolResultContent(result, logs: newToolResultIDs.contains(result.toolCallId))])
             }
         }
         flushSystem()
@@ -367,8 +368,8 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         }
     }
 
-    private func toolResultContent(_ result: ToolResultMessage) throws -> [String: Any] {
-        let parts = ToolResultParts(result, label: "\(displayName).messages.toolResult")
+    private func toolResultContent(_ result: ToolResultMessage, logs: Bool) throws -> [String: Any] {
+        let parts = ToolResultParts(result, label: "\(displayName).messages.toolResult", logs: logs)
         var content: [[String: Any]] = []
         if !parts.text.isEmpty { content.append(["type": "text", "text": parts.text]) }
         for attachment in parts.media {

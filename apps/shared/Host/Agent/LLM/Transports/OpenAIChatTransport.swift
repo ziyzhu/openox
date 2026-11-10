@@ -362,6 +362,7 @@ public struct OpenAIChatTransport: ProviderClient {
             msgs.append(try buildToolMediaMessage(pendingToolMedia))
             pendingToolMedia = []
         }
+        let newToolResultIDs = messages.newToolResultIDs
         for m in messages {
             switch m {
             case .system(let system):
@@ -374,7 +375,7 @@ public struct OpenAIChatTransport: ProviderClient {
                 try flushToolMedia()
                 msgs.append(buildAssistantMessage(a, model: model))
             case .toolResult(let r):
-                let result = ToolResultParts(r, label: "\(displayName).buildToolResultMessage")
+                let result = ToolResultParts(r, label: "\(displayName).buildToolResultMessage", logs: newToolResultIDs.contains(r.toolCallId))
                 msgs.append(buildToolResultMessage(r, text: result.text))
                 pendingToolMedia.append(contentsOf: result.media)
             }

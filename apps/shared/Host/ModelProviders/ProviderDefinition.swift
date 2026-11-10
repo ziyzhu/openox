@@ -52,6 +52,23 @@ nonisolated struct ProviderDefinition: Codable, Equatable, Identifiable, Sendabl
         var accountHeader: String?
         var version: String?
         var beta: [String]?
+
+        func filling(from defaults: Self) -> Self {
+            Self(
+                headers: headers ?? defaults.headers,
+                extraBody: extraBody ?? defaults.extraBody,
+                maxTokensField: maxTokensField ?? defaults.maxTokensField,
+                reasoningFormat: reasoningFormat ?? defaults.reasoningFormat,
+                reasoningEffort: reasoningEffort ?? defaults.reasoningEffort,
+                cachesSystemPrompt: cachesSystemPrompt ?? defaults.cachesSystemPrompt,
+                cacheRouting: cacheRouting ?? defaults.cacheRouting,
+                sessionHeader: sessionHeader ?? defaults.sessionHeader,
+                streaming: streaming ?? defaults.streaming,
+                accountHeader: accountHeader ?? defaults.accountHeader,
+                version: version ?? defaults.version,
+                beta: beta ?? defaults.beta
+            )
+        }
     }
 
     struct Model: Codable, Equatable, Identifiable, Sendable {

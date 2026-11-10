@@ -84,6 +84,8 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
         var callFailures: [CallKind: Int] = [:]
         var callDurations: [CallKind: Int64] = [:]
         var toolIntervals: [ClosedRange<Int64>] = []
+        var handoffs = 0
+        var handoffMs: Int64 = 0
         var finished = false
     }
 
@@ -205,6 +207,14 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
         }
     }
 
+    func recordHandoff(_ duration: Duration) {
+        state.withLock { state in
+            guard !state.finished else { return }
+            state.handoffs += 1
+            state.handoffMs += Self.milliseconds(duration)
+        }
+    }
+
     private func toolWallMilliseconds(_ intervals: [ClosedRange<Int64>]) -> Int64 {
         var end: Int64 = 0
         var total: Int64 = 0
@@ -265,7 +275,7 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
             let usageComplete = state.missingUsage == 0 && state.counts[.modelCompleted, default: 0] == state.counts[.modelStarted, default: 0]
             let timeline = state.events.map { "\($0.label):\($0.elapsedMs)" }.joined(separator: ",")
             let cacheWrite = state.cacheWriteSamples > 0 ? String(state.cacheWriteInputTokens) : "n/a"
-            return "AgentLatency.summary conversation=\(conversationID) submission=\(submissionID.uuidString) kind=\(kind) outcome=\(outcome) client=\(client) model=\(model) totalMs=\(totalMs) queueMs=\(value(queueMs)) prepareMs=\(value(prepareMs)) ttftMs=\(value(ttftMs)) \(segmentSummary) firstThinkingMs=\(value(firstThinkingMs)) firstTextMs=\(value(firstTextMs)) firstVisibleMs=\(value(firstVisibleMs)) toolWallMs=\(toolWallMs) modelTurns=\(state.counts[.modelStarted, default: 0]) modelRoundTrips=\(state.counts[.modelStarted, default: 0] - state.compactionTurns) browserCalls=\(browserCalls) browserResultBytes=\(state.browserResultBytes) compactionTurns=\(state.compactionTurns) toolCalls=\(state.counts[.toolStarted, default: 0]) toolFailures=\(state.callFailures[.tool, default: 0]) toolMs=\(state.callDurations[.tool, default: 0]) tools=[\(calls(.tool))] functionCalls=\((state.callCounts[.function] ?? [:]).values.reduce(0, +)) functionFailures=\(state.callFailures[.function, default: 0]) functionMs=\(state.callDurations[.function, default: 0]) functions=[\(calls(.function))] unfinishedCalls=\(state.calls.count) usageSamples=\(state.usageSamples) missingUsage=\(state.missingUsage) usageComplete=\(usageComplete) tokens=\(tokens(state.totalTokens)) input=\(tokens(state.inputTokens)) cached=\(tokens(state.cachedInputTokens)) cacheWrite=\(cacheWrite) output=\(tokens(state.outputTokens)) timeline=\(timeline)"
+            return "AgentLatency.summary conversation=\(conversationID) submission=\(submissionID.uuidString) kind=\(kind) outcome=\(outcome) client=\(client) model=\(model) totalMs=\(totalMs) queueMs=\(value(queueMs)) prepareMs=\(value(prepareMs)) ttftMs=\(value(ttftMs)) \(segmentSummary) firstThinkingMs=\(value(firstThinkingMs)) firstTextMs=\(value(firstTextMs)) firstVisibleMs=\(value(firstVisibleMs)) toolWallMs=\(toolWallMs) handoffs=\(state.handoffs) handoffMs=\(state.handoffMs) modelTurns=\(state.counts[.modelStarted, default: 0]) modelRoundTrips=\(state.counts[.modelStarted, default: 0] - state.compactionTurns) browserCalls=\(browserCalls) browserResultBytes=\(state.browserResultBytes) compactionTurns=\(state.compactionTurns) toolCalls=\(state.counts[.toolStarted, default: 0]) toolFailures=\(state.callFailures[.tool, default: 0]) toolMs=\(state.callDurations[.tool, default: 0]) tools=[\(calls(.tool))] functionCalls=\((state.callCounts[.function] ?? [:]).values.reduce(0, +)) functionFailures=\(state.callFailures[.function, default: 0]) functionMs=\(state.callDurations[.function, default: 0]) functions=[\(calls(.function))] unfinishedCalls=\(state.calls.count) usageSamples=\(state.usageSamples) missingUsage=\(state.missingUsage) usageComplete=\(usageComplete) tokens=\(tokens(state.totalTokens)) input=\(tokens(state.inputTokens)) cached=\(tokens(state.cachedInputTokens)) cacheWrite=\(cacheWrite) output=\(tokens(state.outputTokens)) timeline=\(timeline)"
         }
         if let summary { Log.perf.info(summary) }
     }

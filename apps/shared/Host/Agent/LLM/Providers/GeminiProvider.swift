@@ -264,6 +264,7 @@ public struct GeminiProvider: ProviderClient {
         cachedContent: String?
     ) throws -> Data {
         var contents: [[String: Any]] = []
+        let newToolResultIDs = messages.newToolResultIDs
         for m in messages {
             switch m {
             case .system:
@@ -271,7 +272,7 @@ public struct GeminiProvider: ProviderClient {
             case .user(let u): contents.append(try buildUserContent(u))
             case .assistant(let a): contents.append(buildAssistantContent(a))
             case .toolResult(let r):
-                let content = try buildToolResultContent(r)
+                let content = try buildToolResultContent(r, logs: newToolResultIDs.contains(r.toolCallId))
                 if let last = contents.indices.last,
                    contents[last]["role"] as? String == "user",
                    let existing = contents[last]["parts"] as? [[String: Any]],
@@ -419,8 +420,8 @@ public struct GeminiProvider: ProviderClient {
         return ["role": "model", "parts": parts]
     }
 
-    private func buildToolResultContent(_ r: ToolResultMessage) throws -> [String: Any] {
-        let result = ToolResultParts(r, label: "Gemini.buildToolResultContent")
+    private func buildToolResultContent(_ r: ToolResultMessage, logs: Bool) throws -> [String: Any] {
+        let result = ToolResultParts(r, label: "Gemini.buildToolResultContent", logs: logs)
         var payload: [String: Any]
         if r.isError {
             payload = ["error": result.text]

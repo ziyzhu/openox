@@ -440,6 +440,8 @@ final class Conversation: Identifiable {
             },
             native: nativeServiceOperations,
             presentServiceHandoff: { [unowned self] service, page, session in
+                let started = ContinuousClock.now
+                defer { activeLatency?.recordHandoff(started.duration(to: .now)) }
                 if presentations.browser != nil {
                     return await presentations.serviceHandoff.present(session: session)
                 }

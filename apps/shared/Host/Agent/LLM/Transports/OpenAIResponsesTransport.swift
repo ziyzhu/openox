@@ -575,6 +575,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
         maxTokens: Int?
     ) throws -> Data {
         var input: [[String: Any]] = []
+        let newToolResultIDs = messages.newToolResultIDs
         for (messageIndex, m) in messages.enumerated() {
             switch m {
             case .system(let system):
@@ -644,7 +645,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
                     }
                 }
             case .toolResult(let r):
-                let parts = ToolResultParts(r, label: "\(displayName).buildToolResult")
+                let parts = ToolResultParts(r, label: "\(displayName).buildToolResult", logs: newToolResultIDs.contains(r.toolCallId))
                 let resultText = r.isError
                     ? JSONValue.object(["error": .string(parts.text)]).jsonString(fallback: parts.text)
                     : parts.text
