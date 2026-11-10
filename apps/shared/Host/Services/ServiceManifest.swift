@@ -368,6 +368,8 @@ nonisolated enum Manifest {
         let requireAuth: Bool
         let raw: [String: JSONValue]
 
+        var defaultPolicy: ActionPolicy { requireApproval ? .ask : .allow }
+
         init?(
             _ value: JSONValue,
             serviceDomain: String? = nil,

@@ -11,7 +11,7 @@ final class ServiceOperations {
     let resolveService: (String) async throws -> Service
     let resolveAction: (String) async throws -> (Service, String)
     let attachedDomains: () -> Set<String>
-    let requireApproval: (String, ActionPolicy, Any?, String?, String?) async throws -> Void
+    let requireApproval: (String, ActionPolicy?, Any?, String?, String?) async throws -> Void
     let presentControl: (ServiceControl, Service) async -> JSONValue?
     let readMCPFile: (String, String) async throws -> Data
     let receiveFiles: @MainActor ([RemoteMCPFile]) async throws -> Void
@@ -32,7 +32,7 @@ final class ServiceOperations {
         resolveService: @escaping (String) async throws -> Service,
         resolveAction: @escaping (String) async throws -> (Service, String),
         attachedDomains: @escaping () -> Set<String> = { [] },
-        approve: @escaping (String, ActionPolicy, Any?, String?, String?) async throws -> Void,
+        approve: @escaping (String, ActionPolicy?, Any?, String?, String?) async throws -> Void,
         presentControl: @escaping (ServiceControl, Service) async -> JSONValue?,
         readMCPFile: @escaping (String, String) async throws -> Data = { _, _ in throw RuntimeError.bridge("This caller cannot transfer local MCP files") },
         receiveFiles: @escaping @MainActor ([RemoteMCPFile]) async throws -> Void,
@@ -70,7 +70,6 @@ final class ServiceOperations {
         try await recorded(action, args, purpose: purpose) {
             try await requireApproval(
                 action: action,
-                defaultPolicy: Actions.defaultPolicy(for: action),
                 args: args.toAny(),
                 purpose: purpose
             )
@@ -93,7 +92,7 @@ final class ServiceOperations {
 
     private func requireApproval(
         action: String,
-        defaultPolicy: ActionPolicy,
+        defaultPolicy: ActionPolicy? = nil,
         args: Any? = nil,
         purpose: String? = nil,
         prompt: String? = nil
@@ -158,7 +157,7 @@ final class ServiceOperations {
             if actionID != WebConversationContract.actionID || WebConversationContract.requiresApproval(input) {
                 try await self.requireApproval(
                     action: qualifiedName,
-                    defaultPolicy: action.requireApproval ? .ask : .allow,
+                    defaultPolicy: action.defaultPolicy,
                     args: recordedInput.toAny(),
                     purpose: purpose
                 )
@@ -775,7 +774,7 @@ final class ServiceOperations {
             }
             return .object(["state": .string(state)])
         }
-        try await requireApproval(action: Actions.serviceLogin, defaultPolicy: Actions.defaultPolicy(for: Actions.serviceLogin), args: ["domain": service.domain], purpose: purpose)
+        try await requireApproval(action: Actions.serviceLogin, args: ["domain": service.domain], purpose: purpose)
         if !service.supportsAuthentication {
             return .object(["completed": .bool(true), "completion": .string("notRequired"), "state": .string("notRequired")])
         }

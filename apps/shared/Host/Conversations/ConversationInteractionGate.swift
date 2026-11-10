@@ -286,7 +286,6 @@ final class ConversationInteractionGate {
         }
         switch await requestApproval(
             action: Conversation.attachApproveKey(service.domain),
-            defaultPolicy: Actions.defaultPolicy(for: Actions.serviceAttach),
             prompt: "\(title)\n\(message)"
         ) {
         case .approved: return
@@ -298,7 +297,7 @@ final class ConversationInteractionGate {
 
     func requireApproval(
         action: String,
-        defaultPolicy: ActionPolicy,
+        defaultPolicy: ActionPolicy? = nil,
         args: Any?,
         purpose: String?,
         prompt: String?
@@ -319,7 +318,7 @@ final class ConversationInteractionGate {
 
     private func requestApproval(
         action: String,
-        defaultPolicy: ActionPolicy,
+        defaultPolicy: ActionPolicy? = nil,
         args: Any? = nil,
         purpose: String? = nil,
         prompt: String? = nil

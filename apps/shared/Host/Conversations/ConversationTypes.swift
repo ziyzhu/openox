@@ -286,7 +286,7 @@ extension Conversation {
     struct PendingPrompt: Identifiable, Equatable {
         struct AutoApproval: Equatable {
             let action: String
-            let defaultPolicy: ActionPolicy
+            let defaultPolicy: ActionPolicy?
             let approve: String
             let alwaysApprove: String
             let deny: String

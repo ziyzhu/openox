@@ -86,18 +86,18 @@ extension Conversation {
         let purpose = "Read app configuration"
         if let action {
             let query = try AppActionPolicyQuery(options: .object(["action": .string(action)]))
-            try await requireApproval(action: Actions.appActionPolicies, defaultPolicy: Actions.defaultPolicy(for: Actions.appActionPolicies), purpose: purpose)
+            try await requireApproval(action: Actions.appActionPolicies, purpose: purpose)
             return try Self.appConfigurationText(query.read(serviceManager.actionPolicies, actionDefaultPolicy: serviceManager.defaultPolicy(for: action)))
         }
         switch path {
         case "app/settings.json":
-            try await requireApproval(action: Actions.appLanguage, defaultPolicy: Actions.defaultPolicy(for: Actions.appLanguage), purpose: purpose)
+            try await requireApproval(action: Actions.appLanguage, purpose: purpose)
             return try Self.appConfigurationText(AppSettings.load())
         case "app/policy.json":
-            try await requireApproval(action: Actions.appActionPolicies, defaultPolicy: Actions.defaultPolicy(for: Actions.appActionPolicies), purpose: purpose)
+            try await requireApproval(action: Actions.appActionPolicies, purpose: purpose)
             return try Self.appConfigurationText(ActionPolicyConfiguration.load())
         case "app/providers.json":
-            try await requireApproval(action: Actions.providerList, defaultPolicy: Actions.defaultPolicy(for: Actions.providerList), purpose: purpose)
+            try await requireApproval(action: Actions.providerList, purpose: purpose)
             return try Self.appConfigurationText(ProviderCatalog.load())
         case "app/services.json":
             return try Self.appConfigurationText(ServicePreferences.load())
@@ -115,7 +115,7 @@ extension Conversation {
                 "host": .object(["allowConnections": .bool(try HostConfiguration.load().allowConnections)]),
             ]))
         case "app/logs.jsonl":
-            try await requireApproval(action: Actions.appLogs, defaultPolicy: .ask, purpose: "Read app-wide diagnostic logs")
+            try await requireApproval(action: Actions.appLogs, purpose: "Read app-wide diagnostic logs")
             let snapshot = try await LogFile.shared.snapshot()
             return try await Task.detached(priority: .userInitiated) {
                 let formatter = ISO8601DateFormatter()
@@ -159,7 +159,7 @@ extension Conversation {
             let next = try JSONDecoder().decode(AppSettings.self, from: Data(content.utf8))
             try next.validate()
             guard let language = AppLocale.Language(rawValue: next.language) else { throw RuntimeError.bridge("Unsupported language") }
-            try await requireApproval(action: Actions.appSetLanguage, defaultPolicy: Actions.defaultPolicy(for: Actions.appSetLanguage),
+            try await requireApproval(action: Actions.appSetLanguage,
                                       args: ["selection": next.language], purpose: "Change Ox language")
             guard try Self.appConfigurationText(AppSettings.load()) == expected else { throw RuntimeError.bridge("App settings changed during approval") }
             try Task.checkCancellation()
@@ -199,15 +199,15 @@ extension Conversation {
         }
         try ProviderRegistry.shared.validateReplacement(next, expected: current)
         if !removed.isEmpty {
-            try await requireApproval(action: Actions.providerDelete, defaultPolicy: Actions.defaultPolicy(for: Actions.providerDelete),
+            try await requireApproval(action: Actions.providerDelete,
                                       args: ["providers": removed.map(\.id)], purpose: "Remove provider definitions")
         }
         if !changed.isEmpty {
-            try await requireApproval(action: Actions.providerSave, defaultPolicy: Actions.defaultPolicy(for: Actions.providerSave),
+            try await requireApproval(action: Actions.providerSave,
                                       args: ["providers": changed.map { try $0.json.toAny() }], purpose: "Update provider definitions")
         }
         if next.defaultModel != current.defaultModel {
-            try await requireApproval(action: Actions.appSetDefaultModel, defaultPolicy: Actions.defaultPolicy(for: Actions.appSetDefaultModel),
+            try await requireApproval(action: Actions.appSetDefaultModel,
                                       args: next.defaultModel?.appInformation.toAny(), purpose: "Change default model")
         }
         guard try Self.appConfigurationText(ProviderCatalog.load()) == expected else { throw RuntimeError.bridge("Provider configuration changed during approval") }

@@ -5,7 +5,6 @@ extension Conversation {
         let parsed = try FollowIntent.parse(intents)
         try await requireApproval(
             action: Actions.userFollow,
-            defaultPolicy: Actions.defaultPolicy(for: Actions.userFollow),
             args: ["count": parsed.count],
             purpose: purpose
         )

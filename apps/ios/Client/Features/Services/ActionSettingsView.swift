@@ -48,8 +48,9 @@ struct ActionPolicyPicker: View {
                         .font(Theme.Icons.xs)
                 }
                 .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .foregroundStyle(selection == nil ? Theme.Colors.onSurfaceMuted : Theme.Colors.onSurface)
             }
+            .accessibilityValue(selection == nil && resolved != nil ? Text("Default") : Text(verbatim: ""))
         }
     }
 
@@ -68,14 +69,14 @@ struct ActionSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 SettingsSection(
-                    footer: "By default, built-in Ox Actions are allowed except deletion. Services and devices use their declared defaults. Ask, Allow, or Block overrides that behavior for all Actions. More specific choices take priority.",
+                    footer: "Each Action starts with its own default. A choice here applies to all Actions; choices for a service or a single Action take priority.",
                     layout: .group
                 ) {
                     ActionPolicyPicker(
                         title: "All Actions",
                         selection: serviceManager.defaultActionPolicy,
                         resolved: serviceManager.defaultActionPolicy,
-                        inheritLabel: "Use Default",
+                        inheritLabel: "Default",
                         onChange: { serviceManager.defaultActionPolicy = $0 }
                     )
                     .settingsRowPadding()
@@ -211,7 +212,7 @@ struct BuiltInActionSettingsView: View {
                         title: "All Built-in Actions",
                         selection: serviceManager.sourcePolicy(for: "ox"),
                         resolved: serviceManager.resolvedSourcePolicy(for: "ox"),
-                        inheritLabel: "Use Global Default",
+                        inheritLabel: "Default",
                         onChange: { serviceManager.setSourcePolicy($0, for: "ox") }
                     )
                 }
@@ -277,8 +278,8 @@ private struct BuiltInActionGroupSettingsView: View {
             ActionPolicyPicker(
                 title: nil,
                 selection: explicit,
-                resolved: serviceManager.actionPolicy(for: action, default: Actions.defaultPolicy(for: action)),
-                inheritLabel: "Use Default",
+                resolved: serviceManager.actionPolicy(for: action),
+                inheritLabel: "Default",
                 onChange: { serviceManager.setActionPolicy($0, for: action) }
             )
         }
@@ -304,7 +305,7 @@ struct ServiceActionSettingsView: View {
                         title: "All Service Actions",
                         selection: serviceManager.sourcePolicy(for: source),
                         resolved: serviceManager.resolvedSourcePolicy(for: source),
-                        inheritLabel: "Use Global Default",
+                        inheritLabel: "Default",
                         onChange: { serviceManager.setSourcePolicy($0, for: source) }
                     )
                 }
@@ -313,16 +314,14 @@ struct ServiceActionSettingsView: View {
                     VStack(spacing: 0) {
                         serviceActionRow(
                             title: String(localized: "Attach to a conversation"),
-                            actionID: Conversation.attachApproveKey(service.domain),
-                            defaultPolicy: Actions.defaultPolicy(for: Actions.serviceAttach)
+                            actionID: Conversation.attachApproveKey(service.domain)
                         )
                         if service.detailCapabilities.supportsFolderAccess {
                             ForEach(OxFileSystem.actions, id: \.self) { action in
                                 Divider().settingsContentInset()
                                 serviceActionRow(
                                     title: Actions.label(for: action) ?? action,
-                                    actionID: action,
-                                    defaultPolicy: Actions.defaultPolicy(for: action)
+                                    actionID: action
                                 )
                             }
                         } else {
@@ -331,7 +330,7 @@ struct ServiceActionSettingsView: View {
                                 serviceActionRow(
                                     title: action.label,
                                     actionID: service.definition.qualifiedActionName(action.id),
-                                    defaultPolicy: action.requireApproval ? .ask : .allow
+                                    defaultPolicy: action.defaultPolicy
                                 )
                             }
                         }
@@ -349,7 +348,7 @@ struct ServiceActionSettingsView: View {
         }
     }
 
-    private func serviceActionRow(title: String, actionID: String, defaultPolicy: ActionPolicy) -> some View {
+    private func serviceActionRow(title: String, actionID: String, defaultPolicy: ActionPolicy? = nil) -> some View {
         let explicit = serviceManager.explicitActionPolicy(for: actionID)
         return VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
             HStack(spacing: Theme.Spacing.sm) {
@@ -361,7 +360,7 @@ struct ServiceActionSettingsView: View {
                     title: nil,
                     selection: explicit,
                     resolved: serviceManager.actionPolicy(for: actionID, default: defaultPolicy),
-                    inheritLabel: "Use Service Default",
+                    inheritLabel: "Default",
                     onChange: { serviceManager.setActionPolicy($0, for: actionID) }
                 )
             }

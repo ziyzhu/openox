@@ -64,7 +64,7 @@ struct ActionApproval {
 
     func request(
         action: String,
-        defaultPolicy: ActionPolicy,
+        defaultPolicy: ActionPolicy? = nil,
         args: Any? = nil,
         purpose: String? = nil,
         prompt override: String? = nil,

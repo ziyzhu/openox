@@ -296,7 +296,7 @@ struct ServiceDetailView: View {
             title: "Default for This Service",
             selection: serviceManager.sourcePolicy(for: actionPolicySource),
             resolved: serviceManager.resolvedSourcePolicy(for: actionPolicySource),
-            inheritLabel: "Use Global Default",
+            inheritLabel: "Default",
             onChange: { serviceManager.setSourcePolicy($0, for: actionPolicySource) }
         )
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -312,7 +312,7 @@ struct ServiceDetailView: View {
                         .font(Theme.Fonts.bodyMd)
                         .foregroundStyle(Theme.Colors.onSurface)
                     Spacer(minLength: 0)
-                    approvalControl(actionID: Conversation.attachApproveKey(service.domain), defaultPolicy: Actions.defaultPolicy(for: Actions.serviceAttach))
+                    approvalControl(actionID: Conversation.attachApproveKey(service.domain))
                 }
                 Divider().padding(.vertical, 4)
                 Text(attachPermissionDescription)
@@ -431,7 +431,7 @@ struct ServiceDetailView: View {
                     if !isStandard {
                         approvalControl(
                             actionID: service.definition.qualifiedActionName(action.id),
-                            defaultPolicy: action.requireApproval ? .ask : .allow
+                            defaultPolicy: action.defaultPolicy
                         )
                     }
                 }
@@ -454,13 +454,13 @@ struct ServiceDetailView: View {
     }
 
     @ViewBuilder
-    private func approvalControl(actionID: String, defaultPolicy: ActionPolicy) -> some View {
+    private func approvalControl(actionID: String, defaultPolicy: ActionPolicy? = nil) -> some View {
         let explicit = serviceManager.explicitActionPolicy(for: actionID)
         ActionPolicyPicker(
             title: nil,
             selection: explicit,
             resolved: serviceManager.actionPolicy(for: actionID, default: defaultPolicy),
-            inheritLabel: "Use Service Default",
+            inheritLabel: "Default",
             onChange: { serviceManager.setActionPolicy($0, for: actionID) }
         )
         .accessibilityIdentifier(A11yID.ConversationControls.Attach.actionApproval(actionID))

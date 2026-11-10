@@ -1048,13 +1048,13 @@
         }
       }
     },
-    "By default, built-in Ox Actions are allowed except deletion. Services and devices use their declared defaults. Ask, Allow, or Block overrides that behavior for all Actions. More specific choices take priority." : {
+    "Each Action starts with its own default. A choice here applies to all Actions; choices for a service or a single Action take priority." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "默认情况下，允许除删除外的 Ox 内置操作。服务和设备使用其声明的默认设置。“询问”、“允许”或“阻止”会覆盖所有操作的此行为。更具体的选择优先。"
+            "value" : "每个操作都有自己的默认设置。此处的选择适用于所有操作；针对服务或单个操作的选择优先。"
           }
         }
       }
@@ -11044,39 +11044,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用"
-          }
-        }
-      }
-    },
-    "Use Default" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用默认设置"
-          }
-        }
-      }
-    },
-    "Use Global Default" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用全局默认设置"
-          }
-        }
-      }
-    },
-    "Use Service Default" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用服务默认设置"
           }
         }
       }

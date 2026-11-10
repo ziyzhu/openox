@@ -408,7 +408,7 @@ final class Conversation: Identifiable {
             },
             readMCPFile: { [unowned self] path, purpose in
                 guard StorageRoot.currentScope == scope else { throw RuntimeError.bridge("MCP file belongs to a stale Profile scope") }
-                try await requireApproval(action: Actions.fsRead, defaultPolicy: Actions.defaultPolicy(for: Actions.fsRead), args: ["path": path], purpose: purpose)
+                try await requireApproval(action: Actions.fsRead, args: ["path": path], purpose: purpose)
                 let media = try await fileSystemMedia(path: path)
                 try Task.checkCancellation()
                 guard StorageRoot.currentScope == scope else { throw RuntimeError.bridge("MCP file belongs to a stale Profile scope") }
@@ -1200,7 +1200,6 @@ final class Conversation: Identifiable {
         do {
             try await requireApproval(
                 action: action,
-                defaultPolicy: Actions.defaultPolicy(for: action),
                 args: args.toAny(),
                 purpose: purpose
             )
@@ -1231,7 +1230,7 @@ final class Conversation: Identifiable {
 
     func requireApproval(
         action: String,
-        defaultPolicy: ActionPolicy,
+        defaultPolicy: ActionPolicy? = nil,
         args: Any? = nil,
         purpose: String? = nil,
         prompt: String? = nil

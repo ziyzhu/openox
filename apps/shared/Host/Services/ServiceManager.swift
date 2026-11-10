@@ -281,9 +281,9 @@ final class ServiceManager {
         }
     }
 
-    func actionPolicy(for action: String, default actionDefault: ActionPolicy) -> ActionPolicy {
+    func actionPolicy(for action: String, default actionDefault: ActionPolicy? = nil) -> ActionPolicy {
         if let use = SecretUse(action: action) { return use.policy() }
-        return actionPolicies.policy(for: action, default: actionDefault)
+        return actionPolicies.policy(for: action, default: actionDefault ?? defaultPolicy(for: action))
     }
 
     func explicitActionPolicy(for action: String) -> ActionPolicy? { actionPolicies.actions[action] }

@@ -69,9 +69,9 @@ extension ServiceManager {
         if Actions.builtIn.contains(action) { return Actions.defaultPolicy(for: action) }
         for service in services {
             guard let serviceAction = service.definition.actions.first(where: {
-                !service.definition.isStandardAction($0.id) && service.definition.qualifiedActionName($0.id) == action
+                service.definition.qualifiedActionName($0.id) == action
             }) else { continue }
-            return serviceAction.requireApproval ? .ask : .allow
+            return serviceAction.defaultPolicy
         }
         return .ask
     }
