@@ -265,7 +265,8 @@ struct ConversationPage: View {
     private var page: some View {
         let interaction = activeInteraction
         let isLogin = if case .serviceControl(let item) = interaction, case .login = item.control { true } else { false }
-        let showsComposer = (interaction == nil || isLogin) && !webInputFocused
+        let mountsComposer = interaction == nil || isLogin
+        let showsComposer = mountsComposer && !webInputFocused
         let authProbe = conversation.pendingServiceControl.flatMap { item -> Conversation.PendingServiceControl? in
             guard isAttached(item.control), case .login = item.control else { return nil }
             return item
@@ -277,6 +278,7 @@ struct ConversationPage: View {
         ) { projection in
             projectedPage(
                 projection,
+                mountsComposer: mountsComposer,
                 showsComposer: showsComposer,
                 authProbe: authProbe
             )
@@ -293,6 +295,7 @@ struct ConversationPage: View {
 
     private func projectedPage(
         _ projection: ConversationTranscriptProjectionSnapshot,
+        mountsComposer: Bool,
         showsComposer: Bool,
         authProbe: Conversation.PendingServiceControl?
     ) -> some View {
@@ -359,12 +362,17 @@ struct ConversationPage: View {
             .accessibilityHidden(speechInput.isPresented)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 ZStack(alignment: .bottom) {
-                    if showsComposer {
+                    if mountsComposer {
                         composerDock(
                             isConversationEmpty: conversation.canChangeRetention && blocks.isEmpty,
                             totalBlockCount: totalBlockCount,
                             floatsTopStrip: floatsTopStrip
                         )
+                        .frame(height: webInputFocused ? 0 : nil, alignment: .bottom)
+                        .clipped()
+                        .opacity(webInputFocused ? 0 : 1)
+                        .allowsHitTesting(!webInputFocused)
+                        .accessibilityHidden(webInputFocused)
                     } else if let dockedPrompt {
                         promptDock(dockedPrompt, totalBlockCount: totalBlockCount)
                     }
@@ -421,8 +429,8 @@ struct ConversationPage: View {
                   ConversationReview.recordAttempt(milestone) else { return }
             requestReview()
         }
-        .onChange(of: showsComposer) { _, visible in
-            if !visible { composerFocused = false }
+        .onChange(of: mountsComposer) { _, mounted in
+            if !mounted { composerFocused = false }
         }
         .onChange(of: webInputFocused) { _, focused in
             Log.ui.info("ConversationUX.webInput conversation=\(conversation.id) focused=\(focused)")
