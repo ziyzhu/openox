@@ -369,7 +369,6 @@ struct ConversationPage: View {
                             floatsTopStrip: floatsTopStrip
                         )
                         .frame(height: webInputFocused ? 0 : nil, alignment: .bottom)
-                        .clipped()
                         .opacity(webInputFocused ? 0 : 1)
                         .allowsHitTesting(!webInputFocused)
                         .accessibilityHidden(webInputFocused)
