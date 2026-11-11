@@ -137,8 +137,9 @@ final class ServiceActionScheduler {
             destination: destination,
             kind: kind
         )
-        guard action.service.owns(page),
-              page.isReady || kind != .invocation || scheduled.needsNavigation(on: page) else {
+        guard action.service.owns(page) else { throw Service.EvalError.notReady }
+        if case .unavailable = page.navigationPhase,
+           kind == .invocation, !scheduled.needsNavigation(on: page) {
             throw Service.EvalError.notReady
         }
         return try await withTaskCancellationHandler {
@@ -166,7 +167,7 @@ final class ServiceActionScheduler {
                     catch { settle(.failure(error)) }
                 }
                 queue.pending.append(scheduled)
-                Log.service.info("ServiceActionScheduler queued id=\(scheduled.id.uuidString.prefix(8)) name=\(scheduled.name) page=\(page.logLabel) active=\(queue.occupancy.actions.count) pending=\(queue.pending.count)")
+                Log.service.info("ServiceActionScheduler queued id=\(scheduled.id.uuidString.prefix(8)) name=\(scheduled.name) page=\(page.logLabel) phase=\(page.navigationPhase.logLabel) active=\(queue.occupancy.actions.count) pending=\(queue.pending.count)")
                 pump(queue)
             }
         } onCancel: {
@@ -256,6 +257,12 @@ final class ServiceActionScheduler {
     private func pump(_ queue: PageQueue) {
         guard queue.isOpen, queue.reservation == nil, let first = queue.pending.first,
               queue.page.isReady || first.kind != .invocation || first.needsNavigation(on: queue.page) else { return }
+        switch queue.page.navigationPhase {
+        case .pending, .reserved, .navigating, .settling, .verifying:
+            guard first.kind == .presentation else { return }
+        case .ready, .unavailable:
+            break
+        }
         if first.blocks(queue.page) {
             guard queue.occupancy.isIdle else { return }
             start(queue.pending.removeFirst(), in: queue, blocking: true)

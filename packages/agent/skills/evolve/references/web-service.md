@@ -83,4 +83,8 @@ For live-page handoffs, follow `references/web-handoffs.md`. If the user's visib
 
 ## Recovery
 
+Classify failures before editing source. Navigation timeouts, terminated pages, and unavailable dispatchers do not establish a broken handler or expired credentials. Inspect page/navigation diagnostics and current authentication evidence first. Repeated failures across unrelated services suggest a shared runtime problem; stop unchanged retries and report that boundary rather than rewriting each service. A public fetch failure does not establish that an existing service action is broken.
+
+After an uncertain mutation, reconcile the requested item's identity and current quantity or state through read-only actions before deciding whether another mutation is needed. An exception or missing success signal does not mean nothing happened. Verify human handoffs expose the expected usable controls before claiming they opened successfully. Report a single successful recovery as such; claim a durable repair only within the fresh-page, session, and workflow boundaries actually verified.
+
 After activation failure, search once for the exact domain and inspect current source: creation may already have persisted a draft. Continue from it or report the repository blocker. Recover source only from known prior bytes or an exported copy; conversation history is not an exact backup. Preserve unrelated work. Correct mistaken identity by creating the intended service and removing only the mistaken draft through normal Action policy.
