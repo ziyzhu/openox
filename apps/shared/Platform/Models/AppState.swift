@@ -48,6 +48,7 @@ final class AppStateStore {
         guard try AppState.load() == value else { throw StorageMigrationError.collision("app state changed externally") }
         var next = value
         mutation(&next)
+        guard next != value else { return }
         try next.save()
         value = next
     }
