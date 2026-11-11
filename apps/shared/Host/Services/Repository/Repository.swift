@@ -251,8 +251,10 @@ actor Repository {
 
     private let bundledRoot: URL?
     let developmentRemote: URL?
-    let repositoriesRoot: URL
-    let configurationURL: URL
+    var repositoriesRoot: URL
+    var configurationURL: URL
+    var repositoryStaging: URL
+    private var profileScope: ProfileScope?
     var configuration: Configuration
     var activeSources: [String: ActiveSource] = [:]
     var candidateSources: [String: [ActiveSource]] = [:]
@@ -268,14 +270,34 @@ actor Repository {
         self.developmentRemote = developmentRemote
         repositoriesRoot = AppStoragePaths.repositories
         configurationURL = AppStoragePaths.repositoriesConfiguration
-        configuration = Self.loadConfiguration(from: configurationURL)
+        repositoryStaging = AppStoragePaths.repositoryStaging
+        configuration = Configuration()
     }
 
     func prepareStorage(retry: Bool = false) {
+        if let scope = StorageRoot.currentScope, let profileID = scope.profileID, scope != profileScope {
+            profileScope = scope
+            repositoriesRoot = scope.root.appendingPathComponent("repositories", isDirectory: true)
+            configurationURL = scope.stateRoot.appendingPathComponent("service-repositories.json")
+            repositoryStaging = AppStoragePaths.repositoryStaging.appendingPathComponent(profileID.uuidString, isDirectory: true)
+            configuration = Configuration()
+            localPreparation = nil
+            activeSources = [:]
+            candidateSources = [:]
+            fileRoots = [:]
+            applicationRepositories = nil
+            applicationSkills = [:]
+            unmountedCatalog = nil
+            Log.service.info("Repository.profile bound id=\(profileID.uuidString)")
+        }
         if retry { localPreparation = nil }
         else if localPreparation?.failureMessage != nil { return }
         do {
-            if localPreparation == nil { configuration = Self.loadConfiguration(from: configurationURL) }
+            guard profileScope?.profileID != nil else { throw StorageMigrationError.activeProfileUnavailable }
+            if localPreparation == nil {
+                configuration = try Self.loadConfiguration(from: configurationURL)
+                try RepositoryMigrator.recoverSnapshotBackups(at: repositoriesRoot, staging: repositoryStaging, configuration: configuration)
+            }
             try materializeLocalRepository()
             localPreparation = .ready
         } catch {
@@ -288,10 +310,11 @@ actor Repository {
 
     func monoRepository(reuseApplicationRepositories: Bool = false) async throws -> MonoRepository {
         prepareStorage()
-        let profileId = await StorageRoot.shared.activeId
+        let scope = profileScope
+        let profileId = scope?.profileID
         let grantIDs = Set(await DeviceFolderStore.shared.grants(for: profileId).map(\.id))
         let mountedRecords = ((try? mountedRepositories.records()) ?? []).filter { grantIDs.contains($0.grantID) }
-        guard await StorageRoot.shared.activeId == profileId else { throw CancellationError() }
+        guard StorageRoot.currentScope == scope else { throw CancellationError() }
         if reuseApplicationRepositories, mountedRecords.isEmpty, let cached = unmountedCatalog {
             Log.service.info("Repository.profileSwitch reusedCatalog=true repositories=\(cached.repositories.count) skills=\(cached.skills.count)")
             return cached
@@ -313,7 +336,7 @@ actor Repository {
         for record in mountedRecords {
             mounted.append(await loadMountedRepository(record, profileId: profileId))
         }
-        guard await StorageRoot.shared.activeId == profileId else { throw CancellationError() }
+        guard StorageRoot.currentScope == scope else { throw CancellationError() }
         let available = application + mounted
         fileRoots = Dictionary(uniqueKeysWithValues: application.map { ($0.descriptor.id, $0.root) })
         let loaded = available.compactMap { loaded in
@@ -677,11 +700,8 @@ actor Repository {
         try data.write(to: url, options: .atomic)
     }
 
-    private static func loadConfiguration(from url: URL) -> Configuration {
-        guard let data = try? Data(contentsOf: url),
-              let configuration = try? JSONDecoder().decode(Configuration.self, from: data),
-              configuration.formatVersion == 1 else { return Configuration() }
-        return configuration
+    private static func loadConfiguration(from url: URL) throws -> Configuration {
+        try RepositoryMigrator.repositoryConfiguration(at: url)
     }
 
     static func errorMessage(_ error: Error) -> String {

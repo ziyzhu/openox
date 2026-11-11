@@ -19,7 +19,6 @@ types remain authoritative in their `Codable` implementations.
 │   │   │   ├── host.json                   format-1 Host connection permission; defaults off
 │   │   │   ├── secrets.json                version-1 Secret metadata/bindings; no secret values
 │   │   │   ├── providers.json              format-2 provider overrides and optional defaultModel
-│   │   │   ├── service-repositories.json   repository enablement, origins, conflict resolutions
 │   │   │   ├── mounted-repositories.json   version-1 bindings to Files grants
 │   │   │   ├── external-profiles.json      selected Profile bookmarks/display names
 │   │   │   └── device-folder-grants.json    Profile-bound native bookmarks
@@ -27,7 +26,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   │                                   cached region, ChatGPT agent Host identity,
 │   │   │                                   optional last seen What's New version
 │   │   ├── service-repositories/development/ simulator development HEAD snapshot
-│   │   ├── RepositoryStaging/              private repository downloads, recoverable snapshot backups, and mutation staging
+│   │   ├── RepositoryStaging/<Profile UUID>/ private repository downloads, recoverable snapshot backups, and mutation staging
 │   │   ├── RepositoryMigrationBackups/     retained predecessor repository-skill migration sources
 │   │   ├── scheduled-skills.json             legacy schedule migration source
 │   │   ├── Profiles/<uuid>/profile.json    predecessor registration and downgrade guard
@@ -52,12 +51,13 @@ types remain authoritative in their `Codable` implementations.
 │   │   └── ServiceSearchVectors.plist       purgeable service-search embeddings
 │   └── ...                                  system-managed framework state
 ├── Documents/                               visible in Apple Files
-│   ├── Repositories/Local/                  complete editable portable Local repository
-│   ├── Repositories/<repository name>/      installed remote snapshots; readable installation-stable folder names
-│   ├── Repositories/<name> Copy <uuid>/     interrupted-publication recovery copies; not connected automatically
 │   └── Profiles/<ProfileName>/              complete portable Profile
 │       ├── profile.json                 identity and portable storage milestone
 │       ├── .ox/state.sqlite             conversations, settings, indexes; DELETE journal
+│       ├── .ox/service-repositories.json    repository enablement, origins, conflict resolutions
+│       ├── repositories/Local/              complete editable Local repository
+│       ├── repositories/<repository name>/ installed remote snapshots; stable folder names
+│       ├── repositories/<name> Copy <uuid>/ interrupted-publication recovery copies
 │       ├── .ox/payloads/, .ox/staging/ retained payloads, owner lock and file staging
 │       ├── MEMORY.md                        authoritative memory and response preferences
 │       ├── .ox/legacy-soul.md                exact retired voice source, when present
@@ -287,11 +287,11 @@ Repository configuration keeps format version 1. Local is always enabled; new
 builds ignore and stop writing the legacy `localEnabled` field, and older builds
 default it to true when it is absent.
 
-Repository packages live in `Documents/Repositories`, are user-owned, and remain eligible for device backup. `RepositoryMigrator` moves predecessor Local and UUID remote folders before repository preparation; it verifies source/destination file fingerprints, retains hidden Git state and empty directories through whole-folder moves, and refuses destination collisions. Development snapshots and predecessor migration backups remain private. Missing Local manifests fail without recreating a manifest over existing files. Remote origins, enablement, resolutions, and optional `directoryName` mappings remain in `service-repositories.json` format 1. New installations sanitize the repository manifest name, reserve Local, and add numeric suffixes for occupied or registered folder names. The chosen name is stable across syncs, even when the manifest name changes. `RepositoryMigrator` journals the chosen directory in configuration before moving each predecessor UUID folder; a restart resumes pending moves, and conflicting folders are never replaced. Publication backups remain keyed by private installation UUID and resolve through the saved directory mapping. Older readers ignore that mapping and cannot discover renamed remote folders; ordinary older writes can discard the mapping. This path change is not downgrade-compatible. Remote source is authoritative: sync replaces the entire downloaded snapshot, including local edits and extra files, without merging, prompting, or keeping an edit copy. Downloads are validated before publication; failed downloads leave the installed snapshot unchanged. Previously written optional snapshot inventories are ignored and omitted when configuration is next saved; predecessor readers accept their absence. Startup restores interrupted snapshot backups when the active folder is missing, or preserves them as visible copies when a new snapshot is already present. Disconnect retains repository files; deletion is performed explicitly in Files. Repository settings reload after browsing or foregrounding.
+Repository packages live in each Profile's `repositories/` folder and follow that Profile's move, export, and backup policy. Configuration lives at `.ox/service-repositories.json` (format 1) and is included in Profile exports. `2026-10-22-profile-repositories` guards older readers; startup moves the predecessor app-wide repository folder and configuration into the existing active Profile before repository preparation. Migration normalizes older layouts first, checks destination collisions before moving, verifies file fingerprints, preserves hidden files and empty directories, and resumes partial moves on the next launch. Other Profiles receive independent empty Local repositories; no shared sources are duplicated. Switching or moving Profiles rebinds repository paths and clears source/catalog caches. Private staging is partitioned by Profile UUID, remains device-local, and is excluded from exports. Mounted repository grants and bindings remain device-local. `RepositoryMigrator` moves predecessor Local and UUID remote folders before repository preparation; it verifies source/destination file fingerprints, retains hidden Git state and empty directories through whole-folder moves, and refuses destination collisions. Development snapshots and predecessor migration backups remain private. Missing Local manifests fail without recreating a manifest over existing files. Remote origins, enablement, resolutions, and optional `directoryName` mappings remain in `service-repositories.json` format 1. New installations sanitize the repository manifest name, reserve Local, and add numeric suffixes for occupied or registered folder names. The chosen name is stable across syncs, even when the manifest name changes. `RepositoryMigrator` journals the chosen directory in configuration before moving each predecessor UUID folder; a restart resumes pending moves, and conflicting folders are never replaced. Publication backups remain keyed by private installation UUID and resolve through the saved directory mapping. Older readers ignore that mapping and cannot discover renamed remote folders; ordinary older writes can discard the mapping. This path change is not downgrade-compatible. Remote source is authoritative: sync replaces the entire downloaded snapshot, including local edits and extra files, without merging, prompting, or keeping an edit copy. Downloads are validated before publication; failed downloads leave the installed snapshot unchanged. Previously written optional snapshot inventories are ignored and omitted when configuration is next saved; predecessor readers accept their absence. Startup restores interrupted snapshot backups when the active folder is missing, or preserves them as visible copies when a new snapshot is already present. Disconnect retains repository files; deletion is performed explicitly in Files. Repository settings reload after browsing or foregrounding.
 
 Older builds do not discover the new paths and can recreate stale private repositories. This location change is not downgrade-compatible; downgrade testing and approval are not release gates. Returning to the changed build refuses conflicting private/public folders rather than merging or overwriting them.
 
-Remote MCP connections are Local services at `Documents/Repositories/Local/mcp/<id>/service.json`.
+Remote MCP connections are Local services at `<Profile>/repositories/Local/mcp/<id>/service.json`.
 The id is derived from the endpoint host, with a numeric suffix for collisions,
 and is the runtime service domain. Creating or migrating a connection selects Local
 for any same-id conflict. Local preparation converts the legacy
@@ -304,7 +304,7 @@ MCP definitions that they cannot update.
 
 ## Shared preferences
 
-Language, Host access, service preferences, policy, provider/repository configuration, and secret metadata are authoritative JSON files under Application Support/Configuration, with internal state in Application Support/state.json. ApplicationStorageMigrator verifies and moves the five predecessor top-level JSON catalogs, then converts app language, Host access, service names/saved domains, Action policies, onboarding, starter count, active Profile, cached region, and the actual `chatgpt.agentHostID` key. Ignored `chatgpt.installationId`, `api.url`, retired voice/theme keys, and framework preferences are not activated or swept. CredentialMigrator converts `secret.index` after legacy vault conversion and before credential consumers. Source preferences/files are removed only after publication verification; divergent coexisting representations and malformed/future files block preparation with both representations preserved. Subsequent launches do not recreate retired preference keys. Files remain device-wide, outside Profile exports, with normal backup eligibility; Keychain values and device-bound bookmark semantics are unchanged. Older writers do not understand the new locations; returning from a downgrade rejects divergent data rather than silently resetting configuration.
+Language, Host access, service preferences, policy, provider configuration, and secret metadata are authoritative JSON files under Application Support/Configuration, with internal state in Application Support/state.json. ApplicationStorageMigrator verifies and moves the five predecessor top-level JSON catalogs, then converts app language, Host access, service names/saved domains, Action policies, onboarding, starter count, active Profile, cached region, and the actual `chatgpt.agentHostID` key. Ignored `chatgpt.installationId`, `api.url`, retired voice/theme keys, and framework preferences are not activated or swept. CredentialMigrator converts `secret.index` after legacy vault conversion and before credential consumers. Source preferences/files are removed only after publication verification; divergent coexisting representations and malformed/future files block preparation with both representations preserved. Subsequent launches do not recreate retired preference keys. Files remain device-wide, outside Profile exports, with normal backup eligibility; Keychain values and device-bound bookmark semantics are unchanged. Older writers do not understand the new locations; returning from a downgrade rejects divergent data rather than silently resetting configuration.
 
 The agent accesses one virtual `app/` mount. settings.json, providers.json, and services.json accept bounded validated edits through their owners, requiring current revisions, normal filesystem policy, and existing semantic Action approval. Provider definitions and default-model changes must be separate writes. policy.json is read-only. status.json and exact-action views under actions/ are generated on demand, not persisted copies. Secret metadata, bookmarks, installation identity, state.json, and host.json are not mounted; status exposes only Host access. Logs are a separate redacted approval-gated JSONL view, readable/searchable only by explicitly naming app/logs.jsonl, never by directory-wide content searches. App files cannot be attached, deleted, moved, or copied; temporary conversations cannot mutate them. A preexisting physical Profile app path retains its user-file access and disables the virtual app mount for that Profile; no collision bytes are moved or hidden. The ox.app function namespace and its aliases are removed; historical Action identifiers remain policy keys for equivalent filesystem operations.
 
@@ -363,7 +363,7 @@ Ox selects another saved profile or creates a new local profile named `Default`.
 Creating a named profile stages and validates the complete directory before
 installing it. Moving a
 managed profile between local and iCloud storage uses coordinated iCloud operations;
-a git working tree never lives inside a Profile. Opened profiles are renamed and
+Ox does not create Git working trees inside a Profile; retained predecessor Git metadata travels with Local unchanged. Opened profiles are renamed and
 moved in Files rather than by Ox.
 
 `ProfileRepository` is the sole application writer for Profile content. It serializes
@@ -716,13 +716,13 @@ images in memory for the process lifetime. Every service source has a top-level
 The kind and relative path are derived from the ID; for example,
 `web:example.com` resolves to `web/example.com`.
 
-`Library/Application Support/service-repositories.json` stores which read-only
+`<Profile>/.ox/service-repositories.json` stores which read-only
 repositories are enabled and the user's whole-service choice for each conflict.
 Public HTTPS Git repositories are cloned into temporary staging directories.
 After validation, their `.git` metadata is removed and the resulting `HEAD`
-snapshot replaces `Documents/Repositories/<repository name>/`. The folder name is chosen at installation, collision-safe, and stored alongside the private installation UUID. These snapshots are visible in Files and eligible for device backup. Sync replaces local edits; disconnecting removes the connection and saved conflict choices without deleting files or website data.
+snapshot replaces `<Profile>/repositories/<repository name>/`. The folder name is chosen at installation, collision-safe, and stored alongside the installation UUID. These snapshots are visible in Files and follow the Profile's backup policy. Sync replaces local edits; disconnecting removes the connection and saved conflict choices without deleting files or website data.
 
-The editable Local repository always exists at `Documents/Repositories/Local/`.
+The editable Local repository always exists at `<Profile>/repositories/Local/`.
 It is always enabled and cannot be removed. Local edits persist
 directly without Git initialization, commits, checkout, or a separate Save step.
 Existing `.git` metadata is retained untouched for external recovery, but is not
@@ -764,7 +764,7 @@ attachment. `ox.service.attach` validates and replaces that conversation's attac
 the draft is ready to test. No validation result is persisted.
 
 Development and installed sources are read-only `HEAD` snapshots without Git metadata.
-Local source and all service snapshots are excluded from device backup.
+Local source and installed snapshots travel with their owning Profile; development snapshots remain device-local.
 Exporting Local creates a transient Files-shareable folder copy containing all
 current source, repository-root skills, incomplete drafts, and any retained legacy
 `.git` directory. Retained Git history does not track edits made by this build. The
@@ -944,11 +944,11 @@ needed for diagnosis but never credentials or reusable secrets.
 | Secret metadata and bindings | Configuration/secrets.json | Device backup policy | Sign out or delete entry |
 | Managed provider OAuth | Keychain | System policy | Sign out |
 | Service website state | Domain website store | Local persistent state | Sign out service family |
-| Remote MCP endpoints and transports | Documents/Repositories/Local | Device backup policy | Disconnect the MCP server |
+| Remote MCP endpoints and transports | <Profile>/repositories/Local | Profile policy | Disconnect the MCP server |
 | Scheduled skill definitions | Application Support | Device backup policy | Delete the schedule or app |
 | Remote MCP OAuth registration and tokens | Keychain | System policy | Disconnect the MCP server |
-| Service repository configuration | Application Support | Device backup policy | Remove repository or reset choices |
-| Local repository and service snapshots | Application Support | Excluded from backup | Remove repository or replace snapshot |
+| Service repository configuration | <Profile>/.ox/service-repositories.json | Profile policy; included in exports | Remove repository or reset choices |
+| Local repository and service snapshots | <Profile>/repositories | Profile policy; included in exports | Delete files or Profile; sync replaces remote snapshots |
 | Service-search vectors | Caches | Purgeable local cache | System eviction or MonoRepository rebuild |
 | Pi Durable temporary-conversation caches | Caches (explicit launch opt-in) | Purgeable; no backup/sync/export | System eviction, app deletion, or explicit QA cleanup after close |
 | Pi Durable upstream storage diagnostics | Caches (DEBUG Simulator only) | Purgeable; no backup/sync/export | Removed after each request; crash remnants by system eviction or QA cleanup |

@@ -180,11 +180,11 @@ extension Repository {
         guard existing != nil || !FileManager.default.fileExists(atPath: destination.path) else {
             throw Failure(message: "Local source already exists for \(payload.domain).")
         }
-        try FileManager.default.createDirectory(at: AppStoragePaths.repositoryStaging, withIntermediateDirectories: true)
-        let staging = AppStoragePaths.repositoryStaging.appendingPathComponent("importing-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: repositoryStaging, withIntermediateDirectories: true)
+        let staging = repositoryStaging.appendingPathComponent("importing-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: staging) }
         let stagedService = staging.appendingPathComponent(service.id.path, isDirectory: true)
-        let backup = AppStoragePaths.repositoryStaging.appendingPathComponent("replaced-\(UUID().uuidString)", isDirectory: true)
+        let backup = repositoryStaging.appendingPathComponent("replaced-\(UUID().uuidString)", isDirectory: true)
         let originalConfiguration = configuration
         var updatedPackage = originalPackage
         if existing == nil {
@@ -249,8 +249,8 @@ extension Repository {
         guard FileManager.default.fileExists(atPath: serviceRoot.path) else {
             throw Failure(message: "Local source does not exist for \(id).")
         }
-        try FileManager.default.createDirectory(at: AppStoragePaths.repositoryStaging, withIntermediateDirectories: true)
-        let staging = AppStoragePaths.repositoryStaging.appendingPathComponent("deleting-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: repositoryStaging, withIntermediateDirectories: true)
+        let staging = repositoryStaging.appendingPathComponent("deleting-\(UUID().uuidString)", isDirectory: true)
         var package = originalPackage
         package.services.remove(at: index)
         let originalConfiguration = configuration

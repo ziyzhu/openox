@@ -37,6 +37,7 @@ nonisolated enum ProfileSchema {
         "2026-10-15-lazy-conversations",
         "2026-10-20-schedules",
         "2026-10-21-response-preferences",
+        "2026-10-22-profile-repositories",
     ]
     static var current: String { versions.last! }
 
@@ -83,6 +84,8 @@ nonisolated enum ProfileMigrator {
     static let schedulesVersion = "2026-10-20-schedules"
 
     static let responsePreferencesVersion = "2026-10-21-response-preferences"
+
+    static let repositoriesVersion = "2026-10-22-profile-repositories"
 
     static let lazyConversationVersion = "2026-10-15-lazy-conversations"
 
@@ -272,20 +275,20 @@ extension ProfileMigrator {
             Log.app.info("StorageMigrator.internalState published id=\(profile.id)")
         }
         var manifest = config
-        if config.version != responsePreferencesVersion {
+        if ![responsePreferencesVersion, repositoriesVersion].contains(config.version) {
             guard await materialize(at: profile.url, paths: ["MEMORY.md", "SOUL.md"]) else {
                 throw StorageMigrationError.invalidApplicationStorage("Profile preferences are not available yet")
             }
             let root = profile.url
             try await Task.detached(priority: .userInitiated) { try migrateResponsePreferences(at: root) }.value
         }
-        manifest.version = responsePreferencesVersion
-        if config.version != responsePreferencesVersion {
+        manifest.version = repositoriesVersion
+        if config.version != repositoriesVersion {
             try ProfileIO.writeConfig(manifest, to: profile.url)
             try syncDurableDirectory(profile.url)
         }
         var prepared = profile
-        prepared.version = responsePreferencesVersion
+        prepared.version = repositoriesVersion
         return prepared
     }
 
@@ -299,7 +302,7 @@ extension ProfileMigrator {
         }
         var migrated = profile
         migrated.version = config.version
-        if [internalStateVersion, lazyConversationVersion, schedulesVersion, responsePreferencesVersion].contains(config.version) {
+        if [internalStateVersion, lazyConversationVersion, schedulesVersion, responsePreferencesVersion, repositoriesVersion].contains(config.version) {
             await progress(String(localized: "Preparing Profile files…"))
             return try await prepareInternalState(migrated, config: config)
         }

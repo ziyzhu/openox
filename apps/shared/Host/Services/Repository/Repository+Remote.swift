@@ -54,12 +54,14 @@ extension Repository {
         }
         let id = UUID().uuidString.lowercased()
         try FileManager.default.createDirectory(at: repositoriesRoot, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: AppStoragePaths.repositoryStaging, withIntermediateDirectories: true)
-        let staging = AppStoragePaths.repositoryStaging.appendingPathComponent("installing-\(id)", isDirectory: true)
+        try FileManager.default.createDirectory(at: repositoryStaging, withIntermediateDirectories: true)
+        let staging = repositoryStaging.appendingPathComponent("installing-\(id)", isDirectory: true)
+        let destinationRoot = repositoriesRoot
         do {
             Log.service.info("Repository.install origin=\(Self.redacted(origin)) id=\(id)")
             let package = try await downloadSnapshot(from: origin, to: staging, provenance: .remote)
-            let directoryName = try Self.availableDirectoryName(for: package.name, excluding: configuration.repositories.compactMap(\.directoryName))
+            guard repositoriesRoot == destinationRoot else { throw CancellationError() }
+            let directoryName = try Self.availableDirectoryName(for: package.name, at: repositoriesRoot, excluding: configuration.repositories.compactMap(\.directoryName))
             let destination = repositoriesRoot.appendingPathComponent(directoryName, isDirectory: true)
             try publishSnapshot(at: destination, staging: staging, repositoryID: id, provenance: .remote, replacingExisting: false)
             configuration.repositories.append(InstalledRepository(id: id, origin: origin, isEnabled: true, directoryName: directoryName))
@@ -81,8 +83,8 @@ extension Repository {
             throw Failure(message: "Repository not found")
         }
         let destination = repositoryDirectory(repositoryID)
-        try FileManager.default.createDirectory(at: AppStoragePaths.repositoryStaging, withIntermediateDirectories: true)
-        let staging = AppStoragePaths.repositoryStaging.appendingPathComponent("updating-\(repositoryID)", isDirectory: true)
+        try FileManager.default.createDirectory(at: repositoryStaging, withIntermediateDirectories: true)
+        let staging = repositoryStaging.appendingPathComponent("updating-\(repositoryID)", isDirectory: true)
         do {
             Log.service.info("Repository.update origin=\(Self.redacted(stored.origin)) id=\(repositoryID)")
             try await replaceSnapshot(from: stored.origin, at: destination, staging: staging, repositoryID: repositoryID, provenance: .remote)
@@ -163,8 +165,10 @@ extension Repository {
     }
 
     private func replaceSnapshot(from origin: URL, at destination: URL, staging: URL, repositoryID: String, provenance: Descriptor.Provenance) async throws {
+        let destinationRoot = repositoriesRoot
         do {
             _ = try await downloadSnapshot(from: origin, to: staging, provenance: provenance)
+            guard repositoriesRoot == destinationRoot else { throw CancellationError() }
             try publishSnapshot(at: destination, staging: staging, repositoryID: repositoryID, provenance: provenance)
         } catch {
             try? FileManager.default.removeItem(at: staging)
@@ -218,7 +222,7 @@ extension Repository {
             && name == name.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".")))
     }
 
-    nonisolated static func availableDirectoryName(for name: String, excluding reserved: [String]) throws -> String {
+    nonisolated static func availableDirectoryName(for name: String, at root: URL, excluding reserved: [String]) throws -> String {
         let invalid = CharacterSet.controlCharacters.union(CharacterSet(charactersIn: "/\\:<>\"|?*"))
         let cleaned = name.components(separatedBy: invalid).filter { !$0.isEmpty }.joined(separator: "-")
             .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".")))
@@ -229,7 +233,7 @@ extension Repository {
         }
         base = base.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".-")))
         if base.isEmpty { base = "Repository" }
-        let names = try FileManager.default.contentsOfDirectory(atPath: AppStoragePaths.repositories.path) + reserved + ["Local"]
+        let names = try FileManager.default.contentsOfDirectory(atPath: root.path) + reserved + ["Local"]
         let taken = Set(names.map { $0.precomposedStringWithCanonicalMapping.lowercased() })
         var candidate = base
         var suffix = 2
