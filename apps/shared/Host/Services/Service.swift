@@ -785,8 +785,9 @@ final class Service: NSObject, Identifiable {
         let loaded = await page.openingTask?.value ?? page.isReady
         page.openingTask = nil
         guard loaded, owns(page), page.isReady else {
-            closeOwnedPage(page, error: EvalError.notReady)
-            throw EvalError.notReady
+            let error = page.navigationFailure.map(EvalError.navigationFailed) ?? .notReady
+            closeOwnedPage(page, error: error)
+            throw error
         }
         try Task.checkCancellation()
         return page

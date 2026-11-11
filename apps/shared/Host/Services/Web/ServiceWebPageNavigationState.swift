@@ -16,6 +16,7 @@ extension Service.ServiceWebPage {
         case redirected
         case committed
         case finished(URL)
+        case documentReady(NavigationLoad, URL)
         case settled(NavigationSettlement)
         case verified(NavigationLoad, URL, NavigationVerification)
         case serviceDomainLost
@@ -36,6 +37,7 @@ extension Service.ServiceWebPage {
             case .redirected: "redirected"
             case .committed: "committed"
             case .finished: "finished"
+            case .documentReady: "documentReady"
             case .settled: "settled"
             case .verified: "verified"
             case .serviceDomainLost: "serviceDomainLost"
@@ -118,6 +120,14 @@ extension Service.ServiceWebPage {
             guard case .navigating(let load) = navigationPhase else { return false }
             finishedNavigationGeneration = load.generation
             navigationPhase = .settling(NavigationSettlement(load: load, url: url))
+            return true
+
+        case .documentReady(let load, let url):
+            guard case .navigating(let current) = navigationPhase,
+                  current === load, load.committed,
+                  navigationGeneration == load.generation else { return false }
+            finishedNavigationGeneration = load.generation
+            navigationPhase = .verifying(load, url)
             return true
 
         case .settled(let settlement):

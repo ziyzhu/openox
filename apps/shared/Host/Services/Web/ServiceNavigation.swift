@@ -33,6 +33,8 @@ extension Service {
                     }
                     if case WebPage.NavigationError.webContentProcessTerminated = error {
                         await self.receive(.webContentProcessTerminated, from: session)
+                    } else if case WebPage.NavigationError.failedProvisionalNavigation(let cause) = error {
+                        await self.receive(.failed(cause), from: session)
                     } else {
                         await self.receive(.failed(error), from: session)
                     }
@@ -206,7 +208,7 @@ extension Service {
             lease.timeoutTask = Task { @MainActor [weak self, weak session, weak lease] in
                 try? await Task.sleep(for: .seconds(timeout))
                 guard !Task.isCancelled, let self, let session, let lease else { return }
-                self.navigationTimedOut(lease, in: session)
+                await self.navigationTimedOut(lease, in: session)
             }
         }
     }
@@ -235,12 +237,29 @@ extension Service {
     func navigationTimedOut(
         _ lease: ServiceWebPage.NavigationLease,
         in session: ServiceWebPage
-    ) {
+    ) async {
         guard owns(session),
               session.navigationPhase.load?.lease === lease else { return }
+        if case .navigating(let load) = session.navigationPhase,
+           load.committed, let url = session.page.url {
+            let raw = try? await evalOnce(session, "return document.readyState;", timeout: 1)
+            guard !Task.isCancelled, owns(session),
+                  session.navigationPhase.load?.lease === lease else { return }
+            let document = raw as? String
+            if case .navigating(let current) = session.navigationPhase,
+               current === load, session.page.url == url,
+               document == "interactive" || document == "complete" {
+                guard transitionNavigation(.documentReady(load, url), on: session) else { return }
+                Log.webView.info("Service.navigation document-ready domain=\(domain) session=\(session.logLabel) nav=\(load.generation) document=\(document ?? "unknown") loading=\(session.page.isLoading) seconds=\(Int(lease.timeout))")
+                await verifyNavigation(in: session, load: load, url: url)
+                return
+            }
+        }
+        let phase = session.navigationPhase.logLabel
+        let committed = session.navigationPhase.load?.committed ?? false
         session.navigationFailure = session.navigationFailure ?? "navigation timed out after \(Int(lease.timeout)) seconds"
         transitionNavigation(.timedOut(lease), on: session)
-        Log.webView.error("Service.navigation timeout domain=\(domain) session=\(session.logLabel) id=\(lease.id.uuidString.prefix(8)) label=\(lease.label) seconds=\(Int(lease.timeout))")
+        Log.webView.error("Service.navigation timeout domain=\(domain) session=\(session.logLabel) id=\(lease.id.uuidString.prefix(8)) label=\(lease.label) seconds=\(Int(lease.timeout)) phase=\(phase) committed=\(committed)")
     }
 
     func verifyNavigation(

@@ -290,7 +290,7 @@ final class ServiceActionScheduler {
             if let destination = action.destination, action.needsNavigation(on: queue.page) {
                 Log.service.info("ServiceActionScheduler navigation id=\(action.id.uuidString.prefix(8)) name=\(action.name) page=\(queue.page.logLabel) phase=\(queue.page.navigationPhase.logLabel) destinationChanged=\(destination != queue.page.executionURL)")
                 guard await queue.service.navigate(destination, in: queue.page) != nil else {
-                    action.fail?(Service.EvalError.notReady)
+                    action.fail?(queue.page.navigationFailure.map(Service.EvalError.navigationFailed) ?? .notReady)
                     self.finish(action, in: queue)
                     return
                 }
