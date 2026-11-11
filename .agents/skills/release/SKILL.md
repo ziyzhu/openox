@@ -43,8 +43,10 @@ is `6802224502`. Follow [references/release-flow.md](references/release-flow.md)
 for draft creation, inspection, release notes, and later build/staging handoff.
 This workflow is not for TestFlight-only distribution. Start with
 `bun .agents/skills/release/scripts/ios-inspect.ts --help`, then follow the
-inspection step in the release flow. The script is read-only; its report is
-evidence, not proof of submission readiness.
+inspection step in the release flow. Resolve the last released source commit through
+App Store Connect and Xcode Cloud build provenance before asking the operator;
+follow the release flow's exact build-ID matching procedure. The script is
+read-only; its report is evidence, not proof of submission readiness.
 
 App Store Connect owns current listing metadata, screenshots, and previews.
 Read its live state during a release; do not keep local metadata copies, media

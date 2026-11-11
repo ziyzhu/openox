@@ -14,6 +14,18 @@ bun .agents/skills/release/scripts/ios-inspect.ts --version <version>
 
 1. Use `--help` for options. Missing baseline, build selection, or release notes are later-step blockers, not draft-creation blockers. Supply `--since <verified-released-commit>` before deriving release notes; supply `--build-id <asc-build-id>` only for a later requested build/staging step. Resolve the report's blockers before the affected build/upload or staging step; the in-app What's New blockers must be resolved before archiving, then rerun inspection. Released-baseline metadata is not staged metadata. Offline reports allow only provisional drafts. Keep reports and release working files in a private temporary workspace outside Git.
 
+## Resolve the released source
+
+Before deriving release notes or asking the operator for a baseline, use the
+installed `asc` CLI to trace the last released iOS version to its source commit.
+Check each subcommand's `--help` before use.
+
+1. Run `asc versions list --app 6802224502 --platform IOS --include build --paginate`. Identify the latest released version, not the newest draft or TestFlight upload, and record its attached build ID. Use `asc builds info --build-id <released-build-id>` to read its build number and marketing version.
+2. Run `asc xcode-cloud workflows --app 6802224502 --paginate`, then `asc xcode-cloud build-runs --workflow-id <workflow-id> --sort=-number --limit 25`. Follow pagination and inspect other app workflows when needed. A matching run number or timestamp is only a candidate, not proof.
+3. Run `asc xcode-cloud build-runs builds --run-id <candidate-run-id> --paginate` and require its returned builds to contain the exact released build ID. Read the run's `sourceCommit.commitSha` from the run listing or `asc xcode-cloud build-runs view --id <candidate-run-id>`. Do not substitute the latest successful run or infer a commit from a version bump, release-note commit, or upload date.
+4. Confirm the SHA exists locally and is an ancestor of the intended source with `git cat-file -e <sha>^{commit}` and `git merge-base --is-ancestor <sha> HEAD`. Save the version/build/run/SHA evidence in the private temporary workspace, then pass that SHA as `--since` to release inspection. This ASC-verified chain establishes the baseline without operator confirmation.
+5. Ask the operator only if ASC provenance is unavailable, missing, ambiguous, or inconsistent, or the released commit is not an ancestor of the intended source. Report what was checked; never guess the baseline. An unavailable baseline blocks release-note derivation, not draft creation.
+
 ## What's New in This Version
 
 1. Draft the App Store Connect `whatsNew` field from actual user-visible changes since the last released version. Do not include unshipped work, internal implementation details, or screenshot-only fixtures as shipped features.

@@ -1,6 +1,10 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "More reliable website actions while pages load, with clearer connection errors." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "网页加载期间的网站操作更可靠，连接错误提示也更清晰。" } } } },
+    "Keep your draft when entering text in an inline webpage, with floating composer controls visible again." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在内嵌网页中输入文字时保留消息草稿，并恢复显示输入框的悬浮控件。" } } } },
+    "Reconnect MCP services when their saved authorization can no longer be refreshed." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "MCP 服务已保存的授权无法刷新时，会提示你重新授权。" } } } },
+    "Reduced startup work and improved responsiveness when discovering models." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "减少启动时的重复处理，并改善查找可用模型时的响应。" } } } },
     "Resume interrupted work when you return to Ox after iOS stops a background task." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "iOS 停止后台任务后，返回 Ox 即可继续被中断的工作。" } } } },
     "Connect to Coinbase, Robinhood, Apple Card, and AWS through new built-in services." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新增 Coinbase、Robinhood、Apple Card 和 AWS 内置服务。" } } } },
     "Use expanded actions for Chase travel, Google Flights, American Express balances, Instagram Stories, Luma events, and Google Calendar." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "扩展了 Chase 旅行、Google 航班搜索、美国运通余额查询、Instagram 快拍、Luma 活动和 Google 日历操作。" } } } },

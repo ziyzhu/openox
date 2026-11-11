@@ -9,6 +9,12 @@ struct WhatsNewRelease: Identifiable {
 
 enum WhatsNew {
     static let releases: [WhatsNewRelease] = [
+        WhatsNewRelease(version: "1.0.27", items: [
+            "More reliable website actions while pages load, with clearer connection errors.",
+            "Keep your draft when entering text in an inline webpage, with floating composer controls visible again.",
+            "Reconnect MCP services when their saved authorization can no longer be refreshed.",
+            "Reduced startup work and improved responsiveness when discovering models."
+        ]),
         WhatsNewRelease(version: "1.0.26", items: [
             "Resume interrupted work when you return to Ox after iOS stops a background task.",
             "Connect to Coinbase, Robinhood, Apple Card, and AWS through new built-in services.",

@@ -18,7 +18,7 @@ if (values.help) {
   console.log(`Usage: bun .agents/skills/release/scripts/ios-inspect.ts [options]
   --version <version>  Intended marketing version; defaults to project.yml
   --build-id <id>      Exact App Store Connect build to inspect; never auto-selected
-  --since <git-ref>    Operator-verified source revision of the last released iOS version
+  --since <git-ref>    Verified source revision of the last released iOS version
   --profile <name>     Existing asc profile; does not change authentication settings
   --offline           Inspect local state only; remote state remains unchecked
 
@@ -145,7 +145,7 @@ try {
     if (ancestor.code !== 0) throw new Error("--since must be an ancestor of HEAD.");
     report.changes = {
       since,
-      provenance: "Operator-supplied; must be confirmed against the last released build.",
+      provenance: "Caller-supplied; verify against the last released build through ASC/Xcode Cloud or operator evidence.",
       commits: await git("log", "--format=%h %s", `${since}..${commit}`),
       files: await git("diff", "--stat", since, commit),
     };
