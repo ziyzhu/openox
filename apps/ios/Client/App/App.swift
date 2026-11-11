@@ -9,7 +9,7 @@ struct OxApp: App {
         #if DEBUG
         guard !OxDemoLaunch.enabled && !OxAppStoreScreenshotLaunch.enabled else { return }
         #endif
-        StorageMigrator.migrateApplicationStorage()
+        _ = IOSHost.shared
         ScheduleScheduler.shared.register()
     }
 

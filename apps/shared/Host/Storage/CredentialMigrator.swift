@@ -106,7 +106,7 @@ nonisolated enum CredentialMigrator {
     }
 
     @MainActor
-    static func migrateSecretAPIServiceCredentials(manifests: [Repository.ManifestFile]) throws {
+    static func migrateSecretAPIServiceCredentials(manifests: [Repository.ManifestFile], legacyAccounts: Set<String>) throws {
         var migrated = 0
         for file in manifests {
             guard let raw = try? JSONDecoder().decode(JSONValue.self, from: file.data),
@@ -120,6 +120,7 @@ nonisolated enum CredentialMigrator {
             let identity = Data("\(definition.repositoryID ?? ""):\(definition.domain)".utf8)
             let hash = SHA256.hash(data: identity).map { String(format: "%02x", $0) }.joined()
             let account = "service:api:\(hash)"
+            guard legacyAccounts.contains(account) else { continue }
             guard let rawCredential = try Credentials.secretChecked(for: account),
                   let data = rawCredential.data(using: .utf8),
                   let credential = try? JSONDecoder().decode(APIServiceCredential.self, from: data),
@@ -256,7 +257,7 @@ nonisolated enum CredentialMigrator {
         Log.app.info("StorageMigrator.managedOAuth moved=\(moved)")
     }
 
-    static func migrateAPIServiceOAuthAccounts(manifests: [Repository.ManifestFile]) throws {
+    static func migrateAPIServiceOAuthAccounts(manifests: [Repository.ManifestFile], legacyAccounts: Set<String>) throws {
         var moved = 0
         for file in manifests {
             guard let raw = try? JSONDecoder().decode(JSONValue.self, from: file.data),
@@ -267,7 +268,9 @@ nonisolated enum CredentialMigrator {
             guard case .oauth = auth else { continue }
             let identity = Data("\(definition.repositoryID ?? ""):\(definition.domain)".utf8)
             let hash = SHA256.hash(data: identity).map { String(format: "%02x", $0) }.joined()
-            if try moveCredential(from: "service:api:\(hash)", to: ManagedOAuthAccount.apiService(hash)) {
+            let account = "service:api:\(hash)"
+            guard legacyAccounts.contains(account) else { continue }
+            if try moveCredential(from: account, to: ManagedOAuthAccount.apiService(hash)) {
                 moved += 1
             }
         }
