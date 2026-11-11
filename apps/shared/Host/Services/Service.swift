@@ -752,8 +752,32 @@ final class Service: NSObject, Identifiable {
     }
 
     func sessionPage(for action: Action) -> ServiceWebPage? {
-        let owner = OwnedPageOwner.session(action.session?.objectValue?["id"]?.stringValue)
-        return ownedPages.values.first { $0.owner == owner }?.page
+        let pages = ownedPages.values.filter {
+            if case .session = $0.owner { return true }
+            return false
+        }
+        if let id = action.session?.objectValue?["id"]?.stringValue {
+            return pages.first { $0.owner == .session(id) }?.page
+                ?? pages.first { $0.owner == .session(nil) }?.page
+        }
+        return pages.first { $0.owner == .session(nil) }?.page
+            ?? pages.max {
+                ($0.page.lastInvocation?.startedAt ?? .distantPast)
+                    < ($1.page.lastInvocation?.startedAt ?? .distantPast)
+            }?.page
+    }
+
+    func updateSessionPage(_ page: ServiceWebPage, session: JSONValue?) {
+        let key = ObjectIdentifier(page)
+        guard let current = ownedPages[key], case .session = current.owner else { return }
+        let owner = OwnedPageOwner.session(session?.objectValue?["id"]?.stringValue)
+        guard current.owner != owner else { return }
+        guard !ownedPages.values.contains(where: { $0.owner == owner && $0.page !== page }) else {
+            Log.webView.warning("Service.session ownership-conflict domain=\(domain) page=\(page.logLabel) assigned=\(session != nil)")
+            return
+        }
+        ownedPages[key] = OwnedPage(page: page, owner: owner)
+        Log.webView.info("Service.session ownership domain=\(domain) page=\(page.logLabel) assigned=\(session != nil) resident=\(ownedPages.count)")
     }
 
     func openSessionPage(for action: Action) async throws -> ServiceWebPage {

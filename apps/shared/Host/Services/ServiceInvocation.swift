@@ -163,6 +163,7 @@ extension Service {
                         throw OxFunctionError(code: "authentication_required", message: "The selected logged-in session is no longer available. No action was executed.", recovery: "Use checkAccess to rediscover sessions and select the intended account/tenant, or requestAccess if login is needed. Do not silently switch accounts or automatically replay writes.")
                     }
                     guard session.navigationGeneration == startingNavigation else { throw EvalError.contextInvalidated }
+                    updateSessionPage(session, session: selectedSession)
                 }
                 session.lastInvocation = (invocationID, actionId, args, requestedSession, pageURL, selectedSession, Date())
                 session.secretAttempt = secrets
@@ -175,6 +176,11 @@ extension Service {
                 if !outputViolations.isEmpty {
                     Log.service.error("Service.invoke invalid-output id=\(invocation) name=\(name) session=\(session.logLabel) ms=\(elapsedMs()) violations=\(InvokeError.describe(outputViolations))")
                     return .failure(InvokeError.invalidOutput(name, outputViolations))
+                }
+                if WebSessionContract.isEnabled(definition), actionId == WebSessionContract.listAction,
+                   session.navigationGeneration == startingNavigation,
+                   let sessions = value.arrayValue, sessions.count <= 1 {
+                    updateSessionPage(session, session: sessions.first)
                 }
                 Log.service.info("Service.invoke result id=\(invocation) name=\(name) session=\(session.logLabel) nav=\(startingNavigation)->\(session.navigationGeneration)/\(session.finishedNavigationGeneration) ms=\(elapsedMs()) value=\(value.logShape)")
                 return .success(secrets?.redact(value) ?? value)
