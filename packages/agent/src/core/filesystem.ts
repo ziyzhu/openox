@@ -1,4 +1,4 @@
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { ToolExecutionApi, ToolExecutionResult } from "@earendil-works/pi-durable";
 import { createReadTool, createWriteTool, createEditTool } from "@earendil-works/pi-durable/tools";
 import { getOrThrow, FileError, type FileInfo } from "@earendil-works/pi-durable/env";

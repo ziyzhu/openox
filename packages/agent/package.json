@@ -12,18 +12,18 @@
     "workbench": "bun --watch workbench/server.ts"
   },
   "dependencies": {
-    "@earendil-works/chord": "1.5.0",
-    "@earendil-works/pi-ai": "1.5.0",
-    "@earendil-works/pi-codemode": "1.5.0",
-    "@earendil-works/pi-durable": "1.5.0",
+    "@earendil-works/chord": "1.5.2",
+    "@earendil-works/pi-ai": "1.5.2",
+    "@earendil-works/pi-codemode": "1.5.2",
+    "@earendil-works/pi-durable": "1.5.2",
     "@openox/protocol": "workspace:*",
     "@ungap/structured-clone": "1.4.0",
     "abort-controller": "3.0.0",
     "defuddle": "0.19.6",
-    "linkedom": "0.18.12",
-    "re2js": "2.9.0",
+    "linkedom": "0.18.15",
+    "re2js": "2.10.0",
     "text-encoding": "0.7.0",
-    "typebox": "1.4.3",
+    "typebox": "1.4.6",
     "whatwg-url": "14.2.0"
   },
   "devDependencies": {

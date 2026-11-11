@@ -41,6 +41,7 @@ nonisolated enum Defuddle {
         context.evaluateScript("""
             globalThis.setTimeout = globalThis.setInterval = () => { throw new Error('Timers unavailable during HTML extraction'); };
             globalThis.clearTimeout = globalThis.clearInterval = () => {};
+            globalThis.atob = value => Array.from(Uint8Array.fromBase64(value), byte => String.fromCharCode(byte)).join('');
             globalThis.console = { log() {}, warn() {}, error() {}, debug() {}, info() {} };
             """)
         context.evaluateScript(source)

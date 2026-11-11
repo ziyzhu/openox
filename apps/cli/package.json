@@ -43,7 +43,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
-    "typebox": "1.4.3"
+    "typebox": "1.4.6"
   },
   "devDependencies": {
     "@openox/protocol": "0.1.0",

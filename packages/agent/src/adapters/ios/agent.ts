@@ -1,6 +1,6 @@
 import { conversationEvents } from "./conversation-view";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import { createModels, createProvider } from "@earendil-works/pi-ai/models";
 import { getCurrentSystemPrompt, getCurrentTools } from "@earendil-works/pi-ai/utils/transcript";
 import type { Model, Tool, Api, ModelThinkingLevel } from "@earendil-works/pi-ai";

@@ -1,4 +1,4 @@
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import { err, ok, LineScanner, FileError, ExecutionError, type BinaryReader, type ExecutionEnv, type FileInfo, type Result } from "@earendil-works/pi-durable/env";
 import { canonical } from "./file-paths";
 

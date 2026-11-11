@@ -20,7 +20,7 @@ function usesNodeRuntime(text: string) {
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const destination = `${root}apps/shared/Resources/PiDurable.bundle`;
-const packages = { durable: "1.5.0", ai: "1.5.0", chord: "1.5.0" };
+const packages = { durable: "1.5.2", ai: "1.5.2", chord: "1.5.2" };
 for (const [key, version] of Object.entries(packages)) {
   const name = key === "chord" ? key : `pi-${key}`;
   const metadata = await Bun.file(new URL("../package.json", import.meta.resolve(`@earendil-works/${name}`))).json();

@@ -1,5 +1,5 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import type { JsonValue } from "@earendil-works/chord";
+import type { JsonValue } from "@earendil-works/chord/json";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { AgentDoc, type ConversationId, type Cursor, type EntryDraft, type EntryRecord, type JsonObject, type Tx } from "@earendil-works/pi-durable";
 import { ConversationFavorite, ConversationPresentation, ConversationReadState, type ConversationReference } from "./conversations";
