@@ -154,7 +154,7 @@ final class ProviderRegistry {
             do {
                 let next = try await ProviderModelCatalog.fetch(names, revalidating: cached)
                 modelCatalog = next
-                try next.save()
+                try await next.save()
                 Log.agent.info("ProviderRegistry.modelCatalog catalogs=\(next.catalogs.count) models=\(next.catalogs.values.reduce(0) { $0 + $1.count })")
             } catch {
                 Log.agent.warning("ProviderRegistry.modelCatalog error=\(error.localizedDescription)")

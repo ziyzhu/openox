@@ -23,6 +23,7 @@ nonisolated struct ProviderModelDiscovery: Codable, Equatable, Sendable {
     var catalog: String?
     var rules: [Rule]?
 
+    @concurrent
     func models(for definition: ProviderDefinition, known: [String: ProviderModel]) async throws -> [ProviderDefinition.Model] {
         let (data, response) = try await URLSession.shared.data(for: try await request(for: definition))
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
@@ -156,7 +157,8 @@ nonisolated struct ProviderModelCatalog: Codable, Sendable {
         try? JSONDecoder().decode(ProviderModelCatalog.self, from: Data(contentsOf: AppStoragePaths.providerModelCatalog))
     }
 
-    func save() throws {
+    @concurrent
+    func save() async throws {
         try FileManager.default.createDirectory(at: AppStoragePaths.caches, withIntermediateDirectories: true)
         try JSONEncoder().encode(self).write(to: AppStoragePaths.providerModelCatalog, options: .atomic)
     }
@@ -173,6 +175,7 @@ nonisolated struct ProviderModelCatalog: Codable, Sendable {
         Dictionary((name.flatMap { catalogs[$0] } ?? []).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
+    @concurrent
     static func fetch(_ names: Set<String>, revalidating cached: ProviderModelCatalog?) async throws -> ProviderModelCatalog {
         var request = URLRequest(url: source, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 60)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
