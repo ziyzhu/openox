@@ -1133,7 +1133,8 @@ struct ConversationPage: View {
                 )
                 logTranscriptWindow(reason: "submissionAnchor", total: totalBlockCount)
             }
-            .onChange(of: composerFocused) { _, _ in
+            .onChange(of: composerFocused) { _, focused in
+                if focused { webInputFocused = false }
                 scroller.focusChanged(
                     anyInputFocused,
                     slack: anchorSlack,

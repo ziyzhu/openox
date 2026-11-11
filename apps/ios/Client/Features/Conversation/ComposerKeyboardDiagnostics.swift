@@ -23,6 +23,10 @@ struct ConversationWebInputFocus: UIViewRepresentable {
                 NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged), name: name, object: nil)
             }
             NotificationCenter.default.addObserver(self, selector: #selector(keyboardHidden), name: UIResponder.keyboardDidHideNotification, object: nil)
+            // Focus can move from a web field to a native field without a keyboard frame change.
+            for name in [UITextField.textDidBeginEditingNotification, UITextView.textDidBeginEditingNotification] {
+                NotificationCenter.default.addObserver(self, selector: #selector(nativeInputBegan), name: name, object: nil)
+            }
         }
 
         required init?(coder: NSCoder) {
@@ -35,6 +39,11 @@ struct ConversationWebInputFocus: UIViewRepresentable {
 
         @objc private func keyboardHidden(_ notification: Notification) {
             guard let window, (notification.object as? UIScreen ?? window.screen) === window.screen else { return }
+            onFocusChange?(false)
+        }
+
+        @objc private func nativeInputBegan(_ notification: Notification) {
+            guard let window, let input = notification.object as? UIView, input.window === window else { return }
             onFocusChange?(false)
         }
 
