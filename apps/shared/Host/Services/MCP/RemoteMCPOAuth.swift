@@ -134,7 +134,15 @@ enum RemoteMCPOAuth {
         guard let refreshToken = tokens.refreshToken else { return forceRefresh ? nil : tokens.accessToken }
         let task = Task {
             var refreshed = credential
-            refreshed.tokens = try await Self.refresh(refreshToken: refreshToken, credential: credential)
+            do {
+                refreshed.tokens = try await Self.refresh(refreshToken: refreshToken, credential: credential)
+            } catch RemoteMCPError.authorizationRequired(let challenge) {
+                try Task.checkCancellation()
+                refreshed.tokens = nil
+                Self.save(refreshed, endpoint: endpoint)
+                Log.service.info("RemoteMCPOAuth.refresh authorization-required endpoint=\(LogPrivacy.url(endpoint.absoluteString))")
+                throw RemoteMCPError.authorizationRequired(challenge)
+            }
             try Task.checkCancellation()
             Self.save(refreshed, endpoint: endpoint)
             Log.service.info("RemoteMCPOAuth.refresh completed endpoint=\(LogPrivacy.url(endpoint.absoluteString))")
@@ -414,10 +422,17 @@ enum RemoteMCPOAuth {
         request.httpBody = OAuthSupport.formEncoded(form)
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let response = try await send(request)
+        if previousRefreshToken != nil,
+           [400, 401].contains(response.response.statusCode),
+           let failure = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
+           failure["error"] as? String == "invalid_grant" {
+            throw RemoteMCPError.authorizationRequired(RemoteMCPAuthorizationChallenge(header: nil))
+        }
         guard (200...299).contains(response.response.statusCode),
               let tokens = try? JSONDecoder().decode(RemoteMCPTokenResponse.self, from: response.data),
               !tokens.accessToken.isEmpty,
               tokens.tokenType.caseInsensitiveCompare("Bearer") == .orderedSame else {
+            Log.service.error("RemoteMCPOAuth.token rejected status=\(response.response.statusCode) refresh=\(previousRefreshToken != nil)")
             throw RemoteMCPError.oauth("The authorization server rejected the token request.")
         }
         return RemoteMCPOAuthTokens(
