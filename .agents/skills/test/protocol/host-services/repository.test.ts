@@ -56,16 +56,16 @@ test("CLI rejects an unsupported repository version without modifying its files"
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("CLI rejects mismatched action registration without changing repository contents", async () => {
+test("CLI validates repository metadata without evaluating JavaScript or changing contents", async () => {
   const root = await mkdtemp(join(tmpdir(), "ox-repository-contract-installer-"));
   try {
     await cp(join(ROOT, "examples/repository"), root, { recursive: true });
     const path = join(root, "web/example.com/actions.js");
-    const contents = 'window.ox.install(({action}) => action("undeclared", {invoke() {return {}}}));';
+    const contents = 'throw new Error("repository JavaScript must not execute");';
     await writeFile(path, contents);
     const result = await ox(root, "validate");
-    expect(result.code).not.toBe(0);
-    expect(result.stderr).toContain("action registration mismatch");
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
     expect(await readFile(path, "utf8")).toBe(contents);
   } finally { await rm(root, { recursive: true, force: true }); }
 });

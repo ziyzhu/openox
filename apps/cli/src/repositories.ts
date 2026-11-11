@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { C, fail, terminalText, type CliContext, type SubCommand } from "./lib.ts";
 import { verifyRepository } from "./repository-verify.ts";
-import { inspectInstaller } from "@openox/protocol/installer";
 import { validateServiceManifest } from "@openox/protocol/manifest";
 
 import { validateRepositoryPackage, type RepositoryPackage } from "@openox/protocol/repository";
@@ -156,13 +155,13 @@ export async function readRepository(root: string): Promise<RepositoryPackage> {
     if (!service.startsWith("web:") && !service.startsWith("api:")) continue;
     const actionsPath = join(path, "actions.js");
     await regularFile(actionsPath, 1_000_000);
-    problems.push(...(await serviceProblems(service, manifestPath, actionsPath)).map(problem => `${service}: ${problem}`));
+    problems.push(...(await serviceProblems(service, manifestPath)).map(problem => `${service}: ${problem}`));
   }
   if (problems.length) throw new Error(`repository has ${problems.length} invalid service ${problems.length === 1 ? "entry" : "entries"}:\n  ${problems.join("\n  ")}`);
   return repository;
 }
 
-async function serviceProblems(service: string, manifestPath: string, actionsPath: string): Promise<string[]> {
+async function serviceProblems(service: string, manifestPath: string): Promise<string[]> {
   let raw: unknown;
   try { raw = JSON.parse(await readFile(manifestPath, "utf8")); }
   catch (error) { return [`service.json is not valid JSON: ${(error as Error).message}`]; }
@@ -171,7 +170,7 @@ async function serviceProblems(service: string, manifestPath: string, actionsPat
   const identity = service.slice(service.indexOf(":") + 1);
   if (result.manifest.domain !== identity) return [`service.json domain "${result.manifest.domain}" does not match ${identity}`];
   if ((result.manifest.kind === "api") !== service.startsWith("api:")) return ["service.json kind does not match its directory"];
-  return inspectInstaller(await readFile(actionsPath, "utf8"), result.manifest);
+  return [];
 }
 
 export async function createSnapshot(sourceRoot: string): Promise<Snapshot> {
