@@ -213,12 +213,18 @@ final class NativeServiceOperations {
             let marked = serviceManager.browserActionSessions.session(for: browser, ownerID: id).markCapture(label)
             return .object(["marked": .bool(marked)])
         case ("ios:browser", "listCapturedEvents"):
-            return serviceManager.browserActionSessions.session(for: browser, ownerID: id).listCapturedEvents()
+            return try serviceManager.browserActionSessions.session(for: browser, ownerID: id).listCapturedEvents(
+                after: fields["after"]?.stringValue,
+                limit: fields["limit"]?.intValue ?? 500,
+                origin: fields["origin"]?.stringValue,
+                pathPrefix: fields["pathPrefix"]?.stringValue,
+                kinds: fields["kinds"]?.arrayValue?.compactMap(\.stringValue)
+            )
         case ("ios:browser", "readCapturedEvent"):
             guard let eventID = fields["id"]?.stringValue,
                   let event = try await serviceManager.browserActionSessions
                     .session(for: browser, ownerID: id)
-                    .readCapturedEvent(id: eventID, authorizeSite: authorizeSite) else {
+                    .readCapturedEvent(id: eventID, bodyMode: fields["bodyMode"]?.stringValue ?? "raw", authorizeSite: authorizeSite) else {
                 throw RuntimeError.bridge("ox.web.browser.readCapturedEvent requires a valid captured event id.")
             }
             return event

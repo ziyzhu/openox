@@ -73,8 +73,18 @@ nonisolated enum BrowserPageState {
           dialogs: collect('dialog[open],[role="dialog"],[role="alertdialog"]', 5, element => ({label: label(element)})),
           messages: collect('[role="alert"],[role="status"],[aria-live="polite"],[aria-live="assertive"]', 10, element => text(element.textContent)),
           controls,
+          embeddedFrames: collect('iframe', 20, element => {
+            let origin = null;
+            if (!element.hasAttribute('srcdoc') && element.hasAttribute('src')) {
+              try {
+                const url = new URL(element.getAttribute('src'), document.baseURI);
+                if (['http:', 'https:'].includes(url.protocol)) origin = url.origin;
+              } catch {}
+            }
+            return {id: attribute(element, 'id'), name: attribute(element, 'name'), title: text(element.getAttribute('title')), origin};
+          }),
           truncated,
-          coverage: 'Visible light-DOM elements in the selected scope; frames and shadow roots are not inspected. Loading and application readiness are not inferred.',
+          coverage: 'Visible light-DOM elements in the selected scope. Embedded frames describe iframe elements and declared src origins, not their current documents or execution targets. Frame contents and shadow roots are not inspected. Loading and application readiness are not inferred.',
         };
         """
     }

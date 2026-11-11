@@ -15,7 +15,7 @@ Choose the lightest stable top-level `baseUrl` preserving required cookies, stor
 
 ## Observe
 
-Use `ox.web.browser.getPageState` for bounded browser metadata and visible headings, dialogs, messages, and controls; scope large pages with `selector`. Input values are omitted. Missing scopes and truncated observations do not prove absence. Read only narrowly authorized private fields needed for fulfillment, never credentials.
+Use `ox.web.browser.getPageState` for bounded page structure; scope large pages with `selector`. Input values and iframe contents are omitted. `embeddedFrames` describes visible iframe elements and their declared origins, not executable frame targets. Missing scopes and truncated observations do not prove absence. Read only narrowly authorized private fields needed for fulfillment, never credentials.
 
 Compose `executeScript`, condition waits, and `getPageState` in one outer code-mode execution, returning the operation result and relevant resulting state together. `executeScript` returns only its script result. On failure preserve the original error and, while access remains authorized, attempt a read-only observation in that execution. Report observation failure separately; never rerun the operation to obtain state. Stop on cancellation or denied access.
 

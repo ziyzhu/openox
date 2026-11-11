@@ -233,8 +233,14 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "listCapturedEvents",
             label: "List Captured Events",
-            description: "List captured event metadata without request or response bodies.",
-            inputSchema: object(),
+            description: "List captured event metadata without bodies. Filter by origin, path prefix, or kind; use nextCursor as after for incremental reads. Reads do not consume events. Capture is main-document instrumentation, not a complete network trace.",
+            inputSchema: object([
+                "after": string(description: "Opaque nextCursor from an earlier read of this capture. Restarting or discarding capture invalidates it.", minimum: 1, maximum: 100),
+                "limit": .object(["type": .string("integer"), "minimum": .int(1), "maximum": .int(500), "description": .string("Maximum returned events. Defaults to 500.")]),
+                "origin": string(description: "Exact HTTP(S) or WebSocket origin, including a non-default port when present.", minimum: 1, maximum: 2_048),
+                "pathPrefix": string(description: "Prefix matched against the captured URL path.", minimum: 1, maximum: 2_048),
+                "kinds": .object(["type": .string("array"), "items": capturedEventProperties["kind"]!, "minItems": .int(1), "maxItems": .int(6), "uniqueItems": .bool(true)]),
+            ]),
             outputSchema: object([
                 "active": boolean,
                 "dropped": integer(minimum: 0),
@@ -243,19 +249,26 @@ nonisolated enum BrowserFunctionCatalog {
                     "type": .string("array"),
                     "items": object(capturedEventProperties, required: ["id", "kind", "timestamp"]),
                 ]),
-            ], required: ["active", "dropped", "evicted", "events"])
+                "nextCursor": string(description: "Opaque scan position; advances past filtered-out records too."),
+                "hasMore": .object(["type": .string("boolean"), "description": .string("Unscanned records remain in this capture.")]),
+                "gap": .object(["type": .string("boolean"), "description": .string("Unread records before this cursor were evicted. Check dropped separately for rejected records.")]),
+                "coverage": string(),
+            ], required: ["active", "dropped", "evicted", "events", "nextCursor", "hasMore", "gap", "coverage"])
         ),
         Action(
             id: "readCapturedEvent",
             label: "Read Captured Event",
-            description: "Read one captured event, including bounded and redacted bodies available to the page.",
-            inputSchema: object(
-                ["id": string(minimum: 1, maximum: 100)],
-                required: ["id"]
-            ),
+            description: "Read one captured event. bodyMode defaults to raw bounded, redacted bodies; shape returns bounded JSON field/type structure without scalar values. Body completeness is unknown; invalid_json can mean non-JSON or clipped content. Shape field names may still be private.",
+            inputSchema: object([
+                "id": string(minimum: 1, maximum: 100),
+                "bodyMode": .object(["type": .string("string"), "enum": .array([.string("raw"), .string("shape")])]),
+            ], required: ["id"]),
             outputSchema: object(capturedEventProperties.merging([
                 "requestBody": nullableString,
                 "responseBody": nullableString,
+                "requestShape": .object(["type": .array([.string("object"), .string("null")])]),
+                "responseShape": .object(["type": .array([.string("object"), .string("null")])]),
+                "bodyCoverage": object(["request": bodyCoverage, "response": bodyCoverage], required: ["request", "response"]),
             ]) { _, value in value }, required: ["id", "kind", "timestamp"])
         ),
         Action(
@@ -337,10 +350,19 @@ nonisolated enum BrowserFunctionCatalog {
                 "disabled": boolean, "required": boolean, "invalid": boolean,
                 "checked": boolean, "expanded": boolean, "selected": boolean, "hasValue": boolean,
             ], required: ["id", "name", "role", "label", "type", "disabled", "required", "invalid"])]),
+            "embeddedFrames": .object(["type": .string("array"), "items": object([
+                "id": nullableString, "name": nullableString, "title": string(),
+                "origin": .object(["type": .array([.string("string"), .string("null")]), "description": .string("Resolved declared src origin, not the frame's final navigated origin. No path, query, or fragment is returned.")]),
+            ], required: ["id", "name", "title", "origin"])]),
             "truncated": boolean,
             "coverage": string(),
-        ], required: ["scope", "scopeFound", "readyState", "busy", "headings", "dialogs", "messages", "controls", "truncated", "coverage"]),
+        ], required: ["scope", "scopeFound", "readyState", "busy", "headings", "dialogs", "messages", "controls", "embeddedFrames", "truncated", "coverage"]),
     ], required: ["pageID", "navigationGeneration", "url", "title", "estimatedProgress", "isLoading", "hasOnlySecureContent", "isBlockedByScreenTime", "fullscreenState", "document"])
+    private static let bodyCoverage = object([
+        "status": .object(["type": .string("string"), "enum": .array(["unavailable", "invalid_json", "json"].map(JSONValue.string))]),
+        "shapeTruncated": boolean,
+        "bodyCompleteness": .object(["type": .string("string"), "enum": .array([.string("unknown")])]),
+    ], required: ["status", "shapeTruncated", "bodyCompleteness"])
     private static let capturedEventProperties: [String: JSONValue] = [
         "id": string(),
         "kind": .object([

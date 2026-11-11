@@ -43,6 +43,7 @@ final class ServiceBrowserActionSession {
     private(set) var page: Service.ServiceWebPage?
     private var captureSink: CaptureSink?
     private var capturedEvents: [JSONValue] = []
+    private var captureRevision = UUID().uuidString
     private var injectedScripts: [(domains: [String], source: String)] = []
     private var trustedSites: Set<String> = []
     private var captureActive = false
@@ -347,29 +348,130 @@ final class ServiceBrowserActionSession {
         return true
     }
 
-    func listCapturedEvents() -> JSONValue {
-        let events = capturedEvents.map { event in
-            guard var fields = event.objectValue else { return event }
-            fields.removeValue(forKey: "requestBody")
-            fields.removeValue(forKey: "responseBody")
-            return .object(fields)
+    func listCapturedEvents(
+        after: String?,
+        limit: Int,
+        origin: String?,
+        pathPrefix: String?,
+        kinds: [String]?
+    ) throws -> JSONValue {
+        let total = captureEvictedCount + capturedEvents.count
+        var offset = captureEvictedCount
+        if let after {
+            let parts = after.split(separator: ":", omittingEmptySubsequences: false)
+            guard parts.count == 2, parts[0] == captureRevision,
+                  let position = Int(parts[1]), position >= 0, position <= total else {
+                throw OxFunctionError(code: "invalid_cursor", message: "The capture cursor is invalid or belongs to an earlier capture.", recovery: "List events without after to read the current capture.")
+            }
+            offset = position
         }
+        let gap = offset < captureEvictedCount
+        offset = max(offset, captureEvictedCount)
+        if let origin {
+            guard let components = URLComponents(string: origin),
+                  components.user == nil, components.password == nil,
+                  components.path.isEmpty || components.path == "/",
+                  components.query == nil, components.fragment == nil else {
+                throw Service.EvalError.js("Capture origin must not include credentials, a path, query, or fragment")
+            }
+        }
+        let selectedOrigin = try origin.map(Self.captureOrigin)
+        var events: [JSONValue] = []
+        for index in (offset - captureEvictedCount)..<capturedEvents.count {
+            let event = capturedEvents[index]
+            let fields = event.objectValue ?? [:]
+            let url = fields["url"]?.stringValue.flatMap(URL.init(string:))
+            let matches = (kinds.map { $0.contains(fields["kind"]?.stringValue ?? "") } ?? true)
+                && (selectedOrigin == nil || url.flatMap { try? Self.captureOrigin($0.absoluteString) } == selectedOrigin)
+                && (pathPrefix.map { url?.path.hasPrefix($0) == true } ?? true)
+            if matches {
+                if events.count == limit { break }
+                var metadata = fields
+                metadata.removeValue(forKey: "requestBody")
+                metadata.removeValue(forKey: "responseBody")
+                events.append(.object(metadata))
+            }
+            offset = captureEvictedCount + index + 1
+        }
+        Log.webView.info("Browser.captureList owner=\(id) returned=\(events.count) remaining=\(total - offset) gap=\(gap)")
         return .object([
             "active": .bool(captureActive),
             "dropped": .int(captureDroppedCount),
             "evicted": .int(captureEvictedCount),
             "events": .array(events),
+            "nextCursor": .string("\(captureRevision):\(offset)"),
+            "hasMore": .bool(offset < total),
+            "gap": .bool(gap),
+            "coverage": .string("Main-document fetch/XHR hooks, form submissions, resource timing, and WebSocket creation; not a complete network trace. Frame documents, workers, WebSocket messages, and requests bypassing hooks are not inspected. Bodies are bounded and redacted; completeness is unknown."),
         ])
     }
 
-    func readCapturedEvent(id: String, authorizeSite: (String) async throws -> Void) async throws -> JSONValue? {
+    private static func captureOrigin(_ value: String) throws -> String {
+        guard let url = URL(string: value),
+              let scheme = url.scheme?.lowercased(), ["http", "https", "ws", "wss"].contains(scheme),
+              let host = url.host?.lowercased(), !host.isEmpty else {
+            throw Service.EvalError.js("Capture origin must be an absolute HTTP(S) or WebSocket origin")
+        }
+        let defaultPort = ["https", "wss"].contains(scheme) ? 443 : 80
+        let port = url.port.flatMap { $0 == defaultPort ? nil : ":\($0)" } ?? ""
+        return "\(scheme)://\(host)\(port)"
+    }
+
+    func readCapturedEvent(id: String, bodyMode: String, authorizeSite: (String) async throws -> Void) async throws -> JSONValue? {
         guard let event = capturedEvents.first(where: { $0.objectValue?["id"]?.stringValue == id }),
-              let fields = event.objectValue else { return nil }
+              var fields = event.objectValue else { return nil }
         let hasBody = [fields["requestBody"], fields["responseBody"]].contains { $0 != nil && $0 != .null }
         if hasBody, let site = fields["site"]?.stringValue {
             try await trust(site, authorizeSite)
         }
-        return event
+        guard bodyMode == "shape" else { return event }
+        var coverage: [String: JSONValue] = [:]
+        for side in ["request", "response"] {
+            let text = fields.removeValue(forKey: "\(side)Body")?.stringValue
+            var budget = 128
+            var truncated = false
+            let parsed = text.flatMap { try? JSONDecoder().decode(JSONValue.self, from: Data($0.utf8)) }
+            fields["\(side)Shape"] = parsed.map { Self.bodyShape($0, depth: 0, budget: &budget, truncated: &truncated) } ?? .null
+            coverage[side] = .object([
+                "status": .string(text == nil ? "unavailable" : parsed == nil ? "invalid_json" : "json"),
+                "shapeTruncated": .bool(truncated),
+                "bodyCompleteness": .string("unknown"),
+            ])
+        }
+        fields["bodyCoverage"] = .object(coverage)
+        Log.webView.info("Browser.captureShape owner=\(self.id) event=\(id)")
+        return .object(fields)
+    }
+
+    private static func bodyShape(_ value: JSONValue, depth: Int, budget: inout Int, truncated: inout Bool) -> JSONValue {
+        guard budget > 0, depth < 5 else {
+            truncated = true
+            return .object(["type": .string("uninspected")])
+        }
+        budget -= 1
+        switch value {
+        case .object(let fields):
+            var properties: [String: JSONValue] = [:]
+            for key in fields.keys.sorted() {
+                guard budget > 0 else { truncated = true; break }
+                guard key.count <= 256 else { truncated = true; continue }
+                properties[key] = bodyShape(fields[key]!, depth: depth + 1, budget: &budget, truncated: &truncated)
+            }
+            return .object(["type": .string("object"), "properties": .object(properties)])
+        case .array(let values):
+            var items: [JSONValue] = []
+            if values.count > 5 { truncated = true }
+            for value in values.prefix(5) {
+                guard budget > 0 else { truncated = true; break }
+                let shape = bodyShape(value, depth: depth + 1, budget: &budget, truncated: &truncated)
+                if !items.contains(shape) { items.append(shape) }
+            }
+            return .object(["type": .string("array"), "items": .array(items)])
+        case .string: return .object(["type": .string("string")])
+        case .int, .double: return .object(["type": .string("number")])
+        case .bool: return .object(["type": .string("boolean")])
+        case .null: return .object(["type": .string("null")])
+        }
     }
 
     private static func site(of page: Service.ServiceWebPage) -> String? {
@@ -537,6 +639,7 @@ final class ServiceBrowserActionSession {
     }
 
     private func clearCapturedEvents() {
+        captureRevision = UUID().uuidString
         capturedEvents = []
         captureDroppedCount = 0
         captureEvictedCount = 0
