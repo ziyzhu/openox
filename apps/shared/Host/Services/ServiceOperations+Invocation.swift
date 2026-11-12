@@ -73,17 +73,7 @@ extension ServiceOperations {
                 guard violations.isEmpty else { throw Service.InvokeError.invalidOutput(qualifiedName, violations) }
                 return value
             }
-            let isLogin = WebSessionContract.isEnabled(service.definition) && actionID == WebSessionContract.loginAction
-            let chosenKey = isLogin && prepared.keys.isEmpty
-                ? try await self.chooseSavedLogin(service: service, consumer: qualifiedName) : nil
-            let selected = try chosenKey.map { key in
-                try SecretAttempt.prepare(.object((input.objectValue ?? [:]).merging(
-                    ["account": .object([SecretReference.marker: .string(key)])]) { $1 }))
-            }
-            let input = selected?.args ?? input
-            let keys = selected?.keys ?? prepared.keys
-            let secrets = keys.isEmpty ? nil : SecretAttempt(consumer: qualifiedName, keys: keys) { use, label in
-                guard use.key != chosenKey else { return true }
+            let secrets = prepared.keys.isEmpty ? nil : SecretAttempt(consumer: qualifiedName, keys: prepared.keys) { use, label in
                 do {
                     try await self.requireApproval(
                         action: use.action,
@@ -96,7 +86,8 @@ extension ServiceOperations {
                     return false
                 }
             }
-            if let secrets, !isLogin, await !secrets.authorize() {
+            let lazyApproval = WebSessionContract.isEnabled(service.definition) && actionID == WebSessionContract.loginAction
+            if let secrets, !lazyApproval, await !secrets.authorize() {
                 throw OxFunctionError(code: "permission_denied", message: "\(qualifiedName): the user did not allow this action to use the saved secret.", recovery: "Stop. Do not retry with the same secret unless the user asks; offer manual login instead.")
             }
             let approve: @MainActor (String, Any?) async -> Bool = { name, args in
@@ -114,7 +105,7 @@ extension ServiceOperations {
                 return try await self.invokeFrameAction(service: service, actionID: actionID, input: input,
                                                        frameID: frameID, session: session, secrets: secrets, purpose: purpose)
             }
-            if let secrets, isLogin,
+            if let secrets, WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction,
                await self.hasIntendedSession(service: service, secrets: secrets, approve: approve) {
                 Log.service.info("Service.login automatic skipped domain=\(service.domain) reason=signed-in")
                 return .object(["interaction": .string("automatic"), "authentication": .string("verified")])
@@ -141,7 +132,7 @@ extension ServiceOperations {
                     service: service, actionID: actionID, args: dispatched,
                     approve: approve, readFile: { try await self.readMCPFile($0, purpose) }, receiveFiles: receiveFiles
                 )
-            } else if secrets != nil, isLogin {
+            } else if secrets != nil, lazyApproval {
                 result = .success(.null)
             } else {
                 result = await service.invokeAction(
@@ -155,7 +146,8 @@ extension ServiceOperations {
             }
             let raw: JSONValue
             do { raw = try result.get() } catch {
-                if isLogin, secrets == nil, self.redirectProvider(for: service) != nil {
+                if WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction,
+                   secrets == nil, self.redirectProvider(for: service) != nil {
                     return try await self.completeLogin(service: service, secrets: nil, input: input, session: session,
                                                         pageURL: pageURL, approve: approve)
                 }
@@ -163,7 +155,7 @@ extension ServiceOperations {
                 throw error
             }
             let value = secrets?.redact(raw) ?? raw
-            if isLogin {
+            if WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction {
                 return try await self.completeLogin(service: service, secrets: secrets, input: input, session: session,
                                                     pageURL: pageURL, approve: approve)
             }

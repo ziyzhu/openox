@@ -2804,16 +2804,6 @@
         }
       }
     },
-    "Choose a saved login or sign in manually." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择已保存的登录信息，或手动登录。"
-          }
-        }
-      }
-    },
     "Choose default model" : {
       "localizations" : {
         "zh-Hans" : {
@@ -9688,16 +9678,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用你的 %@ 账户登录,直接使用你现有的订阅 — 无需 API 密钥。实验性功能:此方式会占用你套餐的用量额度,且未获得 %@ 官方支持。"
-          }
-        }
-      }
-    },
-    "Sign in manually" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "手动登录"
           }
         }
       }
