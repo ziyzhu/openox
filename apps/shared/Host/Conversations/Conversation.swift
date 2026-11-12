@@ -335,17 +335,23 @@ final class Conversation: Identifiable {
         notice = .error(message)
     }
 
+    private var handoffControl: ServiceControl?
+
     var activity: Activity {
-        if let interaction {
-            switch interaction {
-            case .prompt(let prompt):
-                return .running(.awaiting(prompt.kind == .permission ? .approval : .reply))
-            case .serviceControl(let pending):
-                switch pending.control {
-                case .login: return .running(.awaiting(.login))
-                case .botControl: return .running(.awaiting(.verification))
-                case .payment: return .running(.awaiting(.payment))
-                }
+        let control: ServiceControl?
+        switch interaction {
+        case .prompt(let prompt):
+            return .running(.awaiting(prompt.kind == .permission ? .approval : .reply))
+        case .serviceControl(let pending):
+            control = pending.control
+        case nil:
+            control = handoffControl
+        }
+        if let control {
+            switch control {
+            case .login: return .running(.awaiting(.login))
+            case .botControl: return .running(.awaiting(.verification))
+            case .payment: return .running(.awaiting(.payment))
             }
         }
         switch activeRun {
@@ -451,6 +457,8 @@ final class Conversation: Identifiable {
             native: nativeServiceOperations,
             presentServiceHandoff: { [weak self] service, page, session in
                 guard let self else { return .failed }
+                handoffControl = session.control
+                defer { handoffControl = nil }
                 let started = ContinuousClock.now
                 defer { activeLatency?.recordHandoff(started.duration(to: .now)) }
                 if presentations.browser != nil {

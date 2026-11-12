@@ -302,7 +302,8 @@ extension ServiceOperations {
             service: service,
             servicePage: lease.page,
             title: service.title,
-            navigationTitle: String(localized: "Log in")
+            navigationTitle: String(localized: "Log in"),
+            control: .login(domain: service.domain, serviceName: service.title)
         )
         Log.service.info("Service.login presenting domain=\(service.domain) page=\(lease.page.logLabel)")
         let capture = LoginCapture()

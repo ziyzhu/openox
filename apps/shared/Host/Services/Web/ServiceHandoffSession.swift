@@ -24,6 +24,7 @@ final class ServiceHandoffSession {
     let title: String
     let navigationTitle: String
     let page: WebPage
+    let control: ServiceControl?
     private(set) var phase: Phase = .ready
 
     private weak var service: Service?
@@ -35,13 +36,15 @@ final class ServiceHandoffSession {
         service: Service,
         servicePage: Service.ServiceWebPage,
         title: String,
-        navigationTitle: String
+        navigationTitle: String,
+        control: ServiceControl? = nil
     ) {
         self.service = service
         self.servicePage = servicePage
         serviceDomain = service.domain
         self.title = title
         self.navigationTitle = navigationTitle
+        self.control = control
         page = servicePage.page
     }
 
