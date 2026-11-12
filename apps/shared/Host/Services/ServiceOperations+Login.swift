@@ -294,11 +294,8 @@ extension ServiceOperations {
     }
 
     private func offerToRemember(_ capture: LoginCapture, service: Service, also destination: Service?) async {
-        guard let rememberSecret,
-              case .success(let sessions) = await service.invokeAction(WebSessionContract.listAction, args: .object([:])),
-              let account = sessions.arrayValue?.first?.objectValue else { return }
-        let fallback = account["label"]?.stringValue ?? account["id"]?.stringValue
-        guard let captured = capture.credential(fallbackUsername: fallback) else {
+        guard let rememberSecret else { return }
+        guard let captured = capture.credential() else {
             Log.service.info("Service.login remember skipped domain=\(service.domain) reason=nothing-captured")
             return
         }
@@ -307,12 +304,21 @@ extension ServiceOperations {
             Log.service.info("Service.login remember skipped domain=\(service.domain) reason=never")
             return
         }
+        guard case .success(let sessions) = await service.invokeAction(WebSessionContract.listAction, args: .object([:])) else {
+            Log.service.warning("Service.login remember skipped domain=\(service.domain) reason=session-discovery-failed")
+            return
+        }
+        guard let identity = sessions.arrayValue?.first?.objectValue?["id"]?.stringValue, !identity.isEmpty else {
+            Log.service.info("Service.login remember skipped domain=\(service.domain) reason=no-authenticated-session")
+            return
+        }
         let consumers = [service, destination].compactMap { $0?.definition.qualifiedActionName(WebSessionContract.loginAction) }
         let existing = (try? Secret.entries())?.first {
             $0.type == .account && $0.serviceID == owner && (try? Secret.fields(key: $0.key))?["username"] == captured.values["username"]
         }
         if let existing, (try? Secret.fields(key: existing.key)) == captured.values {
             consumers.forEach { try? Secret.setAccess(key: existing.key, consumer: $0, policy: .allow) }
+            Log.service.info("Service.login remember skipped domain=\(service.domain) reason=unchanged")
             return
         }
         let key = existing?.key ?? "login.\(owner.split(separator: ":").last ?? "site").\(UUID().uuidString.prefix(8).lowercased())"
@@ -323,7 +329,7 @@ extension ServiceOperations {
         }
         do {
             for consumer in consumers { try Secret.setAccess(key: key, consumer: consumer, policy: .allow) }
-            if owner == service.definition.actionNamespace, let identity = account["id"]?.stringValue {
+            if owner == service.definition.actionNamespace {
                 try Secret.recordAccountIdentity(key: key, identity: identity)
             }
             Log.service.info("Service.login remember saved domain=\(service.domain) owner=\(owner) updated=\(existing != nil)")

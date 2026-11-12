@@ -131,11 +131,11 @@ final class LoginCapture: NSObject, WKScriptMessageHandler {
         return .object(result)
     }
 
-    func credential(fallbackUsername: String?) -> (owner: String, values: [String: String])? {
+    func credential() -> (owner: String, values: [String: String])? {
         guard let password else { return nil }
         let owner = password.host
         let named = [username, email].compactMap { $0 }.first { Self.sameSite($0.host, owner) }
-        guard let name = named?.text ?? fallbackUsername, !name.isEmpty else { return nil }
+        guard let name = named?.text, !name.isEmpty else { return nil }
         return (owner, ["username": name, "password": password.text])
     }
 
