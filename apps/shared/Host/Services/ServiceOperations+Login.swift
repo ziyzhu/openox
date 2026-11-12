@@ -25,6 +25,45 @@ extension ServiceOperations {
         }
     }
 
+    func chooseSavedLogin(service: Service, consumer: String) async throws -> String? {
+        try Secret.inferMissingTypes()
+        let saved = try Secret.associatedEntries(namespace: service.definition.actionNamespace)
+            .filter { $0.type == .account && SecretUse(key: $0.key, consumer: consumer).policy() != .block }
+            .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+        guard !saved.isEmpty else { return nil }
+        var keys: [String: String] = [:]
+        var labels: [String] = []
+        for entry in saved {
+            let provider = serviceManager.services.first { $0.definition.actionNamespace == entry.serviceID }?.title
+                ?? entry.serviceID?.split(separator: ":", maxSplits: 1).last.map(String.init) ?? service.title
+            let base = "\(entry.displayName) · \(provider)"
+            var label = base
+            var copy = 2
+            while keys[label] != nil {
+                label = "\(base) (\(copy))"
+                copy += 1
+            }
+            keys[label] = entry.key
+            labels.append(label)
+        }
+        let manual = L10n.string("Sign in manually")
+        let cancel = L10n.string("Cancel")
+        let answer = try await native.choose(NativeServiceOperations.Prompt(
+            body: L10n.string("Sign in to \(service.title)") + "\n" + L10n.string("Choose a saved login or sign in manually."),
+            options: labels + [manual, cancel]
+        ))
+        if let answer, let key = keys[answer] {
+            Log.service.info("Service.login chooser domain=\(service.domain) saved=\(saved.count) choice=saved")
+            return key
+        }
+        guard answer == manual else {
+            Log.service.info("Service.login chooser domain=\(service.domain) saved=\(saved.count) choice=cancelled")
+            throw OxFunctionError(code: "cancelled", message: "\(service.title) login: the user cancelled choosing how to sign in.", recovery: "Stop. Do not reopen login automatically; ask whether they want to try again.")
+        }
+        Log.service.info("Service.login chooser domain=\(service.domain) saved=\(saved.count) choice=manual")
+        return nil
+    }
+
     func redirectProvider(for service: Service) -> Service? {
         for page in service.servicePages {
             guard let host = page.page.url?.host, !service.isServiceHost(host) else { continue }
