@@ -53,21 +53,6 @@ struct SecretEntryRequestCard: View {
                 .disabled(!request.spec.type.isComplete(values) || request.state != .editing)
                 .accessibilityIdentifier("secret-entry-save")
             }
-            if !request.spec.prefill.isEmpty, let serviceID = request.spec.serviceID {
-                Button {
-                    try? Secret.neverRemember(serviceID)
-                    request.cancel()
-                    values.removeAll()
-                    onCancel()
-                } label: {
-                    Text("Never for This Site")
-                        .font(Theme.Fonts.bodySm)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("secret-entry-never")
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Theme.Spacing.lg)
