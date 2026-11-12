@@ -1,6 +1,11 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Choose which saved login to use before automatic website sign-in, or sign in manually." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动登录网站前，由你选择使用哪个已保存的账号，也可以手动登录。" } } } },
+    "Ox offers to save or update a website login only after verifying a signed-in session." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Ox 确认网站已成功登录后，才会询问是否保存或更新登录凭据。" } } } },
+    "Edit saved logins, API keys, and tokens directly on their detail page." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "直接在详情页编辑已保存的登录凭据、API 密钥和令牌。" } } } },
+    "Website handoffs no longer keep the reply running while they wait for you, with clearer Done, Cancel, and sign-in status." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "网页交由你操作时，回复不再一直处于运行中；完成、取消和等待登录的状态也更清晰。" } } } },
+    "Restore the message composer when switching from a webpage field to native text input." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "从网页输入框切换到应用内文本输入时，消息输入框会恢复显示。" } } } },
     "More reliable website actions while pages load, with clearer connection errors." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "网页加载期间的网站操作更可靠，连接错误提示也更清晰。" } } } },
     "Keep your draft when entering text in an inline webpage, with floating composer controls visible again." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在内嵌网页中输入文字时保留消息草稿，并恢复显示输入框的悬浮控件。" } } } },
     "Reconnect MCP services when their saved authorization can no longer be refreshed." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "MCP 服务已保存的授权无法刷新时，会提示你重新授权。" } } } },

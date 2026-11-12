@@ -9,6 +9,13 @@ struct WhatsNewRelease: Identifiable {
 
 enum WhatsNew {
     static let releases: [WhatsNewRelease] = [
+        WhatsNewRelease(version: "1.0.28", items: [
+            "Choose which saved login to use before automatic website sign-in, or sign in manually.",
+            "Ox offers to save or update a website login only after verifying a signed-in session.",
+            "Edit saved logins, API keys, and tokens directly on their detail page.",
+            "Website handoffs no longer keep the reply running while they wait for you, with clearer Done, Cancel, and sign-in status.",
+            "Restore the message composer when switching from a webpage field to native text input."
+        ]),
         WhatsNewRelease(version: "1.0.27", items: [
             "More reliable website actions while pages load, with clearer connection errors.",
             "Keep your draft when entering text in an inline webpage, with floating composer controls visible again.",
