@@ -63,7 +63,7 @@ extension ServiceOperations {
         case "ox.repository.disconnect":
             return try await disconnectRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.showPage":
-            return try await showServicePage(name: fields["name"]?.stringValue ?? "", args: fields["input"], session: fields["session"], pageURL: fields["pageUrl"]?.stringValue, waitForUserInteraction: fields["waitForUserInteraction"]?.boolValue ?? false, purpose: purpose)
+            return try await showServicePage(name: fields["name"]?.stringValue ?? "", args: fields["input"], session: fields["session"], pageURL: fields["pageUrl"]?.stringValue, purpose: purpose)
         default: throw RuntimeError.bridge("Function unavailable in HTML: \(function)")
         }
     }

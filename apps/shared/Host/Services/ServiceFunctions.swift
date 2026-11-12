@@ -94,7 +94,8 @@ extension Conversation: OxFunctionBridge {
     }
 
     public func invokeAction(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, frameID: String? = nil, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.invokeAction(name: name, args: args ?? .object([:]), session: session, pageURL: pageURL, frameID: frameID, purpose: purpose) ?? .null
+        try requireNoPendingHandoff()
+        return try await serviceOperations.invokeAction(name: name, args: args ?? .object([:]), session: session, pageURL: pageURL, frameID: frameID, purpose: purpose) ?? .null
     }
 }
 
@@ -141,12 +142,14 @@ extension Conversation {
         }
     }
 
-    public func showServicePage(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, waitForUserInteraction: Bool = false, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.showServicePage(name: name, args: args, session: session, pageURL: pageURL, waitForUserInteraction: waitForUserInteraction, purpose: purpose)
+    public func showServicePage(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
+        try requireNoPendingHandoff()
+        return try await serviceOperations.showServicePage(name: name, args: args, session: session, pageURL: pageURL, purpose: purpose)
     }
 
     public func loginService(domain: String, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.loginService(domain: domain, purpose: purpose)
+        try requireNoPendingHandoff()
+        return try await serviceOperations.loginService(domain: domain, purpose: purpose)
     }
 
     public func detachService(domain: String, purpose: String) async throws -> JSONValue? {

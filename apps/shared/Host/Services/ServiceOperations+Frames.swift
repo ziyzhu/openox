@@ -97,7 +97,9 @@ extension ServiceOperations {
         if await settledSession(service: owner, secrets: secrets, page: page, approve: approve) {
             return .object(["interaction": .string("automatic"), "authentication": .string("verified")])
         }
-        return try await handOffLogin(service: owner, secrets: secrets, input: .object([:]), session: nil,
-                                     pageURL: nil, prepare: false, approve: approve)
+        return try await native.handoff(title: String(localized: "Sign in to \(owner.title)")) { [self] in
+            try await handOffLogin(service: owner, secrets: secrets, input: .object([:]), session: nil,
+                                   pageURL: nil, prepare: false, approve: approve)
+        }
     }
 }

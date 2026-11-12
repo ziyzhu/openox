@@ -70,7 +70,7 @@ extension Scenario {
         if let result = ctx.toolResults.last(where: { $0.toolName == "execute" }) {
             guard !result.isError else { return [.stop(.stop)] }
             return [
-                .say("You're in. Top GitHub notification: **ox/services #42 — flaky CI on macOS runners**."),
+                .say("Use the sign-in page, then choose Done or Cancel. I’ll check your session in the next turn."),
                 .stop(.stop),
             ]
         }
@@ -84,7 +84,7 @@ extension Scenario {
     static let botControl = Scenario(name: "bot-control") { ctx in
         if let result = ctx.toolResults.last(where: { $0.toolName == "execute" }) {
             guard !result.isError else { return [.stop(.stop)] }
-            return [.say("The live verification page is above. Tell me when you have completed verification so I can check the resulting capture."), .stop(.stop)]
+            return [.say("The live verification page is above. Choose Done or Cancel to continue in the next turn."), .stop(.stop)]
         }
         let domain = "archive.ph"
         return [
@@ -96,7 +96,7 @@ extension Scenario {
     static let payment = Scenario(name: "payment") { ctx in
         if let result = ctx.toolResults.last(where: { $0.toolName == "execute" }) {
             guard !result.isError else { return [.stop(.stop)] }
-            return [.say("The live checkout page is above. Tell me when you have completed payment so I can check the order."), .stop(.stop)]
+            return [.say("The live checkout page is above. Choose Done or Cancel; I’ll check the order in the next turn."), .stop(.stop)]
         }
         let domain = "www.doordash.com"
         return [

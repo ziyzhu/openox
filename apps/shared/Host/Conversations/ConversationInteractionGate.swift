@@ -2,6 +2,7 @@ import Foundation
 import Observation
 
 @MainActor
+@Observable
 final class ConversationInteractionGate {
     typealias PendingPrompt = Conversation.PendingPrompt
     typealias PendingServiceControl = Conversation.PendingServiceControl
@@ -91,6 +92,11 @@ final class ConversationInteractionGate {
     }
 
     private var serviceManager: ServiceManager { conversation.serviceManager }
+
+    var interaction: Conversation.Interaction? {
+        guard case .presenting(let waiter, _) = state else { return nil }
+        return waiter.interaction
+    }
 
     private var activeID: UUID? {
         guard case .presenting(let waiter, _) = state else { return nil }
@@ -266,7 +272,7 @@ final class ConversationInteractionGate {
 
     private func waitForPrompt(_ prompt: PendingPrompt) async -> PromptResult {
         await withCheckedContinuation { continuation in
-            if !conversation.isBusy {
+            if !conversation.isBusy && conversation.pendingHandoffs.isEmpty {
                 Log.session.error("Conversation prompt outside run id=\(conversation.id) block=\(prompt.id)")
                 continuation.resume(returning: .cancelled)
             } else {

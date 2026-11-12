@@ -15,12 +15,14 @@ extension ServiceOperations {
                 throw OxFunctionError(code: "permission_denied", message: "\(service.title) login: the user did not allow this action to use the saved login.", recovery: "Stop. Do not retry with the same login unless the user asks; offer manual login instead.")
             }
         }
-        if let provider = loginProvider(for: service, secrets: secrets) {
-            return try await completeProviderChain(service: service, provider: provider, secrets: secrets, input: input,
-                                                   session: session, pageURL: pageURL, approve: approve)
+        return try await native.handoff(title: String(localized: "Sign in to \(service.title)")) { [self] in
+            if let provider = loginProvider(for: service, secrets: secrets) {
+                return try await completeProviderChain(service: service, provider: provider, secrets: secrets, input: input,
+                                                       session: session, pageURL: pageURL, approve: approve)
+            }
+            return try await handOffLogin(service: service, secrets: secrets, input: input, session: session, pageURL: pageURL,
+                                          prepare: secrets != nil, approve: approve)
         }
-        return try await handOffLogin(service: service, secrets: secrets, input: input, session: session, pageURL: pageURL,
-                                      prepare: secrets != nil, approve: approve)
     }
 
     func redirectProvider(for service: Service) -> Service? {
@@ -156,7 +158,7 @@ extension ServiceOperations {
                                                prepare: true, rememberFor: service, approve: approve)
             providerTrace = result.objectValue?["loginTrace"]
             guard await settledSession(service: provider, secrets: secrets, approve: approve) else {
-                throw OxFunctionError(code: "handoff_incomplete", message: "Sign-in to \(provider.title) did not complete, so \(service.title) is still not signed in.", recovery: "Tell the user sign-in was not completed. Do not reopen it automatically; ask whether they want to try again.")
+                return Self.loginResult(interaction: "completed", verified: false, trace: providerTrace)
             }
         }
         if await returnToDestination(service: service, secrets: secrets, input: input, pageURL: pageURL, approve: approve) {

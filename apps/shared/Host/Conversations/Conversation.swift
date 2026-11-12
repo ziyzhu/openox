@@ -208,11 +208,7 @@ final class Conversation: Identifiable {
         answered: { [unowned self] in markActivity() }
     )
 
-    var interaction: Interaction? {
-        guard let run = activeRun,
-              case .awaiting(let interaction) = run.phase else { return nil }
-        return interaction
-    }
+    var interaction: Interaction? { interactions.interaction }
 
     var pendingServiceControl: PendingServiceControl? {
         guard case .serviceControl(let control) = interaction else { return nil }
@@ -285,6 +281,9 @@ final class Conversation: Identifiable {
         modelPreparationTask?.cancel()
         modelPreparationTask = nil
         deselect()
+        let handoffs = pendingHandoffs.values
+        pendingHandoffs.removeAll()
+        for task in handoffs { task.cancel() }
         serviceManager.browserActionSessions.closeSession(for: id)
         if cancelling { durablePreparation?.cancel(); cancelAll() }
         if isTemporary { Task { await OxHostProtocol.releaseDurableTemporaryConversation(self) } }
@@ -332,28 +331,33 @@ final class Conversation: Identifiable {
 
     private(set) var notice = Notice.none
 
+    func reportHandoffFailure(_ message: String) {
+        notice = .error(message)
+    }
+
     var activity: Activity {
+        if let interaction {
+            switch interaction {
+            case .prompt(let prompt):
+                return .running(.awaiting(prompt.kind == .permission ? .approval : .reply))
+            case .serviceControl(let pending):
+                switch pending.control {
+                case .login: return .running(.awaiting(.login))
+                case .botControl: return .running(.awaiting(.verification))
+                case .payment: return .running(.awaiting(.payment))
+                }
+            }
+        }
         switch activeRun {
         case nil:
             if turnEnding == .stopped { return .idle(.stopped) }
             return .idle(hasUnreadResponse ? .unread : .read)
         case .some(let run):
             switch run.phase {
-            case .preparing, .thinking:
+            case .preparing, .thinking, .awaiting:
                 return .running(.thinking)
             case .streaming, .finishing:
                 return .running(.streaming)
-            case .awaiting(let interaction):
-                switch interaction {
-                case .prompt(let prompt):
-                    return .running(.awaiting(prompt.kind == .permission ? .approval : .reply))
-                case .serviceControl(let pending):
-                    switch pending.control {
-                    case .login: return .running(.awaiting(.login))
-                    case .botControl: return .running(.awaiting(.verification))
-                    case .payment: return .running(.awaiting(.payment))
-                    }
-                }
             }
         }
     }
@@ -378,6 +382,7 @@ final class Conversation: Identifiable {
     }
 
     @ObservationIgnored private var standaloneServiceInvocations: Set<UUID> = []
+    var pendingHandoffs: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored var importedMCPFileDigests: Set<String> = []
 
     var serviceOperations: ServiceOperations {
@@ -444,7 +449,8 @@ final class Conversation: Identifiable {
                 }
             },
             native: nativeServiceOperations,
-            presentServiceHandoff: { [unowned self] service, page, session in
+            presentServiceHandoff: { [weak self] service, page, session in
+                guard let self else { return .failed }
                 let started = ContinuousClock.now
                 defer { activeLatency?.recordHandoff(started.duration(to: .now)) }
                 if presentations.browser != nil {
@@ -522,6 +528,10 @@ final class Conversation: Identifiable {
             },
             authorizeBrowserSite: { [unowned self] site, purpose in
                 try await requireApproval(action: Actions.browserSite(site), defaultPolicy: .ask, purpose: purpose)
+            },
+            scheduleHandoff: { [weak self] title, operation in
+                guard let self else { return .null }
+                return scheduleHandoff(title: title, operation: operation)
             }
         )
     }
@@ -709,7 +719,7 @@ final class Conversation: Identifiable {
         case .running, .completed: nil
         }
     }
-    var hasPendingInteraction: Bool { interaction != nil }
+    var hasPendingInteraction: Bool { interaction != nil || !pendingHandoffs.isEmpty }
     @ObservationIgnored private var finishingStartedAt: Date?
     @ObservationIgnored private var finishingWatchdog: Task<Void, Never>?
     @ObservationIgnored private var activeLatency: TurnLatencyTrace?

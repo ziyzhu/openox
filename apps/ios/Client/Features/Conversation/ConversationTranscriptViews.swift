@@ -609,6 +609,26 @@ private struct ScheduleBubble: View {
     }
 }
 
+private struct InteractionResponseBubble: View {
+    let response: UserInteractionResponse
+
+    private var outcomeLabel: String {
+        response.completed ? String(localized: "Done") : String(localized: "Cancelled")
+    }
+
+    var body: some View {
+        Label(response.title, systemImage: response.completed ? "checkmark.circle" : "xmark.circle")
+            .font(Theme.Fonts.bodyMd)
+            .foregroundStyle(Theme.Colors.onSurface)
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.vertical, Theme.Spacing.md)
+            .conversationCardOutline(cornerRadius: Theme.Radius.xl)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(response.title), \(outcomeLabel)")
+            .accessibilityIdentifier("conversation.message.interaction")
+    }
+}
+
 struct QueuedBubble: View {
     let message: Conversation.QueuedMessage
     let onOpenAttachment: (FileItem, String) -> Void
@@ -619,7 +639,10 @@ struct QueuedBubble: View {
         VStack(alignment: .trailing, spacing: 4) {
             HStack {
                 Spacer(minLength: 40)
-                if let scheduleName = message.scheduleName {
+                if let response = UserInteractionResponse.parse(message.text) {
+                    InteractionResponseBubble(response: response)
+                        .opacity(0.55)
+                } else if let scheduleName = message.scheduleName {
                     ScheduleBubble(name: scheduleName)
                         .opacity(0.55)
                 } else if let invocation = message.skillInvocation {
@@ -690,6 +713,7 @@ struct BlockView: View, Equatable {
 
     private var editMenuCanMutate: Bool? {
         if block.scheduleName != nil { nil }
+        else if case .userText(let text, _) = block.kind, UserInteractionResponse.parse(text) != nil { nil }
         else if case .userText = block.kind { controls.canMutate } else { nil }
     }
 
@@ -697,7 +721,12 @@ struct BlockView: View, Equatable {
     var body: some View {
         switch block.kind {
         case .userText(let s, let atts):
-            if let name = block.scheduleName {
+            if let response = UserInteractionResponse.parse(s) {
+                HStack {
+                    Spacer(minLength: 40)
+                    InteractionResponseBubble(response: response)
+                }
+            } else if let name = block.scheduleName {
                 userScheduleBubble(name, createdAt: block.createdAt)
             } else {
                 userTextBubble(s, attachments: atts, createdAt: block.createdAt)

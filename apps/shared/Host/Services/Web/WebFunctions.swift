@@ -63,6 +63,7 @@ extension Conversation {
     }
 
     public func browserOperation(action: String, arguments: JSONValue, purpose: String) async throws -> JSONValue? {
+        try requireNoPendingHandoff()
         guard let catalogAction = BrowserFunctionCatalog.action(id: action) else {
             throw RuntimeError.bridge("ox.web.browser: unknown action '\(action)'")
         }

@@ -123,20 +123,17 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "showPage",
             label: "Show Page",
-            description: "Present Browser's live page using the Host's supported presentation. iOS adds a conversation row; macOS opens a Host window. With waitForUserInteraction, first clear capture and injected scripts, then wait until the user taps Done or Cancel.",
+            description: "Present Browser's live page with Done/Cancel after clearing capture and injected scripts. Return immediately so the agent can finish its turn. Done/Cancel submits the next user prompt.",
             inputSchema: object([
-                "waitForUserInteraction": .object([
-                    "type": .string("boolean"),
-                    "description": .string("Show Done/Cancel and wait for the user. Requires instructions. Defaults to false."),
-                ]),
                 "instructions": string(description: "What the user must do on the page before tapping Done.", minimum: 1, maximum: 1_000),
             ]),
             outputSchema: object([
                 "shown": boolean,
+                "status": .object(["type": .string("string"), "const": .string("awaiting_user")]),
                 "completion": .object([
                     "type": .string("string"),
                     "enum": .array([.string("completed"), .string("cancelled")]),
-                    "description": .string("Present only when waiting: completed means the user tapped Done; cancelled means the user tapped Cancel or closed the page."),
+                    "description": .string("Only returned outside a conversation: completed means Done; cancelled means Cancel."),
                 ]),
             ], required: ["shown"]),
             hasModelGuidance: true

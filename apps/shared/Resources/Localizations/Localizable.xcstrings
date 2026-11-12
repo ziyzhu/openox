@@ -9677,6 +9677,16 @@
         }
       }
     },
+    "Sign in to %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录 %@"
+          }
+        }
+      }
+    },
     "Sign out of %@?" : {
       "comment" : "Title of the confirmation alert shown when signing out of a subscription provider.",
       "extractionState" : "manual",

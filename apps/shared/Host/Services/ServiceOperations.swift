@@ -521,14 +521,14 @@ final class ServiceOperations {
         return try Self.encodeToJSON(results)
     }
 
-    func showServicePage(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, waitForUserInteraction: Bool = false, purpose: String) async throws -> JSONValue? {
+    func showServicePage(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
         let (service, actionID) = try await resolveAction(name)
         let input = args ?? .object([:])
         guard service.isWebService,
               await service.resolvedAction(actionID, args: input, session: session, pageURL: pageURL) != nil else {
             throw RuntimeError.bridge("ox.service.showPage: requires a web service action")
         }
-        return try await tracked(Actions.serviceShowPage, .object(["name": .string(name), "input": input, "session": session ?? .null, "pageUrl": pageURL.map(JSONValue.string) ?? .null, "waitForUserInteraction": .bool(waitForUserInteraction)]), purpose: purpose) {
+        return try await tracked(Actions.serviceShowPage, .object(["name": .string(name), "input": input, "session": session ?? .null, "pageUrl": pageURL.map(JSONValue.string) ?? .null]), purpose: purpose) {
             let page = service.servicePages.filter { page in
                 guard let prepared = page.lastInvocation else { return false }
                 return prepared.actionID == actionID && prepared.args == input
@@ -539,15 +539,21 @@ final class ServiceOperations {
                   let lease = try await serviceManager.actionScheduler.reserveForPresentation(action, allowUnready: true) else {
                 throw OxFunctionError(code: "page_unavailable", message: "ox.service.showPage: this action has no idle live page.", recovery: "Wait for active actions to finish. Use the name and input of the action whose page you want to show. This function never opens a replacement page or reruns the action.")
             }
-            defer { lease.release() }
             guard lease.page === page, page.lastInvocation?.id == prepared.id else {
+                lease.release()
                 throw OxFunctionError(code: "page_unavailable", message: "The prepared page changed before presentation.", recovery: "Inspect the current page state. Do not rediscover a different account or repeat a mutation to replace the page.")
             }
-            try await self.requirePresentablePage(service: service, page: lease.page)
-            guard lease.isActive, page.lastInvocation?.id == prepared.id else {
-                throw Service.EvalError.contextInvalidated
+            do {
+                try await self.requirePresentablePage(service: service, page: lease.page)
+                guard lease.isActive, page.lastInvocation?.id == prepared.id else {
+                    throw Service.EvalError.contextInvalidated
+                }
+            } catch {
+                lease.release()
+                throw error
             }
-            if waitForUserInteraction {
+            return try await native.handoff(title: purpose) { [self] in
+                defer { lease.release() }
                 let handoff = ServiceHandoffSession(
                     service: service,
                     servicePage: lease.page,
@@ -567,9 +573,6 @@ final class ServiceOperations {
                 Log.service.info("Service.showPage interaction domain=\(service.domain) action=\(actionID) session=\(lease.page.logLabel) outcome=\(outcome.rawValue)")
                 return .object(["shown": .bool(true), "completion": .string(outcome.rawValue)])
             }
-            try native.presentServicePage(service, page: lease.page)
-            Log.service.info("Service.showPage shown domain=\(service.domain) action=\(actionID) session=\(lease.page.logLabel)")
-            return .object(["shown": .bool(true)])
         }
     }
 
