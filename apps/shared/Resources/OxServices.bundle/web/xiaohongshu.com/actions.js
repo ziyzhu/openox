@@ -1,6 +1,19 @@
 const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
 
 window.ox.install(({ action }) => {
+    action('listInbox', {async invoke(args){
+        const end=Date.now()+15000;let list=null,rows=[];
+        while(Date.now()<end){
+            list=document.querySelector('.xhs-im-conv-list__scroll');
+            rows=[...document.querySelectorAll('.xhs-im-conv-item[data-conv-id]')];
+            if(list&&rows.length)break;
+            if(/安全验证|Security Verification/.test(document.body?.innerText||''))throw Error('XHS security verification required');
+            await new Promise(r=>setTimeout(r,200));
+        }
+        if(!list||!rows.length)throw Error('XHS conversation list did not become ready; an empty inbox cannot be inferred');
+        return {items:rows.slice(0,Math.min(30,Math.max(1,Number(args.limit)||20))).map(e=>({id:e.getAttribute('data-conv-id')||'',kind:e.getAttribute('data-conv-kind')||'',name:cleanText(e.querySelector('.xhs-im-conv-item__name')?.textContent),preview:cleanText(e.querySelector('.xhs-im-conv-item__summary-text')?.textContent),timeLabel:cleanText(e.querySelector('.xhs-im-conv-item__time')?.textContent)})),nextCursor:null,coverage:'loaded_private_conversation_previews_only; threads not opened; sender direction, unread state, older unloaded conversations, and requests not established'};
+    }});
+
     const ORIGIN = "https://www.xiaohongshu.com";
     const numText = (v) => {
         const s = String(v ?? "").trim();

@@ -18,6 +18,33 @@ window.ox.install(({action}) => {
   }
   return null;
  }
+ action('getBalanceSummary',{async invoke(){
+  const deadline=Date.now()+15000;
+  while(Date.now()<deadline){
+   if(!store())throw Error('Apple Card account is not authenticated');
+   const lines=document.body.innerText.split('\n').map(clean).filter(Boolean);
+   const balances=[];
+   for(let i=0;i<lines.length;i++){
+    if(!/^(?:card balance|total balance|current balance|available credit|remaining balance|statement balance|minimum payment(?: due)?|[A-Za-z]+ balance)(?:\s*[:$]|$)/i.test(lines[i]))continue;
+    const label=lines[i].replace(/\s*-?\$[0-9,.]+.*$/,'').replace(/:$/,'').trim();
+    const same=lines[i].match(/-?\$[0-9,]+\.[0-9]{2}/);
+    const next=lines[i+1]?.match(/^-?\$[0-9,]+\.[0-9]{2}$/);
+    const raw=same?.[0]||next?.[0];
+    if(raw)balances.push({label,displayAmount:raw,currency:'USD'});
+   }
+   if(balances.length)return {balances,checkedAt:new Date().toISOString()};
+   await new Promise(r=>setTimeout(r,200));
+  }
+  throw Error('Authenticated Apple Card page has no verified labeled balance amounts');
+ }});
+ action('getExpenseExportOptions',{async invoke(){
+ if(!store())throw Error('Apple Card account is not authenticated on this page');
+ const controls=()=>[...document.querySelectorAll('a,button,ui-button,[role="button"]')];
+ const statements=controls().find(e=>clean(e.textContent)==='Statements');
+ if(statements)statements.click();
+ const end=Date.now()+8000;while(Date.now()<end&&!/Statements|Export Transactions/i.test(document.body.innerText))await new Promise(r=>setTimeout(r,150));
+ return {statementsAvailable:!!statements,exportAvailable:controls().some(e=>/export transactions/i.test(e.textContent)),controls:controls().filter(e=>/statement|export|download|activity|transaction/i.test(e.textContent)).map(e=>({tag:e.tagName,label:clean(e.textContent).slice(0,150),id:e.id||''})).slice(0,30),notices:[...document.querySelectorAll('h1,h2,h3,[role="alert"]')].map(e=>clean(e.textContent)).filter(Boolean).slice(0,20)};
+ }});
  const signIn=()=>Array.from(document.querySelectorAll('ui-button,button,[role=button]')).find(e=>clean(e.textContent)==='Sign In' && getComputedStyle(e).display!=='none');
  action('listSessions',{async invoke(){
   const deadline=Date.now()+18000;

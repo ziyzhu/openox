@@ -222,7 +222,14 @@ window.ox.install(({ action }) => {
                 return null;
             return candidate;
         }, `${context}: content`);
-        await sleep(300);
+        await waitFor(() => {
+            const main = [...doc.querySelectorAll('[role="main"]')].find(e => e.getClientRects().length > 0);
+            if (!main) return null;
+            const hasRows = threadRows(doc).length > 0;
+            const empty = /No conversations found|No results found|No messages matched your search|Your .* is empty/i.test(main.innerText || "");
+            return hasRows || empty;
+        }, `${context}: loaded results`, 25000);
+        await sleep(600);
         return doc;
     };
     const contactText = (element) => {
@@ -361,8 +368,8 @@ window.ox.install(({ action }) => {
         const messages = [];
         for (const root of messageRoots) {
             const printable = root.matches("table.message");
-            const body = root.querySelector(".a3s, [dir=\"ltr\"], [dir=\"auto\"]")
-                || (printable ? root.querySelector(":scope > tbody > tr:nth-child(3) > td") : null);
+            const body = (printable ? root.querySelector(":scope > tbody > tr:nth-child(3) > td") : null)
+                || root.querySelector(".a3s, [dir=\"ltr\"], [dir=\"auto\"]");
             if (!body)
                 continue;
             const id = root.getAttribute("data-message-id")

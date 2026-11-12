@@ -310,6 +310,24 @@ action('listSessions', { async invoke() {
     action("listTransactions", {
         async invoke({ accountToken, limit = 50 } = {}) {
             const token = requireToken(accountToken);
+            const selected=(await fetchAccounts()).find(a=>a.accountToken===token);
+            if(!selected)throw Error('Account token not found; refresh account list');
+            if(/rewards|credit|visa|mastercard/i.test(selected.name||'')){
+                const res=await fetch(ORIGIN+'/myaccounts/details/card/account-details.go?adx='+encodeURIComponent(token),{credentials:'include',cache:'no-store'});
+                if(!res.ok)throw Error('Credit-card activity HTTP '+res.status);
+                const doc=new DOMParser().parseFromString(await res.text(),'text/html');
+                if(!doc.querySelector('#transactions')||!doc.body.textContent.includes(selected.mask))throw Error('Credit-card transaction table or account identity unavailable');
+                const rows=[...doc.querySelectorAll('#transactions tr')].filter(row=>row.querySelector('.trans-date-cell'));
+                if(!rows.length)throw Error('Credit-card table has no verified transaction rows');
+                const items=rows.slice(0,Math.max(1,Math.min(limit,100))).map(row=>{
+                    const date=row.querySelector('.trans-date-cell').textContent.trim();
+                    const desc=row.querySelector('.trans-desc-cell').cloneNode(true);desc.querySelectorAll('.ada-hidden').forEach(e=>e.remove());
+                    const raw=row.querySelector('.trans-amount-cell')?.textContent.trim();const amount=Number(raw?.replace(/[$,\s]/g,''));
+                    if(!(/^\d{2}\/\d{2}\/\d{4}$/.test(date)||date==='Pending')||!raw||!Number.isFinite(amount))throw Error('Credit transaction row could not be parsed');
+                    return {date,description:desc.textContent.trim(),amount,displayAmount:raw,type:row.querySelector('.icon-type-image')?.getAttribute('title')||null,status:date==='Pending'?'Pending':'Posted',runningBalance:null,transactionToken:null};
+                });
+                return {items,nextCursor:null};
+            }
             const count = Math.max(1, Math.min(Number(limit) || 50, 100));
             const data = await postJson("/ogateway/addapi/v1/activity", {
                 payload: { accountToken: token },

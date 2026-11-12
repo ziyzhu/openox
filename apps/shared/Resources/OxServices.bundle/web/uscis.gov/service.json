@@ -1,0 +1,412 @@
+{
+  "domain": "uscis.gov",
+  "name": "USCIS Account",
+  "description": "Sign in to your USCIS online account securely.",
+  "baseUrl": "https://my.uscis.gov/account/applicant/settings",
+  "faviconUrl": "https://myaccount.uscis.gov/favicon.ico",
+  "actions": [
+    {
+      "id": "login",
+      "label": "Sign in to USCIS",
+      "description": "Use a saved USCIS email and password on the official sign-in form; leave two-factor verification, Login.gov, and unsupported steps to the user.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      },
+      "blocking": true,
+      "baseUrl": "https://myaccount.uscis.gov/sign-in"
+    },
+    {
+      "id": "listSessions",
+      "label": "Check USCIS session",
+      "description": "Detect signed-out state; authenticated identity discovery requires further verification.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      "baseUrl": "https://my.uscis.gov/account/applicant/settings"
+    },
+    {
+      "id": "getCaseStatus",
+      "label": "Check case status",
+      "description": "Read USCIS public status for a receipt number.",
+      "baseUrl": "https://egov.uscis.gov/",
+      "requireAuth": false,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receiptNumber"
+        ],
+        "properties": {
+          "receiptNumber": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}[0-9]{10}$"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receiptNumber",
+          "text",
+          "url"
+        ],
+        "properties": {
+          "receiptNumber": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "getLinkingOptions",
+      "label": "Read case-linking options",
+      "description": "Read paper-case linking instructions and account help without submitting forms.",
+      "baseUrl": "https://my.uscis.gov/account/onboarding/track/new",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pages"
+        ],
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "url",
+                "text"
+              ],
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "submitLinkReceipt",
+      "label": "Enter receipt to link case",
+      "description": "Submit a receipt number once and report the next verification step or result. Does not submit an access code.",
+      "baseUrl": "https://my.uscis.gov/account/onboarding/track/new",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receiptNumber"
+        ],
+        "properties": {
+          "receiptNumber": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}[0-9]{10}$"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "text",
+          "fields"
+        ],
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "askEmma",
+      "label": "Ask Emma",
+      "description": "Send one message to the official Emma chat and read its visible reply.",
+      "baseUrl": "https://www.uscis.gov/tools/meet-emma-our-virtual-assistant",
+      "requireAuth": false,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "connectEmmaAgent",
+      "label": "Connect to Emma live agent",
+      "description": "Select the live-agent option in the current Emma chat and read the response.",
+      "baseUrl": "https://www.uscis.gov/tools/meet-emma-our-virtual-assistant",
+      "requireAuth": false,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "readEmma",
+      "label": "Read Emma chat",
+      "description": "Read chat messages and available choices without sending.",
+      "baseUrl": "https://www.uscis.gov/tools/meet-emma-our-virtual-assistant",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getLinkedCasesSummary",
+      "label": "Read linked case summary",
+      "description": "Verify linked case types, receipt numbers and visible status headings on the signed-in dashboard.",
+      "baseUrl": "https://my.uscis.gov/account/applicant",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": [
+          "headings",
+          "receipts",
+          "url"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "headings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "receipts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "getCaseNotices",
+      "label": "Read case notices and history",
+      "description": "Read linked case notice listings and histories without downloading access-code documents.",
+      "baseUrl": "https://my.uscis.gov/account/applicant",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cases"
+        ],
+        "properties": {
+          "cases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "receipt",
+                "notices",
+                "history"
+              ],
+              "properties": {
+                "receipt": {
+                  "type": "string"
+                },
+                "notices": {
+                  "type": "string"
+                },
+                "history": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "downloadCaseNotices",
+      "label": "Download case notices",
+      "description": "Download listed USCIS notices for a linked case.",
+      "baseUrl": "https://my.uscis.gov/account/applicant",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receiptNumber"
+        ],
+        "properties": {
+          "receiptNumber": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}[0-9]{10}$"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "files"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "base64"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "base64": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

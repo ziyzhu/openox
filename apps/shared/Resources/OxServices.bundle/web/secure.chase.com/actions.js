@@ -84,12 +84,53 @@ window.ox.install(({ action }) => {
         lockStatus: t?.tileDetail?.creditCardLockStatus ?? null,
         closed: t?.tileDetail?.closed ?? null,
     });
-    action('login', { async invoke() {
-            const destination = DASHBOARD_URL;
-            if (location.href !== new URL(destination, location.href).href)
-                location.assign(destination);
-            return null;
-        } });
+    const cleanText=value=>String(value??'').replace(/[\u200B-\u200D\uFEFF]/g,'').replace(/\s+/g,' ').trim();
+    const usable=element=>{
+        if(!element||element.disabled||element.readOnly||element.type==='hidden')return false;
+        if(element.closest('[hidden], [aria-hidden="true"], [inert]'))return false;
+        const style=element.ownerDocument.defaultView.getComputedStyle(element);
+        return style.display!=='none'&&style.visibility!=='hidden';
+    };
+    const waitForStep=async(detectors,timeout=20000)=>{
+        const end=Date.now()+timeout;
+        while(Date.now()<end){
+            for(const [kind,detect] of Object.entries(detectors)){const match=detect();if(match)return {kind,match};}
+            await new Promise(resolve=>setTimeout(resolve,200));
+        }
+        return {kind:'unknown',match:null};
+    };
+    const typeInto=(field,value)=>{
+        const doc=field.ownerDocument,win=doc.defaultView;
+        field.focus();field.select?.();
+        if(!doc.execCommand('insertText',false,value)||field.value!==value){
+            Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype,'value').set.call(field,value);
+            field.dispatchEvent(new win.InputEvent('input',{bubbles:true,inputType:'insertText',data:value}));
+        }
+        field.dispatchEvent(new win.Event('change',{bubbles:true}));
+    };
+    const pageError=root=>[...root.querySelectorAll('[role="alert"], [aria-live="assertive"], [aria-live="polite"]')].filter(usable).map(e=>cleanText(e.innerText)).filter(Boolean).join(' | ').slice(0,200);
+    const chaseDoc=()=>{try{return document.getElementById('logonbox')?.contentDocument||document;}catch{return document;}};
+    const chaseLoginStep=()=>waitForStep({
+        challenge:()=>{const d=chaseDoc();return [...d.querySelectorAll('input[autocomplete="one-time-code"],iframe[src*="captcha"]')].find(usable)||(/verify your identity|verification code|security code|verify you are human/i.test(d.body?.innerText||'')?d.body:null);},
+        credentials:()=>{const d=chaseDoc(),username=d.getElementById('userId-input-field-input'),password=d.getElementById('password-input-field-input'),submit=d.getElementById('signin-button'),root=username?.closest('form');return usable(username)&&usable(password)&&usable(submit)&&root?.contains(password)&&root?.contains(submit)?{username,password,submit,root}:null;}
+    });
+    action('login',{async invoke(input,context){
+        const step=await chaseLoginStep();
+        if(step.kind==='unknown'){
+            const data=await fetchBootstrap();
+            if(data?.personId)return null;
+            throw Error('Chase sign-in screen is not ready; no credentials submitted');
+        }
+        if(step.kind!=='credentials')return null;
+        if(!input?.account||input.account.serviceID!=='web:secure.chase.com')return null;
+        if(pageError(step.match.root))throw Error('Chase sign-in form reports an error; stopped without retrying');
+        const account=await context.secret(input.account);
+        typeInto(step.match.username,account.username);
+        typeInto(step.match.password,account.password);
+        if(!usable(step.match.submit))throw Error('Chase sign-in button unavailable');
+        step.match.submit.click();
+        return null;
+    }});
     action('listSessions', { async invoke() {
             let d;
             try {
@@ -258,6 +299,65 @@ window.ox.install(({ action }) => {
             return { items, nextCursor: null };
         },
     });
+    const initializePaymentWidgets=async()=>{
+        const end=Date.now()+20000;
+        while(Date.now()<end){
+            if(customElements.get('mds-button'))return;
+            const registry=window.MDSRegistry;
+            if(document.readyState!=='loading'&&registry?.components?.['mds-button']&&typeof registry.browserIsReady==='function')registry.browserIsReady();
+            if(customElements.get('mds-button'))return;
+            await new Promise(r=>setTimeout(r,150));
+        }
+        throw Error('Chase payment component library did not initialize');
+    };
+    const paymentWait=async(fn,ms=20000)=>{const end=Date.now()+ms;while(Date.now()<end){const value=fn();if(value)return value;await new Promise(r=>setTimeout(r,150));}throw Error('Chase payment view did not become ready');};
+    action('getCardPaymentActivity',{async invoke(args){
+        await initializePaymentWidgets();
+        const route='#/dashboard/payBillsArea/paymentsActivity/selectPayee;payeeId='+encodeURIComponent(String(args.payeeId))+';payeeType=CREDIT_CARD';
+        const before=[...document.querySelectorAll('table')].find(t=>/Payment date/.test(t.textContent)&&/Status/.test(t.textContent));
+        const changed=location.hash!==route;if(changed)location.hash=route;
+        const table=await paymentWait(()=>{if(location.hash!==route)return null;const t=[...document.querySelectorAll('table')].find(t=>/Payment date/.test(t.textContent)&&/Status/.test(t.textContent));return t&&(!changed||!before||!before.isConnected)?t:null;});
+        const rows=[...table.querySelectorAll('tr')].filter(row=>row.querySelectorAll('td').length>=4);
+        return {items:rows.slice(0,args.limit).map(row=>{const c=[...row.querySelectorAll('td')];return {date:c[0].textContent.replace(/\s+/g,' ').trim(),status:c[1].textContent.trim(),amountLabel:c[3].textContent.replace(/\s+/g,' ').trim()};}),nextCursor:null,coverage:'Displayed payment history; pending entries included'};
+    }});
+    action('prepareCardPayment',{async invoke(args){
+        const data=await postForm('/svc/rr/payments/secure/v2/billpay/multi/payment/add/options',{payeeId:String(args.payeeId)});
+        if(data.code&&data.code!=='SUCCESS')throw Error('Chase payment options unavailable');
+        const o=data.creditCardMultiPayBillOptions;
+        const current=o?.fundingOptions?.find(x=>x.optionType==='CURRENT_BALANCE'&&!x.disabled);
+        const funding=o?.fundingAccounts?.find(x=>String(x.accountId)===String(args.fundingAccountId));
+        if(!current||Math.round(current.amount*100)!==Math.round(args.expectedAmount*100))throw Error('Current balance changed; review the new amount before preparing');
+        if(!funding||o.paymentSuppressed)throw Error('Selected funding account or payment is unavailable');
+        if(!o.dateOptions?.includes(args.paymentDate))throw Error('Requested payment date is unavailable');
+        await initializePaymentWidgets();
+        const route='#/dashboard/overview/index;flyout=manageMultipleBillsPayCard,'+encodeURIComponent(String(args.payeeId))+',BAC,microApp';
+        if(location.hash!==route)location.hash=route;
+        const root=await paymentWait(()=>{const e=document.getElementById('paymentDueAmountOption_0_0');const heading=document.getElementById('creditCardPayeeName');return e?.shadowRoot&&heading?.textContent.trim()===o.payeeLabel?e:null;});
+        const radio=root.shadowRoot.querySelector('input[type="radio"][value="'+String(current.optionId)+'"]');
+        if(!radio||radio.disabled)throw Error('Current balance selection is unavailable');
+        radio.click();
+        await paymentWait(()=>radio.checked&&root.getAttribute('selected-radio')===String(current.optionId),5000);
+        const source=document.getElementById('fundingAccount_0');
+        if(source?.getAttribute('value')!==String(args.fundingAccountId)){
+            const button=source?.shadowRoot?.querySelector('button');if(!button)throw Error('Funding account selector unavailable');button.click();
+            const option=source.shadowRoot.querySelector('mds-select-option[value="'+String(args.fundingAccountId)+'"]');
+            const target=option?.shadowRoot?.querySelector('[role="option"]')||option;
+            if(!target)throw Error('Requested funding account option missing');target.click();
+            await paymentWait(()=>source.getAttribute('value')===String(args.fundingAccountId),5000);
+        }
+        const date=document.getElementById('transactionDueDate_0');const expected=args.paymentDate.slice(4,6)+'/'+args.paymentDate.slice(6,8)+'/'+args.paymentDate.slice(0,4);
+        if(date?.getAttribute('selected-date')!==expected)throw Error('Payment date needs manual review; no payment submitted');
+        const button=document.getElementById('verify-bill-payments')?.shadowRoot?.querySelector('button');
+        const b=button?.getBoundingClientRect();const style=button?getComputedStyle(button):null;
+        if(!button||button.disabled||!b||b.width<60||b.height<20||parseFloat(style.fontSize)<12||style.visibility==='hidden'||style.display==='none')throw Error('Final payment controls are not readable and usable; no payment submitted');
+        return {payee:o.payeeLabel,amount:current.amount,funding:String(funding.accountMask),paymentDate:args.paymentDate,submitted:false,readabilityVerified:true};
+    }});
+    action('getPaymentOptions',{async invoke({payeeId}){
+        const data=await postForm('/svc/rr/payments/secure/v2/billpay/multi/payment/add/options',{payeeId:String(payeeId)});
+        if(data.code&&data.code!=='SUCCESS')throw Error('Chase payment options returned '+data.code);
+        const o=data.creditCardMultiPayBillOptions;if(!o||!Array.isArray(o.fundingAccounts)||!Array.isArray(o.fundingOptions)||!Array.isArray(o.dateOptions))throw Error('Payment options incomplete');
+        return {payeeLabel:String(o.payeeLabel||''),paymentSuppressed:!!o.paymentSuppressed,fundingAccounts:o.fundingAccounts.map(a=>({accountId:a.accountId,label:String(a.accountMask||a.nickName||'').replace(/\d(?=\d{4})/g,'*'),external:!!a.external,default:!!a.defaultFlag})),amountOptions:o.fundingOptions.map(x=>({type:String(x.optionType),amount:typeof x.amount==='number'?x.amount:null,disabled:!!x.disabled})),availableDates:o.dateOptions.map(String)};
+    }});
     action("createPayment", {
         async invoke({ payeeId, amount, paymentDate, fundingAccountId, paymentOption } = {}) {
             if (!payeeId)

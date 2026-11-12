@@ -198,6 +198,53 @@ window.ox.install(({ action }) => {
     };
     action('listCardBalances',{async invoke(){return {items:await overviewCards(),nextCursor:null};}});
 
+    action('listRecentTransactions',{async invoke(args){
+        const deadline=Date.now()+20000;
+        while(Date.now()<deadline&&!document.getElementById('myca-feed-search'))await new Promise(r=>setTimeout(r,150));
+        const headings=[...document.querySelectorAll('main h1,main h2')].map(e=>e.textContent).join(' ');
+        if(!headings.includes(args.lastDigits)||!headings.toLowerCase().includes(args.cardName.toLowerCase()))throw Error('Selected card mismatch; select requested card before reading');
+        const range=document.querySelector('[data-testid="date-picker-popover-button"]')?.textContent.trim();
+        if(range!=='Last 30 Days')throw Error('Activity must be on Last 30 Days; current range is '+range);
+        const input=document.getElementById('myca-feed-search');if(!input||input.value)throw Error('Activity search is not ready or has a filter');
+        const rows=[...document.querySelectorAll('[data-testid="activity-feed-transaction-row"]')];
+        const main=document.querySelector('main')?.innerText||'';
+        if(!rows.length)throw Error('Transaction table unavailable or empty; not verified');
+        const items=rows.slice(0,args.limit||100).map(row=>{const cells=[...row.querySelectorAll('td')];const dateLabel=cells[0]?.querySelector('.DataTable_module_cellTextTruncate')?.textContent.trim();const status=cells[1]?.textContent.trim()||'Posted';const description=cells[2]?.textContent.trim();const raw=cells.at(-1)?.querySelector('.DataTable_module_cellTextTruncate')?.textContent.trim();if(!dateLabel||!description||!raw)throw Error('Transaction row incomplete');const amount=Number(raw.replace(/[$,\s]/g,''));if(!Number.isFinite(amount))throw Error('Invalid transaction amount');return {dateLabel,status,description,amount,currency:'USD'};});
+        return {cardName:args.cardName,lastDigits:args.lastDigits,range,items,nextCursor:null,coverage:/reached the end of your transactions/i.test(main)&&rows.length<=args.limit?'complete':'partial'};
+    }});
+
+    const amexPaymentWait=async(fn,ms=20000)=>{const end=Date.now()+ms;while(Date.now()<end){const v=fn();if(v)return v;await new Promise(r=>setTimeout(r,150));}throw Error('Amex payment controls or current card data did not become ready');};
+    const paymentSelected=()=>{const e=document.querySelector('[data-testid="simple_switcher_selected_option_display"]');if(!e)return null;const name=e.querySelector('[data-testid="simple_switcher_display_name"]')?.textContent.trim();const digits=e.querySelector('[data-testid="simple_switcher_display_number_val"]')?.textContent.replace(/[^0-9]/g,'');return name&&digits?{name,digits,label:name+' ••••'+digits}:null;};
+    const selectPaymentCard=async(lastDigits)=>{
+        await amexPaymentWait(()=>paymentSelected());
+        if(paymentSelected().digits===lastDigits)return false;
+        const combo=document.querySelector('[data-testid="simple_switcher_combobox"]');if(!combo)throw Error('Amex card switcher unavailable');
+        if(combo.getAttribute('aria-expanded')!=='true')combo.click();
+        const option=await amexPaymentWait(()=>[...document.querySelectorAll('[role="option"][data-testid^="simple_switcher_product_option_CARD_PRODUCT_"]')].find(e=>e.getAttribute('aria-label')?.endsWith('ending in '+lastDigits+'.')));
+        if(option.getAttribute('aria-disabled')==='true')throw Error('Requested Amex card is unavailable');option.click();
+        await amexPaymentWait(()=>paymentSelected()?.digits===lastDigits);return true;
+    };
+    action('getAmexPaymentActivity',{async invoke(args){
+        const stamp=()=>[...document.querySelectorAll('main table tbody tr')].filter(t=>t.querySelectorAll(':scope > td').length===4).map(t=>t.id+'|'+t.textContent).join(';');
+        const before=stamp();const changed=await selectPaymentCard(args.lastDigits);
+        await amexPaymentWait(()=>{const s=stamp();return document.querySelector('main h1')?.textContent.trim()==='Payment Activity'&&s&&(!changed||s!==before);});
+        const rows=[...document.querySelectorAll('main table tbody tr')].filter(t=>t.querySelectorAll(':scope > td').length===4);
+        return {card:paymentSelected().label,items:rows.slice(0,args.limit).map(row=>{const c=[...row.querySelectorAll(':scope > td')];const next=row.nextElementSibling;const detail=next?.querySelectorAll(':scope > td').length===1?next.textContent.replace(/\s+/g,' ').trim():'';return {date:c[1].textContent.trim(),status:c[2].textContent.trim(),amountLabel:c[3].textContent.trim(),details:detail};}),nextCursor:null,coverage:'Displayed payment activity; additional pages may exist'};
+    }});
+    action('prepareAmexCardPayment',{async invoke(args){
+        const old=document.getElementById('FULL_BALANCE');const changed=await selectPaymentCard(args.lastDigits);
+        const full=await amexPaymentWait(()=>{const e=document.getElementById('FULL_BALANCE');return e&&(!changed||e!==old||!old?.isConnected)?e:null;});
+        const option=JSON.parse(full.value);if(option.name!=='FULL_BALANCE'||Math.round(Number(option.amount)*100)!==Math.round(args.expectedAmount*100))throw Error('Amex total balance changed; review new amount before preparing');
+        const banks=[...document.querySelectorAll('main select')].filter(s=>[...s.options].some(o=>o.textContent.trim().endsWith('-'+args.fundingLastDigits)));
+        if(banks.length!==1)throw Error('A unique linked funding account was not found');const bank=banks[0];const options=[...bank.options].filter(o=>o.textContent.trim().endsWith('-'+args.fundingLastDigits));
+        if(options.length!==1)throw Error('Funding account selection is ambiguous');const funding=options[0];bank.value=funding.value;bank.dispatchEvent(new Event('change',{bubbles:true}));full.click();
+        await amexPaymentWait(()=>bank.value===funding.value&&full.checked);
+        const date=document.getElementById('payment-datepicker')?.value;if(date!==args.paymentDate)throw Error('Amex payment date differs from requested date; no payment submitted');
+        const b=document.getElementById('makePaymentButton');const rect=b?.getBoundingClientRect();const style=b?getComputedStyle(b):null;
+        if(!b||b.textContent.trim()!=='Continue'||b.disabled||!rect||rect.width<50||rect.height<20||parseFloat(style.fontSize)<12||style.display==='none'||style.visibility==='hidden')throw Error('Amex payment review controls are not readable and usable');
+        return {card:paymentSelected().label,amount:Number(option.amount),funding:funding.textContent.trim(),paymentDate:date,submitted:false,readabilityVerified:true};
+    }});
+
     let profileIdCache = null;
     const fetchProfile = async () => {
         const j = await call("/profile_mgmt/profiles/inquiry_results", profileHeaders(), {
@@ -262,6 +309,10 @@ const loginStep = async () => waitForStep({challenge:()=>document.querySelector(
     }});
     action('listSessions', { async invoke() {
             profileIdCache = null;
+            if (location.hostname === 'global.americanexpress.com' && location.pathname.startsWith('/payments/')) {
+                const selected=await amexPaymentWait(()=>{if(document.getElementById('eliloUserID'))throw Error('Amex payment session is signed out');const c=paymentSelected();return c&&document.getElementById('gnav_logout')&&document.querySelector('main h1')?c:null;});
+                return [{id:'card:'+selected.label,label:selected.label,url:'https://global.americanexpress.com/payments/pay'}];
+            }
             if (location.hostname === 'global.americanexpress.com' && location.pathname === '/overview') {
                 const cards=await overviewCards();
                 const identity=cards.map(c=>c.name+':'+c.mask).sort().join('|');

@@ -58,6 +58,114 @@
       "requireAuth": false,
       "requireApproval": false,
       "blocking": true
+    },
+    {
+      "id": "getExpenseExportOptions",
+      "label": "Read expense export options",
+      "description": "Read the Statements section and available transaction export options without changing account data.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "statementsAvailable",
+          "exportAvailable",
+          "controls",
+          "notices"
+        ],
+        "properties": {
+          "statementsAvailable": {
+            "type": "boolean"
+          },
+          "exportAvailable": {
+            "type": "boolean"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "tag",
+                "label",
+                "id"
+              ],
+              "properties": {
+                "tag": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "getBalanceSummary",
+      "label": "Read card balance summary",
+      "description": "Read explicitly labeled balance amounts from the authenticated Apple Card page; never infers missing amounts as zero.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "balances",
+          "checkedAt"
+        ],
+        "properties": {
+          "balances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "label",
+                "displayAmount",
+                "currency"
+              ],
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "displayAmount": {
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "checkedAt": {
+            "type": "string"
+          }
+        }
+      }
     }
   ]
 }

@@ -1,0 +1,231 @@
+{
+  "domain": "order.toasttab.com",
+  "name": "Toast Online Ordering",
+  "description": "Browse restaurant items and prepare pickup carts.",
+  "baseUrl": "https://order.toasttab.com/",
+  "faviconUrl": "https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Ftoasttab.com&sz=128&alt=404",
+  "actions": [
+    {
+      "id": "addItem",
+      "label": "Add restaurant item",
+      "description": "Add one standard item to the current restaurant cart without checkout.",
+      "requireAuth": false,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemName"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "added": {
+            "type": "boolean"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "cartLabel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "added",
+          "itemName",
+          "cartLabel"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "listSessions",
+      "label": "Check signed-in accounts",
+      "description": "Report guest state when the visible sign-in control confirms signed out.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "login",
+      "label": "Sign in to Toast",
+      "description": "Open the restaurant sign-in dialog.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      }
+    },
+    {
+      "id": "inspectCart",
+      "label": "Inspect order state",
+      "description": "Read current cart and item dialog readiness.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cart": {
+            "type": "string"
+          },
+          "dialogs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "ctas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "tag": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "text",
+                "tag",
+                "href"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "cart",
+          "dialogs",
+          "ctas"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "limitItemQuantity",
+      "label": "Correct duplicate cart items",
+      "description": "Reduce matching single-quantity cart rows to requested count, preserving other dishes.",
+      "requireAuth": false,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemName": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "itemName",
+          "quantity"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cartSummary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cartSummary"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "reviewCheckout",
+      "label": "Review checkout",
+      "description": "Read the live checkout form without submitting payment.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

@@ -392,7 +392,8 @@
         "type": "null"
       },
       "requireApproval": false,
-      "requireAuth": false
+      "requireAuth": false,
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard"
     },
     {
       "id": "listSessions",
@@ -855,6 +856,252 @@
           "ok"
         ],
         "additionalProperties": false
+      }
+    },
+    {
+      "id": "getPaymentOptions",
+      "label": "Review card payment options",
+      "description": "Read current payment amounts, linked masked funding accounts, and available dates. Does not validate or submit a payment.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "payeeId"
+        ],
+        "properties": {
+          "payeeId": {
+            "type": [
+              "string",
+              "integer"
+            ]
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "payeeLabel",
+          "paymentSuppressed",
+          "fundingAccounts",
+          "amountOptions",
+          "availableDates"
+        ],
+        "properties": {
+          "payeeLabel": {
+            "type": "string"
+          },
+          "paymentSuppressed": {
+            "type": "boolean"
+          },
+          "fundingAccounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "accountId",
+                "label",
+                "external",
+                "default"
+              ],
+              "properties": {
+                "accountId": {
+                  "type": [
+                    "string",
+                    "integer"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "external": {
+                  "type": "boolean"
+                },
+                "default": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "amountOptions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "amount",
+                "disabled"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "disabled": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "availableDates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "getCardPaymentActivity",
+      "label": "Read card payment activity",
+      "description": "Read displayed pending and past payments for a selected Chase credit card. Never changes scheduled payments.",
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard",
+      "blocking": true,
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "payeeId": {
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "payeeId",
+          "limit"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "amountLabel": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "date",
+                "status",
+                "amountLabel"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "coverage": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "coverage"
+        ]
+      }
+    },
+    {
+      "id": "prepareCardPayment",
+      "label": "Prepare current-balance card payment",
+      "description": "Restore official payment widgets, select the requested current balance and linked funding account, and leave the real Chase form for user review. Does not schedule or submit payment.",
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard",
+      "blocking": true,
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "payeeId": {
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "fundingAccountId": {
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "expectedAmount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "paymentDate": {
+            "type": "string",
+            "pattern": "^[0-9]{8}$"
+          }
+        },
+        "required": [
+          "payeeId",
+          "fundingAccountId",
+          "expectedAmount",
+          "paymentDate"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "payee": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "funding": {
+            "type": "string"
+          },
+          "paymentDate": {
+            "type": "string"
+          },
+          "submitted": {
+            "type": "boolean"
+          },
+          "readabilityVerified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "payee",
+          "amount",
+          "funding",
+          "paymentDate",
+          "submitted",
+          "readabilityVerified"
+        ]
       }
     }
   ],

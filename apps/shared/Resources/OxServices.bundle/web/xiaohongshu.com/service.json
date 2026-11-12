@@ -4,7 +4,70 @@
   "description": "A Chinese lifestyle and shopping community. Search notes by keyword, browse the home feed (personalized to the signed-in user), read a note's body and engagement counts, browse its comment thread, and extract a note's image and video URLs.",
   "baseUrl": "https://www.xiaohongshu.com/explore",
   "$defs": {
-    "standardSearchPage": {"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string","minLength":1},"url":{"type":["string","null"]},"snippet":{"type":["string","null"]},"data":{"$ref":"#/$defs/searchResult"}},"required":["title","url","snippet","data"],"additionalProperties":false}},"nextCursor":{"type":["string","null"]},"scope":{"type":"string","minLength":1},"coverage":{"type":"string","enum":["complete","partial","unknown"]}},"required":["items","nextCursor","scope","coverage"],"additionalProperties":false},
+    "standardSearchPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "snippet": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "data": {
+                "$ref": "#/$defs/searchResult"
+              }
+            },
+            "required": [
+              "title",
+              "url",
+              "snippet",
+              "data"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coverage": {
+          "type": "string",
+          "enum": [
+            "complete",
+            "partial",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor",
+        "scope",
+        "coverage"
+      ],
+      "additionalProperties": false
+    },
     "note": {
       "type": "object",
       "properties": {
@@ -367,8 +430,32 @@
       "id": "search",
       "label": "Search notes",
       "description": "Search Xiaohongshu notes by keyword. Returns a bounded visible result window, not exhaustive coverage. Searches execute sequentially.",
-      "inputSchema": {"type":"object","properties":{"query":{"type":"string","minLength":1},"limit":{"type":"integer","minimum":1,"maximum":50,"default":10},"cursor":{"type":"string","minLength":1}},"required":["query"],"additionalProperties":false},
-      "outputSchema": {"$ref":"#/$defs/standardSearchPage"},
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/standardSearchPage"
+      },
       "defaultArgs": {
         "query": "美食"
       },
@@ -691,6 +778,75 @@
       "requireApproval": false,
       "requireAuth": true,
       "baseUrl": "https://www.xiaohongshu.com/explore"
+    },
+    {
+      "id": "listInbox",
+      "label": "Read inbox previews",
+      "description": "Read loaded private conversation previews without opening threads or marking them read. No full-history or request coverage is implied.",
+      "baseUrl": "https://www.xiaohongshu.com/chat?channel_id=&channel_type=message_pc_page",
+      "blocking": true,
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "default": 20
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor",
+          "coverage"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "preview",
+                "timeLabel",
+                "kind"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "preview": {
+                  "type": "string"
+                },
+                "timeLabel": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "coverage": {
+            "type": "string"
+          }
+        }
+      }
     }
   ],
   "locales": {

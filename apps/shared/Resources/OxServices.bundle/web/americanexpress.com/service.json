@@ -1001,6 +1001,246 @@
           }
         }
       }
+    },
+    {
+      "id": "listRecentTransactions",
+      "label": "Read recent card expenses",
+      "description": "Read the selected card Last 30 Days table, with explicit coverage. Requires matching card identity and no search filter.",
+      "baseUrl": "https://global.americanexpress.com/activity",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cardName",
+          "lastDigits",
+          "limit"
+        ],
+        "properties": {
+          "cardName": {
+            "type": "string"
+          },
+          "lastDigits": {
+            "type": "string",
+            "pattern": "^[0-9]{4,5}$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cardName",
+          "lastDigits",
+          "range",
+          "items",
+          "nextCursor",
+          "coverage"
+        ],
+        "properties": {
+          "cardName": {
+            "type": "string"
+          },
+          "lastDigits": {
+            "type": "string"
+          },
+          "range": {
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "coverage": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "partial"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "dateLabel",
+                "status",
+                "description",
+                "amount",
+                "currency"
+              ],
+              "properties": {
+                "dateLabel": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "currency": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "getAmexPaymentActivity",
+      "label": "Read card payment activity",
+      "description": "Read displayed scheduled and prior Amex payments for an explicitly selected card, including status and confirmation details when shown. Never changes payments.",
+      "baseUrl": "https://global.americanexpress.com/payments/history",
+      "blocking": true,
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "lastDigits": {
+            "type": "string",
+            "pattern": "^[0-9]{4,5}$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          }
+        },
+        "required": [
+          "lastDigits",
+          "limit"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "card": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "amountLabel": {
+                  "type": "string"
+                },
+                "details": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "date",
+                "status",
+                "amountLabel",
+                "details"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "coverage": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "card",
+          "items",
+          "nextCursor",
+          "coverage"
+        ]
+      }
+    },
+    {
+      "id": "prepareAmexCardPayment",
+      "label": "Prepare full-balance card payment",
+      "description": "Select the requested card, total balance, linked bank, and displayed date on the actual Amex form. Leaves Continue and all final payment steps to the user; never submits payment.",
+      "baseUrl": "https://global.americanexpress.com/payments/pay",
+      "blocking": true,
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "lastDigits": {
+            "type": "string",
+            "pattern": "^[0-9]{4,5}$"
+          },
+          "fundingLastDigits": {
+            "type": "string",
+            "pattern": "^[0-9]{4}$"
+          },
+          "expectedAmount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "paymentDate": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          }
+        },
+        "required": [
+          "lastDigits",
+          "fundingLastDigits",
+          "expectedAmount",
+          "paymentDate"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "card": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "funding": {
+            "type": "string"
+          },
+          "paymentDate": {
+            "type": "string"
+          },
+          "submitted": {
+            "type": "boolean"
+          },
+          "readabilityVerified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "card",
+          "amount",
+          "funding",
+          "paymentDate",
+          "submitted",
+          "readabilityVerified"
+        ]
+      }
     }
   ],
   "locales": {
