@@ -183,7 +183,7 @@ private struct SecretEntryDetailView: View {
             if phase == .active { reload() }
             else {
                 fields = nil
-                conceal()
+                mode = .concealed
             }
         }
         .onDisappear {
