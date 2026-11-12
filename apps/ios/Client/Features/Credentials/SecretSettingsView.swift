@@ -44,7 +44,7 @@ struct SecretSettingsView: View {
             .accessibilityIdentifier("secret-settings-add")
         }
         .sheet(isPresented: $showingEditor, onDismiss: reload) {
-            SecretEntryEditorView(entry: nil, onSaved: {
+            SecretCreationView(onSaved: {
                 showingEditor = false
                 reload()
             })
@@ -97,16 +97,29 @@ struct SecretSettingsView: View {
 }
 
 private struct SecretEntryDetailView: View {
+    private enum Mode: Equatable {
+        case concealed
+        case revealed
+        case editing([String: String])
+    }
+
     let key: String
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var entry: SecretEntry?
     @State private var fields: [SecretFieldDraft]?
-    @State private var showsValues = false
-    @State private var showingEditor = false
+    @State private var mode = Mode.concealed
     @State private var confirmingDelete = false
     @State private var error: String?
+
+    private var draft: [String: String]? {
+        if case .editing(let draft) = mode { draft } else { nil }
+    }
+
+    private var draftValues: Binding<[String: String]> {
+        Binding(get: { draft ?? [:] }, set: { mode = .editing($0) })
+    }
 
     var body: some View {
         ScrollView {
@@ -134,16 +147,25 @@ private struct SecretEntryDetailView: View {
         .background(Theme.Colors.background)
         .navigationTitle(entry.map { Text(verbatim: $0.displayName) } ?? Text("Secrets"))
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(draft != nil)
         .toolbar {
-            Button("Edit") { showingEditor = true }
-                .disabled(entry?.type == nil)
-                .accessibilityIdentifier("secret-detail-edit")
-        }
-        .sheet(isPresented: $showingEditor, onDismiss: reload) {
-            SecretEntryEditorView(entry: entry, onSaved: {
-                showingEditor = false
-                reload()
-            })
+            if let draft {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { mode = .concealed }
+                        .accessibilityIdentifier("secret-detail-cancel")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save(draft) }
+                        .disabled(entry?.type?.isComplete(draft) != true)
+                        .accessibilityIdentifier("secret-detail-save")
+                }
+            } else {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Edit") { mode = .editing((try? Secret.fields(key: key)) ?? [:]) }
+                        .disabled(entry?.type == nil)
+                        .accessibilityIdentifier("secret-detail-edit")
+                }
+            }
         }
         .alert("Delete this secret?", isPresented: $confirmingDelete) {
             Button("Cancel", role: .cancel) {}
@@ -161,28 +183,32 @@ private struct SecretEntryDetailView: View {
             if phase == .active { reload() }
             else {
                 fields = nil
-                showsValues = false
+                conceal()
             }
         }
         .onDisappear {
             fields = nil
-            showsValues = false
+            mode = .concealed
         }
     }
 
     private var valuesSection: some View {
         SettingsSection(layout: .group) {
             VStack(spacing: 0) {
-                if let fields {
+                if let type = entry?.type, draft != nil {
+                    ForEach(Array(type.fields.enumerated()), id: \.element) { index, field in
+                        if index > 0 { Divider().settingsContentInset() }
+                        fieldRow(field) {
+                            SecretFieldInput(type: type, field: field, values: draftValues)
+                                .font(.system(.body, design: .monospaced))
+                        }
+                    }
+                } else if let fields {
                     ForEach(Array(fields.enumerated()), id: \.element.id) { index, field in
                         if index > 0 { Divider().settingsContentInset() }
-                        SecretFieldLayout(spacing: Theme.Spacing.md) {
-                            Text(verbatim: field.name)
-                                .font(Theme.Fonts.bodyMd)
-                                .lineLimit(1)
-                                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                        fieldRow(field.name) {
                             ScrollView(.horizontal) {
-                                Text(verbatim: showsValues || field.name == "username" ? field.value : "••••••••")
+                                Text(verbatim: mode == .revealed || field.name == "username" ? field.value : "••••••••")
                                     .font(.system(.body, design: .monospaced))
                                     .fixedSize(horizontal: true, vertical: false)
                                     .textSelection(.enabled)
@@ -190,10 +216,7 @@ private struct SecretEntryDetailView: View {
                             }
                             .scrollIndicators(.hidden)
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                            .frame(minWidth: 0, maxWidth: .infinity)
                         }
-                        .settingsRowPadding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 } else {
                     Text("Unavailable")
@@ -204,22 +227,36 @@ private struct SecretEntryDetailView: View {
         }
     }
 
+    private func fieldRow(_ name: String, @ViewBuilder value: () -> some View) -> some View {
+        SecretFieldLayout(spacing: Theme.Spacing.md) {
+            Text(verbatim: name)
+                .font(Theme.Fonts.bodyMd)
+                .lineLimit(1)
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+            value()
+                .frame(minWidth: 0, maxWidth: .infinity)
+        }
+        .settingsRowPadding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var actionsSection: some View {
         VStack(spacing: 0) {
             if fields != nil {
                 Button {
-                    showsValues.toggle()
+                    mode = mode == .revealed ? .concealed : .revealed
                 } label: {
                     Group {
-                        if showsValues { Text("Hide") }
+                        if mode == .revealed { Text("Hide") }
                         else { Text("Show") }
                     }
                     .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.primary)
+                    .foregroundStyle(draft == nil ? Theme.Colors.primary : Theme.Colors.onSurfaceMuted)
                     .settingsRowPadding()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                 }
+                .disabled(draft != nil)
                 .accessibilityIdentifier("secret-detail-show")
                 Divider().settingsContentInset()
             }
@@ -237,9 +274,23 @@ private struct SecretEntryDetailView: View {
         .buttonStyle(.plain)
     }
 
+    private func conceal() {
+        if mode == .revealed { mode = .concealed }
+    }
+
+    private func save(_ values: [String: String]) {
+        guard let entry, let type = entry.type else { return }
+        do {
+            try Secret.setTyped(key: key, displayName: entry.displayName, type: type, serviceID: entry.serviceID,
+                                values: values, origin: entry.origin, usePolicy: entry.usePolicy)
+            mode = .concealed
+            reload()
+        } catch { self.error = error.localizedDescription }
+    }
+
     private func reload() {
         do {
-            showsValues = false
+            conceal()
             try Secret.inferMissingTypes()
             entry = try Secret.entry(key: key)
             let order = entry?.type?.fields ?? []
@@ -350,8 +401,7 @@ private struct SecretAccessRulesView: View {
     }
 }
 
-private struct SecretEntryEditorView: View {
-    let entry: SecretEntry?
+private struct SecretCreationView: View {
     let onSaved: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -367,30 +417,24 @@ private struct SecretEntryEditorView: View {
                 VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                     SettingsSection(layout: .group) {
                         VStack(spacing: 0) {
-                            if entry == nil {
-                                Picker("Type", selection: $type) {
-                                    ForEach(SecretType.allCases) { Text($0.title).tag($0) }
-                                }
-                                .settingsRowPadding()
-                                .accessibilityIdentifier("secret-editor-type")
-                                Divider().settingsContentInset()
-                                TextField("Key", text: $key)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                    .settingsRowPadding()
-                                    .accessibilityIdentifier("secret-editor-key")
-                                Divider().settingsContentInset()
-                                TextField("Website or service domain", text: $domain)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                    .keyboardType(.URL)
-                                    .settingsRowPadding()
-                                    .accessibilityIdentifier("secret-editor-domain")
-                            } else {
-                                Text(verbatim: key)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .settingsRowPadding()
+                            Picker("Type", selection: $type) {
+                                ForEach(SecretType.allCases) { Text($0.title).tag($0) }
                             }
+                            .settingsRowPadding()
+                            .accessibilityIdentifier("secret-editor-type")
+                            Divider().settingsContentInset()
+                            TextField("Key", text: $key)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .settingsRowPadding()
+                                .accessibilityIdentifier("secret-editor-key")
+                            Divider().settingsContentInset()
+                            TextField("Website or service domain", text: $domain)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .keyboardType(.URL)
+                                .settingsRowPadding()
+                                .accessibilityIdentifier("secret-editor-domain")
                         }
                     }
                     SettingsSection(type.title, layout: .group) {
@@ -408,7 +452,7 @@ private struct SecretEntryEditorView: View {
             }
             .scrollIndicators(.hidden)
             .background(Theme.Colors.background)
-            .navigationTitle(entry == nil ? "Add Secret" : "Edit Secret")
+            .navigationTitle("Add Secret")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -420,17 +464,11 @@ private struct SecretEntryEditorView: View {
                         .accessibilityIdentifier("secret-editor-save")
                 }
             }
-            .onAppear {
-                key = entry?.key ?? ""
-                type = entry?.type ?? .account
-                values = entry.flatMap { try? Secret.fields(key: $0.key) } ?? [:]
-            }
-            .onChange(of: type) { _, _ in if entry == nil { values = [:] } }
+            .onChange(of: type) { _, _ in values = [:] }
         }
     }
 
     private var serviceID: String? {
-        if let entry { return entry.serviceID }
         let host = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !host.isEmpty else { return nil }
         return "\(type == .account ? "web" : "api"):\(host)"
@@ -439,9 +477,8 @@ private struct SecretEntryEditorView: View {
     private func save() {
         do {
             let spec = SecretEntrySpec(key: key, type: type, serviceID: serviceID)
-            try Secret.setTyped(key: key, displayName: entry?.displayName ?? spec.displayName(values: values),
-                                type: type, serviceID: serviceID, values: values,
-                                origin: entry?.origin ?? .named, usePolicy: entry?.usePolicy ?? .reusable)
+            try Secret.setTyped(key: key, displayName: spec.displayName(values: values),
+                                type: type, serviceID: serviceID, values: values)
             onSaved()
         } catch { self.error = error.localizedDescription }
     }

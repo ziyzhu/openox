@@ -11882,16 +11882,6 @@
         }
       }
     },
-    "Edit Secret" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "编辑密钥"
-          }
-        }
-      }
-    },
     "Save a secret" : {
       "localizations" : {
         "zh-Hans" : {

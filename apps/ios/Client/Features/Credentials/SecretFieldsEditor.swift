@@ -48,17 +48,27 @@ struct SecretTypedFieldsEditor: View {
         VStack(spacing: 0) {
             ForEach(Array(type.fields.enumerated()), id: \.element) { index, field in
                 if index > 0 { Divider() }
-                input(field)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                SecretFieldInput(type: type, field: field, values: $values)
                     .frame(minHeight: 44)
-                    .accessibilityIdentifier("secret-entry-field-\(field)")
             }
         }
     }
+}
+
+struct SecretFieldInput: View {
+    let type: SecretType
+    let field: String
+    @Binding var values: [String: String]
+
+    var body: some View {
+        input
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .accessibilityIdentifier("secret-entry-field-\(field)")
+    }
 
     @ViewBuilder
-    private func input(_ field: String) -> some View {
+    private var input: some View {
         let binding = Binding(get: { values[field] ?? "" }, set: { values[field] = $0 })
         if field == "username" {
             TextField(type.fieldTitle(field), text: binding)
