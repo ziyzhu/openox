@@ -8,7 +8,7 @@ public protocol OxFunctionBridge: AnyObject {
     func appModel(purpose: String) async throws -> JSONValue?
     func setAppModel(options: JSONValue, purpose: String) async throws -> JSONValue?
     func renameConversation(title: String, purpose: String) async throws -> JSONValue?
-    func invokeAction(name: String, args: JSONValue?, session: JSONValue?, pageURL: String?, purpose: String) async throws -> JSONValue?
+    func invokeAction(name: String, args: JSONValue?, session: JSONValue?, pageURL: String?, frameID: String?, purpose: String) async throws -> JSONValue?
     func searchWeb(arguments: JSONValue, purpose: String) async throws -> JSONValue?
     func fetchWeb(url: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
     func browserOperation(action: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?

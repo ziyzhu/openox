@@ -16,6 +16,8 @@ Automatic login: when `input.account` is present it is a reference `{ $secret, s
 
 Before returning from `login`, inspect the prepared live document and verify that the intended sign-in or account-selection controls are visible and usable for the requested product and tenant. Use a bounded wait for those specific controls, then throw a clear preparation error if they do not appear. A URL, navigation completion, page title, or generic nonblank page does not establish login readiness. Never return successfully from a blank, error, loading, or unrelated page: the Host presents immediately after the handler returns. Do not read or return credential field values.
 
+For embedded provider login, inspect the consumer’s prepared page with `ox.web.browser.getPageState({ service: consumerDomain, purpose })`. Attach the provider matching the observed frame origin and the account reference’s serviceID, then invoke its login with top-level frameId from that snapshot. The Host runs the provider on the preserved consumer page, enforces provider ownership and the frame origin, and verifies the consumer session afterward. Missing, replaced, opaque-origin, or mismatched frames fail; inspect fresh state before another attempt. Never move an embedded authorization URL to a separate page or use Browser to retrieve credentials. parentId can be null across origins; origin metadata does not prove login readiness.
+
 ## Automatic login
 
 Build automatic login only after manual `login` and `listSessions` work. Use the Browser to observe the site, never the user's real credentials.

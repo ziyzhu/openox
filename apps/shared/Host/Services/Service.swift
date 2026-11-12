@@ -390,6 +390,11 @@ final class Service: NSObject, Identifiable {
         var pendingEvaluations: [UUID: PendingEvaluation] = [:]
         var scriptMode: ScriptMode?
         var secretAttempt: SecretAttempt?
+        var frameSecretContext: (service: Service, documentID: String)?
+        var frameCandidates: [WebPage.FrameInfo] = []
+        var omittedFrames = 0
+        var frameTargets: [String: FrameTarget] = [:]
+        var frameServiceSources: [String: String] = [:]
 
         init(page: WebPage, navigationDecider: NavigationDecider, userContentController: WKUserContentController, actions: String) {
             self.page = page
@@ -880,19 +885,9 @@ final class Service: NSObject, Identifiable {
         guard servicePage.scriptMode != mode else { return }
         let ucc = servicePage.userContentController
         ucc.removeAllUserScripts()
-        if mode == .service {
-            ucc.addBridgeUserScripts()
-            ucc.addUserScript(WKUserScript(
-                source: ServiceActionRuntime.source(domain: domain),
-                injectionTime: .atDocumentStart,
-                forMainFrameOnly: true
-            ))
-            ucc.addUserScript(WKUserScript(
-                source: servicePage.actions,
-                injectionTime: .atDocumentStart,
-                forMainFrameOnly: true
-            ))
-        }
+        ucc.addUserScript(WKUserScript(source: ServiceWebPage.frameIdentityScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        if mode == .service { ucc.addBridgeUserScripts() }
+        ucc.addUserScript(WKUserScript(source: frameServicesScript(servicePage), injectionTime: .atDocumentStart, forMainFrameOnly: false))
         for script in servicePage.additionalUserScripts {
             ucc.addUserScript(script)
         }

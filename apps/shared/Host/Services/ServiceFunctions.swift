@@ -93,8 +93,8 @@ extension Conversation: OxFunctionBridge {
         try await serviceOperations.inspectService(domain: domain, cursor: cursor, purpose: purpose)
     }
 
-    public func invokeAction(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.invokeAction(name: name, args: args ?? .object([:]), session: session, pageURL: pageURL, purpose: purpose) ?? .null
+    public func invokeAction(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, frameID: String? = nil, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.invokeAction(name: name, args: args ?? .object([:]), session: session, pageURL: pageURL, frameID: frameID, purpose: purpose) ?? .null
     }
 }
 

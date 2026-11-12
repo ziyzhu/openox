@@ -173,7 +173,7 @@ extension ServiceOperations {
         ])])
     }
 
-    private func handOffLogin(service: Service, secrets: SecretAttempt?, input: JSONValue, session: JSONValue?, pageURL: String?,
+    func handOffLogin(service: Service, secrets: SecretAttempt?, input: JSONValue, session: JSONValue?, pageURL: String?,
                               prepare: Bool, rememberFor destination: Service? = nil,
                               approve: @escaping @MainActor (String, Any?) async -> Bool) async throws -> JSONValue {
         if prepare, loginPage(service)?.page.url?.host.map(service.isServiceHost) != true {
@@ -208,7 +208,7 @@ extension ServiceOperations {
         }
     }
 
-    private func settledSession(service: Service, secrets: SecretAttempt?, page: Service.ServiceWebPage? = nil,
+    func settledSession(service: Service, secrets: SecretAttempt?, page: Service.ServiceWebPage? = nil,
                                 approve: @escaping @MainActor (String, Any?) async -> Bool) async -> Bool {
         for attempt in 1...3 {
             if let page { await settle(page) }
@@ -265,7 +265,7 @@ extension ServiceOperations {
         )
         Log.service.info("Service.login presenting domain=\(service.domain) page=\(lease.page.logLabel)")
         let capture = LoginCapture()
-        await capture.install(on: lease.page, credentials: rememberSecret != nil)
+        await capture.install(on: lease.page, owner: service, credentials: rememberSecret != nil)
         let outcome: ServiceHandoffSession.Outcome
         if let presentServiceHandoff {
             outcome = await presentServiceHandoff(service, lease.page, handoff)

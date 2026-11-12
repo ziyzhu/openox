@@ -45,7 +45,7 @@ extension ServiceOperations {
         case "ox.service.validate":
             return try await validateService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.invoke":
-            return try await invokeAction(name: fields["name"]?.stringValue ?? "", args: fields["input"], session: fields["session"], pageURL: fields["pageUrl"]?.stringValue, purpose: purpose)
+            return try await invokeAction(name: fields["name"]?.stringValue ?? "", args: fields["input"], session: fields["session"], pageURL: fields["pageUrl"]?.stringValue, frameID: fields["frameId"]?.stringValue, purpose: purpose)
         case "ox.service.create":
             return try await createService(kind: fields["kind"]?.stringValue ?? "", domain: fields["domain"]?.stringValue ?? "", name: fields["name"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, faviconURL: fields["faviconUrl"], purpose: purpose)
         case "ox.service.update":

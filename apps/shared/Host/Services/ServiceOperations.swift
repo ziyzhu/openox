@@ -77,7 +77,7 @@ final class ServiceOperations {
         }
     }
 
-    private func recorded(_ name: String, _ args: JSONValue, purpose: String, _ body: () async throws -> JSONValue?) async throws -> JSONValue? {
+    func recorded(_ name: String, _ args: JSONValue, purpose: String, _ body: () async throws -> JSONValue?) async throws -> JSONValue? {
         try Task.checkCancellation()
         let id = begin(name, args, purpose)
         do {
@@ -90,7 +90,7 @@ final class ServiceOperations {
         }
     }
 
-    private func requireApproval(
+    func requireApproval(
         action: String,
         defaultPolicy: ActionPolicy? = nil,
         args: Any? = nil,
@@ -98,161 +98,6 @@ final class ServiceOperations {
         prompt: String? = nil
     ) async throws {
         try await requireApproval(action, defaultPolicy, args, purpose, prompt)
-    }
-
-    func invokeAction(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
-        let (service, actionID) = try await resolveAction(name)
-        return try await invokeAction(service: service, actionID: actionID, args: args, session: session, pageURL: pageURL, purpose: purpose)
-    }
-
-    func invokeAction(service: Service, actionID: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
-        guard !service.isMCPService || serviceManager.service(domain: service.domain) === service else {
-            throw RuntimeError.bridge("This MCP connection changed or was removed. Attach the current service before invoking it.")
-        }
-        let hostStandard = !service.isWebService && service.definition.standardServiceActions.contains { $0.id == actionID }
-        if service.isMCPService, !hostStandard, await service.loadManifest(reason: .invoke) == nil {
-            throw RuntimeError.bridge("Service capabilities are unavailable; invoke the server's authorize action if authorization is required")
-        }
-        try service.definition.validateStandardServiceActions()
-        var input = args ?? .object([:])
-        if session != nil || pageURL != nil {
-            guard service.isWebService, let baseURL = service.definition.baseURL else {
-                throw RuntimeError.bridge("Session routing is supported only for web services")
-            }
-            _ = try service.executionURL(defaultURL: baseURL, session: session, pageURL: pageURL)
-        }
-        let qualifiedName = service.definition.qualifiedActionName(actionID)
-        guard let action = service.definition.action(actionID), let inputSchema = service.definition.inputSchema(for: action) else {
-            throw Service.InvokeError.unknown(qualifiedName)
-        }
-        if service.isWebService, actionID == "search", service.definition.standardServiceActions.contains(where: { $0.id == actionID }),
-           let schema = ModelGuidance.standardServiceActions.objectValue?["web"]?.arrayValue?.first(where: { $0.objectValue?["id"] == .string(actionID) })?.objectValue?["inputSchema"],
-           let maximum = inputSchema.objectValue?["properties"]?.objectValue?["limit"]?.objectValue?["maximum"]?.intValue {
-            let violations = JSONSchemaValidator.validate(input, against: schema, definitions: [:])
-            guard violations.isEmpty else { throw Service.InvokeError.invalidInput(qualifiedName, violations) }
-            var fields = input.objectValue ?? [:]
-            fields["limit"] = .int(min(fields["limit"]?.intValue ?? 10, maximum))
-            input = .object(fields)
-        }
-        let recordedInput: JSONValue = session == nil && pageURL == nil ? input : .object([
-            "input": input,
-            "session": session ?? .null,
-            "pageUrl": pageURL.map(JSONValue.string) ?? .null,
-        ])
-        let prepared = try SecretAttempt.prepare(input)
-        if !prepared.keys.isEmpty, hostStandard {
-            throw RuntimeError.bridge("Secret references are not supported for this action")
-        }
-        input = prepared.args
-        let inputViolations = JSONSchemaValidator.validate(
-            input,
-            against: inputSchema,
-            definitions: service.definition.definitions,
-            allowingSecretReferences: !prepared.keys.isEmpty
-        )
-        guard inputViolations.isEmpty else {
-            throw Service.InvokeError.invalidInput(qualifiedName, inputViolations)
-        }
-        return try await recorded("ox.service.invoke(\(service.definition.qualifiedActionName(actionID)))", recordedInput, purpose: purpose) {
-            if actionID != WebConversationContract.actionID || WebConversationContract.requiresApproval(input) {
-                try await self.requireApproval(
-                    action: qualifiedName,
-                    defaultPolicy: action.defaultPolicy,
-                    args: recordedInput.toAny(),
-                    purpose: purpose
-                )
-            }
-            if hostStandard {
-                let value = try await self.invokeStandardServiceAction(service, actionID: actionID, purpose: purpose)
-                let violations = JSONSchemaValidator.validate(value ?? .null, against: action.outputSchema ?? .null, definitions: [:])
-                guard violations.isEmpty else { throw Service.InvokeError.invalidOutput(qualifiedName, violations) }
-                return value
-            }
-            let secrets = prepared.keys.isEmpty ? nil : SecretAttempt(consumer: qualifiedName, keys: prepared.keys) { use, label in
-                do {
-                    try await self.requireApproval(
-                        action: use.action,
-                        defaultPolicy: .ask,
-                        purpose: purpose,
-                        prompt: L10n.string("Allow \(qualifiedName) to use the saved secret \(label)?\nOnly the service that owns it can read it, on its own domain. It never enters the conversation.")
-                    )
-                    return true
-                } catch {
-                    return false
-                }
-            }
-            let lazyApproval = WebSessionContract.isEnabled(service.definition) && actionID == WebSessionContract.loginAction
-            if let secrets, !lazyApproval, await !secrets.authorize() {
-                throw OxFunctionError(code: "permission_denied", message: "\(qualifiedName): the user did not allow this action to use the saved secret.", recovery: "Stop. Do not retry with the same secret unless the user asks; offer manual login instead.")
-            }
-            let approve: @MainActor (String, Any?) async -> Bool = { name, args in
-                guard service.isWebService,
-                      name == service.definition.qualifiedActionName(WebSessionContract.listAction),
-                      name != qualifiedName else { return true }
-                do {
-                    try await self.requireApproval(action: name, defaultPolicy: .allow, args: args, purpose: purpose)
-                    return true
-                } catch {
-                    return false
-                }
-            }
-            if let secrets, WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction,
-               await self.hasIntendedSession(service: service, secrets: secrets, approve: approve) {
-                Log.service.info("Service.login automatic skipped domain=\(service.domain) reason=signed-in")
-                return .object(["interaction": .string("automatic"), "authentication": .string("verified")])
-            }
-            if service.definition.supportsConversation, actionID == WebConversationContract.actionID {
-                let attachments = try await resolveConversationAttachments(input.objectValue?["attachments"]?.arrayValue ?? [])
-                return try await serviceManager.invokeConversation(service: service, args: input, owner: conversationOwner, attachments: attachments, session: session, pageURL: pageURL, approve: approve)
-            }
-            let result: Result<JSONValue, Error>
-            if let implementation = service.apiService {
-                result = await implementation.invoke(service: service, actionID: actionID, args: input, secrets: secrets, approve: approve)
-            } else if let implementation = service.iOSService {
-                let dispatched = try await secrets?.substitute(input, caller: service.definition.actionNamespace) ?? input
-                result = await implementation.invoke(
-                    service: service, actionID: actionID, args: dispatched, purpose: purpose,
-                    approve: approve,
-                    nativeInvocation: { _, id, args, purpose in
-                        try await self.native.invoke(service: service, actionID: id, args: args, purpose: purpose)
-                    }
-                )
-            } else if let implementation = service.remoteMCPService {
-                let dispatched = try await secrets?.substitute(input, caller: service.definition.actionNamespace) ?? input
-                result = await implementation.invoke(
-                    service: service, actionID: actionID, args: dispatched,
-                    approve: approve, readFile: { try await self.readMCPFile($0, purpose) }, receiveFiles: receiveFiles
-                )
-            } else if secrets != nil, lazyApproval {
-                result = .success(.null)
-            } else {
-                result = await service.invokeAction(
-                    actionID,
-                    args: input,
-                    session: session,
-                    pageURL: pageURL,
-                    secrets: secrets,
-                    approve: approve
-                )
-            }
-            let raw: JSONValue
-            do { raw = try result.get() } catch {
-                if WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction,
-                   secrets == nil, self.redirectProvider(for: service) != nil {
-                    return try await self.completeLogin(service: service, secrets: nil, input: input, session: session,
-                                                        pageURL: pageURL, approve: approve)
-                }
-                secrets?.releaseRendering()
-                throw error
-            }
-            let value = secrets?.redact(raw) ?? raw
-            if WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction {
-                return try await self.completeLogin(service: service, secrets: secrets, input: input, session: session,
-                                                    pageURL: pageURL, approve: approve)
-            }
-            secrets?.releaseRendering()
-            return value
-        }
     }
 
     func validateService(domain: String, purpose: String) async throws -> JSONValue? {
@@ -752,7 +597,7 @@ final class ServiceOperations {
         Log.service.info("Service.handoff preflight domain=\(service.domain) page=\(page.logLabel) nav=\(generation) ready=true")
     }
 
-    private func invokeStandardServiceAction(_ service: Service, actionID: String, purpose: String) async throws -> JSONValue? {
+    func invokeStandardServiceAction(_ service: Service, actionID: String, purpose: String) async throws -> JSONValue? {
         if ["credentialStatus", "connectionStatus", "permissionStatus"].contains(actionID) {
             guard serviceManager.actionPolicy(for: Actions.serviceCheckAccess, default: .allow) == .allow else {
                 throw OxFunctionError(code: "permission_denied", message: "Status inspection is blocked by the existing access-check policy.", recovery: "Stop. Do not bypass the policy through another action.")

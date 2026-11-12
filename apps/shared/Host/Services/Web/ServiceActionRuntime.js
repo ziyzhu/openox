@@ -40,7 +40,7 @@
     const secret = async ref => {
       const channel = window.webkit?.messageHandlers?.oxSecret;
       if (!channel) throw new Error("secret retrieval is unavailable");
-      return await channel.postMessage({ ref });
+      return await channel.postMessage({ ref, documentID: window.__oxDocumentID });
     };
     const context = Object.freeze({ secret });
     const callServiceAction = async (name, args = {}) => {

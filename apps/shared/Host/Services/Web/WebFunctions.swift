@@ -79,6 +79,21 @@ extension Conversation {
         )
         guard violations.isEmpty else { throw Service.InvokeError.invalidInput(name, violations) }
         return try await tracked(name, arguments, purpose: purpose) {
+            if action == "getPageState" {
+                let fields = arguments.objectValue ?? [:]
+                var prepared: (Service, Service.ServiceWebPage)?
+                if let domain = fields["service"]?.stringValue {
+                    guard let target = self.attachedServices.first(where: { $0.domain == domain && $0.isWebService }),
+                          let page = self.serviceOperations.loginPage(target) ?? (target.servicePages.count == 1 ? target.servicePages.first : nil) else {
+                        throw RuntimeError.bridge("Attach the web service and prepare a unique live page before inspecting its frames.")
+                    }
+                    prepared = (target, page)
+                }
+                return try await self.serviceManager.browserActionSessions.session(for: service, ownerID: self.id)
+                    .pageState(selector: fields["selector"]?.stringValue, frameID: fields["frameId"]?.stringValue,
+                               prepared: prepared, attached: self.attachedServices,
+                               authorizeSite: { site in try await self.nativeServiceOperations.authorizeBrowserSite(site, purpose) })
+            }
             guard let implementation = service.iOSService else { throw Service.InvokeError.unknown(name) }
             let result = await implementation.invoke(
                 service: service,

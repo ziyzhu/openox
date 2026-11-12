@@ -102,7 +102,7 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "getPageState",
             label: "Get Page State",
-            description: "Observe a bounded, read-only snapshot of Browser's visible headings, dialogs, status messages, and controls without returning input values. Control id and name attributes are separate, unnormalized strings capped at 256 characters, or null when absent; clipping sets truncated. Optionally scope with a CSS selector. Includes page identity, navigation generation, loading progress, security, Screen Time, fullscreen state, and coverage limits; does not infer application readiness or authentication. Uses the same site authorization as executeScript.",
+            description: "Observe a bounded, read-only snapshot of Browser's visible headings, dialogs, status messages, and controls without returning input values. Control id and name attributes are separate, unnormalized strings capped at 256 characters, or null when absent; clipping sets truncated. Optionally scope with a CSS selector or frameId. Lists bounded live frames with origin-only metadata; parentId is null when unavailable across origins. Optional service selects an attached service’s prepared page instead of Browser. Includes page identity, navigation generation, loading progress, security, Screen Time, fullscreen state, and coverage limits; does not infer application readiness or authentication. Uses the same site authorization as executeScript.",
             inputSchema: observationOptions,
             outputSchema: pageState
         ),
@@ -146,7 +146,7 @@ nonisolated enum BrowserFunctionCatalog {
             label: "Execute JavaScript",
             description: "Execute arbitrary JavaScript in Browser's page, including logged-in website data and network access.",
             inputSchema: object(
-                ["script": string(
+                ["frameId": frameID, "script": string(
                     description: "Async JavaScript function body that returns a JSON-compatible value.",
                     minimum: 1,
                     maximum: 100_000
@@ -315,7 +315,10 @@ nonisolated enum BrowserFunctionCatalog {
     private static let nullableString: JSONValue = .object([
         "type": .array([.string("string"), .string("null")]),
     ])
+    private static let frameID = string(description: "Opaque live document ID from getPageState.frames. Stale IDs fail; omission selects the main frame.", minimum: 1, maximum: 100)
     private static let observationOptions = object([
+        "frameId": frameID,
+        "service": string(description: "Attached web service whose existing prepared page to inspect. Omit for Browser.", minimum: 1, maximum: 253),
         "selector": string(description: "Optional CSS selector limiting observation to one light-DOM subtree. Defaults to document.body. Missing scope is reported, not treated as an empty page.", minimum: 1, maximum: 2_000),
     ])
     private static let pageState = object([
@@ -336,6 +339,12 @@ nonisolated enum BrowserFunctionCatalog {
                 "notInFullscreen", "unknown",
             ].map(JSONValue.string)),
         ]),
+        "frameId": nullableString,
+        "frames": .object(["type": .string("array"), "maxItems": .int(65), "items": object([
+            "id": string(), "parentId": nullableString, "origin": string(), "isMainFrame": boolean,
+            "serviceID": nullableString, "attached": boolean,
+        ], required: ["id", "parentId", "origin", "isMainFrame", "serviceID", "attached"])]),
+        "framesTruncated": boolean,
         "document": object([
             "scope": nullableString,
             "scopeFound": boolean,
@@ -357,7 +366,7 @@ nonisolated enum BrowserFunctionCatalog {
             "truncated": boolean,
             "coverage": string(),
         ], required: ["scope", "scopeFound", "readyState", "busy", "headings", "dialogs", "messages", "controls", "embeddedFrames", "truncated", "coverage"]),
-    ], required: ["pageID", "navigationGeneration", "url", "title", "estimatedProgress", "isLoading", "hasOnlySecureContent", "isBlockedByScreenTime", "fullscreenState", "document"])
+    ], required: ["pageID", "navigationGeneration", "url", "title", "estimatedProgress", "isLoading", "hasOnlySecureContent", "isBlockedByScreenTime", "fullscreenState", "frameId", "frames", "framesTruncated", "document"])
     private static let bodyCoverage = object([
         "status": .object(["type": .string("string"), "enum": .array(["unavailable", "invalid_json", "json"].map(JSONValue.string))]),
         "shapeTruncated": boolean,

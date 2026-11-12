@@ -31,6 +31,7 @@ extension Service {
         preferences: inout WebPage.NavigationPreferences,
         in session: ServiceWebPage
     ) async -> WKNavigationActionPolicy {
+        session.observeFrames(action)
         let url = action.request.url
         if action.target?.isMainFrame == false {
             guard let frameURL = url, await BrowserNavigation.resolvesFrameNavigation(frameURL) else {

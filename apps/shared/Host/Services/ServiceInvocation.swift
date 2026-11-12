@@ -219,6 +219,7 @@ extension Service {
         _ script: String,
         action: Action,
         in page: ServiceWebPage,
+        frame: ServiceWebPage.FrameTarget? = nil,
         verify: @escaping @MainActor @Sendable (ServiceWebPage) throws -> Void
     ) async throws -> JSONValue {
         guard domain == "ios:browser" else { throw EvalError.notActive }
@@ -234,7 +235,7 @@ extension Service {
             Log.service.info("Service.dangerousBrowser start id=\(invocation) domain=\(self.domain) session=\(page.logLabel) nav=\(startingNavigation)/\(page.finishedNavigationGeneration) host=\(host) bytes=\(script.utf8.count)")
             do {
                 try await self.manager.requireInvocationAccess(for: self)
-                let raw = try await self.evalAsync(page, script, context: "dangerous-web:\(invocation)")
+                let raw = try await self.evalOnce(page, frame?.guarded(script) ?? script, timeout: 30, frame: frame?.info)
                 let value = raw.map(JSONValue.from) ?? .null
                 Log.service.info("Service.dangerousBrowser result id=\(invocation) domain=\(self.domain) session=\(page.logLabel) nav=\(startingNavigation)->\(page.navigationGeneration)/\(page.finishedNavigationGeneration) ms=\(Int(Date().timeIntervalSince(started) * 1000)) value=\(value.logShape)")
                 return value
@@ -260,7 +261,7 @@ extension Service {
         }
     }
 
-    func evalOnce(_ session: ServiceWebPage, _ js: String, timeout: TimeInterval) async throws -> Any? {
+    func evalOnce(_ session: ServiceWebPage, _ js: String, timeout: TimeInterval, frame: WebPage.FrameInfo? = nil) async throws -> Any? {
         let id = UUID()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Any?, any Error>) in
@@ -275,7 +276,7 @@ extension Service {
                         let value = try await session.page.callJavaScript(
                             js,
                             arguments: [:],
-                            in: nil,
+                            in: frame,
                             contentWorld: .page
                         )
                         session.finishEvaluation(id, with: .success(value))

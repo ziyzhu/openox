@@ -159,7 +159,7 @@ final class NativeServiceOperations {
             }
             return try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
-                .executeScript(script, authorizeSite: authorizeSite)
+                .executeScript(script, frameID: fields["frameId"]?.stringValue, authorizeSite: authorizeSite)
         case ("ios:browser", "exportPdf"):
             let pdf = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)

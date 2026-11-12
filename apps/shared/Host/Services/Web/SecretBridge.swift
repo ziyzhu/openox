@@ -16,11 +16,19 @@ final class SecretBridge: NSObject, WKScriptMessageHandlerWithReply {
         guard let service, let page, let attempt = page.secretAttempt else {
             return (nil, "No secret is available to this page.")
         }
+        let caller = page.frameSecretContext?.service ?? service
+        let body = JSONValue.from(message.body).objectValue
+        if let expected = page.frameSecretContext?.documentID, body?["documentID"]?.stringValue != expected {
+            return (nil, "Secret request came from another frame document.")
+        }
+        guard message.frameInfo.securityOrigin.protocol == "https" else {
+            return (nil, "Secret retrieval requires a secure origin.")
+        }
         let host = message.frameInfo.securityOrigin.host
-        let reference = JSONValue.from(message.body).objectValue?["ref"] ?? .null
+        let reference = body?["ref"] ?? .null
         do {
-            let value = try await attempt.retrieve(reference, caller: service.definition.actionNamespace, host: host)
-            await SecretRequestGuard.install(on: page, owner: service.definition.actionNamespace)
+            let value = try await attempt.retrieve(reference, caller: caller.definition.actionNamespace, host: host)
+            await SecretRequestGuard.install(on: page, owner: caller.definition.actionNamespace)
             attempt.keepRendering(page)
             return (value.toAny(), nil)
         } catch {

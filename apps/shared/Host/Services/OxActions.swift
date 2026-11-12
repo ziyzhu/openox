@@ -26,6 +26,7 @@ nonisolated enum OxActions {
                                 "type": .string("object"),
                                 "description": .string("Input matching the upfront standard contract or the non-standard contract from ox.service.inspect."),
                             ]),
+                            "frameId": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(100), "description": .string("Optional live frame document ID from getPageState. Requires an attached matching web service; cannot combine with pageUrl.")]),
                             "session": WebSessionContract.sessionSchema,
                             "pageUrl": .object([
                                 "type": .string("string"),
@@ -47,17 +48,18 @@ nonisolated enum OxActions {
             )]
         },
         installNatives: { ctx, env in
-            let invokeBlock: @convention(block) (String, JSValue, JSValue, JSValue, JSValue) -> JSValue = { name, argsValue, sessionValue, pageURLValue, purposeValue in
+            let invokeBlock: @convention(block) (String, JSValue, JSValue, JSValue, JSValue, JSValue) -> JSValue = { name, argsValue, sessionValue, pageURLValue, frameValue, purposeValue in
                 let args = jsValueToJSON(argsValue)
                 let purpose = purposeValue.toString()!
                 let session = sessionValue.isNull || sessionValue.isUndefined ? nil : jsValueToJSON(sessionValue)
                 let pageURL = pageURLValue.isNull || pageURLValue.isUndefined ? nil : pageURLValue.toString()
-                return env.call(suspendingTimeout: true) { try await $0.invokeAction(name: name, args: args, session: session, pageURL: pageURL, purpose: purpose) }
+                let frameID = frameValue.isNull || frameValue.isUndefined ? nil : frameValue.toString()
+                return env.call(suspendingTimeout: true) { try await $0.invokeAction(name: name, args: args, session: session, pageURL: pageURL, frameID: frameID, purpose: purpose) }
             }
             ctx.setObject(invokeBlock as AnyObject, forKeyedSubscript: "__nativeAction" as NSString)
         },
         jsFragment: """
-          invoke: (value) => { const options = __oxOptions(value, 'ox.service.invoke'); return __nativeAction(String(options.name), options.input ?? {}, options.session ?? null, options.pageUrl ?? null, String(options.purpose)); }
+          invoke: (value) => { const options = __oxOptions(value, 'ox.service.invoke'); return __nativeAction(String(options.name), options.input ?? {}, options.session ?? null, options.pageUrl ?? null, options.frameId ?? null, String(options.purpose)); }
         """
     )
 

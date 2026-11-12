@@ -141,14 +141,38 @@ final class ServiceBrowserActionSession {
         }
     }
 
-    func pageState(selector: String?, authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
-        try await service.awaitAuthenticationAvailability(name: "ox.web.browser.getPageState")
-        guard let page, service.owns(page) else { throw Service.EvalError.notReady }
+    func pageState(selector: String?, frameID: String? = nil, prepared: (Service, Service.ServiceWebPage)? = nil,
+                   attached: [Service] = [], authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
+        let owner = prepared?.0 ?? service
+        try await owner.awaitAuthenticationAvailability(name: "ox.web.browser.getPageState")
+        guard let page = prepared?.1 ?? page, owner.owns(page), page.secretAttempt?.holdsValues != true else {
+            throw Service.EvalError.notReady
+        }
         let approval = try await authorize(page, authorizeSite)
-        return try await readState(page, selector: selector, site: approval.site)
+        let generation = page.navigationGeneration
+        try await owner.installFrameServices(attached, on: page)
+        Log.webView.info("Browser.state phase=installed page=\(page.logLabel) targeted=\(frameID != nil)")
+        let target: Service.ServiceWebPage.FrameTarget?
+        if let frameID { target = try await page.requireFrame(frameID, owner: owner) } else { target = nil }
+        Log.webView.info("Browser.state phase=selected page=\(page.logLabel) origin=\(target?.origin ?? "main")")
+        if let target, let host = URL(string: target.origin)?.host {
+            try await trust(ServiceWebsiteDataCoordinator.site(for: host), authorizeSite)
+        }
+        Log.webView.info("Browser.state phase=authorized page=\(page.logLabel)")
+        try Self.requireUnchanged(page, since: approval)
+        try await owner.manager.requireInvocationAccess(for: owner)
+        let script = BrowserPageState.script(selector: selector)
+        let raw = try await owner.evalOnce(page, target?.guarded(script) ?? script, timeout: 3, frame: target?.info)
+        guard owner.owns(page), page.navigationGeneration == generation else { throw Service.EvalError.contextInvalidated }
+        var result = stateResult(raw.map(JSONValue.from) ?? .null, page: page).objectValue ?? [:]
+        result["frameId"] = frameID.map(JSONValue.string) ?? .null
+        result["frames"] = page.frameMetadata(Array(page.frameTargets.values), services: owner.manager.services, attached: Set(attached.map(\.domain)))
+        result["framesTruncated"] = .bool(page.omittedFrames > 0)
+        Log.webView.info("Browser.state owner=\(id) page=\(page.logLabel) generation=\(generation) frames=\(page.frameTargets.count)")
+        return .object(result)
     }
 
-    func executeScript(_ script: String, authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
+    func executeScript(_ script: String, frameID: String? = nil, authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
         let name = "ox.web.browser.executeScript"
         try await service.awaitAuthenticationAvailability(name: name)
         guard let action = await service.resolvedAction("executeScript", role: .dangerousBrowserControl) else {
@@ -156,22 +180,14 @@ final class ServiceBrowserActionSession {
         }
         let page = try await page(for: action)
         let approval = try await authorize(page, authorizeSite)
-        return try await service.executeBrowserJavaScript(script, action: action, in: page) { page in
+        let target: Service.ServiceWebPage.FrameTarget?
+        if let frameID { target = try await page.requireFrame(frameID, owner: service) } else { target = nil }
+        if let target, let host = URL(string: target.origin)?.host {
+            try await trust(ServiceWebsiteDataCoordinator.site(for: host), authorizeSite)
+        }
+        return try await service.executeBrowserJavaScript(script, action: action, in: page, frame: target) { page in
             try Self.requireUnchanged(page, since: approval)
         }
-    }
-
-    private func readState(_ page: Service.ServiceWebPage, selector: String?, site: String?) async throws -> JSONValue {
-        try Task.checkCancellation()
-        try await service.manager.requireInvocationAccess(for: service)
-        guard service.owns(page), Self.site(of: page) == site else { throw Service.EvalError.contextInvalidated }
-        let generation = page.navigationGeneration
-        let raw = try await service.evalAsync(page, BrowserPageState.script(selector: selector), context: "browser-state", timeout: 3)
-        guard service.owns(page), page.navigationGeneration == generation, Self.site(of: page) == site else {
-            throw Service.EvalError.contextInvalidated
-        }
-        Log.webView.info("Browser.state owner=\(id) page=\(page.logLabel) generation=\(generation)")
-        return stateResult(raw.map(JSONValue.from) ?? .null, page: page)
     }
 
     private func stateResult(_ result: JSONValue, page: Service.ServiceWebPage) -> JSONValue {
