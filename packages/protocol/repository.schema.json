@@ -69,122 +69,191 @@
         "auth": {
           "anyOf": [
             {
-              "type": "object",
-              "required": [
-                "type"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "const": "none"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "required": [
-                "type",
-                "in",
-                "name"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "const": "apiKey"
-                },
-                "in": {
-                  "anyOf": [
-                    {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "type"
+                  ],
+                  "properties": {
+                    "type": {
                       "type": "string",
-                      "const": "header"
-                    },
-                    {
-                      "type": "string",
-                      "const": "query"
+                      "const": "none"
                     }
-                  ]
+                  },
+                  "additionalProperties": false
                 },
-                "name": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9_-]+$"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "required": [
-                "type",
-                "scheme"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "const": "http"
-                },
-                "scheme": {
-                  "anyOf": [
-                    {
+                {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "in",
+                    "name"
+                  ],
+                  "properties": {
+                    "type": {
                       "type": "string",
-                      "const": "basic"
+                      "const": "apiKey"
                     },
-                    {
+                    "in": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "header"
+                        },
+                        {
+                          "type": "string",
+                          "const": "query"
+                        }
+                      ]
+                    },
+                    "name": {
                       "type": "string",
-                      "const": "bearer"
+                      "pattern": "^[A-Za-z0-9_-]+$"
                     }
-                  ]
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "scheme"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "http"
+                    },
+                    "scheme": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "basic"
+                        },
+                        {
+                          "type": "string",
+                          "const": "bearer"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "flow",
+                    "authorizationURL",
+                    "tokenURL",
+                    "clientID",
+                    "redirectURI",
+                    "scopes",
+                    "pkce"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "oauth2"
+                    },
+                    "flow": {
+                      "type": "string",
+                      "const": "authorizationCode"
+                    },
+                    "authorizationURL": {
+                      "type": "string"
+                    },
+                    "tokenURL": {
+                      "type": "string"
+                    },
+                    "clientID": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "redirectURI": {
+                      "type": "string"
+                    },
+                    "scopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "pkce": {
+                      "type": "string",
+                      "const": "S256"
+                    }
+                  },
+                  "additionalProperties": false
                 }
-              },
-              "additionalProperties": false
+              ]
             },
             {
-              "type": "object",
-              "required": [
-                "type",
-                "flow",
-                "authorizationURL",
-                "tokenURL",
-                "clientID",
-                "redirectURI",
-                "scopes",
-                "pkce"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "const": "oauth2"
-                },
-                "flow": {
-                  "type": "string",
-                  "const": "authorizationCode"
-                },
-                "authorizationURL": {
-                  "type": "string"
-                },
-                "tokenURL": {
-                  "type": "string"
-                },
-                "clientID": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "redirectURI": {
-                  "type": "string"
-                },
-                "scopes": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "type"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "password"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "type"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "passkey"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "type"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "code"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "type",
+                      "service"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "provider"
+                      },
+                      "service": {
+                        "type": "string",
+                        "pattern": "^web:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$"
+                      }
+                    },
+                    "additionalProperties": false
                   }
-                },
-                "pkce": {
-                  "type": "string",
-                  "const": "S256"
-                }
+                ]
               },
-              "additionalProperties": false
+              "minItems": 1
             }
           ]
         },

@@ -200,10 +200,18 @@ export const APIAuthSchema = Type.Union([
 ]);
 export type APIAuth = Static<typeof APIAuthSchema>;
 
+export const WebAuthSchema = Type.Array(Type.Union([
+  Type.Object({ type: Type.Literal("password") }, { additionalProperties: false }),
+  Type.Object({ type: Type.Literal("passkey") }, { additionalProperties: false }),
+  Type.Object({ type: Type.Literal("code") }, { additionalProperties: false }),
+  Type.Object({ type: Type.Literal("provider"), service: Type.String({ pattern: "^web:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$" }) }, { additionalProperties: false }),
+]), { minItems: 1 });
+export type WebAuth = Static<typeof WebAuthSchema>;
+
 export const ServiceManifestSchema = Type.Object({
   domain: Type.String({ pattern: "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$" }),
   kind: Type.Optional(Type.Literal("api")),
-  auth: Type.Optional(APIAuthSchema),
+  auth: Type.Optional(Type.Union([APIAuthSchema, WebAuthSchema])),
   name: Type.String({ minLength: 1 }),
   description: Type.Optional(Type.String()),
   baseUrl: Type.String({ minLength: 1 }),
@@ -321,23 +329,31 @@ export function validateServiceManifest(input: unknown, profile: ManifestProfile
   }
   errors.push(...validateModelActions(m.actions, m.$defs), ...validateConversationAction(m.actions, m.$defs));
   if (!api && !HOST_RE.test(m.domain)) at("domain", "must be a website domain");
-  if (api !== (m.auth !== undefined)) at("auth", "is required only for API services");
-  if (api && m.auth?.type === "oauth2") {
+  const webAuth = Array.isArray(m.auth) ? m.auth : undefined;
+  const apiAuth = m.auth !== undefined && !Array.isArray(m.auth) ? m.auth : undefined;
+  if (api && !apiAuth) at("auth", "API services require one authentication object");
+  if (!api && apiAuth) at("auth", "web services declare an array of sign-in methods");
+  if (!api && webAuth) {
+    const methods = webAuth.map(method => method.type === "provider" ? `provider:${method.service}` : method.type);
+    if (new Set(methods).size !== methods.length) at("auth", "duplicate sign-in method");
+    if (webAuth.some(method => method.type === "provider" && method.service === `web:${m.domain}`)) at("auth", "provider must be another web service");
+  }
+  if (api && apiAuth?.type === "oauth2") {
     for (const field of ["authorizationURL", "tokenURL"] as const) {
       try {
-        const url = new URL(m.auth[field]);
+        const url = new URL(apiAuth[field]);
         if (url.protocol !== "https:" || url.username || url.password || url.hash || url.search) throw new Error();
       } catch { at(`auth.${field}`, "must be a credential-free HTTPS URL without query or fragment"); }
     }
     try {
-      const redirect = new URL(m.auth.redirectURI);
+      const redirect = new URL(apiAuth.redirectURI);
       if (["http:", "https:"].includes(redirect.protocol) || redirect.search || redirect.hash) throw new Error();
     } catch { at("auth.redirectURI", "must use an application callback scheme without query or fragment"); }
   }
   if (api) {
     for (const action of m.actions) {
       if (action.baseUrl || action.blocking !== undefined) at("actions", "API actions cannot declare page configuration");
-      if (action.requireAuth && m.auth?.type === "none") at("actions", "authenticated actions need service authentication");
+      if (action.requireAuth && apiAuth?.type === "none") at("actions", "authenticated actions need service authentication");
       if (["getSignInUrl", "getSignInState", "credentialStatus", "configureCredentials"].includes(action.id)) at("actions", "API authentication action IDs are reserved for the host");
     }
   }

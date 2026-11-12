@@ -60,7 +60,7 @@ nonisolated struct ServiceDefinition: Sendable {
                 throw ValidationError.invalid("API identity or authentication")
             }
             _ = try APIServiceAuth(auth)
-        } else if object["kind"] != nil || object["auth"] != nil {
+        } else if object["kind"] != nil || (object["auth"] != nil && object["auth"]?.arrayValue == nil) {
             throw ValidationError.invalid("kind or auth")
         }
         guard let rawBaseURL = object["baseUrl"]?.stringValue,
