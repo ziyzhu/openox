@@ -14,7 +14,9 @@ struct StreamingMarkdownText: View {
     var body: some View {
         let snapshot = buffer.snapshot
         let hasInteractiveCode = snapshot.blocks.contains { block in
-            if case .code(let language, _) = block { return DiffDocument.supports(language) }
+            if case .code(let language, _) = block {
+                return DiffDocument.supports(language) || language == "map" || language == "mermaid"
+            }
             if case .embed = block { return true }
             return false
         }
@@ -527,6 +529,10 @@ private struct MarkdownBlockView: View {
         case .code(let language, let body):
             if language == "mermaid", !isStreaming {
                 MermaidDiagramView(source: body, maxWidth: availableWidth, accessibilityIdentifier: accessibilityIdentifier) {
+                    codeBlock(body, language: language)
+                }
+            } else if language == "map", !isStreaming {
+                ConversationMapView(source: body, accessibilityIdentifier: accessibilityIdentifier) {
                     codeBlock(body, language: language)
                 }
             } else {
