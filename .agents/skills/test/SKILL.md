@@ -46,8 +46,9 @@ through the development repository, drives turns through Mock `execute` scripts,
 answers only expected prompts, deletes saved logins it created, and records
 screenshots and accessibility trees for failures. Assert with service results, fresh
 `listSessions` and fixture-server counters such as password submissions and CSRF
-rejections. Point `login` `baseUrl` at the sign-in route: the automatic step loop
-continues only while each step retrieves the saved login. Web content inside the
+rejections. Exercise destination-initiated provider redirects with preserved return
+parameters and preparatory clicks without secret retrieval. The bounded automatic
+step loop advances on navigation or visible control changes, not credential reads. Web content inside the
 handoff is reachable only through `idb ui describe-point`; open the full-screen
 handoff before typing into it. When a bundled service introduces a new site or login
 shape, add a fixture for it. For browser ownership changes, compare page IDs across

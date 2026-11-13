@@ -3,73 +3,62 @@ import WebKit
 
 extension ServiceOperations {
     private static let loginStepLimit = 5
-    private static let returnLimit = 3
 
     func completeLogin(service: Service, secrets: SecretAttempt?, input: JSONValue, session: JSONValue?, pageURL: String?,
                        approve: @escaping @MainActor (String, Any?) async -> Bool) async throws -> JSONValue {
+        var page = loginPage(service)
         if let secrets {
-            let verified = await completeAutomaticLogin(service: service, secrets: secrets, input: input, pageURL: pageURL, approve: approve)
+            guard let action = await service.resolvedAction(WebSessionContract.loginAction, args: input, pageURL: pageURL, scopeID: native.id) else {
+                throw Service.EvalError.notReady
+            }
+            let opened = try await service.openSessionPage(for: action)
+            page = try await serviceManager.actionScheduler.schedule(action, on: opened, destination: action.baseURL) { $0 }
+            let verified = await completeAutomaticLogin(service: service, secrets: secrets, input: input, page: opened, approve: approve)
             secrets.releaseRendering()
             if verified { return Self.loginResult(interaction: "automatic", verified: true) }
             if secrets.denied {
                 throw OxFunctionError(code: "permission_denied", message: "\(service.title) login: the user did not allow this action to use the saved login.", recovery: "Stop. Do not retry with the same login unless the user asks; offer manual login instead.")
             }
         }
+        try Task.checkCancellation()
+        let preparedPage = page
         return try await native.handoff(title: String(localized: "Sign in to \(service.title)")) { [self] in
-            if let provider = loginProvider(for: service, secrets: secrets) {
-                return try await completeProviderChain(service: service, provider: provider, secrets: secrets, input: input,
-                                                       session: session, pageURL: pageURL, approve: approve)
-            }
-            return try await handOffLogin(service: service, secrets: secrets, input: input, session: session, pageURL: pageURL,
-                                          prepare: secrets != nil, approve: approve)
+            try await handOffLogin(service: service, secrets: secrets, input: input, session: session, pageURL: pageURL,
+                                   prepare: secrets != nil, rememberFor: redirectProvider(for: service, in: preparedPage),
+                                   page: preparedPage, approve: approve)
         }
     }
 
-    func redirectProvider(for service: Service) -> Service? {
-        for page in service.servicePages {
-            guard let host = page.page.url?.host, !service.isServiceHost(host) else { continue }
-            if let provider = webLoginService(containing: host) { return provider }
-        }
-        return nil
-    }
-
-    private func loginProvider(for service: Service, secrets: SecretAttempt?) -> Service? {
-        let destination = service.definition.actionNamespace
-        if let owner = secrets?.owners.first(where: { $0 != destination }) {
-            return serviceManager.services.first { $0.isWebService && $0.definition.actionNamespace == owner }
-                .flatMap { WebSessionContract.isEnabled($0.definition) ? $0 : nil }
-        }
-        return redirectProvider(for: service)
+    func redirectProvider(for service: Service, in page: BrowserSession? = nil) -> Service? {
+        guard let page = page ?? loginPage(service), page.scopeID == native.id,
+              let host = page.page.url?.host, let provider = webLoginService(containing: host),
+              provider !== service else { return nil }
+        return provider
     }
 
     private func webLoginService(containing host: String) -> Service? {
-        serviceManager.services.first {
+        serviceManager.services.filter {
             $0.isWebService && WebSessionContract.isEnabled($0.definition)
                 && SecretAttempt.host(host, isWithin: $0.definition.actionNamespace)
-        }
+        }.max { $0.domain.count < $1.domain.count }
     }
 
-    private func completeAutomaticLogin(service: Service, secrets: SecretAttempt, input: JSONValue, pageURL: String?,
+    private func completeAutomaticLogin(service: Service, secrets: SecretAttempt, input: JSONValue, page: BrowserSession,
                                         approve: @escaping @MainActor (String, Any?) async -> Bool) async -> Bool {
         guard !secrets.isCoolingDown else {
             Log.service.info("Service.login automatic skipped domain=\(service.domain) reason=cooldown")
             return false
         }
-        let provider = loginProvider(for: service, secrets: secrets).flatMap { secrets.owners.contains($0.definition.actionNamespace) ? $0 : nil }
-        var verified: Bool
-        if let provider {
-            Log.service.info("Service.login hop domain=\(service.domain) provider=\(provider.domain)")
-            verified = await settledSession(service: provider, secrets: secrets, approve: approve)
-            if !verified {
-                verified = await runLoginSteps(service: provider, secrets: secrets, input: input, pageURL: nil,
-                                               approve: approve, started: false)
+        secrets.keepRendering(page)
+        var verified = await runLoginSteps(service: service, secrets: secrets, input: input, page: page, approve: approve)
+        if !verified, !secrets.denied, let provider = redirectProvider(for: service, in: page),
+           secrets.owners.contains(provider.definition.actionNamespace) {
+            Log.service.info("Service.login hop domain=\(service.domain) provider=\(provider.domain) page=\(page.logLabel)")
+            _ = await runLoginSteps(service: provider, secrets: secrets, input: input, page: page, approve: approve)
+            if !secrets.denied, page.page.url?.host.map(service.isServiceHost) == true,
+               redirectProvider(for: service, in: page) == nil {
+                verified = await settledSession(service: service, secrets: secrets, page: page, approve: approve)
             }
-            if verified {
-                verified = await returnToDestination(service: service, secrets: secrets, input: input, pageURL: pageURL, approve: approve)
-            }
-        } else {
-            verified = await runLoginSteps(service: service, secrets: secrets, input: input, pageURL: pageURL,
-                                           approve: approve, started: false)
         }
         if verified { secrets.recordSuccess() }
         else if secrets.stepEnd == .stalled { secrets.recordRejection() }
@@ -77,45 +66,71 @@ extension ServiceOperations {
         return verified
     }
 
-    private func runLoginSteps(service: Service, secrets: SecretAttempt, input: JSONValue, pageURL: String?,
-                               approve: @escaping @MainActor (String, Any?) async -> Bool, started: Bool) async -> Bool {
+    private func runLoginSteps(service: Service, secrets: SecretAttempt, input: JSONValue, page: BrowserSession,
+                               approve: @escaping @MainActor (String, Any?) async -> Bool) async -> Bool {
         secrets.stepEnd = .running
-        if !started {
-            guard await runLoginStep(service: service, secrets: secrets, input: input, pageURL: pageURL, in: nil,
-                                     approve: approve) else { return false }
-        }
-        var observed = 0
-        var previousURL: URL?
-        for step in 2...Self.loginStepLimit {
-            guard secrets.retrievals > observed, let page = loginPage(service) else {
-                secrets.stepEnd = secrets.retrievals > 0 ? .awaitingPerson : .finished
-                break
-            }
-            observed = secrets.retrievals
-            try? await Task.sleep(for: .milliseconds(1500))
-            await settle(page)
-            guard let url = page.page.url, let host = url.host, service.isServiceHost(host) else {
+        for step in 1...Self.loginStepLimit {
+            guard !Task.isCancelled, page.page.url?.host.map(service.isServiceHost) == true,
+                  redirectProvider(for: service, in: page) == nil else {
                 secrets.stepEnd = .leftSite
                 break
             }
-            guard url != previousURL else {
-                secrets.stepEnd = .stalled
-                Log.service.info("Service.login step stalled domain=\(service.domain) step=\(step) path=\(url.path)")
+            guard let before = await loginState(page) else {
+                secrets.stepEnd = .awaitingPerson
                 break
             }
-            previousURL = url
+            let retrievals = secrets.retrievals
             guard await runLoginStep(service: service, secrets: secrets, input: input, pageURL: nil, in: page,
                                      approve: approve) else {
                 secrets.stepEnd = .finished
                 break
             }
-            Log.service.info("Service.login step domain=\(service.domain) step=\(step) retrievals=\(secrets.retrievals) path=\(page.page.url?.path ?? "?")")
+            try? await Task.sleep(for: .milliseconds(1500))
+            await settle(page)
+            guard page.page.url?.host.map(service.isServiceHost) == true,
+                  redirectProvider(for: service, in: page) == nil else {
+                secrets.stepEnd = .leftSite
+                break
+            }
+            guard let after = await loginState(page), before != after else {
+                secrets.stepEnd = secrets.retrievals > retrievals ? .stalled : .awaitingPerson
+                Log.service.info("Service.login step stopped domain=\(service.domain) step=\(step) reason=unchanged-or-unavailable retrievals=\(secrets.retrievals)")
+                break
+            }
+            Log.service.info("Service.login step domain=\(service.domain) step=\(step) retrievals=\(secrets.retrievals) page=\(page.logLabel)")
         }
         if secrets.stepEnd == .running { secrets.stepEnd = .finished }
-        guard secrets.retrievals > 0 else {
-            return await hasIntendedSession(service: service, secrets: secrets, in: loginPage(service), approve: approve)
-        }
-        return await settledSession(service: service, secrets: secrets, page: loginPage(service), approve: approve)
+        if secrets.denied || Task.isCancelled { return false }
+        if secrets.stepEnd == .leftSite { return false }
+        return await settledSession(service: service, secrets: secrets, page: page, approve: approve)
+    }
+
+    private func loginState(_ page: BrowserSession) async -> String? {
+        let source = """
+        const controls = [];
+        let inspected = 0;
+        const visit = root => {
+            for (const element of root.querySelectorAll('*')) {
+                if (++inspected > 2048 || controls.length >= 128) break;
+                const style = getComputedStyle(element);
+                if (element.hidden || style.display === 'none' || style.visibility === 'hidden') continue;
+                if (element.matches('input:not([type=hidden]),button,a,select,iframe,[role=button],[role=alert]')) {
+                    let visible = true;
+                    for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+                        const style = getComputedStyle(parent);
+                        if (parent.hidden || style.display === 'none' || style.visibility === 'hidden') { visible = false; break; }
+                    }
+                    if (visible) controls.push([element.tagName, element.getAttribute('type'), element.getAttribute('autocomplete'),
+                        !!element.disabled, !!element.readOnly, element.getAttribute('aria-expanded'), element.getAttribute('aria-busy')]);
+                }
+                if (element.shadowRoot) visit(element.shadowRoot);
+            }
+        };
+        visit(document);
+        return JSON.stringify(controls);
+        """
+        guard let state = try? await page.evalOnce(page, source, timeout: 2) as? String else { return nil }
+        return "\(page.navigationGeneration):\(page.page.url?.absoluteString ?? ""):\(state)"
     }
 
     private func runLoginStep(service: Service, secrets: SecretAttempt, input: JSONValue, pageURL: String?,
@@ -134,59 +149,18 @@ extension ServiceOperations {
         return false
     }
 
-    private func returnToDestination(service: Service, secrets: SecretAttempt?, input: JSONValue, pageURL: String?,
-                                     approve: @escaping @MainActor (String, Any?) async -> Bool) async -> Bool {
-        if await settledSession(service: service, secrets: secrets, approve: approve) { return true }
-        for attempt in 1...Self.returnLimit {
-            guard case .success = await service.invokeAction(WebSessionContract.loginAction, args: input, pageURL: pageURL,
-                                                              secrets: secrets, scopeID: native.id, approve: approve) else { continue }
-            if await settledSession(service: service, secrets: secrets, page: loginPage(service), approve: approve) {
-                Log.service.info("Service.login returned domain=\(service.domain) attempts=\(attempt)")
-                return true
-            }
-        }
-        return false
-    }
-
-    private func completeProviderChain(service: Service, provider: Service, secrets: SecretAttempt?, input: JSONValue,
-                                       session: JSONValue?, pageURL: String?,
-                                       approve: @escaping @MainActor (String, Any?) async -> Bool) async throws -> JSONValue {
-        Log.service.info("Service.login chain domain=\(service.domain) provider=\(provider.domain)")
-        var providerTrace: JSONValue?
-        if !(await settledSession(service: provider, secrets: secrets, approve: approve)) {
-            let result = try await handOffLogin(service: provider, secrets: secrets, input: .object([:]), session: nil, pageURL: nil,
-                                               prepare: true, rememberFor: service, approve: approve)
-            providerTrace = result.objectValue?["loginTrace"]
-            guard await settledSession(service: provider, secrets: secrets, approve: approve) else {
-                return Self.loginResult(interaction: "completed", verified: false, trace: providerTrace)
-            }
-        }
-        if await returnToDestination(service: service, secrets: secrets, input: input, pageURL: pageURL, approve: approve) {
-            return Self.loginResult(interaction: "completed", verified: true, trace: providerTrace)
-        }
-        let result = try await handOffLogin(service: service, secrets: secrets, input: input, session: session, pageURL: pageURL,
-                                           prepare: true, approve: approve)
-        guard let providerTrace else { return result }
-        let destinationTrace = result.objectValue?["loginTrace"]?.objectValue
-        let steps = (providerTrace.objectValue?["steps"]?.arrayValue ?? []) + (destinationTrace?["steps"]?.arrayValue ?? [])
-        return result.merging(["loginTrace": .object([
-            "steps": .array(steps),
-            "truncated": .bool(providerTrace.objectValue?["truncated"]?.boolValue == true || destinationTrace?["truncated"]?.boolValue == true)
-        ])])
-    }
-
     func handOffLogin(service: Service, secrets: SecretAttempt?, input: JSONValue, session: JSONValue?, pageURL: String?,
-                              prepare: Bool, rememberFor destination: Service? = nil,
+                              prepare: Bool, rememberFor destination: Service? = nil, page: BrowserSession? = nil,
                               approve: @escaping @MainActor (String, Any?) async -> Bool) async throws -> JSONValue {
-        if prepare, loginPage(service)?.page.url?.host.map(service.isServiceHost) != true {
+        if prepare, page == nil, loginPage(service)?.page.url?.host.map(service.isServiceHost) != true {
             _ = await service.invokeAction(WebSessionContract.loginAction, args: .object([:]), pageURL: pageURL, scopeID: native.id, approve: approve)
         }
-        let capture = try await presentLogin(service: service, input: .object([:]), session: session, pageURL: pageURL)
+        let capture = try await presentLogin(service: service, input: .object([:]), session: session, pageURL: pageURL, page: page)
         await offerToRemember(capture, service: service, also: destination)
         let trace = capture.trace
         Log.service.info("Service.login trace domain=\(service.domain) steps=\(capture.steps.count) truncated=\(capture.truncated)")
         await capture.discard()
-        let verified = await settledSession(service: service, secrets: secrets, approve: approve)
+        let verified = await settledSession(service: service, secrets: secrets, page: page, approve: approve)
         return Self.loginResult(interaction: "completed", verified: verified, trace: trace)
     }
 
@@ -251,10 +225,10 @@ extension ServiceOperations {
         return false
     }
 
-    private func presentLogin(service: Service, input: JSONValue, session: JSONValue?, pageURL: String?) async throws -> LoginCapture {
+    private func presentLogin(service: Service, input: JSONValue, session: JSONValue?, pageURL: String?, page: BrowserSession?) async throws -> LoginCapture {
         let actionID = WebSessionContract.loginAction
         guard let action = await service.resolvedAction(actionID, args: input, session: session, pageURL: pageURL, scopeID: native.id),
-              let lease = try await serviceManager.actionScheduler.reserveForPresentation(action, on: loginPage(service), allowUnready: true) else {
+              let lease = try await serviceManager.actionScheduler.reserveForPresentation(action, on: page ?? loginPage(service), allowUnready: true) else {
             throw OxFunctionError(code: "page_unavailable", message: "Login preparation has no idle live page.", recovery: "Inspect the page and preparation failure before retrying login.")
         }
         defer { lease.release() }
