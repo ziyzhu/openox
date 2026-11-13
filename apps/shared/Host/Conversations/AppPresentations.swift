@@ -42,7 +42,7 @@ struct AppPresentations {
     let serviceHandoff: any ServiceHandoffPresenting
     let messages: any MessageComposing
     var providerAuthentication: (any ProviderAuthenticating)? = nil
-    var browser: (@MainActor (Service, Service.ServiceWebPage) -> Void)? = nil
+    var browser: (@MainActor (Service, BrowserSession) -> Void)? = nil
     var secretEntry: (@MainActor (SecretEntrySpec) async throws -> Bool)? = nil
     var serviceControl: (@MainActor (Conversation, ServiceControl) async -> JSONValue?)? = nil
 

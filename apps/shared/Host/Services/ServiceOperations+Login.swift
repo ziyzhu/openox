@@ -119,11 +119,11 @@ extension ServiceOperations {
     }
 
     private func runLoginStep(service: Service, secrets: SecretAttempt, input: JSONValue, pageURL: String?,
-                              in page: Service.ServiceWebPage?,
+                              in page: BrowserSession?,
                               approve: @escaping @MainActor (String, Any?) async -> Bool) async -> Bool {
         for _ in 0..<2 {
             let result = await service.invokeAction(WebSessionContract.loginAction, args: input, pageURL: pageURL, in: page,
-                                                    secrets: secrets, approve: approve)
+                                                    secrets: secrets, scopeID: native.id, approve: approve)
             guard !secrets.awaitingApproval.isEmpty else {
                 if case .success = result { return true }
                 return false
@@ -139,7 +139,7 @@ extension ServiceOperations {
         if await settledSession(service: service, secrets: secrets, approve: approve) { return true }
         for attempt in 1...Self.returnLimit {
             guard case .success = await service.invokeAction(WebSessionContract.loginAction, args: input, pageURL: pageURL,
-                                                              secrets: secrets, approve: approve) else { continue }
+                                                              secrets: secrets, scopeID: native.id, approve: approve) else { continue }
             if await settledSession(service: service, secrets: secrets, page: loginPage(service), approve: approve) {
                 Log.service.info("Service.login returned domain=\(service.domain) attempts=\(attempt)")
                 return true
@@ -179,7 +179,7 @@ extension ServiceOperations {
                               prepare: Bool, rememberFor destination: Service? = nil,
                               approve: @escaping @MainActor (String, Any?) async -> Bool) async throws -> JSONValue {
         if prepare, loginPage(service)?.page.url?.host.map(service.isServiceHost) != true {
-            _ = await service.invokeAction(WebSessionContract.loginAction, args: .object([:]), pageURL: pageURL, approve: approve)
+            _ = await service.invokeAction(WebSessionContract.loginAction, args: .object([:]), pageURL: pageURL, scopeID: native.id, approve: approve)
         }
         let capture = try await presentLogin(service: service, input: .object([:]), session: session, pageURL: pageURL)
         await offerToRemember(capture, service: service, also: destination)
@@ -196,13 +196,14 @@ extension ServiceOperations {
         return .object(result)
     }
 
-    func loginPage(_ service: Service) -> Service.ServiceWebPage? {
-        service.servicePages
+    func loginPage(_ service: Service) -> BrowserSession? {
+        serviceManager.browserSessions.sessions
+            .filter { $0.scopeID == native.id && $0.lastInvocation?.domain == service.domain }
             .filter { $0.lastInvocation?.actionID == WebSessionContract.loginAction }
             .max { ($0.lastInvocation?.startedAt ?? .distantPast) < ($1.lastInvocation?.startedAt ?? .distantPast) }
     }
 
-    private func settle(_ page: Service.ServiceWebPage) async {
+    private func settle(_ page: BrowserSession) async {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: .seconds(8))
         while page.navigationPhase.load != nil || page.page.isLoading, clock.now < deadline {
@@ -210,7 +211,7 @@ extension ServiceOperations {
         }
     }
 
-    func settledSession(service: Service, secrets: SecretAttempt?, page: Service.ServiceWebPage? = nil,
+    func settledSession(service: Service, secrets: SecretAttempt?, page: BrowserSession? = nil,
                                 approve: @escaping @MainActor (String, Any?) async -> Bool) async -> Bool {
         for attempt in 1...3 {
             if let page { await settle(page) }
@@ -221,11 +222,11 @@ extension ServiceOperations {
         return false
     }
 
-    func hasIntendedSession(service: Service, secrets: SecretAttempt?, in page: Service.ServiceWebPage? = nil,
+    func hasIntendedSession(service: Service, secrets: SecretAttempt?, in page: BrowserSession? = nil,
                             approve: @escaping @MainActor (String, Any?) async -> Bool) async -> Bool {
         let onSite = page?.page.url?.host.map(service.isServiceHost) == true
         guard case .success(let value) = await service.invokeAction(WebSessionContract.listAction, args: .object([:]),
-                                                                     in: onSite ? page : nil, approve: approve),
+                                                                     in: onSite ? page : nil, scopeID: native.id, approve: approve),
               let sessions = value.arrayValue, !sessions.isEmpty else { return false }
         guard let secrets, secrets.owners.contains(service.definition.actionNamespace) else { return true }
         let ids = Set(sessions.compactMap { $0.objectValue?["id"]?.stringValue })
@@ -252,8 +253,8 @@ extension ServiceOperations {
 
     private func presentLogin(service: Service, input: JSONValue, session: JSONValue?, pageURL: String?) async throws -> LoginCapture {
         let actionID = WebSessionContract.loginAction
-        guard let action = await service.resolvedAction(actionID, args: input, session: session, pageURL: pageURL),
-              let lease = try await serviceManager.actionScheduler.reserveForPresentation(action, allowUnready: true) else {
+        guard let action = await service.resolvedAction(actionID, args: input, session: session, pageURL: pageURL, scopeID: native.id),
+              let lease = try await serviceManager.actionScheduler.reserveForPresentation(action, on: loginPage(service), allowUnready: true) else {
             throw OxFunctionError(code: "page_unavailable", message: "Login preparation has no idle live page.", recovery: "Inspect the page and preparation failure before retrying login.")
         }
         defer { lease.release() }
@@ -307,7 +308,7 @@ extension ServiceOperations {
             Log.service.info("Service.login remember skipped domain=\(service.domain) reason=never")
             return
         }
-        guard case .success(let sessions) = await service.invokeAction(WebSessionContract.listAction, args: .object([:])) else {
+        guard case .success(let sessions) = await service.invokeAction(WebSessionContract.listAction, args: .object([:]), scopeID: native.id) else {
             Log.service.warning("Service.login remember skipped domain=\(service.domain) reason=session-discovery-failed")
             return
         }

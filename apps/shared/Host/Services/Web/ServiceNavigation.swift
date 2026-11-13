@@ -1,8 +1,8 @@
 import Foundation
 import WebKit
 
-extension Service {
-    func observeNavigations(in session: ServiceWebPage) -> Task<Void, Never> {
+extension BrowserSession {
+    func observeNavigations(in session: BrowserSession) -> Task<Void, Never> {
         Task { @MainActor [weak self, weak session] in
             guard let self, let session else { return }
             while !Task.isCancelled, self.owns(session) {
@@ -43,71 +43,25 @@ extension Service {
         }
     }
 
-    @discardableResult
-    func navigate(_ url: URL, timeout: TimeInterval = 15) async -> URL? {
-        guard let action = await inspectionAction() else { return nil }
-        return try? await withNavigationPage(for: action) { page in
-            await self.navigate(url, in: page, timeout: timeout)
-        }
-    }
-
-    @discardableResult
-    func reload(timeout: TimeInterval = 15) async -> URL? {
-        guard let action = await inspectionAction() else { return nil }
-        return try? await withNavigationPage(for: action) { page in
-            await self.reload(page, timeout: timeout)
-        }
-    }
-
-    @discardableResult
-    func goBack(timeout: TimeInterval = 15) async -> URL? {
-        guard let action = await inspectionAction() else { return nil }
-        return try? await withNavigationPage(for: action) { page in
-            await self.goBack(page, timeout: timeout)
-        }
-    }
-
-    @discardableResult
-    func goForward(timeout: TimeInterval = 15) async -> URL? {
-        guard let action = await inspectionAction() else { return nil }
-        return try? await withNavigationPage(for: action) { page in
-            await self.goForward(page, timeout: timeout)
-        }
-    }
-
-    private func withNavigationPage<T>(
-        for action: Action,
-        operation: @escaping @MainActor @Sendable (ServiceWebPage) async throws -> T
-    ) async throws -> T {
-        guard domain != "ios:browser" else { throw EvalError.notActive }
-        let page = try await openSessionPage(for: action)
-        return try await manager.actionScheduler.schedule(
-            action,
-            on: page,
-            kind: .navigation,
-            operation: operation
-        )
-    }
-
-    func navigate(_ url: URL, in page: ServiceWebPage, timeout: TimeInterval = 15) async -> URL? {
+    func navigate(_ url: URL, in page: BrowserSession, timeout: TimeInterval = 15) async -> URL? {
         await performNavigation(.load(URLRequest(url: url)), in: page, label: "load", timeout: timeout)
     }
 
-    func reload(_ page: ServiceWebPage, fromOrigin: Bool = false, timeout: TimeInterval = 15) async -> URL? {
+    func reload(_ page: BrowserSession, fromOrigin: Bool = false, timeout: TimeInterval = 15) async -> URL? {
         await performNavigation(.reload(fromOrigin: fromOrigin), in: page, label: "reload", timeout: timeout)
     }
 
-    func goBack(_ page: ServiceWebPage, timeout: TimeInterval = 15) async -> URL? {
+    func goBack(_ page: BrowserSession, timeout: TimeInterval = 15) async -> URL? {
         await performNavigation(.back, in: page, label: "back", timeout: timeout)
     }
 
-    func goForward(_ page: ServiceWebPage, timeout: TimeInterval = 15) async -> URL? {
+    func goForward(_ page: BrowserSession, timeout: TimeInterval = 15) async -> URL? {
         await performNavigation(.forward, in: page, label: "forward", timeout: timeout)
     }
 
     func performNavigation(
         _ command: NavigationCommand,
-        in session: ServiceWebPage,
+        in session: BrowserSession,
         label: String,
         timeout: TimeInterval,
         prepare: (@MainActor () async -> Void)? = nil
@@ -134,12 +88,12 @@ extension Service {
     }
 
     func requestNavigation(
-        in session: ServiceWebPage,
+        in session: BrowserSession,
         label: String,
         timeout: TimeInterval
-    ) -> ServiceWebPage.NavigationLease? {
+    ) -> BrowserSession.NavigationLease? {
         guard owns(session) else { return nil }
-        let lease = ServiceWebPage.NavigationLease(label: label, timeout: timeout)
+        let lease = BrowserSession.NavigationLease(label: label, timeout: timeout)
         if transitionNavigation(.requested(lease), on: session) {
             session.navigationFailure = nil
             Log.webView.info("Service.navigation requested domain=\(domain) session=\(session.logLabel) id=\(lease.id.uuidString.prefix(8)) label=\(label) active=\(activeInvocationCount(in: session)) queued=\(queuedInvocationCount(in: session))")
@@ -153,8 +107,8 @@ extension Service {
     }
 
     func awaitNavigationReservation(
-        _ lease: ServiceWebPage.NavigationLease,
-        in session: ServiceWebPage
+        _ lease: BrowserSession.NavigationLease,
+        in session: BrowserSession
     ) async -> Bool {
         guard owns(session) else { return false }
         if case .reserved(let current) = session.navigationPhase, current === lease { return true }
@@ -166,8 +120,8 @@ extension Service {
 
     func startNavigation(
         _ command: NavigationCommand,
-        lease: ServiceWebPage.NavigationLease,
-        in session: ServiceWebPage
+        lease: BrowserSession.NavigationLease,
+        in session: BrowserSession
     ) async -> URL? {
         await withCheckedContinuation { (continuation: CheckedContinuation<URL?, Never>) in
             guard owns(session),
@@ -177,7 +131,7 @@ extension Service {
                 return
             }
             lease.completion = continuation
-            let load = ServiceWebPage.NavigationLoad(
+            let load = BrowserSession.NavigationLoad(
                 lease: lease,
                 generation: session.navigationGeneration
             )
@@ -214,8 +168,8 @@ extension Service {
     }
 
     func abandonNavigation(
-        _ lease: ServiceWebPage.NavigationLease,
-        in session: ServiceWebPage,
+        _ lease: BrowserSession.NavigationLease,
+        in session: BrowserSession,
         reason: String
     ) {
         guard owns(session) else { return }
@@ -223,8 +177,8 @@ extension Service {
         Log.webView.info("Service.navigation abandoned domain=\(domain) session=\(session.logLabel) id=\(lease.id.uuidString.prefix(8)) label=\(lease.label) reason=\(reason)")
     }
 
-    func abandonActiveNavigation(in session: ServiceWebPage, reason: String) {
-        let lease: ServiceWebPage.NavigationLease? = switch session.navigationPhase {
+    func abandonActiveNavigation(in session: BrowserSession, reason: String) {
+        let lease: BrowserSession.NavigationLease? = switch session.navigationPhase {
         case .pending(let current), .reserved(let current): current
         case .navigating(let load), .verifying(let load, _): load.lease
         case .settling(let settlement): settlement.load.lease
@@ -235,8 +189,8 @@ extension Service {
     }
 
     func navigationTimedOut(
-        _ lease: ServiceWebPage.NavigationLease,
-        in session: ServiceWebPage
+        _ lease: BrowserSession.NavigationLease,
+        in session: BrowserSession
     ) async {
         guard owns(session),
               session.navigationPhase.load?.lease === lease else { return }
@@ -263,36 +217,21 @@ extension Service {
     }
 
     func verifyNavigation(
-        in session: ServiceWebPage,
-        load: ServiceWebPage.NavigationLoad,
+        in session: BrowserSession,
+        load: BrowserSession.NavigationLoad,
         url: URL
     ) async {
-        let generation = load.generation
-        let host = url.host?.lowercased()
-        let serviceHost = host.map(isServiceHost) == true
-        let dispatcherReady: Bool
-        if domain == "ios:browser" {
-            dispatcherReady = true
-        } else if serviceHost {
-            dispatcherReady = await dispatcherIsReady(in: session, generation: generation)
-        } else {
-            dispatcherReady = false
+        guard BrowserNavigation.allowsServiceNavigation(url) else {
+            _ = transitionNavigation(.verified(load, url, .dispatcherMissing), on: session)
+            return
         }
-        if dispatcherReady {
-            guard transitionNavigation(.verified(load, url, .ready), on: session) else { return }
-            Log.webView.info("Service.navigation ready domain=\(domain) session=\(session.logLabel) nav=\(generation) active=\(activeInvocationCount(in: session)) queued=\(queuedInvocationCount(in: session))")
-        } else if BrowserNavigation.allowsServiceNavigation(url), !serviceHost {
-            guard transitionNavigation(.verified(load, url, .offDomain), on: session) else { return }
-            Log.webView.info("Service.navigation off-domain domain=\(domain) session=\(session.logLabel) nav=\(generation) host=\(host ?? "?") queued=\(queuedInvocationCount(in: session))")
-        } else {
-            guard transitionNavigation(.verified(load, url, .dispatcherMissing), on: session) else { return }
-            Log.webView.error("Service.navigation dispatcher-missing domain=\(domain) session=\(session.logLabel) nav=\(generation) host=\(host ?? "?")")
-        }
+        guard transitionNavigation(.verified(load, url, .ready), on: session) else { return }
+        Log.webView.info("BrowserSession.navigation ready session=\(session.logLabel) nav=\(load.generation) host=\(url.host ?? "?")")
     }
 
     func scheduleNavigationSettlement(
-        in session: ServiceWebPage,
-        settlement: ServiceWebPage.NavigationSettlement
+        in session: BrowserSession,
+        settlement: BrowserSession.NavigationSettlement
     ) {
         settlement.task = Task { @MainActor [weak self, weak session, weak settlement] in
             try? await Task.sleep(for: .milliseconds(400))
@@ -302,7 +241,7 @@ extension Service {
     }
 
     func navigationFailed(
-        in session: ServiceWebPage,
+        in session: BrowserSession,
         error: any Error
     ) {
         guard let load = session.navigationPhase.load,
@@ -313,7 +252,7 @@ extension Service {
         Log.webView.error("Service.navigation failed domain=\(domain) session=\(session.logLabel) nav=\(load.generation) error=\(LogPrivacy.text(error.localizedDescription))")
     }
 
-    func receive(_ event: ServiceWebPage.NavigationEvent, from session: ServiceWebPage) async {
+    func receive(_ event: BrowserSession.NavigationEvent, from session: BrowserSession) async {
         guard owns(session) else { return }
         switch event {
         case .started:
@@ -376,29 +315,5 @@ extension Service {
             _ = transitionNavigation(event, on: session)
         }
     }
-
-    func dispatcherIsReady(in session: ServiceWebPage, generation: Int) async -> Bool {
-        guard owns(session), session.navigationGeneration == generation else { return false }
-        do {
-            let raw = try await evalOnce(
-                session,
-                "return { dispatcher: typeof window.ox?.callServiceAction === 'function', runtime: typeof window.ox?.status === 'function' ? window.ox.status() : null, document: document.readyState };",
-                timeout: 5
-            )
-            guard owns(session), session.navigationGeneration == generation else { return false }
-            let probe = raw as? [String: Any]
-            let runtime = probe?["runtime"] as? [String: Any]
-            let ready = probe?["dispatcher"] as? Bool == true && runtime?["state"] as? String == "ready"
-            if !ready {
-                Log.webView.error("Service.dispatcher unavailable domain=\(domain) session=\(session.logLabel) nav=\(generation) repository=\(definition.repositoryID ?? "native") dispatcher=\(probe?["dispatcher"] as? Bool ?? false) installation=\(runtime?["state"] as? String ?? "missing") actions=\(runtime?["actionCount"] as? Int ?? 0) document=\(probe?["document"] as? String ?? "unknown") error=\(LogPrivacy.text(runtime?["error"] as? String ?? "none"))")
-            }
-            return ready
-        } catch {
-            Log.webView.error("Service.dispatcher probe failed domain=\(domain) session=\(session.logLabel) nav=\(generation) error=\(LogPrivacy.text(error.localizedDescription))")
-            return false
-        }
-    }
-
-    // MARK: - Actions
 
 }

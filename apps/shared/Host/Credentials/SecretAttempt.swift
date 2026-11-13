@@ -116,7 +116,7 @@ final class SecretAttempt {
 
     var holdsValues: Bool { !released.isEmpty }
 
-    func keepRendering(_ page: Service.ServiceWebPage) {
+    func keepRendering(_ page: BrowserSession) {
         let id = ObjectIdentifier(page)
         guard renderings[id] == nil else { return }
         renderings[id] = HiddenPageHost.keep(page.page)

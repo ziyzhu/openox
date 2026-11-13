@@ -5,7 +5,7 @@ enum SecretRequestGuard {
     private static var lists: [String: WKContentRuleList] = [:]
     private static var installed: [ObjectIdentifier: WKContentRuleList] = [:]
 
-    static func install(on page: Service.ServiceWebPage, owner: String) async {
+    static func install(on page: BrowserSession, owner: String) async {
         guard installed[ObjectIdentifier(page)] == nil,
               let domain = owner.split(separator: ":", maxSplits: 1).last.map(String.init),
               let list = await ruleList(for: domain) else { return }
@@ -14,7 +14,7 @@ enum SecretRequestGuard {
         Log.service.info("SecretRequestGuard.install page=\(page.logLabel) domain=\(domain)")
     }
 
-    static func remove(from page: Service.ServiceWebPage) {
+    static func remove(from page: BrowserSession) {
         guard let list = installed.removeValue(forKey: ObjectIdentifier(page)) else { return }
         page.userContentController.remove(list)
         Log.service.info("SecretRequestGuard.remove page=\(page.logLabel)")

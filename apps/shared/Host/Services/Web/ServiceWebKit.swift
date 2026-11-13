@@ -1,35 +1,30 @@
 import Foundation
 import WebKit
 
-extension Service.ServiceWebPage {
+extension BrowserSession {
     final class NavigationDecider: WebPage.NavigationDeciding {
-        weak var service: Service?
-        weak var servicePage: Service.ServiceWebPage?
-
-        init(service: Service) {
-            self.service = service
-        }
+        weak var session: BrowserSession?
 
         func decidePolicy(
             for action: WebPage.NavigationAction,
             preferences: inout WebPage.NavigationPreferences
         ) async -> WKNavigationActionPolicy {
-            guard let service, let servicePage else { return .cancel }
-            return await service.decidePolicy(for: action, preferences: &preferences, in: servicePage)
+            guard let session else { return .cancel }
+            return await session.decidePolicy(for: action, preferences: &preferences, in: session)
         }
 
         func decidePolicy(for response: WebPage.NavigationResponse) async -> WKNavigationResponsePolicy {
-            guard let service, let servicePage else { return .cancel }
-            return await service.decidePolicy(for: response, in: servicePage)
+            guard let session else { return .cancel }
+            return await session.decidePolicy(for: response, in: session)
         }
     }
 }
 
-extension Service {
+extension BrowserSession {
     func decidePolicy(
         for action: WebPage.NavigationAction,
         preferences: inout WebPage.NavigationPreferences,
-        in session: ServiceWebPage
+        in session: BrowserSession
     ) async -> WKNavigationActionPolicy {
         session.observeFrames(action)
         let url = action.request.url
@@ -65,7 +60,7 @@ extension Service {
         return .allow
     }
 
-    func decidePolicy(for response: WebPage.NavigationResponse, in session: ServiceWebPage) async -> WKNavigationResponsePolicy {
+    func decidePolicy(for response: WebPage.NavigationResponse, in session: BrowserSession) async -> WKNavigationResponsePolicy {
         guard response.canShowMimeType else {
             if owns(session) {
                 await receive(.becameDownload, from: session)
@@ -81,13 +76,13 @@ extension Service {
     }
 }
 
-extension Service: WKScriptMessageHandler {
+extension BrowserSession: WKScriptMessageHandler {
     nonisolated func userContentController(_ ucc: WKUserContentController, didReceive message: WKScriptMessage) {
         MainActor.assumeIsolated {
             let frame = message.frameInfo
             let origin = frame.securityOrigin.host
             let tag = origin.isEmpty ? (frame.request.url?.host ?? "?") : origin
-            guard isServiceHost(tag) else { return }
+            guard frameServiceSources.keys.contains(where: { tag == $0 || tag.hasSuffix("." + $0) }) else { return }
             WebViewBridges.handle(message: message, tag: tag)
         }
     }

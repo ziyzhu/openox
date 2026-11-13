@@ -26,7 +26,7 @@ final class WebConversation {
     let id: UUID
     let owner: Owner
     let service: Service
-    let page: Service.ServiceWebPage
+    let page: BrowserSession
     private let navigationGeneration: Int
     private enum State: Equatable {
         case ready
@@ -70,7 +70,7 @@ final class WebConversation {
     fileprivate let selectedSession: JSONValue?
     fileprivate let initialPageURL: String
 
-    private init(id: UUID, service: Service, page: Service.ServiceWebPage, owner: Owner, session: JSONValue?, initialPageURL: String) {
+    private init(id: UUID, service: Service, page: BrowserSession, owner: Owner, session: JSONValue?, initialPageURL: String) {
         self.id = id
         self.service = service
         self.page = page
@@ -315,7 +315,7 @@ extension ServiceManager {
         }
         for (id, opening) in openings {
             openingWebConversations.removeValue(forKey: id)
-            let pendingPages = opening.service.ownedPages.values.filter {
+            let pendingPages = opening.service.registeredPages.values.filter {
                 if case .conversation(let pageOwner) = $0.owner { return pageOwner == id }
                 return false
             }

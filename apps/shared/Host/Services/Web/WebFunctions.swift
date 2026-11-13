@@ -1,4 +1,5 @@
 import Foundation
+import WebKit
 
 nonisolated enum WebExecutionLimits {
     static let maxFetches = 8
@@ -82,10 +83,15 @@ extension Conversation {
         return try await tracked(name, arguments, purpose: purpose) {
             if action == "getPageState" {
                 let fields = arguments.objectValue ?? [:]
-                var prepared: (Service, Service.ServiceWebPage)?
+                var prepared: (Service, BrowserSession)?
                 if let domain = fields["service"]?.stringValue {
-                    guard let target = self.attachedServices.first(where: { $0.domain == domain && $0.isWebService }),
-                          let page = self.serviceOperations.loginPage(target) ?? (target.servicePages.count == 1 ? target.servicePages.first : nil) else {
+                    guard let target = self.attachedServices.first(where: { $0.domain == domain && $0.isWebService }) else {
+                        throw RuntimeError.bridge("Attach the web service before inspecting its frames.")
+                    }
+                    let candidates = self.serviceManager.browserSessions.sessions.filter {
+                        $0.scopeID == self.id && (target.servicePages.contains($0) || $0.lastInvocation?.domain == domain || $0.page.url?.host.map(target.isServiceHost) == true)
+                    }
+                    guard let page = self.serviceOperations.loginPage(target) ?? (candidates.count == 1 ? candidates.first : nil) else {
                         throw RuntimeError.bridge("Attach the web service and prepare a unique live page before inspecting its frames.")
                     }
                     prepared = (target, page)

@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 import WebKit
 
-extension Service.ServiceWebPage {
+extension BrowserSession {
     struct FrameTarget {
         let id: String
         let info: WebPage.FrameInfo?
@@ -33,7 +33,7 @@ extension Service.ServiceWebPage {
         }
     }
 
-    func discoverFrames(owner: Service) async throws -> [FrameTarget] {
+    func discoverFrames() async throws -> [FrameTarget] {
         let generation = navigationGeneration
         let candidates: [WebPage.FrameInfo?] = [nil] + frameCandidates.map(Optional.some)
         var found: [String: FrameTarget] = [:]
@@ -42,14 +42,14 @@ extension Service.ServiceWebPage {
         for (index, candidate) in candidates.enumerated() {
             if clock.now >= deadline { omittedFrames += candidates.count - index; break }
             try Task.checkCancellation()
-            guard owner.owns(self), navigationGeneration == generation else { throw Service.EvalError.contextInvalidated }
+            guard isOpen, navigationGeneration == generation else { throw Service.EvalError.contextInvalidated }
             let source = """
             \(Self.frameIdentityScript)
             let parentID = null;
             try { if (window !== top) parentID = parent.__oxDocumentID || null; } catch {}
             return { id: window.__oxDocumentID, origin: location.origin, parentID };
             """
-            guard let raw = try? await owner.evalOnce(self, source, timeout: 1, frame: candidate),
+            guard let raw = try? await evalOnce(self, source, timeout: 1, frame: candidate),
                   let fields = JSONValue.from(raw).objectValue,
                   let id = fields["id"]?.stringValue,
                   let origin = fields["origin"]?.stringValue else { continue }
@@ -60,15 +60,15 @@ extension Service.ServiceWebPage {
             found[id] = FrameTarget(id: id, info: candidate, origin: origin,
                                     parentID: fields["parentID"]?.stringValue, isMainFrame: candidate == nil)
         }
-        guard owner.owns(self), navigationGeneration == generation else { throw Service.EvalError.contextInvalidated }
+        guard isOpen, navigationGeneration == generation else { throw Service.EvalError.contextInvalidated }
         frameCandidates = found.values.compactMap(\.info)
         frameTargets = found
         return found.values.sorted { $0.id < $1.id }
     }
 
-    func requireFrame(_ id: String, owner: Service) async throws -> FrameTarget {
+    func requireFrame(_ id: String) async throws -> FrameTarget {
         guard frameTargets[id] != nil,
-              let target = try await discoverFrames(owner: owner).first(where: { $0.id == id }) else {
+              let target = try await discoverFrames().first(where: { $0.id == id }) else {
             throw OxFunctionError(code: "frame_unavailable", message: "The selected frame document is no longer available.", recovery: "Inspect getPageState again. Do not automatically repeat an action whose outcome is uncertain.")
         }
         return target
@@ -90,38 +90,42 @@ extension Service.ServiceWebPage {
     }
 }
 
-extension Service {
-    func installFrameServices(_ services: [Service], on page: ServiceWebPage) async throws {
+extension BrowserSession {
+    func installFrameServices(_ services: [Service], on page: BrowserSession) async throws {
         guard owns(page), page.secretAttempt?.holdsValues != true else { throw EvalError.contextInvalidated }
-        var sources: [String: String] = [:]
+        var sources = page.frameServiceSources
         for service in services where service.isWebService {
             try await manager.requireInvocationAccess(for: service)
             await service.loadManifest()
             if let source = service.resolutionState.resolved?.actions { sources[service.domain] = source }
         }
-        if isWebService { sources[domain] = page.actions }
-        if page.frameServiceSources != sources {
+        let changed = page.frameServiceSources != sources
+        if changed {
             page.frameServiceSources = sources
             page.scriptMode = nil
             configureScripts(for: page.page.url, in: page)
         }
+        let targets = try await page.discoverFrames()
+        guard changed else { return }
         let script = frameServicesScript(page)
-        for target in try await page.discoverFrames(owner: self) {
+        for target in targets {
             _ = try await evalOnce(page, target.guarded(script), timeout: 3, frame: target.info)
         }
     }
 
-    func frameServicesScript(_ page: ServiceWebPage) -> String {
-        var sources = page.frameServiceSources
-        if isWebService { sources[domain] = page.actions }
+    func frameServicesScript(_ page: BrowserSession) -> String {
+        let sources = page.frameServiceSources
         let domains = sources.keys.sorted { $0.count > $1.count }
         let choices = JSONValue.array(domains.map(JSONValue.string)).jsonString()
-        let version = SHA256.hash(data: Data(domains.map { $0 + (sources[$0] ?? "") }.joined().utf8)).map { String(format: "%02x", $0) }.joined()
         let installers = domains.map { domain in
-            """
+            let version = SHA256.hash(data: Data(sources[domain]!.utf8)).map { String(format: "%02x", $0) }.joined()
+            let identity = JSONValue.string(domain + ":" + version).jsonString()
+            return """
             if (domain === \(JSONValue.string(domain).jsonString())) {
+              if (window.__oxInstalledService === \(identity)) return;
               \(ServiceActionRuntime.source(domain: domain))
               \(sources[domain]!)
+              window.__oxInstalledService = \(identity);
             }
             """
         }.joined(separator: "\n")
@@ -129,9 +133,8 @@ extension Service {
         (() => {
           const host = location.hostname.toLowerCase();
           const domain = \(choices).find(domain => host === domain || host.endsWith('.' + domain));
-          if (!domain || window.__oxInstalledService === domain + ':\(version)') return;
+          if (!domain) return;
           \(installers)
-          window.__oxInstalledService = domain + ':\(version)';
         })();
         """
     }

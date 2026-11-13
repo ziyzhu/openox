@@ -6,7 +6,7 @@ import WebKit
 final class MacServiceWindows: NSObject, NSWindowDelegate {
     struct Selection {
         let service: Service
-        let session: Service.ServiceWebPage
+        let session: BrowserSession
     }
 
     private var windows: [UUID: NSWindow] = [:]

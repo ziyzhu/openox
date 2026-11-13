@@ -28,13 +28,13 @@ final class ServiceHandoffSession {
     private(set) var phase: Phase = .ready
 
     private weak var service: Service?
-    private let servicePage: Service.ServiceWebPage
+    private let servicePage: BrowserSession
     private var startedAt = ProcessInfo.processInfo.systemUptime
     private var completion: CheckedContinuation<Outcome, Never>?
 
     init(
         service: Service,
-        servicePage: Service.ServiceWebPage,
+        servicePage: BrowserSession,
         title: String,
         navigationTitle: String,
         control: ServiceControl? = nil

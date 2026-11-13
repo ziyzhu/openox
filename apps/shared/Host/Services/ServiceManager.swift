@@ -70,6 +70,7 @@ final class ServiceManager {
     @ObservationIgnored private let nativeServices: any NativeServiceCatalog
     @ObservationIgnored private var memoryWarningObserver: NSObjectProtocol?
     @ObservationIgnored private var folderGrantObserver: NSObjectProtocol?
+    @ObservationIgnored let browserSessions = BrowserSessionStore()
     @ObservationIgnored let actionScheduler = ServiceActionScheduler()
     @ObservationIgnored let browserActionSessions = ServiceBrowserActionSessionCoordinator()
     @ObservationIgnored private var intrinsicBrowserService: Service?

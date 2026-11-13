@@ -19,7 +19,7 @@ final class ServiceOperations {
     let begin: (String, JSONValue, String) -> UUID
     let finish: (UUID, Result<JSONValue?, Error>) -> Void
     let native: NativeServiceOperations
-    let presentServiceHandoff: ((Service, Service.ServiceWebPage, ServiceHandoffSession) async -> ServiceHandoffSession.Outcome)?
+    let presentServiceHandoff: ((Service, BrowserSession, ServiceHandoffSession) async -> ServiceHandoffSession.Outcome)?
     let rememberSecret: ((SecretEntrySpec) async -> Bool)?
 
     init(
@@ -40,7 +40,7 @@ final class ServiceOperations {
         begin: @escaping (String, JSONValue, String) -> UUID,
         finish: @escaping (UUID, Result<JSONValue?, Error>) -> Void,
         native: NativeServiceOperations,
-        presentServiceHandoff: ((Service, Service.ServiceWebPage, ServiceHandoffSession) async -> ServiceHandoffSession.Outcome)? = nil,
+        presentServiceHandoff: ((Service, BrowserSession, ServiceHandoffSession) async -> ServiceHandoffSession.Outcome)? = nil,
         rememberSecret: ((SecretEntrySpec) async -> Bool)? = nil
     ) {
         self.serviceManager = serviceManager
@@ -529,14 +529,15 @@ final class ServiceOperations {
             throw RuntimeError.bridge("ox.service.showPage: requires a web service action")
         }
         return try await tracked(Actions.serviceShowPage, .object(["name": .string(name), "input": input, "session": session ?? .null, "pageUrl": pageURL.map(JSONValue.string) ?? .null]), purpose: purpose) {
-            let page = service.servicePages.filter { page in
+            let page = serviceManager.browserSessions.sessions.filter { page in
+                guard page.scopeID == self.native.id else { return false }
                 guard let prepared = page.lastInvocation else { return false }
-                return prepared.actionID == actionID && prepared.args == input
+                return prepared.domain == service.domain && prepared.actionID == actionID && prepared.args == input
                     && prepared.requestedSession == session && prepared.pageURL == pageURL
             }.max { ($0.lastInvocation?.startedAt ?? .distantPast) < ($1.lastInvocation?.startedAt ?? .distantPast) }
             guard let page, let prepared = page.lastInvocation,
                   let action = await service.resolvedAction(actionID, args: input, session: prepared.selectedSession, pageURL: prepared.pageURL),
-                  let lease = try await serviceManager.actionScheduler.reserveForPresentation(action, allowUnready: true) else {
+                  let lease = try await serviceManager.actionScheduler.reserveForPresentation(action, on: page, allowUnready: true) else {
                 throw OxFunctionError(code: "page_unavailable", message: "ox.service.showPage: this action has no idle live page.", recovery: "Wait for active actions to finish. Use the name and input of the action whose page you want to show. This function never opens a replacement page or reruns the action.")
             }
             guard lease.page === page, page.lastInvocation?.id == prepared.id else {
@@ -576,7 +577,7 @@ final class ServiceOperations {
         }
     }
 
-    func requirePresentablePage(service: Service, page: Service.ServiceWebPage) async throws {
+    func requirePresentablePage(service: Service, page: BrowserSession) async throws {
         let generation = page.navigationGeneration
         guard service.owns(page),
               let scheme = page.page.url?.scheme?.lowercased(), ["http", "https"].contains(scheme),

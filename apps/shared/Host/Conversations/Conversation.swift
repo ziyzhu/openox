@@ -285,6 +285,7 @@ final class Conversation: Identifiable {
         pendingHandoffs.removeAll()
         for task in handoffs { task.cancel() }
         serviceManager.browserActionSessions.closeSession(for: id)
+        serviceManager.browserSessions.close(scopeID: id)
         if cancelling { durablePreparation?.cancel(); cancelAll() }
         if isTemporary { Task { await OxHostProtocol.releaseDurableTemporaryConversation(self) } }
     }

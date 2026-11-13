@@ -50,7 +50,9 @@ rejections. Point `login` `baseUrl` at the sign-in route: the automatic step loo
 continues only while each step retrieves the saved login. Web content inside the
 handoff is reachable only through `idb ui describe-point`; open the full-screen
 handoff before typing into it. When a bundled service introduces a new site or login
-shape, add a fixture for it.
+shape, add a fixture for it. For browser ownership changes, compare page IDs across
+service redirects, reject stale document IDs, and verify separate conversations
+do not reuse each other’s pages.
 
 For filesystem audits, round-trip ordinary files in the default conversation working
 directory, include mixed text/binary searches and exact-limit results, and reconstruct

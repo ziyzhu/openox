@@ -121,6 +121,7 @@ final class HTMLView {
         browser = nil
         activeHandoff?.cancel()
         serviceManager.browserActionSessions.closeSession(for: id)
+        serviceManager.browserSessions.close(scopeID: id)
         serviceManager.closeWebConversations(owner: .canvas(id))
         for service in services.values where service.isWebService { service.discardPages() }
     }

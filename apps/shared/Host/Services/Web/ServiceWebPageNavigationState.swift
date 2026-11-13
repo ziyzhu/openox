@@ -1,10 +1,9 @@
 import Foundation
 import WebKit
 
-extension Service.ServiceWebPage {
+extension BrowserSession {
     enum NavigationVerification {
         case ready
-        case offDomain
         case dispatcherMissing
     }
 
@@ -19,7 +18,6 @@ extension Service.ServiceWebPage {
         case documentReady(NavigationLoad, URL)
         case settled(NavigationSettlement)
         case verified(NavigationLoad, URL, NavigationVerification)
-        case serviceDomainLost
         case startFailed(NavigationLease)
         case abandoned(NavigationLease, String)
         case timedOut(NavigationLease)
@@ -40,7 +38,6 @@ extension Service.ServiceWebPage {
             case .documentReady: "documentReady"
             case .settled: "settled"
             case .verified: "verified"
-            case .serviceDomainLost: "serviceDomainLost"
             case .startFailed: "startFailed"
             case .abandoned: "abandoned"
             case .timedOut: "timedOut"
@@ -148,20 +145,12 @@ extension Service.ServiceWebPage {
             case .ready:
                 navigationPhase = .ready
                 load.lease?.settleCompletion(url)
-            case .offDomain:
-                navigationPhase = .unavailable("off-domain")
-                load.lease?.settleCompletion(url)
             case .dispatcherMissing:
                 navigationPhase = .unavailable("dispatcher")
                 load.lease?.settleCompletion(nil)
                 failPending(Service.EvalError.notReady)
             }
             advance()
-            return true
-
-        case .serviceDomainLost:
-            guard isReady else { return false }
-            navigationPhase = .unavailable("off-domain")
             return true
 
         case .startFailed(let lease):
@@ -267,11 +256,11 @@ extension Service.ServiceWebPage {
     }
 }
 
-extension Service {
+extension BrowserSession {
     @discardableResult
     func transitionNavigation(
-        _ event: ServiceWebPage.NavigationEvent,
-        on page: ServiceWebPage
+        _ event: BrowserSession.NavigationEvent,
+        on page: BrowserSession
     ) -> Bool {
         let isOwned = owns(page)
         if !isOwned, case .terminated = event {
@@ -304,11 +293,11 @@ extension Service {
         return accepted
     }
 
-    func activeInvocationCount(in page: ServiceWebPage) -> Int {
+    func activeInvocationCount(in page: BrowserSession) -> Int {
         manager.actionScheduler.activeInvocationCount(on: page)
     }
 
-    func queuedInvocationCount(in page: ServiceWebPage) -> Int {
+    func queuedInvocationCount(in page: BrowserSession) -> Int {
         manager.actionScheduler.queuedInvocationCount(on: page)
     }
 }

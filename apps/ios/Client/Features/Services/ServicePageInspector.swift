@@ -8,7 +8,7 @@ struct ServicePageInspector: View {
     var handoff: ServiceHandoffSession? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var page: WebPage?
-    @State private var servicePage: Service.ServiceWebPage?
+    @State private var servicePage: BrowserSession?
 
     var body: some View {
         VStack(spacing: 0) {

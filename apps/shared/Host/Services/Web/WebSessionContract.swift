@@ -61,6 +61,8 @@ extension Service {
         action: Manifest.Action,
         session: JSONValue?,
         pageURL: String?,
+        in page: BrowserSession? = nil,
+        scopeID: UUID? = nil,
         approve: (@MainActor (String, Any?) async -> Bool)?
     ) async throws -> JSONValue? {
         guard WebSessionContract.isEnabled(definition),
@@ -68,7 +70,7 @@ extension Service {
               action.id != WebSessionContract.loginAction else { return session }
         var selected = session
         if selected == nil {
-            let discovered = try await invokeAction(WebSessionContract.listAction, args: .object([:]), pageURL: pageURL, approve: approve).get()
+            let discovered = try await invokeAction(WebSessionContract.listAction, args: .object([:]), pageURL: pageURL, in: page, scopeID: scopeID, approve: approve).get()
             selected = discovered.arrayValue?.first
             Log.service.info("Service.session default domain=\(domain) action=\(action.id) available=\(discovered.arrayValue?.count ?? 0) selected=\(selected != nil)")
         }

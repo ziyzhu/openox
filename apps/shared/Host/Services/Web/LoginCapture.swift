@@ -13,13 +13,13 @@ final class LoginCapture: NSObject, WKScriptMessageHandler {
     private var username: Value?
     private var email: Value?
     private var password: Value?
-    private weak var page: Service.ServiceWebPage?
+    private weak var page: BrowserSession?
     private weak var owner: Service?
     private(set) var steps: [JSONValue] = []
     private(set) var truncated = false
     private var flowBytes = 0
 
-    func install(on page: Service.ServiceWebPage, owner: Service, credentials: Bool) async {
+    func install(on page: BrowserSession, owner: Service, credentials: Bool) async {
         self.page = page
         self.owner = owner
         let controller = page.userContentController
@@ -27,7 +27,7 @@ final class LoginCapture: NSObject, WKScriptMessageHandler {
         let flow = WKUserScript(source: Self.flowScript, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .defaultClient)
         page.additionalUserScripts.append(flow)
         controller.addUserScript(flow)
-        let frames = (try? await page.discoverFrames(owner: owner)) ?? []
+        let frames = (try? await page.discoverFrames()) ?? []
         for frame in frames {
             _ = try? await page.page.callJavaScript(Self.flowScript, arguments: [:], in: frame.info, contentWorld: .defaultClient)
         }
@@ -54,7 +54,7 @@ final class LoginCapture: NSObject, WKScriptMessageHandler {
         let scripts = controller.userScripts.filter { !sources.contains($0.source) }
         controller.removeAllUserScripts()
         scripts.forEach(controller.addUserScript)
-        let frames = if let owner { (try? await page.discoverFrames(owner: owner)) ?? [] } else { Array(page.frameTargets.values) }
+        let frames = if let owner { (try? await page.discoverFrames()) ?? [] } else { Array(page.frameTargets.values) }
         for frame in frames {
             _ = try? await page.page.callJavaScript("window.__oxLoginFlow?.stop()", arguments: [:], in: frame.info, contentWorld: .defaultClient)
             _ = try? await page.page.callJavaScript("window.__oxLoginCapture?.stop()", arguments: [:], in: frame.info, contentWorld: .page)

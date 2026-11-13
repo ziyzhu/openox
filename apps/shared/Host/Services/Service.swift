@@ -175,6 +175,7 @@ final class Service: NSObject, Identifiable {
         let role: InvocationRole
         let scripts: String
         let session: JSONValue?
+        let scopeID: UUID?
 
         init(
             service: Service,
@@ -182,7 +183,8 @@ final class Service: NSObject, Identifiable {
             baseURL: URL,
             role: InvocationRole,
             scripts: String,
-            session: JSONValue? = nil
+            session: JSONValue? = nil,
+            scopeID: UUID? = nil
         ) {
             self.service = service
             self.definition = definition
@@ -191,6 +193,7 @@ final class Service: NSObject, Identifiable {
             self.role = self.blocking && role == .standard ? .blockingAction : role
             self.scripts = scripts
             self.session = session
+            self.scopeID = scopeID
         }
     }
 
@@ -232,189 +235,13 @@ final class Service: NSObject, Identifiable {
         let attached: Bool
     }
 
-    enum OwnedPageOwner: Equatable {
-        case session(String?)
-        case inspector(UUID)
-        case debug(UUID)
-        case browser(UUID)
-        case model(UUID)
-        case conversation(UUID)
-
-        var logLabel: String {
-            switch self {
-            case .session: "session"
-            case .inspector: "inspector"
-            case .debug: "debug"
-            case .browser: "browser"
-            case .model: "model"
-            case .conversation: "conversation"
-            }
-        }
-    }
-
     enum InspectionPage {
-        case owned(ServiceWebPage)
-        case browserSession(ServiceWebPage)
+        case owned(BrowserSession)
+        case browserSession(BrowserSession)
 
-        var page: ServiceWebPage {
+        var page: BrowserSession {
             switch self {
             case .owned(let page), .browserSession(let page): page
-            }
-        }
-    }
-
-    struct OwnedPage {
-        let page: ServiceWebPage
-        let owner: OwnedPageOwner
-    }
-
-    @MainActor
-    final class ServiceWebPage {
-        enum ScriptMode: String {
-            case service
-            case browser
-        }
-
-        struct PendingEvaluation {
-            let continuation: CheckedContinuation<Any?, any Error>
-            let timeout: Task<Void, Never>
-            let evaluation: Task<Void, Never>
-        }
-
-        final class NavigationLease {
-            let id = UUID()
-            let label: String
-            let timeout: TimeInterval
-            var reservation: CheckedContinuation<Bool, Never>?
-            var completion: CheckedContinuation<URL?, Never>?
-            var timeoutTask: Task<Void, Never>?
-
-            init(label: String, timeout: TimeInterval) {
-                self.label = label
-                self.timeout = timeout
-            }
-
-            func settleReservation(_ reserved: Bool) {
-                if let reservation {
-                    self.reservation = nil
-                    reservation.resume(returning: reserved)
-                }
-                if !reserved { settleCompletion(nil) }
-            }
-
-            func settleCompletion(_ url: URL?) {
-                if let completion {
-                    self.completion = nil
-                    completion.resume(returning: url)
-                }
-            }
-        }
-
-        final class NavigationLoad {
-            let lease: NavigationLease?
-            let generation: Int
-            var committed = false
-
-            init(lease: NavigationLease?, generation: Int) {
-                self.lease = lease
-                self.generation = generation
-            }
-        }
-
-        final class NavigationSettlement {
-            let id = UUID()
-            let load: NavigationLoad
-            let url: URL
-            var task: Task<Void, Never>?
-
-            init(load: NavigationLoad, url: URL) {
-                self.load = load
-                self.url = url
-            }
-
-            func cancel() {
-                task?.cancel()
-                task = nil
-            }
-        }
-
-        enum NavigationPhase {
-            case unavailable(String)
-            case ready
-            case pending(NavigationLease)
-            case reserved(NavigationLease)
-            case navigating(NavigationLoad)
-            case settling(NavigationSettlement)
-            case verifying(NavigationLoad, URL)
-
-            var logLabel: String {
-                switch self {
-                case .unavailable(let reason): return "unavailable:\(reason)"
-                case .ready: return "ready"
-                case .pending(let lease): return "pending:\(lease.label)"
-                case .reserved(let lease): return "reserved:\(lease.label)"
-                case .navigating(let load): return "navigating:\(load.lease?.label ?? "external"):\(load.generation)"
-                case .settling(let settlement): return "settling:\(settlement.load.lease?.label ?? "external"):\(settlement.load.generation)"
-                case .verifying(let load, _): return "verifying:\(load.lease?.label ?? "external"):\(load.generation)"
-                }
-            }
-
-            var load: NavigationLoad? {
-                switch self {
-                case .navigating(let load), .verifying(let load, _): load
-                case .settling(let settlement): settlement.load
-                case .unavailable, .ready, .pending, .reserved: nil
-                }
-            }
-
-            var settlement: NavigationSettlement? {
-                if case .settling(let settlement) = self { settlement } else { nil }
-            }
-        }
-
-        let id = UUID()
-        let page: WebPage
-        let navigationDecider: NavigationDecider
-        let userContentController: WKUserContentController
-        let actions: String
-        var additionalUserScripts: [WKUserScript] = []
-        var openingTask: Task<Bool, Never>?
-        var executionURL: URL?
-        var lastInvocation: (id: UUID, actionID: String, args: JSONValue, requestedSession: JSONValue?, pageURL: String?, selectedSession: JSONValue?, startedAt: Date)?
-        var navigationTask: Task<Void, Never>?
-        var navigationGeneration = 0
-        var finishedNavigationGeneration = 0
-        var navigationStartedAt: Date?
-        var navigationPhase: NavigationPhase = .unavailable("new")
-        var navigationFailure: String?
-        var pendingEvaluations: [UUID: PendingEvaluation] = [:]
-        var scriptMode: ScriptMode?
-        var secretAttempt: SecretAttempt?
-        var frameSecretContext: (service: Service, documentID: String)?
-        var frameCandidates: [WebPage.FrameInfo] = []
-        var omittedFrames = 0
-        var frameTargets: [String: FrameTarget] = [:]
-        var frameServiceSources: [String: String] = [:]
-
-        init(page: WebPage, navigationDecider: NavigationDecider, userContentController: WKUserContentController, actions: String) {
-            self.page = page
-            self.navigationDecider = navigationDecider
-            self.userContentController = userContentController
-            self.actions = actions
-        }
-
-        var logLabel: String { String(id.uuidString.prefix(8)) }
-        var isReady: Bool { if case .ready = navigationPhase { true } else { false } }
-        func finishEvaluation(_ id: UUID, with result: Result<Any?, any Error>) {
-            guard let pending = pendingEvaluations.removeValue(forKey: id) else { return }
-            pending.timeout.cancel()
-            pending.evaluation.cancel()
-            pending.continuation.resume(with: result)
-        }
-
-        func interruptEvaluations(with error: any Error) {
-            for id in Array(pendingEvaluations.keys) {
-                finishEvaluation(id, with: .failure(error))
             }
         }
     }
@@ -450,7 +277,7 @@ final class Service: NSObject, Identifiable {
     }
     @ObservationIgnored var authenticationWaiters: [AuthenticationWaiter] = []
     @ObservationIgnored let access = ServiceAccess()
-    @ObservationIgnored var ownedPages: [ObjectIdentifier: OwnedPage] = [:]
+    var registeredPages: [ObjectIdentifier: BrowserSessionStore.Registration] { manager.browserSessions.pages(for: domain) }
     @ObservationIgnored private var invalidationTask: Task<Void, Never>?
     @ObservationIgnored private var capabilityTask: Task<Void, Never>?
     @ObservationIgnored var debugSession: ServiceDebugSession?
@@ -476,22 +303,22 @@ final class Service: NSObject, Identifiable {
         }
     }
 
-    var servicePages: [ServiceWebPage] {
-        ownedPages.values.map(\.page)
+    var servicePages: [BrowserSession] {
+        registeredPages.values.map(\.page)
     }
 
     var pages: [WebPage] { servicePages.map(\.page) }
 
-    func servicePage(id: UUID) -> ServiceWebPage? {
-        ownedPages.values.first { $0.page.id == id }?.page
+    func servicePage(id: UUID) -> BrowserSession? {
+        registeredPages.values.first { $0.page.id == id }?.page
     }
 
-    func owns(_ page: ServiceWebPage) -> Bool {
-        servicePages.contains { $0 === page }
+    func owns(_ page: BrowserSession) -> Bool {
+        manager.browserSessions.contains(page)
     }
 
-    func pageKind(for page: ServiceWebPage) -> String {
-        ownedPages[ObjectIdentifier(page)]?.owner.logLabel ?? "closed"
+    func pageKind(for page: BrowserSession) -> String {
+        registeredPages[ObjectIdentifier(page)]?.owner.logLabel ?? "closed"
     }
 
     var pageCount: Int { pages.count }
@@ -508,7 +335,8 @@ final class Service: NSObject, Identifiable {
         args: JSONValue = .object([:]),
         role: InvocationRole = .standard,
         session: JSONValue? = nil,
-        pageURL: String? = nil
+        pageURL: String? = nil,
+        scopeID: UUID? = nil
     ) async -> Action? {
         await loadManifest()
         guard let definition = definition.action(id, includingStandard: true),
@@ -518,7 +346,7 @@ final class Service: NSObject, Identifiable {
         do {
             destination = try executionURL(defaultURL: baseURL, session: session, pageURL: pageURL)
         } catch { return nil }
-        return Action(service: self, definition: definition, baseURL: destination, role: role, scripts: scripts, session: session)
+        return Action(service: self, definition: definition, baseURL: destination, role: role, scripts: scripts, session: session, scopeID: scopeID)
     }
 
     func inspectionAction() async -> Action? {
@@ -719,107 +547,21 @@ final class Service: NSObject, Identifiable {
         Log.service.info("Service.capabilities domain=\(domain) -> \(next.logLabel) from=\(previous.logLabel) reason=\(reason.rawValue)")
     }
 
-    func makeServiceWebPage(actions: String) -> ServiceWebPage {
-        var config = manager.makePageConfiguration()
-        let ucc = WKUserContentController()
-        config.userContentController = ucc
-        ucc.installBridgeHandlers(self)
-        let navigationDecider = ServiceWebPage.NavigationDecider(service: self)
-        let page = WebPage(configuration: config, navigationDecider: navigationDecider)
-        let servicePage = ServiceWebPage(
-            page: page,
-            navigationDecider: navigationDecider,
-            userContentController: ucc,
-            actions: actions
-        )
-        navigationDecider.servicePage = servicePage
-        ucc.addScriptMessageHandler(SecretBridge(service: self, page: servicePage), contentWorld: .page, name: SecretBridge.channelName)
-        Log.webView.info("Service.makePage domain=\(self.domain) contentMode=desktop ua=system")
-        #if targetEnvironment(simulator)
-        page.isInspectable = true
-        #endif
-        return servicePage
+    func sessionPage(for action: Action) -> BrowserSession? {
+        manager.browserSessions.sessionPage(for: action)
     }
 
-    func loadServiceWebPage(_ servicePage: ServiceWebPage, at baseURL: URL, label: String) async -> Bool {
-        configureScripts(for: baseURL, in: servicePage)
-        servicePage.navigationTask = observeNavigations(in: servicePage)
-        Log.webView.info("Service.webPage load domain=\(domain) session=\(servicePage.logLabel) label=\(label) url=\(LogPrivacy.url(baseURL.absoluteString)) pages=\(pageCount)")
-        let landed = await performNavigation(
-            .load(URLRequest(url: baseURL)),
-            in: servicePage,
-            label: label,
-            timeout: 15
-        )
-        guard landed != nil, owns(servicePage), servicePage.isReady else { return false }
-        servicePage.executionURL = baseURL
-        return true
+    func updateSessionPage(_ page: BrowserSession, session: JSONValue?) {
+        manager.browserSessions.updateSessionPage(page, domain: domain, session: session)
     }
 
-    func sessionPage(for action: Action) -> ServiceWebPage? {
-        let pages = ownedPages.values.filter {
-            if case .session = $0.owner { return true }
-            return false
-        }
-        if let id = action.session?.objectValue?["id"]?.stringValue {
-            return pages.first { $0.owner == .session(id) }?.page
-                ?? pages.first { $0.owner == .session(nil) }?.page
-        }
-        return pages.first { $0.owner == .session(nil) }?.page
-            ?? pages.max {
-                ($0.page.lastInvocation?.startedAt ?? .distantPast)
-                    < ($1.page.lastInvocation?.startedAt ?? .distantPast)
-            }?.page
-    }
-
-    func updateSessionPage(_ page: ServiceWebPage, session: JSONValue?) {
-        let key = ObjectIdentifier(page)
-        guard let current = ownedPages[key], case .session = current.owner else { return }
-        let owner = OwnedPageOwner.session(session?.objectValue?["id"]?.stringValue)
-        guard current.owner != owner else { return }
-        guard !ownedPages.values.contains(where: { $0.owner == owner && $0.page !== page }) else {
-            Log.webView.warning("Service.session ownership-conflict domain=\(domain) page=\(page.logLabel) assigned=\(session != nil)")
-            return
-        }
-        ownedPages[key] = OwnedPage(page: page, owner: owner)
-        Log.webView.info("Service.session ownership domain=\(domain) page=\(page.logLabel) assigned=\(session != nil) resident=\(ownedPages.count)")
-    }
-
-    func openSessionPage(for action: Action) async throws -> ServiceWebPage {
+    func openSessionPage(for action: Action) async throws -> BrowserSession {
         try await openOwnedPage(for: action, owner: .session(action.session?.objectValue?["id"]?.stringValue))
     }
 
-    func openOwnedPage(for action: Action, owner: OwnedPageOwner) async throws -> ServiceWebPage {
+    func openOwnedPage(for action: Action, owner: BrowserSessionStore.Purpose) async throws -> BrowserSession {
         guard invalidationTask == nil else { throw EvalError.contextInvalidated }
-        let page: ServiceWebPage
-        if case .session = owner, let existing = sessionPage(for: action) {
-            if existing.openingTask == nil {
-                try Task.checkCancellation()
-                return existing
-            }
-            page = existing
-        } else {
-            page = makeServiceWebPage(actions: action.scripts)
-            ownedPages[ObjectIdentifier(page)] = OwnedPage(page: page, owner: owner)
-            page.openingTask = Task { @MainActor [weak self, weak page] in
-                guard let self, let page else { return false }
-                return await self.loadServiceWebPage(
-                    page,
-                    at: action.baseURL,
-                    label: "owned:\(owner.logLabel):\(self.domain):\(action.definition.id)"
-                )
-            }
-            Log.webView.info("Service.ownedPage event=open owner=\(owner.logLabel) domain=\(domain) session=\(page.logLabel) resident=\(ownedPages.count)")
-        }
-        let loaded = await page.openingTask?.value ?? page.isReady
-        page.openingTask = nil
-        guard loaded, owns(page), page.isReady else {
-            let error = page.navigationFailure.map(EvalError.navigationFailed) ?? .notReady
-            closeOwnedPage(page, error: error)
-            throw error
-        }
-        try Task.checkCancellation()
-        return page
+        return try await manager.browserSessions.open(for: action, purpose: owner)
     }
 
     func openInspectionPage(browserSessionID: UUID? = nil) async throws -> InspectionPage {
@@ -840,60 +582,20 @@ final class Service: NSObject, Identifiable {
         closeOwnedPage(page)
     }
 
-    func closeOwnedPage(_ page: ServiceWebPage, error: any Error = CancellationError()) {
-        guard let owned = ownedPages.removeValue(forKey: ObjectIdentifier(page)) else { return }
-        manager.actionScheduler.discard(page, error: error)
-        closeServiceWebPage(page, error: error)
-        Log.webView.info("Service.ownedPage event=close owner=\(owned.owner.logLabel) domain=\(domain) session=\(page.logLabel) resident=\(ownedPages.count)")
+    func closeOwnedPage(_ page: BrowserSession, error: any Error = CancellationError()) {
+        manager.browserSessions.close(page, error: error)
     }
 
     private func closeOwnedPages(error: any Error) {
-        for page in ownedPages.values.map(\.page) { closeOwnedPage(page, error: error) }
+        manager.browserSessions.close(using: domain, error: error)
     }
 
     private func closeOwnedPagesAfterRunning(error: any Error) async {
-        let pages = ownedPages.values.map(\.page)
-        guard !pages.isEmpty else { return }
-        await withCheckedContinuation { continuation in
-            var remaining = pages.count
-            for page in pages {
-                manager.actionScheduler.closeWhenIdle(page, error: error) {
-                    self.closeOwnedPage(page, error: error)
-                    remaining -= 1
-                    if remaining == 0 { continuation.resume() }
-                }
-            }
-        }
+        await manager.browserSessions.closeWhenIdle(using: domain, error: error)
     }
 
     func releaseIdleSessionPages(reason: PageReleaseReason) {
-        let pages = ownedPages.values.filter {
-            if case .session = $0.owner {
-                return $0.page.openingTask == nil && $0.page.navigationPhase.load == nil
-                    && manager.actionScheduler.isIdle($0.page)
-            }
-            return false
-        }.map(\.page)
-        for page in pages { closeOwnedPage(page) }
-        if !pages.isEmpty {
-            Log.webView.info("Service.sessions release reason=\(reason.rawValue) domain=\(domain) count=\(pages.count)")
-        }
-    }
-
-    func configureScripts(for url: URL?, in servicePage: ServiceWebPage) {
-        let mode: ServiceWebPage.ScriptMode = url?.host.map(isServiceHost) == true ? .service : .browser
-        guard servicePage.scriptMode != mode else { return }
-        let ucc = servicePage.userContentController
-        ucc.removeAllUserScripts()
-        ucc.addUserScript(WKUserScript(source: ServiceWebPage.frameIdentityScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
-        if mode == .service { ucc.addBridgeUserScripts() }
-        ucc.addUserScript(WKUserScript(source: frameServicesScript(servicePage), injectionTime: .atDocumentStart, forMainFrameOnly: false))
-        for script in servicePage.additionalUserScripts {
-            ucc.addUserScript(script)
-        }
-        servicePage.scriptMode = mode
-        let digest = SHA256.hash(data: Data(servicePage.actions.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined()
-        Log.webView.info("Service.scripts domain=\(domain) session=\(servicePage.logLabel) mode=\(mode.rawValue) repository=\(definition.repositoryID ?? "native") actionsBytes=\(servicePage.actions.utf8.count) actionsHash=\(digest)")
+        manager.browserSessions.releaseIdlePages(reason: reason.rawValue)
     }
 
     func invalidateResolved() async {
@@ -947,28 +649,9 @@ final class Service: NSObject, Identifiable {
         manager.serviceCapabilitiesDidChange(self)
     }
 
-    private func closePage(_ page: ServiceWebPage, error: any Error) {
-        conversationHandoffs[page.id]?.session.cancel()
-        page.openingTask?.cancel()
-        page.openingTask = nil
-        page.navigationTask?.cancel()
-        page.navigationTask = nil
-        page.page.stopLoading()
-        transitionNavigation(.terminated(error), on: page)
-    }
-
-    func closeServiceWebPage(_ servicePage: ServiceWebPage, error: any Error = CancellationError()) {
-        closePage(servicePage, error: error)
-    }
-
     // MARK: - Browser
 
-    enum NavigationCommand {
-        case load(URLRequest)
-        case reload(fromOrigin: Bool)
-        case back
-        case forward
-    }
+    typealias NavigationCommand = BrowserSession.NavigationCommand
 
     enum InvokeError: LocalizedError {
         case denied(String)
@@ -996,28 +679,8 @@ final class Service: NSObject, Identifiable {
         }
     }
 
-    enum EvalError: LocalizedError {
-        case timeout(TimeInterval)
-        case js(String)
-        case contextInvalidated
-        case navigationTimeout(TimeInterval)
-        case navigationFailed(String)
-        case notActive
-        case notReady
-        case offDomain
-        var errorDescription: String? {
-            switch self {
-            case .timeout(let s): return "JS eval timed out after \(Int(s))s"
-            case .js(let s): return s
-            case .contextInvalidated: return "service page navigated while the action was running"
-            case .navigationTimeout(let s): return "service navigation timed out after \(Int(s))s"
-            case .navigationFailed(let message): return "service navigation failed: \(message)"
-            case .notActive: return "service page failed to load"
-            case .notReady: return "service action dispatcher is unavailable"
-            case .offDomain: return "service page is off-domain; refusing to invoke"
-            }
-        }
-    }
+    typealias EvalError = BrowserSession.EvalError
+
 }
 
 extension Service {

@@ -33,14 +33,14 @@ final class ServiceBrowserActionSession {
     private struct Opening {
         let id: UUID
         let baseURL: URL
-        let task: Task<Service.ServiceWebPage, Error>
+        let task: Task<BrowserSession, Error>
     }
 
     let id: UUID
     let service: Service
     private var loadedBaseURL: URL?
     private var opening: Opening?
-    private(set) var page: Service.ServiceWebPage?
+    private(set) var page: BrowserSession?
     private var captureSink: CaptureSink?
     private var capturedEvents: [JSONValue] = []
     private var captureRevision = UUID().uuidString
@@ -65,7 +65,7 @@ final class ServiceBrowserActionSession {
         return page.page
     }
 
-    func inspectionPage() async throws -> Service.ServiceWebPage {
+    func inspectionPage() async throws -> BrowserSession {
         guard let action = await service.inspectionAction() else { throw Service.EvalError.notActive }
         let page = try await page(for: action)
         guard page.secretAttempt?.holdsValues != true else {
@@ -141,7 +141,7 @@ final class ServiceBrowserActionSession {
         }
     }
 
-    func pageState(selector: String?, frameID: String? = nil, prepared: (Service, Service.ServiceWebPage)? = nil,
+    func pageState(selector: String?, frameID: String? = nil, prepared: (Service, BrowserSession)? = nil,
                    attached: [Service] = [], authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
         let owner = prepared?.0 ?? service
         try await owner.awaitAuthenticationAvailability(name: "ox.web.browser.getPageState")
@@ -152,8 +152,8 @@ final class ServiceBrowserActionSession {
         let generation = page.navigationGeneration
         try await owner.installFrameServices(attached, on: page)
         Log.webView.info("Browser.state phase=installed page=\(page.logLabel) targeted=\(frameID != nil)")
-        let target: Service.ServiceWebPage.FrameTarget?
-        if let frameID { target = try await page.requireFrame(frameID, owner: owner) } else { target = nil }
+        let target: BrowserSession.FrameTarget?
+        if let frameID { target = try await page.requireFrame(frameID) } else { target = nil }
         Log.webView.info("Browser.state phase=selected page=\(page.logLabel) origin=\(target?.origin ?? "main")")
         if let target, let host = URL(string: target.origin)?.host {
             try await trust(ServiceWebsiteDataCoordinator.site(for: host), authorizeSite)
@@ -180,8 +180,8 @@ final class ServiceBrowserActionSession {
         }
         let page = try await page(for: action)
         let approval = try await authorize(page, authorizeSite)
-        let target: Service.ServiceWebPage.FrameTarget?
-        if let frameID { target = try await page.requireFrame(frameID, owner: service) } else { target = nil }
+        let target: BrowserSession.FrameTarget?
+        if let frameID { target = try await page.requireFrame(frameID) } else { target = nil }
         if let target, let host = URL(string: target.origin)?.host {
             try await trust(ServiceWebsiteDataCoordinator.site(for: host), authorizeSite)
         }
@@ -190,7 +190,7 @@ final class ServiceBrowserActionSession {
         }
     }
 
-    private func stateResult(_ result: JSONValue, page: Service.ServiceWebPage) -> JSONValue {
+    private func stateResult(_ result: JSONValue, page: BrowserSession) -> JSONValue {
         let webPage = page.page
         let fullscreenState: String = switch webPage.fullscreenState {
         case .enteringFullscreen: "enteringFullscreen"
@@ -490,12 +490,12 @@ final class ServiceBrowserActionSession {
         }
     }
 
-    private static func site(of page: Service.ServiceWebPage) -> String? {
+    private static func site(of page: BrowserSession) -> String? {
         page.page.url?.host(percentEncoded: false).flatMap { $0.isEmpty ? nil : ServiceWebsiteDataCoordinator.site(for: $0) }
     }
 
     private func authorize(
-        _ page: Service.ServiceWebPage,
+        _ page: BrowserSession,
         _ authorizeSite: (String) async throws -> Void
     ) async throws -> (generation: Int, site: String?) {
         let approval = (generation: page.navigationGeneration, site: Self.site(of: page))
@@ -511,7 +511,7 @@ final class ServiceBrowserActionSession {
         Log.webView.info("Service.browserSession event=trust owner=\(id) site=\(site)")
     }
 
-    private static func requireUnchanged(_ page: Service.ServiceWebPage, since approval: (generation: Int, site: String?)) throws {
+    private static func requireUnchanged(_ page: BrowserSession, since approval: (generation: Int, site: String?)) throws {
         guard page.navigationGeneration == approval.generation, site(of: page) == approval.site else {
             throw Service.EvalError.contextInvalidated
         }
@@ -593,7 +593,7 @@ final class ServiceBrowserActionSession {
         Log.webView.info("Service.browserSession event=close owner=\(id) domain=\(service.domain)")
     }
 
-    private func configureAuthoringScripts(on page: Service.ServiceWebPage) {
+    private func configureAuthoringScripts(on page: BrowserSession) {
         let controller = page.userContentController
         controller.removeScriptMessageHandler(forName: "oxBrowserCapture")
         captureSink = nil
@@ -661,7 +661,7 @@ final class ServiceBrowserActionSession {
         captureEvictedCount = 0
     }
 
-    private func discardPage(_ page: Service.ServiceWebPage) {
+    private func discardPage(_ page: BrowserSession) {
         service.closeOwnedPage(page)
         if self.page === page {
             self.page = nil
@@ -669,7 +669,7 @@ final class ServiceBrowserActionSession {
         }
     }
 
-    private func deactivateCapture(on page: Service.ServiceWebPage) async -> Bool {
+    private func deactivateCapture(on page: BrowserSession) async -> Bool {
         do {
             let result = try await service.evalAsync(
                 page,
@@ -890,7 +890,7 @@ final class ServiceBrowserActionSession {
         """#
     }
 
-    private func page(for action: Service.Action) async throws -> Service.ServiceWebPage {
+    private func page(for action: Service.Action) async throws -> BrowserSession {
         guard service.domain == "ios:browser" else { throw Service.EvalError.notActive }
         if let page,
            loadedBaseURL == action.baseURL,
@@ -932,6 +932,7 @@ final class ServiceBrowserActionSession {
             }
             opening = nil
             loadedBaseURL = action.baseURL
+            page.scopeID = id
             self.page = page
             Log.webView.info("Service.browserSession event=open owner=\(id) domain=\(service.domain) session=\(page.logLabel)")
             return page

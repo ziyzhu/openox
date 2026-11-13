@@ -16,9 +16,9 @@ extension JSONValue {
 final class ServiceDebugSession {
     let id: UUID
     let service: Service
-    let page: Service.ServiceWebPage
+    let page: BrowserSession
 
-    private init(id: UUID, service: Service, page: Service.ServiceWebPage) {
+    private init(id: UUID, service: Service, page: BrowserSession) {
         self.id = id
         self.service = service
         self.page = page
@@ -103,7 +103,7 @@ extension Service {
         let evaluationID = UUID()
         let evaluation = String(evaluationID.uuidString.prefix(8))
         do {
-            let page: ServiceWebPage
+            let page: BrowserSession
             if let debugSession,
                owns(debugSession.page),
                debugSession.page.isReady {
