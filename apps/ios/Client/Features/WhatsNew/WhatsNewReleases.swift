@@ -9,6 +9,10 @@ struct WhatsNewRelease: Identifiable {
 
 enum WhatsNew {
     static let releases: [WhatsNewRelease] = [
+        WhatsNewRelease(version: "1.0.29", items: [
+            "Pan, pinch to zoom, and rotate maps directly in conversations.",
+            "The Thinking indicator disappears while Ox waits for you to take over."
+        ]),
         WhatsNewRelease(version: "1.0.28", items: [
             "Choose which saved login to use before automatic website sign-in, or sign in manually.",
             "Ox offers to save or update a website login only after verifying a signed-in session.",

@@ -1,6 +1,8 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Pan, pinch to zoom, and rotate maps directly in conversations." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "直接在对话中拖动地图，也可以用双指缩放和旋转。" } } } },
+    "The Thinking indicator disappears while Ox waits for you to take over." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Ox 等待你接手操作时，会隐藏「思考中」提示。" } } } },
     "Choose which saved login to use before automatic website sign-in, or sign in manually." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动登录网站前，由你选择使用哪个已保存的账号，也可以手动登录。" } } } },
     "Ox offers to save or update a website login only after verifying a signed-in session." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Ox 确认网站已成功登录后，才会询问是否保存或更新登录凭据。" } } } },
     "Edit saved logins, API keys, and tokens directly on their detail page." : { "extractionState" : "manual", "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "直接在详情页编辑已保存的登录凭据、API 密钥和令牌。" } } } },
