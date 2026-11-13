@@ -15,6 +15,39 @@ nonisolated enum OxServices {
         ]), "required": .array(["domain", "name", "kind", "login", "saved", "attached"].map(JSONValue.string)), "additionalProperties": .bool(false),
     ])
 
+    static let inspectionSchema: JSONValue = .object([
+        "type": .string("object"), "properties": .object([
+            "service": snapshotSchema,
+            "actions": .object(["type": .string("object"), "additionalProperties": .object(["type": .string("object"), "description": .string("Complete action inputSchema and outputSchema with metadata.")])]),
+            "standardActions": .object(["type": .string("array"), "items": .object(["type": .string("string")]), "description": .string("Available standard action IDs; their contracts are supplied upfront.")]),
+            "nextCursor": .object(["type": .string("string"), "description": .string("Continuation cursor; absent after the last page.")]),
+            "secrets": .object(["type": .string("array"), "description": .string("Typed saved secrets associated with this service: owned by it or granted to it. Metadata only."), "items": .object([
+                "type": .string("object"), "properties": .object([
+                    "key": .object(["type": .string("string")]),
+                    "displayName": .object(["type": .string("string")]),
+                    "type": .object(["type": .string("string"), "enum": .array(["account", "apiKey", "token"].map(JSONValue.string))]),
+                ]), "required": .array(["key", "displayName", "type"].map(JSONValue.string)), "additionalProperties": .bool(false),
+            ])]),
+        ]), "required": .array(["service", "standardActions", "actions", "secrets"].map(JSONValue.string)), "additionalProperties": .bool(false),
+    ])
+
+    static var attachmentSchema: JSONValue {
+        var schema = snapshotSchema.objectValue!
+        var properties = schema["properties"]!.objectValue!
+        var inspection = inspectionSchema.objectValue!["properties"]!.objectValue!
+        inspection.removeValue(forKey: "service")
+        properties.merge(inspection) { _, inspected in inspected }
+        properties["capabilitiesError"] = .object([
+            "type": .string("object"), "properties": .object([
+                "code": .object(["type": .string("string")]),
+                "message": .object(["type": .string("string")]),
+                "recovery": .object(["type": .string("string")]),
+            ]), "required": .array(["code", "message", "recovery"].map(JSONValue.string)), "additionalProperties": .bool(false),
+        ])
+        schema["properties"] = .object(properties)
+        return .object(schema)
+    }
+
     static var inventorySchema: JSONValue {
         var schema = snapshotSchema.objectValue!
         var properties = schema["properties"]!.objectValue!
@@ -91,21 +124,7 @@ nonisolated enum OxServices {
                             "required": .array([.string("domain")]),
                             "additionalProperties": .bool(false),
                         ]),
-                        "outputSchema": .object([
-                            "type": .string("object"), "properties": .object([
-                                "service": snapshotSchema,
-                                "actions": .object(["type": .string("object"), "additionalProperties": .object(["type": .string("object"), "description": .string("Complete action inputSchema and outputSchema with metadata.")])]),
-                                "standardActions": .object(["type": .string("array"), "items": .object(["type": .string("string")]), "description": .string("Available standard action IDs; their contracts are supplied upfront.")]),
-                                "nextCursor": .object(["type": .string("string"), "description": .string("Continuation cursor; absent after the last page.")]),
-                                "secrets": .object(["type": .string("array"), "description": .string("Typed saved secrets associated with this service: owned by it or granted to it. Metadata only."), "items": .object([
-                                    "type": .string("object"), "properties": .object([
-                                        "key": .object(["type": .string("string")]),
-                                        "displayName": .object(["type": .string("string")]),
-                                        "type": .object(["type": .string("string"), "enum": .array(["account", "apiKey", "token"].map(JSONValue.string))]),
-                                    ]), "required": .array(["key", "displayName", "type"].map(JSONValue.string)), "additionalProperties": .bool(false),
-                                ])]),
-                            ]), "required": .array(["service", "standardActions", "actions", "secrets"].map(JSONValue.string)), "additionalProperties": .bool(false),
-                        ]),
+                        "outputSchema": inspectionSchema,
                     ])
                 ),
                 (
@@ -216,7 +235,7 @@ nonisolated enum OxServices {
                             ]),
                             "required": .array([.string("domain")]),
                         ]),
-                        "outputSchema": snapshotSchema,
+                        "outputSchema": attachmentSchema,
                     ])
                 ),
                 (

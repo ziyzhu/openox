@@ -9,7 +9,7 @@ Prepare the requested transaction, hand final review and payment to the user, th
 
 ## Prepare
 
-Identify the merchant, attach its service, and inspect needed preparation/read contracts. Reuse matching carts, bookings, or orders; preserve unrelated items and completed effects. Missing repository coverage does not limit merchant support.
+Identify the merchant, attach its service, and reuse the returned preparation/read contracts; use inspect for additional pages or a later refresh. Reuse matching carts, bookings, or orders; preserve unrelated items and completed effects. Missing repository coverage does not limit merchant support.
 
 Before changing a cart, read fully loaded matching line items and quantities, including variants and modifiers, and establish the user's intended final quantity. After an uncertain add, reconcile those same items against that target before any further change; never treat another add as a diagnostic probe. A cart badge changing or a dialog closing does not establish which item changed, and hidden dialogs may remain in the DOM. Verify matching line quantities after the change and preserve unrelated items. If no trustworthy cart reader exists, build it before adding or retrying items.
 

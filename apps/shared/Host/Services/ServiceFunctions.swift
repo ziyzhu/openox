@@ -128,14 +128,21 @@ extension Conversation {
             } else {
                 setAttachedServices(attachedServices + [service])
             }
-            guard case .object(var result) = try Self.encodeToJSON(service.snapshot(attached: true)) else {
-                throw RuntimeError.bridge("ox.service.attach: failed to encode service snapshot")
+            var result = try ServiceOperations.serviceSnapshotFields(service, attached: true)
+            do {
+                if case .object(var inspection) = try await serviceOperations.inspectService(domain: service.domain, cursor: nil, purpose: purpose) {
+                    if case .object(let snapshot) = inspection.removeValue(forKey: "service") {
+                        result.merge(snapshot) { _, inspected in inspected }
+                    }
+                    result.merge(inspection) { _, inspected in inspected }
+                }
+            } catch {
+                let failure = OxFunctionError.from(error)
+                if failure.code == "cancelled" { throw error }
+                result["capabilitiesError"] = failure.value
+                Log.session.warning("bridge.service.attach capabilitiesUnavailable domain=\(service.domain) code=\(failure.code)")
             }
             result["reloaded"] = .bool(existing != nil)
-            if case .repository(let repository, let provenance) = service.definition.source {
-                result["repository"] = .string(repository)
-                result["repositoryProvenance"] = .string(provenance.rawValue)
-            }
             let snapshot = service.snapshot(attached: true)
             Log.session.info("bridge.service.attach requested=\(domain) domain=\(service.domain) reloaded=\(existing != nil) login=\(snapshot.login.rawValue)")
             return .object(result)
