@@ -10,6 +10,7 @@
     "build": "bun .agents/skills/build/scripts/build.ts",
     "test": "bun test ./.agents/skills/build/checks ./.agents/skills/test/protocol",
     "test:protocol": "bun test ./.agents/skills/test/protocol",
+    "test:web": "bun .agents/skills/test/protocol/web/run.ts",
     "generate:ios": "xcodegen generate --spec apps/ios/project.yml",
     "generate:macos": "xcodegen generate --spec apps/macos/project.yml",
     "build:macos": "bun .agents/skills/build/scripts/xcode-build.ts macos",

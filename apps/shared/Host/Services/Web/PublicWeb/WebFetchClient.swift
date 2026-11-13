@@ -104,14 +104,14 @@ nonisolated enum WebFetchURLPolicy {
     static func allows(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
               url.user == nil, url.password == nil else { return false }
-        if isServicesEndpoint(url) { return true }
+        if isServicesEndpoint(url) || isSimulatorFixture(url) { return true }
         guard url.port == nil || url.port == 80 || url.port == 443 else { return false }
         return hasPublicHost(url)
     }
 
     static func allowsResolved(_ url: URL, allowsTailscale: Bool = false) async -> Bool {
         guard allows(url) else { return false }
-        if isServicesEndpoint(url) { return true }
+        if isServicesEndpoint(url) || isSimulatorFixture(url) { return true }
         if allowsTailscale, url.scheme?.lowercased() == "https",
            let host = host(of: url), host.hasSuffix(".ts.net") {
             let addresses = await resolve(host)
@@ -144,6 +144,14 @@ nonisolated enum WebFetchURLPolicy {
         var host = url.host?.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]")) ?? ""
         while host.hasSuffix(".") { host.removeLast() }
         return host.isEmpty ? nil : host
+    }
+
+    static func isSimulatorFixture(_ url: URL) -> Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        return url.scheme?.lowercased() == "https" && host(of: url)?.hasSuffix(".localhost") == true
+        #else
+        return false
+        #endif
     }
 
     private static func isServicesEndpoint(_ url: URL) -> Bool {

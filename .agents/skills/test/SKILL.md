@@ -34,6 +34,24 @@ use `bun .agents/skills/test/protocol/native/vm.ts --help` or
 `bun .agents/skills/test/protocol/native/ox-errors.ts --help` against a fresh QA app.
 These native checks require an explicit reserved simulator and assigned Host endpoint;
 portable fixtures alone do not establish native implementation conformance.
+Website service cases live in `protocol/web/` and run with
+`bun run test:web --device ox-N [--app <Ox.app>] [--case <name>]` against a Debug
+Simulator build. Fixture sites model bundled service archetypes: server-rendered
+two-page login, client-rendered same-page login with streamed `conversation`
+generation, in-page GraphQL with CSRF, a same-site accounts provider hop, and a
+cross-site sign-in widget nested in iframes. They are served over HTTPS on
+`*.localhost` with a CA trusted on that simulator only; Debug Simulator builds allow
+those hosts. The runner applies a run-owned template Profile, serves fixture services
+through the development repository, drives turns through Mock `execute` scripts,
+answers only expected prompts, deletes saved logins it created, and records
+screenshots and accessibility trees for failures. Assert with service results, fresh
+`listSessions` and fixture-server counters such as password submissions and CSRF
+rejections. Point `login` `baseUrl` at the sign-in route: the automatic step loop
+continues only while each step retrieves the saved login. Web content inside the
+handoff is reachable only through `idb ui describe-point`; open the full-screen
+handoff before typing into it. When a bundled service introduces a new site or login
+shape, add a fixture for it.
+
 For filesystem audits, round-trip ordinary files in the default conversation working
 directory, include mixed text/binary searches and exact-limit results, and reconstruct
 continued reads to detect missing or duplicate content.

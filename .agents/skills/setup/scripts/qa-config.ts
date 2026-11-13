@@ -9,6 +9,7 @@ export function qaConfig(device: string) {
     device,
     registryPort: 8100 + index,
     debugPort: 9100 + index,
+    fixturePort: 8440 + index,
     debugEndpoint: `ws://127.0.0.1:${9100 + index}`,
   };
 }

@@ -9,12 +9,13 @@ enum BrowserNavigation {
         #if targetEnvironment(simulator)
         if scheme == "http", isLoopback(url) { return true }
         #endif
+        if WebFetchURLPolicy.isSimulatorFixture(url) { return true }
         return scheme == "https" && WebFetchURLPolicy.hasPublicHost(url)
     }
 
     static func resolvesServiceNavigation(_ url: URL) async -> Bool {
         guard allowsServiceNavigation(url) else { return false }
-        guard url.scheme?.lowercased() == "https" else { return true }
+        guard url.scheme?.lowercased() == "https", WebFetchURLPolicy.hasPublicHost(url) else { return true }
         return await WebFetchURLPolicy.resolvesPublicHost(url)
     }
 
