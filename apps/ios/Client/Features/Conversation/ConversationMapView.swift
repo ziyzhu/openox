@@ -94,21 +94,20 @@ struct ConversationMapView<Fallback: View>: View {
             VStack(spacing: 0) {
                 header(map)
                 Divider()
-                Button(action: { expand(map) }) {
-                    Map(initialPosition: map.overview, interactionModes: []) {
-                        ConversationMapRoutes(outcomes: outcomes)
-                        ForEach(map.markers.indices, id: \.self) { index in
-                            Marker(map.markers[index].title, coordinate: map.markers[index].coordinate)
-                                .tint(Theme.Colors.primary.dynamic)
-                        }
+                Map(initialPosition: map.overview, interactionModes: [.zoom, .rotate]) {
+                    ConversationMapRoutes(outcomes: outcomes)
+                    ForEach(map.markers.indices, id: \.self) { index in
+                        Marker(map.markers[index].title, coordinate: map.markers[index].coordinate)
+                            .tint(Theme.Colors.primary.dynamic)
                     }
-                    .mapStyle(.standard(pointsOfInterest: .excludingAll))
-                    .allowsHitTesting(false)
-                    .frame(height: 220)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .mapStyle(.standard(pointsOfInterest: .excludingAll))
+                .frame(height: 220)
+                .simultaneousGesture(TapGesture().onEnded { expand(map) })
+                .accessibilityElement()
+                .accessibilityAddTraits(.isButton)
                 .accessibilityLabel("Open map, \(map.summary)")
+                .accessibilityAction { expand(map) }
                 .accessibilityIdentifier("\(accessibilityIdentifier).map")
             }
             .background(Theme.Colors.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
