@@ -12,7 +12,7 @@ OpenOx is an open-source project for building and running Ox.
 
 ## What is an Ox?
 
-Each Ox is a self-evolving agent that runs on your phone and builds new tools on demand.
+Each Ox is a self-evolving bot that runs locally on your phone and builds new tools on demand.
 
 1. **Connect to anything** by turning any website into tools, using your device’s capabilities, and mounting directories.
 1. **Stay yours** by running on your device and keeping conversation data in a portable folder.
