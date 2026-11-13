@@ -743,11 +743,9 @@ struct ConversationPage: View {
         return switch conversation.activity {
         case .running(.thinking):
             conversation.thinkingActivity == nil
-        case .running(.awaiting(_)):
-            activeInteraction == nil
         case .running(.streaming):
             showsDelayedActivity
-        case .idle:
+        case .running(.awaiting), .idle:
             false
         }
     }
