@@ -94,7 +94,7 @@ struct ConversationMapView<Fallback: View>: View {
             VStack(spacing: 0) {
                 header(map)
                 Divider()
-                Map(initialPosition: map.overview, interactionModes: [.zoom, .rotate]) {
+                Map(initialPosition: map.overview, interactionModes: [.pan, .zoom, .rotate]) {
                     ConversationMapRoutes(outcomes: outcomes)
                     ForEach(map.markers.indices, id: \.self) { index in
                         Marker(map.markers[index].title, coordinate: map.markers[index].coordinate)
