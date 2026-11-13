@@ -1,0 +1,45 @@
+name: App Store Announcement
+
+on:
+  schedule:
+    - cron: "17 16 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options:
+          - dry-run
+          - test
+          - announce
+        default: dry-run
+
+permissions: {}
+
+concurrency:
+  group: appstore-announce
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    environment: appstore-announce
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.4
+
+      - name: Announce
+        run: bun .agents/skills/release/scripts/appstore-announce.ts --mode "$MODE"
+        env:
+          MODE: ${{ inputs.mode || 'announce' }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_TEST_WEBHOOK_URL: ${{ secrets.DISCORD_TEST_WEBHOOK_URL }}
