@@ -451,6 +451,9 @@ final class ServiceOperations {
                     ])
                 }),
             ]
+            if service.isWebService, let methods = definition.manifest.objectValue?["auth"]?.arrayValue {
+                result["auth"] = .array(methods)
+            }
             if start + page.count < actions.count, let last = page.last {
                 result["nextCursor"] = .string(definition.qualifiedActionName(last.id))
             }

@@ -10,6 +10,7 @@ import { harness } from "./harness.ts";
 import { startFixtures } from "./server.ts";
 import { card } from "./sites/card.ts";
 import { chat } from "./sites/chat.ts";
+import { gov } from "./sites/gov.ts";
 import { gql } from "./sites/gql.ts";
 import { ssr } from "./sites/ssr.ts";
 import { suite } from "./sites/suite.ts";
@@ -22,7 +23,7 @@ unless it was already booted or --keep-booted is passed. Builds the app when --a
 
 const config = qaCommand({ usage, options: { app: { type: "string" }, case: { type: "string" }, "keep-booted": { type: "boolean" } } });
 const values = config.values as { app?: string; case?: string; "keep-booted"?: boolean };
-const sites = [ssr, chat, gql, suite, card];
+const sites = [ssr, chat, gql, suite, card, gov];
 const selected = cases.filter(entry => !values.case || entry.name === values.case || entry.site === values.case);
 if (!selected.length) throw new Error(`No case matches ${values.case}`);
 

@@ -117,7 +117,7 @@ export function action(id: string, description: string, options: { input?: unkno
 
 export function webService(domain: string, name: string, origin: string, actions: unknown[], options: { loginPath: string; extra?: Record<string, unknown> }): Manifest {
   return {
-    domain, name, description: `${name} test fixture.`, baseUrl: `${origin}/`, faviconUrl: favicon, ...options.extra,
+    domain, name, description: `${name} test fixture.`, baseUrl: `${origin}/`, faviconUrl: favicon, auth: [{ type: "password" }], ...options.extra,
     actions: [
       action("listSessions", "List signed-in fixture accounts.", { output: sessionList }),
       action("login", "Sign in to a fixture account.", { output: { type: "null" }, baseUrl: `${origin}${options.loginPath}` }),

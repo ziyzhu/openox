@@ -337,7 +337,16 @@ nonisolated struct ServiceDefinition: Sendable {
 
     func inputSchema(for action: Manifest.Action) -> JSONValue? {
         guard action.id == WebSessionContract.loginAction, !isAPI, !isIOS, !isMCP else { return action.inputSchema }
-        return standardServiceActions.first { $0.id == action.id }?.inputSchema ?? action.inputSchema
+        guard var schema = (standardServiceActions.first { $0.id == action.id }?.inputSchema ?? action.inputSchema)?.objectValue,
+              var properties = schema["properties"]?.objectValue else { return action.inputSchema }
+        if let methods = manifest.objectValue?["auth"]?.arrayValue, !methods.isEmpty {
+            properties["auth"] = .object(["enum": .array(methods)])
+            schema["required"] = .array([.string("auth")])
+        } else {
+            properties.removeValue(forKey: "auth")
+        }
+        schema["properties"] = .object(properties)
+        return .object(schema)
     }
 
     func action(_ id: String, includingStandard: Bool = false) -> Manifest.Action? {

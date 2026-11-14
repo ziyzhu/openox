@@ -51,50 +51,27 @@ extension ServiceOperations {
                 secrets?.releaseRendering()
             }
             let source = "return await window.ox.callServiceAction(\(JSONValue.string(actionID).jsonString()), \(input.jsonString()));"
-            let login = actionID == WebSessionContract.loginAction
-            let fingerprint = "return JSON.stringify((await (async () => { \(BrowserPageState.script(selector: nil)) })()).controls);"
-            var value: JSONValue = .null
-            steps: for step in 0..<(login && secrets != nil ? 5 : 1) {
-                let before = login ? try await binding.evaluate(fingerprint, timeout: 3) as? String : nil
-                let retrievals = secrets?.retrievals ?? 0
-                var raw: Any?
-                for _ in 0..<2 {
-                    do { raw = try await binding.evaluate(source) }
-                    catch {
-                        if secrets?.awaitingApproval.isEmpty != false {
-                            if login, (secrets?.retrievals ?? 0) > retrievals,
-                               (try? await page.requireFrame(frameID)) == nil { break steps }
-                            throw error
+            var raw: Any?
+            for attempt in 0..<2 {
+                do { raw = try await binding.evaluate(source) }
+                catch {
+                    if secrets?.awaitingApproval.isEmpty != false {
+                        if actionID == WebSessionContract.loginAction, page.navigationGeneration != binding.generation {
+                            break
                         }
+                        throw error
                     }
-                    if secrets?.awaitingApproval.isEmpty != false { break }
-                    guard await secrets?.authorizePending() == true else { throw SecretAttemptError.denied }
                 }
-                value = raw.map(JSONValue.from) ?? .null
-                let violations = JSONSchemaValidator.validate(value, against: definition.outputSchema ?? .null, definitions: service.definition.definitions)
-                guard violations.isEmpty else { throw Service.InvokeError.invalidOutput(qualified, violations) }
-                guard login, (secrets?.retrievals ?? 0) > retrievals, step < 4 else { break }
-                try await Task.sleep(for: .milliseconds(1500))
-                guard let after = try? await binding.evaluate(fingerprint, timeout: 3) as? String,
-                      after != before else { break }
+                guard let secrets, !secrets.awaitingApproval.isEmpty, attempt == 0 else { break }
+                guard await secrets.authorizePending() else { throw SecretAttemptError.denied }
             }
+            let value = raw.map(JSONValue.from) ?? .null
+            let violations = JSONSchemaValidator.validate(value, against: definition.outputSchema ?? .null, definitions: service.definition.definitions)
+            guard violations.isEmpty else { throw Service.InvokeError.invalidOutput(qualified, violations) }
             Log.service.info("Service.frame invoked service=\(service.domain) owner=\(owner.domain) action=\(actionID) frame=\(frameID) origin=\(frame.origin)")
             return secrets?.redact(value) ?? value
         }
         guard actionID == WebSessionContract.loginAction else { return result }
-        guard owner.isWebService, WebSessionContract.isEnabled(owner.definition) else {
-            throw RuntimeError.bridge("Embedded login requires a prepared consumer service page. Inspect that service's page instead of Browser.")
-        }
-        let approve: @MainActor (String, Any?) async -> Bool = { name, args in
-            do { try await self.requireApproval(name, .allow, args, purpose, nil); return true }
-            catch { return false }
-        }
-        if await settledSession(service: owner, secrets: secrets, page: page, approve: approve) {
-            return .object(["interaction": .string("automatic"), "authentication": .string("verified")])
-        }
-        return try await native.handoff(title: String(localized: "Sign in to \(owner.title)")) { [self] in
-            try await handOffLogin(service: owner, secrets: secrets, input: .object([:]), session: nil,
-                                   pageURL: nil, prepare: false, approve: approve)
-        }
+        return try await completeLogin(service: owner, input: input, page: page)
     }
 }

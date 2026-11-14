@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import { elements } from "../../../setup/scripts/ios.ts";
 import { approveSecretUse, wait, type Harness } from "./harness.ts";
+import { govSecurityCode } from "./sites/gov.ts";
 import { accounts } from "./sites/shared.ts";
 
 export type Case = { name: string; site: string; run: (h: Harness) => Promise<string> };
@@ -13,6 +14,15 @@ function attach(name: string): string {
 }
 
 export function invokeScript(name: string, input: unknown = {}, extra: Record<string, unknown> = {}): string {
+  if (name.endsWith(":login")) {
+    const providers: Record<string, string> = {
+      "mail.ox-suite.localhost": "accounts.ox-suite.localhost",
+      "ox-gov.localhost": "ox-govid.localhost",
+      "ox-card.localhost": "ox-idp.localhost",
+    };
+    const provider = providers[name.split(":")[1]!];
+    input = { auth: provider ? { type: "provider", service: `web:${provider}` } : { type: "password" }, ...input as object };
+  }
   return `${attach(name)}
 return await ox.service.invoke({ purpose: "Fixture case", name: ${JSON.stringify(name)}, input: ${JSON.stringify(input)}, ...${JSON.stringify(extra)} });`;
 }
@@ -23,9 +33,29 @@ try { return { value: await ox.service.invoke({ purpose: "Fixture case", name: $
 catch (error) { return { error: String(error?.message ?? error), code: error?.code ?? null }; }`;
 }
 
+async function driveLogin(h: Harness, domain: string, key: string, steps = 5) {
+  let result = await h.turn(invokeScript(`web:${domain}:login`, { account: { $secret: key } }));
+  assert.deepEqual(result, { interaction: "automatic", authentication: "unverified" });
+  for (let step = 0; step < steps; step++) {
+    await Bun.sleep(700);
+    const state = await h.turn(`return await ox.web.browser.getPageState({ service: ${JSON.stringify(domain)}, purpose: "Inspect login document" });`);
+    const frame = state.frames.find((frame: { isMainFrame: boolean }) => frame.isMainFrame);
+    assert.ok(frame?.serviceID, "the live document has no service");
+    if (frame.serviceID === `web:${domain}`) {
+      const sessions = await h.turn(invokeScript(`web:${domain}:listSessions`, {}, { frameId: frame.id }));
+      if (sessions.length) return sessions;
+    }
+    result = await h.turn(invokeScript(`${frame.serviceID}:login`, { account: { $secret: key } }, { frameId: frame.id }));
+    assert.deepEqual(result, { interaction: "automatic", authentication: "unverified" });
+  }
+  return [];
+}
+
 async function signIn(h: Harness, domain: string, key: string) {
   await h.saveLogin(key, `web:${domain}`, ada);
-  return h.turn(invokeScript(`web:${domain}:login`, { account: { $secret: key } }));
+  const sessions = await driveLogin(h, domain, key);
+  assert.deepEqual(sessions.map((session: { id: string }) => session.id), [ada.id]);
+  return sessions;
 }
 
 export const cases: Case[] = [
@@ -51,7 +81,7 @@ export const cases: Case[] = [
     name: "ssr-auto-login", site: "ssr",
     async run(h) {
       const login = await signIn(h, "ox-ssr.localhost", "fixture-ssr-ada");
-      assert.deepEqual(login, { interaction: "automatic", authentication: "verified" });
+      assert.ok(login.length);
       const counters = h.site("ssr").counters;
       assert.equal(counters.passwordSubmissions, 1, "automatic login must submit the password exactly once");
       assert.equal(counters.passwordRejections ?? 0, 0);
@@ -66,7 +96,7 @@ export const cases: Case[] = [
     name: "chat-model-generation", site: "chat",
     async run(h) {
       const login = await signIn(h, "ox-chat.localhost", "fixture-chat-ada");
-      assert.deepEqual(login, { interaction: "automatic", authentication: "verified" });
+      assert.ok(login.length);
       assert.equal(h.site("chat").counters.passwordSubmissions, 1, "same-page login must submit once");
       const { models } = await h.turn(invokeScript("web:ox-chat.localhost:listModels"));
       assert.deepEqual(models.map((model: { id: string }) => model.id), ["fixture-fast", "fixture-slow"]);
@@ -93,7 +123,7 @@ return { streamed: first.events.some(event => event.type === "text"), status: ca
     name: "gql-page-api", site: "gql",
     async run(h) {
       const login = await signIn(h, "ox-gql.localhost", "fixture-gql-ada");
-      assert.deepEqual(login, { interaction: "automatic", authentication: "verified" });
+      assert.ok(login.length);
       const before = await h.turn(invokeScript("web:ox-gql.localhost:listNotes"));
       assert.deepEqual(before.notes.map((note: { id: string }) => note.id), ["n1"]);
       const created = await h.turn(invokeScript("web:ox-gql.localhost:addNote", { title: "From Ox" }),
@@ -108,9 +138,9 @@ return { streamed: first.events.some(event => event.type === "text"), status: ca
     name: "suite-provider-hop", site: "suite",
     async run(h) {
       await h.saveLogin("fixture-suite-ada", "web:accounts.ox-suite.localhost", ada);
-      const login = await h.turn(`await ox.service.attach({ purpose: "Attach provider", domain: "accounts.ox-suite.localhost" });
-${invokeScript("web:mail.ox-suite.localhost:login", { account: { $secret: "fixture-suite-ada" } })}`);
-      assert.deepEqual(login, { interaction: "automatic", authentication: "verified" });
+      await h.turn(`return await ox.service.attach({ purpose: "Attach provider", domain: "accounts.ox-suite.localhost" });`);
+      const login = await driveLogin(h, "mail.ox-suite.localhost", "fixture-suite-ada");
+      assert.ok(login.length);
       assert.equal(h.site("suite").counters.passwordSubmissions, 1, "provider login must submit once");
       const sessions = await h.turn(invokeScript("web:mail.ox-suite.localhost:listSessions"));
       assert.deepEqual(sessions.map((session: { id: string }) => session.id), [ada.id]);
@@ -120,9 +150,68 @@ ${invokeScript("web:mail.ox-suite.localhost:login", { account: { $secret: "fixtu
     },
   },
   {
+    name: "gov-auth-selection", site: "gov",
+    async run(h) {
+      const result = await h.turn(invokeScript("web:ox-gov.localhost:login"));
+      assert.deepEqual(result, { interaction: "automatic", authentication: "unverified" });
+      const state = await h.turn(`return await ox.web.browser.getPageState({ service: "ox-gov.localhost", purpose: "Inspect selected provider" });`);
+      const frame = state.frames.find((frame: { isMainFrame: boolean }) => frame.isMainFrame);
+      assert.equal(frame.serviceID, "web:ox-govid.localhost");
+      assert.equal(h.site("gov").counters.authStarts, 1);
+      assert.equal(h.site("gov").counters.passwordSubmissions ?? 0, 0);
+      return "an explicit provider method started authorization without credentials or an implicit manual handoff";
+    },
+  },
+  {
+    name: "gov-provider-continuity", site: "gov",
+    async run(h) {
+      const attached = await h.turn(`return await ox.service.attach({ purpose: "Inspect authentication methods", domain: "ox-gov.localhost" });`);
+      assert.deepEqual(attached.auth, [{ type: "provider", service: "web:ox-govid.localhost" }]);
+      for (const input of [{}, { auth: { type: "password" } }, { auth: { type: "provider", service: "web:other.localhost" } }]) {
+        const denied = await h.turn(attemptScript("web:ox-gov.localhost:login", input));
+        assert.ok(denied.error, "missing or unadvertised authentication method was accepted");
+      }
+      assert.equal(h.site("gov").counters.authStarts ?? 0, 0, "invalid auth selection reached the website");
+      await h.saveLogin("fixture-govid-ada", "web:ox-govid.localhost", ada);
+      await h.turn(`return await ox.service.attach({ purpose: "Attach provider", domain: "ox-govid.localhost" });`);
+      await driveLogin(h, "ox-gov.localhost", "fixture-govid-ada", 3);
+      const login = await h.turn(`const state = await ox.web.browser.getPageState({ service: "ox-gov.localhost", purpose: "Inspect provider challenge" });
+const frame = state.frames.find(frame => frame.isMainFrame);
+return await ox.service.invoke({ purpose: "Complete session verification", name: "web:ox-govid.localhost:login", frameId: frame.id, input: { auth: { type: "password" }, interaction: "manual" } });`);
+      assert.equal(login?.status, "awaiting_user");
+      const counters = h.site("gov").counters;
+      assert.equal(counters.authStarts, 1, "the destination must start provider authorization once");
+      assert.equal(counters.passwordSubmissions, 1, "the provider handler must submit the password once on the same page");
+      await h.waitMatching(/^conversation\.service\.login\..+\.done$/);
+      await h.tapMatching(/^serviceInspector\.open\./);
+      await h.ios.wait({ id: "serviceHandoff.done" }, { timeout: 10_000, stable: 800 });
+      await h.screenshot("gov-session-verification");
+      await h.fillWeb("Security code", govSecurityCode);
+      await h.pressReturn();
+      const deadline = Date.now() + 10_000;
+      while (!counters.codeSubmissions && Date.now() < deadline) await Bun.sleep(100);
+      assert.equal(counters.codeSubmissions, 1, "the security code was not submitted");
+      await h.ios.tap({ id: "serviceHandoff.done" }, { stable: 300 });
+      await h.idle(prompt => /remember|save/i.test(prompt.prompt) ? wait : undefined);
+      await h.turn(`const state = await ox.web.browser.getPageState({ service: "ox-gov.localhost", purpose: "Inspect authentication callback" });
+const frame = state.frames.find(frame => frame.isMainFrame);
+if (frame.serviceID === "web:ox-govid.localhost") return await ox.service.invoke({ purpose: "Finish provider return", name: "web:ox-govid.localhost:login", frameId: frame.id, input: { auth: { type: "password" }, account: { $secret: "fixture-govid-ada" } } });
+return null;`);
+      await Bun.sleep(700);
+      assert.equal(counters.callbacks, 1, "the authentication callback must complete after Done");
+      assert.equal(counters.callbackRejections ?? 0, 0);
+      assert.equal(counters.authStarts, 1, "Done must not restart provider authorization");
+      const sessions = await h.turn(invokeScript("web:ox-gov.localhost:listSessions"));
+      assert.deepEqual(sessions.map((session: { id: string }) => session.id), [ada.username]);
+      const cases = await h.turn(invokeScript("web:ox-gov.localhost:getCases"));
+      assert.equal(cases.account, ada.username);
+      return "destination and provider handlers advanced one page, the manual security code returned through the callback after Done, and the intended destination account was verified";
+    },
+  },
+  {
     name: "card-iframe-handoff", site: "card",
     async run(h) {
-      const login = await h.turn(invokeScript("web:ox-card.localhost:login"));
+      const login = await h.turn(invokeScript("web:ox-card.localhost:login", { interaction: "manual" }));
       assert.equal(login?.status, "awaiting_user", `expected a manual handoff, got ${JSON.stringify(login)}`);
       await h.waitMatching(/^conversation\.service\.login\..+\.done$/);
       await h.tapMatching(/^serviceInspector\.open\./);

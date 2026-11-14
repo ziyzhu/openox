@@ -46,14 +46,6 @@ nonisolated struct SecretUse: Equatable, Sendable {
     }
 }
 
-nonisolated enum LoginStepEnd: String, Sendable {
-    case running
-    case finished
-    case awaitingPerson
-    case leftSite
-    case stalled
-}
-
 nonisolated enum SecretAttemptError: LocalizedError {
     case invalidReference
     case notPassed
@@ -87,24 +79,7 @@ final class SecretAttempt {
     private(set) var denied = false
     private var released: Set<String> = []
     private(set) var retrievals = 0
-    var stepEnd = LoginStepEnd.finished
     private var renderings: [ObjectIdentifier: () -> Void] = [:]
-    private static var rejectedAt: [String: Date] = [:]
-    private static let cooldown: TimeInterval = 600
-
-    var isCoolingDown: Bool {
-        keys.contains { Self.rejectedAt[$0].map { Date().timeIntervalSince($0) < Self.cooldown } ?? false }
-    }
-
-    func recordRejection() {
-        for key in keys { Self.rejectedAt[key] = Date() }
-        Log.service.info("SecretAttempt.rejected id=\(id.uuidString.prefix(8)) consumer=\(consumer) cooldown=\(Int(Self.cooldown))")
-    }
-
-    func recordSuccess() {
-        for key in keys { Self.rejectedAt[key] = nil }
-    }
-
     private static let live = NSHashTable<SecretAttempt>.weakObjects()
 
     init(consumer: String, keys: Set<String>, approve: @escaping (SecretUse, String) async -> Bool) {
@@ -130,18 +105,6 @@ final class SecretAttempt {
 
     var owners: Set<String> {
         Set(keys.compactMap { try? Secret.entry(key: $0)?.serviceID })
-    }
-
-    var accountIdentities: [String: String] {
-        Dictionary(uniqueKeysWithValues: keys.compactMap { key in
-            (try? Secret.entry(key: key))?.accountIdentity.map { (key, $0) }
-        })
-    }
-
-    var usernames: [String: String] {
-        Dictionary(uniqueKeysWithValues: keys.compactMap { key in
-            (try? Secret.fields(key: key))?["username"].map { (key, $0.lowercased()) }
-        })
     }
 
     static func redactLive(_ value: JSONValue) -> JSONValue {

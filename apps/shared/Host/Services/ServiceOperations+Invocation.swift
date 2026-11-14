@@ -105,10 +105,9 @@ extension ServiceOperations {
                 return try await self.invokeFrameAction(service: service, actionID: actionID, input: input,
                                                        frameID: frameID, session: session, secrets: secrets, purpose: purpose)
             }
-            if let secrets, WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction,
-               await self.hasIntendedSession(service: service, secrets: secrets, approve: approve) {
-                Log.service.info("Service.login automatic skipped domain=\(service.domain) reason=signed-in")
-                return .object(["interaction": .string("automatic"), "authentication": .string("verified")])
+            if service.isWebService, WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction {
+                return try await self.invokeLogin(service: service, input: input, session: session, pageURL: pageURL,
+                                                  secrets: secrets, approve: approve)
             }
             if service.definition.supportsConversation, actionID == WebConversationContract.actionID {
                 let attachments = try await resolveConversationAttachments(input.objectValue?["attachments"]?.arrayValue ?? [])
@@ -132,8 +131,6 @@ extension ServiceOperations {
                     service: service, actionID: actionID, args: dispatched,
                     approve: approve, readFile: { try await self.readMCPFile($0, purpose) }, receiveFiles: receiveFiles
                 )
-            } else if secrets != nil, lazyApproval {
-                result = .success(.null)
             } else {
                 result = await service.invokeAction(
                     actionID,
@@ -145,23 +142,9 @@ extension ServiceOperations {
                     approve: approve
                 )
             }
-            let raw: JSONValue
-            do { raw = try result.get() } catch {
-                if WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction,
-                   secrets == nil, self.redirectProvider(for: service) != nil {
-                    return try await self.completeLogin(service: service, secrets: nil, input: input, session: session,
-                                                        pageURL: pageURL, approve: approve)
-                }
-                secrets?.releaseRendering()
-                throw error
-            }
-            let value = secrets?.redact(raw) ?? raw
-            if WebSessionContract.isEnabled(service.definition), actionID == WebSessionContract.loginAction {
-                return try await self.completeLogin(service: service, secrets: secrets, input: input, session: session,
-                                                    pageURL: pageURL, approve: approve)
-            }
-            secrets?.releaseRendering()
-            return value
+            defer { secrets?.releaseRendering() }
+            let raw = try result.get()
+            return secrets?.redact(raw) ?? raw
         }
     }
 

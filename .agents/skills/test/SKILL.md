@@ -39,7 +39,8 @@ Website service cases live in `protocol/web/` and run with
 Simulator build. Fixture sites model bundled service archetypes: server-rendered
 two-page login, client-rendered same-page login with streamed `conversation`
 generation, in-page GraphQL with CSRF, a same-site accounts provider hop, and a
-cross-site sign-in widget nested in iframes. They are served over HTTPS on
+cross-site sign-in widget nested in iframes, and a cross-site provider redirect with a
+manual security code and a delayed single-use callback. They are served over HTTPS on
 `*.localhost` with a CA trusted on that simulator only; Debug Simulator builds allow
 those hosts. The runner applies a run-owned template Profile, serves fixture services
 through the development repository, drives turns through Mock `execute` scripts,
@@ -47,8 +48,9 @@ answers only expected prompts, deletes saved logins it created, and records
 screenshots and accessibility trees for failures. Assert with service results, fresh
 `listSessions` and fixture-server counters such as password submissions and CSRF
 rejections. Exercise destination-initiated provider redirects with preserved return
-parameters and preparatory clicks without secret retrieval. The bounded automatic
-step loop advances on navigation or visible control changes, not credential reads. Web content inside the
+parameters and preparatory clicks without secret retrieval. The agent coordinates login by inspecting the live document and invoking the matching
+service with its fresh frameId; the Host executes one handler and never verifies login
+or advances steps. Same-page transitions belong to the handler. Web content inside the
 handoff is reachable only through `idb ui describe-point`; open the full-screen
 handoff before typing into it. When a bundled service introduces a new site or login
 shape, add a fixture for it. For browser ownership changes, compare page IDs across
