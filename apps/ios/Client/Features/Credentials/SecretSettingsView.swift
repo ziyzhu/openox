@@ -64,7 +64,12 @@ struct SecretSettingsView: View {
                         .lineLimit(1)
                     Group {
                         if !available { Text("Unavailable") }
-                        else if let type = entry.type { Text(type.title) + Text(verbatim: entry.serviceID.map { " · \($0)" } ?? "") }
+                        else if let type = entry.type {
+                            HStack(spacing: 0) {
+                                Text(type.title)
+                                if let serviceID = entry.serviceID { Text(verbatim: " · \(serviceID)") }
+                            }
+                        }
                         else { Text("Needs setup") }
                     }
                     .font(Theme.Fonts.caption)

@@ -4,14 +4,14 @@ import UniformTypeIdentifiers
 import Darwin
 
 extension ProfileMigrator {
-    static func durableJournalDirectory(_ id: UUID) throws -> URL {
+    nonisolated static func durableJournalDirectory(_ id: UUID) throws -> URL {
         let root = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent("StorageMigration/PiProfiles/" + id.uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         return root
     }
 
-    static func writeDurableJournal(_ journal: [String: Any], profileID: UUID) throws {
+    nonisolated static func writeDurableJournal(_ journal: [String: Any], profileID: UUID) throws {
         let directory = try durableJournalDirectory(profileID)
         let file = directory.appendingPathComponent("journal.json")
         try JSONSerialization.data(withJSONObject: journal, options: [.sortedKeys]).write(to: file, options: .atomic)
@@ -22,14 +22,14 @@ extension ProfileMigrator {
         try syncDurableDirectory(directory)
     }
 
-    static func syncDurableDirectory(_ url: URL) throws {
+    nonisolated static func syncDurableDirectory(_ url: URL) throws {
         let fd = open(url.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard fd >= 0 else { throw StorageMigrationError.invalidApplicationStorage("Pi migration directory") }
         defer { Darwin.close(fd) }
         guard fsync(fd) == 0 else { throw StorageMigrationError.invalidApplicationStorage("Pi migration directory durability") }
     }
 
-    static func publishDurableJournal(_ journal: [String: Any]) throws {
+    nonisolated static func publishDurableJournal(_ journal: [String: Any]) throws {
         guard journal["format"] as? Int == 1, let text = journal["profileID"] as? String, let id = UUID(uuidString: text),
               let rootPath = journal["root"] as? String, let stagePath = journal["stage"] as? String, let backupPath = journal["backup"] as? String else {
             throw StorageMigrationError.invalidApplicationStorage("Pi migration journal")
@@ -63,7 +63,7 @@ extension ProfileMigrator {
         Log.app.info("StorageMigrator.pi published id=\(id) sourceBackupRetained=true")
     }
 
-    static func recoverDurablePublications() throws {
+    nonisolated static func recoverDurablePublications() throws {
         let base = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent("StorageMigration/PiProfiles")
         guard FileManager.default.fileExists(atPath: base.path) else { return }
@@ -78,7 +78,7 @@ extension ProfileMigrator {
         }
     }
 
-    static func durableConversationReference(for legacyID: UUID, in scope: ProfileScope) throws -> DurableConversationReference? {
+    nonisolated static func durableConversationReference(for legacyID: UUID, in scope: ProfileScope) throws -> DurableConversationReference? {
         guard let id = scope.profileID else { return nil }
         let file = try durableJournalDirectory(id).appendingPathComponent("journal.json")
         guard FileManager.default.fileExists(atPath: file.path) else { return nil }
@@ -170,7 +170,7 @@ extension ProfileMigrator {
         }
     }
 
-    private struct DurableProfileDraft: @unchecked Sendable {
+    nonisolated private struct DurableProfileDraft: @unchecked Sendable {
         let draft: JSONValue
         let manifest: [String: Any]
         let inventory: [String: String]
@@ -178,7 +178,7 @@ extension ProfileMigrator {
         let conversationCount: Int
     }
 
-    private static func durableProfileDraft(_ profile: Profile, destination: URL) throws -> DurableProfileDraft {
+    nonisolated private static func durableProfileDraft(_ profile: Profile, destination: URL) throws -> DurableProfileDraft {
         let manager = FileManager.default
         let inventory = try durableSourceInventory(at: profile.url)
         let manifest = try JSONSerialization.jsonObject(with: durableSourceFile(ProfileIO.configName, at: profile.url)) as? [String: Any]
@@ -280,7 +280,7 @@ extension ProfileMigrator {
             conversationDirectory: conversationDirectory, conversationCount: conversationPaths.count)
     }
 
-    private static func durableSourceInventory(at root: URL) throws -> [String: String] {
+    nonisolated private static func durableSourceInventory(at root: URL) throws -> [String: String] {
         var files: [String: String] = [:]
         var directories = [(root, "")]
         while let (directory, prefix) = directories.popLast() {
@@ -307,7 +307,7 @@ extension ProfileMigrator {
         return files
     }
 
-    private static func durableSourceFile(_ path: String, at root: URL, limit: Int = 64 * 1024 * 1024) throws -> Data {
+    nonisolated private static func durableSourceFile(_ path: String, at root: URL, limit: Int = 64 * 1024 * 1024) throws -> Data {
         let descriptor = try StorageMigrationSupport.durableSourceDescriptor(path, at: root)
         defer { Darwin.close(descriptor) }
         var before = stat()

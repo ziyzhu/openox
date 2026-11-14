@@ -52,7 +52,7 @@ extension ProfileMigrator {
         }
     }
 
-    static func copyProfile(_ profile: Profile, to parent: URL) throws -> (Profile, [String: String]) {
+    nonisolated static func copyProfile(_ profile: Profile, to parent: URL) throws -> (Profile, [String: String]) {
         let manager = FileManager.default
         let destination = parent.appendingPathComponent(profile.name, isDirectory: true)
         let sourceParts = profile.url.standardizedFileURL.resolvingSymlinksInPath().pathComponents
@@ -93,7 +93,7 @@ extension ProfileMigrator {
         return (copied, inventory)
     }
 
-    private static func transferInventory(at root: URL) throws -> [String: String] {
+    nonisolated private static func transferInventory(at root: URL) throws -> [String: String] {
         var inventory = try StorageMigrationSupport.migrationSourceInventory(at: root)
         guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else {
             throw RuntimeError.bridge("The Profile folder could not be read.")
@@ -106,7 +106,7 @@ extension ProfileMigrator {
         return inventory
     }
 
-    static func removeMovedSource(_ profile: Profile, inventory: [String: String]) throws {
+    nonisolated static func removeMovedSource(_ profile: Profile, inventory: [String: String]) throws {
         var result: Result<Void, Error>?
         var coordinationError: NSError?
         NSFileCoordinator().coordinate(writingItemAt: profile.url, options: .forDeleting, error: &coordinationError) { source in
@@ -214,7 +214,7 @@ extension ProfileMigrator {
         } catch { await runtime.dispose(); throw error }
     }
 
-    static func syncImportedTree(_ root: URL) throws {
+    nonisolated static func syncImportedTree(_ root: URL) throws {
         var directories = [root]
         guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else {
             throw ProfilePackage.Failure.invalid
@@ -329,7 +329,7 @@ extension ProfileMigrator {
         return published
     }
 
-    private static func writePublicProfileJournal(_ journal: [String: Any], profileID: UUID) throws {
+    nonisolated private static func writePublicProfileJournal(_ journal: [String: Any], profileID: UUID) throws {
         let root = try durableJournalDirectory(profileID)
         let file = root.appendingPathComponent("public-journal.json")
         try JSONSerialization.data(withJSONObject: journal, options: [.sortedKeys]).write(to: file, options: .atomic)
@@ -340,7 +340,7 @@ extension ProfileMigrator {
         try syncDurableDirectory(root)
     }
 
-    private static func publishPublicProfileJournal(_ journal: [String: Any]) throws {
+    nonisolated private static func publishPublicProfileJournal(_ journal: [String: Any]) throws {
         guard journal["format"] as? Int == 1, let idText = journal["profileID"] as? String, let id = UUID(uuidString: idText),
               let sourcePath = journal["source"] as? String, let destinationPath = journal["destination"] as? String,
               let contentPath = journal["content"] as? String, let statePath = journal["state"] as? String,
@@ -387,7 +387,7 @@ extension ProfileMigrator {
         Log.app.info("StorageMigrator.publicFiles published id=\(id) from=\(filesystemProfileVersion) to=\(publicProfileVersion) sourceBackupRetained=true")
     }
 
-    static func recoverPublicProfilePublications() throws {
+    nonisolated static func recoverPublicProfilePublications() throws {
         let base = AppStoragePaths.applicationSupport.appendingPathComponent("StorageMigration/PiProfiles")
         guard FileManager.default.fileExists(atPath: base.path) else { return }
         for root in try FileManager.default.contentsOfDirectory(at: base, includingPropertiesForKeys: nil) {

@@ -1,6 +1,6 @@
 import Foundation
 
-extension ApplicationStorageMigrator {
+nonisolated extension ApplicationStorageMigrator {
     static func legacyPreference(_ key: String, defaults: UserDefaults = .standard) -> Any? {
         guard defaults === UserDefaults.standard else { return defaults.object(forKey: key) }
         return defaults.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "")?[key]

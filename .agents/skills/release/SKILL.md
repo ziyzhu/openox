@@ -65,6 +65,10 @@ it back; reporting drift alone is insufficient. A release request authorizes
 applying this approved copy, not inventing replacement copy. Preserve non-English
 promotional text unless a change is requested. Do not automatically translate the
 tagline or use it as release notes.
+What's New must communicate only changes users can actually see or feel: new
+capabilities, visible improvements, and fixes to problems they experience. Omit
+internal refactors, tooling, infrastructure, and implementation details unless
+expressed as a concrete user-facing benefit. Do not invent benefits to fill notes.
 For app updates, require saved, nonempty **What's New in This Version** text in
 every configured locale, including `zh-Hans`; English text alone is insufficient.
 Review translations before staging and verify all locales afterward. Preserve

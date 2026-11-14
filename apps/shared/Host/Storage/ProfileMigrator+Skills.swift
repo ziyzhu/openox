@@ -3,7 +3,7 @@ import CryptoKit
 import UniformTypeIdentifiers
 import Darwin
 
-extension ProfileMigrator {
+nonisolated extension ProfileMigrator {
     static func migrateProfileSkillCatalog(at root: URL) throws {
         let manager = FileManager.default
         let skills = root.appendingPathComponent("skills")

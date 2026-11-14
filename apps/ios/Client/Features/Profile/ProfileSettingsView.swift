@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-private struct ProfileFolderDocument: FileDocument {
+private struct ProfileFolderDocument: FileDocument, @unchecked Sendable {
     static var readableContentTypes: [UTType] { [.folder] }
     let folder: FileWrapper
 

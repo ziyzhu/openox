@@ -213,9 +213,8 @@ struct OxDemoSceneView: View {
     }
 }
 
-#Preview("App Store creative · 20-second loop") {
+#Preview("App Store creative · 20-second loop", traits: .fixedLayout(width: 402, height: 268)) {
     OxDemoSceneView(scene: .creative, autoplay: true)
-        .previewLayout(.fixed(width: 402, height: 268))
 }
 
 #Preview("Storyboard · native UI") {

@@ -1,6 +1,6 @@
 import Foundation
 
-extension ProfileMigrator {
+nonisolated extension ProfileMigrator {
     static func migrateResponsePreferences(at root: URL) throws {
         let manager = FileManager.default
         let source = root.appendingPathComponent("SOUL.md")

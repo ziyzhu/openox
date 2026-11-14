@@ -162,7 +162,7 @@ actor ProfileRepository {
     func saveConversation(_ request: ConversationSaveRequest, in scope: ProfileScope) async -> ConversationSaveReceipt {
         debugSaveGate.pass()
         do {
-            let reference = try await DurableProfileStore.shared.reference(for: request.conversationID, in: scope)
+            let reference = try DurableProfileStore.shared.reference(for: request.conversationID, in: scope)
             let meta: ConversationMeta
             let turns: [Turn]?
             switch request.payload {
@@ -192,7 +192,7 @@ actor ProfileRepository {
     }
 
     func deleteConversation(_ id: ConversationID, in scope: ProfileScope) async throws {
-        let reference = try await DurableProfileStore.shared.reference(for: id, in: scope)
+        let reference = try DurableProfileStore.shared.reference(for: id, in: scope)
         _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationDelete"), "reference": reference.value]))
         deleted[scope, default: []].insert(id)
     }
@@ -200,10 +200,10 @@ actor ProfileRepository {
     func virtualConversationMetadata(_ id: ConversationID, in scope: ProfileScope, snapshot: ConversationState? = nil) async throws -> Data {
         let loaded = snapshot == nil ? await loadConversation(id, in: scope)?.state : nil
         guard let state = snapshot ?? loaded else { throw RuntimeError.bridge("Conversation unavailable") }
-        let reference = try await DurableProfileStore.shared.reference(for: id, in: scope)
+        let reference = try DurableProfileStore.shared.reference(for: id, in: scope)
         var metadata = try encoded(state.meta).objectValue ?? [:]
         metadata["workingDirectory"] = .string("conversations/\(reference.conversationID)")
-        return Data(try JSONValue.object(metadata).jsonString().utf8)
+        return Data(JSONValue.object(metadata).jsonString().utf8)
     }
 
     func virtualConversationTranscript(_ id: ConversationID, in scope: ProfileScope, snapshot: ConversationState? = nil) async throws -> Data {
@@ -221,7 +221,7 @@ actor ProfileRepository {
     }
 
     func export(_ state: ConversationState) throws -> Data {
-        try Data(JSONValue.object(["metadata": try encoded(state.meta), "turns": .array(try state.turns.map(encoded))]).jsonString().utf8)
+        Data(JSONValue.object(["metadata": try encoded(state.meta), "turns": .array(try state.turns.map(encoded))]).jsonString().utf8)
     }
 
     func importConversationPackage(_ payload: ConversationPackagePayload, in scope: ProfileScope) async throws -> ConversationState {

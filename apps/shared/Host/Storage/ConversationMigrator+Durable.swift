@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 import Darwin
 
-extension ConversationMigrator {
+nonisolated extension ConversationMigrator {
     static func decodeDurableConversation(metadata data: Data, transcript: Int32?, checkpoint contextData: Data?,
         sources: [String: JSONValue], scope: ProfileScope, names: Set<String>, store: DurableFileStore) throws -> JSONValue {
         let decoder = JSONDecoder()
@@ -87,7 +87,7 @@ extension ConversationMigrator {
     }
 }
 
-extension ConversationMigrator {
+nonisolated extension ConversationMigrator {
     static func decodeMigrationValue<T: Decodable>(_ type: T.Type, from data: Data, decoder: JSONDecoder, path: String) throws -> T {
         do { return try decoder.decode(type, from: data) }
         catch let error as DecodingError {

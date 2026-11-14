@@ -3,7 +3,7 @@ import CryptoKit
 import UniformTypeIdentifiers
 import Darwin
 
-extension ProfileMigrator {
+nonisolated extension ProfileMigrator {
     static func moveAttachmentsToFiles(at root: URL) throws {
         let fm = FileManager.default
         let attachments = root.appendingPathComponent("attachments", isDirectory: true)

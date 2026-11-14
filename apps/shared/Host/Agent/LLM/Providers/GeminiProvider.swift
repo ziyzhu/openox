@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-public struct GeminiConfig: Sendable {
+nonisolated public struct GeminiConfig: Sendable {
     public var baseURL: URL
     public init(baseURL: URL = URL(string: "https://generativelanguage.googleapis.com/v1beta")!) {
         self.baseURL = baseURL

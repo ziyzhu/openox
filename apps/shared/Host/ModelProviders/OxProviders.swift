@@ -112,7 +112,7 @@ nonisolated enum OxProviders {
     )
 }
 
-private extension LLMWireProtocol {
+nonisolated private extension LLMWireProtocol {
     static let allProviderInformationValues = [
         openAIResponses.rawValue,
         openAIChatCompletions.rawValue,

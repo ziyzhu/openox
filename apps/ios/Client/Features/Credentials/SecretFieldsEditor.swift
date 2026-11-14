@@ -1,13 +1,13 @@
 import Foundation
 import SwiftUI
 
-struct SecretFieldDraft: Identifiable {
+nonisolated struct SecretFieldDraft: Identifiable {
     let id = UUID()
     var name: String
     var value: String
 }
 
-enum SecretFieldCodec {
+nonisolated enum SecretFieldCodec {
     static func decode(_ json: String) throws -> [SecretFieldDraft] {
         guard let data = json.data(using: .utf8),
               let object = try JSONSerialization.jsonObject(with: data) as? [String: String] else {
