@@ -20,14 +20,16 @@ import { handoff } from "./sites/handoff.ts";
 import { ssr } from "./sites/ssr.ts";
 import { suite } from "./sites/suite.ts";
 
-const usage = `Usage: bun run test:web --device ox-N [--app <Ox.app>] [--case <name>] [--keep-booted]
+const usage = `Usage: bun run test:web --device ox-N [--app <Ox.app>] [--case <name>] [--repeat <1..20>] [--keep-booted]
 Runs website service fixtures against a Debug Simulator build on a reserved QA simulator.
 Applies a run-owned template Profile, trusts the fixture CA on that simulator only, serves the
 fixture repository on the device's repository port, and shuts the simulator down afterwards
 unless it was already booted or --keep-booted is passed. Builds the app when --app is omitted.`;
 
-const config = qaCommand({ usage, options: { app: { type: "string" }, case: { type: "string" }, "keep-booted": { type: "boolean" } } });
-const values = config.values as { app?: string; case?: string; "keep-booted"?: boolean };
+const config = qaCommand({ usage, options: { app: { type: "string" }, case: { type: "string" }, repeat: { type: "string" }, "keep-booted": { type: "boolean" } } });
+const values = config.values as { app?: string; case?: string; repeat?: string; "keep-booted"?: boolean };
+const repetitions = Number(values.repeat ?? 1);
+if (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > 20) throw new Error("repeat must be 1..20");
 const sites = [ssr, chat, gql, suite, card, gov, handoff, oauth, popup];
 const selected = [...cases, ...handoffCases, ...oauthCases].filter(entry => !values.case || entry.name === values.case || entry.site === values.case);
 if (!selected.length) throw new Error(`No case matches ${values.case}`);
@@ -44,6 +46,7 @@ const template = join(evidence, "template.json");
 await writeFile(template, JSON.stringify({
   version: 1,
   settings: { language: "en", onboardingCompleted: true, allowHostConnections: true, defaultModel: { provider: "mock", model: "mock" } },
+  userDefaults: { app: { set: { "review.attemptedMilestones": [3, 7, 14] } } },
   profiles: [{ id: "web", name: "Web Fixtures", conversations: [{ id: "fixtures", title: "Web fixtures", model: { provider: "mock", model: "mock" },
     messages: [{ role: "user", text: "Web fixture run." }, { role: "assistant", text: "Ready." }] }] }],
   selection: { profile: "web", conversation: "fixtures" },
@@ -54,7 +57,7 @@ const release = claimSimulator(config.device);
 const fixtures = await startFixtures(sites, config.fixturePort);
 const repository = Bun.spawn(["bun", "apps/cli/src/ox.ts", "--repository", fixtures.repository, "repository", "serve", "--port", String(config.registryPort)],
   { cwd: ROOT, stdout: Bun.file(join(evidence, "repository.log")), stderr: "inherit" });
-const results: Array<{ name: string; status: "pass" | "fail"; detail: string }> = [];
+const results: Array<{ name: string; repetition: number; status: "pass" | "fail"; detail: string; elapsedMs: number; scriptTurns: number; resultBytes: number }> = [];
 try {
   const udid = await ios.udid();
   await run(["xcrun", "simctl", "keychain", udid, "add-root-cert", fixtures.ca], { capture: true });
@@ -78,19 +81,23 @@ try {
   const loaded = new Set((await h.ox(["service", "list"]) as Array<{ domain: string }>).map(service => service.domain));
   const missing = sites.flatMap(site => site.services(fixtures.origin).map(service => service.manifest.domain)).filter(domain => !loaded.has(domain));
   if (missing.length) throw new Error(`Fixture services did not load: ${missing.join(", ")}`);
-  for (const entry of selected) {
+  await writeFile(join(evidence, "function-catalog.json"), JSON.stringify(await h.ox(["vm", "functions"])), { mode: 0o600 });
+  for (const { entry, repetition } of selected.flatMap(entry => Array.from({ length: repetitions }, (_, index) => ({ entry, repetition: index + 1 })))) {
     fixtures.reset();
     await h.newConversation();
+    const started = performance.now();
     try {
-      results.push({ name: entry.name, status: "pass", detail: await entry.run(h) });
+      const detail = await entry.run(h);
+      results.push({ name: entry.name, repetition, status: "pass", detail, elapsedMs: Math.round(performance.now() - started), ...h.metrics });
     } catch (error) {
       await h.screenshot(`${entry.name}-failure`).catch(() => {});
       await ios.describe().then(tree => writeFile(join(evidence, `${entry.name}-failure-accessibility.json`), JSON.stringify(tree)), () => {});
-      results.push({ name: entry.name, status: "fail", detail: (error as Error).message.replace(/\s+/g, " ").slice(0, 600) });
+      results.push({ name: entry.name, repetition, status: "fail", elapsedMs: Math.round(performance.now() - started), ...h.metrics, detail: (error as Error).message.replace(/\s+/g, " ").slice(0, 600) });
     }
     await h.forgetLogins().catch(error => console.error(`Saved login cleanup failed: ${(error as Error).message}`));
     console.log(`${results.at(-1)!.status.toUpperCase()} ${entry.name}: ${results.at(-1)!.detail}`);
   }
+  await writeFile(join(evidence, "login-diagnostics.json"), JSON.stringify(await h.ox(["host", "logs", "--all", "--grep", "Service.login"], { allowFailure: true })), { mode: 0o600 });
 } finally {
   repository.kill();
   fixtures.stop();

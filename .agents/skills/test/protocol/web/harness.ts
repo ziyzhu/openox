@@ -14,12 +14,15 @@ export type Prompt = { id: string; prompt: string; options: string[] };
 export type Responder = (prompt: Prompt) => string | undefined;
 
 export const wait = "";
-export const approveSecretUse: Responder = prompt => /to use the saved secret/.test(prompt.prompt) ? "Approve" : undefined;
+export const approveSecretUse: Responder = prompt => /to use the saved secret/.test(prompt.prompt) || /^Browser - [a-z0-9.-]+\.localhost(?:\n|$)/.test(prompt.prompt) ? "Approve" : undefined;
 
 export function harness(options: { device: string; debugEndpoint: string; fixtures: Fixtures; sites: Site[]; evidence: string }) {
   const ios = iosTarget(options.device);
   let conversation = "";
   let prompts: string[] = [];
+  let scriptTurns = 0;
+  let resultBytes = 0;
+  let loginObservations = 0;
   const saved = new Set<string>();
 
   async function ox(args: string[], flags: { conversation?: boolean; allowFailure?: boolean } = {}) {
@@ -42,7 +45,7 @@ export function harness(options: { device: string; debugEndpoint: string; fixtur
       const prompt = current.pendingPrompt;
       if (Date.now() > deadline) throw new Error(`Turn did not finish; pending=${prompt?.prompt ?? "none"}`);
       if (prompt && !answered.has(prompt.id)) {
-        const reply = answer(prompt);
+        const reply = answer(prompt) ?? (/^Browser - [a-z0-9.-]+\.localhost(?:\n|$)/.test(prompt.prompt) ? "Approve" : undefined);
         if (reply === undefined) throw new Error(`Unexpected prompt: ${prompt.prompt.split("\n")[0]}`);
         if (reply === wait) { await Bun.sleep(250); continue; }
         prompts.push(prompt.prompt.split("\n")[0]!);
@@ -81,7 +84,11 @@ export function harness(options: { device: string; debugEndpoint: string; fixtur
 
   async function turn(script: string, answer?: Responder): Promise<any> {
     await begin(script);
-    return lastResult(await idle(answer));
+    const result = lastResult(await idle(answer));
+    scriptTurns++;
+    resultBytes += Buffer.byteLength(JSON.stringify(result));
+    if (result && typeof result === "object" && "page" in result && "authentication" in result && result.authentication === "unverified") loginObservations++;
+    return result;
   }
 
   async function waitMatching(pattern: RegExp, timeout = 20_000): Promise<string> {
@@ -137,17 +144,21 @@ export function harness(options: { device: string; debugEndpoint: string; fixtur
   }
 
   return {
-    ios, ox, turn, begin, idle, pending, lastResult, waitMatching, tapMatching, fillWeb,
+    ios, ox, turn, begin, idle, pending, lastResult, waitMatching, tapMatching, fillWeb, snapshot,
     async pressReturn() { await run(["idb", "ui", "key", "40", "--udid", await ios.udid()], { capture: true }); },
     get fixtures() { return options.fixtures; },
     get evidence() { return options.evidence; },
     get prompts() { return prompts; },
+    get metrics() { return { scriptTurns, resultBytes, loginObservations }; },
     site: (name: string) => options.sites.find(site => site.name === name)!,
     async newConversation() {
       const created = await ox(["conversation", "new", "--provider", "mock", "--model", "mock"]);
       if (!created.conversationId) throw new Error(`Conversation was not created: ${JSON.stringify(created)}`);
       conversation = created.conversationId;
       prompts = [];
+      scriptTurns = 0;
+      resultBytes = 0;
+      loginObservations = 0;
     },
     async forgetLogins() {
       for (const key of saved) {

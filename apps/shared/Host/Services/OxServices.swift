@@ -21,10 +21,15 @@ nonisolated enum OxServices {
             "actions": .object(["type": .string("object"), "additionalProperties": .object(["type": .string("object"), "description": .string("Complete action inputSchema and outputSchema with metadata.")])]),
             "standardActions": .object(["type": .string("array"), "items": .object(["type": .string("string")]), "description": .string("Available standard action IDs; their contracts are supplied upfront.")]),
             "nextCursor": .object(["type": .string("string"), "description": .string("Continuation cursor; absent after the last page.")]),
+            "auth": .object([
+                "type": .string("array"), "minItems": .int(1), "items": WebSessionContract.authMethodSchema,
+                "description": .string("Observed web sign-in methods. Pass one item unchanged as login input.auth; absence means unknown, not no authentication support."),
+            ]),
             "secrets": .object(["type": .string("array"), "description": .string("Typed saved secrets associated with this service: owned by it or granted to it. Metadata only."), "items": .object([
                 "type": .string("object"), "properties": .object([
                     "key": .object(["type": .string("string")]),
                     "displayName": .object(["type": .string("string")]),
+                    "serviceID": .object(["type": .array([.string("string"), .string("null")]), "description": .string("Owning service namespace; only this service can read the secret. Null for an unassigned secret.")]),
                     "type": .object(["type": .string("string"), "enum": .array(["account", "apiKey", "token"].map(JSONValue.string))]),
                 ]), "required": .array(["key", "displayName", "type"].map(JSONValue.string)), "additionalProperties": .bool(false),
             ])]),
@@ -281,6 +286,7 @@ nonisolated enum OxServices {
                                 "shown": .object(["type": .string("boolean")]),
                                 "status": .object(["type": .string("string"), "const": .string("awaiting_user")]),
                                 "completion": .object(["type": .string("string"), "enum": .array([.string("completed"), .string("cancelled")])]),
+                                "loginTrace": LoginCapture.traceSchema,
                             ]),
                             "required": .array([.string("shown")]),
                             "additionalProperties": .bool(false),

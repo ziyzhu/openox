@@ -28,6 +28,17 @@ export function summarize(runs: RunRecord[], variants: string[], repetitions: nu
   const lines = rows.map(row => row.map((cell, column) => cell.padEnd(widths[column]!)).join("  ").trimEnd());
   const errors = runs.filter(run => run.status === "error");
   lines.push("");
+  for (const id of ids) for (const variant of variants) {
+    const completed = runs.filter(run => run.case === id && run.variant === variant && run.status === "pass" && run.metrics);
+    if (!completed.length) continue;
+    const median = (key: "elapsedMs" | "tokens" | "inputTokens" | "outputTokens" | "cacheReadTokens" | "cacheWriteTokens" | "modelResponses" | "oxCalls") => {
+      const values = completed.map(run => run.metrics![key]).sort((a, b) => a - b);
+      const middle = Math.floor(values.length / 2);
+      return values.length % 2 ? values[middle]! : (values[middle - 1]! + values[middle]!) / 2;
+    };
+    lines.push(`${id} ${variant}: ${completed.length} successful runs; median ${median("elapsedMs")} ms, ${median("tokens")} tokens (input ${median("inputTokens")}, output ${median("outputTokens")}, cache read ${median("cacheReadTokens")}, cache write ${median("cacheWriteTokens")}), ${median("modelResponses")} model responses, ${median("oxCalls")} function calls`);
+  }
+  lines.push("");
   if (errors.length) lines.push(`Headline withheld: ${errors.length} errored run(s).`, ...errors.map(run => `  ${run.case} ${run.variant} #${run.repetition}: ${run.error}`));
   else for (const variant of variants) {
     const group = runs.filter(run => run.variant === variant);

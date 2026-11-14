@@ -19,7 +19,49 @@ extension ServiceOperations {
             _ = try result.get()
             break
         }
-        return .object(["interaction": .string("automatic"), "authentication": .string("unverified")])
+        let result = await loginResult(service: service, page: page)
+        return secrets?.redact(result) ?? result
+    }
+
+    func loginResult(service: Service, page: BrowserSession) async -> JSONValue {
+        var result: [String: JSONValue] = ["interaction": .string("automatic"), "authentication": .string("unverified")]
+        for attempt in 0..<3 {
+            do {
+                try await page.waitForNavigationReady(timeout: 3)
+                let generation = page.navigationGeneration
+                let frames = try await page.discoverFrames()
+                var document: JSONValue = .null
+                if let host = page.page.url?.host, service.isServiceHost(host) {
+                    let raw = try await service.evalOnce(page, BrowserPageState.script(selector: nil), timeout: 2)
+                    let fields = raw.map(JSONValue.from)?.objectValue ?? [:]
+                    document = .object([
+                        "headings": .array(Array((fields["headings"]?.arrayValue ?? []).prefix(3))),
+                        "messages": .array(Array((fields["messages"]?.arrayValue ?? []).prefix(3))),
+                        "controls": .array(Array((fields["controls"]?.arrayValue ?? []).prefix(16)).map { control in
+                            .object((control.objectValue ?? [:]).filter { ["type", "label", "disabled", "invalid"].contains($0.key) })
+                        }),
+                        "truncated": .bool(fields["truncated"] == .bool(true) || (fields["controls"]?.arrayValue?.count ?? 0) > 16
+                            || (fields["headings"]?.arrayValue?.count ?? 0) > 3 || (fields["messages"]?.arrayValue?.count ?? 0) > 3),
+                    ])
+                }
+                guard page.isOpen, page.navigationGeneration == generation, !page.page.isLoading else { throw Service.EvalError.contextInvalidated }
+                result["page"] = .object([
+                    "pageID": .string(page.id.uuidString),
+                    "navigationGeneration": .int(generation),
+                    "isLoading": .bool(page.page.isLoading),
+                    "frames": page.frameMetadata(frames, services: serviceManager.services, attached: attachedDomains()),
+                    "framesTruncated": .bool(page.omittedFrames > 0),
+                    "document": document,
+                ])
+                break
+            } catch Service.EvalError.contextInvalidated where attempt < 2 {
+                continue
+            } catch {
+                Log.service.info("Service.login observation unavailable domain=\(service.domain) error=\(error.localizedDescription)")
+                break
+            }
+        }
+        return .object(result)
     }
 
     func loginPage(_ service: Service) -> BrowserSession? {

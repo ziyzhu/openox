@@ -359,7 +359,7 @@ final class ConversationInteractionGate {
         let identifier = "conversation.attention.\(conversation.id.uuidString).\(interactionID.uuidString)"
         attentionNotificationID = identifier
         let notificationTitle = conversation.title
-        Task {
+        Task { [self] in
             do {
                 let delivered = try await feedback.notifyAttention(
                     identifier: identifier,

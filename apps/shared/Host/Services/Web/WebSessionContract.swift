@@ -3,6 +3,8 @@ import Foundation
 nonisolated enum WebSessionContract {
     static let listAction = "listSessions"
     static let loginAction = "login"
+    static let authMethodSchema = ModelGuidance.standardServiceActions.objectValue!["web"]!.arrayValue!
+        .first { $0.objectValue?["id"] == .string(loginAction) }!.objectValue!["inputSchema"]!.objectValue!["properties"]!.objectValue!["auth"]!
 
     static func isEnabled(_ definition: ServiceDefinition) -> Bool {
         !definition.isAPI && !definition.isIOS && !definition.isMCP

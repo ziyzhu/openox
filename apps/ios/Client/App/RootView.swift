@@ -6,6 +6,7 @@ import Security
 
 @Observable
 final class SidebarInteraction {
+    static let defaultValue = SidebarInteraction()
     private struct PageSwitchExclusion {
         let bounds: CGRect
         let includesAreaBelow: Bool
@@ -33,7 +34,7 @@ final class SidebarInteraction {
 }
 
 extension EnvironmentValues {
-    @Entry var sidebarInteraction = SidebarInteraction()
+    @Entry var sidebarInteraction = SidebarInteraction.defaultValue
 }
 
 private struct PageSwitchExclusionModifier: ViewModifier {

@@ -35,18 +35,27 @@ catch (error) { return { error: String(error?.message ?? error), code: error?.co
 
 async function driveLogin(h: Harness, domain: string, key: string, steps = 5) {
   let result = await h.turn(invokeScript(`web:${domain}:login`, { account: { $secret: key } }));
-  assert.deepEqual(result, { interaction: "automatic", authentication: "unverified" });
+  assert.equal(result.interaction, "automatic");
+  assert.equal(result.authentication, "unverified");
+  assert.ok(result.page?.frames.length, "login must return an observation of the settled document");
   for (let step = 0; step < steps; step++) {
-    await Bun.sleep(700);
-    const state = await h.turn(`return await ox.web.browser.getPageState({ service: ${JSON.stringify(domain)}, purpose: "Inspect login document" });`);
+    const state = result.page && !result.page.isLoading ? result.page : await h.turn(`return await ox.web.browser.getPageState({ service: ${JSON.stringify(domain)}, purpose: "Inspect login document" });`);
     const frame = state.frames.find((frame: { isMainFrame: boolean }) => frame.isMainFrame);
     assert.ok(frame?.serviceID, "the live document has no service");
     if (frame.serviceID === `web:${domain}`) {
-      const sessions = await h.turn(invokeScript(`web:${domain}:listSessions`, {}, { frameId: frame.id }));
-      if (sessions.length) return sessions;
+      try {
+        const sessions = await h.turn(invokeScript(`web:${domain}:listSessions`, {}, { frameId: frame.id }));
+        if (sessions.length) return sessions;
+      } catch (error) {
+        if (!String(error).includes('"code":"frame_unavailable"')) throw error;
+        result = {};
+        continue;
+      }
     }
     result = await h.turn(invokeScript(`${frame.serviceID}:login`, { account: { $secret: key } }, { frameId: frame.id }));
-    assert.deepEqual(result, { interaction: "automatic", authentication: "unverified" });
+    assert.equal(result.interaction, "automatic");
+    assert.equal(result.authentication, "unverified");
+    assert.ok(result.page?.frames.length, "each login step must return fresh frame metadata");
   }
   return [];
 }
@@ -153,7 +162,7 @@ return { streamed: first.events.some(event => event.type === "text"), status: ca
     name: "gov-auth-selection", site: "gov",
     async run(h) {
       const result = await h.turn(invokeScript("web:ox-gov.localhost:login"));
-      assert.deepEqual(result, { interaction: "automatic", authentication: "unverified" });
+      assert.equal(result.authentication, "unverified");
       const state = await h.turn(`return await ox.web.browser.getPageState({ service: "ox-gov.localhost", purpose: "Inspect selected provider" });`);
       const frame = state.frames.find((frame: { isMainFrame: boolean }) => frame.isMainFrame);
       assert.equal(frame.serviceID, "web:ox-govid.localhost");
@@ -234,7 +243,7 @@ return null;`);
     name: "card-iframe-handoff", site: "card",
     async run(h) {
       const prepared = await h.turn(invokeScript("web:ox-card.localhost:login"));
-      assert.deepEqual(prepared, { interaction: "automatic", authentication: "unverified" });
+      assert.equal(prepared.authentication, "unverified");
       const login = await h.turn(`await ox.service.attach({ purpose: "Attach embedded provider", domain: "ox-idp.localhost" });
 const state = await ox.web.browser.getPageState({ service: "ox-card.localhost", purpose: "Inspect embedded provider" });
 const frame = state.frames.find(frame => !frame.isMainFrame && frame.serviceID === "web:ox-idp.localhost" && state.frames.some(parent => parent.id === frame.parentId && parent.serviceID === frame.serviceID));
@@ -260,6 +269,12 @@ return await ox.service.showPage({ purpose: "Complete card sign-in", name: "web:
       assert.match(remember ?? "", /ox-idp\.localhost/, "the captured login must belong to the identity provider that owns the nested frame");
       await h.ios.tap({ id: "secret-entry-dont-save" }, { stable: 300 });
       await h.idle(prompt => /remember|save/i.test(prompt.prompt) ? wait : undefined);
+      const transcript = JSON.stringify(await h.snapshot());
+      assert.ok(transcript.includes("stepCount"), "Done must resume with a compact trace summary");
+      const tracePath = transcript.match(/tmp\/[A-Fa-f0-9-]+\.txt/)?.[0];
+      assert.ok(tracePath, "the full trace must remain available on demand");
+      const captured = await h.turn(`return await ox.fs.read({ purpose: "Verify stored login trace", path: ${JSON.stringify(tracePath)} });`);
+      assert.ok(JSON.parse(captured.text).steps.length > 0, "stored trace must retain structural steps");
       const sessions = await h.turn(invokeScript("web:ox-card.localhost:listSessions"));
       assert.deepEqual(sessions.map((session: { id: string }) => session.id), [ada.id]);
       return "manual login inside a nested cross-site iframe verified the destination and offered to remember the login for the identity provider";

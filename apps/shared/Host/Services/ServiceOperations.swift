@@ -448,6 +448,7 @@ final class ServiceOperations {
                         "key": .string(entry.key),
                         "displayName": .string(entry.displayName),
                         "type": .string(entry.type?.rawValue ?? ""),
+                        "serviceID": entry.serviceID.map(JSONValue.string) ?? .null,
                     ])
                 }),
             ]

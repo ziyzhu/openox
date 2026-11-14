@@ -12,7 +12,8 @@ extension ServiceOperations {
             $0.scopeID == native.id && $0.frameTargets[frameID] != nil
         }
         guard matches.count == 1, let page = matches.first else {
-            throw RuntimeError.bridge("Frame is unavailable or ambiguous. Inspect getPageState again before invoking.")
+            throw OxFunctionError(code: "frame_unavailable", message: "The frame is unavailable or ambiguous. No action was executed.",
+                                  recovery: "Inspect getPageState again and use a fresh frameId before invoking.")
         }
         let owner = serviceManager.services.first { $0.servicePages.contains { $0 === page } } ?? serviceManager.browserService
         if actionID == WebSessionContract.loginAction,
@@ -73,6 +74,7 @@ extension ServiceOperations {
             return secrets?.redact(value) ?? value
         }
         guard actionID == WebSessionContract.loginAction else { return result }
-        return .object(["interaction": .string("automatic"), "authentication": .string("unverified")])
+        let observation = await loginResult(service: service, page: page)
+        return secrets?.redact(observation) ?? observation
     }
 }

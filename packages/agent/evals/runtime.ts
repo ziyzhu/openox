@@ -40,6 +40,7 @@ export class EvalRuntime {
   readonly provider: string;
   readonly model: string;
   private readonly attached: AttachedService[];
+  private continuation?: { id: string; target: Parameters<ProfileRuntime["run"]>[0]; systemPrompt: string };
   private constructor(provider: string, model: string, fixture: StubFixture, attached: AttachedService[]) { this.provider = provider; this.model = model; this.attached = attached; this.stubs = new Stubs(fixture); }
 
   static async open(provider: string, model: string, fixture: StubFixture = {}, attached: AttachedService[] = [], models = evalModels(provider)) {
@@ -73,16 +74,21 @@ export class EvalRuntime {
 
   async observe(name: string, args: Record<string, unknown>) { return this.call("", name, { purpose: "Observe eval state", ...args }); }
 
-  async run(text: string, timeoutMs: number, temporary = false): Promise<Turn> {
-    const conversation = await this.session.harness.createConversation({ ownership: { kind: "ownerless" }, agent: { model: { provider: this.provider, modelId: this.model }, extensions: [this.extension] } }, BACKGROUND_CONTEXT);
-    const id = String(conversation.id);
-    const target = { profileID: "eval", conversationID: Number(id) as ConversationId };
-    const input = { hostContext: this.hostContext, memory: String(await this.session.files.read("MEMORY.md")) };
-    const state: TurnState = { skills: [...bundledSkills], skillConflicts: [], attachedServices: this.attached, filePaths: [], storageMode: temporary ? "temporary" : "persisted", responseLanguage: null, hostContext: this.hostContext };
-    const systemPrompt = renderSections({ ...composeOxPrompt(input).sections, ...composeOxTurnSections(state, input) });
-    this.prompts.set(id, systemPrompt);
-    this.calls.set(id, []);
-    if (temporary) this.temporary.add(id);
+  async run(text: string, timeoutMs: number, temporary = false, continuing = false): Promise<Turn> {
+    if (!continuing) {
+      const conversation = await this.session.harness.createConversation({ ownership: { kind: "ownerless" }, agent: { model: { provider: this.provider, modelId: this.model }, extensions: [this.extension] } }, BACKGROUND_CONTEXT);
+      const id = String(conversation.id);
+      const target = { profileID: "eval", conversationID: Number(id) as ConversationId };
+      const input = { hostContext: this.hostContext, memory: String(await this.session.files.read("MEMORY.md")) };
+      const state: TurnState = { skills: [...bundledSkills], skillConflicts: [], attachedServices: this.attached, filePaths: [], storageMode: temporary ? "temporary" : "persisted", responseLanguage: null, hostContext: this.hostContext };
+      const systemPrompt = renderSections({ ...composeOxPrompt(input).sections, ...composeOxTurnSections(state, input) });
+      this.prompts.set(id, systemPrompt);
+      this.calls.set(id, []);
+      if (temporary) this.temporary.add(id);
+      this.continuation = { id, target, systemPrompt };
+    }
+    if (!this.continuation) throw new Error("No conversation to continue");
+    const { id, target, systemPrompt } = this.continuation;
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; void this.session.abort(target); }, timeoutMs);
     try {

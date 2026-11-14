@@ -69,7 +69,7 @@ extension BrowserSession {
     func requireFrame(_ id: String) async throws -> FrameTarget {
         guard frameTargets[id] != nil,
               let target = try await discoverFrames().first(where: { $0.id == id }) else {
-            throw OxFunctionError(code: "frame_unavailable", message: "The selected frame document is no longer available.", recovery: "Inspect getPageState again. Do not automatically repeat an action whose outcome is uncertain.")
+            throw OxFunctionError(code: "frame_unavailable", message: "The selected frame document is no longer available. No action was executed.", recovery: "Inspect getPageState again. Do not automatically repeat an action whose outcome is uncertain.")
         }
         return target
     }

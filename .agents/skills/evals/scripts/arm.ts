@@ -14,6 +14,10 @@ function metrics(turn: Turn, elapsedMs: number): Metrics {
     oxCalls: turn.calls.length,
     failedOxCalls: turn.calls.filter(call => call.error).length,
     tokens: assistants.reduce((total, message) => total + (message.usage?.totalTokens ?? 0), 0),
+    inputTokens: assistants.reduce((total, message) => total + (message.usage?.input ?? 0), 0),
+    outputTokens: assistants.reduce((total, message) => total + (message.usage?.output ?? 0), 0),
+    cacheReadTokens: assistants.reduce((total, message) => total + (message.usage?.cacheRead ?? 0), 0),
+    cacheWriteTokens: assistants.reduce((total, message) => total + (message.usage?.cacheWrite ?? 0), 0),
     cost: assistants.reduce((total, message) => total + (message.usage?.cost.total ?? 0), 0),
   };
 }
@@ -28,7 +32,11 @@ export async function evaluate(test: EvalCase, provider: string, model: string, 
   let runtime: EvalRuntime | undefined;
   try {
     runtime = await EvalRuntime.open(provider, model, test.stubs, test.attached, models ?? evalModels(provider));
-    const turn = await runtime.run(test.task, timeoutMs);
+    let turn = await runtime.run(test.task, timeoutMs);
+    if (turn.status === "completed" && test.continuation && Object.entries(test.continuation.when).every(([key, value]) => runtime!.stubs.state[key] === value)) {
+      Object.assign(runtime.stubs.state, test.continuation.state);
+      turn = await runtime.run(test.continuation.task, Math.max(1, timeoutMs - (Date.now() - started)), false, true);
+    }
     const base = { answer: answer(turn), metrics: metrics(turn, Date.now() - started), promptHash: createHash("sha256").update(turn.systemPrompt).digest("hex"), turn };
     if (turn.status === "failed") return { ...base, status: "error", checks: [], error: turn.error ?? "Model turn failed" };
     const reader = runtime;

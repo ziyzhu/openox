@@ -8,9 +8,23 @@ struct ConversationFileResolver {
     let read: (String) async throws -> JSONValue
 }
 
+private struct OpenConversationKey: EnvironmentKey {
+    static let defaultValue: ((UUID) -> Void)? = nil
+}
+
+private struct ConversationLinkHandlerKey: EnvironmentKey {
+    static let defaultValue: ((URL) -> Void)? = nil
+}
+
 extension EnvironmentValues {
-    @Entry var openConversation: ((UUID) -> Void)? = nil
-    @Entry var conversationLinkHandler: ((URL) -> Void)? = nil
+    var openConversation: ((UUID) -> Void)? {
+        get { self[OpenConversationKey.self] }
+        set { self[OpenConversationKey.self] = newValue }
+    }
+    var conversationLinkHandler: ((URL) -> Void)? {
+        get { self[ConversationLinkHandlerKey.self] }
+        set { self[ConversationLinkHandlerKey.self] = newValue }
+    }
     @Entry var conversationFileResolver: ConversationFileResolver? = nil
 }
 

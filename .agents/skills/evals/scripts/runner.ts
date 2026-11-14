@@ -118,8 +118,13 @@ async function main(): Promise<void> {
   for (const id of selected) if (!ids.includes(id)) throw new Error(`Unknown case: ${id}`);
   const repetitions = integer(values.repeat!, 1, 20);
   const timeout = values.timeout ? String(integer(values.timeout, 1, 600_000)) : "default";
-  await loadKeys(values.keys);
   const directory = await outputDirectory(values.output);
+  if (values.baseline) git(ROOT, "rev-parse", "--verify", `${values.baseline}^{commit}`);
+  await loadKeys(values.keys);
+  for (const row of rows) {
+    const key = { openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY", google: "GEMINI_API_KEY" }[row.provider as "openai" | "anthropic" | "google"];
+    if (!process.env[key]) throw new Error(`Benchmark blocked: configure ${key} through the existing secrets/API_KEYS.json or environment before running ${row.provider}/${row.model}. No inference was started.`);
+  }
   const candidate: Variant = { name: "candidate", root: ROOT, revision: git(ROOT, "rev-parse", "HEAD"), dirty: git(ROOT, "status", "--porcelain").length > 0 };
   const variants = values.baseline ? [await baseline(values.baseline), candidate] : [candidate];
   try {

@@ -43,8 +43,16 @@ extension Conversation {
             var diagnostic = ""
             do {
                 let result = try await operation()
-                if let trace = result.objectValue?["loginTrace"] {
-                    diagnostic = "\n<login_trace>\n\(trace.jsonString())\n</login_trace>"
+                if let trace = result.objectValue?["loginTrace"], let self {
+                    let steps = trace.objectValue?["steps"]?.arrayValue ?? []
+                    var summary: [String: JSONValue] = [
+                        "stepCount": .int(steps.count),
+                        "origins": .array(Array(Set(steps.compactMap { $0.objectValue?["origin"]?.stringValue })).sorted().map(JSONValue.string)),
+                        "truncated": trace.objectValue?["truncated"] ?? .bool(false),
+                    ]
+                    do { summary["path"] = .string(try await javaScriptOutputs.save(trace.jsonString())) }
+                    catch { Log.session.warning("Conversation.handoff trace cache unavailable id=\(id)") }
+                    diagnostic = "\n<login_trace>\n\(JSONValue.object(summary).jsonString())\n</login_trace>"
                 }
                 completed = result.objectValue?["completion"]?.stringValue != "cancelled"
             } catch {

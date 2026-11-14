@@ -52,7 +52,7 @@ final class ConversationSpeechInput {
         level = 0
         notice = nil
         Log.ui.info("SpeechInput.prepare session=\(id) locale=\(AppLocale.shared.locale.identifier)")
-        task = Task {
+        task = Task { [self] in
             defer { if Task.isCancelled { recording.cancel() } }
             do {
                 let setup = try await recording.prepare(locale: AppLocale.shared.locale)

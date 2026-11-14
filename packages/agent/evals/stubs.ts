@@ -17,8 +17,14 @@ export class StubError extends Error {
   constructor(code: string, message: string, recovery = "Inspect the current state and function help before proceeding.") { super(message); this.code = code; this.recovery = recovery; }
   toJSON() { return { code: this.code, message: this.message, recovery: this.recovery }; }
 }
-const equal = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
-const matches = (value: Record<string, unknown>, expected: Record<string, unknown> = {}) => Object.entries(expected).every(([key, item]) => equal(value[key], item));
+function matches(value: unknown, expected: unknown = {}): boolean {
+  if (Array.isArray(expected)) return Array.isArray(value) && value.length === expected.length && expected.every((item, index) => matches(value[index], item));
+  if (expected !== null && typeof expected === "object") {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      && Object.entries(expected).every(([key, item]) => matches((value as Record<string, unknown>)[key], item));
+  }
+  return Object.is(value, expected);
+}
 export class Stubs {
   readonly state: Record<string, unknown>;
   readonly rules: Record<string, StubRule[]>;

@@ -1,5 +1,17 @@
 # Ox evals
 
+For sign-in efficiency, select `signin-password`, `signin-provider`, and
+`signin-manual` with identical GPT model IDs, `--repeat 3`, and `--baseline <ref>`.
+These use stateful observations modeled on the native website fixtures. Manual
+sign-in includes a simulated Done continuation in the same conversation; it excludes
+human typing time. Reports record elapsed time, model responses, tool/function calls,
+input/output tokens, cache reads/writes, total tokens and provider-reported cost.
+Native fixture timing is separate: `bun run test:web --device ox-N --case <name>
+--repeat 3 --app <Ox.app>` records elapsedMs, scriptTurns and resultBytes with Mock;
+these are deterministic driver steps and serialized result bytes, not model token
+usage or evidence of model behavior. Native elapsed time includes fixture setup
+inside the case and CLI/UI overhead. Only compare identical cases and runners.
+
 Evals run real models through the production Pi loop and Ox prompts, with local
 stateful `ox.*` stubs. They do not connect to a simulator or live Host. VM and native
 bridge behavior is verified independently by integration tests.

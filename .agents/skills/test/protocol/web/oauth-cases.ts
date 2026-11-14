@@ -49,7 +49,9 @@ export const oauthCases: Case[] = [
       const frame = state.frames.find((frame: any) => frame.isMainFrame && frame.serviceID === "web:ox-popup-idp.localhost");
       assert.ok(frame, "target=_blank did not preserve an inspectable provider page");
       assert.equal(h.site("popup").counters.authorization, 1);
-      assert.deepEqual(await h.turn(invokeScript("web:ox-popup-idp.localhost:login", { auth: { type: "password" } }, { frameId: frame.id })), { interaction: "automatic", authentication: "unverified" });
+      const login = await h.turn(invokeScript("web:ox-popup-idp.localhost:login", { auth: { type: "password" } }, { frameId: frame.id }));
+      assert.equal(login.interaction, "automatic");
+      assert.equal(login.authentication, "unverified");
       let sessions: any[] = [];
       for (let attempt = 0; attempt < 20 && !sessions.length; attempt++) {
         await Bun.sleep(300);

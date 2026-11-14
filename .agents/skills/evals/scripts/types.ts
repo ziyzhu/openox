@@ -8,8 +8,9 @@ export type EvalCase = {
   stubs?: StubFixture;
   attached?: AttachedService[];
   timeoutMs?: number;
+  continuation?: { task: string; when: Record<string, unknown>; state: Record<string, unknown> };
   checks(run: Run): Check[] | Promise<Check[]>;
 };
-export type Metrics = { elapsedMs: number; modelResponses: number; toolCalls: number; oxCalls: number; failedOxCalls: number; tokens: number; cost: number };
+export type Metrics = { elapsedMs: number; modelResponses: number; toolCalls: number; oxCalls: number; failedOxCalls: number; tokens: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; cost: number };
 export type Outcome = { status: "pass" | "fail" | "error"; checks: Check[]; answer?: string; metrics?: Metrics; promptHash?: string; error?: string };
 export type RunRecord = Outcome & { case: string; variant: string; repetition: number; transcript?: string };
