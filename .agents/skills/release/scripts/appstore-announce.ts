@@ -5,6 +5,7 @@ const APP_ID = "6802224502";
 const APP_STORE_URL = `https://apps.apple.com/app/id${APP_ID}`;
 const REPOSITORY_URL = "https://github.com/ziyzhu/openox";
 const TAG_PREFIX = "ios-v";
+const BUILD_TAG_PREFIX = "ios-build-";
 const API = "https://api.appstoreconnect.apple.com/v1";
 
 const MODES = ["dry-run", "test", "tag", "announce"] as const;
@@ -86,18 +87,12 @@ async function whatsNew(version: Version, jwt: string): Promise<string> {
 }
 
 async function sourceCommit(version: Version, jwt: string): Promise<string | null> {
-  type Build = { data: { id: string; attributes: { version: string } } | null };
-  type Product = { data: { id: string } };
-  type Runs = { data: { id: string; attributes: { number: number; sourceCommit: { commitSha: string } | null } }[] };
-  type RunBuilds = { data: { id: string }[] };
+  type Build = { data: { attributes: { version: string } } | null };
   const { data: build } = await asc<Build>(`/appStoreVersions/${version.id}/build`, jwt);
   if (!build) return null;
-  const { data: product } = await asc<Product>(`/apps/${APP_ID}/ciProduct`, jwt);
-  const runs = await asc<Runs>(`/ciProducts/${product.id}/buildRuns?limit=200&sort=-number&fields[ciBuildRuns]=number,sourceCommit`, jwt);
-  const run = runs.data.find((entry) => String(entry.attributes.number) === build.attributes.version);
-  if (!run?.attributes.sourceCommit) return null;
-  const builds = await asc<RunBuilds>(`/ciBuildRuns/${run.id}/builds`, jwt);
-  return builds.data.some((entry) => entry.id === build.id) ? run.attributes.sourceCommit.commitSha : null;
+  const ref = `refs/tags/${BUILD_TAG_PREFIX}${build.attributes.version}`;
+  const { stdout } = await run(["git", "ls-remote", "origin", ref], { capture: true });
+  return stdout.split("\n").find((line) => line.endsWith(`\t${ref}`))?.split("\t")[0] ?? null;
 }
 
 async function pushTag(version: string, commit: string): Promise<void> {
@@ -155,7 +150,7 @@ async function announce(mode: Mode): Promise<Outcome> {
   }
   const commit = await sourceCommit(version, jwt);
   console.log(JSON.stringify({ event: "appstore_announce_source", version: version.versionString, commit }));
-  if (tags && !commit) throw new Error(`${version.versionString} has no Xcode Cloud source commit to tag`);
+  if (tags && !commit) throw new Error(`${version.versionString} has no ${BUILD_TAG_PREFIX} source tag`);
   if (mode === "tag") {
     await pushTag(version.versionString, commit!);
     return { kind: "tagged", version: version.versionString, commit: commit! };

@@ -4,16 +4,18 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { ROOT } from "../../../../lib.ts";
 
-test("Xcode Cloud prepares a clean checkout and rejects incomplete agent resources", async () => {
+test("A clean checkout builds complete agent resources and rejects incomplete ones", async () => {
   const directory = await mkdtemp(join(tmpdir(), "openox-agent-packaging-"));
   const ios = join(directory, "apps/ios");
   const bundle = join(directory, "apps/shared/Resources/PiDurable.bundle");
-  const environment = { ...Bun.env, CI_XCODE_CLOUD: "", CI_TEAM_ID: "PACKAGING",
-    OX_BUNDLE_IDENTIFIER: "ai.openox.packaging", SRCROOT: ios, BUN_INSTALL: join(directory, ".bun"),
+  const environment = { ...Bun.env, SRCROOT: ios,
     BUN_INSTALL_CACHE_DIR: Bun.env.BUN_INSTALL_CACHE_DIR ?? join(Bun.env.BUN_INSTALL ?? join(homedir(), ".bun"), "install/cache") };
   async function shell(script: string) {
-    const child = Bun.spawn(["sh", join(ios, script)], {
-      cwd: tmpdir(), env: environment, stdout: "pipe", stderr: "pipe",
+    return await spawn(["sh", join(ios, script)], tmpdir());
+  }
+  async function spawn(command: string[], cwd: string) {
+    const child = Bun.spawn(command, {
+      cwd, env: environment, stdout: "pipe", stderr: "pipe",
     });
     const [code, stdout, stderr] = await Promise.all([
       child.exited, new Response(child.stdout).text(), new Response(child.stderr).text(),
@@ -33,8 +35,10 @@ test("Xcode Cloud prepares a clean checkout and rejects incomplete agent resourc
     const missing = await shell("../shared/validate-agent-bundle.sh");
     expect(missing.code, missing.output).toBe(1);
     expect(missing.output).toContain("bun run build:agent");
-    const prepared = await shell("ci_scripts/ci_post_clone.sh");
-    expect(prepared.code, prepared.output).toBe(0);
+    for (const command of [["install", "--frozen-lockfile"], ["run", "build:agent"]]) {
+      const prepared = await spawn([process.execPath, "--no-env-file", ...command], directory);
+      expect(prepared.code, prepared.output).toBe(0);
+    }
     const complete = await shell("../shared/validate-agent-bundle.sh");
     expect(complete.code, complete.output).toBe(0);
     const manifest = await Bun.file(join(bundle, "manifest.json")).json();

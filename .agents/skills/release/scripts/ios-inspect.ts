@@ -145,7 +145,7 @@ try {
     if (ancestor.code !== 0) throw new Error("--since must be an ancestor of HEAD.");
     report.changes = {
       since,
-      provenance: "Caller-supplied; verify against the last released build through ASC/Xcode Cloud or operator evidence.",
+      provenance: "Caller-supplied; verify against the last released build through ASC and its ios-build-<number> tag or operator evidence.",
       commits: await git("log", "--format=%h %s", `${since}..${commit}`),
       files: await git("diff", "--stat", since, commit),
     };
