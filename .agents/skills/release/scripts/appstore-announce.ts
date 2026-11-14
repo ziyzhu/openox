@@ -7,7 +7,7 @@ const REPOSITORY_URL = "https://github.com/ziyzhu/openox";
 const TAG_PREFIX = "ios-v";
 const API = "https://api.appstoreconnect.apple.com/v1";
 
-const MODES = ["dry-run", "test", "announce"] as const;
+const MODES = ["dry-run", "test", "tag", "announce"] as const;
 type Mode = typeof MODES[number];
 type Version = { id: string; versionString: string };
 type Outcome =
@@ -15,6 +15,7 @@ type Outcome =
   | { kind: "already_announced"; version: string }
   | { kind: "dry_run"; version: string; message: unknown }
   | { kind: "tested"; version: string }
+  | { kind: "tagged"; version: string; commit: string }
   | { kind: "announced"; version: string };
 
 const { values } = parseArgs({
@@ -99,6 +100,11 @@ async function sourceCommit(version: Version, jwt: string): Promise<string | nul
   return builds.data.some((entry) => entry.id === build.id) ? run.attributes.sourceCommit.commitSha : null;
 }
 
+async function pushTag(version: string, commit: string): Promise<void> {
+  await run(["git", "fetch", "--depth=1", "origin", commit]);
+  await run(["git", "push", "origin", `${commit}:refs/tags/${TAG_PREFIX}${version}`]);
+}
+
 async function newestAnnounced(): Promise<string | null> {
   const { stdout } = await run(["git", "ls-remote", "--tags", "origin", `refs/tags/${TAG_PREFIX}*`], { capture: true });
   const versions = stdout.split("\n").map((line) => line.split(`refs/tags/${TAG_PREFIX}`)[1]).filter(Boolean);
@@ -140,7 +146,8 @@ async function announce(mode: Mode): Promise<Outcome> {
   const jwt = await token();
   const version = await liveVersion(jwt);
   if (!version) return { kind: "nothing_live" };
-  if (mode === "announce") {
+  const tags = mode === "tag" || mode === "announce";
+  if (tags) {
     const announced = await newestAnnounced();
     if (announced && compare(version.versionString, announced) <= 0) {
       return { kind: "already_announced", version: version.versionString };
@@ -148,7 +155,11 @@ async function announce(mode: Mode): Promise<Outcome> {
   }
   const commit = await sourceCommit(version, jwt);
   console.log(JSON.stringify({ event: "appstore_announce_source", version: version.versionString, commit }));
-  if (mode === "announce" && !commit) throw new Error(`${version.versionString} has no Xcode Cloud source commit to tag`);
+  if (tags && !commit) throw new Error(`${version.versionString} has no Xcode Cloud source commit to tag`);
+  if (mode === "tag") {
+    await pushTag(version.versionString, commit!);
+    return { kind: "tagged", version: version.versionString, commit: commit! };
+  }
   const body = message(version.versionString, await whatsNew(version, jwt), await appIcon(), commit);
   if (mode === "dry-run") return { kind: "dry_run", version: version.versionString, message: body };
   if (mode === "test") {
@@ -156,9 +167,7 @@ async function announce(mode: Mode): Promise<Outcome> {
     return { kind: "tested", version: version.versionString };
   }
   await post(env("DISCORD_WEBHOOK_URL"), body);
-  const tag = `${TAG_PREFIX}${version.versionString}`;
-  await run(["git", "fetch", "--depth=1", "origin", commit!]);
-  await run(["git", "push", "origin", `${commit}:refs/tags/${tag}`]);
+  await pushTag(version.versionString, commit!);
   return { kind: "announced", version: version.versionString };
 }
 

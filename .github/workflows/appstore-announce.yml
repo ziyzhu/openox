@@ -10,6 +10,7 @@ on:
         options:
           - dry-run
           - test
+          - tag
           - announce
         default: dry-run
 
