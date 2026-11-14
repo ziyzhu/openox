@@ -93,7 +93,7 @@ jobs:
           BUILD: ${{ steps.plan.outputs.build }}
           GH_TOKEN: ${{ github.token }}
         run: gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/ios-build-$BUILD" -f sha="$GITHUB_SHA"
-      - name: Distribute to TestFlight gamma
+      - name: Assign to TestFlight gamma
         if: inputs.mode == 'upload'
         env:
           BUILD: ${{ steps.plan.outputs.build }}
@@ -101,7 +101,8 @@ jobs:
           set -euo pipefail
           build=(--app "$OX_BUNDLE_IDENTIFIER" --build-number "$BUILD" --platform IOS)
           asc builds test-notes update "${build[@]}" --locale en-US --whats-new "$(git log -1 --format=%s)"
-          asc builds add-groups "${build[@]}" --group gamma --submit --confirm | tee -a "$GITHUB_STEP_SUMMARY"
+          asc builds add-groups "${build[@]}" --group gamma | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Assigned build $BUILD to gamma. External beta review submission is manual." >> "$GITHUB_STEP_SUMMARY"
       - if: always()
         run: rm -rf "$(dirname "$ASC_PRIVATE_KEY_PATH")"
       - if: failure()
