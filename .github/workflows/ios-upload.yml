@@ -31,10 +31,8 @@ jobs:
       ASC_BYPASS_KEYCHAIN: "1"
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      ASC_PRIVATE_KEY_PATH: ${{ runner.temp }}/asc/AuthKey.p8
       OX_DEVELOPMENT_TEAM: ${{ vars.OX_DEVELOPMENT_TEAM }}
       OX_BUNDLE_IDENTIFIER: ${{ vars.OX_BUNDLE_IDENTIFIER }}
-      OUT: ${{ runner.temp }}/ios-upload
       MODE: ${{ inputs.mode }}
       BUILD_INPUT: ${{ inputs.build }}
     steps:
@@ -52,6 +50,9 @@ jobs:
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: |
           set -euo pipefail
+          ASC_PRIVATE_KEY_PATH="$RUNNER_TEMP/asc/AuthKey.p8"
+          echo "ASC_PRIVATE_KEY_PATH=$ASC_PRIVATE_KEY_PATH" >> "$GITHUB_ENV"
+          echo "OUT=$RUNNER_TEMP/ios-upload" >> "$GITHUB_ENV"
           mkdir -p "$(dirname "$ASC_PRIVATE_KEY_PATH")"
           chmod 700 "$(dirname "$ASC_PRIVATE_KEY_PATH")"
           (umask 077 && printf '%s\n' "$ASC_PRIVATE_KEY" > "$ASC_PRIVATE_KEY_PATH")
