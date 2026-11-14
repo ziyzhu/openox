@@ -125,7 +125,6 @@ final class ConversationViewportController {
 
     private enum Presentation {
         case opening(() -> Void)
-        case followingBottom
         case sending(UUID)
         case followingTurn(UUID)
         case revealingEarlier(content: CGFloat, top: CGFloat)
@@ -223,7 +222,7 @@ final class ConversationViewportController {
         switch presentation {
         case .sending(let targetID), .followingTurn(let targetID):
             guard targetID == id else { return }
-        case .opening, .followingBottom, .revealingEarlier, .reading: return
+        case .opening, .revealingEarlier, .reading: return
         }
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
@@ -316,7 +315,7 @@ final class ConversationViewportController {
         guard old != new else { return }
         if new.isUserDriven {
             switch presentation {
-            case .followingBottom, .followingTurn, .sending, .revealingEarlier: presentation = .reading
+            case .followingTurn, .sending, .revealingEarlier: presentation = .reading
             case .opening, .reading: break
             }
             viewportHold = nil
@@ -363,7 +362,7 @@ final class ConversationViewportController {
         if case .opening(let completion) = presentation {
             guard new.container > 0 else { return }
             if placeOpeningAtBottom(new) { return }
-            presentation = .followingBottom
+            presentation = .reading
             motion = .stationary
             showsJumpButton = false
             completion()
@@ -463,7 +462,7 @@ final class ConversationViewportController {
 
     private var pinsEnd: Bool {
         switch presentation {
-        case .opening, .followingBottom: return true
+        case .opening: return true
         case .sending, .followingTurn, .revealingEarlier, .reading: break
         }
         if case .tail(let hold) = viewportHold { return hold.pinsEnd }
