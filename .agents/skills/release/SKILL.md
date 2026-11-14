@@ -50,6 +50,8 @@ read-only; its report is evidence, not proof of submission readiness.
 
 CI calls `.github/workflows/ios-upload.yml` in upload mode after checks and both native builds succeed on an initial push run to `main`, only when the full push changes iOS build inputs. `.github/workflows/ci.yml` owns that path filter; bundled agent skills are shipped content, not docs-only changes. Uploads use the verified commit and the existing serialized `appstore` environment. CI assigns uploaded builds to `gamma` but does not submit beta app review; external testing may require manual review submission. Manual dry-run and upload dispatch remain available; do not upload merely to verify workflow changes.
 
+The `appstore` environment secret `BUILD_SOURCE_TOKEN` needs Contents and Workflows write permissions. Prefer a token restricted to this repository; reusing a broader CLI token requires explicit operator approval. Only the build-source tagging step uses it. The built-in token can reject tags for older commits whose workflow files differ from current `main`; upload mode checks for the credential before uploading.
+
 App Store Connect owns current listing metadata, screenshots, and previews.
 Read its live state during a release; do not keep local metadata copies, media
 libraries, or inventory manifests in either repository. Keep drafts, captures,

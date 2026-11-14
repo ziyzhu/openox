@@ -96,7 +96,7 @@ jobs:
     needs: [ios-changes, checks, apps]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 && needs.ios-changes.outputs.relevant == 'true'
     permissions:
-      contents: write
+      contents: read
     uses: ./.github/workflows/ios-upload.yml
     with:
       mode: upload
