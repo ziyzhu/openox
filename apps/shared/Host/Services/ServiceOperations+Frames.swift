@@ -42,6 +42,7 @@ extension ServiceOperations {
                 guard let values = sessions.arrayValue, !values.isEmpty,
                       session.map({ values.contains($0) }) ?? true else { throw Service.InvokeError.requiresAuth(qualified) }
             }
+            page.lastInvocation = (UUID(), service.domain, actionID, input, session, nil, session, Date())
             page.secretAttempt = secrets
             page.frameSecretContext = (service, frameID)
             defer {
@@ -72,6 +73,6 @@ extension ServiceOperations {
             return secrets?.redact(value) ?? value
         }
         guard actionID == WebSessionContract.loginAction else { return result }
-        return try await completeLogin(service: owner, input: input, page: page)
+        return .object(["interaction": .string("automatic"), "authentication": .string("unverified")])
     }
 }

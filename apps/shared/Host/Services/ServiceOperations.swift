@@ -526,7 +526,7 @@ final class ServiceOperations {
 
     func showServicePage(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
         let (service, actionID) = try await resolveAction(name)
-        let input = args ?? .object([:])
+        let input = try SecretAttempt.prepare(args ?? .object([:])).args
         guard service.isWebService,
               await service.resolvedAction(actionID, args: input, session: session, pageURL: pageURL) != nil else {
             throw RuntimeError.bridge("ox.service.showPage: requires a web service action")
@@ -556,26 +556,42 @@ final class ServiceOperations {
                 lease.release()
                 throw error
             }
+            let owner = serviceManager.services.first { $0.servicePages.contains { $0 === page } } ?? service
+            let isLogin = actionID == WebSessionContract.loginAction && WebSessionContract.isEnabled(service.definition)
             return try await native.handoff(title: purpose) { [self] in
                 defer { lease.release() }
                 let handoff = ServiceHandoffSession(
-                    service: service,
+                    service: owner,
                     servicePage: lease.page,
                     title: service.title,
-                    navigationTitle: service.title
+                    navigationTitle: service.title,
+                    control: isLogin ? .login(domain: owner.domain, serviceName: service.title) : nil
                 )
+                let capture = isLogin ? LoginCapture() : nil
+                await capture?.install(on: lease.page, owner: service, credentials: rememberSecret != nil)
                 let outcome: ServiceHandoffSession.Outcome
                 if let presentServiceHandoff {
-                    outcome = await presentServiceHandoff(service, lease.page, handoff)
+                    outcome = await presentServiceHandoff(owner, lease.page, handoff)
                 } else {
                     outcome = await native.presentations.serviceHandoff.present(session: handoff)
                 }
+                await capture?.remove()
+                let trace = capture?.trace
+                if let capture {
+                    Log.service.info("Service.login trace domain=\(service.domain) page=\(lease.page.logLabel) steps=\(capture.steps.count) truncated=\(capture.truncated) outcome=\(outcome.rawValue)")
+                }
+                if let capture, outcome == .completed, lease.isActive, !Task.isCancelled {
+                    await offerToRemember(capture, service: service)
+                }
+                await capture?.discard()
                 try Task.checkCancellation()
                 guard outcome != .failed, lease.isActive else {
                     throw OxFunctionError(code: "page_unavailable", message: "The live page interaction could not be completed.", recovery: "Inspect the preserved page. Do not reopen automatically or repeat a mutation.")
                 }
                 Log.service.info("Service.showPage interaction domain=\(service.domain) action=\(actionID) session=\(lease.page.logLabel) outcome=\(outcome.rawValue)")
-                return .object(["shown": .bool(true), "completion": .string(outcome.rawValue)])
+                var result: [String: JSONValue] = ["shown": .bool(true), "completion": .string(outcome.rawValue)]
+                if outcome == .completed, let trace { result["loginTrace"] = trace }
+                return .object(result)
             }
         }
     }

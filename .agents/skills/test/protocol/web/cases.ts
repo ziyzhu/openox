@@ -159,7 +159,15 @@ return { streamed: first.events.some(event => event.type === "text"), status: ca
       assert.equal(frame.serviceID, "web:ox-govid.localhost");
       assert.equal(h.site("gov").counters.authStarts, 1);
       assert.equal(h.site("gov").counters.passwordSubmissions ?? 0, 0);
-      return "an explicit provider method started authorization without credentials or an implicit manual handoff";
+      const stale = await h.turn(`await ox.service.attach({ purpose: "Attach provider", domain: "ox-govid.localhost" });
+const state = await ox.web.browser.getPageState({ service: "ox-gov.localhost", purpose: "Inspect provider document" });
+const frame = state.frames.find(frame => frame.isMainFrame);
+await ox.service.invoke({ purpose: "Check provider session", name: "web:ox-govid.localhost:listSessions", frameId: frame.id });
+try { return await ox.service.showPage({ purpose: "Show superseded login", name: "web:ox-gov.localhost:login", input: { auth: { type: "provider", service: "web:ox-govid.localhost" } } }); }
+catch (error) { return { code: error.code }; }`);
+      assert.equal(stale.code, "page_unavailable");
+      assert.equal(h.site("gov").counters.authStarts, 1, "presentation must not replay a superseded login");
+      return "provider selection needed no credentials or implicit handoff; presenting a superseded invocation failed without replay";
     },
   },
   {
@@ -167,7 +175,7 @@ return { streamed: first.events.some(event => event.type === "text"), status: ca
     async run(h) {
       const attached = await h.turn(`return await ox.service.attach({ purpose: "Inspect authentication methods", domain: "ox-gov.localhost" });`);
       assert.deepEqual(attached.auth, [{ type: "provider", service: "web:ox-govid.localhost" }]);
-      for (const input of [{}, { auth: { type: "password" } }, { auth: { type: "provider", service: "web:other.localhost" } }]) {
+      for (const input of [{}, { auth: { type: "password" } }, { auth: { type: "provider", service: "web:other.localhost" } }, { auth: attached.auth[0], interaction: "manual" }]) {
         const denied = await h.turn(attemptScript("web:ox-gov.localhost:login", input));
         assert.ok(denied.error, "missing or unadvertised authentication method was accepted");
       }
@@ -175,9 +183,7 @@ return { streamed: first.events.some(event => event.type === "text"), status: ca
       await h.saveLogin("fixture-govid-ada", "web:ox-govid.localhost", ada);
       await h.turn(`return await ox.service.attach({ purpose: "Attach provider", domain: "ox-govid.localhost" });`);
       await driveLogin(h, "ox-gov.localhost", "fixture-govid-ada", 3);
-      const login = await h.turn(`const state = await ox.web.browser.getPageState({ service: "ox-gov.localhost", purpose: "Inspect provider challenge" });
-const frame = state.frames.find(frame => frame.isMainFrame);
-return await ox.service.invoke({ purpose: "Complete session verification", name: "web:ox-govid.localhost:login", frameId: frame.id, input: { auth: { type: "password" }, interaction: "manual" } });`);
+      const login = await h.turn(`return await ox.service.showPage({ purpose: "Complete session verification", name: "web:ox-govid.localhost:login", input: { auth: { type: "password" }, account: { $secret: "fixture-govid-ada" } } });`);
       assert.equal(login?.status, "awaiting_user");
       const counters = h.site("gov").counters;
       assert.equal(counters.authStarts, 1, "the destination must start provider authorization once");
@@ -209,9 +215,33 @@ return null;`);
     },
   },
   {
+    name: "card-handoff-cancel", site: "card",
+    async run(h) {
+      await h.turn(invokeScript("web:ox-card.localhost:login"));
+      const shown = await h.turn(`return await ox.service.showPage({ purpose: "Review sign-in", name: "web:ox-card.localhost:login", input: { auth: { type: "provider", service: "web:ox-idp.localhost" } } });`);
+      assert.equal(shown.status, "awaiting_user");
+      await h.waitMatching(/^conversation\.service\.login\..+\.done$/);
+      await h.tapMatching(/^serviceInspector\.open\./);
+      await h.ios.wait({ id: "serviceHandoff.cancel" }, { timeout: 10_000, stable: 800 });
+      await h.ios.tap({ id: "serviceHandoff.cancel" }, { stable: 300 });
+      await h.idle();
+      assert.equal(h.site("card").counters.passwordSubmissions ?? 0, 0);
+      assert.deepEqual(await h.turn(invokeScript("web:ox-card.localhost:listSessions")), []);
+      return "explicit login presentation was cancelled without credential submission or reopening, and released its page reservation";
+    },
+  },
+  {
     name: "card-iframe-handoff", site: "card",
     async run(h) {
-      const login = await h.turn(invokeScript("web:ox-card.localhost:login", { interaction: "manual" }));
+      const prepared = await h.turn(invokeScript("web:ox-card.localhost:login"));
+      assert.deepEqual(prepared, { interaction: "automatic", authentication: "unverified" });
+      const login = await h.turn(`await ox.service.attach({ purpose: "Attach embedded provider", domain: "ox-idp.localhost" });
+const state = await ox.web.browser.getPageState({ service: "ox-card.localhost", purpose: "Inspect embedded provider" });
+const frame = state.frames.find(frame => !frame.isMainFrame && frame.serviceID === "web:ox-idp.localhost" && state.frames.some(parent => parent.id === frame.parentId && parent.serviceID === frame.serviceID));
+if (!frame) throw Error("Embedded provider document unavailable");
+const input = { auth: { type: "password" } };
+await ox.service.invoke({ purpose: "Prepare embedded sign-in", name: "web:ox-idp.localhost:login", frameId: frame.id, input });
+return await ox.service.showPage({ purpose: "Complete card sign-in", name: "web:ox-idp.localhost:login", input });`);
       assert.equal(login?.status, "awaiting_user", `expected a manual handoff, got ${JSON.stringify(login)}`);
       await h.waitMatching(/^conversation\.service\.login\..+\.done$/);
       await h.tapMatching(/^serviceInspector\.open\./);
