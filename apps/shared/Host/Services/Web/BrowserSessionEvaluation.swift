@@ -2,6 +2,51 @@ import Foundation
 import WebKit
 
 extension BrowserSession {
+    func waitForNavigationReady(timeout: TimeInterval) async throws {
+        try Task.checkCancellation()
+        guard isOpen else { throw EvalError.notActive }
+        switch navigationPhase {
+        case .ready where !page.isLoading:
+            return
+        case .unavailable(let reason):
+            throw EvalError.navigationFailed(reason)
+        default:
+            break
+        }
+        let id = UUID()
+        let timeoutTask = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .seconds(timeout)) }
+            catch { return }
+            self?.navigationWaiters.removeValue(forKey: id)?.resume(throwing: EvalError.navigationTimeout(timeout))
+        }
+        defer { timeoutTask.cancel() }
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            try await withCheckedThrowingContinuation { continuation in
+                navigationWaiters[id] = continuation
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                self?.navigationWaiters.removeValue(forKey: id)?.resume(throwing: CancellationError())
+            }
+        }
+    }
+
+    func resolveNavigationWaiters() {
+        let result: Result<Void, any Error>
+        switch navigationPhase {
+        case .ready where !page.isLoading:
+            result = .success(())
+        case .unavailable(let reason):
+            result = .failure(EvalError.navigationFailed(reason))
+        default:
+            return
+        }
+        let waiters = navigationWaiters
+        navigationWaiters.removeAll()
+        for waiter in waiters.values { waiter.resume(with: result) }
+    }
+
     func advancePage(_ session: BrowserSession) {
         guard owns(session) else {
             failQueuedInvocations(in: session, error: EvalError.notActive)

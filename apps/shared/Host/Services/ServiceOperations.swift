@@ -597,27 +597,30 @@ final class ServiceOperations {
     }
 
     func requirePresentablePage(service: Service, page: BrowserSession) async throws {
-        let generation = page.navigationGeneration
-        guard service.owns(page),
-              let scheme = page.page.url?.scheme?.lowercased(), ["http", "https"].contains(scheme),
-              !page.page.isLoading, !page.page.isBlockedByScreenTime else {
-            throw OxFunctionError(code: "page_unavailable", message: "The live page is unavailable, blocked, or still loading.", recovery: "Inspect the preserved page and verify the intended user step before requesting interaction. Do not repeat a mutation to prepare another page.")
+        let deadline = ContinuousClock.now.advanced(by: .seconds(15))
+        while true {
+            try Task.checkCancellation()
+            guard service.owns(page), page.isOpen, !page.page.isBlockedByScreenTime else {
+                throw OxFunctionError(code: "page_unavailable", message: "The live page is unavailable or blocked.", recovery: "Inspect the preserved page and verify the intended user step before requesting interaction. Do not repeat a mutation to prepare another page.")
+            }
+            let remaining = ContinuousClock.now.duration(to: deadline) / .seconds(1)
+            guard remaining > 0 else { throw Service.EvalError.navigationTimeout(15) }
+            if !page.isReady || page.page.isLoading {
+                Log.service.info("Service.handoff waiting domain=\(service.domain) page=\(page.logLabel) phase=\(page.navigationPhase.logLabel)")
+            }
+            try await page.waitForNavigationReady(timeout: remaining)
+            try Task.checkCancellation()
+            guard service.owns(page), page.isOpen, !page.page.isBlockedByScreenTime,
+                  let scheme = page.page.url?.scheme?.lowercased(), ["http", "https"].contains(scheme) else {
+                throw Service.EvalError.notActive
+            }
+            guard page.isReady, !page.page.isLoading else {
+                Log.service.info("Service.handoff retry domain=\(service.domain) page=\(page.logLabel) phase=\(page.navigationPhase.logLabel)")
+                continue
+            }
+            Log.service.info("Service.handoff preflight domain=\(service.domain) page=\(page.logLabel) nav=\(page.navigationGeneration) ready=true")
+            return
         }
-        let ready = try await service.evalAsync(page, """
-        return document.readyState !== 'loading' && Boolean(document.body && (
-          document.body.innerText.trim() ||
-          Array.from(document.body.querySelectorAll('button,input:not([type="hidden"]),select,textarea,iframe,canvas,img,svg,video,object,embed'))
-            .some(element => element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }))
-        ));
-        """, context: "handoff-preflight", timeout: 3)
-        guard service.owns(page), page.navigationGeneration == generation,
-              !page.page.isLoading, !page.page.isBlockedByScreenTime else {
-            throw Service.EvalError.contextInvalidated
-        }
-        guard ready as? Bool == true else {
-            throw OxFunctionError(code: "page_unavailable", message: "The live page has no loaded content for the user.", recovery: "Inspect and repair page preparation before requesting interaction. Do not repeat a mutation or treat an empty page as a login or verification step.")
-        }
-        Log.service.info("Service.handoff preflight domain=\(service.domain) page=\(page.logLabel) nav=\(generation) ready=true")
     }
 
     func invokeStandardServiceAction(_ service: Service, actionID: String, purpose: String) async throws -> JSONValue? {

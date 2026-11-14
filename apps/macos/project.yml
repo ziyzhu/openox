@@ -66,6 +66,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: ai.openox.host.local
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES
+        LM_SKIP_METADATA_EXTRACTION: YES
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: host.entitlements
         ENABLE_HARDENED_RUNTIME: YES

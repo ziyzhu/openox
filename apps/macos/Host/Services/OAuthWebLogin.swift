@@ -91,7 +91,7 @@ private final class MacOAuthSession: NSObject, ASWebAuthenticationPresentationCo
             parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: port)
             let listener = try NWListener(using: parameters)
             listener.stateUpdateHandler = { [weak self] state in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     switch state {
                     case .ready:
                         guard self?.continuation != nil else { return }
@@ -104,7 +104,7 @@ private final class MacOAuthSession: NSObject, ASWebAuthenticationPresentationCo
                 }
             }
             listener.newConnectionHandler = { [weak self] connection in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     guard let self, self.continuation != nil, self.connections.count < 8 else { connection.cancel(); return }
                     self.connections[ObjectIdentifier(connection)] = connection
                     connection.start(queue: .main)
@@ -132,7 +132,7 @@ private final class MacOAuthSession: NSObject, ASWebAuthenticationPresentationCo
 
     private func receive(_ connection: NWConnection, redirect: URL, buffer: Data = Data()) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 16 * 1024) { [weak self] data, _, complete, error in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 guard let self else { connection.cancel(); return }
                 guard self.continuation != nil, let data, error == nil else { self.close(connection); return }
                 let received = buffer + data
@@ -146,7 +146,7 @@ private final class MacOAuthSession: NSObject, ASWebAuthenticationPresentationCo
                 let body = url != nil ? "Return to Ox Host to continue." : "Invalid callback."
                 let response = "HTTP/1.1 \(url != nil ? "200 OK" : "400 Bad Request")\r\nContent-Type: text/plain\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
                 connection.send(content: Data(response.utf8), completion: .contentProcessed { [weak self] _ in
-                    Task { @MainActor in
+                    Task { @MainActor [weak self] in
                         self?.close(connection)
                         if let url { self?.finish(url) }
                     }

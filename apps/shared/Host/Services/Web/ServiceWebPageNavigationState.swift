@@ -56,6 +56,7 @@ extension BrowserSession {
         failPending: (any Error) -> Void,
         advance: () -> Void
     ) -> Bool {
+        defer { resolveNavigationWaiters() }
         switch event {
         case .requested(let lease):
             switch navigationPhase {
