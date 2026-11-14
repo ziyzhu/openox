@@ -87,7 +87,7 @@ final class WebPageMountCoordinator {
 
     func restore(page: WebPage, ownerID: UUID) {
         guard pageID == ObjectIdentifier(page), placement == .detached(ownerID) else { return }
-        activate(page: page, ownerID: ownerID)
+        activate(page: page, ownerID: preferredOwnerID ?? ownerID)
     }
 
     func collapse(page: WebPage, ownerID: UUID) {

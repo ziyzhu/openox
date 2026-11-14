@@ -365,7 +365,7 @@ private struct ServiceInspectorRow: View {
 
     private func expandPage() {
         Task { @MainActor in
-            if let page, isInline {
+            if let page, pageMount.inlineOwnerID(for: page) != nil {
                 guard await pageMount.detach(page: page, ownerID: rowID) else { return }
             }
             isPresented = true
