@@ -2,7 +2,7 @@
 
 Goal: qualify Ox as an Apple-approved browser so users can authenticate to third-party websites with passkeys inside Ox. Keep the existing WebKit browser; establish Profile-owned website sessions through an agreed storage transition. Current website sessions are app-wide. Do not build a separate engine or custom JavaScript passkey bridge.
 
-Status: Apple rejected the entitlement request on October 20, 2026 because reviewers could not reach arbitrary-URL browsing at launch and the documented “+” entry was absent without model setup. The model-dependent composer visibility was reproduced and fixed; browsing without a default model is simulator-verified. External-link handling and selected navigation paths are also implemented and simulator-verified. Cross-Profile cookie/local-storage sharing and a nonfunctional JavaScript popup remain unresolved. Apple approval and passkey behavior in an entitled Ox build remain unverified. Users should not need to select Ox as their default browser to use embedded passkeys; verify this on-device before promising support.
+Status: Apple rejected the entitlement request on October 20, 2026 because reviewers could not reach arbitrary-URL browsing at launch and the documented “+” entry was absent without model setup. The model-dependent composer visibility was reproduced and fixed; browsing without a default model is simulator-verified. External-link handling and selected navigation paths are also implemented and simulator-verified. Cross-Profile cookie/local-storage sharing and a nonfunctional JavaScript popup remain unresolved. Apple has now assigned the Default Web Browser managed capability to the account for `ai.oxcraft.bot`. The main iOS app declares `com.apple.developer.web-browser`; a signed development device build and its refreshed provisioning profile both contain the entitlement, and code-signature validation passed. On-device browser and passkey behavior remain unverified. Users should not need to select Ox as their default browser to use embedded passkeys; verify this on-device before promising support.
 
 ## Benefits and trade-offs
 
@@ -22,7 +22,9 @@ Costs and limitations:
 ## 1. Confirm eligibility and permission compatibility
 
 - [x] Receive Apple’s entitlement-request decision. Apple declined the initial request for missing launch-time browsing access; this is not approval or a categorical ruling on AI apps. The original submission text has not been inspected.
-- [ ] Resubmit after verifying provider-independent browsing, identifying the exact candidate version/build, and providing a launch-to-website recording. Ask Apple which build they will assess.
+- [x] Receive subsequent approval: Apple assigned the Default Web Browser managed capability for `ai.oxcraft.bot`.
+- [x] Enable the managed capability for the App ID, refresh the development provisioning profile, and verify the entitlement in a signed device build and its embedded profile. Code-signature validation passed.
+- [ ] Verify distribution signing and on-device default-browser, external-link, and passkey behavior.
 - [x] Remove the native Bluetooth service, provider/helpers, session ownership, permission requests, usage key, and translations with maintainer approval.
 - [x] Remove the read/write Photos provider, native actions, bundled service, permission key, and permission translations with maintainer approval.
 - [x] Preserve and simulator-verify picker-based photo attachments without Photos library authorization. Add-only image saving is not implemented.
@@ -40,7 +42,7 @@ Audit findings:
 - Apple's modern CoreBluetooth key requirement conflicts with its browser guidance. Any future reintroduction of native Bluetooth requires Apple clarification, not an unverified usage-key substitution.
 - No always-on location, HomeKit, or Health usage keys are declared. Location access is while-in-use. Contacts, calendar, reminders, camera, microphone, local-network access, background processing, and iCloud capabilities are not explicitly forbidden by this browser guide, but that is not approval for their use in Ox.
 - No associated-domain entitlement claims are present. Adding the browser entitlement would prevent Ox from claiming Universal Links for specific domains, so account for that in future authentication and linking decisions.
-- HTTP/HTTPS scheme declarations are implemented; the browser entitlement remains absent. Launch-time browser accessibility and physical-device external-link behavior still require later UX/navigation audits.
+- HTTP/HTTPS scheme declarations and the main iOS browser entitlement are implemented. Launch-time browser accessibility and physical-device external-link behavior still require later UX/navigation audits.
 
 Questions to submit to Apple after maintainer review:
 1. Can Ox qualify for `com.apple.developer.web-browser` as an AI assistant with a user-controlled general WebKit browser, if it meets launch-time browsing and external HTTP/HTTPS navigation requirements?
@@ -49,7 +51,7 @@ Questions to submit to Apple after maintainer review:
 4. Are there additional restrictions on Ox's user-authorized Contacts, calendar, reminders, camera, microphone, local-network, background-processing, or iCloud features?
 5. What build and review evidence should accompany the request, and how can external-link behavior be demonstrated before production entitlement approval?
 
-Apple’s email, “Your Default Web Browser entitlement request status is ready.” (October 20, 2026), says the app lacked a URL bar/search field for arbitrary URLs, the documented “+” button was absent, and requiring chat-engine authentication would violate launch-time browser requirements. It invites another request once the app meets the requirements. The email does not identify the assessed version/build. Photos and Bluetooth removals are maintainer-approved and implemented. Do not represent the remaining compliance plan as implemented or Apple-approved.
+Apple’s email, “Your Default Web Browser entitlement request status is ready.” (October 20, 2026), says the app lacked a URL bar/search field for arbitrary URLs, the documented “+” button was absent, and requiring chat-engine authentication would violate launch-time browser requirements. It invites another request once the app meets the requirements. The email does not identify the assessed version/build. Photos and Bluetooth removals are maintainer-approved and implemented. The subsequent capability approval supersedes the initial rejection; it does not verify the remaining implementation or device behavior.
 
 Apple's public guidance does not specify whether entitlement assessment uses the published version or the latest uploaded build; the request form requires login and its evidence fields have not been inspected. Identify the intended candidate version/build and any available TestFlight access, distinguish it from the published version, and ask Apple which build to assess. Do not assume the latest upload is automatically assessed or that the changes must be published first. Managed-capability approval does not replace App Review of the submitted entitled build.
 
