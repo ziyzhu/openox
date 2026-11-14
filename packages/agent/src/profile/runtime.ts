@@ -261,7 +261,7 @@ export class ProfileRuntime {
     } finally { projection.waiter = undefined; }
   }
 
-  async run(reference: ConversationId | ConversationReference, input: InputSubmissionDraft) {
+  async run(reference: ConversationId | ConversationReference, input: InputSubmissionDraft | { type: "continue"; requestId?: string }) {
     return this.observedSubmission(reference, async (conversation, id) => {
       await this.options.beforeProgress?.(this.conversations.reference(id));
       const submission = await conversation.submit(input, context);

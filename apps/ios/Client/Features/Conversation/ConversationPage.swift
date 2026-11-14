@@ -1034,7 +1034,7 @@ struct ConversationPage: View {
         return {
             guard !conversation.isBusy, case .failed = conversation.turnEnding else { return }
             Log.ui.info("ConversationPage.retryFailed conversation=\(conversation.id)")
-            latestSubmissionID = conversation.enqueue(L10n.string("Continue", comment: "Message sent when the user resumes a stopped conversation reply.")).id
+            latestSubmissionID = conversation.retryFailedTurn()?.id
         }
     }
 

@@ -58,7 +58,7 @@ type Command = CommandScope & (
   | { action: "conversationHistory"; limit?: number; historyCursor?: ConversationHistoryCursor | null }
   | { action: "conversationPresent"; presentation?: PresentationChange | null }
   | { action: "conversationRead"; lastReadEntryID?: EntryId | null }
-  | { action: "run"; content?: UserInput; turnState?: TurnState; requestID?: string }
+  | { action: "run" | "continue"; content?: UserInput; turnState?: TurnState; requestID?: string }
   | { action: "resumeExisting"; submissionID?: SubmissionId; requestID?: string }
   | { action: "fileList"; prefix?: string; limit?: number; fileCursor?: string | null }
   | { action: "fileResolve"; paths: string[] }
@@ -236,7 +236,8 @@ export class IOSAgentAdapter {
       case "conversationRead": await session.conversations.markRead(required(), args.lastReadEntryID ?? null); return {};
       case "observe": await session.observe(attached()); return {};
       case "recoveryPlan": return this.recoveryPlan();
-      case "run": {
+      case "run":
+      case "continue": {
         const target = attached();
         if (args.turnState?.hostContext) {
           const attachment = this.attachments.get(target.conversationID);
@@ -252,7 +253,9 @@ export class IOSAgentAdapter {
             (await tx.doc(ConversationApplicationMetadata, conversation.id)).fields.turnState = turnState as unknown as JsonObject;
           }, context);
         }
-        return session.run(target, { type: "input", content: args.content ?? "", requestId: args.requestID });
+        return session.run(target, args.action === "continue"
+          ? { type: "continue", requestId: args.requestID }
+          : { type: "input", content: args.content ?? "", requestId: args.requestID });
       }
       case "resumeExisting": return this.resumeExisting(attached(), args.submissionID, args.requestID);
       case "resume": {

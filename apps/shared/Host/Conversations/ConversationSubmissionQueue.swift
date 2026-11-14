@@ -9,6 +9,7 @@ final class ConversationSubmissionQueue {
             case user
             case browse(URL)
             case system(resume: TurnID?)
+            case retry(resume: TurnID)
         }
 
         enum State {
@@ -30,7 +31,7 @@ final class ConversationSubmissionQueue {
         var needsPosting: Bool {
             switch kind {
             case .user, .browse: state == .queued
-            case .system: false
+            case .system, .retry: false
             }
         }
 

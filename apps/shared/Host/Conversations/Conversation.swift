@@ -754,17 +754,6 @@ final class Conversation: Identifiable {
         }
     )
 
-    static func userFacingError(_ raw: String, kind: LLMFailureKind?) -> String {
-        if kind == .rateLimited {
-            return "Rate limit reached — the model provider's quota is exhausted. Try again later or switch model."
-        }
-        if kind == .network {
-            return "Network error — check your connection and try again."
-        }
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.count > 240 ? String(trimmed.prefix(240)) + "…" : trimmed
-    }
-
     init(id: UUID = UUID(),
          createdAt: Date = Date(),
          client: any ProviderClient,
@@ -968,7 +957,7 @@ final class Conversation: Identifiable {
         setRunPhase(.thinking)
         activeRun?.backgroundExecution?.updatePhase(.thinking)
         switch activeRun?.activeSubmission?.kind {
-        case let .system(.some(target)):
+        case let .system(.some(target)), let .retry(target):
             document.apply(.resumeAgentTurn(id: target))
         case .user, .browse, .system, nil:
             document.apply(.beginAgentTurn(at: Date()))
@@ -1369,6 +1358,17 @@ final class Conversation: Identifiable {
         )
     }
 
+    func retryFailedTurn() -> SubmissionReceipt? {
+        guard !isBusy, case .failed = turnEnding,
+              case let .agent(turn, target) = document.turns.last else { return nil }
+        if let assistant = turn.generations.last?.assistantMessage,
+           assistant.stopReason == .length, assistant.content.toolCalls.isEmpty {
+            return enqueue(L10n.string("Continue", comment: "Message sent when the user resumes a stopped conversation reply."))
+        }
+        Log.session.info("Conversation.retryFailed id=\(id) turn=\(target.rawValue)")
+        return enqueue("", attachments: [], skillInvocation: nil, kind: .retry(resume: target), submissionID: SubmissionID())
+    }
+
     @discardableResult
     func enqueue(
         _ intent: String,
@@ -1457,8 +1457,9 @@ final class Conversation: Identifiable {
         }
         let posting = !isBusy
         notice = .none
-        let latency = TurnLatencyTrace(submissionID: submissionID.rawValue, conversationID: id, kind: "user")
-        if posting {
+        let continuing = if case .retry = kind { true } else { false }
+        let latency = TurnLatencyTrace(submissionID: submissionID.rawValue, conversationID: id, kind: continuing ? "retry" : "user")
+        if posting && !continuing {
             let at = Date()
             document.apply(.appendUser(
                 intent: intent,
@@ -1847,7 +1848,8 @@ final class Conversation: Identifiable {
                 .joined(separator: ",")
             Log.session.info("Conversation.runOne service=\(definition.domain) actions=[\(actions)]")
         }
-        let turnID = if case .system = submission.kind { submission.id.rawValue } else { transcript.last(where: { $0.isUserInitiated })?.id }
+        let continuing = if case .retry = submission.kind { true } else { false }
+        let turnID = if case .user = submission.kind { transcript.last(where: { $0.isUserInitiated })?.id } else { submission.id.rawValue }
         submission.latency.bindTurn(turnID)
         submission.latency.mark(.agentSubmitted)
         let result: ConversationRunResult
@@ -1865,7 +1867,7 @@ final class Conversation: Identifiable {
                             attachments: submission.attachments,
                             turnState: turnState,
                             turnID: turnID
-                        ), configuration: configuration)
+                        ), configuration: configuration, continuing: continuing)
                     }
                 }
             }
@@ -1905,12 +1907,6 @@ final class Conversation: Identifiable {
             cancelled: Task.isCancelled || err == "aborted"
         )
         Log.session.info("Conversation.runOne end id=\(id) outcome=\(outcomeName)")
-    }
-
-    private static func outcome(for assistant: AssistantMessage, at: Date) -> TurnOutcome {
-        if assistant.stopReason == .aborted { return .cancelled(at: at) }
-        if let error = assistant.errorMessage { return .failed(at: at, message: error) }
-        return .completed(at: at)
     }
 
     func setAttachedServices(_ services: [Service]) {
