@@ -140,6 +140,7 @@ export function harness(options: { device: string; debugEndpoint: string; fixtur
     ios, ox, turn, begin, idle, pending, lastResult, waitMatching, tapMatching, fillWeb,
     async pressReturn() { await run(["idb", "ui", "key", "40", "--udid", await ios.udid()], { capture: true }); },
     get fixtures() { return options.fixtures; },
+    get evidence() { return options.evidence; },
     get prompts() { return prompts; },
     site: (name: string) => options.sites.find(site => site.name === name)!,
     async newConversation() {

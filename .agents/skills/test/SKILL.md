@@ -36,7 +36,7 @@ These native checks require an explicit reserved simulator and assigned Host end
 portable fixtures alone do not establish native implementation conformance.
 Website service cases live in `protocol/web/` and run with
 `bun run test:web --device ox-N [--app <Ox.app>] [--case <name>]` against a Debug
-Simulator build. Fixture sites model bundled service archetypes: server-rendered
+Simulator build. Use `--case handoff` for slow responses, streamed documents, server/client redirect chains, redirect loops and bounded presentation timeout checks. Assert one login dispatch, usable final-page controls, cancellation and conversation recovery; transport navigation counts alone do not prove action replay. Fixture sites model bundled service archetypes: server-rendered
 two-page login, client-rendered same-page login with streamed `conversation`
 generation, in-page GraphQL with CSRF, a same-site accounts provider hop, and a
 cross-site sign-in widget nested in iframes, and a cross-site provider redirect with a

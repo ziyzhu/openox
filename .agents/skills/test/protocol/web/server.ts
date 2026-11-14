@@ -47,7 +47,7 @@ export async function startFixtures(sites: Site[], port: number): Promise<Fixtur
   };
   const tls = await certificates([...byHost.keys()]);
   const server = Bun.serve({
-    port, hostname: "127.0.0.1", tls: { cert: tls.cert, key: tls.key },
+    port, hostname: "127.0.0.1", idleTimeout: 60, tls: { cert: tls.cert, key: tls.key },
     async fetch(request) {
       const url = new URL(request.url);
       const site = byHost.get(url.hostname);
