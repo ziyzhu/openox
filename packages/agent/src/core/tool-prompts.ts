@@ -30,7 +30,7 @@ const commonContracts = {
 const commonDeclarations = ["fs", "web", "service"].map(namespace => {
   const functions = Object.entries(commonContracts).filter(([name]) => name.startsWith(`ox.${namespace}.`))
     .map(([name, contract]) => {
-      const description = contract.description.replace(/: `await [^`]+`/g, "").replace(/`await [^`]+`/g, "").replace(/`(ox\.[\w.]+)\([^`]*\)`/g, "`$1`").replaceAll("*/", "*\\/");
+      const description = contract.description.replace(/: `await [^`]+`/g, "").replace(/`await (ox\.[\w.]+)\([^`]*\)`/g, "`$1`").replace(/`(ox\.[\w.]+)\([^`]*\)`/g, "`$1`").replaceAll("*/", "*\\/");
       const signature = renderToolSignature({ ...contract, name: name.split(".").at(-1)! });
       return `  /** ${description} */\n  function ${signature}`;
     }).join("\n");

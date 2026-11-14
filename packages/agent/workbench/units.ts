@@ -28,17 +28,28 @@ const functionsDir = join(agent, "src/functions");
 const commonFunctions = ["ox.fs.read", "ox.fs.edit", "ox.fs.write", "ox.web.search", "ox.web.fetch", "ox.service.attach", "ox.service.inspect", "ox.service.invoke"];
 const catalogNamespaces = ["conversation", "provider", "repository", "secret", "service", "user", "web", "fs", "output", "skill", "schedule", "vision"];
 const catalogSentinel = "\u0000CATALOG\u0000";
-const limits = { timeoutSeconds: 60, maxLines: 2000, maxKiB: 50, maxFetches: 8, maxTransientAttachments: 4 };
+const nativeFacts = [
+  ["timeoutSeconds", "apps/shared/Host/VM/VirtualMachine.swift", /defaultTimeout: TimeInterval = ([\d_]+)/],
+  ["maxLines", "apps/shared/Host/Conversations/JavaScriptOutputStore.swift", /static let maxLines = ([\d_]+)/],
+  ["maxKiB", "apps/shared/Host/Conversations/JavaScriptOutputStore.swift", /static let maxBytes = ([\d_]+) \* 1024/],
+  ["maxFetches", "apps/shared/Host/Services/Web/WebFunctions.swift", /static let maxFetches = ([\d_]+)/],
+  ["maxTransientAttachments", "apps/shared/Host/Services/Web/WebFunctions.swift", /static let maxTransientAttachments = ([\d_]+)/],
+] as const;
+const limits = Object.fromEntries(nativeFacts.map(([key, file, pattern]) => {
+  const match = readFileSync(join(repo, file), "utf8").match(pattern);
+  if (!match) throw new Error(`Cannot read native prompt limit ${key} from ${file}`);
+  return [key, Number(match[1]!.replaceAll("_", ""))];
+})) as Record<typeof nativeFacts[number][0], number>;
 const sentinels: [string, string, string][] = [
   ["999001", "{timeoutSeconds}", String(limits.timeoutSeconds)], ["999002", "{maxLines}", String(limits.maxLines)],
-  ["999003", "{maxKiB}", String(limits.maxKiB)], ["999004", "{maxFetches}", countWords[limits.maxFetches]!],
-  ["999005", "{maxTransientAttachments}", countWords[limits.maxTransientAttachments]!],
+  ["999003", "{maxKiB}", String(limits.maxKiB)], ["999004", "{maxFetches}", countWords[limits.maxFetches] ?? String(limits.maxFetches)],
+  ["999005", "{maxTransientAttachments}", countWords[limits.maxTransientAttachments] ?? String(limits.maxTransientAttachments)],
 ];
 const languageExample = { identifier: "zh-Hans", name: "Simplified Chinese" };
 
 const normalized = (text: string) => text.split(/\s+/u).filter(Boolean).join(" ");
 const escapeXml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
-const declaration = (text: string) => text.replace(/: `await [^`]+`/g, "").replace(/`await [^`]+`/g, "").replace(/`(ox\.[\w.]+)\([^`]*\)`/g, "`$1`").replaceAll("*/", "*\\/");
+const declaration = (text: string) => text.replace(/: `await [^`]+`/g, "").replace(/`await (ox\.[\w.]+)\([^`]*\)`/g, "`$1`").replace(/`(ox\.[\w.]+)\([^`]*\)`/g, "`$1`").replaceAll("*/", "*\\/");
 const fillLimits = (text: string) => sentinels.reduce((value, [, placeholder, real]) => value.replaceAll(placeholder, real), text);
 
 export function catalogSummary(description: string) {
@@ -82,7 +93,16 @@ function executeTemplate() {
 }
 
 const execute = executeTemplate();
-const executeNames = ["intro", "discovery", "standard", "handoffs", "batching", "state", "budget", "output"];
+const executeNames = [
+  ["intro", "Run JavaScript as an async function body."],
+  ["discovery", "The catalog contains summaries, not full contracts."],
+  ["standard", "Call standard service actions through ox.service.invoke"],
+  ["handoffs", "Use service handoffs for login"],
+  ["batching", "Batch independent reads with Promise.allSettled"],
+  ["state", "Each execution is self-contained;"],
+  ["budget", "Service actions and user handoffs do not consume"],
+  ["output", "Combined console and return output is limited"],
+] as const;
 
 function catalog() {
   const namespaces = catalogNamespaces.map(name => `ox.${name} — ${guidanceTexts[`namespace.${name}`]}`);
@@ -93,7 +113,8 @@ function catalog() {
 function cwdTemplate() {
   const source = readFileSync(join(agent, "src/adapters/ios/agent.ts"), "utf8");
   const match = source.match(/section\("cwd", \(\) => `([^`]*)`\)/);
-  return { text: (match?.[1] ?? "").replace("${conversation.id}", "{conversationId}"), source: locate(join(agent, "src/adapters/ios/agent.ts"), 'section("cwd"') };
+  if (!match) throw new Error("Cannot read iOS working-directory prompt");
+  return { text: match[1]!.replace("${conversation.id}", "{conversationId}"), source: locate(join(agent, "src/adapters/ios/agent.ts"), 'section("cwd"') };
 }
 
 const iosScope = { hostID: "ios", profileID: "local" };
@@ -180,7 +201,7 @@ function buildUnits(): Unit[] {
   const prose = execute.paragraphs.filter(paragraph => !paragraph.includes(catalogSentinel)
     && !paragraph.startsWith("Common built-in functions:") && !paragraph.startsWith("Standard action contracts:"));
   prose.forEach((paragraph, index) => {
-    const name = executeNames[index] ?? `p${index + 1}`;
+    const name = executeNames.find(([, prefix]) => paragraph.startsWith(prefix))?.[0] ?? `p${index + 1}`;
     units.push(textUnit(`execute.${name}`, "Execute · prose", `Execute: ${name}`, locate(core("tool-prompts.ts"), paragraph.slice(0, 40)), "execute", paragraph, text => [fillLimits(text)]));
   });
   for (const name of catalogNamespaces) {
