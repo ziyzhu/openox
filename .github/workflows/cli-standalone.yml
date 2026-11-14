@@ -38,6 +38,7 @@ permissions: {}
 jobs:
   build:
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
     permissions:
       contents: read
     strategy:
@@ -63,7 +64,7 @@ jobs:
         run: |
           test "$(bun -p 'process.platform + "-" + process.arch')" = "${{ matrix.platform }}"
           bun run ci --standalone-only --out "$RUNNER_TEMP/ox-cli-artifacts"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: ox-cli-${{ matrix.platform }}
           path: ${{ runner.temp }}/ox-cli-artifacts/*

@@ -11,11 +11,12 @@ permissions: {}
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
@@ -29,6 +30,7 @@ jobs:
 
   apps:
     runs-on: macos-26
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
