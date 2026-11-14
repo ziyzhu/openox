@@ -956,7 +956,13 @@ struct ConversationPage: View {
     }
 
     private func isEndedHandoff(_ block: ConversationBlock) -> Bool {
-        guard case .agentContent(.serviceInspector(let link)) = block.kind, link.isHandoff == true else { return false }
+        guard case .agentContent(.serviceInspector(let link)) = block.kind else { return false }
+        if link.domain == BrowserFunctionCatalog.publicNamespace {
+            guard let service = serviceManager.inspectionService(domain: link.domain),
+                  let session = serviceManager.browserActionSessions.existingSession(for: conversation.id, service: service) else { return true }
+            return !session.isWaitingForUserInteraction
+        }
+        guard link.isHandoff == true else { return false }
         guard let pageID = link.pageID, let service = serviceManager.inspectionService(domain: link.domain) else { return true }
         return !service.isHandoffActive(pageID: pageID)
     }
