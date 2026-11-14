@@ -60,6 +60,14 @@ shape, add a fixture for it. For browser ownership changes, compare page IDs acr
 service redirects, reject stale document IDs, and verify separate conversations
 do not reuse each other’s pages.
 
+Use `--case popup` for target-blank provider navigation through the preserved page;
+it does not establish `window.opener` continuity. Use `--case oauth` for native API
+callback-state rejection, MCP metadata discovery/dynamic registration/PKCE and model-provider
+OAuth-backed streaming generation. Fixture token endpoints enforce PKCE, single-use codes
+and rotating refresh tokens; fixture behavior alone does not prove native refresh coverage.
+A startup migration collision blocks these cases: preserve the data and report it rather
+than erasing a simulator to make the run pass.
+
 For filesystem audits, round-trip ordinary files in the default conversation working
 directory, include mixed text/binary searches and exact-limit results, and reconstruct
 continued reads to detect missing or duplicate content.

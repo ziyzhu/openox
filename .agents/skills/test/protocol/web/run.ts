@@ -8,6 +8,9 @@ import { claimSimulator, requireFreePort, requireSimulator } from "../../../setu
 import { cases } from "./cases.ts";
 import { harness } from "./harness.ts";
 import { handoffCases } from "./handoff-cases.ts";
+import { oauthCases } from "./oauth-cases.ts";
+import { oauth } from "./sites/oauth.ts";
+import { popup } from "./sites/popup.ts";
 import { startFixtures } from "./server.ts";
 import { card } from "./sites/card.ts";
 import { chat } from "./sites/chat.ts";
@@ -25,8 +28,8 @@ unless it was already booted or --keep-booted is passed. Builds the app when --a
 
 const config = qaCommand({ usage, options: { app: { type: "string" }, case: { type: "string" }, "keep-booted": { type: "boolean" } } });
 const values = config.values as { app?: string; case?: string; "keep-booted"?: boolean };
-const sites = [ssr, chat, gql, suite, card, gov, handoff];
-const selected = [...cases, ...handoffCases].filter(entry => !values.case || entry.name === values.case || entry.site === values.case);
+const sites = [ssr, chat, gql, suite, card, gov, handoff, oauth, popup];
+const selected = [...cases, ...handoffCases, ...oauthCases].filter(entry => !values.case || entry.name === values.case || entry.site === values.case);
 if (!selected.length) throw new Error(`No case matches ${values.case}`);
 
 const bundle = /^OX_BUNDLE_IDENTIFIER\s*=\s*([^\s/]+)/m.exec(await Bun.file(join(ROOT, "apps/ios/Local.xcconfig")).text().catch(() => ""))?.[1];

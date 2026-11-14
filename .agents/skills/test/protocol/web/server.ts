@@ -28,10 +28,10 @@ async function writeRepository(sites: Site[], origin: (host: string) => string):
   const root = await mkdtemp(join(tmpdir(), "ox-web-fixture-repository-"));
   const services = sites.flatMap(site => site.services(origin));
   await writeFile(join(root, "repository.json"), JSON.stringify({
-    version: 3, name: "Web Fixtures", services: services.map(service => `web:${service.manifest.domain}`), skills: [],
+    version: 3, name: "Web Fixtures", services: services.map(service => `${service.manifest.kind ?? "web"}:${service.manifest.domain}`), skills: [],
   }, null, 2));
   for (const service of services) {
-    const directory = join(root, "web", service.manifest.domain);
+    const directory = join(root, String(service.manifest.kind ?? "web"), service.manifest.domain);
     await mkdir(directory, { recursive: true });
     await writeFile(join(directory, "service.json"), JSON.stringify(service.manifest, null, 2));
     await writeFile(join(directory, "actions.js"), await actionsSource(service.actions));
