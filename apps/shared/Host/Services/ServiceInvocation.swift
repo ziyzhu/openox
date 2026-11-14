@@ -144,7 +144,7 @@ extension Service {
                     guard session.navigationGeneration == startingNavigation else { throw EvalError.contextInvalidated }
                     updateSessionPage(session, session: selectedSession)
                 }
-                session.lastInvocation = (invocationID, domain, actionId, args, requestedSession, pageURL, selectedSession, Date())
+                session.lastInvocation = (invocationID, domain, actionId, Date())
                 session.secretAttempt = secrets
                 session.frameSecretContext = (self, binding.document.id)
                 let raw = try await binding.evaluate(source)

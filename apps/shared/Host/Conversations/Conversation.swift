@@ -221,9 +221,6 @@ final class Conversation: Identifiable {
     private(set) var isSelected = false
     private(set) var isTranscriptVisible = false
     private(set) var hasUnreadResponse = false
-    @ObservationIgnored private var browserURLToRestore: URL?
-    @ObservationIgnored private var browserRestoreTask: Task<Void, Never>?
-
     func select() {
         guard !isSelected else { return }
         isSelected = true
@@ -234,21 +231,6 @@ final class Conversation: Identifiable {
         Log.session.info("Conversation.selection id=\(id) selected=true busy=\(isBusy)")
         stream.setVisible(true)
         scheduleModelPreparation()
-        if let browserURLToRestore,
-           !isBusy,
-           serviceManager.browserActionSessions.existingSession(for: id)?.webPage == nil {
-            browserRestoreTask = Task { [weak self] in
-                guard let self, isSelected else { return }
-                let session = serviceManager.browserActionSessions.session(
-                    for: serviceManager.browserService,
-                    ownerID: id
-                )
-                let restored = try? await session.navigate(browserURLToRestore)
-                if restored == nil {
-                    Log.webView.warning("Conversation.browser restore failed id=\(id) host=\(browserURLToRestore.host ?? "?")")
-                }
-            }
-        }
     }
 
     func setTranscriptVisible(_ visible: Bool) {
@@ -265,10 +247,6 @@ final class Conversation: Identifiable {
         serviceManager.removeAttachedServices(for: id)
         Log.session.info("Conversation.selection id=\(id) selected=false busy=\(isBusy)")
         setTranscriptVisible(false)
-        browserRestoreTask?.cancel()
-        browserRestoreTask = nil
-        browserURLToRestore = serviceManager.browserActionSessions.existingSession(for: id)?.webPage?.url
-            ?? browserURLToRestore
         modelPreparationTask?.cancel()
         modelPreparationTask = nil
         stream.setVisible(false)
@@ -468,7 +446,7 @@ final class Conversation: Identifiable {
                 service.conversationHandoffs[page.id] = (id, session)
                 let link = ServiceInspectorLink(
                     domain: service.domain,
-                    serviceName: service.title,
+                    serviceName: session.title,
                     pageID: page.id,
                     isHandoff: true
                 )
@@ -494,12 +472,6 @@ final class Conversation: Identifiable {
             presentations: presentations,
             requireActive: { [unowned self] in
                 guard isSelected else { throw RuntimeError.bridge("This device service requires the active conversation.") }
-            },
-            showBrowser: { [unowned self] service, _ in
-                embedServiceInspector(ServiceInspectorLink(
-                    domain: BrowserFunctionCatalog.publicNamespace,
-                    serviceName: service.title
-                ))
             },
             showServicePage: { [unowned self] service, page in
                 embedServiceInspector(ServiceInspectorLink(

@@ -16,10 +16,6 @@ extension ServiceOperations {
                                   recovery: "Inspect getPageState again and use a fresh frameId before invoking.")
         }
         let owner = serviceManager.services.first { $0.servicePages.contains { $0 === page } } ?? serviceManager.browserService
-        if actionID == WebSessionContract.loginAction,
-           !owner.isWebService || !WebSessionContract.isEnabled(owner.definition) {
-            throw RuntimeError.bridge("Embedded login requires a prepared consumer service page. Inspect that service's page instead of Browser.")
-        }
         guard page.secretAttempt?.holdsValues != true else { throw Service.EvalError.contextInvalidated }
         let frame = try await page.requireFrame(frameID)
         guard let host = URL(string: frame.origin)?.host, service.isServiceHost(host),
@@ -43,7 +39,7 @@ extension ServiceOperations {
                 guard let values = sessions.arrayValue, !values.isEmpty,
                       session.map({ values.contains($0) }) ?? true else { throw Service.InvokeError.requiresAuth(qualified) }
             }
-            page.lastInvocation = (UUID(), service.domain, actionID, input, session, nil, session, Date())
+            page.lastInvocation = (UUID(), service.domain, actionID, Date())
             page.secretAttempt = secrets
             page.frameSecretContext = (service, frameID)
             defer {

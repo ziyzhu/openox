@@ -3,11 +3,22 @@ import Foundation
 nonisolated enum CanvasServiceCatalog {
     private static let excluded: Set<String> = ["ox.service.attach", "ox.service.detach", "ox.service.listAttached"]
 
-    static let schemas = OxFunctionCatalog.build().objectValue!.filter {
-        $0.key.hasPrefix("ox.service.") && !excluded.contains($0.key)
-    }
+    static let schemas: [String: JSONValue] = {
+        var schemas = OxFunctionCatalog.build().objectValue!.filter {
+            $0.key.hasPrefix("ox.service.") && !excluded.contains($0.key)
+        }
+        var invoke = schemas["ox.service.invoke"]!.objectValue!
+        var input = invoke["inputSchema"]!.objectValue!
+        var properties = input["properties"]!.objectValue!
+        properties["pageUrl"] = .object(["type": .string("string"), "description": .string("Optional execution URL override within the service domain.")])
+        input["properties"] = .object(properties)
+        invoke["inputSchema"] = .object(input)
+        invoke["description"] = .string("Invoke an attached service action. HTML uses Host-managed website routing; session selects account/context and pageUrl optionally selects the destination.")
+        schemas["ox.service.invoke"] = .object(invoke)
+        return schemas
+    }()
 
-    static let help = OxFunctionCatalog.buildHelpText().objectValue!.filter { schemas[$0.key] != nil }
+    static let help: [String: JSONValue] = schemas.mapValues { .string($0.jsonString()) }
 
     static func validate(function: String, arguments: JSONValue) throws {
         guard let schema = schemas[function]?.objectValue?["inputSchema"] else {
@@ -45,7 +56,8 @@ extension ServiceOperations {
         case "ox.service.validate":
             return try await validateService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.invoke":
-            return try await invokeAction(name: fields["name"]?.stringValue ?? "", args: fields["input"], session: fields["session"], pageURL: fields["pageUrl"]?.stringValue, frameID: fields["frameId"]?.stringValue, purpose: purpose)
+            let (service, actionID) = try await resolveAction(fields["name"]?.stringValue ?? "")
+            return try await invokeAction(service: service, actionID: actionID, args: fields["input"], session: fields["session"], pageURL: fields["pageUrl"]?.stringValue, frameID: fields["frameId"]?.stringValue, purpose: purpose)
         case "ox.service.create":
             return try await createService(kind: fields["kind"]?.stringValue ?? "", domain: fields["domain"]?.stringValue ?? "", name: fields["name"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, faviconURL: fields["faviconUrl"], purpose: purpose)
         case "ox.service.update":
@@ -62,8 +74,6 @@ extension ServiceOperations {
             return try await syncRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
         case "ox.repository.disconnect":
             return try await disconnectRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
-        case "ox.service.showPage":
-            return try await showServicePage(name: fields["name"]?.stringValue ?? "", args: fields["input"], session: fields["session"], pageURL: fields["pageUrl"]?.stringValue, purpose: purpose)
         default: throw RuntimeError.bridge("Function unavailable in HTML: \(function)")
         }
     }

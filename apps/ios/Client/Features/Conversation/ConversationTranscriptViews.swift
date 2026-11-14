@@ -288,14 +288,6 @@ private struct ServiceInspectorRow: View {
                     done: { finishLogin(handoff, completed: true) }
                 )
             }
-            if let browserSession, browserSession.isWaitingForUserInteraction, !isPresented, isInline {
-                ServiceHandoffActions(
-                    cancelAccessibilityIdentifier: "conversation.browser.interaction.\(rowID).cancel",
-                    doneAccessibilityIdentifier: "conversation.browser.interaction.\(rowID).done",
-                    cancel: { finishUserInteraction(completed: false) },
-                    done: { finishUserInteraction(completed: true) }
-                )
-            }
         }
         .fullScreenCover(isPresented: $isPresented, onDismiss: {
             if let page { pageMount.restore(page: page, ownerID: rowID) }
@@ -346,14 +338,6 @@ private struct ServiceInspectorRow: View {
         withAnimation(reduceMotion ? nil : Theme.Animation.handoff) {
             if completed { handoff.dismissPresentation() }
             else { handoff.cancel() }
-            collapsePage()
-        }
-    }
-
-    private func finishUserInteraction(completed: Bool) {
-        guard let browserSession else { return }
-        withAnimation(reduceMotion ? nil : Theme.Animation.handoff) {
-            browserSession.finishUserInteraction(completed: completed)
             collapsePage()
         }
     }

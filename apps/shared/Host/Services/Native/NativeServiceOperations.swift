@@ -13,7 +13,6 @@ final class NativeServiceOperations {
     let serviceManager: ServiceManager
     let presentations: AppPresentations
     let requireActive: () throws -> Void
-    let showBrowser: (Service, UUID) -> Void
     let showServicePage: (Service, BrowserSession) throws -> Void
     let attachTransient: (TransientAttachment) throws -> Void
     let importFile: (TransientAttachment, String) async throws -> FileItem
@@ -26,7 +25,6 @@ final class NativeServiceOperations {
         serviceManager: ServiceManager,
         presentations: AppPresentations,
         requireActive: @escaping () throws -> Void,
-        showBrowser: @escaping (Service, UUID) -> Void,
         showServicePage: @escaping (Service, BrowserSession) throws -> Void,
         attachTransient: @escaping (TransientAttachment) throws -> Void,
         importFile: @escaping (TransientAttachment, String) async throws -> FileItem,
@@ -38,7 +36,6 @@ final class NativeServiceOperations {
         self.serviceManager = serviceManager
         self.presentations = presentations
         self.requireActive = requireActive
-        self.showBrowser = showBrowser
         self.showServicePage = showServicePage
         self.attachTransient = attachTransient
         self.importFile = importFile
@@ -57,186 +54,12 @@ final class NativeServiceOperations {
         else { try showServicePage(service, page) }
     }
 
-    private func presentBrowser(_ service: Service) async throws {
-        let page = try await serviceManager.browserActionSessions.session(for: service, ownerID: id).inspectionPage()
-        if let presenter = presentations.browser { presenter(service, page) }
-        else { showBrowser(service, id) }
-    }
-
-    func invoke(
-        service: Service,
-        actionID: String,
-        args: JSONValue,
-        purpose: String?
-    ) async throws -> JSONValue? {
-        let browser = service
-        let serviceID = service.domain
+    func invoke(service: Service, actionID: String, args: JSONValue, purpose: String?) async throws -> JSONValue? {
+        if service.domain == BrowserFunctionCatalog.internalDomain {
+            return try await invokeBrowserOperation(actionID: actionID, args: args, purpose: purpose)
+        }
         let fields = args.objectValue ?? [:]
-        let authorizeSite = { [authorizeBrowserSite] (site: String) in try await authorizeBrowserSite(site, purpose) }
-        switch (serviceID, actionID) {
-        case ("ios:browser", "navigate"):
-            guard let rawURL = fields["url"]?.stringValue,
-                  let url = URL(string: rawURL),
-                  let scheme = url.scheme?.lowercased(),
-                  scheme == "http" || scheme == "https",
-                  url.host?.isEmpty == false,
-                  BrowserNavigation.allowsServiceNavigation(url) else {
-                throw RuntimeError.bridge("ox.web.browser.navigate requires an absolute public HTTPS URL. Simulator builds also allow loopback HTTP.")
-            }
-            let landed: URL
-            do {
-                landed = try await serviceManager.browserActionSessions
-                    .session(for: browser, ownerID: id)
-                    .navigate(url)
-            } catch Service.EvalError.navigationFailed(let message) {
-                throw RuntimeError.bridge("ox.web.browser.navigate failed to load the requested URL: \(message)")
-            } catch {
-                throw RuntimeError.bridge("ox.web.browser.navigate failed to load the requested URL: \(error.localizedDescription)")
-            }
-            return .object(["url": .string(landed.absoluteString)])
-        case ("ios:browser", "reload"):
-            let landed = await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .reload(fromOrigin: fields["fromOrigin"]?.boolValue ?? false)
-            return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case ("ios:browser", "stopLoading"):
-            let url = try await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .stopLoading()
-            return .object([
-                "stopped": .bool(true),
-                "url": url.map { .string($0.absoluteString) } ?? .null,
-            ])
-        case ("ios:browser", "goBack"):
-            let landed = await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .goBack()
-            return .object([
-                "navigated": .bool(landed != nil),
-                "url": landed.map { .string($0.absoluteString) } ?? .null,
-            ])
-        case ("ios:browser", "goForward"):
-            let landed = await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .goForward()
-            return .object([
-                "navigated": .bool(landed != nil),
-                "url": landed.map { .string($0.absoluteString) } ?? .null,
-            ])
-        case ("ios:browser", "getNavigationHistory"):
-            return try await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .navigationHistory()
-        case ("ios:browser", "getPageState"):
-            return try await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .pageState(selector: fields["selector"]?.stringValue, authorizeSite: authorizeSite)
-        case ("ios:browser", "waitForNavigation"):
-            let landed = try await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .waitForNavigation(timeoutMilliseconds: fields["timeoutMs"]?.intValue ?? 15_000)
-            return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case ("ios:browser", "showPage"):
-            let instructions = fields["instructions"]?.stringValue ?? purpose ?? "Interact with the page"
-            let session = serviceManager.browserActionSessions.session(for: browser, ownerID: id)
-            try await session.prepareForUserInteraction()
-            try await presentBrowser(browser)
-            return try await handoff(title: purpose ?? instructions) { [self] in
-                let completed: Bool
-                if presentations.browser != nil {
-                    let done = L10n.string("Done")
-                    let answer = try await choose(Prompt(
-                        body: instructions,
-                        options: [done, L10n.string("Cancel")],
-                        purpose: purpose ?? L10n.string("Wait for browser interaction")
-                    ))
-                    completed = answer == done
-                } else {
-                    completed = try await session.waitForUserInteraction()
-                }
-                Log.service.info("Browser.showPage interaction completion=\(completed ? "completed" : "cancelled")")
-                return .object(["shown": .bool(true), "completion": .string(completed ? "completed" : "cancelled")])
-            }
-        case ("ios:browser", "executeScript"):
-            guard let script = fields["script"]?.stringValue else {
-                throw RuntimeError.bridge("ox.web.browser.executeScript requires Browser to be available to an active caller.")
-            }
-            return try await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .executeScript(script, frameID: fields["frameId"]?.stringValue, authorizeSite: authorizeSite)
-        case ("ios:browser", "exportPdf"):
-            let pdf = try await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .exportPDF(authorizeSite: authorizeSite)
-            let file: FileItem?
-            if let filename = fields["filename"]?.stringValue {
-                file = try await importFile(pdf.attachment, filename)
-            } else {
-                try attachTransient(pdf.attachment)
-                file = nil
-            }
-            return .object([
-                "url": pdf.url.map { .string($0.absoluteString) } ?? .null,
-                "contentType": .string(pdf.attachment.mimeType),
-                "pages": .int(pdf.pages),
-                "bytes": .int(pdf.attachment.data.count),
-                "attached": .bool(true),
-                "file": file.map { .string($0.fileName) } ?? .null,
-            ])
-        case ("ios:browser", "injectScript"):
-            guard let source = fields["script"]?.stringValue,
-                  let domains = fields["domains"]?.arrayValue?.compactMap(\.stringValue) else {
-                throw RuntimeError.bridge("ox.web.browser.injectScript requires a script and target domains.")
-            }
-            let landed = try await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .injectScript(source, domains: domains, authorizeSite: authorizeSite)
-            return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case ("ios:browser", "clearScripts"):
-            let landed = try await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .clearScripts()
-            return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case ("ios:browser", "startCapture"):
-            let capture = try await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .startCapture(
-                    includeBodies: fields["includeBodies"]?.boolValue ?? false,
-                    reload: fields["reload"]?.boolValue ?? false
-                )
-            return .object([
-                "active": .bool(true),
-                "includeBodies": .bool(fields["includeBodies"]?.boolValue ?? false),
-                "reloaded": .bool(capture.reloaded),
-                "url": capture.url.map { .string($0.absoluteString) } ?? .null,
-            ])
-        case ("ios:browser", "markCapture"):
-            guard let label = fields["label"]?.stringValue else {
-                throw RuntimeError.bridge("ox.web.browser.markCapture requires a label.")
-            }
-            let marked = serviceManager.browserActionSessions.session(for: browser, ownerID: id).markCapture(label)
-            return .object(["marked": .bool(marked)])
-        case ("ios:browser", "listCapturedEvents"):
-            return try serviceManager.browserActionSessions.session(for: browser, ownerID: id).listCapturedEvents(
-                after: fields["after"]?.stringValue,
-                limit: fields["limit"]?.intValue ?? 500,
-                origin: fields["origin"]?.stringValue,
-                pathPrefix: fields["pathPrefix"]?.stringValue,
-                kinds: fields["kinds"]?.arrayValue?.compactMap(\.stringValue)
-            )
-        case ("ios:browser", "readCapturedEvent"):
-            guard let eventID = fields["id"]?.stringValue,
-                  let event = try await serviceManager.browserActionSessions
-                    .session(for: browser, ownerID: id)
-                    .readCapturedEvent(id: eventID, bodyMode: fields["bodyMode"]?.stringValue ?? "raw", authorizeSite: authorizeSite) else {
-                throw RuntimeError.bridge("ox.web.browser.readCapturedEvent requires a valid captured event id.")
-            }
-            return event
-        case ("ios:browser", "stopCapture"):
-            let stopped = try await serviceManager.browserActionSessions
-                .session(for: browser, ownerID: id)
-                .stopCapture(discard: fields["discard"]?.boolValue ?? false)
-            return .object(["stopped": .bool(stopped)])
+        switch (service.domain, actionID) {
         case ("ios:location", "current"):
             return try await currentLocation(purpose: purpose)
         case ("ios:location", "searchNearby"):
@@ -247,23 +70,11 @@ final class NativeServiceOperations {
                 purpose: purpose
             )
         case ("ios:location", "resolve"):
-            return try await resolveLocation(
-                query: fields["query"]?.stringValue,
-                limit: fields["limit"]?.intValue,
-                purpose: purpose
-            )
+            return try await resolveLocation(query: fields["query"]?.stringValue, limit: fields["limit"]?.intValue, purpose: purpose)
         case ("ios:location", "route"):
-            return try await routeLocation(
-                destination: fields["destination"]?.stringValue,
-                transport: fields["transport"]?.stringValue,
-                purpose: purpose
-            )
+            return try await routeLocation(destination: fields["destination"]?.stringValue, transport: fields["transport"]?.stringValue, purpose: purpose)
         case ("ios:location", "openInMaps"):
-            return try await openLocationInMaps(
-                placeID: fields["placeID"]?.stringValue,
-                directionsMode: fields["directionsMode"]?.stringValue,
-                purpose: purpose
-            )
+            return try await openLocationInMaps(placeID: fields["placeID"]?.stringValue, directionsMode: fields["directionsMode"]?.stringValue, purpose: purpose)
         case ("ios:notifications", "schedule"):
             let schedule = fields["schedule"]?.objectValue ?? [:]
             return try await scheduleNotification(options: .object([
@@ -283,8 +94,7 @@ final class NativeServiceOperations {
         case ("ios:contacts", "search"):
             return try await searchContacts(query: fields["query"]?.stringValue, purpose: purpose)
         default:
-            throw Service.InvokeError.unknown("\(serviceID):\(actionID)")
+            throw Service.InvokeError.unknown("\(service.domain):\(actionID)")
         }
     }
-
 }

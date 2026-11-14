@@ -41,13 +41,24 @@ nonisolated enum BrowserFunctionCatalog {
     static let legacyAttachmentApproval = "ox.service.attach:ios:browser"
 
     static let actions: [Action] = [
+        Action(id: "open", label: "Open Page", description: "Open an explicit conversation-owned page. At most six agent pages may be open across the active Profile; opening pages count. At capacity reuse a page or close one. Never silently replaces or evicts pages.",
+               inputSchema: object(["url": string(minimum: 1, maximum: 8_192)], required: ["url"]),
+               outputSchema: object(["pageId": string(), "mainFrameId": string()], required: ["pageId", "mainFrameId"])),
+        Action(id: "list", label: "List Pages", description: "List this conversation's live pages. Include frames to discover fresh document targets, including the main document. Frames do not consume page capacity. Frame discovery is bounded; cross-origin parents may be unknown. A replaced document invalidates its frameId.",
+               inputSchema: object(["includeFrames": boolean]),
+               outputSchema: object(["pages": .object(["type": .string("array"), "items": object([
+                   "pageId": string(), "url": nullableString, "title": string(), "isLoading": boolean, "busy": boolean,
+                   "frames": frames, "framesTruncated": boolean,
+               ], required: ["pageId", "url", "title", "isLoading", "busy"])]), "limit": integer(minimum: 1)], required: ["pages", "limit"])),
+        Action(id: "close", label: "Close Page", description: "Close an explicit idle conversation-owned page. Busy pages and pages awaiting user interaction cannot be closed. Does not clear website data or sign out.",
+               inputSchema: object(["pageId": pageID], required: ["pageId"]), outputSchema: object(["closed": boolean], required: ["closed"])),
         Action(
             id: "navigate",
             label: "Navigate",
             description: "Navigate Browser to an absolute public HTTPS URL. Simulator builds also allow loopback HTTP.",
             inputSchema: object(
-                ["url": string(description: "Absolute public HTTPS URL, or loopback HTTP in a simulator.", minimum: 1, maximum: 8_192)],
-                required: ["url"]
+                ["pageId": pageID, "url": string(description: "Absolute public HTTPS URL, or loopback HTTP in a simulator.", minimum: 1, maximum: 8_192)],
+                required: ["pageId", "url"]
             ),
             outputSchema: object(["url": string()], required: ["url"]),
             hasModelGuidance: true
@@ -55,20 +66,21 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "reload",
             label: "Reload",
-            description: "Reload Browser's current page, optionally revalidating every resource from its origin.",
+            description: "Reload an explicit page, optionally revalidating every resource from its origin.",
             inputSchema: object([
+                "pageId": pageID,
                 "fromOrigin": .object([
                     "type": .string("boolean"),
                     "description": .string("When true, revalidate the page and its resources from their origin."),
                 ]),
-            ]),
+            ], required: ["pageId"]),
             outputSchema: object(["url": nullableString], required: ["url"])
         ),
         Action(
             id: "stopLoading",
             label: "Stop Loading",
-            description: "Stop Browser's current page load.",
-            inputSchema: object(),
+            description: "Stop an explicit page's current load.",
+            inputSchema: object(["pageId": pageID], required: ["pageId"]),
             outputSchema: object([
                 "stopped": boolean,
                 "url": nullableString,
@@ -77,22 +89,22 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "goBack",
             label: "Go Back",
-            description: "Navigate Browser to the previous item in its history.",
-            inputSchema: object(),
+            description: "Navigate an explicit page to the previous item in its history.",
+            inputSchema: object(["pageId": pageID], required: ["pageId"]),
             outputSchema: navigationResult
         ),
         Action(
             id: "goForward",
             label: "Go Forward",
-            description: "Navigate Browser to the next item in its history.",
-            inputSchema: object(),
+            description: "Navigate an explicit page to the next item in its history.",
+            inputSchema: object(["pageId": pageID], required: ["pageId"]),
             outputSchema: navigationResult
         ),
         Action(
             id: "getNavigationHistory",
             label: "Get Navigation History",
-            description: "Read Browser's back, current, and forward navigation history.",
-            inputSchema: object(),
+            description: "Read an explicit page's back, current, and forward navigation history.",
+            inputSchema: object(["pageId": pageID], required: ["pageId"]),
             outputSchema: object([
                 "back": .object(["type": .string("array"), "items": historyItem]),
                 "current": .object(["oneOf": .array([.object(["type": .string("null")]), historyItem])]),
@@ -102,33 +114,33 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "getPageState",
             label: "Get Page State",
-            description: "Observe a bounded, read-only snapshot of Browser's visible headings, dialogs, status messages, and controls without returning input values. Control id and name attributes are separate, unnormalized strings capped at 256 characters, or null when absent; clipping sets truncated. Optionally scope with a CSS selector or frameId. Lists bounded live frames with origin-only metadata; parentId is null when unavailable across origins. Optional service selects an attached service’s prepared page instead of Browser. Includes page identity, navigation generation, loading progress, security, Screen Time, fullscreen state, and coverage limits; does not infer application readiness or authentication. Uses the same site authorization as executeScript.",
+            description: "Observe a bounded, read-only snapshot of the explicitly selected frame document without returning input values. Optionally scope with a CSS selector. Includes page identity, navigation generation, loading, security, frame discovery, and coverage limits; does not infer application readiness or authentication. Control id and name attributes are separate strings capped at 256 characters. Uses the same site authorization as executeScript. Discover fresh frame targets with list({ includeFrames:true }); stale targets fail without fallback.",
             inputSchema: observationOptions,
             outputSchema: pageState
         ),
         Action(
             id: "waitForNavigation",
             label: "Wait for Navigation",
-            description: "Wait until Browser finishes its next navigation.",
+            description: "Wait until an explicit page finishes its next navigation.",
             inputSchema: object([
+                "pageId": pageID,
                 "timeoutMs": .object([
                     "type": .string("integer"),
                     "minimum": .int(100),
                     "maximum": .int(120_000),
                     "description": .string("Maximum wait in milliseconds. Defaults to 15000."),
                 ]),
-            ]),
+            ], required: ["pageId"]),
             outputSchema: object(["url": nullableString], required: ["url"])
         ),
         Action(
             id: "showPage",
             label: "Show Page",
             description: "Present Browser's live page with Done/Cancel after clearing capture and injected scripts. Return immediately so the agent can finish its turn. Done/Cancel submits the next user prompt.",
-            inputSchema: object([
-                "instructions": string(description: "What the user must do on the page before tapping Done.", minimum: 1, maximum: 1_000),
-            ]),
+            inputSchema: object(["pageId": pageID], required: ["pageId"]),
             outputSchema: object([
                 "shown": boolean,
+                "loginTrace": LoginCapture.traceSchema,
                 "status": .object(["type": .string("string"), "const": .string("awaiting_user")]),
                 "completion": .object([
                     "type": .string("string"),
@@ -148,7 +160,7 @@ nonisolated enum BrowserFunctionCatalog {
                     minimum: 1,
                     maximum: 100_000
                 )],
-                required: ["script"]
+                required: ["frameId", "script"]
             ),
             outputSchema: .object([:]),
             hasModelGuidance: true
@@ -156,14 +168,15 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "exportPdf",
             label: "Export PDF",
-            description: "Export Browser's complete page as a PDF attachment or named Profile file.",
+            description: "Export an explicit complete page as a PDF attachment or named Profile file.",
             inputSchema: object([
+                "pageId": pageID,
                 "filename": string(
                     description: "Optional file basename, never a path.",
                     minimum: 1,
                     maximum: 255
                 ),
-            ]),
+            ], required: ["pageId"]),
             outputSchema: object([
                 "url": nullableString,
                 "contentType": .object([
@@ -179,28 +192,30 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "injectScript",
             label: "Inject Script",
-            description: "Install a document-start script for selected domains and reload Browser.",
+            description: "Install page-scoped document-start scripts for selected domains and reload the explicit page. Applies to future documents, not a single frame target.",
             inputSchema: object([
+                "pageId": pageID,
                 "domains": .object([
                     "type": .string("array"),
                     "items": string(minimum: 1),
                 ]),
                 "script": string(minimum: 1, maximum: 100_000),
-            ], required: ["domains", "script"]),
+            ], required: ["pageId", "domains", "script"]),
             outputSchema: object(["url": nullableString], required: ["url"])
         ),
         Action(
             id: "clearScripts",
             label: "Clear Scripts",
-            description: "Remove all session-scoped injected scripts and reload Browser.",
-            inputSchema: object(),
+            description: "Remove an explicit page's injected scripts and reload it.",
+            inputSchema: object(["pageId": pageID], required: ["pageId"]),
             outputSchema: object(["url": nullableString], required: ["url"])
         ),
         Action(
             id: "startCapture",
             label: "Start Network Capture",
-            description: "Start a fresh redacted network capture in Browser and future documents without delaying page requests.",
+            description: "Start a fresh redacted network capture on an explicit page and its future documents without delaying page requests.",
             inputSchema: object([
+                "pageId": pageID,
                 "includeBodies": .object([
                     "type": .string("boolean"),
                     "description": .string("Capture bounded request and response bodies. Defaults to false."),
@@ -209,7 +224,7 @@ nonisolated enum BrowserFunctionCatalog {
                     "type": .string("boolean"),
                     "description": .string("Reload after installing capture when initial document-load traffic is required. Defaults to false."),
                 ]),
-            ]),
+            ], required: ["pageId"]),
             outputSchema: object([
                 "active": boolean,
                 "includeBodies": boolean,
@@ -222,8 +237,8 @@ nonisolated enum BrowserFunctionCatalog {
             label: "Mark Network Capture",
             description: "Add a labeled marker to the active network capture.",
             inputSchema: object(
-                ["label": string(minimum: 1, maximum: 200)],
-                required: ["label"]
+                ["pageId": pageID, "label": string(minimum: 1, maximum: 200)],
+                required: ["pageId", "label"]
             ),
             outputSchema: object(["marked": boolean], required: ["marked"])
         ),
@@ -232,12 +247,13 @@ nonisolated enum BrowserFunctionCatalog {
             label: "List Captured Events",
             description: "List captured event metadata without bodies. Filter by origin, path prefix, or kind; use nextCursor as after for incremental reads. Reads do not consume events. Capture is main-document instrumentation, not a complete network trace.",
             inputSchema: object([
+                "pageId": pageID,
                 "after": string(description: "Opaque nextCursor from an earlier read of this capture. Restarting or discarding capture invalidates it.", minimum: 1, maximum: 100),
                 "limit": .object(["type": .string("integer"), "minimum": .int(1), "maximum": .int(500), "description": .string("Maximum returned events. Defaults to 500.")]),
                 "origin": string(description: "Exact HTTP(S) or WebSocket origin, including a non-default port when present.", minimum: 1, maximum: 2_048),
                 "pathPrefix": string(description: "Prefix matched against the captured URL path.", minimum: 1, maximum: 2_048),
                 "kinds": .object(["type": .string("array"), "items": capturedEventProperties["kind"]!, "minItems": .int(1), "maxItems": .int(6), "uniqueItems": .bool(true)]),
-            ]),
+            ], required: ["pageId"]),
             outputSchema: object([
                 "active": boolean,
                 "dropped": integer(minimum: 0),
@@ -257,9 +273,10 @@ nonisolated enum BrowserFunctionCatalog {
             label: "Read Captured Event",
             description: "Read one captured event. bodyMode defaults to raw bounded, redacted bodies; shape returns bounded JSON field/type structure without scalar values. Body completeness is unknown; invalid_json can mean non-JSON or clipped content. Shape field names may still be private.",
             inputSchema: object([
+                "pageId": pageID,
                 "id": string(minimum: 1, maximum: 100),
                 "bodyMode": .object(["type": .string("string"), "enum": .array([.string("raw"), .string("shape")])]),
-            ], required: ["id"]),
+            ], required: ["pageId", "id"]),
             outputSchema: object(capturedEventProperties.merging([
                 "requestBody": nullableString,
                 "responseBody": nullableString,
@@ -273,11 +290,12 @@ nonisolated enum BrowserFunctionCatalog {
             label: "Stop Network Capture",
             description: "Stop network capture, optionally discarding its current records.",
             inputSchema: object([
+                "pageId": pageID,
                 "discard": .object([
                     "type": .string("boolean"),
                     "description": .string("Discard captured records after stopping. Defaults to false."),
                 ]),
-            ]),
+            ], required: ["pageId"]),
             outputSchema: object(["stopped": boolean], required: ["stopped"])
         ),
     ]
@@ -312,12 +330,16 @@ nonisolated enum BrowserFunctionCatalog {
     private static let nullableString: JSONValue = .object([
         "type": .array([.string("string"), .string("null")]),
     ])
-    private static let frameID = string(description: "Opaque live document ID from getPageState.frames. Stale IDs fail; omission selects the main frame.", minimum: 1, maximum: 100)
+    private static let pageID = string(description: "Explicit live page ID from open or list.", minimum: 1, maximum: 100)
+    private static let frameID = string(description: "Explicit live document ID from open or list({ includeFrames:true }). Required for main documents too. Stale targets fail without fallback.", minimum: 1, maximum: 100)
     private static let observationOptions = object([
         "frameId": frameID,
-        "service": string(description: "Attached web service whose existing prepared page to inspect. Omit for Browser.", minimum: 1, maximum: 253),
         "selector": string(description: "Optional CSS selector limiting observation to one light-DOM subtree. Defaults to document.body. Missing scope is reported, not treated as an empty page.", minimum: 1, maximum: 2_000),
-    ])
+    ], required: ["frameId"])
+    private static let frames: JSONValue = .object(["type": .string("array"), "maxItems": .int(65), "items": object([
+        "id": string(), "parentId": nullableString, "origin": string(), "isMainFrame": boolean,
+        "serviceID": nullableString, "attached": boolean,
+    ], required: ["id", "parentId", "origin", "isMainFrame", "serviceID", "attached"])])
     private static let pageState = object([
         "pageID": string(),
         "navigationGeneration": integer(minimum: 0),
@@ -337,10 +359,7 @@ nonisolated enum BrowserFunctionCatalog {
             ].map(JSONValue.string)),
         ]),
         "frameId": nullableString,
-        "frames": .object(["type": .string("array"), "maxItems": .int(65), "items": object([
-            "id": string(), "parentId": nullableString, "origin": string(), "isMainFrame": boolean,
-            "serviceID": nullableString, "attached": boolean,
-        ], required: ["id", "parentId", "origin", "isMainFrame", "serviceID", "attached"])]),
+        "frames": frames,
         "framesTruncated": boolean,
         "document": object([
             "scope": nullableString,

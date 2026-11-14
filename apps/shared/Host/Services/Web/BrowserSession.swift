@@ -115,7 +115,7 @@ final class BrowserSession: NSObject {
     var additionalUserScripts: [WKUserScript] = []
     var openingTask: Task<Bool, Never>?
     var executionURL: URL?
-    var lastInvocation: (id: UUID, domain: String, actionID: String, args: JSONValue, requestedSession: JSONValue?, pageURL: String?, selectedSession: JSONValue?, startedAt: Date)?
+    var lastInvocation: (id: UUID, domain: String, actionID: String, startedAt: Date)?
     var navigationTask: Task<Void, Never>?
     var navigationGeneration = 0
     var finishedNavigationGeneration = 0

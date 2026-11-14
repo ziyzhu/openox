@@ -114,6 +114,9 @@ nonisolated enum OxWeb {
         jsFragment: """
           fetch: (value) => { const options = __oxOptions(value, 'ox.web.fetch'); return __nativeWebFetch(String(options.url), options.options ?? null, String(options.purpose)); },
           browser: {
+            open: (value) => __nativeWebBrowser('open', __oxOptions(value, 'ox.web.browser.open')),
+            list: (value) => __nativeWebBrowser('list', __oxOptions(value, 'ox.web.browser.list')),
+            close: (value) => __nativeWebBrowser('close', __oxOptions(value, 'ox.web.browser.close')),
             navigate: (value) => __nativeWebBrowser('navigate', __oxOptions(value, 'ox.web.browser.navigate')),
             reload: (value) => __nativeWebBrowser('reload', __oxOptions(value, 'ox.web.browser.reload')),
             stopLoading: (value) => __nativeWebBrowser('stopLoading', __oxOptions(value, 'ox.web.browser.stopLoading')),

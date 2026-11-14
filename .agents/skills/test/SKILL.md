@@ -51,8 +51,8 @@ rejections. Exercise destination-initiated provider redirects with preserved ret
 parameters and preparatory clicks without secret retrieval. The agent coordinates login by inspecting the live document and invoking the matching
 service with its fresh frameId; the Host executes one handler and never verifies login
 or advances steps. Same-page transitions belong to the handler. Manual interaction uses
-service.showPage after login, including frame-targeted invocations; it must not replay
-the handler or navigate. Verify cancellation, superseded-invocation rejection, capture,
+web.browser.showPage with the exact pageId after login, including frame-targeted invocations;
+it must not replay the handler or navigate to a replacement page. Verify cancellation, stale-document rejection, capture,
 and remember prompts separately. Web content inside the
 handoff is reachable only through `idb ui describe-point`; open the full-screen
 handoff before typing into it. When a bundled service introduces a new site or login

@@ -138,6 +138,7 @@ final class ServiceActionScheduler {
         )
         if kind == .invocation, !scheduled.needsNavigation(on: page) { scheduled.expectedGeneration = page.navigationGeneration }
         guard page.isOpen else { throw Service.EvalError.notReady }
+        try requireNoPresentation(page)
         if case .unavailable = page.navigationPhase,
            kind == .invocation, !scheduled.needsNavigation(on: page) {
             throw Service.EvalError.notReady
@@ -200,6 +201,12 @@ final class ServiceActionScheduler {
         queue.reservation = nil
         Log.service.info("ServiceActionScheduler presentation-released domain=\(queue.page.domain) page=\(page.logLabel)")
         advance(page)
+    }
+
+    func requireNoPresentation(_ page: BrowserSession) throws {
+        guard queues[ObjectIdentifier(page)]?.reservation == nil else {
+            throw OxFunctionError(code: "page_awaiting_user", message: "The page is awaiting user interaction.", recovery: "Finish the turn and wait for Done or Cancel before continuing.")
+        }
     }
 
     func isIdle(_ page: BrowserSession) -> Bool {

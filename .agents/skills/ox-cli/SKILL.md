@@ -18,9 +18,12 @@ selector flag:
 - `ox conversation` and `ox vm` with `--host` and `--conversation <conversation-id>`: a conversation on that
   Host and its VM.
 
-Do not select or infer a web-page runtime. The Host owns service adapters and
-decides how live service pages are implemented and managed. Do not use service
-or tab session IDs; a live service is addressed by its domain.
+Do not select or infer a web-page engine. The Host owns service adapters and rendering.
+In a conversation VM, the agent explicitly opens/lists/closes pages through ox.web.browser,
+uses pageId for lifecycle/navigation/handoff, and frameId for document inspection,
+scripts, and web service invocation. Discover fresh document IDs after navigation.
+The active Profile allows six agent pages total; frames do not count separately.
+Direct ox service commands retain Host-managed routing and address services by domain.
 
 ## Choose the correct surface
 
@@ -201,9 +204,9 @@ Services picker or the authorized conversation workflow before invoking
 `ios:<service>:<action>`; an unattached native service may report an unknown
 action even when it appears in the catalog.
 
-Login, human verification, page creation, and page lifecycle happen through
-the Host's interface. Do not attempt to choose a page engine, tab, or another
-implementation from the Client.
+For conversation-driven login or human verification, use VM page lifecycle functions
+and browser.showPage with the exact pageId. The agent must finish the turn while
+awaiting the user. Never select a page engine or replay an action to recover its page.
 
 ## Diagnose live connection failures
 

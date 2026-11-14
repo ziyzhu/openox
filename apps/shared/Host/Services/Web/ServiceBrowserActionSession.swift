@@ -30,16 +30,8 @@ final class ServiceBrowserActionSession {
         }
     }
 
-    private struct Opening {
-        let id: UUID
-        let baseURL: URL
-        let task: Task<BrowserSession, Error>
-    }
-
     let id: UUID
     let service: Service
-    private var loadedBaseURL: URL?
-    private var opening: Opening?
     private(set) var page: BrowserSession?
     private var captureSink: CaptureSink?
     private var capturedEvents: [JSONValue] = []
@@ -51,13 +43,10 @@ final class ServiceBrowserActionSession {
     private var captureIncludesBodies = false
     private var captureDroppedCount = 0
     private var captureEvictedCount = 0
-    private var userInteraction: (id: UUID, continuation: CheckedContinuation<Bool, Error>)?
-
-    var isWaitingForUserInteraction: Bool { userInteraction != nil }
-
-    init(id: UUID, service: Service) {
+    init(id: UUID, service: Service, page: BrowserSession) {
         self.id = id
         self.service = service
+        self.page = page
     }
 
     var webPage: WebPage? {
@@ -66,8 +55,9 @@ final class ServiceBrowserActionSession {
     }
 
     func inspectionPage() async throws -> BrowserSession {
-        guard let action = await service.inspectionAction() else { throw Service.EvalError.notActive }
-        let page = try await page(for: action)
+        guard let page, service.owns(page), page.isOpen else {
+            throw OxFunctionError(code: "page_unavailable", message: "The selected page is unavailable.", recovery: "List live pages. No replacement page was opened.")
+        }
         guard page.secretAttempt?.holdsValues != true else {
             throw OxFunctionError(code: "page_locked", message: "This page holds a saved secret during a login.", recovery: "Wait for the login to finish before inspecting the page.")
         }
@@ -75,17 +65,15 @@ final class ServiceBrowserActionSession {
     }
 
     func navigate(_ url: URL, timeout: TimeInterval = 15) async throws -> URL {
-        guard let action = await service.inspectionAction() else { throw Service.EvalError.notActive }
-        let page = try await page(for: action)
+        let page = try await inspectionPage()
         guard let landed = await service.navigate(url, in: page, timeout: timeout) else {
             throw Service.EvalError.navigationFailed(page.navigationFailure ?? "Browser did not complete the navigation")
         }
         return landed
     }
 
-    func reload(fromOrigin: Bool = false, timeout: TimeInterval = 15) async -> URL? {
-        guard let action = await service.inspectionAction(),
-              let page = try? await page(for: action) else { return nil }
+    func reload(fromOrigin: Bool = false, timeout: TimeInterval = 15) async throws -> URL? {
+        let page = try await inspectionPage()
         return await service.reload(page, fromOrigin: fromOrigin, timeout: timeout)
     }
 
@@ -96,15 +84,13 @@ final class ServiceBrowserActionSession {
         return page.page.url
     }
 
-    func goBack(timeout: TimeInterval = 15) async -> URL? {
-        guard let action = await service.inspectionAction(),
-              let page = try? await page(for: action) else { return nil }
+    func goBack(timeout: TimeInterval = 15) async throws -> URL? {
+        let page = try await inspectionPage()
         return await service.goBack(page, timeout: timeout)
     }
 
-    func goForward(timeout: TimeInterval = 15) async -> URL? {
-        guard let action = await service.inspectionAction(),
-              let page = try? await page(for: action) else { return nil }
+    func goForward(timeout: TimeInterval = 15) async throws -> URL? {
+        let page = try await inspectionPage()
         return await service.goForward(page, timeout: timeout)
     }
 
@@ -178,7 +164,7 @@ final class ServiceBrowserActionSession {
         guard let action = await service.resolvedAction("executeScript", role: .dangerousBrowserControl) else {
             throw Service.EvalError.notActive
         }
-        let page = try await page(for: action)
+        let page = try await inspectionPage()
         let approval = try await authorize(page, authorizeSite)
         let target: BrowserSession.FrameTarget?
         if let frameID { target = try await page.requireFrame(frameID) } else { target = nil }
@@ -219,7 +205,7 @@ final class ServiceBrowserActionSession {
         guard let action = await service.resolvedAction("exportPdf", role: .dangerousBrowserControl) else {
             throw Service.EvalError.notActive
         }
-        let page = try await page(for: action)
+        let page = try await inspectionPage()
         let approval = try await authorize(page, authorizeSite)
         return try await service.manager.actionScheduler.schedule(action, on: page, name: name) { page in
             try Self.requireUnchanged(page, since: approval)
@@ -541,44 +527,7 @@ final class ServiceBrowserActionSession {
         }
     }
 
-    func waitForUserInteraction() async throws -> Bool {
-        guard userInteraction == nil else {
-            throw RuntimeError.bridge("Browser is already waiting for user interaction.")
-        }
-        let interactionID = UUID()
-        return try await withTaskCancellationHandler {
-            try Task.checkCancellation()
-            return try await withCheckedThrowingContinuation { continuation in
-                userInteraction = (interactionID, continuation)
-                Log.webView.info("Service.browserSession event=interaction-wait owner=\(id)")
-            }
-        } onCancel: {
-            Task { @MainActor in
-                guard self.userInteraction?.id == interactionID else { return }
-                self.abandonUserInteraction()
-            }
-        }
-    }
-
-    func finishUserInteraction(completed: Bool) {
-        guard let interaction = userInteraction else { return }
-        userInteraction = nil
-        Log.webView.info("Service.browserSession event=interaction-finish owner=\(id) completed=\(completed)")
-        interaction.continuation.resume(returning: completed)
-    }
-
-    private func abandonUserInteraction() {
-        guard let interaction = userInteraction else { return }
-        userInteraction = nil
-        Log.webView.info("Service.browserSession event=interaction-abandon owner=\(id)")
-        interaction.continuation.resume(throwing: CancellationError())
-    }
-
     func close() {
-        abandonUserInteraction()
-        opening?.task.cancel()
-        opening = nil
-        loadedBaseURL = nil
         if let page {
             page.userContentController.removeScriptMessageHandler(forName: "oxBrowserCapture")
             service.closeOwnedPage(page)
@@ -665,7 +614,6 @@ final class ServiceBrowserActionSession {
         service.closeOwnedPage(page)
         if self.page === page {
             self.page = nil
-            loadedBaseURL = nil
         }
     }
 
@@ -890,57 +838,6 @@ final class ServiceBrowserActionSession {
         """#
     }
 
-    private func page(for action: Service.Action) async throws -> BrowserSession {
-        guard service.domain == "ios:browser" else { throw Service.EvalError.notActive }
-        if let page,
-           loadedBaseURL == action.baseURL,
-           service.owns(page),
-           page.isReady {
-            return page
-        }
-        if let opening, opening.baseURL == action.baseURL {
-            let page = try await opening.task.value
-            guard service.owns(page), page.isReady else { throw Service.EvalError.contextInvalidated }
-            return page
-        }
-
-        opening?.task.cancel()
-        opening = nil
-        if let page {
-            service.closeOwnedPage(page)
-            self.page = nil
-        }
-        loadedBaseURL = nil
-
-        let openingID = UUID()
-        let task = Task { @MainActor in
-            let page = try await service.openOwnedPage(for: action, owner: .browser(id))
-            do {
-                try Task.checkCancellation()
-                return page
-            } catch {
-                service.closeOwnedPage(page)
-                throw error
-            }
-        }
-        opening = Opening(id: openingID, baseURL: action.baseURL, task: task)
-        do {
-            let page = try await task.value
-            guard opening?.id == openingID else {
-                service.closeOwnedPage(page)
-                throw Service.EvalError.contextInvalidated
-            }
-            opening = nil
-            loadedBaseURL = action.baseURL
-            page.scopeID = id
-            self.page = page
-            Log.webView.info("Service.browserSession event=open owner=\(id) domain=\(service.domain) session=\(page.logLabel)")
-            return page
-        } catch {
-            if opening?.id == openingID { opening = nil }
-            throw error
-        }
-    }
 }
 
 @MainActor
@@ -948,24 +845,27 @@ final class ServiceBrowserActionSession {
 final class ServiceBrowserActionSessionCoordinator {
     private var sessions: [UUID: ServiceBrowserActionSession] = [:]
 
-    func session(for service: Service, ownerID: UUID) -> ServiceBrowserActionSession {
-        if let session = sessions[ownerID], session.service === service { return session }
-        sessions.removeValue(forKey: ownerID)?.close()
-        let session = ServiceBrowserActionSession(id: ownerID, service: service)
-        sessions[ownerID] = session
-        Log.webView.info("Service.browserSession event=create owner=\(ownerID) domain=\(service.domain) resident=\(sessions.count)")
+    func session(for service: Service, page: BrowserSession, ownerID: UUID) -> ServiceBrowserActionSession {
+        if let session = sessions[page.id] { return session }
+        let session = ServiceBrowserActionSession(id: ownerID, service: service, page: page)
+        sessions[page.id] = session
         return session
+    }
+
+    func closePage(_ page: BrowserSession) {
+        sessions.removeValue(forKey: page.id)?.close()
+        if page.manager.browserSessions.contains(page) { page.manager.browserSessions.close(page) }
     }
 
     func existingSession(for ownerID: UUID, service: Service? = nil) -> ServiceBrowserActionSession? {
-        guard let session = sessions[ownerID] else { return nil }
-        guard service == nil || session.service === service else { return nil }
-        return session
+        let matches = sessions.values.filter { $0.id == ownerID && $0.webPage != nil && (service == nil || $0.service === service) }
+        return matches.count == 1 ? matches.first : nil
     }
 
     func closeSession(for ownerID: UUID) {
-        guard let session = sessions.removeValue(forKey: ownerID) else { return }
-        session.close()
-        Log.webView.info("Service.browserSession event=remove owner=\(ownerID) resident=\(sessions.count)")
+        for (id, session) in sessions.filter({ $0.value.id == ownerID }) {
+            sessions.removeValue(forKey: id)
+            session.close()
+        }
     }
 }

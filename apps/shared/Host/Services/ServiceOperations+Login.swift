@@ -64,13 +64,6 @@ extension ServiceOperations {
         return .object(result)
     }
 
-    func loginPage(_ service: Service) -> BrowserSession? {
-        serviceManager.browserSessions.sessions
-            .filter { $0.scopeID == native.id && $0.lastInvocation?.domain == service.domain }
-            .filter { $0.lastInvocation?.actionID == WebSessionContract.loginAction }
-            .max { ($0.lastInvocation?.startedAt ?? .distantPast) < ($1.lastInvocation?.startedAt ?? .distantPast) }
-    }
-
     private func webLoginService(containing host: String) -> Service? {
         serviceManager.services.filter {
             $0.isWebService && WebSessionContract.isEnabled($0.definition)

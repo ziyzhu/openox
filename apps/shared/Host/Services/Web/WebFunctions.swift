@@ -12,8 +12,8 @@ extension Conversation {
         let purpose = L10n.string("Open website")
         let navigation: JSONValue = .object(["purpose": .string(purpose), "url": .string(url.absoluteString)])
         let source = """
-        const page = await ox.web.browser.navigate(\(navigation.jsonString()));
-        await ox.web.browser.showPage(\(JSONValue.object(["purpose": .string(purpose)]).jsonString()));
+        const page = await ox.web.browser.open(\(navigation.jsonString()));
+        await ox.web.browser.showPage({ purpose: \(JSONValue.string(purpose).jsonString()), pageId: page.pageId });
         return page;
         """
         let call = ToolCall(id: UUID().uuidString, name: ConversationTool.schema.name,
@@ -81,25 +81,23 @@ extension Conversation {
         )
         guard violations.isEmpty else { throw Service.InvokeError.invalidInput(name, violations) }
         return try await tracked(name, arguments, purpose: purpose) {
+            if action == "list" {
+                return try await self.nativeServiceOperations.listBrowserPages(includeFrames: arguments.objectValue?["includeFrames"]?.boolValue ?? false,
+                                                                              attached: self.attachedServices)
+            }
             if action == "getPageState" {
                 let fields = arguments.objectValue ?? [:]
-                var prepared: (Service, BrowserSession)?
-                if let domain = fields["service"]?.stringValue {
-                    guard let target = self.attachedServices.first(where: { $0.domain == domain && $0.isWebService }) else {
-                        throw RuntimeError.bridge("Attach the web service before inspecting its frames.")
-                    }
-                    let candidates = self.serviceManager.browserSessions.sessions.filter {
-                        $0.scopeID == self.id && (target.servicePages.contains($0) || $0.lastInvocation?.domain == domain || $0.page.url?.host.map(target.isServiceHost) == true)
-                    }
-                    guard let page = self.serviceOperations.loginPage(target) ?? (candidates.count == 1 ? candidates.first : nil) else {
-                        throw RuntimeError.bridge("Attach the web service and prepare a unique live page before inspecting its frames.")
-                    }
-                    prepared = (target, page)
+                let session = try self.nativeServiceOperations.browserSession(arguments: fields)
+                guard let page = session.page, let inspection = await service.inspectionAction() else { throw Service.EvalError.notReady }
+                return try await self.serviceManager.actionScheduler.schedule(inspection, on: page, name: name) { _ in
+                    try await session.pageState(selector: fields["selector"]?.stringValue, frameID: fields["frameId"]?.stringValue,
+                                                attached: self.attachedServices,
+                                                authorizeSite: { site in try await self.nativeServiceOperations.authorizeBrowserSite(site, purpose) })
                 }
-                return try await self.serviceManager.browserActionSessions.session(for: service, ownerID: self.id)
-                    .pageState(selector: fields["selector"]?.stringValue, frameID: fields["frameId"]?.stringValue,
-                               prepared: prepared, attached: self.attachedServices,
-                               authorizeSite: { site in try await self.nativeServiceOperations.authorizeBrowserSite(site, purpose) })
+            }
+            if action == "showPage" {
+                let fields = arguments.objectValue ?? [:]
+                return try await self.serviceOperations.showBrowserPage(pageID: fields["pageId"]?.stringValue ?? "", purpose: purpose)
             }
             guard let implementation = service.iOSService else { throw Service.InvokeError.unknown(name) }
             let result = await implementation.invoke(
@@ -109,12 +107,7 @@ extension Conversation {
                 purpose: purpose,
                 approve: { _, _ in true },
                 nativeInvocation: { [unowned self] _, id, args, purpose in
-                    try await nativeServiceOperations.invoke(
-                        service: service,
-                        actionID: id,
-                        args: args,
-                        purpose: purpose
-                    )
+                    try await nativeServiceOperations.invokeBrowserOperation(actionID: id, args: args, purpose: purpose)
                 }
             )
             return try result.get()

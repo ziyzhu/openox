@@ -19,7 +19,7 @@ Preparation actions must leave the actual checkout page human-readable and ready
 
 ## Review and pay
 
-Present material transaction details, then call `await ox.service.showPage({ purpose, name, input, session, pageUrl })` with the preparation action's original qualified name, input, and routing, preserving omitted fields. `session` and `pageUrl` may both be supplied. Do not request separate chat confirmation: the user reviews and commits on the merchant's page. Never substitute a charge or order-submission action. Use the website's login action for authentication and the blocked action's live page for human verification.
+Open or reuse an explicit page and invoke preparation actions on its live frameId. Present material transaction details, then call `await ox.web.browser.showPage({ purpose, pageId })` with that exact owning pageId; no invocation matching or replay is needed. Do not request separate chat confirmation: the user reviews and commits on the merchant's page. Never substitute a charge or order-submission action. Use the website's login action for authentication and the blocked action's live page for human verification.
 
 If navigation interrupts preparation, show its preserved page without rerunning it or claiming success. No special URL or completion-detection actions are needed. Explain the user's step before calling showPage. The call shows Done/Cancel and returns `status: "awaiting_user"` immediately. Finish the turn without polling or continuing dependent work. Done/Cancel submits the next internal user prompt. On Cancel, stop and do not reopen automatically. On Done, inspect fresh order or receipt state before claiming success; Done alone is not proof of payment.
 

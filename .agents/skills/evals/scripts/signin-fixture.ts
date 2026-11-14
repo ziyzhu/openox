@@ -21,12 +21,17 @@ function state(host: string, step: string) {
   const value = page(host, step);
   return {
     ...value, url: `https://${host}/login`, title: "Fixture sign-in", estimatedProgress: 1,
-    hasOnlySecureContent: true, isBlockedByScreenTime: false, fullscreenState: "notInFullscreen", frameId: null,
+    hasOnlySecureContent: true, isBlockedByScreenTime: false, fullscreenState: "notInFullscreen", frameId: value.frames[0]!.id,
     document: { ...value.document, scope: null, scopeFound: true, readyState: "complete", busy: false,
       dialogs: [], embeddedFrames: [], coverage: "Visible light DOM only",
       controls: value.document.controls.map(control => ({ ...control, id: null, name: null, role: "input", required: true })),
     },
   };
+}
+
+function listing(host: string, step: string) {
+  return { pages: [{ pageId: "fixture-page", url: `https://${host}/login`, title: "Fixture sign-in", isLoading: false,
+    busy: false, frames: page(host, step).frames, framesTruncated: false }], limit: 6 };
 }
 
 function result(host: string, step: string) {
@@ -71,7 +76,14 @@ export function signinFixture(mode: "password" | "provider" | "manual"): EvalCas
       "ox.service.listAttached": [{ result: [] }],
       "ox.service.inspect": [domain, provider].map(host => { const { domain: _, name: _name, kind: _kind, saved: _saved, attached: _attached, login: _login, ...rest } = inspection(host); return { args: { domain: host }, result: { service: service(host), ...rest } }; }),
       "ox.service.invoke": invoke,
-      "ox.service.showPage": [{ args: { name: `web:${domain}:login` }, when: { prepared: true }, result: { shown: true, status: "awaiting_user" }, set: { awaiting: true } }],
+      "ox.web.browser.open": [{ result: { pageId: "fixture-page", mainFrameId: `${domain}-identifier` } }],
+      "ox.web.browser.list": [
+        { when: { step: 1 }, result: listing(provider, "identifier") },
+        { when: { step: 2 }, result: listing(owner, "password") },
+        { when: { signedIn: true }, result: listing(domain, "signed-in") },
+        { result: listing(domain, "identifier") },
+      ],
+      "ox.web.browser.showPage": [{ args: { pageId: "fixture-page" }, when: { prepared: true }, result: { shown: true, status: "awaiting_user" }, set: { awaiting: true } }],
       "ox.user.choose": [{ result: "Ada Fixture" }],
       "ox.web.browser.getPageState": [
         { when: { step: 1 }, result: state(provider, "identifier") },

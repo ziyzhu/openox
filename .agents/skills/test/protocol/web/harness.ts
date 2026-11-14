@@ -76,9 +76,11 @@ export function harness(options: { device: string; debugEndpoint: string; fixtur
     return JSON.parse(line.slice("RESULT ".length));
   }
 
-  async function begin(script: string) {
-    const body = `const result = await (async () => {\n${script}\n})();\nconsole.log("RESULT " + JSON.stringify(result ?? null));`;
-    const sent = await ox(["conversation", "send", `execute\n${body}`], { conversation: true, allowFailure: true });
+  async function begin(script: string, noWait = false) {
+    const targets = Object.fromEntries(options.sites.flatMap(site => site.services(options.fixtures.origin)).flatMap(({ manifest }) =>
+      (manifest.actions as Array<{ id: string; baseUrl?: string }>).map(action => [`web:${manifest.domain}:${action.id}`, action.baseUrl ?? manifest.baseUrl])));
+    const body = `const fixtureTargets = ${JSON.stringify(targets)};\nconst result = await (async () => {\n${script}\n})();\nconsole.log("RESULT " + JSON.stringify(result ?? null));`;
+    const sent = await ox(["conversation", "send", `execute\n${body}`, ...noWait ? ["--no-wait"] : []], { conversation: true, allowFailure: true });
     if (sent.error && !/needs attention/.test(sent.error)) throw new Error(sent.error);
   }
 
@@ -152,6 +154,7 @@ export function harness(options: { device: string; debugEndpoint: string; fixtur
     get metrics() { return { scriptTurns, resultBytes, loginObservations }; },
     site: (name: string) => options.sites.find(site => site.name === name)!,
     async newConversation() {
+      if (conversation) await ox(["vm", "eval", "--script", "const {pages}=await ox.web.browser.list({purpose:'List fixture cleanup pages'});for(const page of pages)await ox.web.browser.close({purpose:'Close completed fixture page',pageId:page.pageId});"], { conversation: true });
       const created = await ox(["conversation", "new", "--provider", "mock", "--model", "mock"]);
       if (!created.conversationId) throw new Error(`Conversation was not created: ${JSON.stringify(created)}`);
       conversation = created.conversationId;

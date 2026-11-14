@@ -35,7 +35,24 @@ final class BrowserSessionStore {
 
     private var entries: [ObjectIdentifier: Entry] = [:]
 
+    static let maximumAgentPages = 6
+
     var sessions: [BrowserSession] { entries.values.map { $0.owned.page } }
+
+    func requirePage(_ id: String, scopeID: UUID) throws -> BrowserSession {
+        guard let page = sessions.first(where: { $0.id.uuidString == id && $0.scopeID == scopeID }), contains(page) else {
+            throw OxFunctionError(code: "page_unavailable", message: "The selected page is closed or unavailable.", recovery: "List live pages and explicitly open a new page if needed. Do not replay uncertain writes.")
+        }
+        return page
+    }
+
+    func requireFramePage(_ id: String, scopeID: UUID) throws -> BrowserSession {
+        let matches = sessions.filter { $0.scopeID == scopeID && $0.frameTargets[id] != nil }
+        guard matches.count == 1, let page = matches.first, contains(page) else {
+            throw OxFunctionError(code: "frame_unavailable", message: "The selected frame document is unavailable.", recovery: "List pages with includeFrames:true and select a fresh frameId. Do not replay uncertain writes.")
+        }
+        return page
+    }
 
     func pages(for domain: String) -> [ObjectIdentifier: Registration] {
         entries.filter { $0.value.domain == domain }.mapValues(\.owned)
@@ -97,6 +114,10 @@ final class BrowserSessionStore {
             }
             page = existing
         } else {
+            if action.scopeID != nil, sessions.count(where: { $0.scopeID != nil && $0.isOpen }) >= Self.maximumAgentPages {
+                Log.webView.warning("BrowserSession.open rejected=page_limit scope=\(action.scopeID?.uuidString ?? "none") limit=\(Self.maximumAgentPages)")
+                throw OxFunctionError(code: "page_limit_reached", message: "The active Profile already has six agent pages open.", recovery: "Reuse a live page or close one of this conversation's pages before opening another.")
+            }
             page = BrowserSession(manager: action.service.manager)
             page.scopeID = action.scopeID
             if action.service.isWebService { page.frameServiceSources[action.service.domain] = action.scripts }
@@ -119,13 +140,20 @@ final class BrowserSessionStore {
             close(page, error: error)
             throw error
         }
-        try Task.checkCancellation()
+        do { try Task.checkCancellation() }
+        catch {
+            if case .browser = purpose { close(page, error: error) }
+            throw error
+        }
         return page
     }
 
     func close(_ page: BrowserSession, error: any Error = CancellationError()) {
         guard let entry = entries.removeValue(forKey: ObjectIdentifier(page)) else { return }
-        for service in page.manager.services { service.conversationHandoffs[page.id]?.session.cancel() }
+        for service in page.manager.services + [page.manager.browserService] {
+            service.conversationHandoffs[page.id]?.session.cancel()
+        }
+        page.manager.browserActionSessions.closePage(page)
         page.close(error: error)
         Log.webView.info("BrowserSession.close purpose=\(entry.owned.owner.logLabel) session=\(page.logLabel) resident=\(entries.count)")
     }

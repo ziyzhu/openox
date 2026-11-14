@@ -13,6 +13,22 @@ function attach(name: string): string {
   return `await ox.service.attach({ purpose: "Attach fixture", domain: ${JSON.stringify(domain)} });`;
 }
 
+function frameScript(name: string, frameId?: unknown): string {
+  if (!name.startsWith("web:")) return "";
+  if (frameId) return `const fixtureFrameId = ${JSON.stringify(frameId)};`;
+  return `const fixtureTarget = fixtureTargets[${JSON.stringify(name)}];
+const fixturePages = await ox.web.browser.list({ purpose: "Find fixture page", includeFrames: true });
+let fixturePage = fixturePages.pages.find(page => page.url?.split("/")[2] === fixtureTarget.split("/")[2]);
+if (!fixturePage) {
+  const opened = await ox.web.browser.open({ purpose: "Open fixture page", url: fixtureTarget });
+  fixturePage = { pageId: opened.pageId, frames: [{ id: opened.mainFrameId, isMainFrame: true }] };
+} else if (${JSON.stringify(name.endsWith(":login"))} && fixturePage.url.split(/[?#]/)[0] !== fixtureTarget.split(/[?#]/)[0]) {
+  await ox.web.browser.navigate({ purpose: "Open fixture login", pageId: fixturePage.pageId, url: fixtureTarget });
+  fixturePage = (await ox.web.browser.list({ purpose: "Discover login document", includeFrames: true })).pages.find(page => page.pageId === fixturePage.pageId);
+}
+const fixtureFrameId = fixturePage.frames.find(frame => frame.isMainFrame).id;`;
+}
+
 export function invokeScript(name: string, input: unknown = {}, extra: Record<string, unknown> = {}): string {
   if (name.endsWith(":login")) {
     const providers: Record<string, string> = {
@@ -24,12 +40,14 @@ export function invokeScript(name: string, input: unknown = {}, extra: Record<st
     input = { auth: provider ? { type: "provider", service: `web:${provider}` } : { type: "password" }, ...input as object };
   }
   return `${attach(name)}
-return await ox.service.invoke({ purpose: "Fixture case", name: ${JSON.stringify(name)}, input: ${JSON.stringify(input)}, ...${JSON.stringify(extra)} });`;
+${frameScript(name, extra.frameId)}
+return await ox.service.invoke({ purpose: "Fixture case", name: ${JSON.stringify(name)}, input: ${JSON.stringify(input)}, ...${JSON.stringify(extra)}, ${name.startsWith("web:") ? "frameId: fixtureFrameId" : ""} });`;
 }
 
 export function attemptScript(name: string, input: unknown = {}): string {
   return `${attach(name)}
-try { return { value: await ox.service.invoke({ purpose: "Fixture case", name: ${JSON.stringify(name)}, input: ${JSON.stringify(input)} }) }; }
+${frameScript(name)}
+try { return { value: await ox.service.invoke({ purpose: "Fixture case", name: ${JSON.stringify(name)}, input: ${JSON.stringify(input)}, ${name.startsWith("web:") ? "frameId: fixtureFrameId" : ""} }) }; }
 catch (error) { return { error: String(error?.message ?? error), code: error?.code ?? null }; }`;
 }
 
@@ -39,7 +57,7 @@ async function driveLogin(h: Harness, domain: string, key: string, steps = 5) {
   assert.equal(result.authentication, "unverified");
   assert.ok(result.page?.frames.length, "login must return an observation of the settled document");
   for (let step = 0; step < steps; step++) {
-    const state = result.page && !result.page.isLoading ? result.page : await h.turn(`return await ox.web.browser.getPageState({ service: ${JSON.stringify(domain)}, purpose: "Inspect login document" });`);
+    const state = result.page && !result.page.isLoading ? result.page : await h.turn(`return (await ox.web.browser.list({ purpose: "Inspect login frames", includeFrames: true })).pages[0];`);
     const frame = state.frames.find((frame: { isMainFrame: boolean }) => frame.isMainFrame);
     assert.ok(frame?.serviceID, "the live document has no service");
     if (frame.serviceID === `web:${domain}`) {
@@ -163,20 +181,20 @@ return { streamed: first.events.some(event => event.type === "text"), status: ca
     async run(h) {
       const result = await h.turn(invokeScript("web:ox-gov.localhost:login"));
       assert.equal(result.authentication, "unverified");
-      const state = await h.turn(`return await ox.web.browser.getPageState({ service: "ox-gov.localhost", purpose: "Inspect selected provider" });`);
+      const state = await h.turn(`return (await ox.web.browser.list({ purpose: "Inspect selected provider", includeFrames: true })).pages[0];`);
       const frame = state.frames.find((frame: { isMainFrame: boolean }) => frame.isMainFrame);
       assert.equal(frame.serviceID, "web:ox-govid.localhost");
       assert.equal(h.site("gov").counters.authStarts, 1);
       assert.equal(h.site("gov").counters.passwordSubmissions ?? 0, 0);
       const stale = await h.turn(`await ox.service.attach({ purpose: "Attach provider", domain: "ox-govid.localhost" });
-const state = await ox.web.browser.getPageState({ service: "ox-gov.localhost", purpose: "Inspect provider document" });
+const state = (await ox.web.browser.list({ purpose: "Inspect provider document", includeFrames: true })).pages[0];
 const frame = state.frames.find(frame => frame.isMainFrame);
-await ox.service.invoke({ purpose: "Check provider session", name: "web:ox-govid.localhost:listSessions", frameId: frame.id });
-try { return await ox.service.showPage({ purpose: "Show superseded login", name: "web:ox-gov.localhost:login", input: { auth: { type: "provider", service: "web:ox-govid.localhost" } } }); }
+await ox.web.browser.navigate({ purpose: "Replace provider document", pageId: state.pageId, url: state.url });
+try { return await ox.service.invoke({ purpose: "Reject stale login target", name: "web:ox-govid.localhost:listSessions", frameId: frame.id }); }
 catch (error) { return { code: error.code }; }`);
-      assert.equal(stale.code, "page_unavailable");
-      assert.equal(h.site("gov").counters.authStarts, 1, "presentation must not replay a superseded login");
-      return "provider selection needed no credentials or implicit handoff; presenting a superseded invocation failed without replay";
+      assert.equal(stale.code, "frame_unavailable");
+      assert.equal(h.site("gov").counters.authStarts, 1, "stale-target rejection must not restart provider authorization");
+      return "provider selection needed no credentials or implicit handoff; replaced document targets failed without replay";
     },
   },
   {
@@ -192,7 +210,7 @@ catch (error) { return { code: error.code }; }`);
       await h.saveLogin("fixture-govid-ada", "web:ox-govid.localhost", ada);
       await h.turn(`return await ox.service.attach({ purpose: "Attach provider", domain: "ox-govid.localhost" });`);
       await driveLogin(h, "ox-gov.localhost", "fixture-govid-ada", 3);
-      const login = await h.turn(`return await ox.service.showPage({ purpose: "Complete session verification", name: "web:ox-govid.localhost:login", input: { auth: { type: "password" }, account: { $secret: "fixture-govid-ada" } } });`);
+      const login = await h.turn(`const { pages } = await ox.web.browser.list({ purpose: "Find verification page" }); return await ox.web.browser.showPage({ purpose: "Complete session verification", pageId: pages[0].pageId });`);
       assert.equal(login?.status, "awaiting_user");
       const counters = h.site("gov").counters;
       assert.equal(counters.authStarts, 1, "the destination must start provider authorization once");
@@ -208,7 +226,7 @@ catch (error) { return { code: error.code }; }`);
       assert.equal(counters.codeSubmissions, 1, "the security code was not submitted");
       await h.ios.tap({ id: "serviceHandoff.done" }, { stable: 300 });
       await h.idle(prompt => /remember|save/i.test(prompt.prompt) ? wait : undefined);
-      await h.turn(`const state = await ox.web.browser.getPageState({ service: "ox-gov.localhost", purpose: "Inspect authentication callback" });
+      await h.turn(`const state = (await ox.web.browser.list({ purpose: "Inspect authentication callback", includeFrames: true })).pages[0];
 const frame = state.frames.find(frame => frame.isMainFrame);
 if (frame.serviceID === "web:ox-govid.localhost") return await ox.service.invoke({ purpose: "Finish provider return", name: "web:ox-govid.localhost:login", frameId: frame.id, input: { auth: { type: "password" }, account: { $secret: "fixture-govid-ada" } } });
 return null;`);
@@ -227,7 +245,7 @@ return null;`);
     name: "card-handoff-cancel", site: "card",
     async run(h) {
       await h.turn(invokeScript("web:ox-card.localhost:login"));
-      const shown = await h.turn(`return await ox.service.showPage({ purpose: "Review sign-in", name: "web:ox-card.localhost:login", input: { auth: { type: "provider", service: "web:ox-idp.localhost" } } });`);
+      const shown = await h.turn(`const { pages } = await ox.web.browser.list({ purpose: "Find sign-in page" }); return await ox.web.browser.showPage({ purpose: "Review sign-in", pageId: pages[0].pageId });`);
       assert.equal(shown.status, "awaiting_user");
       await h.waitMatching(/^conversation\.service\.login\..+\.done$/);
       await h.tapMatching(/^serviceInspector\.open\./);
@@ -245,12 +263,12 @@ return null;`);
       const prepared = await h.turn(invokeScript("web:ox-card.localhost:login"));
       assert.equal(prepared.authentication, "unverified");
       const login = await h.turn(`await ox.service.attach({ purpose: "Attach embedded provider", domain: "ox-idp.localhost" });
-const state = await ox.web.browser.getPageState({ service: "ox-card.localhost", purpose: "Inspect embedded provider" });
+const state = (await ox.web.browser.list({ purpose: "Inspect embedded provider", includeFrames: true })).pages[0];
 const frame = state.frames.find(frame => !frame.isMainFrame && frame.serviceID === "web:ox-idp.localhost" && state.frames.some(parent => parent.id === frame.parentId && parent.serviceID === frame.serviceID));
 if (!frame) throw Error("Embedded provider document unavailable");
 const input = { auth: { type: "password" } };
 await ox.service.invoke({ purpose: "Prepare embedded sign-in", name: "web:ox-idp.localhost:login", frameId: frame.id, input });
-return await ox.service.showPage({ purpose: "Complete card sign-in", name: "web:ox-idp.localhost:login", input });`);
+return await ox.web.browser.showPage({ purpose: "Complete card sign-in", pageId: state.pageId });`);
       assert.equal(login?.status, "awaiting_user", `expected a manual handoff, got ${JSON.stringify(login)}`);
       await h.waitMatching(/^conversation\.service\.login\..+\.done$/);
       await h.tapMatching(/^serviceInspector\.open\./);
@@ -284,7 +302,8 @@ return await ox.service.showPage({ purpose: "Complete card sign-in", name: "web:
 
 function submitScript(modelId: string, text: string): string {
   const input = { operation: "submit", conversationRef: null, accountId: null, modelId, messages: [{ role: "user", text }], attachments: [], options: { temperature: null, maxTokens: null } };
-  return `await ox.service.attach({ purpose: "Attach fixture", domain: "ox-chat.localhost" });
-const conversation = input => ox.service.invoke({ purpose: "Website conversation", name: "web:ox-chat.localhost:conversation", input });
+  return `${attach("web:ox-chat.localhost:conversation")}
+${frameScript("web:ox-chat.localhost:conversation")}
+const conversation = input => ox.service.invoke({ purpose: "Website conversation", name: "web:ox-chat.localhost:conversation", frameId: fixtureFrameId, input });
 const started = await conversation(${JSON.stringify(input)});`;
 }

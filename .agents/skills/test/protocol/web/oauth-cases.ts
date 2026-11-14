@@ -42,7 +42,7 @@ export const oauthCases: Case[] = [
       assert.equal(initial.authentication, "unverified");
       let state: any;
       for (let attempt = 0; attempt < 30; attempt++) {
-        state = await h.turn('return await ox.web.browser.getPageState({ service: "ox-popup.localhost", purpose: "Inspect popup navigation" });');
+        state = await h.turn('return (await ox.web.browser.list({ purpose: "Inspect popup navigation", includeFrames: true })).pages[0];');
         if (state.frames.some((frame: any) => frame.isMainFrame && frame.serviceID === "web:ox-popup-idp.localhost")) break;
         await Bun.sleep(300);
       }

@@ -207,7 +207,6 @@ final class HTMLView {
                     messages: CanvasMessagePresenter(canvas: self)
                 ),
                 requireActive: { [unowned self] in try requireRunning() },
-                showBrowser: { [unowned self] service, owner in browser = Browser(id: owner, service: service) },
                 showServicePage: { [unowned self] service, page in
                     browser = Browser(id: page.id, service: service, pageID: page.id)
                 },

@@ -149,11 +149,6 @@ extension Conversation {
         }
     }
 
-    public func showServicePage(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, purpose: String) async throws -> JSONValue? {
-        try requireNoPendingHandoff()
-        return try await serviceOperations.showServicePage(name: name, args: args, session: session, pageURL: pageURL, purpose: purpose)
-    }
-
     public func loginService(domain: String, purpose: String) async throws -> JSONValue? {
         try requireNoPendingHandoff()
         return try await serviceOperations.loginService(domain: domain, purpose: purpose)

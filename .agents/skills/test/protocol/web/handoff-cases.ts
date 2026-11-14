@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { writeFile } from "node:fs/promises";
-import type { Case } from "./cases.ts";
+import { invokeScript, type Case } from "./cases.ts";
 
 const scenarios = ["control", "slow", "stream", "server", "client", "loop", "timeout"];
 
@@ -10,10 +10,9 @@ export const handoffCases: Case[] = scenarios.map(scenario => ({
   async run(h) {
     const domain = `ox-handoff-${scenario}.localhost`;
     const started = Date.now();
-    const result = await h.turn(`await ox.service.attach({ purpose: "Attach handoff fixture", domain: ${JSON.stringify(domain)} });
-const input = { auth: { type: "password" } };
-await ox.service.invoke({ purpose: "Prepare stress handoff", name: "web:${domain}:login", input });
-try { return { value: await ox.service.showPage({ purpose: "Show stress handoff", name: "web:${domain}:login", input }) }; }
+    const result = await h.turn(`await (async () => { ${invokeScript(`web:${domain}:login`)} })();
+const { pages } = await ox.web.browser.list({ purpose: "Find prepared handoff page" });
+try { return { value: await ox.web.browser.showPage({ purpose: "Show stress handoff", pageId: pages[0].pageId }) }; }
 catch (error) { return { error: error.message, code: error.code }; }`);
     const elapsedMs = Date.now() - started;
     const counters = Object.fromEntries(Object.entries(h.site("handoff").counters).filter(([key]) => key.startsWith(`${scenario}.`)).map(([key, value]) => [key.slice(scenario.length + 1), value]));
@@ -43,7 +42,7 @@ catch (error) { return { error: error.message, code: error.code }; }`);
         await h.idle();
       }
       assert.equal(h.site("handoff").counters[`${scenario}.dispatches`], 1, "handoff cancellation replayed login");
-      assert.deepEqual(await h.turn(`return await ox.service.invoke({ purpose: "Verify no authentication", name: "web:${domain}:listSessions", input: {} });`), []);
+      assert.deepEqual(await h.turn(invokeScript(`web:${domain}:listSessions`)), []);
       return `usable final-page field, cancel and session check passed; ${elapsedMs}ms, dispatches=1, hops=${counters.hops ?? 0}`;
     } finally {
       const logs = await h.ox(["host", "logs", "--grep", "Service.handoff", "--since", new Date(started).toISOString(), "--limit", "200"]);
@@ -57,12 +56,9 @@ handoffCases.push({
   site: "handoff",
   async run(h) {
     const started = Date.now();
-    const sent = await h.ox(["conversation", "send", `execute
-await ox.service.attach({ purpose: "Attach cancellation fixture", domain: "ox-handoff-cancel.localhost" });
-const input = { auth: { type: "password" } };
-await ox.service.invoke({ purpose: "Prepare delayed handoff", name: "web:ox-handoff-cancel.localhost:login", input });
-await ox.service.showPage({ purpose: "Wait for delayed page", name: "web:ox-handoff-cancel.localhost:login", input });`, "--no-wait"], { conversation: true });
-    assert.ok(!sent.error, JSON.stringify(sent));
+    await h.begin(`await (async () => { ${invokeScript("web:ox-handoff-cancel.localhost:login")} })();
+const { pages } = await ox.web.browser.list({ purpose: "Find delayed handoff page" });
+await ox.web.browser.showPage({ purpose: "Wait for delayed page", pageId: pages[0].pageId });`, true);
     const counters = h.site("handoff").counters;
     const deadline = Date.now() + 10_000;
     while (!counters["cancel.starts"] && Date.now() < deadline) await Bun.sleep(100);
