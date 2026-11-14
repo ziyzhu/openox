@@ -48,6 +48,8 @@ App Store Connect and `ios-build-<number>` tag provenance before asking the oper
 follow the release flow's exact build-ID matching procedure. The script is
 read-only; its report is evidence, not proof of submission readiness.
 
+CI calls `.github/workflows/ios-upload.yml` in upload mode after checks and both native builds succeed on an initial push run to `main`, only when the full push changes iOS build inputs. `.github/workflows/ci.yml` owns that path filter; bundled agent skills are shipped content, not docs-only changes. Uploads use the verified commit and the existing serialized `appstore` environment. Manual dry-run and upload dispatch remain available; do not upload merely to verify workflow changes.
+
 App Store Connect owns current listing metadata, screenshots, and previews.
 Read its live state during a release; do not keep local metadata copies, media
 libraries, or inventory manifests in either repository. Keep drafts, captures,

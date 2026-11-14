@@ -14,6 +14,49 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  ios-changes:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      relevant: ${{ steps.paths.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: paths
+        name: Check iOS build inputs across the push
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          base="$BEFORE"
+          if [[ "$base" =~ ^0+$ ]]; then
+            base="$(git hash-object -w -t tree /dev/null)"
+          elif ! git cat-file -e "$base^{commit}"; then
+            git fetch --no-tags origin "$base"
+          fi
+          git diff --no-renames --name-only -z "$base" "$GITHUB_SHA" > "$RUNNER_TEMP/ios-changed-paths"
+          relevant=false
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              apps/ios/*|apps/shared/*|packages/agent/src/*|packages/agent/skills/*|packages/protocol/src/*|\
+              packages/agent/build.ts|packages/agent/native-guidance.ts|packages/agent/tsconfig.json|packages/agent/UPSTREAM_LICENSE.txt|packages/protocol/tsconfig.json|\
+              package.json|*/package.json|bun.lock|bunfig.toml|.npmrc|\
+              .agents/lib.ts|.agents/skills/build/scripts/*|.agents/skills/release/scripts/ios-upload.sh|\
+              .github/workflows/ci.yml|.github/workflows/ios-upload.yml)
+                relevant=true
+                printf 'iOS input matched: %q\n' "$path"
+                break
+                ;;
+            esac
+          done < "$RUNNER_TEMP/ios-changed-paths"
+          echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
+          echo "iOS build inputs changed: $relevant" >> "$GITHUB_STEP_SUMMARY"
+
   checks:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -48,3 +91,13 @@ jobs:
       - run: bun --no-env-file run build:agent
       - run: bun --no-env-file run build:ios CODE_SIGNING_ALLOWED=NO
       - run: bun --no-env-file run build:macos CODE_SIGNING_ALLOWED=NO
+
+  testflight:
+    needs: [ios-changes, checks, apps]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 && needs.ios-changes.outputs.relevant == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/ios-upload.yml
+    with:
+      mode: upload
+    secrets: inherit
