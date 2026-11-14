@@ -269,10 +269,9 @@ nonisolated private final class WebFetchSessionDelegate: NSObject, URLSessionTas
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
-        didReceive challenge: URLAuthenticationChallenge,
-        completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
-    ) {
-        completionHandler(
+        didReceive challenge: URLAuthenticationChallenge
+    ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        (
             challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust
                 ? .performDefaultHandling : .cancelAuthenticationChallenge,
             nil

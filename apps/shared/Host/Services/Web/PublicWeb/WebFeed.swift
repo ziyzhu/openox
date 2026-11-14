@@ -102,12 +102,15 @@ nonisolated final class WebFeed: NSObject, XMLParserDelegate {
             let standard = element.namespace.isEmpty || element.namespace == Self.rssNamespace || element.namespace == Self.atomNamespace
             switch element.name {
             case "title" where standard: store("title", text)
-            case "id", "guid" where standard: store("id", text)
+            case "id": store("id", text)
+            case "guid" where standard: store("id", text)
             case "link" where standard && format != "atom":
                 if let link = publicLink(text) { store("url", link) }
-            case "published", "pubDate" where standard: store("published", text)
+            case "published": store("published", text)
+            case "pubDate" where standard: store("published", text)
             case "updated" where standard: store("updated", text)
-            case "description", "summary" where standard: store("summary", text)
+            case "description": store("summary", text)
+            case "summary" where standard: store("summary", text)
             case "content" where standard: store("content", text)
             case "encoded" where element.namespace == "http://purl.org/rss/1.0/modules/content/": store("content", text)
             case "date" where element.namespace == "http://purl.org/dc/elements/1.1/": store("published", text)

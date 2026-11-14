@@ -55,7 +55,7 @@ final class WebSocketOxHostTransport {
         let monitor = HostTransportIngress.pathMonitor()
         self.monitor = monitor
         monitor.pathUpdateHandler = { [weak self, weak monitor] path in
-            Task { @MainActor in
+            Task { @MainActor [weak self, weak monitor] in
                 guard let self, let monitor, self.monitor === monitor else { return }
                 self.path = path
                 Log.app.info("WebSocketOxHostTransport path status=\(path.status) interfaces=\(path.availableInterfaces.map { "\($0.name):\($0.type)" }.joined(separator: ","))")
@@ -65,7 +65,7 @@ final class WebSocketOxHostTransport {
         let poll = DispatchSource.makeTimerSource(queue: queue)
         poll.schedule(deadline: .now() + 1, repeating: 1, leeway: .milliseconds(250))
         poll.setEventHandler { [weak self, weak monitor] in
-            Task { @MainActor in
+            Task { @MainActor [weak self, weak monitor] in
                 guard let self, let monitor, self.monitor === monitor else { return }
                 self.refreshIngress()
             }
@@ -111,7 +111,7 @@ final class WebSocketOxHostTransport {
         do {
             let listener = try NWListener(using: parameters)
             listener.stateUpdateHandler = { [weak self, weak listener] state in
-                Task { @MainActor in
+                Task { @MainActor [weak self, weak listener] in
                     guard let self, let listener, self.listeners[address] === listener else { return }
                     switch state {
                     case .ready:
@@ -124,7 +124,7 @@ final class WebSocketOxHostTransport {
                 }
             }
             listener.newConnectionHandler = { [weak self, weak listener] connection in
-                Task { @MainActor in
+                Task { @MainActor [weak self, weak listener] in
                     guard let self, let listener, self.listeners[address] === listener else { connection.cancel(); return }
                     self.accept(connection, ingress: ingress, address: address)
                 }
@@ -178,7 +178,7 @@ final class WebSocketOxHostTransport {
         let key = ObjectIdentifier(connection)
         connections[key] = Client(connection: connection, scope: StorageRoot.currentScope, ingress: ingress, address: address)
         connection.stateUpdateHandler = { [weak self, weak connection] state in
-            Task { @MainActor in
+            Task { @MainActor [weak self, weak connection] in
                 guard let self, let connection, let client = self.connections[key], client.connection === connection else { return }
                 switch state {
                 case .ready:
@@ -191,7 +191,7 @@ final class WebSocketOxHostTransport {
             }
         }
         connection.pathUpdateHandler = { [weak self, weak connection] _ in
-            Task { @MainActor in
+            Task { @MainActor [weak self, weak connection] in
                 guard let self, let connection, let client = self.connections[key] else { return }
                 if !self.hasCurrentIngress(client) { connection.cancel() }
             }

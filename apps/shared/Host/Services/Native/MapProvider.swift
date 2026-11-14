@@ -136,7 +136,8 @@ final class MapProvider {
             if let directionsMode {
                 options = [MKLaunchOptionsDirectionsModeKey: try Self.launchDirectionsMode(directionsMode)]
             }
-            let opened = await item.openInMaps(launchOptions: options)
+            let open: ([String: Any]?) async -> Bool = item.openInMaps(launchOptions:)
+            let opened = await open(options)
             Log.agent.info("location.open placeID=\(placeID) directions=\(directionsMode ?? "none") opened=\(opened)")
             return OpenResult(opened: opened)
         } catch let error as MapError {

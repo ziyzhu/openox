@@ -54,7 +54,7 @@ final class LoginCapture: NSObject, WKScriptMessageHandler {
         let scripts = controller.userScripts.filter { !sources.contains($0.source) }
         controller.removeAllUserScripts()
         scripts.forEach(controller.addUserScript)
-        let frames = if let owner { (try? await page.discoverFrames()) ?? [] } else { Array(page.frameTargets.values) }
+        let frames = if owner != nil { (try? await page.discoverFrames()) ?? [] } else { Array(page.frameTargets.values) }
         for frame in frames {
             _ = try? await page.page.callJavaScript("window.__oxLoginFlow?.stop()", arguments: [:], in: frame.info, contentWorld: .defaultClient)
             _ = try? await page.page.callJavaScript("window.__oxLoginCapture?.stop()", arguments: [:], in: frame.info, contentWorld: .page)
@@ -106,7 +106,7 @@ final class LoginCapture: NSObject, WKScriptMessageHandler {
             "origin": .string("https://\(origin.host)\(origin.port == 0 || origin.port == 443 ? "" : ":\(origin.port)")"),
             "mainFrame": .bool(message.frameInfo.isMainFrame),
             "route": .string(route),
-            "controls": .array(controls.compactMap(Self.flowControl))
+            "controls": .array(controls.compactMap { Self.flowControl($0) })
         ]
         if let target = body["target"] as? [String: Any], let control = Self.flowControl(target) {
             fields["target"] = control

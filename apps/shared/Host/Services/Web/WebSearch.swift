@@ -135,7 +135,7 @@ extension Conversation {
     }
 }
 
-extension OxSearch {
+nonisolated extension OxSearch {
     static let slowDomainGrace = Duration.seconds(4)
 
     static func failure(_ code: String, _ message: String) -> OxFunctionError {

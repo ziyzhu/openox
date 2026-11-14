@@ -104,8 +104,9 @@ nonisolated enum OxWeb {
             let browser: @convention(block) (String, JSValue) -> JSValue = { action, options in
                 var fields = jsValueToJSON(options)?.objectValue ?? [:]
                 let purpose = fields.removeValue(forKey: "purpose")?.stringValue ?? ""
+                let arguments = JSONValue.object(fields)
                 return env.call(suspendingTimeout: action == "waitForNavigation") {
-                    try await $0.browserOperation(action: action, arguments: .object(fields), purpose: purpose)
+                    try await $0.browserOperation(action: action, arguments: arguments, purpose: purpose)
                 }
             }
             ctx.setObject(browser as AnyObject, forKeyedSubscript: "__nativeWebBrowser" as NSString)

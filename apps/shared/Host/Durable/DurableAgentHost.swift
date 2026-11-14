@@ -96,7 +96,7 @@ actor DurableAgentHost {
         guard fileCapabilities.count < 128 else { throw RuntimeError.bridge("Too many concurrent filesystem capabilities") }
         let capability = UUID().uuidString
         let reference = await owner.durableRoute?.reference
-        let state = FileCapability(owner: owner, scope: await owner.scope, operation: operation,
+        let state = FileCapability(owner: owner, scope: owner.scope, operation: operation,
             roots: Set(mounts.compactMap { $0.objectValue?["path"]?.stringValue }),
             path: arguments.objectValue?["path"]?.stringValue ?? arguments.objectValue?["from"]?.stringValue ?? "")
         fileCapabilities[capability] = state

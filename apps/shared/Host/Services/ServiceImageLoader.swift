@@ -33,10 +33,9 @@ nonisolated private final class ServiceImageSessionDelegate: NSObject, URLSessio
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
-        didReceive challenge: URLAuthenticationChallenge,
-        completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
-    ) {
-        completionHandler(
+        didReceive challenge: URLAuthenticationChallenge
+    ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        (
             challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust
                 ? .performDefaultHandling : .cancelAuthenticationChallenge,
             nil
