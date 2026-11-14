@@ -139,6 +139,10 @@ final class ServiceManager {
         ServiceWebsiteDataCoordinator.site(for: domain)
     }
 
+    func visitedSites() async -> [String] {
+        await websiteData.visitedSites()
+    }
+
     func clearWebsiteData(domain: String) async {
         await websiteData.clear(domain: domain, services: services)
     }

@@ -7,23 +7,30 @@ struct ComposerServicePicker: View {
     let onSelect: (Service) -> Void
     let onExplore: () -> Void
 
-    @ViewBuilder
     var body: some View {
-        if case .mention(let query) = composer.surface {
-            GeometryReader { geometry in
-                ServicePickerPanel(
-                    query: query,
-                    excludedDomains: excludedDomains,
-                    space: max(0, geometry.size.height - composerHeight),
-                    onSelect: onSelect,
-                    onExplore: onExplore
-                )
-                .frame(maxWidth: Theme.ContainerWidth.readable)
-                .padding(.horizontal, Theme.Spacing.md)
-                .padding(.bottom, composerHeight + Theme.Spacing.xs)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        ZStack {
+            if case .mention(let query) = composer.surface {
+                GeometryReader { geometry in
+                    ServicePickerPanel(
+                        query: query,
+                        excludedDomains: excludedDomains,
+                        space: max(0, geometry.size.height - composerHeight),
+                        onSelect: onSelect,
+                        onExplore: onExplore
+                    )
+                    .frame(maxWidth: Theme.ContainerWidth.readable)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.bottom, composerHeight + Theme.Spacing.xs)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                }
+                .transition(.opacity)
             }
         }
+        .animation(Theme.Animation.standard, value: isMentioning)
+    }
+
+    private var isMentioning: Bool {
+        if case .mention = composer.surface { true } else { false }
     }
 }
 
@@ -49,10 +56,69 @@ struct ComposerSlashPicker: View {
                     .padding(.bottom, composerHeight + Theme.Spacing.xs)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(.opacity)
             }
         }
-        .animation(Theme.Animation.standard, value: suggestions.map(\.id))
+        .animation(Theme.Animation.standard, value: suggestions.isEmpty)
+    }
+}
+
+struct ComposerWebsitePicker: View {
+    @Bindable var composer: ConversationComposerModel
+    let isFocused: Bool
+    let composerHeight: CGFloat
+    let onSelect: (String) -> Void
+    @Environment(ServiceManager.self) private var serviceManager
+    @State private var sites: [String] = []
+
+    var body: some View {
+        let suggestions = isFocused ? composer.websiteSuggestions(from: sites) : []
+        ZStack {
+            if !suggestions.isEmpty {
+                WebsitePickerPanel(suggestions: suggestions, onSelect: onSelect)
+                    .frame(maxWidth: Theme.ContainerWidth.readable)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.bottom, composerHeight + Theme.Spacing.xs)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .transition(.opacity)
+            }
+        }
+        .animation(Theme.Animation.standard, value: suggestions.isEmpty)
+        .task(id: isFocused) {
+            guard isFocused else { return }
+            sites = await serviceManager.visitedSites()
+        }
+    }
+}
+
+private struct WebsitePickerPanel: View {
+    let suggestions: [String]
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(suggestions, id: \.self) { site in
+                Button { onSelect(site) } label: {
+                    HStack(spacing: Theme.Spacing.md) {
+                        Image(systemName: "globe")
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        Text(verbatim: site)
+                            .font(Theme.Fonts.bodyMd)
+                            .foregroundStyle(Theme.Colors.onSurface)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(A11yID.ConversationControls.websiteSuggestion(site))
+            }
+        }
+        .padding(.vertical, 6)
+        .fixedSize(horizontal: false, vertical: true)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
     }
 }
 

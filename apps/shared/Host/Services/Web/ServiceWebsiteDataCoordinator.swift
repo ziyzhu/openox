@@ -77,6 +77,14 @@ final class ServiceWebsiteDataCoordinator {
         return WebsitePublicSuffixList.bundled.effectiveTLDPlusOne(normalized)
     }
 
+    func visitedSites() async -> [String] {
+        let types: Set<String> = [WKWebsiteDataTypeCookies, WKWebsiteDataTypeLocalStorage]
+        let records = await dataStore().dataRecords(ofTypes: types)
+        let sites = Set(records.map { Self.site(for: $0.displayName) }).sorted()
+        Log.service.info("ServiceManager.visitedSites records=\(records.count) sites=\(sites.count)")
+        return sites
+    }
+
     func clear(domain: String, services: [Service]) async {
         let site = Self.site(for: domain)
         let store = dataStore()

@@ -413,6 +413,16 @@ struct ConversationPage: View {
                 slashPickerOverlay(floatsTopStrip: floatsTopStrip)
             }
         }
+        .overlay(alignment: .bottom) {
+            if showsComposer, editedBlockID == nil {
+                ComposerWebsitePicker(
+                    composer: composer,
+                    isFocused: composerFocused,
+                    composerHeight: effectiveComposerHeight(floatsTopStrip: floatsTopStrip),
+                    onSelect: selectWebsiteSuggestion
+                )
+            }
+        }
         .overlay { sendFlightOverlay }
         let observedTranscript = composedTranscript
         .onChange(of: speechInput.notice) { _, message in
@@ -676,6 +686,12 @@ struct ConversationPage: View {
         composer.discardDraft()
         sendTranscriptTail = scroller.transcriptTail
         holdForSend(conversation.enqueuePage(url))
+    }
+
+    private func selectWebsiteSuggestion(_ site: String) {
+        guard let url = WebBrowserView.url(from: site) else { return }
+        Log.ui.info("ConversationPage.websiteSuggestion conversation=\(conversation.id) site=\(site)")
+        openWebsite(url)
     }
 
     private func effectiveComposerHeight(floatsTopStrip: Bool) -> CGFloat {

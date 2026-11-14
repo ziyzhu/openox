@@ -117,6 +117,23 @@ final class ConversationComposerModel {
         return WebBrowserView.url(from: value)
     }
 
+    var websiteQuery: String? {
+        guard surface == .none, draftAttachments.isEmpty else { return nil }
+        var value = draft.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard value.count >= 2, !value.contains(where: \.isWhitespace) else { return nil }
+        for prefix in ["https://", "http://", "www."] where value.hasPrefix(prefix) {
+            value.removeFirst(prefix.count)
+        }
+        guard !value.isEmpty, !value.contains(where: { "/?#".contains($0) }) else { return nil }
+        return value
+    }
+
+    func websiteSuggestions(from sites: [String]) -> [String] {
+        guard let query = websiteQuery else { return [] }
+        let matches = sites.filter { $0 != query && ($0.hasPrefix(query) || $0.contains("." + query)) }
+        return Array(matches.sorted { ($0.hasPrefix(query) ? 0 : 1, $0.count, $0) < ($1.hasPrefix(query) ? 0 : 1, $1.count, $1) }.prefix(5))
+    }
+
     var slashInvocation: SlashInvocation? {
         slashInvocation(in: draft)
     }
