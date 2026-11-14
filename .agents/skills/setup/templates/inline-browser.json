@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "settings": {
+    "language": "en",
+    "onboardingCompleted": true,
+    "defaultModel": null
+  },
+  "profiles": [
+    {
+      "id": "browser",
+      "name": "Inline Browser QA",
+      "conversations": [
+        {
+          "id": "browser",
+          "title": "Inline browser validation",
+          "messages": [
+            {
+              "role": "user",
+              "text": "Inline browser validation starts here."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "selection": {
+    "profile": "browser",
+    "conversation": "browser"
+  }
+}
