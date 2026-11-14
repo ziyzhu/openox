@@ -1,0 +1,88 @@
+name: iOS Upload
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: dry-run exports and verifies the signed IPA; upload also sends it to App Store Connect
+        type: choice
+        options: [dry-run, upload]
+        default: dry-run
+      build:
+        description: Build number (empty uses the next number after the highest uploaded build)
+        type: string
+        required: false
+
+permissions: {}
+
+concurrency:
+  group: ios-upload
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-26
+    timeout-minutes: 90
+    environment: appstore
+    permissions:
+      contents: read
+    env:
+      ASC_BYPASS_KEYCHAIN: "1"
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY_PATH: ${{ runner.temp }}/asc/AuthKey.p8
+      OX_DEVELOPMENT_TEAM: ${{ vars.OX_DEVELOPMENT_TEAM }}
+      OX_BUNDLE_IDENTIFIER: ${{ vars.OX_BUNDLE_IDENTIFIER }}
+      OUT: ${{ runner.temp }}/ios-upload
+      MODE: ${{ inputs.mode }}
+      BUILD_INPUT: ${{ inputs.build }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.4
+      - run: sudo xcode-select --switch /Applications/Xcode_26.2.app
+      - run: brew install asc
+      - run: git config --global lfs.fetchexclude 'prebuilt/**'
+      - name: App Store Connect key
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$ASC_PRIVATE_KEY_PATH")"
+          chmod 700 "$(dirname "$ASC_PRIVATE_KEY_PATH")"
+          (umask 077 && printf '%s\n' "$ASC_PRIVATE_KEY" > "$ASC_PRIVATE_KEY_PATH")
+          grep -q 'BEGIN PRIVATE KEY' "$ASC_PRIVATE_KEY_PATH" || { echo "::error::ASC_PRIVATE_KEY is not a .p8 key"; exit 1; }
+      - id: plan
+        name: Build number
+        run: |
+          set -euo pipefail
+          build="$BUILD_INPUT"
+          if [ -z "$build" ]; then
+            latest="$(asc builds list --app "$OX_BUNDLE_IDENTIFIER" --sort -uploadedDate --limit 200 --output json | jq '[.data[].attributes.version | tonumber] | max // 0')"
+            build=$((latest + 1))
+          fi
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "### Ox build $build ($MODE) from \`$GITHUB_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+      - run: bun --no-env-file install --frozen-lockfile
+      - run: bun --no-env-file run build:agent
+      - name: Archive, export, verify${{ inputs.mode == 'upload' && ', upload' || '' }}
+        env:
+          BUILD: ${{ steps.plan.outputs.build }}
+        run: |
+          set -euo pipefail
+          args=(--build "$BUILD" --out "$OUT")
+          [ "$MODE" != upload ] || args+=(--upload)
+          .agents/skills/release/scripts/ios-upload.sh "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        run: rm -rf "$(dirname "$ASC_PRIVATE_KEY_PATH")"
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: ios-upload-logs
+          path: ${{ runner.temp }}/ios-upload/*.log
+          if-no-files-found: ignore
+          retention-days: 7
