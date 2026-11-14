@@ -713,6 +713,7 @@ final class Conversation: Identifiable {
         responseText: { [unowned self] submissionID in document.responseText(forSubmissionID: submissionID) }
     )
     var isBusy: Bool { activeRun != nil }
+    var isStreamingText: Bool { activeRun?.phase == .streaming }
 
     func waitForRun() async {
         while let run = activeRun { await run.task.value }

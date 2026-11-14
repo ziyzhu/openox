@@ -926,7 +926,7 @@ struct ConversationPage: View {
         return BlockView(
             block: block,
             isLatestCanvas: isLatestCanvas,
-            isStreamingTail: conversation.isBusy && isTail,
+            isStreamingTail: conversation.isStreamingText && isTail,
             conversationID: conversation.id,
             browserPageMount: browserPageMount,
             isThinkingTail: block.isLiveThinking,
