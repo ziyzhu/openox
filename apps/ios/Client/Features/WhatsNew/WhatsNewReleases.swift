@@ -9,6 +9,12 @@ struct WhatsNewRelease: Identifiable {
 
 enum WhatsNew {
     static let releases: [WhatsNewRelease] = [
+        WhatsNewRelease(version: "1.0.30", items: [
+            "See suggestions for previously visited websites as you type in the message composer.",
+            "Retry a failed reply without adding another message to the conversation.",
+            "Keep your place when opening conversations, with more reliable scrolling and complete streamed replies.",
+            "Improved website sign-in, page handoffs, and service access during conversations."
+        ]),
         WhatsNewRelease(version: "1.0.29", items: [
             "Pan, pinch to zoom, and rotate maps directly in conversations.",
             "The Thinking indicator disappears while Ox waits for you to take over."

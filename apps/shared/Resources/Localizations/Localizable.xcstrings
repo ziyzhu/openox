@@ -1,6 +1,50 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "See suggestions for previously visited websites as you type in the message composer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在消息输入框中输入时，可看到此前访问过的网站建议。"
+          }
+        }
+      }
+    },
+    "Retry a failed reply without adding another message to the conversation." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试失败的回复，无需在对话中添加新消息。"
+          }
+        }
+      }
+    },
+    "Keep your place when opening conversations, with more reliable scrolling and complete streamed replies." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开对话时保持阅读位置，滚动更稳定，流式回复显示更完整。"
+          }
+        }
+      }
+    },
+    "Improved website sign-in, page handoffs, and service access during conversations." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改进对话中的网站登录、网页接管和服务访问。"
+          }
+        }
+      }
+    },
     "" : {
       "shouldTranslate" : false
     },
