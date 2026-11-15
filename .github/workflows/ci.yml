@@ -87,10 +87,7 @@ jobs:
       - run: brew install xcodegen
       - run: git config --global lfs.fetchexclude 'prebuilt/**'
       - run: printf '%s\n' 'OX_DEVELOPMENT_TEAM =' 'OX_BUNDLE_IDENTIFIER = ai.openox.local' > apps/ios/Local.xcconfig
-      - run: bun --no-env-file install --frozen-lockfile
-      - run: bun --no-env-file run build:agent
-      - run: bun --no-env-file run build:ios CODE_SIGNING_ALLOWED=NO
-      - run: bun --no-env-file run build:macos CODE_SIGNING_ALLOWED=NO
+      - run: bun run ci --native-only
 
   testflight:
     needs: [ios-changes, checks, apps]

@@ -5,8 +5,15 @@ These cover static/type checks, eval-definition validation, agent/service genera
 package consumers, offline build-tool safety checks and controlled CLI/Host fixtures. It clears live-target variables and
 disables `.env` loading. No simulator, credentials, model calls, or publication are required.
 
-The GitHub CI workflow also compiles the iOS and macOS apps unsigned on a macOS runner.
-It catches Swift build breaks only; it does not launch or exercise either app.
+Run `bun run ci --native` on macOS for portable checks, the current platform's
+standalone CLI checks, and unsigned iOS/macOS builds. Xcode and XcodeGen must be
+installed; select the same Xcode version as `.github/workflows/ci.yml` for toolchain
+parity. The command uses the checkout's configured bundle identifier without
+rewriting local signing settings. It does not boot a simulator or publish anything.
+
+The GitHub CI workflow uses `bun run ci --native-only` for its macOS build job;
+portable checks and the four-platform CLI matrix run separately. Native builds
+catch Swift build breaks only; they do not launch or exercise either app.
 
 Standalone mode additionally needs platform installation tools such as curl and tar.
 It installs the current platform's CLI archive and exercises fixtures without Bun or
