@@ -10,7 +10,7 @@ Choose the lightest form serving the user's task. Ordinary Markdown and file ope
 | Result | Default |
 | --- | --- |
 | Flow, sequence, state, class, entity relationship, mind map, timeline, Gantt, or pie diagram | Mermaid in the reply; no file |
-| Places on a map with optional tappable details or routes between them | A fenced `map` block in the reply; no file |
+| Places on a map with optional tappable details or routes between them | Read `references/maps.md`; a fenced `map` block in the reply; no file |
 | Static illustration, icon, or fixed drawing Mermaid cannot express | Self-contained SVG file |
 | Data plot, spatial comparison, explorable explanation, simulation, interactive tool, or app | Read `references/html.md` before authoring HTML |
 
@@ -24,13 +24,7 @@ Do not add `%%{init}%%`, `classDef` colors, `click` callbacks, links, or images;
 
 ## Maps
 
-Put a JSON object in a fenced `map` block to show places in an iOS conversation. After streaming finishes, tapping the card opens an interactive native map; tapping a marker shows its supplied details and an Open in Maps action on the viewing device. Other clients may show the JSON instead. Include a short text summary outside the block.
-
-```map
-{"markers":[{"latitude":37.77,"longitude":-122.42,"label":"Example place","detail":{"title":"Example place","description":"Illustrative marker, not a verified business.","address":"Optional verified address","url":"https://example.com"}}]}
-```
-
-Use 1–50 markers, finite latitude from -90 to 90 and longitude from -180 to 180, and at most 64 KiB of JSON. Only latitude and longitude are required. Optional label and placeID are at most 200 characters each; set placeID only to an Apple Maps place identifier returned by a service, which lets the device open Apple's listing for that place; optional detail fields title, description, address, and url are at most 2,000 characters each. Website links must be HTTPS without embedded credentials. Use plain text in detail fields, not Markdown, HTML, scripts, or service calls. Detail content is supplied by you, not fetched or verified by MapKit. Use coordinates and facts from inspected service results or the user; do not invent places or descriptions. Invalid blocks remain code. Add up to 5 optional `routes` between markers, for example `"routes":[{"from":0,"to":1,"transport":"walking"}]`. `from` and `to` are distinct marker indices; `transport` is `automobile` (default), `walking`, or `cycling`; transit is not supported. Apple Maps calculates each route on the viewing device and shows its distance, travel time, and alternatives, and the user can switch travel mode; do not state your own times, distances, or turn-by-turn steps for those routes. Every route endpoint must be a marker you supplied. Do not use or insert the user's live location as an origin or to center a map.
+Read `references/maps.md` before making a geographic map. It covers local-first coordinate resolution, optional place search, accuracy checks, efficient lookups, native marker details, and routes. Keep mind maps and other non-geographic relationships in Mermaid.
 
 ## SVG
 

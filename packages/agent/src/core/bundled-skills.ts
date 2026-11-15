@@ -18,6 +18,7 @@ import serviceIcon from "../../skills/evolve/references/service-icon.md" with { 
 import skillGuide from "../../skills/evolve/references/skills.md" with { type: "text" };
 import visualize from "../../skills/visualize/SKILL.md" with { type: "text" };
 import html from "../../skills/visualize/references/html.md" with { type: "text" };
+import maps from "../../skills/visualize/references/maps.md" with { type: "text" };
 import reactiveExample from "../../skills/visualize/references/reactive-example.md" with { type: "text" };
 
 export type BundledSkill = Omit<Skill, "services" | "resources"> & {
@@ -42,5 +43,5 @@ export const bundledSkills: readonly BundledSkill[] = Object.freeze([
     "references/web-capture.md": webCapture, "references/service-icon.md": serviceIcon, "references/search.md": search,
     "references/skills.md": skillGuide }),
   skill("onboard", onboard, { "references/import-memory.md": importMemory }),
-  skill("visualize", visualize, { "references/html.md": html, "references/reactive-example.md": reactiveExample }),
+  skill("visualize", visualize, { "references/html.md": html, "references/maps.md": maps, "references/reactive-example.md": reactiveExample }),
 ]);
