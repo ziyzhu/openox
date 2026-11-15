@@ -1,6 +1,6 @@
 # Web Service
 
-Deliver a useful Local service from live website evidence, then invoke it to complete the original request. Work through awaited `ox.*` calls, Browser, and the virtual filesystem. Author plain JavaScript against the service installer; there is no shell, build, TypeScript, HAR, or replay step.
+Follow Evolve's service authoring loop using live website evidence. Author plain JavaScript against the service installer; there is no build, TypeScript, HAR, or replay step.
 
 Browser is for observing and developing service actions, not fulfillment. Use read-only evidence and non-consequential UI interaction. Never submit external mutations through Browser to discover or test them. Preserve any unexpected effect; perform requested mutations through approval-gated service actions and never repeat completed effects for testing.
 
@@ -25,7 +25,13 @@ Choose operation-specific readiness and outcome predicates. Browser loading, doc
 
 For same-document interaction, use one async page script to act, wait for a specific success or error condition with a bounded timeout, and extract relevant fields. Full-page navigation destroys page scripts, so sequence Browser exploration through awaited Browser calls. Navigation calls already wait for completion; `waitForNavigation` afterward waits for the next navigation. For a service's initial destination, open or navigate the explicit page to the observed action baseUrl before discovering a fresh frameId and invoking the action. `location.assign()`, a click, or form submission only initiates navigation; returning or sleeping does not establish destination readiness. For unavoidable cross-document transitions, preserve the execution page and inspect the new document before continuing; never replay the triggering step just to obtain readiness evidence. Stop at unexpected choices, confirmation boundaries, or human-only steps.
 
-Before each probe identify the unresolved implementation question. Batch independent read-only questions and return compact structural evidence: request method/origin/path and fields, response shape, resource identity, pagination, units/time zones, execution prerequisites, and observed success/empty/missing/authentication outcomes. Mark unknown cases explicitly. Explore one representative list-to-detail journey using returned identifiers, without assuming other endpoints share its contract. Reuse current evidence and the existing page unless a fresh-page check is necessary. Stop exploration when the requested capability is supported.
+Before each probe identify the unresolved implementation question. Batch independent read-only questions and return compact structural evidence:
+
+- Request method/origin/path and fields, response shape, and resource identity.
+- Pagination, units/time zones, and execution prerequisites.
+- Observed success, empty, missing-resource, and authentication outcomes; mark unknown cases explicitly.
+
+Explore one representative list-to-detail journey using returned identifiers, without assuming other endpoints share its contract. Reuse current evidence and the existing page unless a fresh-page check is necessary. Stop exploration when the requested capability is supported.
 
 Default to observed same-origin structured `fetch`, then stable fetched HTML with `DOMParser`. Use page-owned state when required. Read `references/web-capture.md` before network capture or inherited-signature response capture. Keep authoring evidence bounded and exclude private bodies, cookies, authorization/CSRF values, reusable tokens, and signatures. On authenticated pages, do not dump broad text or HTML. Bootstrap answers may contain narrowly requested private values; verification-only probes must not echo them. Preserve an opaque resource URL only if it is required to revisit that item and is not a reusable account credential; keep token components out of logs and descriptions.
 
@@ -39,13 +45,32 @@ Default to observed same-origin structured `fetch`, then stable fetched HTML wit
 
 ## Author service.json
 
-Inspect `ox.repository.list` and current Local source before mutation. Create `repositories/local/web/<domain>/{service.json,actions.js}` with ox.fs.write, or copy an eligible repository service directory there with ox.fs.copy. Use the verified domain as directory, manifest, and runtime identity. Read repositories/local/repository.json and add web:<domain> to its services array while preserving existing entries. Local files persist immediately and may be temporarily incomplete while editing. File operations do not select sources; finish the coherent edit, validate the complete draft, explicitly select Local with ox.repository.resolve if conflicting sources exist, then inspect. Inspection and invocation load the current valid revision. Copy the exact service identity returned by ox.repository.conflicts: web services use a bare domain such as youtube.com, not the web:youtube.com registration entry.
+After inspecting the target and Local readiness through Evolve's authoring loop:
+
+1. Create `repositories/local/web/<domain>/{service.json,actions.js}` with `ox.fs.write`, or copy an eligible repository service directory there with `ox.fs.copy`.
+2. Use the verified domain as directory, manifest, and runtime identity. Register `web:<domain>` in the Local repository manifest.
+3. Finish the coherent edit and validate the complete draft. If sources conflict, explicitly select Local with `ox.repository.resolve`, then inspect. Copy the exact service identity returned by `ox.repository.conflicts`: web services use a bare domain such as `youtube.com`, not the `web:youtube.com` registration entry.
 
 Use `domain`, `name`, optional `description`, required `baseUrl`, verified `faviconUrl`, optional local `$defs`, `actions`, and optional locale overlays. Do not change the manifest schema. Skills live independently at repository root, never inside a service. Read `references/skills.md` when changed contracts require skill repair or the task needs a reusable workflow.
 
-Each action declares a JavaScript-identifier `id`, matching handler, user-facing `label` and `description`, concrete input/output schemas, explicit `requireAuth` and `requireApproval`, optional stable public `defaultArgs`, and optional action `baseUrl`. The action inherits the service `baseUrl` when omitted; declared query parameters resolve from action inputs before execution. The agent explicitly opens or navigates its page before invoking a handler with frameId; invocation does not navigate implicitly. session.url is context metadata, not navigation. Pages are shared browser resources, not allocated per service or account. Set blocking:true when shared state needs exclusivity. Explicit navigation is serialized with actions. Base URL placeholders must be whole query values bound to direct string inputs. Keep every execution URL on the service domain or a subdomain.
+Action declarations:
 
-Constrain nested objects and array items using schema vocabulary demonstrated by existing manifests. Declare only consumed inputs. `listSessions` uses the standard authenticated-session array contract. Other `get<Thing>` actions return one resource; other `list*` and `search*` return `{items, nextCursor}` with the source cursor. A null cursor means no continuation is exposed, not proof of exhaustive coverage. Search requires `query`; bounded collections need a sensible bounded `limit`. To opt into `ox.web.search`, read `references/search.md` and expose a compatible default action named `search` with normalized results, scope, and coverage; do not invent manifest fields or force structured searches into a query-only contract. Require approval for every create, update, delete, submission, or other external mutation. Defaults must not be private, account-specific, resource-scoped, or expiring. Design actions for any user of the product, not the triggering request: take request values such as locations, dates, times, queries, and identifiers as inputs or discovered state, never fixed in `baseUrl`, defaults, or handler code, and return structured fields rather than raw page text. Locale overlays must translate the service name/description and all action labels/descriptions without changing capability or safety meaning.
+- Declare a JavaScript-identifier `id`, matching handler, user-facing `label` and `description`, concrete input/output schemas, and explicit `requireAuth` and `requireApproval`. Optional fields include stable public `defaultArgs` and action `baseUrl`.
+- Require approval for every create, update, delete, submission, or other external mutation.
+- Defaults must not be private, account-specific, resource-scoped, or expiring. Take request values such as locations, dates, times, queries, and identifiers as inputs or discovered state, never fixed in `baseUrl`, defaults, or handler code.
+- Locale overlays must translate the service name/description and all action labels/descriptions without changing capability or safety meaning.
+
+Execution pages:
+
+- An action inherits the service `baseUrl` when omitted; declared query parameters resolve from action inputs before execution. Base URL placeholders must be whole query values bound to direct string inputs. Keep every execution URL on the service domain or a subdomain.
+- Explicitly open or navigate the page before invoking a handler with `frameId`; invocation does not navigate implicitly. `session.url` is context metadata, not navigation.
+- Pages are shared browser resources, not allocated per service or account. Set `blocking: true` when shared state needs exclusivity. Explicit navigation is serialized with actions.
+
+Inputs and results:
+
+- Constrain nested objects and array items using schema vocabulary demonstrated by existing manifests. Declare only consumed inputs and return structured fields rather than raw page text.
+- `listSessions` uses the standard authenticated-session array contract. Other `get<Thing>` actions return one resource; other `list*` and `search*` return `{items, nextCursor}` with the source cursor. A null cursor means no continuation is exposed, not proof of exhaustive coverage.
+- Search requires `query`; bounded collections need a sensible bounded `limit`. To opt into `ox.web.search`, read `references/search.md` and expose a compatible default action named `search` with normalized results, scope, and coverage. Do not invent manifest fields or force structured searches into a query-only contract.
 
 ## Author actions.js
 
@@ -69,14 +94,19 @@ Read `references/helpers.js` only when a helper outside that subset is needed; c
 
 For page-owned actions, start from the action base page, serialize shared SPA navigation not already isolated by the Host, navigate within the document, invalidate stale store values, and wait for target-specific route, ID, controls, and fresh data. Each handler must establish readiness independently of Browser or sibling actions. Use a wall-clock deadline shorter than the action timeout, never fixed delays or iteration-count timing alone; hidden-page timers may be throttled. Read semantic labels and normalize text before parsing. Return legitimate empty values only after readiness is established; otherwise report incomplete evidence with safe page context.
 
-The handler's second argument is an empty frozen object; it carries no session descriptor or diagnostic callback. Use `console.log(JSON.stringify({ action: "example", phase: "waitingForControls", expectedControls: 2, observedControls: 0 }))` for concise phase-change diagnostics. Include only action ID, safe route, status, and counts; exclude credentials, field values, private bodies, and opaque tokens. Throw a clear error when readiness or success cannot be established; logs alone do not verify the action. Distinguish pre-dispatch readiness failures from unverified outcomes after a mutation was dispatched; do not label both as controls failing to load. Success predicates must verify the affected resource, not depend on removal of a dialog that the site may retain hidden in the DOM.
+Diagnostics and outcomes:
+
+- The handler's second argument is an empty frozen object; it carries no session descriptor or diagnostic callback.
+- Use `console.log(JSON.stringify({ action: "example", phase: "waitingForControls", expectedControls: 2, observedControls: 0 }))` for concise phase-change diagnostics. Include only action ID, safe route, status, and counts; exclude credentials, field values, private bodies, and opaque tokens.
+- Throw a clear error when readiness or success cannot be established; logs alone do not verify the action. Distinguish pre-dispatch readiness failures from unverified outcomes after a mutation was dispatched; do not label both as controls failing to load.
+- Success predicates must verify the affected resource, not depend on removal of a dialog that the site may retain hidden in the DOM.
 
 For live-page handoffs, follow `references/web-handoffs.md`. If the user's visible page conflicts with observations, show the actual page and inspect fresh evidence. Return opaque identifiers rather than credential-grade card, bank, government-ID, verification, or reusable-token values.
 
 ## Verify and finish
 
 1. Read changed files back and audit manifest/installer parity, consumed inputs, valid defaults, schemas, and deterministic source pagination. Never fabricate a numeric cursor over only the currently rendered snapshot.
-2. Verify `faviconUrl` through the icon reference before `ox.service.validate` and `ox.service.inspect`. Preserve drafts if no candidate passes. Validate the whole Local service using its bare domain, then inspect its current contracts; repeat after another coherent patch. Inspection and invocation load the current valid source on demand.
+2. Verify `faviconUrl` through the icon reference before validation and inspection; preserve drafts if no candidate passes. Follow Evolve's validation/repair loop, then inspect current contracts.
 3. Inspect the action index and needed full contracts together. Invoke each changed handler with a small success case on its actual execution page. Page-owned actions must work as the first invocation on a fresh action page, without Browser or sibling-action priming. Pass detail actions an identifier returned by the corresponding list/search in the same verified state; synthetic IDs or empty ranges are not successful detail verification.
 4. Check applicable empty, terminal pagination, missing-resource, stale-state, concurrency, and authentication boundaries. Exercise declared handoffs through their standard APIs at safe boundaries. Do not change live authentication state merely to test another branch.
 5. Execute only mutations authorized by the request under runtime Action policies, without another approval form. A successful requested mutation verifies the handler; never repeat it for testing. Inspect completed or uncertain effects read-only and label unexecuted handlers partially verified.

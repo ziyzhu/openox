@@ -2,11 +2,11 @@
 
 `ox.web.search` orchestrates opted-in web services only. API search actions remain ordinary `ox.service.invoke` actions; naming an API action `search` does not add it to public search defaults.
 
-Build Local API services inside Ox from published API documentation and verified responses. The Host executes handlers in an isolated JavaScript runtime and owns HTTP authentication. No website page, cookies, DOM, browser globals, or shell is available.
+Follow Evolve's service authoring loop using published API documentation and verified responses. The Host executes handlers in an isolated JavaScript runtime and owns HTTP authentication. No website page, cookies, DOM, browser globals, or shell is available.
 
 ## Contract
 
-Create `repositories/local/api/<domain>/service.json` and `actions.js` with ox.fs.write. Use a stable lowercase identifier such as `google-calendar`; it is independent of the API hostname. Read repositories/local/repository.json and add api:<domain> to its services array, preserving existing entries. Alternatively, copy an existing repository service directory into Local with ox.fs.copy and register it the same way. Validate the draft, explicitly select Local for conflicts with ox.repository.resolve, then inspect. File edits and copies do not select sources; inspection and invocation load the current valid revision.
+Create `repositories/local/api/<domain>/{service.json,actions.js}` with `ox.fs.write`, or copy an eligible repository service directory there with `ox.fs.copy`. Use a stable lowercase identifier such as `google-calendar`; it is independent of the API hostname. Register `api:<domain>` in the Local repository manifest. Follow Evolve's validation and source-selection steps before inspection.
 
 The manifest uses `kind: "api"`, `domain`, `name`, optional `description`, a static HTTPS `baseUrl`, required `auth`, optional `$defs`, and `actions`. Actions retain `id`, `label`, `description`, concrete `inputSchema` and `outputSchema`, `requireAuth`, `requireApproval`, and optional `defaultArgs`. Use Capability in visible copy. API actions cannot declare `baseUrl`, `blocking`, or web login actions. Human verification and checkout page interaction require a web service.
 
@@ -17,9 +17,14 @@ Authentication configurations:
 - `{ "type": "http", "scheme": "basic" }`, or `scheme: "bearer"`
 - `{ "type": "oauth2", "flow": "authorizationCode", "authorizationURL": "https://accounts.example.com/authorize", "tokenURL": "https://accounts.example.com/token", "clientID": "registered-public-client", "redirectURI": "com.example.app:/callback", "scopes": ["read"], "pkce": "S256" }`
 
-OAuth requires an existing public client registered as OpenOx and its application callback URI. If no suitable OpenOx registration is available, report that setup blocker rather than borrowing another app's client identity. Do not invent a working client ID, use a desktop loopback redirect for an iOS client, or put client secrets in source. Authorization and token URLs must be HTTPS without credentials, query, or fragment. The Host opens the system login flow and refreshes tokens. The user enters API keys, passwords, and bearer tokens through the service login interface; never request them in conversation, action inputs, or files.
+Authentication boundaries:
 
-Mark authenticated capabilities `requireAuth: true`; public capabilities can use false. An action with `requireAuth: false` never sends the configured credentials, even after login. Reads that must support private resources or account-scoped search therefore need `requireAuth: true`, even when the endpoint also permits anonymous public reads. Use the standard `credentialStatus` and `configureCredentials` actions through `ox.service.invoke`; their full contracts are supplied upfront and both accept empty input. Changing the API base URL or authentication configuration requires setup again. Setting credentials does not prove the API accepts them; verify a small authenticated read.
+- OAuth requires an existing public client registered as OpenOx and its application callback URI. If none is available, report that setup blocker rather than borrowing another app's client identity. Do not invent a working client ID, use a desktop loopback redirect for an iOS client, or put client secrets in source.
+- Authorization and token URLs must be HTTPS without credentials, query, or fragment. The Host opens the system login flow and refreshes tokens.
+- The user enters API keys, passwords, and bearer tokens through the service login interface; never request them in conversation, action inputs, or files.
+- Mark authenticated capabilities `requireAuth: true`; public capabilities can use false. An action with `requireAuth: false` never sends configured credentials, even after login. Private resources and account-scoped search therefore require `requireAuth: true`, even when the endpoint also permits anonymous public reads.
+- Use the standard `credentialStatus` and `configureCredentials` actions through `ox.service.invoke`; their full contracts are supplied upfront and both accept empty input.
+- Changing the API base URL or authentication configuration requires setup again. Setting credentials does not prove the API accepts them; verify a small authenticated read.
 
 ## Handlers
 
@@ -52,9 +57,9 @@ Install synchronously exactly once and register every declared action exactly on
 
 1. Identify the API's domain from supplied documentation or public research through `ox.web.search` and official documentation. Check relevant manifests under `repositories/` using the glob `*/api/*/service.json` with targeted `ox.fs.glob` lookups and reuse a suitable implementation. Missing source means author the needed service, not that the API is unavailable. Verify the base URL, operations, and authentication before authoring; never guess endpoints. For Google, use Google Discovery documents and googleworkspace/cli as request and workflow references.
 2. Identify bounded operations, permissions, pagination, and mutation effects. Reuse the user's approved scope; ask only about meaningful unresolved decisions. Author or repair only what the user requested or the task needs. Stop when the requested outcome is complete rather than adding an improvement pass.
-3. Read existing Local source before editing and preserve unrelated work. Create or copy the service and edit through `ox.fs`. Before inspection or invocation, read `references/service-icon.md`, preflight the product favicon, and set its verified `faviconUrl`. If no candidate passes, preserve the draft and stop before execution. Then call `ox.service.validate` and `ox.service.inspect`. Local edits persist immediately, including incomplete drafts.
+3. Author the manifest and handlers using the contract above. Before validation or inspection, read `references/service-icon.md`, preflight the product favicon, and set its verified `faviconUrl`. If no candidate passes, preserve the draft and stop before execution. Follow Evolve's validation/repair and source-selection steps, then inspect current contracts.
 4. Complete setup through the standard `configureCredentials` action. Inspect contracts and invoke names such as `api:google-calendar:listCalendars`.
 5. Verify successful reads, empty results, continuation, missing resources, and auth errors. Exercise mutations only with authorization. Report inaccessible or unverified capabilities explicitly.
-6. Re-read the final source, preserve unrelated work, and confirm validation and verification reflect the final files. No separate Save operation is needed. Report what improved, checks performed, and limitations; distinguish persisted drafts from verified capabilities.
+6. Review final source and evidence through Evolve's authoring loop. Report what improved, checks performed, and limitations; distinguish persisted drafts from verified capabilities.
 
 Credentials are stored separately in the Host's Keychain, bound to this service, repository, base URL, and auth configuration. Source and shared verification evidence must contain only public configuration and synthetic or sanitized examples.
