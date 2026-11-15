@@ -69,8 +69,11 @@ if [ "$mode" = full ] || [ "$mode" = standalone ]; then
   fi
 fi
 
-if [ "$mode" = full ] || [ "$mode" = native ]; then
+if [ "$mode" = native ]; then
   bun --no-env-file run build:agent
+fi
+
+if [ "$mode" = full ] || [ "$mode" = native ]; then
   bun --no-env-file run build:ios CODE_SIGNING_ALLOWED=NO
   bun --no-env-file run build:macos CODE_SIGNING_ALLOWED=NO
   echo 'PASS unsigned iOS and macOS builds'
