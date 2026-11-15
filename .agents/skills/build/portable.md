@@ -7,9 +7,18 @@ disables `.env` loading. No simulator, credentials, model calls, or publication 
 
 Run `bun run ci --native` on macOS for portable checks, the current platform's
 standalone CLI checks, and unsigned iOS/macOS builds. Xcode and XcodeGen must be
-installed; select the same Xcode version as `.github/workflows/ci.yml` for toolchain
-parity. The command uses the checkout's configured bundle identifier without
-rewriting local signing settings. It does not boot a simulator or publish anything.
+installed. `.bun-version` owns the required Bun version; `.github/ci.json` owns
+Node/npm requirements, the Xcode version, CLI runner matrix, and fallback iOS bundle
+identifier. CI validates applicable requirements before installing dependencies;
+select Xcode with `DEVELOPER_DIR` or `xcode-select`. Existing commands and flags are
+unchanged. Run the same checks on another machine for other platforms; no machines
+or VMs are provisioned locally.
+
+Native verification disables signing and clears the development team through
+command-line build settings, without rewriting existing local configuration. It
+keeps the configured iOS bundle identifier. If `Local.xcconfig` is absent, CI creates
+one with the shared fallback identifier and removes it on exit. It does not boot a
+simulator or publish anything.
 
 The GitHub CI workflow uses `bun run ci --native-only` for its macOS build job;
 portable checks and the four-platform CLI matrix run separately. Native builds
@@ -17,7 +26,8 @@ catch Swift build breaks only; they do not launch or exercise either app.
 
 Standalone mode additionally needs platform installation tools such as curl and tar.
 It installs the current platform's CLI archive and exercises fixtures without Bun or
-Node on PATH. See the CI workflow for platform coverage and pinned tool versions.
+Node on PATH. GitHub reads its platform matrix from `.github/ci.json`; local CLI
+checks validate only the current platform, not the entire matrix.
 
 Checkout fixtures must include untracked files and skip working-tree deletions;
 `git ls-files --cached` includes deleted files until staged. Package-owned

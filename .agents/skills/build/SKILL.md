@@ -75,7 +75,9 @@ For native HTML extraction dependency changes, verify byte-for-byte Markdown par
 The same build generates native filesystem contracts from `packages/agent/src/core/filesystem-contract.ts`, using pinned Pi read/write/edit schemas. Edit agent contracts and logic, not the generated Swift. Run `build:agent` before native compilation when changing function guidance or filesystem schemas; native compilation alone can reuse stale generated resources. Keep `packages/agent/src/functions/*/contracts.json` synchronized with a fresh Host's `ox vm functions --json`, including descriptions and required-field ordering; verify with the native VM contract runner. `execute` → `ox.fs.*` is the sole model filesystem surface; native backends retain source permissions, platform effects, and storage safety.
 All hosts share one core prompt. Put presentation facts in current turn context and detailed capability guidance in function help or matching skills; avoid capability-driven prose parsing or rendered-text patching.
 
-Run `bun run ci` after maintenance. `scripts/ci.sh` owns credential-free orchestration;
+Run `bun run ci` after maintenance. `.bun-version` and `.github/ci.json` own shared
+CI toolchain and platform requirements; applicable versions are checked before installation.
+`scripts/ci.sh` owns credential-free orchestration;
 static eval-definition validation does not load API keys or invoke models. Build-only
 checks live in `checks/`, not the protocol suite. Do not add general agent unit tests. Simulator provisioning
 belongs to `setup`; real-model behavior belongs to `evals`; publication belongs

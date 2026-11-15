@@ -46,9 +46,12 @@ if [ "$mode" = full ] || [ "$mode" = standalone ]; then
   done
 fi
 if [ "$mode" = portable ] || [ "$mode" = full ]; then
-  command -v npm >/dev/null || { echo 'Missing prerequisite: npm' >&2; exit 1; }
+  for tool in node npm; do
+    command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
+  done
 fi
 unset OX_HOST_ENDPOINT OX_DEBUG_ENDPOINT OX_SERVER_ROOT OX_QA_DEVICE
+bun --no-env-file .agents/skills/build/scripts/ci-environment.ts "$mode"
 bun --no-env-file install --frozen-lockfile
 
 if [ "$mode" = portable ] || [ "$mode" = full ]; then
@@ -74,7 +77,12 @@ if [ "$mode" = native ]; then
 fi
 
 if [ "$mode" = full ] || [ "$mode" = native ]; then
-  bun --no-env-file run build:ios CODE_SIGNING_ALLOWED=NO
-  bun --no-env-file run build:macos CODE_SIGNING_ALLOWED=NO
+  if [ ! -e apps/ios/Local.xcconfig ]; then
+    bundle="$(bun --no-env-file -p 'require("./.github/ci.json").iosBundleIdentifier')"
+    (set -o noclobber; printf 'OX_BUNDLE_IDENTIFIER = %s\n' "$bundle" > apps/ios/Local.xcconfig)
+    trap 'rm -f apps/ios/Local.xcconfig' EXIT
+  fi
+  bun --no-env-file run build:ios CODE_SIGNING_ALLOWED=NO OX_DEVELOPMENT_TEAM=
+  bun --no-env-file run build:macos CODE_SIGNING_ALLOWED=NO OX_DEVELOPMENT_TEAM=
   echo 'PASS unsigned iOS and macOS builds'
 fi

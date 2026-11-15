@@ -38,18 +38,22 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          bun-version: 1.4.4
+          bun-version-file: .bun-version
+
+      - id: config
+        run: |
+          bun --no-env-file -e 'const c = require("./.github/ci.json"); console.log(`node=${c.node}\nnpm=${c.npm}`)' >> "$GITHUB_OUTPUT"
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '>=24.22.1 <25'
+          node-version: ${{ steps.config.outputs.node }}
           check-latest: true
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
       - name: Install current npm
-        run: npm install --global npm@11.19.0 --ignore-scripts
+        run: npm install --global "npm@${{ steps.config.outputs.npm }}" --ignore-scripts
 
       - name: Resolve release
         id: release
@@ -108,7 +112,8 @@ jobs:
       - name: Verify release payload
         run: |
           cd "$RUNNER_TEMP/ox-cli-release"
-          for platform in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do
+          platforms="$(python3 -c 'import json, os; print(" ".join(p["platform"] for p in json.load(open(os.environ["GITHUB_WORKSPACE"] + "/.github/ci.json"))["cli"]))')"
+          for platform in $platforms; do
             test -f "ox-cli-$platform.tar.gz"
             test -f "SHA256SUMS-$platform"
           done

@@ -59,8 +59,10 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          bun-version: 1.4.4
-      - run: sudo xcode-select --switch /Applications/Xcode_26.2.app
+          bun-version-file: .bun-version
+      - run: |
+          version="$(bun --no-env-file -p 'require("./.github/ci.json").xcode')"
+          echo "DEVELOPER_DIR=/Applications/Xcode_$version.app/Contents/Developer" >> "$GITHUB_ENV"
       - run: brew install asc
       - run: git config --global lfs.fetchexclude 'prebuilt/**'
       - name: App Store Connect key
