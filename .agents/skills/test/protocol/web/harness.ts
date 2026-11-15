@@ -146,7 +146,7 @@ export function harness(options: { device: string; debugEndpoint: string; fixtur
   }
 
   return {
-    ios, ox, turn, begin, idle, pending, lastResult, waitMatching, tapMatching, fillWeb, snapshot,
+    ios, ox, turn, begin, idle, pending, lastResult, waitMatching, tapMatching, webField, fillWeb, snapshot,
     async pressReturn() { await run(["idb", "ui", "key", "40", "--udid", await ios.udid()], { capture: true }); },
     get fixtures() { return options.fixtures; },
     get evidence() { return options.evidence; },

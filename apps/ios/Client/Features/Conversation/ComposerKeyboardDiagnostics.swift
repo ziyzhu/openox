@@ -15,6 +15,7 @@ struct ConversationWebInputFocus: UIViewRepresentable {
 
     final class ProbeView: UIView {
         var onFocusChange: ((Bool) -> Void)?
+        private var resyncedKeyboard: CGRect?
 
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -53,6 +54,30 @@ struct ConversationWebInputFocus: UIViewRepresentable {
                   let frame = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue else { return }
             let keyboard = window.screen.coordinateSpace.convert(frame, to: window)
             onFocusChange?(window.bounds.intersects(keyboard) && hasFocusedWebInput(in: window))
+            if notification.name == UIResponder.keyboardDidChangeFrameNotification {
+                resyncKeyboardGuide(keyboard: keyboard, in: window)
+            }
+        }
+
+        private func resyncKeyboardGuide(keyboard: CGRect, in window: UIWindow) {
+            guard window.bounds.intersects(keyboard),
+                  let root = window.rootViewController?.view,
+                  let responder = firstResponder(in: window) else { return }
+            let guide = root.convert(root.keyboardLayoutGuide.layoutFrame, to: window)
+            let drift = guide.minY - keyboard.minY
+            guard abs(drift) > 1 else {
+                resyncedKeyboard = nil
+                return
+            }
+            guard resyncedKeyboard != keyboard else { return }
+            resyncedKeyboard = keyboard
+            Log.ui.warning("ConversationUX.keyboardGuide drift=\(Int(drift.rounded())) guide=\(guide) keyboard=\(keyboard) responder=\(type(of: responder)) action=reloadInputViews")
+            responder.reloadInputViews()
+        }
+
+        private func firstResponder(in view: UIView) -> UIView? {
+            if view.isFirstResponder { return view }
+            return view.subviews.lazy.compactMap { self.firstResponder(in: $0) }.first
         }
 
         private func hasFocusedWebInput(in view: UIView, insideWebView: Bool = false) -> Bool {
