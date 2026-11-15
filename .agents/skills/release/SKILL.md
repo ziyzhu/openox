@@ -48,7 +48,7 @@ App Store Connect and `ios-build-<number>` tag provenance before asking the oper
 follow the release flow's exact build-ID matching procedure. The script is
 read-only; its report is evidence, not proof of submission readiness.
 
-CI calls `.github/workflows/ios-upload.yml` in upload mode after checks and both native builds succeed on an initial push run to `main`, only when the full push changes iOS build inputs. `.github/workflows/ci.yml` owns that path filter; bundled agent skills are shipped content, not docs-only changes. Uploads use the verified commit and the existing serialized `appstore` environment. CI assigns uploaded builds to `gamma` but does not submit beta app review; external testing may require manual review submission. Manual dry-run and upload dispatch remain available; do not upload merely to verify workflow changes.
+CI calls `.github/workflows/ios-release.yml` in upload mode after checks and both native builds succeed on an initial push run to `main`, only when the full push changes iOS build inputs. `.github/workflows/ci.yml` owns that path filter; bundled agent skills are shipped content, not docs-only changes. Uploads use the verified commit and the existing serialized `appstore` environment. CI assigns uploaded builds to `gamma` but does not submit beta app review; external testing may require manual review submission. Manual dry-run and upload dispatch remain available; do not upload merely to verify workflow changes.
 
 The `appstore` environment secret `BUILD_SOURCE_TOKEN` needs Contents and Workflows write permissions. Prefer a token restricted to this repository; reusing a broader CLI token requires explicit operator approval. Only the build-source tagging step uses it. The built-in token can reject tags for older commits whose workflow files differ from current `main`; upload mode checks for the credential before uploading.
 
@@ -96,12 +96,12 @@ verification requires no prior publication. Run `bun run build:services` from
 the repository root before checking the services package.
 
 Run `bun run ci`; CLI releases also require the four-platform standalone checks
-in `.github/workflows/cli-standalone.yml`. Each package's `package-check.ts` creates
+in `.github/workflows/cli.yml`. Each package's `package-check.ts` creates
 and verifies its tarball. Keep release artifacts outside the repository.
 
 ## Publish packages
 
-The authorized `.github/workflows/publish-npm.yml` workflow owns publication and
+The authorized `.github/workflows/npm-release.yml` workflow owns publication and
 CLI GitHub Release delivery. It validates release tags, repository ancestry, and
 artifacts before invoking `.agents/skills/release/scripts/npm-publish.ts` with an
 explicit package and verified tarball. Tags must match the package version and

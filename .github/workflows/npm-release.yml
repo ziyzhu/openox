@@ -16,7 +16,7 @@ concurrency:
 jobs:
   standalone:
     if: startsWith(github.ref_name, 'ox-cli-v')
-    uses: ./.github/workflows/cli-standalone.yml
+    uses: ./.github/workflows/cli.yml
     permissions:
       contents: read
 

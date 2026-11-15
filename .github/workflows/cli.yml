@@ -15,8 +15,8 @@ on:
       - "examples/repository/**"
       - "package.json"
       - "bun.lock"
-      - ".github/workflows/cli-standalone.yml"
-      - ".github/workflows/publish-npm.yml"
+      - ".github/workflows/cli.yml"
+      - ".github/workflows/npm-release.yml"
   pull_request:
     branches: [main]
     paths:
@@ -30,8 +30,8 @@ on:
       - "examples/repository/**"
       - "package.json"
       - "bun.lock"
-      - ".github/workflows/cli-standalone.yml"
-      - ".github/workflows/publish-npm.yml"
+      - ".github/workflows/cli.yml"
+      - ".github/workflows/npm-release.yml"
 
 permissions: {}
 
