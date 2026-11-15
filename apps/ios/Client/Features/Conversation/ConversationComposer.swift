@@ -583,12 +583,12 @@ struct ConversationComposer: View, Equatable {
             case .importMemory:
                 Task { @MainActor in
                     await Skills.shared.waitUntilCurrent()
-                    guard let skill = Skills.shared.skill(named: "import-memory"), skill.owner == .system else {
+                    guard let skill = Skills.shared.skill(named: "onboard"), skill.owner == .system else {
                         Log.ui.error("ConversationComposer.importMemoryIntent unavailable conversation=\(sessionID)")
                         return
                     }
                     Log.ui.info("ConversationComposer.importMemoryIntent send conversation=\(sessionID)")
-                    onSubmitSkill(skill, "")
+                    onSubmitSkill(skill, String(localized: "Import memory to Ox"))
                 }
             }
         } label: {

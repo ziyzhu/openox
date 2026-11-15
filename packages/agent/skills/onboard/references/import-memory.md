@@ -1,8 +1,3 @@
----
-name: import-memory
-description: "Use when the user wants to bring durable personal context from another AI app into the active Ox Profile's memory, with review before saving. Do not use for ordinary conversation summaries or full-history exports."
----
-
 # Import Memory
 
 Use this workflow when the user wants Ox to remember information from another AI app. Import durable context into the active Profile's `MEMORY.md`, not full conversation history. If the source app is unclear, ask which one they mean.

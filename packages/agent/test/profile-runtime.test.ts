@@ -364,7 +364,7 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(mounts.mounts[0]!.files).toEqual({ "readme.md": "native notes" });
     const packages = await adapter.command({ action: "skillPackages" }) as { scope: string; skills: { name: string; source: string; files: Record<string, string> }[] };
     expect(packages.scope).toBe("ios-profile");
-    expect(packages.skills.map(skill => skill.name)).toEqual(["checkout", "evolve", "import-memory", "visualize"]);
+    expect(packages.skills.map(skill => skill.name)).toEqual(["checkout", "evolve", "onboard", "visualize"]);
     expect(packages.skills.every(skill => skill.source === "system" && skill.files["SKILL.md"]?.startsWith("---"))).toBe(true);
     expect(packages.skills.find(skill => skill.name === "evolve")!.files["references/providers.md"]).toContain("# Model Providers");
     expect(packages.skills.find(skill => skill.name === "visualize")!.files["references/html.md"]).toContain("# HTML Results and Apps");

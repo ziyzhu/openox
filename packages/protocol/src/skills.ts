@@ -1,4 +1,4 @@
-export const SYSTEM_SKILL_NAMES = ["checkout", "evolve", "import-memory", "visualize"] as const;
+export const SYSTEM_SKILL_NAMES = ["checkout", "evolve", "onboard", "visualize"] as const;
 export const RESERVED_SKILL_NAMES = [...SYSTEM_SKILL_NAMES, "manage-providers"] as const;
 export const SKILL_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const MAXIMUM_SKILL_BYTES = 524_288;
