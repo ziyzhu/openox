@@ -96,7 +96,7 @@ For page-owned actions, start from the action base page, serialize shared SPA na
 
 Diagnostics and outcomes:
 
-- The handler's second argument is an empty frozen object; it carries no session descriptor or diagnostic callback.
+- The handler's second argument is a frozen context exposing `secret(ref)` for Host-managed secret retrieval; it carries no session descriptor or diagnostic callback. Before implementing credential use, read `references/web-authentication.md` for ownership and login boundaries.
 - Use `console.log(JSON.stringify({ action: "example", phase: "waitingForControls", expectedControls: 2, observedControls: 0 }))` for concise phase-change diagnostics. Include only action ID, safe route, status, and counts; exclude credentials, field values, private bodies, and opaque tokens.
 - Throw a clear error when readiness or success cannot be established; logs alone do not verify the action. Distinguish pre-dispatch readiness failures from unverified outcomes after a mutation was dispatched; do not label both as controls failing to load.
 - Success predicates must verify the affected resource, not depend on removal of a dialog that the site may retain hidden in the DOM.
