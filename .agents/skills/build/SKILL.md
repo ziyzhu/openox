@@ -19,6 +19,8 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | `bun run ci` | Run lint, build and test with frozen dependencies, no `.env` loading and generated-resource drift checks; see [portable checks](portable.md). |
 | `bun run ci --native` | Run portable checks, current-platform standalone CLI checks, and unsigned iOS/macOS builds on macOS. |
 | `bun run ci --native-only` | Run agent generation and unsigned iOS/macOS builds, matching GitHub's native-build job. |
+| `bun run ci --ios-only` | Validate the native toolchain, install frozen dependencies, generate the agent, and build unsigned iOS only. |
+| `bun run ci --macos-only` | Validate the native toolchain, install frozen dependencies, generate the agent, and build unsigned macOS only. |
 | `bun run build:host-schema` | Regenerate Host RPC JSON/Swift artifacts. |
 | `bun run build:repository-schema` | Regenerate repository JSON/Swift artifacts. |
 | `bun run build:provider-schema` | Regenerate provider definitions schema. |

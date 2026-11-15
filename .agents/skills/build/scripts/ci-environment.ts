@@ -27,7 +27,7 @@ if (mode === "portable" || mode === "full") {
 if (mode === "standalone" || mode === "full") {
   if (!config.cli.some(entry => entry.platform === platform)) throw new Error(`Unsupported CLI verification platform: ${platform}`);
 }
-if (mode === "native" || mode === "full") {
+if (["native", "full", "ios", "macos"].includes(mode)) {
   const xcode = version(["xcodebuild", "-version"]).match(/^Xcode (\S+)/)?.[1];
   if (xcode !== config.xcode) throw new Error(`CI requires Xcode ${config.xcode}; found ${xcode ?? "unknown"}. Select the required Xcode with DEVELOPER_DIR or xcode-select.`);
 }

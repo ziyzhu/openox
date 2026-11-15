@@ -20,6 +20,11 @@ keeps the configured iOS bundle identifier. If `Local.xcconfig` is absent, CI cr
 one with the shared fallback identifier and removes it on exit. It does not boot a
 simulator or publish anything.
 
+Use `bun run ci --ios-only` or `bun run ci --macos-only` for one native target with
+the same preflight, frozen install, agent generation, and unsigned build settings.
+These modes are mutually exclusive with other CI modes; `--out` remains standalone-only.
+The macOS-only mode does not create or modify iOS configuration.
+
 The GitHub CI workflow uses `bun run ci --native-only` for its macOS build job;
 portable checks and the four-platform CLI matrix run separately. Native builds
 catch Swift build breaks only; they do not launch or exercise either app.

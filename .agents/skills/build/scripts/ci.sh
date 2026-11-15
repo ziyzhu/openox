@@ -6,11 +6,13 @@ mode=portable
 output=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --native|--native-only|--standalone-only)
+    --native|--native-only|--ios-only|--macos-only|--standalone-only)
       [ "$mode" = portable ] || { echo 'Choose only one CI mode' >&2; exit 1; }
       case "$1" in
         --native) mode=full ;;
         --native-only) mode=native ;;
+        --ios-only) mode=ios ;;
+        --macos-only) mode=macos ;;
         --standalone-only) mode=standalone ;;
       esac
       shift ;;
@@ -18,10 +20,12 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -ge 2 ] && [ -n "$2" ] || { echo '--out requires a directory' >&2; exit 1; }
       output="$2"; shift 2 ;;
     -h|--help)
-      echo 'Usage: bun run ci [--native | --native-only | --standalone-only [--out <directory>]]'
+      echo 'Usage: bun run ci [--native | --native-only | --ios-only | --macos-only | --standalone-only [--out <directory>]]'
       echo 'Default: lint, build, and test (portable, credential-free coverage).'
       echo '--native: default checks, current-platform standalone CLI, and unsigned iOS/macOS builds.'
       echo '--native-only: agent bundle and unsigned iOS/macOS builds (macOS, Xcode, and XcodeGen required).'
+      echo '--ios-only: agent bundle and unsigned iOS build.'
+      echo '--macos-only: agent bundle and unsigned macOS build.'
       echo '--standalone-only: standalone CLI checks for the current platform.'
       echo 'No live Hosts, model calls, credentials, or publication.'
       exit 0 ;;
@@ -34,12 +38,13 @@ fi
 for tool in bun git; do
   command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
 done
-if [ "$mode" = full ] || [ "$mode" = native ]; then
-  [ "$(uname -s)" = Darwin ] || { echo 'Native CI requires macOS' >&2; exit 1; }
-  for tool in xcodebuild xcodegen; do
-    command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
-  done
-fi
+case "$mode" in
+  full|native|ios|macos)
+    [ "$(uname -s)" = Darwin ] || { echo 'Native CI requires macOS' >&2; exit 1; }
+    for tool in xcodebuild xcodegen; do
+      command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
+    done ;;
+esac
 if [ "$mode" = full ] || [ "$mode" = standalone ]; then
   for tool in curl tar; do
     command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
@@ -72,17 +77,23 @@ if [ "$mode" = full ] || [ "$mode" = standalone ]; then
   fi
 fi
 
-if [ "$mode" = native ]; then
-  bun --no-env-file run build:agent
-fi
+case "$mode" in
+  native|ios|macos) bun --no-env-file run build:agent ;;
+esac
 
-if [ "$mode" = full ] || [ "$mode" = native ]; then
+if [ "$mode" = full ] || [ "$mode" = native ] || [ "$mode" = ios ]; then
   if [ ! -e apps/ios/Local.xcconfig ]; then
     bundle="$(bun --no-env-file -p 'require("./.github/ci.json").iosBundleIdentifier')"
     (set -o noclobber; printf 'OX_BUNDLE_IDENTIFIER = %s\n' "$bundle" > apps/ios/Local.xcconfig)
     trap 'rm -f apps/ios/Local.xcconfig' EXIT
   fi
   bun --no-env-file run build:ios CODE_SIGNING_ALLOWED=NO OX_DEVELOPMENT_TEAM=
+fi
+
+if [ "$mode" = full ] || [ "$mode" = native ] || [ "$mode" = macos ]; then
   bun --no-env-file run build:macos CODE_SIGNING_ALLOWED=NO OX_DEVELOPMENT_TEAM=
+fi
+
+if [ "$mode" = full ] || [ "$mode" = native ]; then
   echo 'PASS unsigned iOS and macOS builds'
 fi
