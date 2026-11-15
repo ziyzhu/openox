@@ -52,8 +52,10 @@ parameters and preparatory clicks without secret retrieval. The agent coordinate
 service with its fresh frameId; the Host executes one handler and never verifies login
 or advances steps. Same-page transitions belong to the handler. Manual interaction uses
 web.browser.showPage with the exact pageId after login, including frame-targeted invocations;
-it must not replay the handler or navigate to a replacement page. Verify cancellation, stale-document rejection, capture,
-and remember prompts separately. Web content inside the
+it must not replay the handler or navigate to a replacement page. Presentation keeps the original
+execution pending until Done/Cancel, returning only status: completed or cancelled without a synthetic
+user message. Verify cancellation, stale-document rejection, capture, and remember prompts separately.
+The runner allows a longer cold service-list timeout because that Host endpoint fetches service icons. Web content inside the
 handoff is reachable only through `idb ui describe-point`; open the full-screen
 handoff before typing into it. When a bundled service introduces a new site or login
 shape, add a fixture for it. For browser ownership changes, compare page IDs across

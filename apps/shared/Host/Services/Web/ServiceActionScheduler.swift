@@ -205,7 +205,7 @@ final class ServiceActionScheduler {
 
     func requireNoPresentation(_ page: BrowserSession) throws {
         guard queues[ObjectIdentifier(page)]?.reservation == nil else {
-            throw OxFunctionError(code: "page_awaiting_user", message: "The page is awaiting user interaction.", recovery: "Finish the turn and wait for Done or Cancel before continuing.")
+            throw OxFunctionError(code: "page_awaiting_user", message: "The page is awaiting user interaction.", recovery: "Await the pending interaction's Done or Cancel result before using this page.")
         }
     }
 

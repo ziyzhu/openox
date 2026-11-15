@@ -18,7 +18,6 @@ final class NativeServiceOperations {
     let importFile: (TransientAttachment, String) async throws -> FileItem
     let choose: (Prompt) async throws -> String?
     let authorizeBrowserSite: (String, String?) async throws -> Void
-    let scheduleHandoff: ((String, @escaping @MainActor () async throws -> JSONValue) -> JSONValue)?
 
     init(
         id: UUID,
@@ -29,8 +28,7 @@ final class NativeServiceOperations {
         attachTransient: @escaping (TransientAttachment) throws -> Void,
         importFile: @escaping (TransientAttachment, String) async throws -> FileItem,
         choose: @escaping (Prompt) async throws -> String?,
-        authorizeBrowserSite: @escaping (String, String?) async throws -> Void,
-        scheduleHandoff: ((String, @escaping @MainActor () async throws -> JSONValue) -> JSONValue)? = nil
+        authorizeBrowserSite: @escaping (String, String?) async throws -> Void
     ) {
         self.id = id
         self.serviceManager = serviceManager
@@ -41,12 +39,6 @@ final class NativeServiceOperations {
         self.importFile = importFile
         self.choose = choose
         self.authorizeBrowserSite = authorizeBrowserSite
-        self.scheduleHandoff = scheduleHandoff
-    }
-
-    func handoff(title: String, operation: @escaping @MainActor () async throws -> JSONValue) async throws -> JSONValue {
-        if let scheduleHandoff { return scheduleHandoff(title, operation) }
-        return try await operation()
     }
 
     func presentServicePage(_ service: Service, page: BrowserSession) throws {

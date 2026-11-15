@@ -272,7 +272,7 @@ final class ConversationInteractionGate {
 
     private func waitForPrompt(_ prompt: PendingPrompt) async -> PromptResult {
         await withCheckedContinuation { continuation in
-            if !conversation.isBusy && conversation.pendingHandoffs.isEmpty {
+            if !conversation.isBusy {
                 Log.session.error("Conversation prompt outside run id=\(conversation.id) block=\(prompt.id)")
                 continuation.resume(returning: .cancelled)
             } else {

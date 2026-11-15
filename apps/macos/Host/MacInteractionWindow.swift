@@ -45,7 +45,7 @@ enum MacCredentialPrompt {
         for (index, title) in buttons.enumerated() {
             alert.addButton(withTitle: title).setAccessibilityIdentifier("mac-host-auth-choice-\(index)")
         }
-        let owner = MacInteractionWindow(title: title, size: NSSize(width: 440, height: 180), view: Text(message).padding(24)) { NSApplication.shared.endSheet(alert.window, returnCode: NSApplication.ModalResponse.abort.rawValue) }
+        let owner = MacInteractionWindow(title: title, size: NSSize(width: 440, height: 180), view: Text(message).padding(24)) { alert.window.sheetParent?.endSheet(alert.window, returnCode: .abort) }
         defer { owner.dismiss() }
         let response = await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
@@ -53,7 +53,7 @@ enum MacCredentialPrompt {
                 else { alert.beginSheetModal(for: owner.window) { continuation.resume(returning: $0) } }
             }
         } onCancel: {
-            Task { @MainActor in NSApplication.shared.endSheet(alert.window, returnCode: NSApplication.ModalResponse.abort.rawValue) }
+            Task { @MainActor in alert.window.sheetParent?.endSheet(alert.window, returnCode: .abort) }
         }
         try Task.checkCancellation()
         let index = response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
@@ -82,7 +82,7 @@ enum MacCredentialPrompt {
             secret.stringValue = prefill.secret
         }
         alert.accessoryView = fields
-        let owner = MacInteractionWindow(title: title, size: NSSize(width: 440, height: 180), view: Text("Authentication stays on this Host.").padding(24)) { NSApplication.shared.endSheet(alert.window, returnCode: NSApplication.ModalResponse.abort.rawValue) }
+        let owner = MacInteractionWindow(title: title, size: NSSize(width: 440, height: 180), view: Text("Authentication stays on this Host.").padding(24)) { alert.window.sheetParent?.endSheet(alert.window, returnCode: .abort) }
         defer {
             secret.stringValue = ""
             name.stringValue = ""
@@ -94,7 +94,7 @@ enum MacCredentialPrompt {
                 else { alert.beginSheetModal(for: owner.window) { continuation.resume(returning: $0) } }
             }
         } onCancel: {
-            Task { @MainActor in NSApplication.shared.endSheet(alert.window, returnCode: NSApplication.ModalResponse.abort.rawValue) }
+            Task { @MainActor in alert.window.sheetParent?.endSheet(alert.window, returnCode: .abort) }
         }
         try Task.checkCancellation()
         guard response == .alertFirstButtonReturn else { throw CancellationError() }

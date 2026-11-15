@@ -547,41 +547,41 @@ final class ServiceOperations {
         }
         let owner = serviceManager.services.first { $0.servicePages.contains { $0 === page } } ?? serviceManager.browserService
         let isLogin = page.lastInvocation?.actionID == WebSessionContract.loginAction && WebSessionContract.isEnabled(service.definition)
-        return try await native.handoff(title: purpose) { [self] in
-            defer { lease.release() }
-            let handoff = ServiceHandoffSession(
-                service: owner,
-                servicePage: page,
-                title: service.title,
-                navigationTitle: service.title,
-                control: isLogin ? .login(domain: service.domain, serviceName: service.title) : nil
-            )
-            let capture = isLogin ? LoginCapture() : nil
-            await capture?.install(on: page, owner: service, credentials: rememberSecret != nil)
-            let outcome: ServiceHandoffSession.Outcome
-            if let presentServiceHandoff {
-                outcome = await presentServiceHandoff(owner, page, handoff)
-            } else {
-                outcome = await native.presentations.serviceHandoff.present(session: handoff)
-            }
-            await capture?.remove()
-            let trace = capture?.trace
-            if let capture {
-                Log.service.info("Service.login trace domain=\(service.domain) page=\(page.logLabel) steps=\(capture.steps.count) truncated=\(capture.truncated) outcome=\(outcome.rawValue)")
-            }
-            if let capture, outcome == .completed, lease.isActive, !Task.isCancelled {
+        defer { lease.release() }
+        let handoff = ServiceHandoffSession(
+            service: owner,
+            servicePage: page,
+            title: service.title,
+            navigationTitle: service.title,
+            control: isLogin ? .login(domain: service.domain, serviceName: service.title) : nil
+        )
+        let capture = isLogin ? LoginCapture() : nil
+        await capture?.install(on: page, owner: service, credentials: rememberSecret != nil)
+        let outcome: ServiceHandoffSession.Outcome
+        if Task.isCancelled || !lease.isActive || !page.isOpen {
+            outcome = .failed
+        } else if let presentServiceHandoff {
+            outcome = await presentServiceHandoff(owner, page, handoff)
+        } else {
+            outcome = await native.presentations.serviceHandoff.present(session: handoff)
+        }
+        await capture?.remove()
+        if let capture {
+            Log.service.info("Service.login trace domain=\(service.domain) page=\(page.logLabel) steps=\(capture.steps.count) truncated=\(capture.truncated) outcome=\(outcome.rawValue)")
+            if outcome == .completed, lease.isActive, !Task.isCancelled {
+                for (index, step) in capture.steps.enumerated() {
+                    Log.service.info("Service.login traceStep domain=\(service.domain) page=\(page.logLabel) index=\(index) step=\(step.jsonString())")
+                }
                 await offerToRemember(capture, service: service)
             }
-            await capture?.discard()
-            try Task.checkCancellation()
-            guard outcome != .failed, lease.isActive else {
-                throw OxFunctionError(code: "page_unavailable", message: "The live page interaction could not be completed.", recovery: "Inspect the preserved page. Do not reopen automatically or repeat a mutation.")
-            }
-            Log.service.info("Browser.showPage interaction domain=\(service.domain) session=\(page.logLabel) outcome=\(outcome.rawValue)")
-            var result: [String: JSONValue] = ["shown": .bool(true), "completion": .string(outcome.rawValue)]
-            if outcome == .completed, let trace { result["loginTrace"] = trace }
-            return .object(result)
         }
+        await capture?.discard()
+        try Task.checkCancellation()
+        guard outcome != .failed, lease.isActive else {
+            throw OxFunctionError(code: "page_unavailable", message: "The live page interaction could not be completed.", recovery: "Inspect the preserved page. Do not reopen automatically or repeat a mutation.")
+        }
+        Log.service.info("Browser.showPage interaction domain=\(service.domain) session=\(page.logLabel) outcome=\(outcome.rawValue)")
+        return .object(["status": .string(outcome.rawValue)])
     }
 
     func requirePresentablePage(service: Service, page: BrowserSession) async throws {

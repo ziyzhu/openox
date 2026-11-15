@@ -10,13 +10,16 @@ export const handoffCases: Case[] = scenarios.map(scenario => ({
   async run(h) {
     const domain = `ox-handoff-${scenario}.localhost`;
     const started = Date.now();
-    const result = await h.turn(`await (async () => { ${invokeScript(`web:${domain}:login`)} })();
+    await h.begin(`await (async () => { ${invokeScript(`web:${domain}:login`)} })();
 const { pages } = await ox.web.browser.list({ purpose: "Find prepared handoff page" });
 try { return { value: await ox.web.browser.showPage({ purpose: "Show stress handoff", pageId: pages[0].pageId }) }; }
-catch (error) { return { error: error.message, code: error.code }; }`);
+catch (error) { return { error: error.message, code: error.code }; }`, true);
+    const terminal = scenario === "loop" || scenario === "timeout";
+    let result: any;
+    if (terminal) result = h.lastResult(await h.idle());
+    else await h.waitMatching(/^conversation\.service\.login\..+\.done$/, 20_000);
     const elapsedMs = Date.now() - started;
     const counters = Object.fromEntries(Object.entries(h.site("handoff").counters).filter(([key]) => key.startsWith(`${scenario}.`)).map(([key, value]) => [key.slice(scenario.length + 1), value]));
-    const terminal = scenario === "loop" || scenario === "timeout";
     try {
       assert.equal(counters.dispatches, 1, "login was not dispatched exactly once");
       assert.equal(counters.starts, 1, "login navigation was replayed");
@@ -29,8 +32,7 @@ catch (error) { return { error: error.message, code: error.code }; }`);
         assert.equal(recovery.recovered, true, "failed handoff left the conversation locked");
         return `bounded failure in ${elapsedMs}ms, code=${result.code}, dispatches=1, hops=${counters.hops ?? 0}, conversation usable`;
       }
-      assert.equal(result.value?.status, "awaiting_user", JSON.stringify(result));
-      await h.waitMatching(/^conversation\.service\.login\..+\.done$/, 20_000);
+      assert.equal((await h.snapshot()).isBusy, true, "presentation must keep execution pending");
       assert.equal(counters.destinations, 1, "handoff appeared before the final destination was served");
       await h.tapMatching(/^serviceInspector\.open\./);
       await h.ios.wait({ id: "serviceHandoff.cancel" }, { timeout: 10_000, stable: 500 });
@@ -39,7 +41,10 @@ catch (error) { return { error: error.message, code: error.code }; }`);
         await h.screenshot(`handoff-${scenario}`);
       } finally {
         await h.ios.tap({ id: "serviceHandoff.cancel" }, { stable: 300 });
-        await h.idle();
+        const cancelled = await h.idle();
+        result = h.lastResult(cancelled);
+        assert.deepEqual(result.value, { status: "cancelled" });
+        assert.ok(!JSON.stringify(cancelled).includes("<user_interaction>"));
       }
       assert.equal(h.site("handoff").counters[`${scenario}.dispatches`], 1, "handoff cancellation replayed login");
       assert.deepEqual(await h.turn(invokeScript(`web:${domain}:listSessions`)), []);

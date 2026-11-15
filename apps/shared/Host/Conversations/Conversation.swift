@@ -259,9 +259,6 @@ final class Conversation: Identifiable {
         modelPreparationTask?.cancel()
         modelPreparationTask = nil
         deselect()
-        let handoffs = pendingHandoffs.values
-        pendingHandoffs.removeAll()
-        for task in handoffs { task.cancel() }
         serviceManager.browserActionSessions.closeSession(for: id)
         serviceManager.browserSessions.close(scopeID: id)
         if cancelling { durablePreparation?.cancel(); cancelAll() }
@@ -310,11 +307,7 @@ final class Conversation: Identifiable {
 
     private(set) var notice = Notice.none
 
-    func reportHandoffFailure(_ message: String) {
-        notice = .error(message)
-    }
-
-    private var handoffControl: ServiceControl?
+    private var handoffSession: ServiceHandoffSession?
 
     var activity: Activity {
         let control: ServiceControl?
@@ -324,7 +317,10 @@ final class Conversation: Identifiable {
         case .serviceControl(let pending):
             control = pending.control
         case nil:
-            control = handoffControl
+            if let handoffSession, handoffSession.control == nil {
+                return .running(.awaiting(.reply))
+            }
+            control = handoffSession?.control
         }
         if let control {
             switch control {
@@ -367,7 +363,6 @@ final class Conversation: Identifiable {
     }
 
     @ObservationIgnored private var standaloneServiceInvocations: Set<UUID> = []
-    var pendingHandoffs: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored var importedMCPFileDigests: Set<String> = []
 
     var serviceOperations: ServiceOperations {
@@ -436,23 +431,34 @@ final class Conversation: Identifiable {
             native: nativeServiceOperations,
             presentServiceHandoff: { [weak self] service, page, session in
                 guard let self else { return .failed }
-                handoffControl = session.control
-                defer { handoffControl = nil }
+                guard handoffSession == nil else { return .failed }
+                handoffSession = session
+                let phase: ConversationBackgroundPhase
+                switch session.control {
+                case .login: phase = .loginNeeded
+                case .botControl: phase = .verificationNeeded
+                case .payment: phase = .paymentNeeded
+                case nil: phase = .inputNeeded
+                }
+                activeRun?.backgroundExecution?.finish(.awaitingInput(phase))
+                activeRun?.backgroundExecution = nil
+                defer {
+                    handoffSession = nil
+                    if !Task.isCancelled { startBackgroundExecution() }
+                }
                 let started = ContinuousClock.now
                 defer { activeLatency?.recordHandoff(started.duration(to: .now)) }
+                service.conversationHandoffs[page.id] = (id, session)
+                defer { service.conversationHandoffs[page.id] = nil }
                 if presentations.browser != nil {
                     return await presentations.serviceHandoff.present(session: session)
                 }
-                service.conversationHandoffs[page.id] = (id, session)
                 let link = ServiceInspectorLink(
                     domain: service.domain,
                     serviceName: session.title,
                     pageID: page.id,
                     isHandoff: true
                 )
-                defer {
-                    service.conversationHandoffs[page.id] = nil
-                }
                 embedServiceInspector(link)
                 return await session.run()
             },
@@ -509,10 +515,6 @@ final class Conversation: Identifiable {
             },
             authorizeBrowserSite: { [unowned self] site, purpose in
                 try await requireApproval(action: Actions.browserSite(site), defaultPolicy: .ask, purpose: purpose)
-            },
-            scheduleHandoff: { [weak self] title, operation in
-                guard let self else { return .null }
-                return scheduleHandoff(title: title, operation: operation)
             }
         )
     }
@@ -701,7 +703,7 @@ final class Conversation: Identifiable {
         case .running, .completed: nil
         }
     }
-    var hasPendingInteraction: Bool { interaction != nil || !pendingHandoffs.isEmpty }
+    var hasPendingInteraction: Bool { interaction != nil || handoffSession != nil }
     @ObservationIgnored private var finishingStartedAt: Date?
     @ObservationIgnored private var finishingWatchdog: Task<Void, Never>?
     @ObservationIgnored private var activeLatency: TurnLatencyTrace?
@@ -1732,6 +1734,7 @@ final class Conversation: Identifiable {
 
     private func startBackgroundExecution() {
         guard executionLease == .userInitiated,
+              !hasPendingInteraction,
               let runID = activeRun?.id,
               activeRun?.backgroundExecution == nil else { return }
         let execution = self.execution.backgroundExecution(conversationID: id, runID: runID) { [weak self] in

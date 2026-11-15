@@ -105,7 +105,7 @@ nonisolated enum OxWeb {
                 var fields = jsValueToJSON(options)?.objectValue ?? [:]
                 let purpose = fields.removeValue(forKey: "purpose")?.stringValue ?? ""
                 let arguments = JSONValue.object(fields)
-                return env.call(suspendingTimeout: action == "waitForNavigation") {
+                return env.call(suspendingTimeout: action == "waitForNavigation" || action == "showPage") {
                     try await $0.browserOperation(action: action, arguments: arguments, purpose: purpose)
                 }
             }

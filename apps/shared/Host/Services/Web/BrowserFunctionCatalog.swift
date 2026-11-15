@@ -136,18 +136,15 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "showPage",
             label: "Show Page",
-            description: "Present Browser's live page with Done/Cancel after clearing capture and injected scripts. Return immediately so the agent can finish its turn. Done/Cancel submits the next user prompt.",
+            description: "Present the exact live page with Done/Cancel after clearing capture and injected scripts. Await user interaction and return its status in the same execution. Completed acknowledges interaction, not task success.",
             inputSchema: object(["pageId": pageID], required: ["pageId"]),
             outputSchema: object([
-                "shown": boolean,
-                "loginTrace": LoginCapture.traceSchema,
-                "status": .object(["type": .string("string"), "const": .string("awaiting_user")]),
-                "completion": .object([
+                "status": .object([
                     "type": .string("string"),
                     "enum": .array([.string("completed"), .string("cancelled")]),
-                    "description": .string("Only returned outside a conversation: completed means Done; cancelled means Cancel."),
+                    "description": .string("Completed means Done, not verified task success; cancelled means Cancel."),
                 ]),
-            ], required: ["shown"]),
+            ], required: ["status"]),
             hasModelGuidance: true
         ),
         Action(

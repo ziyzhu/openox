@@ -94,7 +94,7 @@ extension Conversation: OxFunctionBridge {
     }
 
     public func invokeAction(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, frameID: String? = nil, purpose: String) async throws -> JSONValue? {
-        try requireNoPendingHandoff()
+        try Task.checkCancellation()
         return try await serviceOperations.invokeAction(name: name, args: args ?? .object([:]), session: session, pageURL: pageURL, frameID: frameID, purpose: purpose) ?? .null
     }
 }
@@ -150,7 +150,7 @@ extension Conversation {
     }
 
     public func loginService(domain: String, purpose: String) async throws -> JSONValue? {
-        try requireNoPendingHandoff()
+        try Task.checkCancellation()
         return try await serviceOperations.loginService(domain: domain, purpose: purpose)
     }
 

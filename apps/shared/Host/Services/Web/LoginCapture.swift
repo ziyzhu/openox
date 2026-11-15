@@ -5,37 +5,6 @@ final class LoginCapture: NSObject, WKScriptMessageHandler {
     static let channelName = "oxLoginCapture"
     static let flowChannelName = "oxLoginFlow"
 
-    nonisolated static let traceSchema: JSONValue = {
-        let control: JSONValue = .object([
-            "type": .string("object"), "additionalProperties": .bool(false),
-            "properties": .object([
-                "selector": .object(["type": .string("string"), "maxLength": .int(1024)]),
-                "kind": .object(["type": .string("string"), "enum": .array(["username", "password", "code", "text", "button", "link", "form", "select"].map(JSONValue.string))]),
-                "intent": .object(["type": .string("string")]),
-            ]), "required": .array(["selector", "kind"].map(JSONValue.string)),
-        ])
-        return .object([
-            "type": .string("object"), "additionalProperties": .bool(false),
-            "properties": .object([
-                "steps": .object([
-                    "type": .string("array"), "maxItems": .int(64),
-                    "items": .object([
-                        "type": .string("object"), "additionalProperties": .bool(false),
-                        "properties": .object([
-                            "event": .object(["type": .string("string"), "enum": .array(["page", "focus", "click", "submit"].map(JSONValue.string))]),
-                            "origin": .object(["type": .string("string")]),
-                            "mainFrame": .object(["type": .string("boolean")]),
-                            "route": .object(["type": .string("string"), "description": .string("Redacted path pattern; never navigate to this placeholder route.")]),
-                            "controls": .object(["type": .string("array"), "maxItems": .int(16), "items": control]),
-                            "target": control,
-                        ]), "required": .array(["event", "origin", "mainFrame", "route", "controls"].map(JSONValue.string)),
-                    ]),
-                ]),
-                "truncated": .object(["type": .string("boolean")]),
-            ]), "required": .array(["steps", "truncated"].map(JSONValue.string)),
-        ])
-    }()
-
     struct Value {
         let text: String
         let host: String
@@ -117,10 +86,6 @@ final class LoginCapture: NSObject, WKScriptMessageHandler {
         case "password": password = value
         default: return
         }
-    }
-
-    var trace: JSONValue {
-        .object(["steps": .array(steps), "truncated": .bool(truncated)])
     }
 
     private func recordStep(_ message: WKScriptMessage) {

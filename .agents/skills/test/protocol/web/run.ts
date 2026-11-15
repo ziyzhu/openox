@@ -78,7 +78,7 @@ try {
     if (attempt > 60) throw new Error(`Host did not become available: ${synced.error}`);
     await Bun.sleep(500);
   }
-  const loaded = new Set((await h.ox(["service", "list"]) as Array<{ domain: string }>).map(service => service.domain));
+  const loaded = new Set((await h.ox(["service", "list", "--timeout", "180000"]) as Array<{ domain: string }>).map(service => service.domain));
   const missing = sites.flatMap(site => site.services(fixtures.origin).map(service => service.manifest.domain)).filter(domain => !loaded.has(domain));
   if (missing.length) throw new Error(`Fixture services did not load: ${missing.join(", ")}`);
   await writeFile(join(evidence, "function-catalog.json"), JSON.stringify(await h.ox(["vm", "functions"])), { mode: 0o600 });
