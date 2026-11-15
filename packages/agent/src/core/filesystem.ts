@@ -9,6 +9,7 @@ import { canonical } from "./file-paths";
 import { filesystemContract } from "./filesystem-contract";
 import { bundledSkills } from "./bundled-skills";
 import { decodeBase64 } from "./base64";
+import { embedServiceAutomation } from "./service-automation";
 
 const tools = { read: createReadTool(), write: createWriteTool(), edit: createEditTool() };
 export type FileOperation = "stat" | "list" | "read" | "write" | "edit" | "rm" | "mkdir" | "move" | "copy" | "glob" | "grep";
@@ -177,7 +178,7 @@ async function executeFileTool(operation: "read" | "write" | "edit", args: FileR
     throw new Error(`Filesystem tools cannot access invocation capability ${String(name)}`);
   } }) as unknown as ToolExecutionApi;
   if (operation === "read") return tools.read.execute({ path: args.path!, offset: args.offset, limit: args.limit }, api, context);
-  if (operation === "write") return tools.write.execute({ path: args.path!, content: args.content! }, api, context);
+  if (operation === "write") return tools.write.execute({ path: args.path!, content: embedServiceAutomation(args.path!, args.content!) }, api, context);
   return tools.edit.execute({ path: args.path!, edits: args.edits! }, api, context);
 }
 function readPage(result: ToolExecutionResult, args: FileRequest, totalLines: number) {
