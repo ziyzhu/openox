@@ -18,6 +18,7 @@ final class ConversationServiceAttachments {
 
     private(set) var services: [Service] = []
     @ObservationIgnored private(set) var domains: [String] = []
+    @ObservationIgnored private var loadedDomains: Set<String> = []
     @ObservationIgnored private unowned let conversation: Conversation
     @ObservationIgnored private let cancelInteractions: (Set<String>) -> Void
     @ObservationIgnored private let resumeAgent: (JSONValue, SystemEvent) -> Void
@@ -34,6 +35,7 @@ final class ConversationServiceAttachments {
 
     private var id: UUID { conversation.id }
     private var serviceManager: ServiceManager { conversation.serviceManager }
+    var loadedServices: [Service] { loadedDomains.sorted().compactMap { serviceManager.service(domain: $0) } }
 
     func restore(_ stored: [String]) {
         domains = Self.uniqueDomains(stored)
@@ -47,27 +49,41 @@ final class ConversationServiceAttachments {
         services.first { $0.domain == domain }
     }
 
-    func target(_ name: String, label: String) throws -> (service: Service, id: String) {
+    func resolveService(_ domain: String) async throws -> Service {
+        let locale = AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+        if serviceManager.service(domain: domain) == nil {
+            await serviceManager.refreshServices(locale: locale)
+        }
+        var candidate = try await serviceManager.serviceForAttachment(domain: domain)
+        if let current = serviceManager.service(domain: candidate.domain), current.sourceVersion != candidate.sourceVersion {
+            await serviceManager.refreshServices(locale: locale)
+            candidate = try await serviceManager.serviceForAttachment(domain: candidate.domain)
+        }
+        let service = try await serviceManager.selectServiceForAttachment(candidate)
+        if let index = services.firstIndex(where: { $0.domain == service.domain }) {
+            var updated = services
+            updated[index] = service
+            replace(updated)
+        } else {
+            replace(services + [service])
+        }
+        Log.session.info("Conversation.service resolved id=\(id) domain=\(service.domain) source=\(service.sourceVersion ?? "none")")
+        return service
+    }
+
+    func target(_ name: String, label: String) async throws -> (service: Service, id: String) {
         let parts = name.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
         if parts.count == 3, ["web", "api", "ios", "mcp"].contains(parts[0]) {
-            let service = services.first { candidate in
-                switch parts[0] {
-                case "web": candidate.isWebService && candidate.domain == parts[1]
-                case "api": candidate.isAPIService && candidate.domain == parts[1]
-                case "ios": candidate.isIOSService && candidate.domain == "ios:\(parts[1])"
-                case "mcp": candidate.isMCPService && candidate.domain == parts[1]
-                default: false
-                }
+            guard !parts[1].isEmpty, !parts[2].isEmpty else {
+                throw RuntimeError.bridge("\(label): service and action must be non-empty")
             }
-            guard let service else {
-                throw OxFunctionError(code: "service_not_attached", message: "\(label): service '\(parts[0]):\(parts[1])' isn't attached to this conversation.", recovery: "Find the service with ox.service.find and attach its exact returned domain with ox.service.attach before invoking its actions.")
+            let service = try await resolveService(parts[0] == "ios" ? "ios:\(parts[1])" : parts[1])
+            guard ServiceOperations.serviceKind(service) == parts[0] else {
+                throw Service.InvokeError.unknown(name)
             }
             return (service, parts[2])
         }
-        if services.count == 1, let only = services.first {
-            return (only, name)
-        }
-        throw RuntimeError.bridge("\(label): use 'web:<domain>:\(name)', 'ios:<app>:\(name)', or 'mcp:<server>:\(name)' — the conversation has \(services.count) services attached.")
+        throw RuntimeError.bridge("\(label): use a qualified web:<domain>:<action>, api:<service>:<action>, ios:<app>:<action>, or mcp:<server>:<action> name.")
     }
 
     func set(_ supplied: [Service]) {
@@ -76,7 +92,8 @@ final class ConversationServiceAttachments {
         if normalized.count != supplied.count {
             Log.session.warning("Conversation.setAttachedServices deduplicated id=\(id) supplied=\(supplied.count) unique=\(normalized.count)")
         }
-        let normalizedDomains = normalized.map(\.domain)
+        let visibleDomains = Set(services.map(\.domain))
+        let normalizedDomains = normalized.map(\.domain).filter { domains.contains($0) || !visibleDomains.contains($0) }
         guard normalizedDomains != domains else {
             replace(normalized)
             return
@@ -87,8 +104,12 @@ final class ConversationServiceAttachments {
     }
 
     func attach(_ service: Service) -> Bool {
-        guard !services.contains(where: { $0.domain == service.domain }) else { return false }
-        set(services + [service])
+        guard !domains.contains(service.domain) else { return false }
+        domains.append(service.domain)
+        if !services.contains(where: { $0.domain == service.domain }) {
+            replace(services + [service])
+        }
+        conversation.onPersistableChange?()
         return true
     }
 
@@ -132,7 +153,8 @@ final class ConversationServiceAttachments {
             Log.session.warning("Conversation.resolveAttachedServices deduplicated id=\(id) stored=\(domains.count) unique=\(normalizedDomains.count)")
             domains = normalizedDomains
         }
-        replace(domains.compactMap { serviceManager.service(domain: $0) })
+        let visible = Self.uniqueDomains(domains + services.map(\.domain))
+        replace(visible.compactMap { serviceManager.service(domain: $0) })
     }
 
     private static func uniqueDomains(_ domains: [String]) -> [String] {
@@ -157,17 +179,18 @@ final class ConversationServiceAttachments {
     private func replace(_ replacement: [Service]) {
         assert(Set(replacement.map(\.domain)).count == replacement.count)
         assert(replacement.allSatisfy { serviceManager.service(domain: $0.domain) === $0 })
+        loadedDomains.formUnion(replacement.map(\.domain))
         let unchanged = replacement.count == services.count
             && zip(replacement, services).allSatisfy { pair in pair.0 === pair.1 }
         guard !unchanged else { return }
         let removed = services.filter { candidate in
             !replacement.contains { $0 === candidate }
         }
-        cancelInteractions(Set(removed.map(\.domain)))
+        cancelInteractions(Set(removed.filter { serviceManager.service(domain: $0.domain) !== $0 }.map(\.domain)))
         services = replacement
         Log.session.info("Conversation.setAttachedServices id=\(id) attached=\(replacement.map(\.domain).joined(separator: ",")) selected=\(conversation.isSelected)")
         if conversation.isSelected {
-            serviceManager.setAttachedServices(replacement, for: id)
+            serviceManager.setAttachedServices(loadedServices, for: id)
         }
         for svc in replacement {
             Task { _ = await svc.loadManifest(reason: .attach) }

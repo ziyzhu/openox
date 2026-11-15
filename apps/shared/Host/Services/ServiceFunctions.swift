@@ -74,21 +74,6 @@ extension Conversation: OxFunctionBridge {
         try await serviceOperations.listServices(kind: kind, purpose: purpose)
     }
 
-    public func listAttachedServices(kind: String?, purpose: String) async throws -> JSONValue? {
-        guard kind == nil || kind == "web" || kind == "api" || kind == "ios" || kind == "mcp" else {
-            throw RuntimeError.bridge("ox.service.listAttached: kind must be 'web', 'api', 'ios', or 'mcp'")
-        }
-        let args: JSONValue = .object(kind.map { ["kind": .string($0)] } ?? [:])
-        return try await tracked(Actions.serviceListAttached, args, purpose: purpose) {
-            let snapshots = try self.attachedServices
-                .filter { kind == nil || ServiceOperations.serviceKind($0) == kind }
-                .sorted { $0.domain < $1.domain }
-                .map { JSONValue.object(try ServiceOperations.serviceSnapshotFields($0, attached: true)) }
-            Log.session.info("bridge.service.listAttached kind=\(kind ?? "all") count=\(snapshots.count)")
-            return .array(snapshots)
-        }
-    }
-
     public func inspectService(domain: String, cursor: String?, purpose: String) async throws -> JSONValue? {
         try await serviceOperations.inspectService(domain: domain, cursor: cursor, purpose: purpose)
     }
@@ -97,79 +82,13 @@ extension Conversation: OxFunctionBridge {
         try Task.checkCancellation()
         return try await serviceOperations.invokeAction(name: name, args: args ?? .object([:]), session: session, pageURL: pageURL, frameID: frameID, purpose: purpose) ?? .null
     }
-}
-
-extension Conversation {
-    func requireIOSService(_ id: String) throws {
-        guard attachedServices.contains(where: { $0.domain == id }) else {
-            throw RuntimeError.bridge("\(id) isn't attached to this conversation. Find and attach it before using this iOS service.")
-        }
-    }
 
     public func findServices(query: String, purpose: String) async throws -> JSONValue? {
         try await serviceOperations.findServices(query: query, purpose: purpose)
-    }
-
-    public func attachService(domain: String, purpose: String) async throws -> JSONValue? {
-        guard !domain.isEmpty else {
-            throw RuntimeError.bridge("ox.service.attach: requires a non-empty domain")
-        }
-        return try await tracked(Actions.serviceAttach, .object(["domain": .string(domain)]), purpose: purpose) {
-            await serviceManager.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
-            let candidate = try await serviceManager.serviceForAttachment(domain: domain)
-            if attachedService(domain: candidate.domain) == nil { try await gateServiceAttach(candidate) }
-            let service = try await serviceManager.selectServiceForAttachment(candidate)
-            let existing = attachedService(domain: service.domain)
-            serviceManager.setSaved(service, true)
-            if let existing, let index = attachedServices.firstIndex(where: { $0 === existing }) {
-                var services = attachedServices
-                services[index] = service
-                setAttachedServices(services)
-            } else {
-                setAttachedServices(attachedServices + [service])
-            }
-            var result = try ServiceOperations.serviceSnapshotFields(service, attached: true)
-            do {
-                if case .object(var inspection) = try await serviceOperations.inspectService(domain: service.domain, cursor: nil, purpose: purpose) {
-                    if case .object(let snapshot) = inspection.removeValue(forKey: "service") {
-                        result.merge(snapshot) { _, inspected in inspected }
-                    }
-                    result.merge(inspection) { _, inspected in inspected }
-                }
-            } catch {
-                let failure = OxFunctionError.from(error)
-                if failure.code == "cancelled" { throw error }
-                result["capabilitiesError"] = failure.value
-                Log.session.warning("bridge.service.attach capabilitiesUnavailable domain=\(service.domain) code=\(failure.code)")
-            }
-            result["reloaded"] = .bool(existing != nil)
-            let snapshot = service.snapshot(attached: true)
-            Log.session.info("bridge.service.attach requested=\(domain) domain=\(service.domain) reloaded=\(existing != nil) login=\(snapshot.login.rawValue)")
-            return .object(result)
-        }
     }
 
     public func loginService(domain: String, purpose: String) async throws -> JSONValue? {
         try Task.checkCancellation()
         return try await serviceOperations.loginService(domain: domain, purpose: purpose)
     }
-
-    public func detachService(domain: String, purpose: String) async throws -> JSONValue? {
-        try await tracked(Actions.serviceDetach, .object(["domain": .string(domain)]), purpose: purpose) {
-            guard !domain.isEmpty else {
-                throw RuntimeError.bridge("ox.service.detach: requires a non-empty domain")
-            }
-            guard let service = attachedService(domain: domain) ?? serviceManager.service(domain: domain) else {
-                throw RuntimeError.bridge("ox.service.detach: no service with domain '\(domain)'.")
-            }
-            guard attachedService(domain: domain) != nil else {
-                Log.session.info("bridge.service.detach not attached domain=\(domain)")
-                return try Self.encodeToJSON(service.snapshot(attached: false))
-            }
-            setAttachedServices(attachedServices.filter { $0.domain != domain })
-            Log.session.info("bridge.service.detach detached domain=\(domain)")
-            return try Self.encodeToJSON(service.snapshot(attached: false))
-        }
-    }
-
 }

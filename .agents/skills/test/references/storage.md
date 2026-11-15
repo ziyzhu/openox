@@ -759,9 +759,11 @@ single-argument installers instead of interpreting them.
 manifest, action registration, and service size limits. Root skill packages are
 validated separately with the shared package loader. The same
 validator runs before loading Local source for a caller. Failed
-validation leaves the draft untouched and cannot replace a conversation's running
-attachment. `ox.service.attach` validates and replaces that conversation's attachment when
-the draft is ready to test. No validation result is persisted.
+validation leaves the draft untouched. Service inspection and invocation resolve the
+current valid source on demand; invalid current source fails rather than silently
+executing a previous revision. No validation result is persisted. Agent-driven use
+surfaces runtime conversation chips without saving services or granting permissions;
+existing attachedServiceDomains metadata retains explicit user selections.
 
 Development and installed sources are read-only `HEAD` snapshots without Git metadata.
 Local source and installed snapshots travel with their owning Profile; development snapshots remain device-local.

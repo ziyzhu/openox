@@ -66,7 +66,7 @@ it("shares the core across hosts, supplies presentation in turn context, and rej
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,active:{hostID:'wrong',profileID:'profile-a'}}})", realm)).toThrow("unavailable");
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[...input.hostContext.hosts,...input.hostContext.hosts]}})", realm)).toThrow("Duplicate");
   expect(runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[{...input.hostContext.hosts[0],functions:['ox'],serviceKinds:['web','api','ios','mcp'],presentation:'conversation-bubbles',externalFiles:true}]}}).rendered", realm)).toBe(prompt);
-  const state: TurnState = { skills: [], skillConflicts: [], attachedServices: [], filePaths: [], storageMode: "temporary", responseLanguage: null,
+  const state: TurnState = { skills: [], skillConflicts: [], filePaths: [], storageMode: "temporary", responseLanguage: null,
     hostContext: { active: scope, hosts: [{ ...scope, functions: ["ox.fs.read"], serviceKinds: [], presentation: "text", externalFiles: false }] } };
   const textContext = Object.values(composeOxTurnSections(state, { memory: "" })).join("\n");
   expect(textContext).toContain("text with Markdown support");

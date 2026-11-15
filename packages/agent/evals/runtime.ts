@@ -14,7 +14,7 @@ import { execute } from "./execute";
 import { catalog, Stubs, StubError, type StubFixture } from "./stubs";
 
 export type Call = { name: string; args: Record<string, unknown>; result?: unknown; error?: { code: string; message: string; recovery: string } };
-export type AttachedService = TurnState["attachedServices"][number];
+export type AttachedService = { domain: string; description?: string; login: "notRequired" | "signedIn" | "signedOut" | "authorized" | "notAuthorized" | "unknown" };
 type Messages = Awaited<ReturnType<ProfileRuntime["run"]>>["messages"];
 export type Turn = { status: "completed" | "failed" | "timeout"; error?: string; systemPrompt: string; messages: Messages; calls: Call[] };
 
@@ -80,7 +80,7 @@ export class EvalRuntime {
       const id = String(conversation.id);
       const target = { profileID: "eval", conversationID: Number(id) as ConversationId };
       const input = { hostContext: this.hostContext, memory: String(await this.session.files.read("MEMORY.md")) };
-      const state: TurnState = { skills: [...bundledSkills], skillConflicts: [], attachedServices: this.attached, filePaths: [], storageMode: temporary ? "temporary" : "persisted", responseLanguage: null, hostContext: this.hostContext };
+      const state: TurnState = { skills: [...bundledSkills], skillConflicts: [], filePaths: [], storageMode: temporary ? "temporary" : "persisted", responseLanguage: null, hostContext: this.hostContext };
       const systemPrompt = renderSections({ ...composeOxPrompt(input).sections, ...composeOxTurnSections(state, input) });
       this.prompts.set(id, systemPrompt);
       this.calls.set(id, []);
@@ -92,7 +92,8 @@ export class EvalRuntime {
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; void this.session.abort(target); }, timeoutMs);
     try {
-      const turn = await this.session.run(target, { type: "input", content: text, requestId: crypto.randomUUID() });
+      const content = !continuing && this.attached.length ? text + "\n\n[Selected services: " + JSON.stringify(this.attached.map(service => service.domain)) + "]" : text;
+      const turn = await this.session.run(target, { type: "input", content, requestId: crypto.randomUUID() });
       const last = turn.messages.at(-1);
       const completed = turn.receipt.status === "done" && last?.role === "assistant" && last.stopReason !== "error" && last.stopReason !== "aborted";
       return { status: completed ? "completed" : timedOut ? "timeout" : "failed", ...(completed ? {} : { error: last?.role === "assistant" && last.errorMessage || ("detail" in turn.receipt ? String(turn.receipt.detail) : turn.receipt.status) }), systemPrompt, messages: turn.messages, calls: structuredClone(this.calls.get(id)!) };

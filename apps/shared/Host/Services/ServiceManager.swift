@@ -831,7 +831,7 @@ final class ServiceManager {
         throw OxFunctionError(
             code: matches.isEmpty ? "service_not_found" : "invalid_argument",
             message: "No unique service match for '\(domain)'." + (available.isEmpty ? "" : " Available candidates: \(available)."),
-            recovery: "Use ox.service.find with the service name or task, then attach its exact returned domain. A domain lookup miss does not establish that support is missing."
+            recovery: "Use ox.service.list to find the service, then inspect or invoke its exact returned domain. A domain lookup miss does not establish that support is missing."
         )
     }
 

@@ -40,7 +40,7 @@ export async function check(): Promise<string> {
     }
   }
   if (files.size > 64 || bytes > 512 * 1024) throw new Error("Bundled skills exceed native resource limits");
-  const catalog = composeOxTurnSections({ skills: [...bundledSkills], skillConflicts: [], attachedServices: [], filePaths: [], storageMode: "persisted", responseLanguage: null }, { memory: "" }).skills;
+  const catalog = composeOxTurnSections({ skills: [...bundledSkills], skillConflicts: [], filePaths: [], storageMode: "persisted", responseLanguage: null }, { memory: "" }).skills;
   for (const name of SYSTEM_SKILL_NAMES) if (!catalog.includes(`skills/${name}/SKILL.md`)) throw new Error(`Missing System skill route: ${name}`);
   return `bundled skills ${bundledSkills.length} packages, ${files.size} files, ${bytes} bytes`;
 }

@@ -7,7 +7,6 @@ export default {
   task: "Find the email from Dana about the Q3 budget in my Gmail.",
   attached: [{ domain: "mail.google.com", description: "Gmail", login: "signedIn" }],
   stubs: { state: { searched: false }, functions: {
-    "ox.service.listAttached": [{ result: [{ domain: "mail.google.com", kind: "web", name: "Gmail", attached: true }] }],
     "ox.service.inspect": [{ result: {
       service: { domain: "mail.google.com", kind: "web", name: "Gmail", attached: true, login: "signedIn" },
       actions: { searchMessages: {

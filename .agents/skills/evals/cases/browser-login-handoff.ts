@@ -9,8 +9,6 @@ const listSessions = `web:${domain}:listSessions`;
 export default {
   task: `Open my eye doctor's patient portal at https://${domain}/login so I can log in.`,
   stubs: { state: { loginAcknowledged: false }, functions: {
-    "ox.service.attach": [{ result: service }],
-    "ox.service.listAttached": [{ result: [service] }],
     "ox.service.inspect": [{ result: { service, standardActions: ["listSessions", "login"], actions: {} } }],
     "ox.service.invoke": [
       { args: { name: login }, result: null, set: { loginAcknowledged: true } },

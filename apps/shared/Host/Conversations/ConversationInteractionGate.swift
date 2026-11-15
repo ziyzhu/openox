@@ -281,26 +281,6 @@ final class ConversationInteractionGate {
         }
     }
 
-    func gateServiceAttach(_ service: Service) async throws {
-        let title = "\(service.title) - \(L10n.string( "Attach"))"
-        let message = if service.isIOSService {
-            L10n.string("Its actions and permitted device data become available to this conversation.")
-        } else if service.isMCPService {
-            L10n.string("Its remote Actions can receive arguments from this conversation and return data to Ox.")
-        } else {
-            L10n.string("Its actions and your logged-in data become available to this conversation.")
-        }
-        switch await requestApproval(
-            action: Conversation.attachApproveKey(service.domain),
-            prompt: "\(title)\n\(message)"
-        ) {
-        case .approved: return
-        case .denied: throw OxFunctionError(code: "permission_denied", message: "ox.service.attach: the user declined to attach \(service.title).", recovery: "Stop. Do not request this attachment again unless the user asks.")
-        case .blocked: throw OxFunctionError(code: "permission_denied", message: "ox.service.attach: the user blocked this Action in Settings.", recovery: "Do not bypass the policy. Ask the user to change it in Settings only if they want to allow this action.")
-        case .stopped: throw OxFunctionError(code: "cancelled", message: "ox.service.attach: the user stopped before attaching \(service.title).", recovery: "Stop. Do not reopen the attachment request unless the user asks.")
-        }
-    }
-
     func requireApproval(
         action: String,
         defaultPolicy: ActionPolicy? = nil,

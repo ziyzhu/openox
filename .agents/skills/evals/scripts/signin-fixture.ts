@@ -71,9 +71,7 @@ export function signinFixture(mode: "password" | "provider" | "manual"): EvalCas
   return {
     task: manual ? `Sign in manually to ${domain}, then tell me the subject of my inbox message.` : `Use my saved Ada Fixture login to sign in to ${domain}${federated ? " with its advertised account provider" : ""}, then tell me the subject of my inbox message.`,
     timeoutMs: 180_000,
-    stubs: { state: { step: 0, signedIn: false, read: false, providerAttached: false }, files: { [tracePath]: JSON.stringify(trace) }, functions: {
-      "ox.service.attach": [domain, provider].map(host => ({ args: { domain: host }, result: inspection(host), set: host === provider ? { providerAttached: true } : {} })),
-      "ox.service.listAttached": [{ result: [] }],
+    stubs: { state: { step: 0, signedIn: false, read: false }, files: { [tracePath]: JSON.stringify(trace) }, functions: {
       "ox.service.inspect": [domain, provider].map(host => { const { domain: _, name: _name, kind: _kind, saved: _saved, attached: _attached, login: _login, ...rest } = inspection(host); return { args: { domain: host }, result: { service: service(host), ...rest } }; }),
       "ox.service.invoke": invoke,
       "ox.web.browser.open": [{ result: { pageId: "fixture-page", mainFrameId: `${domain}-identifier` } }],

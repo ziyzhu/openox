@@ -19,7 +19,7 @@ Before requesting user interaction, verify the actual live document contains the
 For transaction fulfillment, read `skills/checkout/SKILL.md`. Build missing support within the original request without a proposal checkpoint, then resume checkout. Final review and commitment belong to the user.
 
 1. Prepare and price the transaction through ordinary service actions. Leave its actual checkout page ready for user review. Preparation must never submit an order or charge payment.
-2. Preflight the favicon through `references/service-icon.md`, validate, attach or reload, and reuse the returned preparation action contracts; inspect additional pages only when needed. Verify the live page without placing an order or charging to test the implementation.
+2. Preflight the favicon through `references/service-icon.md`, validate, inspect, and reuse the returned preparation action contracts; inspect additional pages only when needed. Verify the live page without placing an order or charging to test the implementation.
 3. Call `ox.web.browser.showPage` with the exact preparation pageId. Await the result while the user reviews and commits on the merchant's page, then chooses Done or Cancel. Resume the same execution and turn; stop on cancelled and inspect fresh state after completed. Presentation is not verified payment confirmation. Retrieve order or receipt details through ordinary read actions when needed.
 4. Complete a real checkout only when authorized by the user's purchase request; never replace the handoff with a separate submission or charge action.
 

@@ -312,21 +312,17 @@ struct ServiceActionSettingsView: View {
 
                 SettingsSection(layout: .group) {
                     VStack(spacing: 0) {
-                        serviceActionRow(
-                            title: String(localized: "Attach to a conversation"),
-                            actionID: Conversation.attachApproveKey(service.domain)
-                        )
                         if service.detailCapabilities.supportsFolderAccess {
-                            ForEach(OxFileSystem.actions, id: \.self) { action in
-                                Divider().settingsContentInset()
+                            ForEach(Array(OxFileSystem.actions.enumerated()), id: \.element) { index, action in
+                                if index > 0 { Divider().settingsContentInset() }
                                 serviceActionRow(
                                     title: Actions.label(for: action) ?? action,
                                     actionID: action
                                 )
                             }
                         } else {
-                            ForEach(actions) { action in
-                                Divider().settingsContentInset()
+                            ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
+                                if index > 0 { Divider().settingsContentInset() }
                                 serviceActionRow(
                                     title: action.label,
                                     actionID: service.definition.qualifiedActionName(action.id),

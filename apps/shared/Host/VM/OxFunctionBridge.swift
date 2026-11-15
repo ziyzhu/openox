@@ -16,7 +16,6 @@ public protocol OxFunctionBridge: AnyObject {
     func fileSystemOperation(name: String, arguments: JSONValue) async throws -> JSONValue?
     func findServices(query: String, purpose: String) async throws -> JSONValue?
     func listServices(kind: String?, purpose: String) async throws -> JSONValue?
-    func listAttachedServices(kind: String?, purpose: String) async throws -> JSONValue?
     func inspectService(domain: String, cursor: String?, purpose: String) async throws -> JSONValue?
     func validateService(domain: String, purpose: String) async throws -> JSONValue?
     func createService(kind: String, domain: String, name: String, endpoint: String?, transport: String?, faviconURL: JSONValue?, purpose: String) async throws -> JSONValue?
@@ -29,8 +28,6 @@ public protocol OxFunctionBridge: AnyObject {
     func syncRepository(repository: String, purpose: String) async throws -> JSONValue?
     func enableRepository(repository: String, enabled: Bool, purpose: String) async throws -> JSONValue?
     func disconnectRepository(repository: String, purpose: String) async throws -> JSONValue?
-    func attachService(domain: String, purpose: String) async throws -> JSONValue?
-    func detachService(domain: String, purpose: String) async throws -> JSONValue?
     func loginService(domain: String, purpose: String) async throws -> JSONValue?
     func createSkill(name: String, description: String, instructions: String, services: [String], purpose: String) async throws -> JSONValue?
     func copySkill(source: String, name: String, purpose: String) async throws -> JSONValue?

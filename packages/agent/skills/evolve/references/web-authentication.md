@@ -50,7 +50,7 @@ Trace steps contain event, origin, mainFrame, redacted route patterns, bounded c
 
 ## Recovery
 
-An unsupported contract is a normal service repair: inspect current source and live evidence, implement standard actions, preserve unrelated Local edits and website state, validate, and reattach. Do not invent authenticated IDs from booleans.
+An unsupported contract is a normal service repair: inspect current source and live evidence, implement standard actions, preserve unrelated Local edits and website state, validate, and inspect the current contracts. Inspection and invocation load the current valid source on demand. Do not invent authenticated IDs from booleans.
 
 If fresh discovery finds a session but an action rejects it, inspect descriptor and execution-context differences before requesting login. Do not weaken checks or silently switch accounts. After uncertain effects, inspect current state before another attempt. Presentation failure is not evidence that the login or mutation failed; preserve the page and report unresolved blockers.
 

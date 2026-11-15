@@ -10,7 +10,7 @@ const [ada] = accounts as [typeof accounts[0]];
 
 function attach(name: string): string {
   const domain = name.split(":")[1];
-  return `await ox.service.attach({ purpose: "Attach fixture", domain: ${JSON.stringify(domain)} });`;
+  return `await ox.service.inspect({ purpose: "Inspect fixture", domain: ${JSON.stringify(domain)} });`;
 }
 
 function frameScript(name: string, frameId?: unknown): string {
@@ -165,7 +165,7 @@ return { streamed: first.events.some(event => event.type === "text"), status: ca
     name: "suite-provider-hop", site: "suite",
     async run(h) {
       await h.saveLogin("fixture-suite-ada", "web:accounts.ox-suite.localhost", ada);
-      await h.turn(`return await ox.service.attach({ purpose: "Attach provider", domain: "accounts.ox-suite.localhost" });`);
+      await h.turn(`return await ox.service.inspect({ purpose: "Inspect provider", domain: "accounts.ox-suite.localhost" });`);
       const login = await driveLogin(h, "mail.ox-suite.localhost", "fixture-suite-ada");
       assert.ok(login.length);
       assert.equal(h.site("suite").counters.passwordSubmissions, 1, "provider login must submit once");
@@ -186,7 +186,7 @@ return { streamed: first.events.some(event => event.type === "text"), status: ca
       assert.equal(frame.serviceID, "web:ox-govid.localhost");
       assert.equal(h.site("gov").counters.authStarts, 1);
       assert.equal(h.site("gov").counters.passwordSubmissions ?? 0, 0);
-      const stale = await h.turn(`await ox.service.attach({ purpose: "Attach provider", domain: "ox-govid.localhost" });
+      const stale = await h.turn(`await ox.service.inspect({ purpose: "Inspect provider", domain: "ox-govid.localhost" });
 const state = (await ox.web.browser.list({ purpose: "Inspect provider document", includeFrames: true })).pages[0];
 const frame = state.frames.find(frame => frame.isMainFrame);
 await ox.web.browser.navigate({ purpose: "Replace provider document", pageId: state.pageId, url: state.url });
@@ -200,7 +200,7 @@ catch (error) { return { code: error.code }; }`);
   {
     name: "gov-provider-continuity", site: "gov",
     async run(h) {
-      const attached = await h.turn(`return await ox.service.attach({ purpose: "Inspect authentication methods", domain: "ox-gov.localhost" });`);
+      const attached = await h.turn(`return await ox.service.inspect({ purpose: "Inspect authentication methods", domain: "ox-gov.localhost" });`);
       assert.deepEqual(attached.auth, [{ type: "provider", service: "web:ox-govid.localhost" }]);
       for (const input of [{}, { auth: { type: "password" } }, { auth: { type: "provider", service: "web:other.localhost" } }, { auth: attached.auth[0], interaction: "manual" }]) {
         const denied = await h.turn(attemptScript("web:ox-gov.localhost:login", input));
@@ -208,7 +208,7 @@ catch (error) { return { code: error.code }; }`);
       }
       assert.equal(h.site("gov").counters.authStarts ?? 0, 0, "invalid auth selection reached the website");
       await h.saveLogin("fixture-govid-ada", "web:ox-govid.localhost", ada);
-      await h.turn(`return await ox.service.attach({ purpose: "Attach provider", domain: "ox-govid.localhost" });`);
+      await h.turn(`return await ox.service.inspect({ purpose: "Inspect provider", domain: "ox-govid.localhost" });`);
       await driveLogin(h, "ox-gov.localhost", "fixture-govid-ada", 3);
       await h.begin(`const { pages } = await ox.web.browser.list({ purpose: "Find verification page" }); return await ox.web.browser.showPage({ purpose: "Complete session verification", pageId: pages[0].pageId });`, true);
       const counters = h.site("gov").counters;
@@ -266,7 +266,7 @@ return null;`);
     async run(h) {
       const prepared = await h.turn(invokeScript("web:ox-card.localhost:login"));
       assert.equal(prepared.authentication, "unverified");
-      await h.begin(`await ox.service.attach({ purpose: "Attach embedded provider", domain: "ox-idp.localhost" });
+      await h.begin(`await ox.service.inspect({ purpose: "Inspect embedded provider", domain: "ox-idp.localhost" });
 const state = (await ox.web.browser.list({ purpose: "Inspect embedded provider", includeFrames: true })).pages[0];
 const frame = state.frames.find(frame => !frame.isMainFrame && frame.serviceID === "web:ox-idp.localhost" && state.frames.some(parent => parent.id === frame.parentId && parent.serviceID === frame.serviceID));
 if (!frame) throw Error("Embedded provider document unavailable");

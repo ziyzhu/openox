@@ -1,4 +1,4 @@
-import { hostContextText, activeHost, sameScope, type HostContext, type HostScope } from "./host-context";
+import { hostContextText, activeHost, type HostContext } from "./host-context";
 
 export interface ResponseLanguage { identifier: string; name: string }
 export interface SystemPromptInput { memory: string; hostContext?: HostContext }
@@ -6,14 +6,12 @@ export interface PromptScaffold { preamble: string; rules: string; skills: strin
 export interface TurnState {
   skills: { name: string; description: string }[];
   skillConflicts: string[];
-  attachedServices: { domain: string; description?: string; login: LoginState; scope?: HostScope }[];
   fileMounts?: string[];
   hostContext?: HostContext;
   filePaths: string[];
   storageMode: "persisted" | "temporary";
   responseLanguage: ResponseLanguage | null;
 }
-type LoginState = "notRequired" | "signedIn" | "signedOut" | "authorized" | "notAuthorized" | "unknown";
 const persistedStorage = "This conversation is saved to the Profile.";
 const temporaryStorage = "This is a temporary conversation. You may read Profile-owned files, but cannot save changes to Profile files, including `MEMORY.md` or user skills. Selected external files under `mounts/<folder-id>/` are separate: they may still be changed with runtime approval. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
 const temporaryProfileStorage = "This is a temporary conversation. You may read Profile-owned files, but cannot save changes to Profile files, including `MEMORY.md` or user skills. Do not attempt blocked Profile mutations; continue with a transient answer or result.";
@@ -47,16 +45,10 @@ export function composeTurnSections(state: TurnState, scaffold: PromptScaffold, 
   const replies = host?.presentation === "conversation-bubbles"
     ? "Replies render as Markdown conversation bubbles. Put ![title](path) on its own line to show a file inline, or use a direct public image URL. Link supporting files with [title](path). A fenced mermaid block renders as a diagram."
     : "Replies render as text with Markdown support. Link supporting files with [title](path).";
-  const services = state.attachedServices.length === 0 ? "No services are attached." : [...state.attachedServices].sort((a, b) => ordered(a.domain, b.domain)).map(service => {
-    const description = normalized(service.description ?? "");
-    if (service.scope && (!hostContext || !hostContext.hosts.some(owner => sameScope(owner, service.scope!)))) throw new Error("Service owner is unavailable");
-    const owner = service.scope && host && !sameScope(service.scope, host) ? ` [host=${JSON.stringify(service.scope.hostID)} profile=${JSON.stringify(service.scope.profileID)}]` : "";
-    return `- ${service.domain}${description ? ` — ${description}` : ""}${owner}`;
-  }).join("\n");
   const folders = state.fileMounts?.length ? [...state.fileMounts].sort().map(path => `- \`${path}/\``).join("\n")
     : "No folders are granted to this Profile. The user can add folders on the Profile's Files page.";
   const files = state.filePaths.length === 0 ? "No files are attached to this conversation." : state.filePaths.map(path => `- \`${path}\``).join("\n");
   const storage = state.storageMode === "persisted" ? persistedStorage : host?.externalFiles === false ? temporaryProfileStorage : temporaryStorage;
-  return { skills, hosts: hostContext ? hostContextText(hostContext) : "No host context is available.", replies, attached_services: services,
+  return { skills, hosts: hostContext ? hostContextText(hostContext) : "No host context is available.", replies,
     conversation_files: files, mounted_folders: folders, storage, language: responseDirective(state.responseLanguage) || "Reply in the language the user writes in." };
 }

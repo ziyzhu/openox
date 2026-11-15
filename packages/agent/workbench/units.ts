@@ -18,14 +18,14 @@ export interface Unit {
 }
 export interface Variant {
   presentation: "conversation-bubbles" | "text"; storage: "persisted" | "temporary" | "temporaryProfile";
-  language: boolean; services: boolean; files: boolean; folders: boolean; multiHost: boolean; identity: boolean; isolated: boolean;
+  language: boolean; files: boolean; folders: boolean; multiHost: boolean; identity: boolean; isolated: boolean;
 }
 export interface Rendered { identity: string; system: string; execute: string }
 
 export const repo = join(import.meta.dir, "../../..");
 const agent = join(import.meta.dir, "..");
 const functionsDir = join(agent, "src/functions");
-const commonFunctions = ["ox.fs.read", "ox.fs.edit", "ox.fs.write", "ox.web.search", "ox.web.fetch", "ox.service.attach", "ox.service.inspect", "ox.service.invoke"];
+const commonFunctions = ["ox.fs.read", "ox.fs.edit", "ox.fs.write", "ox.web.search", "ox.web.fetch", "ox.service.inspect", "ox.service.invoke"];
 const catalogNamespaces = ["conversation", "provider", "repository", "secret", "service", "user", "web", "fs", "output", "skill", "schedule", "vision"];
 const catalogSentinel = "\u0000CATALOG\u0000";
 const nativeFacts = [
@@ -126,10 +126,8 @@ function hostContext(variant: Variant): HostContext {
 }
 
 function turnState(variant: Variant, context: HostContext): TurnState {
-  const services: TurnState["attachedServices"] = [{ domain: "spotify.com", description: "Music streaming", login: "signedIn" }];
-  if (variant.multiHost) services.push({ domain: "github.com", login: "unknown", scope: { hostID: "mac", profileID: "work" } });
   return {
-    skills: [...bundledSkills], skillConflicts: [], attachedServices: variant.services ? services : [],
+    skills: [...bundledSkills], skillConflicts: [],
     fileMounts: variant.folders ? ["mounts/icloud-notes"] : [], filePaths: variant.files ? ["conversations/42/photo.jpg", "reports/q3.pdf"] : [],
     storageMode: variant.storage === "persisted" ? "persisted" : "temporary", responseLanguage: variant.language ? languageExample : null, hostContext: context,
   };
@@ -155,7 +153,7 @@ function textUnit(id: string, group: string, title: string, source: string, scop
 }
 
 export const defaultVariant: Variant = {
-  presentation: "conversation-bubbles", storage: "persisted", language: false, services: false, files: false, folders: false, multiHost: false, identity: false, isolated: false,
+  presentation: "conversation-bubbles", storage: "persisted", language: false, files: false, folders: false, multiHost: false, identity: false, isolated: false,
 };
 
 function turnSections(patch: Partial<Variant>) {
@@ -187,7 +185,6 @@ function buildUnits(): Unit[] {
     textUnit("hosts.footer", "System · turn state", "Hosts footer", locate(core("host-context.ts"), hostFooter), "system", hostFooter),
     textUnit("replies.bubbles", "System · turn state", "Replies (conversation bubbles)", locate(prompts, "Replies render as Markdown"), "system", bubbles),
     textUnit("replies.text", "System · turn state", "Replies (text)", locate(prompts, "Replies render as text"), "system", textReplies),
-    textUnit("services.none", "System · turn state", "No attached services", locate(prompts, empty.attached_services!), "system", empty.attached_services!),
     textUnit("files.none", "System · turn state", "No conversation files", locate(prompts, empty.conversation_files!), "system", empty.conversation_files!),
     textUnit("folders.none", "System · turn state", "No mounted folders", locate(prompts, empty.mounted_folders!), "system", empty.mounted_folders!),
     textUnit("storage.persisted", "System · turn state", "Storage (saved)", locate(prompts, "const persistedStorage"), "system", empty.storage!),

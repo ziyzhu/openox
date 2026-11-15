@@ -8,7 +8,6 @@ export default {
   task: "Email Alex the Q3 budget numbers: revenue $4.2M, costs $3.1M, margin 26%.",
   attached: [{ domain: "mail.google.com", description: "Gmail", login: "signedIn" }],
   stubs: { functions: {
-    "ox.service.listAttached": [{ result: [{ domain: "mail.google.com", kind: "web", name: "Gmail", attached: true }] }],
     "ox.service.inspect": [{ result: {
       service: { domain: "mail.google.com", kind: "web", name: "Gmail", attached: true, login: "signedIn" },
       actions: {

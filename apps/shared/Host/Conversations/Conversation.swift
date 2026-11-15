@@ -224,7 +224,7 @@ final class Conversation: Identifiable {
     func select() {
         guard !isSelected else { return }
         isSelected = true
-        serviceManager.setAttachedServices(attachedServices, for: id)
+        serviceManager.setAttachedServices(serviceAttachments.loadedServices, for: id)
         for service in attachedServices {
             Task { _ = await service.loadManifest(reason: .attach) }
         }
@@ -373,12 +373,9 @@ final class Conversation: Identifiable {
                 try await websiteConversationAttachments(refs)
             },
             resolveService: { [unowned self] domain in
-                guard let service = attachedService(domain: domain) else {
-                    throw RuntimeError.bridge("Service '\(domain)' isn't attached to this conversation.")
-                }
-                return service
+                try await serviceAttachments.resolveService(domain)
             },
-            resolveAction: { [unowned self] name in try serviceAttachments.target(name, label: "ox.service.invoke") },
+            resolveAction: { [unowned self] name in try await serviceAttachments.target(name, label: "ox.service.invoke") },
             attachedDomains: { [unowned self] in Set(attachedServices.map(\.domain)) },
             approve: { [unowned self] action, defaultPolicy, args, purpose, prompt in
                 try await requireApproval(
@@ -1211,12 +1208,6 @@ final class Conversation: Identifiable {
         return .from(value)
     }
 
-    static func attachApproveKey(_ domain: String) -> String { "ox.service.attach:\(domain)" }
-
-    func gateServiceAttach(_ service: Service) async throws {
-        try await interactions.gateServiceAttach(service)
-    }
-
     func requireApproval(
         action: String,
         defaultPolicy: ActionPolicy? = nil,
@@ -1453,6 +1444,7 @@ final class Conversation: Identifiable {
             attachments: attachments,
             skillInvocation: skillInvocation,
             scheduleName: scheduleName,
+            selectedServices: serviceAttachments.domains,
             latency: latency,
             state: posting ? .posted : .queued
         ))
@@ -1806,7 +1798,6 @@ final class Conversation: Identifiable {
         let turnState = ConversationPromptState.turn(
             skills: turnSkills,
             skillConflicts: skillConflicts,
-            attachedServices: attached,
             fileMountPaths: fileMountPaths,
             filePaths: referencedFiles.compactMap(\.virtualPath),
             isTemporary: retention == .temporary,
@@ -1840,6 +1831,7 @@ final class Conversation: Identifiable {
                         try await submit(ConversationInput(
                             text: submission.text,
                             attachments: submission.attachments,
+                            selectedServices: submission.selectedServices,
                             turnState: turnState,
                             turnID: turnID
                         ), configuration: configuration, continuing: continuing)

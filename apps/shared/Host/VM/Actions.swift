@@ -97,16 +97,16 @@ nonisolated enum Actions {
         webSearch, webFetch,
         fsStat, fsList, fsRead, fsAttach, fsWrite, fsEdit, fsRm, fsMkdir, fsMove, fsCopy, fsGlob, fsGrep,
         visionAnalyze,
-        serviceFind, serviceList, serviceListAttached, serviceInspect, serviceCheckAccess, serviceValidate, serviceCreate,
+        serviceFind, serviceList, serviceInspect, serviceCheckAccess, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryEnable, repositoryDisconnect,
         repositoryConflicts, repositoryResolve,
-        serviceAttach, serviceShowPage, serviceLogin, serviceDetach,
+        serviceShowPage, serviceLogin,
         skillCreate, skillCopy, skillDelete, skillShare,
         scheduleCreate, scheduleList, scheduleDelete, scheduleEnable, scheduleRun, scheduleComplete,
         memoryRead, memoryWrite, memoryReplaceText,
         userChoose, userFollow, userProgress,
     ]
-    static let retired = [widgetShoveler, widgetVideo, widgetImage]
+    static let retired = [widgetShoveler, widgetVideo, widgetImage, serviceAttach, serviceDetach, serviceListAttached]
 
     static func browserSite(_ site: String) -> String { "\(BrowserFunctionCatalog.publicNamespace):\(site)" }
 

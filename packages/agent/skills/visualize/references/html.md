@@ -46,7 +46,7 @@ The content policy forbids browser network requests, remote subresources, extern
 
 The Host injects `window.ox.service` before scripts. Only this namespace is available, not `ox.fs`, `ox.web`, `ox.user`, or other VM APIs. Use inspected action contracts, normal options objects and `purpose`, and synchronous `.help()`.
 
-HTML runs independently of its creating conversation. Services initialize on demand; do not call conversation-only `attach`, `detach`, or `listAttached`. Use `find`/`inspect` and qualified `web:<domain>:<action>`, `ios:<app>:<action>`, or `mcp:<server>:<action>` names. Discovery reports `attached: false` because the page has no conversation attachments.
+HTML runs independently of its creating conversation. Services initialize on demand; conversation chips are not required. Use `find`/`inspect` and qualified `web:<domain>:<action>`, `ios:<app>:<action>`, or `mcp:<server>:<action>` names. Discovery reports `attached: false` because the page has no conversation attachments.
 
 Invoke with `await ox.service.invoke({ name, input, purpose })`. Authentication, Action policies, login, verification, payment, and Always allow settings remain authoritative. Do not add a second approval form or claim success before resolution. Disable pending mutation controls, show loading/failure/success, never automatically retry mutations, and render returned text with `textContent`, not interpolated HTML. Verify effects from actual returned or re-read state.
 

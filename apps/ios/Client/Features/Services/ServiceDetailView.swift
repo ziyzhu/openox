@@ -264,7 +264,6 @@ struct ServiceDetailView: View {
                 .settingsSectionHeaderInset()
 
             servicePolicyContent
-            attachActionContent
 
             if loadingManifest {
                 CellularAutomatonLoader.small
@@ -302,33 +301,6 @@ struct ServiceDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .settingsRowPadding()
         .settingsSurface(singleRow: true)
-    }
-
-    private var attachActionContent: some View {
-        actionCard {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: Theme.Spacing.sm) {
-                    Text("Attach to a conversation")
-                        .font(Theme.Fonts.bodyMd)
-                        .foregroundStyle(Theme.Colors.onSurface)
-                    Spacer(minLength: 0)
-                    approvalControl(actionID: Conversation.attachApproveKey(service.domain))
-                }
-                Divider().padding(.vertical, 4)
-                Text(attachPermissionDescription)
-                    .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private var attachPermissionDescription: LocalizedStringKey {
-        switch capabilities.attachmentData {
-        case .signedIn: "Adds this service to a conversation, giving Ox its actions and your logged-in data."
-        case .onDevice: "Its actions and permitted device data become available to this conversation."
-        case .remote: "Its remote Actions can receive arguments from this conversation and return data to Ox."
-        }
     }
 
     @ViewBuilder

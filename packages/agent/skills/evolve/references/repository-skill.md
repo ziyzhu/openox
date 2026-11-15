@@ -4,7 +4,7 @@ Repository skills live at the repository root under `skills/<name>/`. The reposi
 
 Use `ox.skill.share({ name, purpose })` to copy a complete resolved skill into Local. This creates editable repository content without publishing it. If Local already contains the name, inspect the existing skill and agree on a revision or another name instead of replacing it implicitly.
 
-A skill's optional `services` field lists runtime service identities. Dependencies may come from any enabled repository. Loading the skill does not grant permission, authenticate accounts, or bypass service conflicts. Discover and attach dependencies through normal Ox APIs before invoking their Actions.
+A skill's optional `services` field lists runtime service identities. Dependencies may come from any enabled repository. Loading the skill does not grant permission, authenticate accounts, or bypass service conflicts. Inspect dependencies through normal Ox APIs before invoking their Actions. The Host loads current valid source on demand; conversation chips do not enable Actions.
 
 Review the skill's trigger, inputs, steps, expected result, and stopping condition. Verify every named Action against the current service manifest. Keep account details and personal preferences in the Profile rather than shared instructions.
 

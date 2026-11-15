@@ -11,7 +11,7 @@ extension ServiceOperations {
 
     func invokeAction(service: Service, actionID: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, frameID: String? = nil, purpose: String) async throws -> JSONValue? {
         guard !service.isMCPService || serviceManager.service(domain: service.domain) === service else {
-            throw RuntimeError.bridge("This MCP connection changed or was removed. Attach the current service before invoking it.")
+            throw RuntimeError.bridge("This MCP connection changed or was removed. Inspect the current service before invoking it.")
         }
         let hostStandard = !service.isWebService && service.definition.standardServiceActions.contains { $0.id == actionID }
         if service.isMCPService, !hostStandard, await service.loadManifest(reason: .invoke) == nil {

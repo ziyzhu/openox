@@ -25,6 +25,7 @@ final class ConversationSubmissionQueue {
         let attachments: [FileItem]
         let skillInvocation: UserSkillInvocation?
         var scheduleName: String? = nil
+        var selectedServices: [String] = []
         let latency: TurnLatencyTrace
         var state: State
 

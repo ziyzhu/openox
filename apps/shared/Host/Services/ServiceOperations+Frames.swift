@@ -4,9 +4,9 @@ import WebKit
 extension ServiceOperations {
     func invokeFrameAction(service: Service, actionID: String, input: JSONValue, frameID: String,
                            session: JSONValue?, secrets: SecretAttempt?, purpose: String) async throws -> JSONValue {
-        guard service.isWebService, attachedDomains().contains(service.domain),
+        guard service.isWebService,
               let definition = service.definition.action(actionID, includingStandard: true) else {
-            throw RuntimeError.bridge("Frame actions require an attached web service.")
+            throw RuntimeError.bridge("Frame actions require a web service action.")
         }
         let matches = serviceManager.browserSessions.sessions.filter {
             $0.scopeID == native.id && $0.frameTargets[frameID] != nil

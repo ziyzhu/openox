@@ -36,23 +36,6 @@ nonisolated enum OxServices {
         ]), "required": .array(["service", "standardActions", "actions", "secrets"].map(JSONValue.string)), "additionalProperties": .bool(false),
     ])
 
-    static var attachmentSchema: JSONValue {
-        var schema = snapshotSchema.objectValue!
-        var properties = schema["properties"]!.objectValue!
-        var inspection = inspectionSchema.objectValue!["properties"]!.objectValue!
-        inspection.removeValue(forKey: "service")
-        properties.merge(inspection) { _, inspected in inspected }
-        properties["capabilitiesError"] = .object([
-            "type": .string("object"), "properties": .object([
-                "code": .object(["type": .string("string")]),
-                "message": .object(["type": .string("string")]),
-                "recovery": .object(["type": .string("string")]),
-            ]), "required": .array(["code", "message", "recovery"].map(JSONValue.string)), "additionalProperties": .bool(false),
-        ])
-        schema["properties"] = .object(properties)
-        return .object(schema)
-    }
-
     static var inventorySchema: JSONValue {
         var schema = snapshotSchema.objectValue!
         var properties = schema["properties"]!.objectValue!
@@ -89,23 +72,6 @@ nonisolated enum OxServices {
                             "additionalProperties": .bool(false),
                         ]),
                         "outputSchema": .object(["type": .string("array"), "items": inventorySchema]),
-                    ])
-                ),
-                (
-                    "ox.service.listAttached",
-                    .object([
-                        "description": .string(ModelGuidance.text("ox.service.listAttached")),
-                        "inputSchema": .object([
-                            "type": .string("object"),
-                            "properties": .object([
-                                "kind": .object([
-                                    "type": .string("string"),
-                                    "enum": .array([.string("web"), .string("api"), .string("ios"), .string("mcp")]),
-                                ]),
-                            ]),
-                            "additionalProperties": .bool(false),
-                        ]),
-                        "outputSchema": .object(["type": .string("array"), "items": snapshotSchema]),
                     ])
                 ),
                 (
@@ -222,48 +188,6 @@ nonisolated enum OxServices {
                         ]),
                     ])
                 ),
-                (
-                    "ox.service.attach",
-                    .object([
-                        "description": .string(ModelGuidance.text("ox.service.attach")),
-                        "inputSchema": .object([
-                            "type": .string("object"),
-                            "properties": .object([
-                                "domain": .object([
-                                    "type": .string("string"),
-                                    "description": .string("The service's domain, e.g. \"spotify.com\"."),
-                                ]),
-                                "purpose": .object([
-                                    "type": .string("string"),
-                                    "description": .string("Short (<10 words) description of why you're making this call, shown to the user as the step label."),
-                                ]),
-                            ]),
-                            "required": .array([.string("domain")]),
-                        ]),
-                        "outputSchema": attachmentSchema,
-                    ])
-                ),
-                (
-                    "ox.service.detach",
-                    .object([
-                        "description": .string(ModelGuidance.text("ox.service.detach")),
-                        "inputSchema": .object([
-                            "type": .string("object"),
-                            "properties": .object([
-                                "domain": .object([
-                                    "type": .string("string"),
-                                    "description": .string("The service's domain, e.g. \"spotify.com\"."),
-                                ]),
-                                "purpose": .object([
-                                    "type": .string("string"),
-                                    "description": .string("Short (<10 words) description of why you're making this call, shown to the user as the step label."),
-                                ]),
-                            ]),
-                            "required": .array([.string("domain")]),
-                        ]),
-                        "outputSchema": snapshotSchema,
-                    ])
-                ),
             ]
         },
         installNatives: { ctx, env in
@@ -272,12 +196,6 @@ nonisolated enum OxServices {
                 return env.call { try await $0.listServices(kind: kind, purpose: purposeValue.toString()!) }
             }
             ctx.setObject(listBlock as AnyObject, forKeyedSubscript: "__nativeServiceList" as NSString)
-
-            let listAttachedBlock: @convention(block) (JSValue, JSValue) -> JSValue = { kindValue, purposeValue in
-                let kind = kindValue.isString ? kindValue.toString() : nil
-                return env.call { try await $0.listAttachedServices(kind: kind, purpose: purposeValue.toString()!) }
-            }
-            ctx.setObject(listAttachedBlock as AnyObject, forKeyedSubscript: "__nativeServiceListAttached" as NSString)
 
             let inspectBlock: @convention(block) (String, JSValue, JSValue) -> JSValue = { domain, cursorValue, purposeValue in
                 let cursor = cursorValue.isNull || cursorValue.isUndefined ? nil : cursorValue.toString()
@@ -311,29 +229,14 @@ nonisolated enum OxServices {
             }
             ctx.setObject(deleteBlock as AnyObject, forKeyedSubscript: "__nativeServiceDelete" as NSString)
 
-            let attachBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
-                let purpose = purposeValue.toString()!
-                return env.call(suspendingTimeout: true) { try await $0.attachService(domain: domain, purpose: purpose) }
-            }
-            ctx.setObject(attachBlock as AnyObject, forKeyedSubscript: "__nativeServiceAttach" as NSString)
-
-            let detachBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
-                let purpose = purposeValue.toString()!
-                return env.call { try await $0.detachService(domain: domain, purpose: purpose) }
-            }
-            ctx.setObject(detachBlock as AnyObject, forKeyedSubscript: "__nativeServiceDetach" as NSString)
-
         },
         jsFragment: """
           list: (value) => { const options = __oxOptions(value, 'ox.service.list'); return __nativeServiceList(options.kind == null ? null : String(options.kind), String(options.purpose)); },
-          listAttached: (value) => { const options = __oxOptions(value, 'ox.service.listAttached'); return __nativeServiceListAttached(options.kind == null ? null : String(options.kind), String(options.purpose)); },
           inspect: (value) => { const options = __oxOptions(value, 'ox.service.inspect'); return __nativeServiceInspect(String(options.domain), options.cursor ?? null, String(options.purpose)); },
           validate: (value) => { const options = __oxOptions(value, 'ox.service.validate'); return __nativeServiceValidate(String(options.domain), String(options.purpose)); },
           create: (value) => { const options = __oxOptions(value, 'ox.service.create'); return __nativeServiceCreate(options, String(options.purpose)); },
           update: (value) => { const options = __oxOptions(value, 'ox.service.update'); return __nativeServiceUpdate(options, String(options.purpose)); },
-          delete: (value) => { const options = __oxOptions(value, 'ox.service.delete'); return __nativeServiceDelete(String(options.domain), String(options.purpose)); },
-          attach: (value) => { const options = __oxOptions(value, 'ox.service.attach'); return __nativeServiceAttach(String(options.domain), String(options.purpose)); },
-          detach: (value) => { const options = __oxOptions(value, 'ox.service.detach'); return __nativeServiceDetach(String(options.domain), String(options.purpose)); }
+          delete: (value) => { const options = __oxOptions(value, 'ox.service.delete'); return __nativeServiceDelete(String(options.domain), String(options.purpose)); }
         """
     )
 }

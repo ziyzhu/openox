@@ -14,11 +14,16 @@ nonisolated public struct ConversationInput: Sendable {
     public init(
         text: String,
         attachments: [FileItem] = [],
+        selectedServices: [String] = [],
         turnState: JSONValue? = nil,
         turnID: UUID? = nil
     ) {
+        var message = UserMessage(text: text, attachments: attachments)
+        if !selectedServices.isEmpty {
+            message.content.append(.text(TextContent("[Selected services: " + JSONValue.array(selectedServices.map(JSONValue.string)).jsonString() + "]")))
+        }
         self.init(
-            messages: [.user(UserMessage(text: text, attachments: attachments))],
+            messages: [.user(message)],
             turnID: turnID,
             turnState: turnState
         )

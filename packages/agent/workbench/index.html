@@ -83,7 +83,6 @@ td.ok { color: var(--add-ink); } td.missing { color: var(--error); font-weight: 
   <label>Display <select id="v-presentation" data-testid="variant-presentation"><option value="conversation-bubbles">iOS bubbles</option><option value="text">Text</option></select></label>
   <label>Storage <select id="v-storage" data-testid="variant-storage"><option value="persisted">Saved</option><option value="temporary">Temporary</option><option value="temporaryProfile">Temporary, no external files</option></select></label>
   <label><input type="checkbox" id="v-language" data-testid="variant-language">Fixed language</label>
-  <label><input type="checkbox" id="v-services" data-testid="variant-services">Services</label>
   <label><input type="checkbox" id="v-files" data-testid="variant-files">Files</label>
   <label><input type="checkbox" id="v-folders" data-testid="variant-folders">Folders</label>
   <label><input type="checkbox" id="v-multiHost" data-testid="variant-multihost">Two hosts</label>
@@ -139,7 +138,7 @@ const store = {
   set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
 };
 const state = { units: [], byId: new Map(), selected: store.get("selected", "rules"), tab: store.get("tab", "checks"), unitDiff: false, render: null, variant: store.get("variant", {}) };
-const variantKeys = ["presentation", "storage", "language", "services", "files", "folders", "multiHost", "identity", "isolated"];
+const variantKeys = ["presentation", "storage", "language", "files", "folders", "multiHost", "identity", "isolated"];
 const tokens = chars => Math.round(chars / 4);
 const size = text => `${text.length.toLocaleString()} chars · ≈${tokens(text.length).toLocaleString()} tok`;
 const delta = (a, b) => { const d = b - a; return d === 0 ? "±0" : (d > 0 ? "+" : "−") + Math.abs(d).toLocaleString(); };
