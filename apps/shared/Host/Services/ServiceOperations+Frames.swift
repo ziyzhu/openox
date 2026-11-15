@@ -13,7 +13,7 @@ extension ServiceOperations {
         }
         guard matches.count == 1, let page = matches.first else {
             throw OxFunctionError(code: "frame_unavailable", message: "The frame is unavailable or ambiguous. No action was executed.",
-                                  recovery: "Inspect getPageState again and use a fresh frameId before invoking.")
+                                  recovery: "List the page's frames again and use a fresh frameId before invoking.")
         }
         let owner = serviceManager.services.first { $0.servicePages.contains { $0 === page } } ?? serviceManager.browserService
         guard page.secretAttempt?.holdsValues != true else { throw Service.EvalError.contextInvalidated }

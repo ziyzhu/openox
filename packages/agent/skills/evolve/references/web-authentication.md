@@ -4,11 +4,11 @@ A session is a currently authenticated website context, not an open page, rememb
 
 ## Pages and documents
 
-The agent owns page selection and lifecycle. Use `ox.web.browser.open({ purpose, url })` to obtain `pageId` and `mainFrameId`, or reuse a page from `ox.web.browser.list({ purpose, includeFrames: true })`. At most six agent pages may be open across the active Profile. Close unused idle pages explicitly; the Host never silently evicts or replaces them.
+The agent owns page selection and lifecycle. Use `ox.web.browser.newPage({ purpose, url })` to obtain `pageId` and `mainFrameId`, or reuse an owned page from `ox.web.browser.pages({ purpose })` and discover its documents with `ox.web.browser.frames({ purpose, pageId })`. At most six agent pages may be open across the active Profile; `pages` lists all of them. Close unused idle pages explicitly; the Host never silently evicts or replaces them.
 
 Every web service invocation requires a live `frameId`, including main-document calls. Invoke the service matching the frame's observed origin; the Host loads its current valid source on demand without a separate attachment call. Navigation replaces document targets: rediscover frames instead of reusing a stale ID, reopening the provider homepage, or replaying the triggering step. `pageId` survives navigation and is used for navigation and presentation. Frames do not count as pages. Cross-origin parent IDs may be null; incomplete frame discovery does not establish absence.
 
-Use `ox.web.browser.getPageState({ purpose, frameId })` for bounded read-only document evidence without field values. The Host enforces service origin, secret ownership, and document identity. It does not choose another page, navigate to an action base URL, or recover a stale frame by falling back to the main document.
+Use `ox.web.browser.snapshot({ purpose, frameId })` for bounded read-only document evidence without field values. The Host enforces service origin, secret ownership, and document identity. It does not choose another page, navigate to an action base URL, or recover a stale frame by falling back to the main document.
 
 ## Standard actions
 
@@ -32,7 +32,7 @@ Open or navigate to an observed entry point preserving tenant and return paths; 
 
 Only continue when fresh evidence establishes a new supported screen. Stop on unchanged screens, errors, rejected credentials, or ambiguous identity. If evidence confirms an automatic-login implementation defect, use Evolve to repair it within the original task; do not leave a confirmed defect as only a manual-login workaround. Preserve the page and website state, use existing structural diagnostics, and never replay credential submission to diagnose or verify the repair without the explicit test-account consent required below. Rejected credentials and human-only challenges are not evidence of an implementation defect. Same-document steps belong within one invocation. Full-document navigation destroys the running context: perform the transition once, preserve its page, and inspect the new document. A URL, title, navigation completion, or generic nonblank page does not establish readiness. Verify intended controls with bounded waits and clear errors. Do not read or return credential field values.
 
-For MFA, captcha, passkey, consent, or unsupported screens, use `ox.web.browser.showPage({ purpose, pageId })` on the exact owning page. Explain the step before calling. It stops capture and clears authoring scripts, reserves the page for interaction, and asynchronously waits for Done/Cancel. It returns only `{ status: "completed" }` or `{ status: "cancelled" }` and resumes the same execution and turn. Do not poll or continue dependent work while waiting. Stop on cancelled; do not reopen automatically. Done acknowledges interaction, not authentication. Inspect fresh destination listSessions and verify the intended account before dependent work. Provider sessions do not establish destination authentication. Never replay login or a task mutation to recover presentation.
+For MFA, captcha, passkey, consent, or unsupported screens, use `ox.web.browser.showPage({ purpose, pageId })` on the exact owning page. Explain the step before calling. It stops capture and removes the init script, reserves the page for interaction, and asynchronously waits for Done/Cancel. It returns only `{ status: "completed" }` or `{ status: "cancelled" }` and resumes the same execution and turn. Do not poll or continue dependent work while waiting. Stop on cancelled; do not reopen automatically. Done acknowledges interaction, not authentication. Inspect fresh destination listSessions and verify the intended account before dependent work. Provider sessions do not establish destination authentication. Never replay login or a task mutation to recover presentation.
 
 ## Automatic login authoring
 
@@ -45,7 +45,7 @@ Trace steps contain event, origin, mainFrame, redacted route patterns, bounded c
 1. Use a successful manual trace first; inspect only missing evidence without submitting passwords. Classify chooser, username, password, challenge, consent, and landing screens from observed structure.
 2. Copy only needed usable, waitForStep, typeInto, pageError, and cleanText helpers from references/helpers.js. Use usable rather than getClientRects; use typeInto rather than assigning value. Scope pageError to the relevant form.
 3. Implement login as one step function without code comments. Select chooser rows by exact account identity. Submit at most once and reject current form errors before submission. Return without acting on challenge or consent; the agent presents the owning page. Throw on unknown screens. Do not invent storage submission markers or retry rejected credentials.
-4. Dry-run classification with executeScript and explicit frameId on reachable screens without context.secret or submission.
+4. Dry-run classification with evaluate and explicit frameId on reachable screens without context.secret or submission.
 5. Verify one automatic attempt only with a dedicated user-saved test account and explicit consent. Never retry rejection or rate limits. Mark generated automatic handlers unverified until that succeeds.
 
 ## Recovery

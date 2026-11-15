@@ -105,7 +105,7 @@ nonisolated enum OxWeb {
                 var fields = jsValueToJSON(options)?.objectValue ?? [:]
                 let purpose = fields.removeValue(forKey: "purpose")?.stringValue ?? ""
                 let arguments = JSONValue.object(fields)
-                return env.call(suspendingTimeout: action == "waitForNavigation" || action == "showPage") {
+                return env.call(suspendingTimeout: action == "waitForURL" || action == "showPage") {
                     try await $0.browserOperation(action: action, arguments: arguments, purpose: purpose)
                 }
             }
@@ -114,22 +114,21 @@ nonisolated enum OxWeb {
         jsFragment: """
           fetch: (value) => { const options = __oxOptions(value, 'ox.web.fetch'); return __nativeWebFetch(String(options.url), options.options ?? null, String(options.purpose)); },
           browser: {
-            open: (value) => __nativeWebBrowser('open', __oxOptions(value, 'ox.web.browser.open')),
-            list: (value) => __nativeWebBrowser('list', __oxOptions(value, 'ox.web.browser.list')),
+            newPage: (value) => __nativeWebBrowser('newPage', __oxOptions(value, 'ox.web.browser.newPage')),
+            pages: (value) => __nativeWebBrowser('pages', __oxOptions(value, 'ox.web.browser.pages')),
+            frames: (value) => __nativeWebBrowser('frames', __oxOptions(value, 'ox.web.browser.frames')),
             close: (value) => __nativeWebBrowser('close', __oxOptions(value, 'ox.web.browser.close')),
-            navigate: (value) => __nativeWebBrowser('navigate', __oxOptions(value, 'ox.web.browser.navigate')),
+            goto: (value) => __nativeWebBrowser('goto', __oxOptions(value, 'ox.web.browser.goto')),
             reload: (value) => __nativeWebBrowser('reload', __oxOptions(value, 'ox.web.browser.reload')),
-            stopLoading: (value) => __nativeWebBrowser('stopLoading', __oxOptions(value, 'ox.web.browser.stopLoading')),
             goBack: (value) => __nativeWebBrowser('goBack', __oxOptions(value, 'ox.web.browser.goBack')),
             goForward: (value) => __nativeWebBrowser('goForward', __oxOptions(value, 'ox.web.browser.goForward')),
-            getNavigationHistory: (value) => __nativeWebBrowser('getNavigationHistory', __oxOptions(value, 'ox.web.browser.getNavigationHistory')),
-            getPageState: (value) => __nativeWebBrowser('getPageState', __oxOptions(value, 'ox.web.browser.getPageState')),
-            waitForNavigation: (value) => __nativeWebBrowser('waitForNavigation', __oxOptions(value, 'ox.web.browser.waitForNavigation')),
+            snapshot: (value) => __nativeWebBrowser('snapshot', __oxOptions(value, 'ox.web.browser.snapshot')),
+            waitForURL: (value) => __nativeWebBrowser('waitForURL', __oxOptions(value, 'ox.web.browser.waitForURL')),
             showPage: (value) => __nativeWebBrowser('showPage', __oxOptions(value, 'ox.web.browser.showPage')),
-            executeScript: (value) => __nativeWebBrowser('executeScript', __oxOptions(value, 'ox.web.browser.executeScript')),
-            exportPdf: (value) => __nativeWebBrowser('exportPdf', __oxOptions(value, 'ox.web.browser.exportPdf')),
-            injectScript: (value) => __nativeWebBrowser('injectScript', __oxOptions(value, 'ox.web.browser.injectScript')),
-            clearScripts: (value) => __nativeWebBrowser('clearScripts', __oxOptions(value, 'ox.web.browser.clearScripts')),
+            evaluate: (value) => __nativeWebBrowser('evaluate', __oxOptions(value, 'ox.web.browser.evaluate')),
+            pdf: (value) => __nativeWebBrowser('pdf', __oxOptions(value, 'ox.web.browser.pdf')),
+            screenshot: (value) => __nativeWebBrowser('screenshot', __oxOptions(value, 'ox.web.browser.screenshot')),
+            addInitScript: (value) => __nativeWebBrowser('addInitScript', __oxOptions(value, 'ox.web.browser.addInitScript')),
             startCapture: (value) => __nativeWebBrowser('startCapture', __oxOptions(value, 'ox.web.browser.startCapture')),
             markCapture: (value) => __nativeWebBrowser('markCapture', __oxOptions(value, 'ox.web.browser.markCapture')),
             listCapturedEvents: (value) => __nativeWebBrowser('listCapturedEvents', __oxOptions(value, 'ox.web.browser.listCapturedEvents')),

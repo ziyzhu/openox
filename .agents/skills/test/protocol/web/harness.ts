@@ -154,7 +154,7 @@ export function harness(options: { device: string; debugEndpoint: string; fixtur
     get metrics() { return { scriptTurns, resultBytes, loginObservations }; },
     site: (name: string) => options.sites.find(site => site.name === name)!,
     async newConversation() {
-      if (conversation) await ox(["vm", "eval", "--script", "const {pages}=await ox.web.browser.list({purpose:'List fixture cleanup pages'});for(const page of pages)await ox.web.browser.close({purpose:'Close completed fixture page',pageId:page.pageId});"], { conversation: true });
+      if (conversation) await ox(["vm", "eval", "--script", "const {pages}=await ox.web.browser.pages({purpose:'List fixture cleanup pages'});for(const page of pages.filter(page=>page.owned))await ox.web.browser.close({purpose:'Close completed fixture page',pageId:page.pageId});"], { conversation: true });
       const created = await ox(["conversation", "new", "--provider", "mock", "--model", "mock"]);
       if (!created.conversationId) throw new Error(`Conversation was not created: ${JSON.stringify(created)}`);
       conversation = created.conversationId;

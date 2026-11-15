@@ -42,7 +42,7 @@ export const oauthCases: Case[] = [
       assert.equal(initial.authentication, "unverified");
       let state: any;
       for (let attempt = 0; attempt < 30; attempt++) {
-        state = await h.turn('return (await ox.web.browser.list({ purpose: "Inspect popup navigation", includeFrames: true })).pages[0];');
+        state = await h.turn('return await (async () => { const page = (await ox.web.browser.pages({ purpose: "Inspect popup navigation" })).pages.find(page => page.owned); return { ...page, ...await ox.web.browser.frames({ purpose: "Inspect popup navigation", pageId: page.pageId }) }; })();');
         if (state.frames.some((frame: any) => frame.isMainFrame && frame.serviceID === "web:ox-popup-idp.localhost")) break;
         await Bun.sleep(300);
       }
@@ -60,6 +60,23 @@ export const oauthCases: Case[] = [
       assert.deepEqual(sessions.map(session => session.id), ["ada"]);
       assert.equal(h.site("popup").counters.callback, 1);
       return "target=_blank used the preserved page; provider callback dispatched once and destination session verified; window.opener is not covered";
+    },
+  },
+  {
+    name: "popup-window-open", site: "popup",
+    async run(h) {
+      const opened = await h.turn(`const page = await ox.web.browser.newPage({ purpose: "Open popup consumer", url: fixtureTargets["web:ox-popup.localhost:login"] });
+await ox.web.browser.evaluate({ purpose: "Open script window", frameId: page.mainFrameId, script: "document.querySelector('#script-sign-in').click(); return true;" });
+const landed = await ox.web.browser.waitForURL({ purpose: "Wait for provider", pageId: page.pageId, url: "*ox-popup-idp.localhost*/authorize", timeoutMs: 10000 });
+const frames = await ox.web.browser.frames({ purpose: "Inspect provider", pageId: page.pageId });
+await ox.web.browser.evaluate({ purpose: "Trigger alert", frameId: frames.frames.find(frame => frame.isMainFrame).id, script: "alert('Popup provider alert'); return true;" });
+const snapshot = await ox.web.browser.snapshot({ purpose: "Read dialogs", frameId: frames.frames.find(frame => frame.isMainFrame).id });
+return { landed, dialogs: snapshot.javaScriptDialogs, pages: await ox.web.browser.pages({ purpose: "Count pages" }) };`);
+      assert.match(opened.landed.url, /ox-popup-idp\.localhost.*\/authorize/, "window.open did not navigate the agent page");
+      assert.equal(h.site("popup").counters.authorization, 1);
+      assert.deepEqual(opened.dialogs.map((dialog: { type: string; message: string }) => [dialog.type, dialog.message]), [["alert", "Popup provider alert"]]);
+      assert.equal(opened.pages.pages.filter((page: { owned: boolean }) => page.owned).length, 1, "window.open must reuse the agent page");
+      return "script window.open navigated the same agent page, waitForURL matched a glob, and an alert was dismissed and reported by snapshot";
     },
   },
   {

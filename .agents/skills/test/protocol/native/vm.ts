@@ -51,7 +51,7 @@ try {
       const before = await ox.fs.read({path:'MEMORY.md',purpose:'Read QA memory'});
       const parallel = await Promise.all([ox.fs.read({path:'app/status.json',purpose:'Inspect QA Profile'}),ox.fs.read({path:'MEMORY.md',purpose:'Read QA memory'})]);
       const invalid = [];
-      for (const invoke of [()=>ox.fs.read({path:17,purpose:'Check schema'}),()=>ox.web.browser.navigate({url:17,purpose:'Check nested schema'})]) {
+      for (const invoke of [()=>ox.fs.read({path:17,purpose:'Check schema'}),()=>ox.web.browser.goto({url:17,purpose:'Check nested schema'})]) {
         try {await invoke(); throw Error('Invalid input accepted')} catch(e) {if(e.code!=='invalid_argument') throw e; invalid.push(JSON.parse(JSON.stringify(e)));}
       }
       let denied;

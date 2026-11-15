@@ -14,7 +14,7 @@ export const handoffCases: Case[] = scenarios.map(scenario => ({
     const domain = `ox-handoff-${scenario}.localhost`;
     const started = Date.now();
     await h.begin(`await (async () => { ${invokeScript(`web:${domain}:login`)} })();
-const { pages } = await ox.web.browser.list({ purpose: "Find prepared handoff page" });
+const pages = (await ox.web.browser.pages({ purpose: "Find prepared handoff page" })).pages.filter(page => page.owned);
 try { return { value: await ox.web.browser.showPage({ purpose: "Show stress handoff", pageId: pages[0].pageId }) }; }
 catch (error) { return { error: error.message, code: error.code }; }`, true);
     const terminal = scenario === "loop" || scenario === "timeout";
@@ -65,7 +65,7 @@ handoffCases.push({
   async run(h) {
     const started = Date.now();
     await h.begin(`await (async () => { ${invokeScript("web:ox-handoff-cancel.localhost:login")} })();
-const { pages } = await ox.web.browser.list({ purpose: "Find delayed handoff page" });
+const pages = (await ox.web.browser.pages({ purpose: "Find delayed handoff page" })).pages.filter(page => page.owned);
 await ox.web.browser.showPage({ purpose: "Wait for delayed page", pageId: pages[0].pageId });`, true);
     const counters = h.site("handoff").counters;
     const deadline = Date.now() + 10_000;
@@ -117,7 +117,7 @@ handoffCases.push({
     const udid = await h.ios.udid();
     const tap = (x: number, y: number) => run(["idb", "ui", "tap", String(Math.round(x)), String(Math.round(y)), "--udid", udid], { capture: true });
     await h.begin(`await (async () => { ${invokeScript("web:ox-handoff-control.localhost:login")} })();
-const { pages } = await ox.web.browser.list({ purpose: "Find prepared handoff page" });
+const pages = (await ox.web.browser.pages({ purpose: "Find prepared handoff page" })).pages.filter(page => page.owned);
 return { value: await ox.web.browser.showPage({ purpose: "Show keyboard handoff", pageId: pages[0].pageId }) };`, true);
     const doneID = await h.waitMatching(/^conversation\.service\.login\..+\.done$/, 20_000);
     try {

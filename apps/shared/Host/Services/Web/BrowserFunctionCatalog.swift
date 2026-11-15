@@ -41,20 +41,22 @@ nonisolated enum BrowserFunctionCatalog {
     static let legacyAttachmentApproval = "ox.service.attach:ios:browser"
 
     static let actions: [Action] = [
-        Action(id: "open", label: "Open Page", description: "Open an explicit conversation-owned page. At most six agent pages may be open across the active Profile; opening pages count. At capacity reuse a page or close one. Never silently replaces or evicts pages.",
+        Action(id: "newPage", label: "New Page", description: "Open an explicit conversation-owned page. At most six agent pages may be open across the active Profile; opening pages count. At capacity reuse a page or close one. Never silently replaces or evicts pages.",
                inputSchema: object(["url": string(minimum: 1, maximum: 8_192)], required: ["url"]),
                outputSchema: object(["pageId": string(), "mainFrameId": string()], required: ["pageId", "mainFrameId"])),
-        Action(id: "list", label: "List Pages", description: "List this conversation's live pages. Include frames to discover fresh document targets, including the main document. Frames do not consume page capacity. Frame discovery is bounded; cross-origin parents may be unknown. A replaced document invalidates its frameId.",
-               inputSchema: object(["includeFrames": boolean]),
+        Action(id: "pages", label: "List Pages", description: "List every live agent page in the active Profile, including pages owned by other conversations, which count toward the six-page limit. Only owned pages expose full URLs and titles and accept page operations; other pages show their origin. Discover frame targets with frames.",
+               inputSchema: object(),
                outputSchema: object(["pages": .object(["type": .string("array"), "items": object([
-                   "pageId": string(), "url": nullableString, "title": string(), "isLoading": boolean, "busy": boolean,
-                   "frames": frames, "framesTruncated": boolean,
-               ], required: ["pageId", "url", "title", "isLoading", "busy"])]), "limit": integer(minimum: 1)], required: ["pages", "limit"])),
+                   "pageId": string(), "url": nullableString, "title": string(), "isLoading": boolean, "busy": boolean, "owned": boolean,
+               ], required: ["pageId", "url", "title", "isLoading", "busy", "owned"])]), "limit": integer(minimum: 1)], required: ["pages", "limit"])),
+        Action(id: "frames", label: "List Frames", description: "List fresh document targets of an explicit owned page, including the main document. Frame discovery is bounded; cross-origin parents may be unknown. A replaced document invalidates its frameId.",
+               inputSchema: object(["pageId": pageID], required: ["pageId"]),
+               outputSchema: object(["frames": frames, "framesTruncated": boolean], required: ["frames", "framesTruncated"])),
         Action(id: "close", label: "Close Page", description: "Close an explicit idle conversation-owned page. Busy pages and pages awaiting user interaction cannot be closed. Does not clear website data or sign out.",
                inputSchema: object(["pageId": pageID], required: ["pageId"]), outputSchema: object(["closed": boolean], required: ["closed"])),
         Action(
-            id: "navigate",
-            label: "Navigate",
+            id: "goto",
+            label: "Go to URL",
             description: "Navigate Browser to an absolute public HTTPS URL. Simulator builds also allow loopback HTTP.",
             inputSchema: object(
                 ["pageId": pageID, "url": string(description: "Absolute public HTTPS URL, or loopback HTTP in a simulator.", minimum: 1, maximum: 8_192)],
@@ -77,53 +79,33 @@ nonisolated enum BrowserFunctionCatalog {
             outputSchema: object(["url": nullableString], required: ["url"])
         ),
         Action(
-            id: "stopLoading",
-            label: "Stop Loading",
-            description: "Stop an explicit page's current load.",
-            inputSchema: object(["pageId": pageID], required: ["pageId"]),
-            outputSchema: object([
-                "stopped": boolean,
-                "url": nullableString,
-            ], required: ["stopped", "url"])
-        ),
-        Action(
             id: "goBack",
             label: "Go Back",
-            description: "Navigate an explicit page to the previous item in its history.",
+            description: "Navigate an explicit page to the previous item in its history. Returns navigated: false without a previous item.",
             inputSchema: object(["pageId": pageID], required: ["pageId"]),
             outputSchema: navigationResult
         ),
         Action(
             id: "goForward",
             label: "Go Forward",
-            description: "Navigate an explicit page to the next item in its history.",
+            description: "Navigate an explicit page to the next item in its history. Returns navigated: false without a next item.",
             inputSchema: object(["pageId": pageID], required: ["pageId"]),
             outputSchema: navigationResult
         ),
         Action(
-            id: "getNavigationHistory",
-            label: "Get Navigation History",
-            description: "Read an explicit page's back, current, and forward navigation history.",
-            inputSchema: object(["pageId": pageID], required: ["pageId"]),
-            outputSchema: object([
-                "back": .object(["type": .string("array"), "items": historyItem]),
-                "current": .object(["oneOf": .array([.object(["type": .string("null")]), historyItem])]),
-                "forward": .object(["type": .string("array"), "items": historyItem]),
-            ], required: ["back", "current", "forward"])
-        ),
-        Action(
-            id: "getPageState",
-            label: "Get Page State",
-            description: "Observe a bounded, read-only snapshot of the explicitly selected frame document without returning input values. Optionally scope with a CSS selector. Includes page identity, navigation generation, loading, security, frame discovery, and coverage limits; does not infer application readiness or authentication. Control id and name attributes are separate strings capped at 256 characters. Uses the same site authorization as executeScript. Discover fresh frame targets with list({ includeFrames:true }); stale targets fail without fallback.",
+            id: "snapshot",
+            label: "Snapshot",
+            description: "Observe a bounded, read-only snapshot of the explicitly selected frame document without returning input values. Optionally scope with a CSS selector. Includes page identity, navigation generation, loading, security, frame discovery, recent auto-dismissed JavaScript dialogs, and coverage limits; does not infer application readiness or authentication. Control id and name attributes are separate strings capped at 256 characters. Uses the same site authorization as evaluate. Discover fresh frame targets with frames; stale targets fail without fallback.",
             inputSchema: observationOptions,
             outputSchema: pageState
         ),
         Action(
-            id: "waitForNavigation",
-            label: "Wait for Navigation",
-            description: "Wait until an explicit page finishes its next navigation.",
+            id: "waitForURL",
+            label: "Wait for URL",
+            description: "Wait until an explicit page finishes a navigation. With url, resolve once the finished page URL matches it, including immediately; * matches any characters. Without url, wait for the next finished navigation.",
             inputSchema: object([
                 "pageId": pageID,
+                "url": string(description: "Exact URL or glob where * matches any characters.", minimum: 1, maximum: 8_192),
                 "timeoutMs": .object([
                     "type": .string("integer"),
                     "minimum": .int(100),
@@ -136,7 +118,7 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "showPage",
             label: "Show Page",
-            description: "Present the exact live page with Done/Cancel after clearing capture and injected scripts. Await user interaction and return its status in the same execution. Completed acknowledges interaction, not task success.",
+            description: "Present the exact live page with Done/Cancel after clearing capture and the init script. Await user interaction and return its status in the same execution. Completed acknowledges interaction, not task success.",
             inputSchema: object(["pageId": pageID], required: ["pageId"]),
             outputSchema: object([
                 "status": .object([
@@ -148,8 +130,8 @@ nonisolated enum BrowserFunctionCatalog {
             hasModelGuidance: true
         ),
         Action(
-            id: "executeScript",
-            label: "Execute JavaScript",
+            id: "evaluate",
+            label: "Evaluate JavaScript",
             description: "Execute arbitrary JavaScript in Browser's page, including logged-in website data and network access.",
             inputSchema: object(
                 ["frameId": frameID, "script": string(
@@ -163,33 +145,23 @@ nonisolated enum BrowserFunctionCatalog {
             hasModelGuidance: true
         ),
         Action(
-            id: "exportPdf",
+            id: "pdf",
             label: "Export PDF",
             description: "Export an explicit complete page as a PDF attachment or named Profile file.",
-            inputSchema: object([
-                "pageId": pageID,
-                "filename": string(
-                    description: "Optional file basename, never a path.",
-                    minimum: 1,
-                    maximum: 255
-                ),
-            ], required: ["pageId"]),
-            outputSchema: object([
-                "url": nullableString,
-                "contentType": .object([
-                    "type": .string("string"),
-                    "enum": .array([.string("application/pdf")]),
-                ]),
-                "pages": integer(minimum: 1),
-                "bytes": integer(minimum: 1),
-                "attached": boolean,
-                "file": nullableString,
-            ], required: ["url", "contentType", "pages", "bytes", "attached", "file"])
+            inputSchema: exportOptions,
+            outputSchema: exportResult("application/pdf", extra: ["pages": integer(minimum: 1)])
         ),
         Action(
-            id: "injectScript",
-            label: "Inject Script",
-            description: "Install page-scoped document-start scripts for selected domains and reload the explicit page. Applies to future documents, not a single frame target.",
+            id: "screenshot",
+            label: "Screenshot",
+            description: "Capture an explicit page's rendered contents as an image attachment or named Profile file. Large pages are downsampled. Analyze a named file on device with ox.vision.analyze.",
+            inputSchema: exportOptions,
+            outputSchema: exportResult("image/png", "image/jpeg", extra: ["width": integer(minimum: 1), "height": integer(minimum: 1)])
+        ),
+        Action(
+            id: "addInitScript",
+            label: "Add Init Script",
+            description: "Replace an explicit page's document-start script for selected domains and reload it. Applies to future documents, not a single frame target. Calling again replaces the previous script; showPage and close remove it.",
             inputSchema: object([
                 "pageId": pageID,
                 "domains": .object([
@@ -198,13 +170,6 @@ nonisolated enum BrowserFunctionCatalog {
                 ]),
                 "script": string(minimum: 1, maximum: 100_000),
             ], required: ["pageId", "domains", "script"]),
-            outputSchema: object(["url": nullableString], required: ["url"])
-        ),
-        Action(
-            id: "clearScripts",
-            label: "Clear Scripts",
-            description: "Remove an explicit page's injected scripts and reload it.",
-            inputSchema: object(["pageId": pageID], required: ["pageId"]),
             outputSchema: object(["url": nullableString], required: ["url"])
         ),
         Action(
@@ -327,8 +292,8 @@ nonisolated enum BrowserFunctionCatalog {
     private static let nullableString: JSONValue = .object([
         "type": .array([.string("string"), .string("null")]),
     ])
-    private static let pageID = string(description: "Explicit live page ID from open or list.", minimum: 1, maximum: 100)
-    private static let frameID = string(description: "Explicit live document ID from open or list({ includeFrames:true }). Required for main documents too. Stale targets fail without fallback.", minimum: 1, maximum: 100)
+    private static let pageID = string(description: "Explicit owned page ID from newPage or pages.", minimum: 1, maximum: 100)
+    private static let frameID = string(description: "Explicit live document ID from newPage or frames. Required for main documents too. Stale targets fail without fallback.", minimum: 1, maximum: 100)
     private static let observationOptions = object([
         "frameId": frameID,
         "selector": string(description: "Optional CSS selector limiting observation to one light-DOM subtree. Defaults to document.body. Missing scope is reported, not treated as an empty page.", minimum: 1, maximum: 2_000),
@@ -356,6 +321,10 @@ nonisolated enum BrowserFunctionCatalog {
             ].map(JSONValue.string)),
         ]),
         "frameId": nullableString,
+        "javaScriptDialogs": .object(["type": .string("array"), "maxItems": .int(BrowserSession.maximumRecordedDialogs), "items": object([
+            "type": .object(["type": .string("string"), "enum": .array(["alert", "confirm", "prompt"].map(JSONValue.string))]),
+            "message": string(), "origin": string(), "timestamp": .object(["type": .string("number"), "description": .string("Milliseconds since the Unix epoch.")]),
+        ], required: ["type", "message", "origin", "timestamp"])]),
         "frames": frames,
         "framesTruncated": boolean,
         "document": object([
@@ -379,7 +348,20 @@ nonisolated enum BrowserFunctionCatalog {
             "truncated": boolean,
             "coverage": string(),
         ], required: ["scope", "scopeFound", "readyState", "busy", "headings", "dialogs", "messages", "controls", "embeddedFrames", "truncated", "coverage"]),
-    ], required: ["pageID", "navigationGeneration", "url", "title", "estimatedProgress", "isLoading", "hasOnlySecureContent", "isBlockedByScreenTime", "fullscreenState", "frameId", "frames", "framesTruncated", "document"])
+    ], required: ["pageID", "navigationGeneration", "url", "title", "estimatedProgress", "isLoading", "hasOnlySecureContent", "isBlockedByScreenTime", "fullscreenState", "frameId", "javaScriptDialogs", "frames", "framesTruncated", "document"])
+    private static let exportOptions = object([
+        "pageId": pageID,
+        "filename": string(description: "Optional file basename, never a path.", minimum: 1, maximum: 255),
+    ], required: ["pageId"])
+    private static func exportResult(_ contentTypes: String..., extra: [String: JSONValue]) -> JSONValue {
+        object([
+            "url": nullableString,
+            "contentType": .object(["type": .string("string"), "enum": .array(contentTypes.map(JSONValue.string))]),
+            "bytes": integer(minimum: 1),
+            "attached": boolean,
+            "file": nullableString,
+        ].merging(extra) { _, value in value }, required: ["url", "contentType"] + extra.keys.sorted() + ["bytes", "attached", "file"])
+    }
     private static let bodyCoverage = object([
         "status": .object(["type": .string("string"), "enum": .array(["unavailable", "invalid_json", "json"].map(JSONValue.string))]),
         "shapeTruncated": boolean,
@@ -410,11 +392,6 @@ nonisolated enum BrowserFunctionCatalog {
         "event": string(),
     ]
     private static let stringArray: JSONValue = .object(["type": .string("array"), "items": string()])
-    private static let historyItem = object([
-        "initialUrl": string(),
-        "title": nullableString,
-        "url": string(),
-    ], required: ["initialUrl", "title", "url"])
     private static let navigationResult = object([
         "navigated": boolean,
         "url": nullableString,

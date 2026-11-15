@@ -4,7 +4,7 @@ extension ServiceOperations {
     func invokeAction(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, frameID: String? = nil, purpose: String) async throws -> JSONValue? {
         let (service, actionID) = try await resolveAction(name)
         if service.isWebService, frameID == nil {
-            throw OxFunctionError(code: "frame_required", message: "Web service actions require an explicit frameId.", recovery: "Open a page or list pages with includeFrames:true and select the matching document.")
+            throw OxFunctionError(code: "frame_required", message: "Web service actions require an explicit frameId.", recovery: "Open a page or list its frames and select the matching document.")
         }
         return try await invokeAction(service: service, actionID: actionID, args: args, session: session, pageURL: pageURL, frameID: frameID, purpose: purpose)
     }

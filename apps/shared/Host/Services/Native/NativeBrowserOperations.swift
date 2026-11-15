@@ -4,10 +4,12 @@ extension NativeServiceOperations {
     func invokeBrowserOperation(actionID: String, args: JSONValue, purpose: String?) async throws -> JSONValue? {
         let fields = args.objectValue ?? [:]
         switch actionID {
-        case "open":
+        case "newPage":
             return try await openBrowserPage(url: fields["url"]?.stringValue ?? "")
-        case "list":
-            return try await listBrowserPages(includeFrames: fields["includeFrames"]?.boolValue ?? false)
+        case "pages":
+            return listBrowserPages()
+        case "frames":
+            return try await listBrowserFrames(pageID: fields["pageId"]?.stringValue ?? "")
         case "close":
             let page = try serviceManager.browserSessions.requirePage(fields["pageId"]?.stringValue ?? "", scopeID: id)
             guard serviceManager.actionScheduler.isIdle(page) else {
@@ -17,7 +19,7 @@ extension NativeServiceOperations {
             return .object(["closed": .bool(true)])
         default:
             let session = try browserSession(arguments: fields)
-            if ["executeScript", "exportPdf", "stopLoading", "waitForNavigation"].contains(actionID) {
+            if ["evaluate", "pdf", "screenshot", "waitForURL"].contains(actionID) {
                 return try await performBrowserOperation(actionID, fields: fields, session: session, purpose: purpose)
             }
             guard let page = session.page, let action = await serviceManager.browserService.inspectionAction() else {
@@ -32,49 +34,43 @@ extension NativeServiceOperations {
     private func performBrowserOperation(_ actionID: String, fields: [String: JSONValue], session: ServiceBrowserActionSession, purpose: String?) async throws -> JSONValue {
         let authorizeSite = { [authorizeBrowserSite] (site: String) in try await authorizeBrowserSite(site, purpose) }
         switch actionID {
-        case "navigate":
+        case "goto":
             guard let raw = fields["url"]?.stringValue, let url = URL(string: raw), BrowserNavigation.allowsServiceNavigation(url) else {
-                throw RuntimeError.bridge("ox.web.browser.navigate requires an absolute public HTTPS URL. Simulator builds also allow loopback HTTP.")
+                throw RuntimeError.bridge("ox.web.browser.goto requires an absolute public HTTPS URL. Simulator builds also allow loopback HTTP.")
             }
             let landed = try await session.navigate(url)
             return .object(["url": .string(landed.absoluteString)])
         case "reload":
             let landed = try await session.reload(fromOrigin: fields["fromOrigin"]?.boolValue ?? false)
             return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case "stopLoading":
-            let url = try await session.stopLoading()
-            return .object(["stopped": .bool(true), "url": url.map { .string($0.absoluteString) } ?? .null])
         case "goBack", "goForward":
             let landed = actionID == "goBack" ? try await session.goBack() : try await session.goForward()
             return .object(["navigated": .bool(landed != nil), "url": landed.map { .string($0.absoluteString) } ?? .null])
-        case "getNavigationHistory":
-            return try await session.navigationHistory()
-        case "getPageState":
+        case "snapshot":
             return try await session.pageState(selector: fields["selector"]?.stringValue, frameID: fields["frameId"]?.stringValue, authorizeSite: authorizeSite)
-        case "waitForNavigation":
-            let landed = try await session.waitForNavigation(timeoutMilliseconds: fields["timeoutMs"]?.intValue ?? 15_000)
+        case "waitForURL":
+            let landed = try await session.waitForURL(fields["url"]?.stringValue, timeoutMilliseconds: fields["timeoutMs"]?.intValue ?? 15_000)
             return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case "executeScript":
-            return try await session.executeScript(fields["script"]?.stringValue ?? "", frameID: fields["frameId"]?.stringValue, authorizeSite: authorizeSite)
-        case "exportPdf":
-            let pdf = try await session.exportPDF(authorizeSite: authorizeSite)
+        case "evaluate":
+            return try await session.evaluate(fields["script"]?.stringValue ?? "", frameID: fields["frameId"]?.stringValue, authorizeSite: authorizeSite)
+        case "pdf", "screenshot":
+            let export = actionID == "pdf"
+                ? try await session.exportPDF(authorizeSite: authorizeSite)
+                : try await session.screenshot(authorizeSite: authorizeSite)
             let file: FileItem?
             if let filename = fields["filename"]?.stringValue {
-                file = try await importFile(pdf.attachment, filename)
+                file = try await importFile(export.attachment, filename)
             } else {
-                try attachTransient(pdf.attachment)
+                try attachTransient(export.attachment)
                 file = nil
             }
-            return .object([
-                "url": pdf.url.map { .string($0.absoluteString) } ?? .null,
-                "contentType": .string(pdf.attachment.mimeType), "pages": .int(pdf.pages), "bytes": .int(pdf.attachment.data.count),
+            return .object(export.metadata.merging([
+                "url": export.url.map { .string($0.absoluteString) } ?? .null,
+                "contentType": .string(export.attachment.mimeType), "bytes": .int(export.attachment.data.count),
                 "attached": .bool(true), "file": file.map { .string($0.fileName) } ?? .null,
-            ])
-        case "injectScript":
-            let landed = try await session.injectScript(fields["script"]?.stringValue ?? "", domains: fields["domains"]?.arrayValue?.compactMap(\.stringValue) ?? [], authorizeSite: authorizeSite)
-            return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case "clearScripts":
-            let landed = try await session.clearScripts()
+            ]) { _, value in value })
+        case "addInitScript":
+            let landed = try await session.addInitScript(fields["script"]?.stringValue ?? "", domains: fields["domains"]?.arrayValue?.compactMap(\.stringValue) ?? [], authorizeSite: authorizeSite)
             return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
         case "startCapture":
             let capture = try await session.startCapture(includeBodies: fields["includeBodies"]?.boolValue ?? false, reload: fields["reload"]?.boolValue ?? false)

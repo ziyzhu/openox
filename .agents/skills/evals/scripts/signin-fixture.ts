@@ -21,7 +21,7 @@ function state(host: string, step: string) {
   const value = page(host, step);
   return {
     ...value, url: `https://${host}/login`, title: "Fixture sign-in", estimatedProgress: 1,
-    hasOnlySecureContent: true, isBlockedByScreenTime: false, fullscreenState: "notInFullscreen", frameId: value.frames[0]!.id,
+    hasOnlySecureContent: true, isBlockedByScreenTime: false, fullscreenState: "notInFullscreen", frameId: value.frames[0]!.id, javaScriptDialogs: [],
     document: { ...value.document, scope: null, scopeFound: true, readyState: "complete", busy: false,
       dialogs: [], embeddedFrames: [], coverage: "Visible light DOM only",
       controls: value.document.controls.map(control => ({ ...control, id: null, name: null, role: "input", required: true })),
@@ -29,9 +29,13 @@ function state(host: string, step: string) {
   };
 }
 
-function listing(host: string, step: string) {
+function listing(host: string) {
   return { pages: [{ pageId: "fixture-page", url: `https://${host}/login`, title: "Fixture sign-in", isLoading: false,
-    busy: false, frames: page(host, step).frames, framesTruncated: false }], limit: 6 };
+    busy: false, owned: true }], limit: 6 };
+}
+
+function frames(host: string, step: string) {
+  return { frames: page(host, step).frames, framesTruncated: false };
 }
 
 function result(host: string, step: string) {
@@ -74,16 +78,21 @@ export function signinFixture(mode: "password" | "provider" | "manual"): EvalCas
     stubs: { state: { step: 0, signedIn: false, read: false }, files: { [tracePath]: JSON.stringify(trace) }, functions: {
       "ox.service.inspect": [domain, provider].map(host => { const { domain: _, name: _name, kind: _kind, saved: _saved, attached: _attached, login: _login, ...rest } = inspection(host); return { args: { domain: host }, result: { service: service(host), ...rest } }; }),
       "ox.service.invoke": invoke,
-      "ox.web.browser.open": [{ result: { pageId: "fixture-page", mainFrameId: `${domain}-identifier` } }],
-      "ox.web.browser.list": [
-        { when: { step: 1 }, result: listing(provider, "identifier") },
-        { when: { step: 2 }, result: listing(owner, "password") },
-        { when: { signedIn: true }, result: listing(domain, "signed-in") },
-        { result: listing(domain, "identifier") },
+      "ox.web.browser.newPage": [{ result: { pageId: "fixture-page", mainFrameId: `${domain}-identifier` } }],
+      "ox.web.browser.pages": [
+        { when: { step: 1 }, result: listing(provider) },
+        { when: { step: 2 }, result: listing(owner) },
+        { result: listing(domain) },
+      ],
+      "ox.web.browser.frames": [
+        { when: { step: 1 }, result: frames(provider, "identifier") },
+        { when: { step: 2 }, result: frames(owner, "password") },
+        { when: { signedIn: true }, result: frames(domain, "signed-in") },
+        { result: frames(domain, "identifier") },
       ],
       "ox.web.browser.showPage": [{ args: { pageId: "fixture-page" }, when: { prepared: true }, result: { shown: true, status: "awaiting_user" }, set: { awaiting: true } }],
       "ox.user.choose": [{ result: "Ada Fixture" }],
-      "ox.web.browser.getPageState": [
+      "ox.web.browser.snapshot": [
         { when: { step: 1 }, result: state(provider, "identifier") },
         { when: { step: 2 }, result: state(owner, "password") },
         { when: { signedIn: true }, result: state(domain, "signed-in") },

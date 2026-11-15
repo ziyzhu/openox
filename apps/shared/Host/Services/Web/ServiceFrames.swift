@@ -24,6 +24,19 @@ extension BrowserSession {
     })();
     """
 
+    static let windowOpenScript = """
+    (() => {
+      const open = window.open;
+      Object.defineProperty(window, 'open', { configurable: true, writable: true, value: function (url) {
+        let destination;
+        try { destination = new URL(String(url ?? ''), location.href); } catch { return open.apply(this, arguments); }
+        if (!url || !/^https?:$/.test(destination.protocol)) return open.apply(this, arguments);
+        location.assign(destination.href);
+        return window;
+      } });
+    })();
+    """
+
     func observeFrames(_ action: WebPage.NavigationAction) {
         if let target = action.target, !target.isMainFrame { frameCandidates.append(target) }
         if !action.source.isMainFrame { frameCandidates.append(action.source) }
@@ -69,7 +82,7 @@ extension BrowserSession {
     func requireFrame(_ id: String) async throws -> FrameTarget {
         guard frameTargets[id] != nil,
               let target = try await discoverFrames().first(where: { $0.id == id }) else {
-            throw OxFunctionError(code: "frame_unavailable", message: "The selected frame document is no longer available. No action was executed.", recovery: "Inspect getPageState again. Do not automatically repeat an action whose outcome is uncertain.")
+            throw OxFunctionError(code: "frame_unavailable", message: "The selected frame document is no longer available. No action was executed.", recovery: "List the page's frames again. Do not automatically repeat an action whose outcome is uncertain.")
         }
         return target
     }

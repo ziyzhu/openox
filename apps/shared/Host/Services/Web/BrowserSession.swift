@@ -109,6 +109,7 @@ final class BrowserSession: NSObject {
     var scopeID: UUID?
     let page: WebPage
     let navigationDecider: NavigationDecider
+    let dialogPresenter: DialogPresenter
     let userContentController: WKUserContentController
     unowned let manager: ServiceManager
     private(set) var isOpen = true
@@ -131,6 +132,10 @@ final class BrowserSession: NSObject {
     var omittedFrames = 0
     var frameTargets: [String: FrameTarget] = [:]
     var frameServiceSources: [String: String] = [:]
+    var recordedDialogs: [JSONValue] = []
+
+    nonisolated static let maximumRecordedDialogs = 10
+    nonisolated static let maximumDialogMessageCharacters = 1_000
 
     init(manager: ServiceManager) {
         self.manager = manager
@@ -138,11 +143,14 @@ final class BrowserSession: NSObject {
         var configuration = manager.makePageConfiguration()
         configuration.userContentController = controller
         let decider = NavigationDecider()
-        self.page = WebPage(configuration: configuration, navigationDecider: decider)
+        let presenter = DialogPresenter()
+        self.page = WebPage(configuration: configuration, navigationDecider: decider, dialogPresenter: presenter)
         self.navigationDecider = decider
+        self.dialogPresenter = presenter
         self.userContentController = controller
         super.init()
         decider.session = self
+        presenter.session = self
         controller.installBridgeHandlers(self)
         controller.addScriptMessageHandler(SecretBridge(page: self), contentWorld: .page, name: SecretBridge.channelName)
         Log.webView.info("BrowserSession.created session=\(logLabel)")
@@ -203,6 +211,7 @@ final class BrowserSession: NSObject {
         guard scriptMode != mode else { return }
         userContentController.removeAllUserScripts()
         userContentController.addUserScript(WKUserScript(source: Self.frameIdentityScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        userContentController.addUserScript(WKUserScript(source: Self.windowOpenScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         userContentController.addBridgeUserScripts()
         userContentController.addUserScript(WKUserScript(source: frameServicesScript(self), injectionTime: .atDocumentStart, forMainFrameOnly: false))
         for script in additionalUserScripts { userContentController.addUserScript(script) }

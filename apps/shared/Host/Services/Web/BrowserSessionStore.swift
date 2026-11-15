@@ -41,7 +41,7 @@ final class BrowserSessionStore {
 
     func requirePage(_ id: String, scopeID: UUID) throws -> BrowserSession {
         guard let page = sessions.first(where: { $0.id.uuidString == id && $0.scopeID == scopeID }), contains(page) else {
-            throw OxFunctionError(code: "page_unavailable", message: "The selected page is closed or unavailable.", recovery: "List live pages and explicitly open a new page if needed. Do not replay uncertain writes.")
+            throw OxFunctionError(code: "page_unavailable", message: "The selected page is closed or unavailable.", recovery: "List owned pages with pages and explicitly open a new page if needed. Do not replay uncertain writes.")
         }
         return page
     }
@@ -49,7 +49,7 @@ final class BrowserSessionStore {
     func requireFramePage(_ id: String, scopeID: UUID) throws -> BrowserSession {
         let matches = sessions.filter { $0.scopeID == scopeID && $0.frameTargets[id] != nil }
         guard matches.count == 1, let page = matches.first, contains(page) else {
-            throw OxFunctionError(code: "frame_unavailable", message: "The selected frame document is unavailable.", recovery: "List pages with includeFrames:true and select a fresh frameId. Do not replay uncertain writes.")
+            throw OxFunctionError(code: "frame_unavailable", message: "The selected frame document is unavailable.", recovery: "List the page's frames and select a fresh frameId. Do not replay uncertain writes.")
         }
         return page
     }
@@ -116,7 +116,7 @@ final class BrowserSessionStore {
         } else {
             if action.scopeID != nil, sessions.count(where: { $0.scopeID != nil && $0.isOpen }) >= Self.maximumAgentPages {
                 Log.webView.warning("BrowserSession.open rejected=page_limit scope=\(action.scopeID?.uuidString ?? "none") limit=\(Self.maximumAgentPages)")
-                throw OxFunctionError(code: "page_limit_reached", message: "The active Profile already has six agent pages open.", recovery: "Reuse a live page or close one of this conversation's pages before opening another.")
+                throw OxFunctionError(code: "page_limit_reached", message: "The active Profile already has six agent pages open.", recovery: "List pages to see every page counting toward the limit, then reuse or close one of this conversation's pages before opening another.")
             }
             page = BrowserSession(manager: action.service.manager)
             page.scopeID = action.scopeID

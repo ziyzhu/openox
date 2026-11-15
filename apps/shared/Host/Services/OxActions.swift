@@ -26,7 +26,7 @@ nonisolated enum OxActions {
                                 "type": .string("object"),
                                 "description": .string("Input matching the upfront standard contract or the non-standard contract from ox.service.inspect."),
                             ]),
-                            "frameId": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(100), "description": .string("Required for web services, including main documents. Live document ID from browser.open or browser.list with includeFrames:true. Omit for non-web services.")]),
+                            "frameId": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(100), "description": .string("Required for web services, including main documents. Live document ID from browser.newPage or browser.frames. Omit for non-web services.")]),
                             "session": WebSessionContract.sessionSchema,
                             "purpose": .object([
                                 "type": .string("string"),

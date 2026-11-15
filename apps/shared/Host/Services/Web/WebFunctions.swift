@@ -12,7 +12,7 @@ extension Conversation {
         let purpose = L10n.string("Open website")
         let navigation: JSONValue = .object(["purpose": .string(purpose), "url": .string(url.absoluteString)])
         let source = """
-        const page = await ox.web.browser.open(\(navigation.jsonString()));
+        const page = await ox.web.browser.newPage(\(navigation.jsonString()));
         await ox.web.browser.showPage({ purpose: \(JSONValue.string(purpose).jsonString()), pageId: page.pageId });
         return page;
         """
@@ -81,11 +81,11 @@ extension Conversation {
         )
         guard violations.isEmpty else { throw Service.InvokeError.invalidInput(name, violations) }
         return try await tracked(name, arguments, purpose: purpose) {
-            if action == "list" {
-                return try await self.nativeServiceOperations.listBrowserPages(includeFrames: arguments.objectValue?["includeFrames"]?.boolValue ?? false,
-                                                                              attached: self.attachedServices)
+            if action == "frames" {
+                return try await self.nativeServiceOperations.listBrowserFrames(pageID: arguments.objectValue?["pageId"]?.stringValue ?? "",
+                                                                               attached: self.attachedServices)
             }
-            if action == "getPageState" {
+            if action == "snapshot" {
                 let fields = arguments.objectValue ?? [:]
                 let session = try self.nativeServiceOperations.browserSession(arguments: fields)
                 guard let page = session.page, let inspection = await service.inspectionAction() else { throw Service.EvalError.notReady }

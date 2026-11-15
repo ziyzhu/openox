@@ -203,7 +203,7 @@ extension Service {
         verify: @escaping @MainActor @Sendable (BrowserSession) throws -> Void
     ) async throws -> JSONValue {
         guard domain == "ios:browser" else { throw EvalError.notActive }
-        let name = "ox.web.browser.executeScript"
+        let name = "ox.web.browser.evaluate"
         let invocationID = UUID()
         let invocation = String(invocationID.uuidString.prefix(8))
         let started = Date()

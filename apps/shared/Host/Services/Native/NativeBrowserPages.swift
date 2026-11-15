@@ -5,7 +5,7 @@ extension NativeServiceOperations {
     func openBrowserPage(url raw: String) async throws -> JSONValue {
         guard let url = URL(string: raw), BrowserNavigation.allowsServiceNavigation(url),
               let inspection = await serviceManager.browserService.inspectionAction() else {
-            throw RuntimeError.bridge("ox.web.browser.open requires an absolute public HTTPS URL. Simulator builds also allow loopback HTTP.")
+            throw RuntimeError.bridge("ox.web.browser.newPage requires an absolute public HTTPS URL. Simulator builds also allow loopback HTTP.")
         }
         let service = serviceManager.browserService
         let action = Service.Action(service: service, definition: inspection.definition, baseURL: url,
@@ -23,27 +23,41 @@ extension NativeServiceOperations {
         }
     }
 
-    func listBrowserPages(includeFrames: Bool, attached: [Service] = []) async throws -> JSONValue {
-        var values: [JSONValue] = []
-        for page in serviceManager.browserSessions.sessions.filter({ $0.scopeID == id && $0.isOpen }).sorted(by: { $0.id.uuidString < $1.id.uuidString }) {
-            var fields: [String: JSONValue] = [
+    func listBrowserPages() -> JSONValue {
+        let pages = serviceManager.browserSessions.sessions
+            .filter { $0.scopeID != nil && $0.isOpen }
+            .sorted { ($0.scopeID != id ? 1 : 0, $0.id.uuidString) < ($1.scopeID != id ? 1 : 0, $1.id.uuidString) }
+        let values: [JSONValue] = pages.map { page in
+            let owned = page.scopeID == id
+            let url = owned ? page.page.url?.absoluteString : page.page.url.flatMap(Self.origin)
+            return .object([
                 "pageId": .string(page.id.uuidString),
-                "url": page.page.url.map { .string($0.absoluteString) } ?? .null,
-                "title": .string(page.page.title),
+                "url": url.map(JSONValue.string) ?? .null,
+                "title": .string(owned ? page.page.title : ""),
                 "isLoading": .bool(page.page.isLoading),
                 "busy": .bool(!serviceManager.actionScheduler.isIdle(page)),
-            ]
-            if includeFrames {
-                guard page.secretAttempt?.holdsValues != true else {
-                    throw OxFunctionError(code: "page_locked", message: "A page holds a saved secret.", recovery: "List pages without frames or wait for the secret operation to finish.")
-                }
-                let frames = try await page.discoverFrames()
-                fields["frames"] = page.frameMetadata(frames, services: serviceManager.services, attached: Set(attached.map(\.domain)))
-                fields["framesTruncated"] = .bool(page.omittedFrames > 0)
-            }
-            values.append(.object(fields))
+                "owned": .bool(owned),
+            ])
         }
+        Log.webView.info("Browser.pages owner=\(id) owned=\(pages.count { $0.scopeID == id }) total=\(pages.count)")
         return .object(["pages": .array(values), "limit": .int(BrowserSessionStore.maximumAgentPages)])
+    }
+
+    func listBrowserFrames(pageID: String, attached: [Service] = []) async throws -> JSONValue {
+        let page = try serviceManager.browserSessions.requirePage(pageID, scopeID: id)
+        guard page.secretAttempt?.holdsValues != true else {
+            throw OxFunctionError(code: "page_locked", message: "The page holds a saved secret.", recovery: "Wait for the secret operation to finish.")
+        }
+        let frames = try await page.discoverFrames()
+        return .object([
+            "frames": page.frameMetadata(frames, services: serviceManager.services, attached: Set(attached.map(\.domain))),
+            "framesTruncated": .bool(page.omittedFrames > 0),
+        ])
+    }
+
+    private static func origin(_ url: URL) -> String? {
+        guard let scheme = url.scheme, let host = url.host else { return nil }
+        return "\(scheme)://\(host)\(url.port.map { ":\($0)" } ?? "")"
     }
 
     func browserSession(arguments: [String: JSONValue]) throws -> ServiceBrowserActionSession {

@@ -18,6 +18,43 @@ extension BrowserSession {
             return await session.decidePolicy(for: response, in: session)
         }
     }
+
+    final class DialogPresenter: WebPage.DialogPresenting {
+        private struct SystemPresenter: WebPage.DialogPresenting {}
+
+        weak var session: BrowserSession?
+
+        func handleJavaScriptAlert(message: String, initiatedBy frame: WebPage.FrameInfo) async {
+            guard record("alert", message, frame) else { return await SystemPresenter().handleJavaScriptAlert(message: message, initiatedBy: frame) }
+        }
+
+        func handleJavaScriptConfirm(message: String, initiatedBy frame: WebPage.FrameInfo) async -> WebPage.JavaScriptConfirmResult {
+            guard record("confirm", message, frame) else { return await SystemPresenter().handleJavaScriptConfirm(message: message, initiatedBy: frame) }
+            return .cancel
+        }
+
+        func handleJavaScriptPrompt(message: String, defaultText: String?, initiatedBy frame: WebPage.FrameInfo) async -> WebPage.JavaScriptPromptResult {
+            guard record("prompt", message, frame) else {
+                return await SystemPresenter().handleJavaScriptPrompt(message: message, defaultText: defaultText, initiatedBy: frame)
+            }
+            return .cancel
+        }
+
+        private func record(_ type: String, _ message: String, _ frame: WebPage.FrameInfo) -> Bool {
+            guard let session else { return true }
+            let presented = (try? session.manager.actionScheduler.requireNoPresentation(session)) == nil
+            let origin = frame.securityOrigin
+            session.recordedDialogs.append(.object([
+                "type": .string(type),
+                "message": .string(String(message.prefix(BrowserSession.maximumDialogMessageCharacters))),
+                "origin": .string("\(origin.protocol)://\(origin.host)\(origin.port == 0 ? "" : ":\(origin.port)")"),
+                "timestamp": .double(Date().timeIntervalSince1970 * 1_000),
+            ]))
+            session.recordedDialogs = Array(session.recordedDialogs.suffix(BrowserSession.maximumRecordedDialogs))
+            Log.webView.info("BrowserSession.dialog session=\(session.logLabel) type=\(type) host=\(origin.host) disposition=\(presented ? "user" : "dismissed")")
+            return !presented
+        }
+    }
 }
 
 extension BrowserSession {

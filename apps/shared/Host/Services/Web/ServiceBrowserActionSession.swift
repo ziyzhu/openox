@@ -5,10 +5,10 @@ import WebKit
 @MainActor
 @Observable
 final class ServiceBrowserActionSession {
-    struct ExportedPDF {
+    struct Export {
         let url: URL?
         let attachment: TransientAttachment
-        let pages: Int
+        let metadata: [String: JSONValue]
     }
 
     private final class CaptureSink: NSObject, WKScriptMessageHandler {
@@ -36,7 +36,7 @@ final class ServiceBrowserActionSession {
     private var captureSink: CaptureSink?
     private var capturedEvents: [JSONValue] = []
     private var captureRevision = UUID().uuidString
-    private var injectedScripts: [(domains: [String], source: String)] = []
+    private var initScript: (domains: [String], source: String)?
     private var trustedSites: Set<String> = []
     private var captureActive = false
     private var captureID: String?
@@ -56,7 +56,7 @@ final class ServiceBrowserActionSession {
 
     func inspectionPage() async throws -> BrowserSession {
         guard let page, service.owns(page), page.isOpen else {
-            throw OxFunctionError(code: "page_unavailable", message: "The selected page is unavailable.", recovery: "List live pages. No replacement page was opened.")
+            throw OxFunctionError(code: "page_unavailable", message: "The selected page is unavailable.", recovery: "List owned pages. No replacement page was opened.")
         }
         guard page.secretAttempt?.holdsValues != true else {
             throw OxFunctionError(code: "page_locked", message: "This page holds a saved secret during a login.", recovery: "Wait for the login to finish before inspecting the page.")
@@ -77,13 +77,6 @@ final class ServiceBrowserActionSession {
         return await service.reload(page, fromOrigin: fromOrigin, timeout: timeout)
     }
 
-    func stopLoading() async throws -> URL? {
-        let page = try await inspectionPage()
-        page.page.stopLoading()
-        Log.webView.info("Browser.stopLoading host=\(page.page.url?.host?.lowercased() ?? "?")")
-        return page.page.url
-    }
-
     func goBack(timeout: TimeInterval = 15) async throws -> URL? {
         let page = try await inspectionPage()
         return await service.goBack(page, timeout: timeout)
@@ -94,43 +87,48 @@ final class ServiceBrowserActionSession {
         return await service.goForward(page, timeout: timeout)
     }
 
-    func navigationHistory() async throws -> JSONValue {
+    func waitForURL(_ pattern: String?, timeoutMilliseconds: Int) async throws -> URL? {
         let page = try await inspectionPage()
         let webPage = page.page
-        let history = webPage.backForwardList
-        return .object([
-            "back": .array(history.backList.map(Self.historyItem)),
-            "current": history.currentItem.map(Self.historyItem) ?? .null,
-            "forward": .array(history.forwardList.map(Self.historyItem)),
-        ])
-    }
-
-    func waitForNavigation(timeoutMilliseconds: Int) async throws -> URL? {
-        let page = try await inspectionPage()
-        let webPage = page.page
+        let matches = { (url: URL?) in pattern.map { Self.url(url, matches: $0) } ?? true }
+        if pattern != nil, !webPage.isLoading, matches(webPage.url) { return webPage.url }
         return try await withThrowingTaskGroup(of: URL?.self) { group in
             group.addTask { @MainActor in
-                for try await event in webPage.navigations {
-                    if event == .finished { return webPage.url }
+                for try await event in webPage.navigations where event == .finished && matches(webPage.url) {
+                    return webPage.url
                 }
-                throw RuntimeError.bridge("ox.web.browser.waitForNavigation ended before navigation finished.")
+                throw RuntimeError.bridge("ox.web.browser.waitForURL ended before a matching navigation finished.")
             }
             group.addTask { @MainActor in
                 try await Task.sleep(for: .milliseconds(timeoutMilliseconds))
-                throw RuntimeError.bridge("ox.web.browser.waitForNavigation timed out.")
+                throw RuntimeError.bridge("ox.web.browser.waitForURL timed out.")
             }
             defer { group.cancelAll() }
             guard let result = try await group.next() else {
-                throw RuntimeError.bridge("ox.web.browser.waitForNavigation produced no result.")
+                throw RuntimeError.bridge("ox.web.browser.waitForURL produced no result.")
             }
+            Log.webView.info("Browser.waitForURL owner=\(id) host=\(result?.host?.lowercased() ?? "?") pattern=\(pattern != nil)")
             return result
         }
+    }
+
+    nonisolated static func url(_ url: URL?, matches pattern: String) -> Bool {
+        guard let value = url?.absoluteString else { return false }
+        let parts = pattern.components(separatedBy: "*")
+        guard parts.count > 1 else { return value == pattern }
+        guard value.hasPrefix(parts[0]), value.hasSuffix(parts[parts.count - 1]) else { return false }
+        var remainder = value.dropFirst(parts[0].count)
+        for part in parts.dropFirst().dropLast() where !part.isEmpty {
+            guard let range = remainder.range(of: part) else { return false }
+            remainder = remainder[range.upperBound...]
+        }
+        return remainder.count >= parts[parts.count - 1].count
     }
 
     func pageState(selector: String?, frameID: String? = nil, prepared: (Service, BrowserSession)? = nil,
                    attached: [Service] = [], authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
         let owner = prepared?.0 ?? service
-        try await owner.awaitAuthenticationAvailability(name: "ox.web.browser.getPageState")
+        try await owner.awaitAuthenticationAvailability(name: "ox.web.browser.snapshot")
         guard let page = prepared?.1 ?? page, owner.owns(page), page.secretAttempt?.holdsValues != true else {
             throw Service.EvalError.notReady
         }
@@ -158,10 +156,10 @@ final class ServiceBrowserActionSession {
         return .object(result)
     }
 
-    func executeScript(_ script: String, frameID: String? = nil, authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
-        let name = "ox.web.browser.executeScript"
+    func evaluate(_ script: String, frameID: String? = nil, authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
+        let name = "ox.web.browser.evaluate"
         try await service.awaitAuthenticationAvailability(name: name)
-        guard let action = await service.resolvedAction("executeScript", role: .dangerousBrowserControl) else {
+        guard let action = await service.resolvedAction("evaluate", role: .dangerousBrowserControl) else {
             throw Service.EvalError.notActive
         }
         let page = try await inspectionPage()
@@ -195,40 +193,50 @@ final class ServiceBrowserActionSession {
             "hasOnlySecureContent": .bool(webPage.hasOnlySecureContent),
             "isBlockedByScreenTime": .bool(webPage.isBlockedByScreenTime),
             "fullscreenState": .string(fullscreenState),
+            "javaScriptDialogs": .array(page.recordedDialogs),
             "document": result,
         ])
     }
 
-    func exportPDF(authorizeSite: (String) async throws -> Void) async throws -> ExportedPDF {
-        let name = "ox.web.browser.exportPdf"
+    func exportPDF(authorizeSite: (String) async throws -> Void) async throws -> Export {
+        try await export("pdf", authorizeSite: authorizeSite) { page in
+            let prepared = try PDFPreparer.prepareFile(try await page.page.exported(as: .pdf()))
+            let attachment = TransientAttachment(kind: .pdf, mimeType: prepared.mimeType, displayName: "Browser Page.pdf", data: prepared.data)
+            return (attachment, ["pages": .int(prepared.pageCount)])
+        }
+    }
+
+    func screenshot(authorizeSite: (String) async throws -> Void) async throws -> Export {
+        try await export("screenshot", authorizeSite: authorizeSite) { page in
+            let prepared = try ImagePreparer.prepare(try await page.page.exported(as: .image(region: .contents)))
+            let inspection = try ImagePreparer.inspect(prepared.data)
+            let attachment = TransientAttachment(kind: .image, mimeType: prepared.mimeType, displayName: "Browser Page.\(prepared.fileExtension)", data: prepared.data)
+            return (attachment, ["width": .int(inspection.width), "height": .int(inspection.height)])
+        }
+    }
+
+    private func export(
+        _ actionID: String,
+        authorizeSite: (String) async throws -> Void,
+        render: @escaping @MainActor (BrowserSession) async throws -> (TransientAttachment, [String: JSONValue])
+    ) async throws -> Export {
+        let name = "ox.web.browser.\(actionID)"
         try await service.awaitAuthenticationAvailability(name: name)
-        guard let action = await service.resolvedAction("exportPdf", role: .dangerousBrowserControl) else {
+        guard let action = await service.resolvedAction(actionID, role: .dangerousBrowserControl) else {
             throw Service.EvalError.notActive
         }
         let page = try await inspectionPage()
         let approval = try await authorize(page, authorizeSite)
         return try await service.manager.actionScheduler.schedule(action, on: page, name: name) { page in
             try Self.requireUnchanged(page, since: approval)
-            let data = try await page.page.exported(as: .pdf())
+            let (attachment, metadata) = try await render(page)
             try Self.requireUnchanged(page, since: approval)
-            let prepared = try PDFPreparer.prepareFile(data)
-            let attachment = TransientAttachment(
-                kind: .pdf,
-                mimeType: prepared.mimeType,
-                displayName: "Browser Page.pdf",
-                data: prepared.data
-            )
-            let host = page.page.url?.host?.lowercased() ?? "?"
-            Log.webView.info("Browser.exportPdf host=\(host) pages=\(prepared.pageCount) bytes=\(prepared.data.count)")
-            return ExportedPDF(
-                url: page.page.url,
-                attachment: attachment,
-                pages: prepared.pageCount
-            )
+            Log.webView.info("Browser.\(actionID) host=\(page.page.url?.host?.lowercased() ?? "?") bytes=\(attachment.data.count)")
+            return Export(url: page.page.url, attachment: attachment, metadata: metadata)
         }
     }
 
-    func injectScript(_ source: String, domains: [String], authorizeSite: (String) async throws -> Void) async throws -> URL? {
+    func addInitScript(_ source: String, domains: [String], authorizeSite: (String) async throws -> Void) async throws -> URL? {
         let normalized = domains
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
             .filter { !$0.isEmpty }
@@ -237,8 +245,7 @@ final class ServiceBrowserActionSession {
               normalized.allSatisfy({
                   $0.range(of: #"^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$"#, options: .regularExpression) != nil
               }),
-              source.utf8.count <= 100_000,
-              injectedScripts.count < 20 else {
+              source.utf8.count <= 100_000 else {
             throw Service.EvalError.js("invalid or excessive document-start script")
         }
         let sites = normalized.map(ServiceWebsiteDataCoordinator.registrableSite(for:))
@@ -249,27 +256,13 @@ final class ServiceBrowserActionSession {
             try await trust(site, authorizeSite)
         }
         let page = try await inspectionPage()
-        injectedScripts.append((domains: Array(Set(normalized)).sorted(), source: source))
+        let previous = initScript
+        initScript = (domains: Array(Set(normalized)).sorted(), source: source)
         configureAuthoringScripts(on: page)
+        Log.webView.info("Browser.addInitScript owner=\(id) domains=\(normalized.count) bytes=\(source.utf8.count) replaced=\(previous != nil)")
         guard let landed = await service.reload(page) else {
-            let failure = page.navigationFailure ?? "Browser did not reload after injecting a script"
-            injectedScripts.removeLast()
-            discardPage(page)
-            throw Service.EvalError.navigationFailed(failure)
-        }
-        return landed
-    }
-
-    func clearScripts() async throws -> URL? {
-        guard !injectedScripts.isEmpty else {
-            Log.webView.info("Browser.authoring clearScripts skipped=empty session=\(id.uuidString.prefix(8))")
-            return page?.page.url
-        }
-        let page = try await inspectionPage()
-        injectedScripts = []
-        configureAuthoringScripts(on: page)
-        guard let landed = await service.reload(page) else {
-            let failure = page.navigationFailure ?? "Browser did not reload after clearing scripts"
+            let failure = page.navigationFailure ?? "Browser did not reload after adding an init script"
+            initScript = previous
             discardPage(page)
             throw Service.EvalError.navigationFailed(failure)
         }
@@ -504,7 +497,7 @@ final class ServiceBrowserActionSession {
     }
 
     func prepareForUserInteraction() async throws {
-        let requiresReload = !injectedScripts.isEmpty
+        let requiresReload = initScript != nil
         let page = self.page
         let captureStopped: Bool
         if captureActive, let page {
@@ -515,7 +508,7 @@ final class ServiceBrowserActionSession {
         captureActive = false
         captureID = nil
         captureIncludesBodies = false
-        injectedScripts = []
+        initScript = nil
         clearCapturedEvents()
         guard let page else { return }
         configureAuthoringScripts(on: page)
@@ -535,7 +528,7 @@ final class ServiceBrowserActionSession {
         }
         captureSink = nil
         clearCapturedEvents()
-        injectedScripts = []
+        initScript = nil
         captureActive = false
         captureID = nil
         captureIncludesBodies = false
@@ -557,7 +550,7 @@ final class ServiceBrowserActionSession {
                 forMainFrameOnly: true
             ))
         }
-        for script in injectedScripts {
+        if let script = initScript {
             let domains = (try? JSONSerialization.data(withJSONObject: script.domains))
                 .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
             let source = """
@@ -577,7 +570,7 @@ final class ServiceBrowserActionSession {
         page.additionalUserScripts = scripts
         page.scriptMode = nil
         service.configureScripts(for: page.page.url, in: page)
-        Log.webView.info("Service.browserSession event=scripts owner=\(id) capture=\(captureActive) injected=\(injectedScripts.count)")
+        Log.webView.info("Service.browserSession event=scripts owner=\(id) capture=\(captureActive) init=\(initScript != nil)")
     }
 
     private func receiveCapture(_ body: Any, host: String) {
@@ -630,14 +623,6 @@ final class ServiceBrowserActionSession {
             Log.webView.warning("Service.browserSession event=capture-stop-failed owner=\(id) error=\(LogPrivacy.text(error.localizedDescription))")
             return false
         }
-    }
-
-    private static func historyItem(_ item: WebPage.BackForwardList.Item) -> JSONValue {
-        .object([
-            "title": item.title.map(JSONValue.string) ?? .null,
-            "url": .string(item.url.absoluteString),
-            "initialUrl": .string(item.initialURL.absoluteString),
-        ])
     }
 
     private static func captureScript(id: String, includeBodies: Bool) -> String {

@@ -102,7 +102,7 @@ test("execute exposes namespace and function help without process, network, or d
   const calls: string[] = [];
   const result = await execute("console.log(typeof process, typeof fetch, typeof Bun); console.log(ox.web.browser.help()); console.log(ox.fs.read.help()); try {console.log(ox.fs.read.constructor('return process')())} catch(e) {console.log(e.name)}", async name => { calls.push(name); return null; });
   expect(result).toContain("undefined undefined undefined");
-  expect(result).toContain("ox.web.browser.navigate");
+  expect(result).toContain("ox.web.browser.goto");
   expect(result).toContain("inputSchema");
   expect(result).toContain("EvalError");
   expect(calls).toEqual([]);

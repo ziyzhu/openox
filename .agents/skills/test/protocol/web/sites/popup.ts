@@ -29,6 +29,6 @@ export const popup: Site = {
       const account = sessions.account(request);
       return json(account ? [{ id: account.id, label: account.label, url: `${origin(consumer)}/` }] : []);
     }
-    return page("Popup consumer", `<h1>Popup consumer</h1><a id="sign-in" target="_blank" href="${origin(provider)}/authorize">Sign in in a new window</a>`);
+    return page("Popup consumer", `<h1>Popup consumer</h1><a id="sign-in" target="_blank" href="${origin(provider)}/authorize">Sign in in a new window</a><button id="script-sign-in" onclick="window.open('${origin(provider)}/authorize', 'signin', 'width=400,height=600')">Sign in with a script window</button><button id="alert" onclick="alert('Popup fixture alert')">Show alert</button>`);
   },
 };
