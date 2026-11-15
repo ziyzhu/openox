@@ -320,6 +320,7 @@ struct ConversationPage: View {
             .onChange(of: endedHandoffCount) { old, new in
                 guard new > old else { return }
                 viewportLayout.holdAnchorFloor(scroller.anchorContentHeight)
+                Log.ui.info("ConversationUX.floor conversation=\(conversation.id) phase=hold endedHandoffs=\(new) anchorContent=\(Int(scroller.anchorContentHeight)) floor=\(Int(viewportLayout.anchorFloor)) contentFloor=\(Int(viewportLayout.contentFloorHeight))")
             }
             .task(id: MessageFilesKey(conversation: conversation.id, blocks: conversation.transcriptBlockCount,
                                       isBusy: conversation.isBusy, files: conversation.filesRevision)) {
@@ -1192,6 +1193,7 @@ struct ConversationPage: View {
     }
 
     private func openTranscriptAtBottom(total: Int) {
+        releaseAnchorFloor(reason: "open")
         hasOpenedTranscript = true
         latestSubmissionID = nil
         sendHandoff = .idle
@@ -1676,7 +1678,13 @@ struct ConversationPage: View {
         Log.ui.info("ConversationPage.send conversation=\(conversation.id) draft=\(message.id) submission=\(receipt.id) disposition=\(receipt.disposition.rawValue) chars=\(message.text.count) attachments=\(message.attachments.count)")
     }
 
+    private func releaseAnchorFloor(reason: String) {
+        guard let released = viewportLayout.releaseAnchorFloor() else { return }
+        Log.ui.info("ConversationUX.floor conversation=\(conversation.id) phase=release reason=\(reason) released=\(Int(released)) floor=\(Int(viewportLayout.anchorFloor))")
+    }
+
     private func holdForSend(_ receipt: Conversation.SubmissionReceipt) {
+        releaseAnchorFloor(reason: "send")
         latestSubmissionID = receipt.id
         submissionFrame = .null
         sendFlightBubble = nil

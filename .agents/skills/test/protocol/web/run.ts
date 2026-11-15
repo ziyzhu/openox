@@ -9,6 +9,7 @@ import { cases } from "./cases.ts";
 import { automationCases } from "./automation-cases.ts";
 import { automation } from "./sites/automation.ts";
 import { harness } from "./harness.ts";
+import { anchorCases } from "./anchor-cases.ts";
 import { handoffCases } from "./handoff-cases.ts";
 import { oauthCases } from "./oauth-cases.ts";
 import { oauth } from "./sites/oauth.ts";
@@ -33,7 +34,7 @@ const values = config.values as { app?: string; case?: string; repeat?: string; 
 const repetitions = Number(values.repeat ?? 1);
 if (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > 20) throw new Error("repeat must be 1..20");
 const sites = [ssr, chat, gql, suite, card, gov, handoff, oauth, popup, automation];
-const selected = [...cases, ...handoffCases, ...oauthCases, ...automationCases].filter(entry => !values.case || entry.name === values.case || entry.site === values.case);
+const selected = [...cases, ...handoffCases, ...anchorCases, ...oauthCases, ...automationCases].filter(entry => !values.case || entry.name === values.case || entry.site === values.case);
 if (!selected.length) throw new Error(`No case matches ${values.case}`);
 
 const bundle = /^OX_BUNDLE_IDENTIFIER\s*=\s*([^\s/]+)/m.exec(await Bun.file(join(ROOT, "apps/ios/Local.xcconfig")).text().catch(() => ""))?.[1];

@@ -64,6 +64,11 @@ do not reuse each other’s pages.
 
 Use `--case automation --repeat 3` for embedded locator fixtures: catalog extraction, delayed search results, and settings controls. They author Local actions through ox.fs.write with automatic locator embedding, refresh the fixture catalog before selecting the new source, validate editable self-contained source, reject unsafe targets, and record per-service benchmark JSON outside the checkout. Benchmarks compare raw DOM and locator reads in alternating batches; source-read measurements distinguish full reads from explicit line-offset reads, not automatic filtering.
 
+Use `--case handoff-anchor-floor` for the chat scroll bottom after an inline handoff ends:
+composer sends a long reply, completes an inline handoff through its Done control, requires
+a `ConversationUX.floor phase=hold` above the viewport floor, then composer-sends a short turn
+and asserts its user message stays at the top when scrolled to the transcript end.
+
 Use `--case popup` for target-blank and script `window.open` provider navigation through the
 preserved page and dismissed JavaScript dialogs reported by snapshot; it does not establish
 `window.opener` continuity. Use `--case oauth` for native API

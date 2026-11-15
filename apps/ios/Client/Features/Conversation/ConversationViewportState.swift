@@ -7,6 +7,7 @@ final class ConversationViewportLayout {
     var composerHeight: CGFloat = 0
     var contentFloorHeight: CGFloat = 0
     var anchorFloor: CGFloat = 0
+    @ObservationIgnored private var restingFloorHeight: CGFloat = 0
 
     func measureComposerHeight(_ height: CGFloat) -> Bool {
         guard abs(composerHeight - height) > 0.5 else { return false }
@@ -16,11 +17,20 @@ final class ConversationViewportLayout {
 
     func measureViewport(_ height: CGFloat, bottomMargin: CGFloat, focused: Bool) {
         contentFloorHeight = max(0, height - bottomMargin)
-        if !focused { anchorFloor = contentFloorHeight }
+        guard !focused else { return }
+        restingFloorHeight = contentFloorHeight
+        anchorFloor = contentFloorHeight
     }
 
     func holdAnchorFloor(_ height: CGFloat) {
         anchorFloor = max(anchorFloor, height)
+    }
+
+    func releaseAnchorFloor() -> CGFloat? {
+        let released = anchorFloor - restingFloorHeight
+        guard released > 0.5 else { return nil }
+        anchorFloor = restingFloorHeight
+        return released
     }
 
     func slack(anchorContentHeight: CGFloat?) -> CGFloat {
