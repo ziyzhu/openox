@@ -5,5 +5,5 @@ export const guidance: Record<string, string> = {
   "ox.schedule.delete": "Delete a schedule and cancel any active check using the user's Action policy: `await ox.schedule.delete({ purpose, id })`.",
   "ox.schedule.enable": "Pause or resume a schedule: `await ox.schedule.enable({ purpose, id, enabled })`. Pausing cancels its active check. Resume does not replay missed checks. An expired deadline cannot be changed through this API; ask the user to edit it in Schedules, or create a replacement when requested. Do not delete the old schedule without confirmation.",
   "ox.schedule.run": "Request one check now: `await ox.schedule.run({ purpose, id })`. A running check cannot overlap itself; expired deadlines are enforced.",
-  "namespace.schedule": "Create, inspect, pause, resume, run, complete, and delete persistent prompt schedules and condition checks.",
+  "namespace.schedule": "Create, inspect, pause, resume, run, complete, and delete persistent prompt schedules and condition checks. Create, change, run, or delete them only when explicitly requested.",
 };

@@ -79,9 +79,10 @@ export function composeTurnSections(state: TurnState, scaffold: PromptScaffold, 
     ...(service.description ? [`    <description>${escapeXml(normalized(service.description))}</description>`] : []), "  </service>"]), "</services>",
     "These services are attached to this conversation. Inspect a service for its actions before invoking it; other services remain available on demand."].join("\n")
     : "No services are attached to this conversation yet; services remain available on demand.";
-  const replies = host?.presentation === "conversation-bubbles"
+  const style = "Describe outcomes in everyday language and keep internal mechanics out unless useful or requested. Preserve useful source URLs as descriptive Markdown links.";
+  const replies = (host?.presentation === "conversation-bubbles"
     ? "Replies render as Markdown conversation bubbles. Put ![title](path) on its own line to show a file inline, or use a direct public image URL. Link supporting files with [title](path). A fenced mermaid block renders as a diagram."
-    : "Replies render as text with Markdown support. Link supporting files with [title](path).";
+    : "Replies render as text with Markdown support. Link supporting files with [title](path).") + ` ${style}`;
   const files = state.filePaths.length === 0 ? "No files are attached to this conversation." : state.filePaths.map(path => `- \`${path}\``).join("\n");
   const storage = state.storageMode === "persisted" ? persistedStorage : host?.externalFiles === false ? temporaryProfileStorage : temporaryStorage;
   return { skills, hosts: hostContext ? hostContextText(hostContext) : "No host context is available.", replies, attached_services: services,

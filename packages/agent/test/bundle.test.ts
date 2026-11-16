@@ -58,7 +58,6 @@ it("shares the core across hosts and rejects ambiguous ownership in the shipped 
   const prompt = runInContext("OxPrompts.composeOxPrompt(input).rendered", realm) as string;
   expect(prompt).toContain("frozen");
   expect(prompt).not.toContain("iOS");
-  expect(prompt).toContain("ox.web.browser.showPage");
   expect(prompt).not.toContain("ox.app");
   expect(prompt).not.toContain("mounts/<folder-id>");
   expect(prompt).not.toContain("ox.service.showPage");
@@ -70,6 +69,7 @@ it("shares the core across hosts and rejects ambiguous ownership in the shipped 
   expect(guide).toContain("10 seconds");
   expect(guide).toContain("100 lines or 2 KiB");
   expect(guide).toContain("ox.service.inspect");
+  expect(guide).toContain("ox.web.browser.showPage");
   expect(guide).toContain("declare namespace ox.web");
   expect(guide).toContain("function fetch(args:");
   expect(guide).not.toContain("does not forcibly stop");
