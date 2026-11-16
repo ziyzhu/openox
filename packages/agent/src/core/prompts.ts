@@ -6,6 +6,7 @@ export interface PromptScaffold { preamble: string; rules: string; skills: strin
 export interface TurnState {
   skills: { name: string; description: string }[];
   skillConflicts: string[];
+  services?: { domain: string; description?: string }[];
   fileMounts?: string[];
   hostContext?: HostContext;
   filePaths: string[];
@@ -42,6 +43,11 @@ export function composeTurnSections(state: TurnState, scaffold: PromptScaffold, 
     "  <skill>", `    <name>${escapeXml(skill.name)}</name>`, `    <description>${escapeXml(normalized(skill.description))}</description>`,
     `    <location>skills/${escapeXml(skill.name)}/SKILL.md</location>`, "  </skill>"]), "</available_skills>",
     ...state.skillConflicts.map(name => `/${name}: choose a source in Skills before use.`)].join("\n");
+  const services = state.services?.length ? ["<services>", ...[...state.services].sort((a, b) => ordered(a.domain, b.domain)).flatMap(service => [
+    "  <service>", `    <domain>${escapeXml(service.domain)}</domain>`,
+    ...(service.description ? [`    <description>${escapeXml(normalized(service.description))}</description>`] : []), "  </service>"]), "</services>",
+    "These services are in this conversation, selected by the user or used earlier. Inspect a service for its actions before invoking it; other services remain available on demand."].join("\n")
+    : "No services are in this conversation yet; services remain available on demand.";
   const replies = host?.presentation === "conversation-bubbles"
     ? "Replies render as Markdown conversation bubbles. Put ![title](path) on its own line to show a file inline, or use a direct public image URL. Link supporting files with [title](path). A fenced mermaid block renders as a diagram."
     : "Replies render as text with Markdown support. Link supporting files with [title](path).";
@@ -49,6 +55,6 @@ export function composeTurnSections(state: TurnState, scaffold: PromptScaffold, 
     : "No folders are granted to this Profile. The user can add folders on the Profile's Files page.";
   const files = state.filePaths.length === 0 ? "No files are attached to this conversation." : state.filePaths.map(path => `- \`${path}\``).join("\n");
   const storage = state.storageMode === "persisted" ? persistedStorage : host?.externalFiles === false ? temporaryProfileStorage : temporaryStorage;
-  return { skills, hosts: hostContext ? hostContextText(hostContext) : "No host context is available.", replies,
+  return { skills, hosts: hostContext ? hostContextText(hostContext) : "No host context is available.", replies, selected_services: services,
     conversation_files: files, mounted_folders: folders, storage, language: responseDirective(state.responseLanguage) || "Reply in the language the user writes in." };
 }

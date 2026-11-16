@@ -11,7 +11,7 @@ extension Scenario {
         let verifiesStablePrefix = ctx.latestUserSaid("cache")
         let activatesUserSkill = ctx.latestUserSaid("activate")
         let skills = ctx.section("skills") ?? ""
-        let hasSelectedServices = ctx.serializedUserText.contains("[Selected services:")
+        let hasSelectedServices = ctx.section("selected_services")?.contains("<services>") == true
         let files = ctx.section("conversation_files") ?? ""
         let hasTimestamp = ctx.serializedUserText
             .split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
@@ -42,6 +42,7 @@ extension Scenario {
               !verifiesStablePrefix || ctx.hasSystemUpdates,
               filePaths.allSatisfy({ files.contains("`\($0)`") }),
               ctx.section("attached_services") == nil,
+              !ctx.serializedUserText.contains("[Selected services:"),
               hasSelectedServices == expectsService else {
             return [.say("Skill catalog context was incorrect."), .stop(.stop)]
         }

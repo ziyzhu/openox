@@ -24,6 +24,7 @@ nonisolated enum ConversationPromptState {
     static func turn(
         skills: [Skill],
         skillConflicts: [String],
+        services: [Service.Snapshot],
         fileMountPaths: [String],
         filePaths: [String],
         isTemporary: Bool,
@@ -34,6 +35,11 @@ nonisolated enum ConversationPromptState {
         .object([
             "skills": .array(skills.map { .object(["name": .string($0.name), "description": .string($0.description)]) }),
             "skillConflicts": .array(skillConflicts.map(JSONValue.string)),
+            "services": .array(services.map { service in
+                var fields: [String: JSONValue] = ["domain": .string(service.domain)]
+                if let description = service.description { fields["description"] = .string(description) }
+                return .object(fields)
+            }),
             "hostContext": hostContext(hostID: hostID, profileID: profileID),
             "filePaths": .array(filePaths.map(JSONValue.string)),
             "fileMounts": .array(fileMountPaths.map(JSONValue.string)),

@@ -1444,7 +1444,6 @@ final class Conversation: Identifiable {
             attachments: attachments,
             skillInvocation: skillInvocation,
             scheduleName: scheduleName,
-            selectedServices: serviceAttachments.domains,
             latency: latency,
             state: posting ? .posted : .queued
         ))
@@ -1798,6 +1797,7 @@ final class Conversation: Identifiable {
         let turnState = ConversationPromptState.turn(
             skills: turnSkills,
             skillConflicts: skillConflicts,
+            services: attached,
             fileMountPaths: fileMountPaths,
             filePaths: referencedFiles.compactMap(\.virtualPath),
             isTemporary: retention == .temporary,
@@ -1831,7 +1831,6 @@ final class Conversation: Identifiable {
                         try await submit(ConversationInput(
                             text: submission.text,
                             attachments: submission.attachments,
-                            selectedServices: submission.selectedServices,
                             turnState: turnState,
                             turnID: turnID
                         ), configuration: configuration, continuing: continuing)

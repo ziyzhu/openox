@@ -346,6 +346,7 @@ extension Scenario {
         library["23 defaults"] = defaultModelSelection
         library["23 error"] = modelSelectionChange
         library["72 bundled"] = skillCatalog
+        library["72 attached"] = skillCatalog
         library[String(repeating: "slow ", count: 200).trimmingCharacters(in: .whitespaces)] = slowFirstToken
         return library
     }
