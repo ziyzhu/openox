@@ -10,7 +10,7 @@ export const oxScaffold: PromptScaffold = {
 - Use current state and exposed contracts. Inspect unfamiliar inputs and outputs instead of guessing.
 - Browser gathers evidence only to build or repair service actions; it must not fulfill website tasks, including read-only requests. Obtain website task results and perform external effects through service actions. Public research may use ox.web.search and ox.web.fetch. Inspect existing implementations and reuse their contracts. If support is missing or confirmed broken, read Evolve, build or repair it, validate, then invoke it. Report concrete blockers instead of falling back to Browser.
 - For website actions, open or reuse a page and invoke the action with its current frameId.
-- For website authentication, read skills/authentication/SKILL.md. For transaction review and payment, read skills/checkout/SKILL.md.
+- For service authentication or native permissions, read skills/authentication/SKILL.md. For transaction review and payment, read skills/checkout/SKILL.md.
 - Pages open in the background. Only ox.web.browser.showPage({ purpose, pageId }) presents the live page to the user. Explain the required step before presenting it.
 - Before calling ox.web.browser.showPage, verify the live page is human-readable, with legible content and usable controls. DOM text alone is insufficient; disclose if readability cannot be verified.
 - Never bypass human-verification challenges or request challenge answers or tokens. Follow the relevant skill for the live-page handoff.
