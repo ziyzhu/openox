@@ -15,12 +15,14 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | --- | --- |
 | `bun run lint` | Repository source policies, resource validation, five TypeScript projects and offline eval-definition validation. |
 | `bun run build` | Verify generated schemas, generate agent/service resources, and build/verify portable packages and CLI consumers. |
-| `bun run test` | Existing offline build-tool/CLI-input checks and portable protocol validation. |
+| `bun run test` | Offline build-tool checks, portable protocol/runtime integration, shipped bundles, and execution-isolation checks. |
+| `bun run test:native` | macOS-only Swift/portable search response contract checks; no simulator. |
 | `bun run ci` | Run lint, build and test with frozen dependencies, no `.env` loading and generated-resource drift checks; see [portable checks](portable.md). |
-| `bun run ci --native` | Run portable checks, current-platform standalone CLI checks, and unsigned iOS/macOS builds on macOS. |
-| `bun run ci --native-only` | Run agent generation and unsigned iOS/macOS builds, matching GitHub's native-build job. |
+| `bun run ci --native` | Run portable checks, current-platform standalone CLI checks, native contracts, and unsigned iOS/macOS builds on macOS. |
+| `bun run ci --native-only` | Run native contracts, agent generation, and unsigned iOS/macOS builds, matching GitHub's native-build job. |
 | `bun run ci --ios-only` | Validate the native toolchain, install frozen dependencies, generate the agent, and build unsigned iOS only. |
 | `bun run ci --macos-only` | Validate the native toolchain, install frozen dependencies, generate the agent, and build unsigned macOS only. |
+| `bun run ci --protocol-only` | Validate the portable environment, install frozen dependencies, and run the existing portable protocol tests. |
 | `bun run build:host-schema` | Regenerate Host RPC JSON/Swift artifacts. |
 | `bun run build:repository-schema` | Regenerate repository JSON/Swift artifacts. |
 | `bun run build:provider-schema` | Regenerate provider definitions schema. |

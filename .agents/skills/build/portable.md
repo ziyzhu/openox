@@ -2,17 +2,32 @@
 
 CI installs with the frozen lockfile, then runs `lint`, `build`, and `test`.
 These cover static/type checks, eval-definition validation, agent/service generation,
-package consumers, offline build-tool safety checks and controlled CLI/Host fixtures. It clears live-target variables and
-disables `.env` loading. No simulator, credentials, model calls, or publication are required.
+package consumers, offline build-tool safety checks, controlled CLI/Host fixtures,
+agent runtime integration with real SQLite/files, shipped bundles, and child-process
+execution isolation. It clears live-target variables and disables `.env` loading.
+No simulator, credentials, real model calls, or publication are required.
 
 Run `bun run ci --native` on macOS for portable checks, the current platform's
-standalone CLI checks, and unsigned iOS/macOS builds. Xcode and XcodeGen must be
+standalone CLI checks, native search contracts, and unsigned iOS/macOS builds.
+Xcode and XcodeGen must be
 installed. `.bun-version` owns the required Bun version; `.github/ci.json` owns
 Node/npm requirements, the Xcode version, CLI runner matrix, and fallback iOS bundle
 identifier. CI validates applicable requirements before installing dependencies;
 select Xcode with `DEVELOPER_DIR` or `xcode-select`. Existing commands and flags are
 unchanged. Run the same checks on another machine for other platforms; no machines
 or VMs are provisioned locally.
+
+`scripts/ci.sh` maps each command to one environment and an ordered list of steps.
+`scripts/ci-environment.ts` validates environment prerequisites; the step dispatcher
+runs existing commands sequentially and stops on the first failure. Logs identify
+the workflow, environment, and current step. Workflow definitions do not provision
+machines or resolve dependency graphs. A preflight failure is reported as `BLOCKED`;
+a failing execution step is reported as `FAIL`, with its original nonzero exit code.
+
+`bun run ci --protocol-only` uses the portable environment and the ordered steps
+`environment`, `install`, and `test:protocol`. The existing runner owns its cases,
+assertions, and cleanup; orchestration does not add a suite. This workflow does not
+run lint, package builds, native Host cases, storage upgrades, or real-provider evals.
 
 Native verification disables signing and clears the development team through
 command-line build settings, without rewriting existing local configuration. It
@@ -26,8 +41,11 @@ These modes are mutually exclusive with other CI modes; `--out` remains standalo
 The macOS-only mode does not create or modify iOS configuration.
 
 The GitHub CI workflow uses `bun run ci --native-only` for its macOS build job;
-portable checks and the four-platform CLI matrix run separately. Native builds
-catch Swift build breaks only; they do not launch or exercise either app.
+portable checks and the four-platform CLI matrix run separately. Both `--native`
+and `--native-only` run `test:native` exactly once: the two retained Swift/portable
+search contract cases. Portable test commands exclude that macOS-only file rather
+than silently skipping it on Linux. Native builds do not launch or exercise either app.
+Target-specific `--ios-only` and `--macos-only` modes remain build-only.
 
 Standalone mode additionally needs platform installation tools such as curl and tar.
 It installs the current platform's CLI archive and exercises fixtures without Bun or

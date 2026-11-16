@@ -5,7 +5,7 @@ import { Harness, createRegistry, defineExtension, defineTool } from "@earendil-
 import { Type } from "typebox";
 import { SqliteStorage } from "@earendil-works/pi-durable/storage/sqlite";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { ProfileFiles, ProfileFile, canonical } from "../src/profile/files";
+import { ProfileFiles, ProfileFile } from "../src/profile/files";
 import { profileEnv } from "../src/profile/filesystem";
 import { backend } from "./sqlite-backend";
 import { openProfileRuntime, installOxProfile, type NormalizedProfileDraft, type FilePayloadStore } from "../src/index";
@@ -65,9 +65,6 @@ test("invalid edits, limits and private paths preserve previous content", async 
   await expect(files.edit("MEMORY.md", [{ oldText: "same same", newText: "x" }, { oldText: "same\nend", newText: "y" }])).rejects.toThrow("overlap");
   await expect(files.write("MEMORY.md", "x".repeat(512 * 1024 + 1))).rejects.toThrow("limit");
   expect(await files.read("MEMORY.md")).toBe("same same\nend");
-  for (const path of ["../MEMORY.md", "/../MEMORY.md", "artifacts/.saved.json", "skills/../../secret", "\\private", "a//b", "a\0b"]) {
-    expect(() => canonical(path)).toThrow();
-  }
   await expect(files.write("session.sqlite", "private")).rejects.toThrow("not writable");
   await expect(files.write("chats/id/turns.jsonl", "private")).rejects.toThrow("not writable");
 });

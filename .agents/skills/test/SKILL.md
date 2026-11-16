@@ -6,8 +6,9 @@ description: "Validate versioned protocol boundaries and predecessor-to-current 
 # Test
 
 Maintain exactly three suites. Do not create a general unit, UI, smoke, or miscellaneous
-regression suite. `bun run test` runs the existing offline build-tool checks and portable
-protocol cases; it does not run storage upgrades or real-provider evals. `bun run lint`
+regression suite. `bun run test` runs offline build-tool checks, portable protocol
+and agent runtime integration, shipped-bundle checks, and child-process execution
+isolation; it does not run storage upgrades or real-provider evals. `bun run lint`
 owns static/type validation; `bun run build` owns generated-artifact consistency,
 packaging and compilation. Exploratory UI verification belongs to gym.
 
@@ -19,7 +20,25 @@ packaging and compilation. Exploratory UI verification belongs to gym.
 
 ## Protocol validation
 
-Cases live in `protocol/client-host/` and `protocol/host-services/`. Exercise public
+Use `bun run ci --protocol-only` to run the existing portable protocol tests through
+the shared environment/workflow/step orchestration, including prerequisite checks
+and a frozen dependency install. `bun run test:protocol` remains the direct runner.
+Preflight failures report `BLOCKED`; execution failures report `FAIL`. The runner
+retains ownership of cases, assertions, and cleanup. This does not run native Host
+cases, storage upgrades, or real-provider evals.
+
+Portable cases live in `protocol/client-host/`, `protocol/host-services/`, and the
+runtime/persistence files under `packages/agent/test/`. Those package tests use real
+SQLite/files and controlled providers; they do not establish native Swift or real-provider
+coverage. Shipped-bundle and execution-isolation checks run through `bun run test`,
+not the narrower protocol command. Isolated algorithm and eval-stub machinery tests
+are not maintained.
+
+`bun run test:native` runs the retained Swift/portable search contracts on macOS;
+`ci --native` and `ci --native-only` include this step. Portable commands exclude it
+instead of silently skipping it. These contracts require no running app or simulator.
+
+Exercise public
 boundaries with real CLI processes and controlled Host/service fixtures. Cover
 supported versions, unsupported and unversioned peers, malformed responses,
 reconnection and negotiation, and rejection before mutation. Never replay a

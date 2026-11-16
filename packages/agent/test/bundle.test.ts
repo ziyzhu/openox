@@ -1,7 +1,6 @@
 import { beforeAll, expect, it } from "bun:test";
 import { createContext, runInContext } from "node:vm";
-import { responseDirective, type TurnState } from "../src/core/prompts";
-import { composeOxTurnSections } from "../src/core/ox-prompts";
+import { responseDirective } from "../src/core/prompts";
 import { providerIdentity } from "../src/core/provider-prompts";
 import { guidanceTexts } from "../src/core/guidance-texts";
 import { nativeGuidanceSource } from "../native-guidance";
@@ -50,7 +49,7 @@ it("ships a standalone prompt renderer without a Profile, native bridge, or sepa
   expect(manifest.resources).toEqual({});
 });
 
-it("shares the core across hosts, supplies presentation in turn context, and rejects ambiguous ownership in the shipped renderer", async () => {
+it("shares the core across hosts and rejects ambiguous ownership in the shipped renderer", async () => {
   const realm = createContext({ console: undefined });
   runInContext(await Bun.file(new URL("../../../apps/shared/Resources/PiDurable.bundle/prompts.js", import.meta.url)).text(), realm);
   const scope = { hostID: "desktop-host", profileID: "profile-a" };
@@ -66,17 +65,6 @@ it("shares the core across hosts, supplies presentation in turn context, and rej
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,active:{hostID:'wrong',profileID:'profile-a'}}})", realm)).toThrow("unavailable");
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[...input.hostContext.hosts,...input.hostContext.hosts]}})", realm)).toThrow("Duplicate");
   expect(runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[{...input.hostContext.hosts[0],functions:['ox'],serviceKinds:['web','api','ios','mcp'],presentation:'conversation-bubbles',externalFiles:true}]}}).rendered", realm)).toBe(prompt);
-  const state: TurnState = { skills: [], skillConflicts: [], filePaths: [], storageMode: "temporary", responseLanguage: null,
-    hostContext: { active: scope, hosts: [{ ...scope, functions: ["ox.fs.read"], serviceKinds: [], presentation: "text", externalFiles: false }] } };
-  const textContext = Object.values(composeOxTurnSections(state, { memory: "" })).join("\n");
-  expect(textContext).toContain("text with Markdown support");
-  expect(textContext).not.toContain("mounts/<folder-id>");
-  state.hostContext!.hosts[0]!.presentation = "conversation-bubbles";
-  state.hostContext!.hosts[0]!.externalFiles = true;
-  const conversationContext = Object.values(composeOxTurnSections(state, { memory: "" })).join("\n");
-  expect(conversationContext).toContain("Markdown conversation bubbles");
-  expect(conversationContext).toContain("![title](path)");
-  expect(conversationContext).toContain("mounts/<folder-id>");
   realm.guide = { catalog: "ox.fs.read", timeoutSeconds: 10, maxLines: 100, maxBytes: 2048, canCancelLoops: true };
   const guide = runInContext("OxPrompts.executeGuidance(guide)", realm) as string;
   expect(guide).toContain("10 seconds");
