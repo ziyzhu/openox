@@ -109,6 +109,12 @@ public struct MockLLMClient: ProviderClient {
                 if intent.hasPrefix("reply\n") {
                     return (Scenario(name: "reply", steps: [.say(String(intent.dropFirst("reply\n".count))), .stop(.stop)]), turn)
                 }
+                if intent.hasPrefix("section\n") {
+                    let key = String(intent.dropFirst("section\n".count))
+                    return (Scenario(name: "section") { context in
+                        [.say(context.section(key) ?? "(mock) No \(key) section."), .stop(.stop)]
+                    }, turn)
+                }
                 if let scenario = scenarios[intent.lowercased()] { return (scenario, turn) }
                 if intent.hasPrefix("[system]") { continue }
                 return (fallback, turn)

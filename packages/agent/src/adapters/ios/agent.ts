@@ -22,6 +22,7 @@ import { fileRequest, nativeFiles } from "./files";
 import { composeIOSPrompt } from "./prompts";
 import type { SystemPromptInput, TurnState } from "../../core/prompts";
 import { composeOxTurnSections } from "../../core/ox-prompts";
+import { filesSection } from "../../core/prompts";
 import { activeHost, sameScope, type HostScope } from "../../core/host-context";
 import { decodeBase64, encodeBase64 } from "../../core/base64";
 
@@ -708,13 +709,19 @@ export class IOSAgentAdapter {
         input: ["text"], contextWindow: config.contextWindow, maxTokens: config.maxTokens,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }], api: { stream, streamSimple: stream } }));
     const sections = Object.entries(prompt.sections).map(([key, text]) => section(key, () => text, { tag: key !== "preamble" }));
-    for (const key of ["skills", "hosts", "replies", "selected_services", "conversation_files", "mounted_folders", "storage", "language"] as const) {
-      sections.push(section(key, async ({ conversationId, read }) => {
-        const turnState = (await read.snapshot(ConversationApplicationMetadata, conversationId, context))?.fields.turnState;
-        return turnState ? composeOxTurnSections(turnState as unknown as TurnState, config.promptState)[key] : undefined;
+    const turnState = async ({ conversationId, read }: Parameters<Parameters<typeof section>[1]>[0]) =>
+      (await read.snapshot(ConversationApplicationMetadata, conversationId, context))?.fields.turnState as unknown as TurnState | undefined;
+    for (const key of ["skills", "hosts", "replies", "conversation_files", "storage", "language", "selected_services"] as const) {
+      sections.push(section(key, async input => {
+        const state = await turnState(input);
+        return state ? composeOxTurnSections(state, config.promptState)[key] : undefined;
       }));
     }
-    if (session.files.physical) sections.push(section("cwd", () => `conversations/${conversation.id}/\nRelative file paths resolve here. Use / for the Profile root and absolute paths such as /reports/report.md for shared files. Mounted resource paths such as skills/ and repositories/ remain Profile-relative.`));
+    sections.push(section("files", async input => {
+      const state = await turnState(input);
+      return state ? filesSection(await session.rootEntries(state.fileRoots), state.grantedFolders ?? [],
+        session.files.physical ? `conversations/${conversation.id}/` : undefined) : undefined;
+    }));
     const extension = defineExtension({ name: extensionName ?? `ox-conversation:${alias.slice(10)}`, sections,
       tools: config.tools.map(tool => defineTool({ ...tool, replay: "unsafe", executionMode: config.toolExecutionMode === "sequential" ? "sequential" : tool.executionMode ?? config.toolExecutionMode ?? "sequential",
         execute: async (arguments_, api, ctx) => this.executeNativeTool(tool.name, arguments_, api, ctx) })) });

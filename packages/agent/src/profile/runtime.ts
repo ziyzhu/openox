@@ -8,6 +8,7 @@ import type { FilePayloadStore } from "./file-payloads";
 import { profileMounts } from "./filesystem";
 import { mountedFileSystem, type FileMount, type TextFileMount } from "../core/file-mounts";
 import { bundledSkills } from "../core/bundled-skills";
+import type { RootEntry } from "../core/prompts";
 import { OxConversations, type ConversationReference } from "./conversations";
 import { ConversationIndexer } from "./conversation-index";
 import { profileTools } from "./tools";
@@ -66,6 +67,12 @@ export class ProfileRuntime {
     this.ready();
     return { scope: this.options.profileID, mounts: this.env.mounts.flatMap(mount => mount.source.kind === "text"
       ? [{ path: mount.path, access: "readOnly" as const, files: mount.source.files }] : []) };
+  }
+  async rootEntries(hostRoots: string[] = []): Promise<RootEntry[]> {
+    const listed = await this.env.listDir("/", BACKGROUND_CONTEXT);
+    const local = listed.ok ? listed.value.map(entry => ({ name: entry.name, directory: entry.kind === "directory" })) : [];
+    const host = hostRoots.filter(root => !this.files.physical || !["artifacts", "conversations"].includes(root)).map(name => ({ name, directory: true }));
+    return [...local, ...host.filter(entry => !local.some(item => item.name === entry.name))];
   }
   private preparedConversations = new Set<ConversationId>();
   private preparingConversations = new Map<ConversationId, Promise<void>>();

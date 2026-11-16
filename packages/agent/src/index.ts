@@ -4,7 +4,7 @@ export { ProfileFiles, ProfileFile, ProfileIndex, LegacyProfileFile, canonical }
 export { profileEnv, profileMounts } from "./profile/filesystem";
 export { mountedFileSystem, type FileBackend, type FileMount, type TextFileMount, type MountedExecutionEnv } from "./core/file-mounts";
 export { composeSystemPrompt, composeTurnSections, renderSections, responseDirective,
-  type SystemPromptInput, type PromptScaffold, type TurnState, type ResponseLanguage } from "./core/prompts";
+  filesSection, type RootEntry, type SystemPromptInput, type PromptScaffold, type TurnState, type ResponseLanguage } from "./core/prompts";
 export { providerIdentity } from "./core/provider-prompts";
 export { composeOxPrompt, composeOxTurnSections, oxScaffold } from "./core/ox-prompts";
 export { activeHost, sameScope, hostContextText, type HostScope, type PromptHost, type HostContext } from "./core/host-context";

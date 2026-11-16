@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { oxScaffold, composeOxPrompt } from "../src/core/ox-prompts";
-import { composeTurnSections, responseDirective, renderSections, type TurnState } from "../src/core/prompts";
+import { composeTurnSections, filesSection, responseDirective, renderSections, type TurnState } from "../src/core/prompts";
 import { hostContextText, type HostContext, type PromptHost } from "../src/core/host-context";
 import { executeGuidance, countWords } from "../src/core/tool-prompts";
 import { guidanceTexts } from "../src/core/guidance-texts";
@@ -110,11 +110,10 @@ function catalog() {
   return [...namespaces, "", ...functions].join("\n");
 }
 
-function cwdTemplate() {
-  const source = readFileSync(join(agent, "src/adapters/ios/agent.ts"), "utf8");
-  const match = source.match(/section\("cwd", \(\) => `([^`]*)`\)/);
-  if (!match) throw new Error("Cannot read iOS working-directory prompt");
-  return { text: match[1]!.replace("${conversation.id}", "{conversationId}"), source: locate(join(agent, "src/adapters/ios/agent.ts"), 'section("cwd"') };
+const sampleRoot = ["MEMORY.md", "app", "conversations", "mounts", "repositories", "skills", "tmp", "reports"].map(name => ({ name, directory: name !== "MEMORY.md" }));
+
+function files(variant: Variant) {
+  return filesSection(sampleRoot, variant.folders ? [{ path: "mounts/icloud-notes", name: "iCloud Drive › Notes" }] : [], "conversations/42/");
 }
 
 const iosScope = { hostID: "ios", profileID: "local" };
@@ -128,19 +127,17 @@ function hostContext(variant: Variant): HostContext {
 function turnState(variant: Variant, context: HostContext): TurnState {
   return {
     skills: [...bundledSkills], skillConflicts: [],
-    fileMounts: variant.folders ? ["mounts/icloud-notes"] : [], filePaths: variant.files ? ["conversations/42/photo.jpg", "reports/q3.pdf"] : [],
+    filePaths: variant.files ? ["conversations/42/photo.jpg", "reports/q3.pdf"] : [],
     storageMode: variant.storage === "persisted" ? "persisted" : "temporary", responseLanguage: variant.language ? languageExample : null, hostContext: context,
   };
 }
-
-const cwd = cwdTemplate();
 
 export function render(variant: Variant): Rendered {
   const context = hostContext(variant);
   const input = { memory: "(MEMORY.md contents)", hostContext: context };
   const base = composeOxPrompt(input, variant.isolated);
   const turn = composeTurnSections(turnState(variant, context), oxScaffold, context);
-  const system = renderSections({ ...base.sections, ...turn, cwd: cwd.text.replace("{conversationId}", "42") });
+  const system = renderSections({ ...base.sections, ...turn, files: files(variant) });
   return {
     identity: variant.identity ? providerIdentities["claude-subscription"]! : "",
     system,
@@ -186,13 +183,12 @@ function buildUnits(): Unit[] {
     textUnit("replies.bubbles", "System · turn state", "Replies (conversation bubbles)", locate(prompts, "Replies render as Markdown"), "system", bubbles),
     textUnit("replies.text", "System · turn state", "Replies (text)", locate(prompts, "Replies render as text"), "system", textReplies),
     textUnit("files.none", "System · turn state", "No conversation files", locate(prompts, empty.conversation_files!), "system", empty.conversation_files!),
-    textUnit("folders.none", "System · turn state", "No mounted folders", locate(prompts, empty.mounted_folders!), "system", empty.mounted_folders!),
+    textUnit("files.tree", "System · turn state", "Profile file tree", locate(prompts, "export function filesSection"), "system", files(defaultVariant), text => [text], false),
     textUnit("storage.persisted", "System · turn state", "Storage (saved)", locate(prompts, "const persistedStorage"), "system", empty.storage!),
     textUnit("storage.temporary", "System · turn state", "Storage (temporary)", locate(prompts, "const temporaryStorage"), "system", temporary!),
     textUnit("storage.temporaryProfile", "System · turn state", "Storage (temporary, no external files)", locate(prompts, "const temporaryProfileStorage"), "system", temporaryProfile!),
     textUnit("language.default", "System · turn state", "Language (default)", locate(prompts, "Reply in the language"), "system", empty.language!),
     textUnit("language.directive", "System · turn state", "Language (fixed)", locate(prompts, "Always reply in"), "system", directive, fillDirective),
-    textUnit("cwd", "System · turn state", "Working directory", cwd.source, "system", cwd.text, text => [text.replace("{conversationId}", "42")]),
     textUnit("durable_test_files", "System · turn state", "Isolated session files", locate(core("ox-prompts.ts"), "const isolatedFiles"), "system", isolated),
   ];
   const prose = execute.paragraphs.filter(paragraph => !paragraph.includes(catalogSentinel)

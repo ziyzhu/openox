@@ -7,7 +7,7 @@ import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import { googleProvider } from "@earendil-works/pi-ai/providers/google";
 import { Type } from "typebox";
 import { nativeDatabase } from "../src/sqlite";
-import { openProfileRuntime, canonical, composeOxPrompt, composeOxTurnSections, renderSections, bundledSkills, executeGuidance, type ProfileRuntime, type FileOperation, type HostContext, type TurnState } from "../src/index";
+import { openProfileRuntime, canonical, composeOxPrompt, composeOxTurnSections, filesSection, renderSections, bundledSkills, executeGuidance, type ProfileRuntime, type FileOperation, type HostContext, type TurnState } from "../src/index";
 import { guidanceText } from "../src/core/guidance-texts";
 import { memoryFiles } from "./files";
 import { execute } from "./execute";
@@ -81,7 +81,7 @@ export class EvalRuntime {
       const target = { profileID: "eval", conversationID: Number(id) as ConversationId };
       const input = { hostContext: this.hostContext, memory: String(await this.session.files.read("MEMORY.md")) };
       const state: TurnState = { skills: [...bundledSkills], skillConflicts: [], services: this.attached.map(({ domain, description }) => ({ domain, ...(description ? { description } : {}) })), filePaths: [], storageMode: temporary ? "temporary" : "persisted", responseLanguage: null, hostContext: this.hostContext };
-      const systemPrompt = renderSections({ ...composeOxPrompt(input).sections, ...composeOxTurnSections(state, input) });
+      const systemPrompt = renderSections({ ...composeOxPrompt(input).sections, ...composeOxTurnSections(state, input), files: filesSection(await this.session.rootEntries(), []) });
       this.prompts.set(id, systemPrompt);
       this.calls.set(id, []);
       if (temporary) this.temporary.add(id);

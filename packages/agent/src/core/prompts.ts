@@ -7,7 +7,8 @@ export interface TurnState {
   skills: { name: string; description: string }[];
   skillConflicts: string[];
   services?: { domain: string; description?: string }[];
-  fileMounts?: string[];
+  fileRoots?: string[];
+  grantedFolders?: { path: string; name: string }[];
   hostContext?: HostContext;
   filePaths: string[];
   storageMode: "persisted" | "temporary";
@@ -36,6 +37,36 @@ export function responseDirective(language: ResponseLanguage | null) {
   return `Always reply in ${language.name} (${language.identifier}), no matter what language the user writes in, unless they explicitly ask for another language. Write every word of every reply — prose, lists, labels — in ${language.name}, and use local conventions for dates, numbers, and currency.`;
 }
 
+export interface RootEntry { name: string; directory: boolean }
+const rootNotes = new Map([
+  ["MEMORY.md", "saved memory"],
+  ["app", "app settings, providers, services, status, and logs"],
+  ["artifacts", "legacy files"],
+  ["conversations", "conversation working folders"],
+  ["mounts", "folders the user granted on the Profile's Files page"],
+  ["repositories", "service sources; only repositories/local/ is writable"],
+  ["skills", "System, repository, and user skills"],
+  ["tmp", "read-only execution output"],
+]);
+const sharedEntryLimit = 20;
+
+export function filesSection(root: RootEntry[], folders: { path: string; name: string }[], cwd?: string) {
+  const entries = [...new Map(root.map(entry => [entry.name, entry])).values()].sort((a, b) => ordered(a.name, b.name));
+  const shared = entries.filter(entry => !rootNotes.has(entry.name));
+  const shown = new Set(shared.slice(0, sharedEntryLimit).map(entry => entry.name));
+  const lines = entries.filter(entry => rootNotes.has(entry.name) || shown.has(entry.name)).flatMap(entry => {
+    const note = rootNotes.get(entry.name);
+    const line = `- \`${entry.name}${entry.directory ? "/" : ""}\`${note ? ` — ${note}` : ""}`;
+    if (entry.name === "conversations" && cwd) return [line, `  - \`${cwd}\` — this conversation; relative paths resolve here`];
+    if (entry.name !== "mounts") return [line];
+    const granted = [...folders].sort((a, b) => ordered(a.path, b.path)).map(folder => `  - \`${folder.path}/\` — ${normalized(folder.name)}`);
+    return [line, ...(granted.length ? granted : ["  - none granted yet"])];
+  });
+  if (shared.length > sharedEntryLimit) lines.push(`- …and ${shared.length - sharedEntryLimit} more`);
+  const paths = cwd ? ["Use / for the Profile root and absolute paths such as /reports/report.md for shared files."] : [];
+  return [...lines, "", ...paths, "This is the top level only; use ox.fs.list for deeper levels."].join("\n");
+}
+
 export function composeTurnSections(state: TurnState, scaffold: PromptScaffold, fallbackHost?: HostContext): Record<string, string> {
   const hostContext = state.hostContext ?? fallbackHost;
   const host = hostContext ? activeHost(hostContext) : undefined;
@@ -51,10 +82,8 @@ export function composeTurnSections(state: TurnState, scaffold: PromptScaffold, 
   const replies = host?.presentation === "conversation-bubbles"
     ? "Replies render as Markdown conversation bubbles. Put ![title](path) on its own line to show a file inline, or use a direct public image URL. Link supporting files with [title](path). A fenced mermaid block renders as a diagram."
     : "Replies render as text with Markdown support. Link supporting files with [title](path).";
-  const folders = state.fileMounts?.length ? [...state.fileMounts].sort().map(path => `- \`${path}/\``).join("\n")
-    : "No folders are granted to this Profile. The user can add folders on the Profile's Files page.";
   const files = state.filePaths.length === 0 ? "No files are attached to this conversation." : state.filePaths.map(path => `- \`${path}\``).join("\n");
   const storage = state.storageMode === "persisted" ? persistedStorage : host?.externalFiles === false ? temporaryProfileStorage : temporaryStorage;
   return { skills, hosts: hostContext ? hostContextText(hostContext) : "No host context is available.", replies, selected_services: services,
-    conversation_files: files, mounted_folders: folders, storage, language: responseDirective(state.responseLanguage) || "Reply in the language the user writes in." };
+    conversation_files: files, storage, language: responseDirective(state.responseLanguage) || "Reply in the language the user writes in." };
 }
