@@ -5,7 +5,7 @@ usage() {
   cat <<'EOF'
 Usage: ios-upload.sh --build <number> --out <directory> [--upload]
 
-Archives apps/ios unsigned, exports with cloud-managed App Store Connect signing,
+Archives apps/ios with an existing development identity, exports with cloud-managed App Store Connect signing,
 verifies the signed app, and uploads with --upload.
 
 Required environment: ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY_PATH, OX_DEVELOPMENT_TEAM, OX_BUNDLE_IDENTIFIER.
@@ -69,11 +69,12 @@ run_logged archive xcodebuild archive \
   -project "$ios/Ox.xcodeproj" -scheme ios -configuration Release \
   -destination "generic/platform=iOS" \
   -archivePath "$archive" -derivedDataPath "$out/DerivedData" \
-  CODE_SIGNING_ALLOWED=NO \
+  "${auth[@]}" \
   CURRENT_PROJECT_VERSION="$build" COMPILER_INDEX_STORE_ENABLE=NO
 
 app="$archive/Products/Applications/Ox.app"
 [ -d "$app" ] || die "archive has no Ox.app"
+[ "$(entitlement "$app" 'com\.apple\.developer\.web-browser')" = true ] || die "archive signature lacks com.apple.developer.web-browser"
 version="$(plist "$app/Info.plist" CFBundleShortVersionString)"
 for bundle in "$app" "$app"/PlugIns/*.appex; do
   [ "$(plist "$bundle/Info.plist" CFBundleVersion)" = "$build" ] || die "$(basename "$bundle") is not build $build"
@@ -110,6 +111,13 @@ codesign --verify --deep --strict "$signed" || die "code signature is invalid"
 authority="$(codesign -dvv "$signed" 2>&1)"
 grep -q "^Authority=Apple Distribution: " <<<"$authority" || die "app is not signed for distribution"
 [ "$(entitlement "$signed" 'com\.apple\.developer\.web-browser')" = true ] || die "app signature lacks com.apple.developer.web-browser"
+[ "$(entitlement "$signed" 'com\.apple\.security\.application-groups.0')" = "group.$OX_BUNDLE_IDENTIFIER" ] || die "app signature lacks its app group"
+[ "$(entitlement "$signed" 'com\.apple\.developer\.icloud-container-identifiers.0')" = "iCloud.$OX_BUNDLE_IDENTIFIER" ] || die "app signature lacks its iCloud container"
+[ "$(entitlement "$signed" 'com\.apple\.developer\.ubiquity-container-identifiers.0')" = "iCloud.$OX_BUNDLE_IDENTIFIER" ] || die "app signature lacks its ubiquity container"
+[ "$(entitlement "$signed" 'com\.apple\.developer\.icloud-services.0')" = CloudDocuments ] || die "app signature lacks CloudDocuments"
+for extension in "$signed"/PlugIns/*.appex; do
+  [ "$(entitlement "$extension" 'com\.apple\.security\.application-groups.0')" = "group.$OX_BUNDLE_IDENTIFIER" ] || die "$(basename "$extension") signature lacks its app group"
+done
 [ "$(entitlement "$signed" get-task-allow)" = false ] || die "app signature allows debugging"
 [ "$(entitlement "$signed" beta-reports-active)" = true ] || die "app signature is not TestFlight-eligible"
 security cms -D -i "$signed/embedded.mobileprovision" > "$out/profile.plist"

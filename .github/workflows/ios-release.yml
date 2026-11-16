@@ -65,6 +65,32 @@ jobs:
           echo "DEVELOPER_DIR=/Applications/Xcode_$version.app/Contents/Developer" >> "$GITHUB_ENV"
       - run: brew install asc
       - run: git config --global lfs.fetchexclude 'prebuilt/**'
+      - name: Import archive signing identity
+        env:
+          IOS_SIGNING_P12_BASE64: ${{ secrets.IOS_SIGNING_P12_BASE64 }}
+          IOS_SIGNING_P12_PASSWORD: ${{ secrets.IOS_SIGNING_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          [ -n "$IOS_SIGNING_P12_BASE64" ] && [ -n "$IOS_SIGNING_P12_PASSWORD" ] || {
+            echo "::error::Set IOS_SIGNING_P12_BASE64 and IOS_SIGNING_P12_PASSWORD in the appstore environment to an existing Apple Development identity."
+            exit 1
+          }
+          keychain="$RUNNER_TEMP/ios-signing.keychain-db"
+          password="$(openssl rand -hex 32)"
+          echo "::add-mask::$password"
+          umask 077
+          printf '%s' "$IOS_SIGNING_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/ios-signing.p12"
+          trap 'rm -f "$RUNNER_TEMP/ios-signing.p12"' EXIT
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/ios-signing.p12" -k "$keychain" -P "$IOS_SIGNING_P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
+          security find-identity -v -p codesigning "$keychain" | grep -q 'Apple Development:' || {
+            echo "::error::The imported certificate has no valid Apple Development signing identity."
+            exit 1
+          }
       - name: App Store Connect key
         env:
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
@@ -115,7 +141,12 @@ jobs:
           asc builds add-groups "${build[@]}" --group gamma | tee -a "$GITHUB_STEP_SUMMARY"
           echo "Assigned build $BUILD to gamma. External beta review submission is manual." >> "$GITHUB_STEP_SUMMARY"
       - if: always()
-        run: rm -rf "$(dirname "$ASC_PRIVATE_KEY_PATH")"
+        run: |
+          rm -rf "$RUNNER_TEMP/asc"
+          rm -f "$RUNNER_TEMP/ios-signing.p12"
+          if [ -f "$RUNNER_TEMP/ios-signing.keychain-db" ]; then
+            security delete-keychain "$RUNNER_TEMP/ios-signing.keychain-db"
+          fi
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
