@@ -40,8 +40,7 @@ Default to observed same-origin structured `fetch`, then stable fetched HTML wit
 - Before implementing session discovery, login, authenticated behavior, or repairing legacy authentication, read `references/web-authentication.md`. Preserve current website data and login state.
 - Before implementing bot-control or payment handoffs, read `references/web-handoffs.md`. For transaction fulfillment, also read `skills/checkout/SKILL.md`.
 - Before setting or replacing the product favicon, read `references/service-icon.md`; its verification must pass before inspection or invocation.
-- For new web authentication, implement and inspect listSessions and executable login before authenticated exploration. Open the observed entry point, then invoke login with explicit frameId, selected auth, and optional account reference. Login only prepares or advances one step. Present that same page with ox.web.browser.showPage({ purpose, pageId }) for manual sign-in, bot control, or payment without replay, URL/state actions, or polling. showPage pauses event recording and removes the init script before credentials are entered.
-- Login completion acknowledges user interaction, not authentication. Discover sessions afterward and verify account/tenant identity before sensitive actions. Repair obsolete web authentication using the current Evolve contract, not a compatibility handoff. API credentials, OAuth callbacks, and native OS grants still require their actual security checks.
+- For new web authentication, implement and inspect listSessions and executable login before authenticated exploration. Follow `skills/authentication/SKILL.md` for sign-in and verification, and `references/web-authentication.md` for handler contracts. API credentials, OAuth callbacks, and native OS grants retain their own contracts.
 
 ## Author service.json
 

@@ -15,7 +15,7 @@ Use current host and Profile context and exposed function contracts. Inspect onl
 | --- | --- |
 | Bring personal context from another assistant | Read `references/import-memory.md` and follow its account selection, retrieval, review, and save workflow. |
 | Connect, configure, or troubleshoot a model provider | Read `skills/evolve/SKILL.md` and its provider reference. Inspect existing providers before changing anything; preserve the user's working model and unrelated configuration. |
-| Connect a website, API, or MCP service | Inspect an existing service and reuse its returned contracts. Read `skills/evolve/SKILL.md` when support must be created, connected, or repaired. Authenticate only when the chosen task needs it. |
+| Connect a website, API, or MCP service | Inspect an existing service and reuse its returned contracts. Read `skills/evolve/SKILL.md` when support must be created, connected, or repaired. For website sign-in, read `skills/authentication/SKILL.md`. Authenticate only when the chosen task needs it. |
 | Establish preferences or working context directly | Ask only for context relevant to the user's goal. Offer a concise proposed memory update and wait for approval before saving. |
 | Learn what Ox can do | Explain capabilities relevant to the user's goal using current tools and state, then offer one small real task rather than a broad feature tour. |
 

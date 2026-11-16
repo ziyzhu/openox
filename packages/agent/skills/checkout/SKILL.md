@@ -5,6 +5,8 @@ description: "Use to prepare a purchase, booking, or payable order through user 
 
 # Checkout
 
+When website authentication is needed, read `skills/authentication/SKILL.md` and resume this workflow after verifying sign-in.
+
 Prepare the requested transaction, hand final review and payment to the user, then verify confirmation. Continue predictable discovery, selection, pricing, and authoring without proposal checkpoints. Pause for consequential missing choices, login, human verification, runtime approvals, or blockers. Honor Action policies without adding approval forms or changing policies to avoid gates.
 
 ## Prepare
