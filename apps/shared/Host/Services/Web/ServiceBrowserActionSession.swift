@@ -11,38 +11,11 @@ final class ServiceBrowserActionSession {
         let metadata: [String: JSONValue]
     }
 
-    private final class CaptureSink: NSObject, WKScriptMessageHandler {
-        weak var session: ServiceBrowserActionSession?
-
-        init(session: ServiceBrowserActionSession) {
-            self.session = session
-        }
-
-        func userContentController(
-            _ userContentController: WKUserContentController,
-            didReceive message: WKScriptMessage
-        ) {
-            let body = message.body
-            let host = message.frameInfo.securityOrigin.host
-            Task { @MainActor [weak self] in
-                self?.session?.receiveCapture(body, host: host)
-            }
-        }
-    }
-
     let id: UUID
     let service: Service
     private(set) var page: BrowserSession?
-    private var captureSink: CaptureSink?
-    private var capturedEvents: [JSONValue] = []
-    private var captureRevision = UUID().uuidString
     private var initScript: (domains: [String], source: String)?
     private var trustedSites: Set<String> = []
-    private var captureActive = false
-    private var captureID: String?
-    private var captureIncludesBodies = false
-    private var captureDroppedCount = 0
-    private var captureEvictedCount = 0
     init(id: UUID, service: Service, page: BrowserSession) {
         self.id = id
         self.service = service
@@ -193,7 +166,6 @@ final class ServiceBrowserActionSession {
             "hasOnlySecureContent": .bool(webPage.hasOnlySecureContent),
             "isBlockedByScreenTime": .bool(webPage.isBlockedByScreenTime),
             "fullscreenState": .string(fullscreenState),
-            "javaScriptDialogs": .array(page.recordedDialogs),
             "document": result,
         ])
     }
@@ -269,173 +241,46 @@ final class ServiceBrowserActionSession {
         return landed
     }
 
-    func startCapture(includeBodies: Bool, reload: Bool) async throws -> (url: URL?, reloaded: Bool) {
+    func events(after: String?, names: Set<String>?, limit: Int, authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
         let page = try await inspectionPage()
-        clearCapturedEvents()
-        let id = UUID().uuidString
-        captureActive = true
-        captureID = id
-        captureIncludesBodies = includeBodies
-        configureAuthoringScripts(on: page)
-        if reload {
-            guard let landed = await service.reload(page) else {
-                let failure = page.navigationFailure ?? "Browser did not reload after starting capture"
-                let stopped = await deactivateCapture(on: page)
-                captureActive = false
-                captureID = nil
-                captureIncludesBodies = false
-                configureAuthoringScripts(on: page)
-                if !stopped { discardPage(page) }
-                throw Service.EvalError.navigationFailed(failure)
-            }
-            return (landed, true)
-        }
-        do {
-            _ = try await service.evalAsync(
-                page,
-                Self.captureScript(id: id, includeBodies: includeBodies),
-                context: "browser-capture-start",
-                timeout: 5
-            )
-        } catch {
-            let stopped = await deactivateCapture(on: page)
-            captureActive = false
-            captureID = nil
-            captureIncludesBodies = false
-            configureAuthoringScripts(on: page)
-            if !stopped { discardPage(page) }
-            throw error
-        }
-        return (page.page.url, false)
+        _ = try await authorize(page, authorizeSite)
+        return try page.events.read(after: after, names: names, limit: limit)
     }
 
-    func stopCapture(discard: Bool) async throws -> Bool {
-        let wasActive = captureActive
-        let page = self.page
-        let stopped: Bool
-        if wasActive, let page {
-            stopped = await deactivateCapture(on: page)
-        } else {
-            stopped = true
-        }
-        captureActive = false
-        captureID = nil
-        captureIncludesBodies = false
-        if let page { configureAuthoringScripts(on: page) }
-        if discard { clearCapturedEvents() }
-        guard !stopped, let page else { return wasActive }
-        guard await service.reload(page) != nil else {
-            let failure = page.navigationFailure ?? "Browser did not reload after stopping capture"
-            discardPage(page)
-            throw Service.EvalError.navigationFailed(failure)
-        }
-        return wasActive
+    func waitForEvent(_ names: Set<String>, timeoutMilliseconds: Int, authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
+        let page = try await inspectionPage()
+        _ = try await authorize(page, authorizeSite)
+        return try await page.events.next(names, timeoutMilliseconds: timeoutMilliseconds)
     }
 
-    func markCapture(_ label: String) -> Bool {
-        guard captureActive else { return false }
-        appendCapturedEvent(.object([
-            "id": .string(UUID().uuidString),
-            "kind": .string("mark"),
-            "label": .string(label),
-            "timestamp": .double(Date().timeIntervalSince1970 * 1_000),
-        ]))
-        return true
-    }
-
-    func listCapturedEvents(
-        after: String?,
-        limit: Int,
-        origin: String?,
-        pathPrefix: String?,
-        kinds: [String]?
-    ) throws -> JSONValue {
-        let total = captureEvictedCount + capturedEvents.count
-        var offset = captureEvictedCount
-        if let after {
-            let parts = after.split(separator: ":", omittingEmptySubsequences: false)
-            guard parts.count == 2, parts[0] == captureRevision,
-                  let position = Int(parts[1]), position >= 0, position <= total else {
-                throw OxFunctionError(code: "invalid_cursor", message: "The capture cursor is invalid or belongs to an earlier capture.", recovery: "List events without after to read the current capture.")
-            }
-            offset = position
+    func readEventBody(id: String, mode: String, authorizeSite: (String) async throws -> Void) async throws -> JSONValue {
+        let page = try await inspectionPage()
+        guard var fields = page.events.record(id: id)?.objectValue,
+              ["request", "response"].contains(fields["event"]?.stringValue ?? "") else {
+            throw OxFunctionError(code: "event_unavailable", message: "The event is unavailable or has no body.", recovery: "Read events again and use a retained request or response event id.")
         }
-        let gap = offset < captureEvictedCount
-        offset = max(offset, captureEvictedCount)
-        if let origin {
-            guard let components = URLComponents(string: origin),
-                  components.user == nil, components.password == nil,
-                  components.path.isEmpty || components.path == "/",
-                  components.query == nil, components.fragment == nil else {
-                throw Service.EvalError.js("Capture origin must not include credentials, a path, query, or fragment")
-            }
+        if let site = fields["site"]?.stringValue { try await trust(site, authorizeSite) }
+        let bodies = ["requestBody", "responseBody"].filter { fields[$0] != nil && fields[$0] != .null }
+        Log.webView.info("Browser.readEventBody owner=\(self.id) event=\(id) mode=\(mode) bodies=\(bodies.count)")
+        guard mode == "shape" else {
+            return .object(["id": .string(id), "requestBody": fields["requestBody"] ?? .null, "responseBody": fields["responseBody"] ?? .null])
         }
-        let selectedOrigin = try origin.map(Self.captureOrigin)
-        var events: [JSONValue] = []
-        for index in (offset - captureEvictedCount)..<capturedEvents.count {
-            let event = capturedEvents[index]
-            let fields = event.objectValue ?? [:]
-            let url = fields["url"]?.stringValue.flatMap(URL.init(string:))
-            let matches = (kinds.map { $0.contains(fields["kind"]?.stringValue ?? "") } ?? true)
-                && (selectedOrigin == nil || url.flatMap { try? Self.captureOrigin($0.absoluteString) } == selectedOrigin)
-                && (pathPrefix.map { url?.path.hasPrefix($0) == true } ?? true)
-            if matches {
-                if events.count == limit { break }
-                var metadata = fields
-                metadata.removeValue(forKey: "requestBody")
-                metadata.removeValue(forKey: "responseBody")
-                events.append(.object(metadata))
-            }
-            offset = captureEvictedCount + index + 1
-        }
-        Log.webView.info("Browser.captureList owner=\(id) returned=\(events.count) remaining=\(total - offset) gap=\(gap)")
-        return .object([
-            "active": .bool(captureActive),
-            "dropped": .int(captureDroppedCount),
-            "evicted": .int(captureEvictedCount),
-            "events": .array(events),
-            "nextCursor": .string("\(captureRevision):\(offset)"),
-            "hasMore": .bool(offset < total),
-            "gap": .bool(gap),
-            "coverage": .string("Main-document fetch/XHR hooks, form submissions, resource timing, and WebSocket creation; not a complete network trace. Frame documents, workers, WebSocket messages, and requests bypassing hooks are not inspected. Bodies are bounded and redacted; completeness is unknown."),
-        ])
-    }
-
-    private static func captureOrigin(_ value: String) throws -> String {
-        guard let url = URL(string: value),
-              let scheme = url.scheme?.lowercased(), ["http", "https", "ws", "wss"].contains(scheme),
-              let host = url.host?.lowercased(), !host.isEmpty else {
-            throw Service.EvalError.js("Capture origin must be an absolute HTTP(S) or WebSocket origin")
-        }
-        let defaultPort = ["https", "wss"].contains(scheme) ? 443 : 80
-        let port = url.port.flatMap { $0 == defaultPort ? nil : ":\($0)" } ?? ""
-        return "\(scheme)://\(host)\(port)"
-    }
-
-    func readCapturedEvent(id: String, bodyMode: String, authorizeSite: (String) async throws -> Void) async throws -> JSONValue? {
-        guard let event = capturedEvents.first(where: { $0.objectValue?["id"]?.stringValue == id }),
-              var fields = event.objectValue else { return nil }
-        let hasBody = [fields["requestBody"], fields["responseBody"]].contains { $0 != nil && $0 != .null }
-        if hasBody, let site = fields["site"]?.stringValue {
-            try await trust(site, authorizeSite)
-        }
-        guard bodyMode == "shape" else { return event }
+        var result: [String: JSONValue] = ["id": .string(id)]
         var coverage: [String: JSONValue] = [:]
         for side in ["request", "response"] {
             let text = fields.removeValue(forKey: "\(side)Body")?.stringValue
             var budget = 128
             var truncated = false
             let parsed = text.flatMap { try? JSONDecoder().decode(JSONValue.self, from: Data($0.utf8)) }
-            fields["\(side)Shape"] = parsed.map { Self.bodyShape($0, depth: 0, budget: &budget, truncated: &truncated) } ?? .null
+            result["\(side)Shape"] = parsed.map { Self.bodyShape($0, depth: 0, budget: &budget, truncated: &truncated) } ?? .null
             coverage[side] = .object([
                 "status": .string(text == nil ? "unavailable" : parsed == nil ? "invalid_json" : "json"),
                 "shapeTruncated": .bool(truncated),
                 "bodyCompleteness": .string("unknown"),
             ])
         }
-        fields["bodyCoverage"] = .object(coverage)
-        Log.webView.info("Browser.captureShape owner=\(self.id) event=\(id)")
-        return .object(fields)
+        result["bodyCoverage"] = .object(coverage)
+        return .object(result)
     }
 
     private static func bodyShape(_ value: JSONValue, depth: Int, budget: inout Int, truncated: inout Bool) -> JSONValue {
@@ -497,22 +342,11 @@ final class ServiceBrowserActionSession {
     }
 
     func prepareForUserInteraction() async throws {
-        let requiresReload = initScript != nil
-        let page = self.page
-        let captureStopped: Bool
-        if captureActive, let page {
-            captureStopped = await deactivateCapture(on: page)
-        } else {
-            captureStopped = true
-        }
-        captureActive = false
-        captureID = nil
-        captureIncludesBodies = false
-        initScript = nil
-        clearCapturedEvents()
         guard let page else { return }
+        await page.setEventRecording(paused: true)
+        guard initScript != nil else { return }
+        initScript = nil
         configureAuthoringScripts(on: page)
-        guard requiresReload || !captureStopped else { return }
         guard await service.reload(page) != nil else {
             let failure = page.navigationFailure ?? "Browser did not reload before user interaction"
             discardPage(page)
@@ -520,36 +354,22 @@ final class ServiceBrowserActionSession {
         }
     }
 
+    func finishUserInteraction() async {
+        guard let page, page.isOpen else { return }
+        await page.setEventRecording(paused: false)
+    }
+
     func close() {
         if let page {
-            page.userContentController.removeScriptMessageHandler(forName: "oxBrowserCapture")
             service.closeOwnedPage(page)
             self.page = nil
         }
-        captureSink = nil
-        clearCapturedEvents()
         initScript = nil
-        captureActive = false
-        captureID = nil
-        captureIncludesBodies = false
         Log.webView.info("Service.browserSession event=close owner=\(id) domain=\(service.domain)")
     }
 
     private func configureAuthoringScripts(on page: BrowserSession) {
-        let controller = page.userContentController
-        controller.removeScriptMessageHandler(forName: "oxBrowserCapture")
-        captureSink = nil
         var scripts: [WKUserScript] = []
-        if captureActive, let captureID {
-            let sink = CaptureSink(session: self)
-            captureSink = sink
-            controller.add(sink, name: "oxBrowserCapture")
-            scripts.append(WKUserScript(
-                source: Self.captureScript(id: captureID, includeBodies: captureIncludesBodies),
-                injectionTime: .atDocumentStart,
-                forMainFrameOnly: true
-            ))
-        }
         if let script = initScript {
             let domains = (try? JSONSerialization.data(withJSONObject: script.domains))
                 .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
@@ -570,37 +390,7 @@ final class ServiceBrowserActionSession {
         page.additionalUserScripts = scripts
         page.scriptMode = nil
         service.configureScripts(for: page.page.url, in: page)
-        Log.webView.info("Service.browserSession event=scripts owner=\(id) capture=\(captureActive) init=\(initScript != nil)")
-    }
-
-    private func receiveCapture(_ body: Any, host: String) {
-        guard captureActive else { return }
-        guard let data = try? JSONSerialization.data(withJSONObject: body), data.count <= 100_000 else {
-            captureDroppedCount += 1
-            Log.webView.warning("Service.browserSession event=capture-dropped owner=\(id)")
-            return
-        }
-        var fields = JSONValue.from(body).objectValue ?? [:]
-        guard fields.removeValue(forKey: "captureID")?.stringValue == captureID else { return }
-        fields["id"] = .string(UUID().uuidString)
-        fields["site"] = host.isEmpty ? .null : .string(ServiceWebsiteDataCoordinator.site(for: host))
-        appendCapturedEvent(.object(fields))
-    }
-
-    private func appendCapturedEvent(_ event: JSONValue) {
-        capturedEvents.append(SecretAttempt.redactLive(event))
-        if capturedEvents.count > 500 {
-            let removed = capturedEvents.count - 500
-            capturedEvents.removeFirst(removed)
-            captureEvictedCount += removed
-        }
-    }
-
-    private func clearCapturedEvents() {
-        captureRevision = UUID().uuidString
-        capturedEvents = []
-        captureDroppedCount = 0
-        captureEvictedCount = 0
+        Log.webView.info("Service.browserSession event=scripts owner=\(id) init=\(initScript != nil)")
     }
 
     private func discardPage(_ page: BrowserSession) {
@@ -608,219 +398,6 @@ final class ServiceBrowserActionSession {
         if self.page === page {
             self.page = nil
         }
-    }
-
-    private func deactivateCapture(on page: BrowserSession) async -> Bool {
-        do {
-            let result = try await service.evalAsync(
-                page,
-                "return globalThis.__oxCaptureControl?.stop?.() !== false;",
-                context: "browser-capture-stop",
-                timeout: 5
-            )
-            return result.map(JSONValue.from)?.boolValue == true
-        } catch {
-            Log.webView.warning("Service.browserSession event=capture-stop-failed owner=\(id) error=\(LogPrivacy.text(error.localizedDescription))")
-            return false
-        }
-    }
-
-    private static func captureScript(id: String, includeBodies: Bool) -> String {
-        #"""
-        (() => {
-          globalThis.__oxCaptureControl?.stop?.();
-          const control = { active: true, id: '\#(id)', includeBodies: \#(includeBodies ? "true" : "false") };
-          globalThis.__oxCaptureControl = control;
-          const sensitive = /authorization|cookie|token|secret|password|passwd|api[-_]?key|session|credential|signature|nonce|jwt|(?:^|[^a-z0-9])(?:auth|code)(?:$|[^a-z0-9])/i;
-          const redactURL = raw => {
-            try {
-              const url = new URL(raw, location.href);
-              if (url.username || url.password) { url.username = '[REDACTED]'; url.password = '[REDACTED]'; }
-              if (sensitive.test(url.pathname)) url.pathname = '/[REDACTED]';
-              for (const key of [...url.searchParams.keys()]) if (sensitive.test(key)) url.searchParams.set(key, '[REDACTED]');
-              if (sensitive.test(url.hash)) url.hash = '#[REDACTED]';
-              return url.href;
-            } catch { return '[UNPARSEABLE URL]'; }
-          };
-          const headers = value => {
-            const result = {};
-            try {
-              let count = 0;
-              for (const [key, item] of new Headers(value)) {
-                if (count++ >= 64) break;
-                result[key] = sensitive.test(key) ? '[REDACTED]' : String(item).slice(0, 2048);
-              }
-            } catch {}
-            return result;
-          };
-          const body = value => {
-            if (value == null) return null;
-            if (value instanceof URLSearchParams || value instanceof FormData) {
-              const fields = {};
-              let count = 0;
-              for (const [key, entry] of value) {
-                if (count++ >= 64) break;
-                fields[key] = sensitive.test(key) ? '[REDACTED]' : String(entry).slice(0, 2048);
-              }
-              return JSON.stringify(fields).slice(0, 8192);
-            }
-            if (typeof value !== 'string') return `[${value.constructor?.name || typeof value}]`;
-            const text = value.slice(0, 8192);
-            try {
-              const parsed = JSON.parse(text);
-              const clean = item => Array.isArray(item) ? item.map(clean) : item && typeof item === 'object'
-                ? Object.fromEntries(Object.entries(item).map(([key, entry]) => [key, sensitive.test(key) ? '[REDACTED]' : clean(entry)])) : item;
-              return JSON.stringify(clean(parsed));
-            } catch { return sensitive.test(text) ? '[REDACTED]' : text; }
-          };
-          const send = value => {
-            if (!control.active) return;
-            try { webkit.messageHandlers.oxBrowserCapture.postMessage({ captureID: control.id, timestamp: Date.now(), frameURL: redactURL(location.href), ...value }); } catch {}
-          };
-          const readers = new Set();
-          const readResponseBody = async response => {
-            let reader;
-            try { reader = response.body?.getReader?.(); } catch { return null; }
-            if (!reader) return null;
-            readers.add(reader);
-            const decoder = new TextDecoder();
-            let text = '';
-            let timedOut = false;
-            const timeout = setTimeout(() => {
-              timedOut = true;
-              void reader.cancel().catch(() => {});
-            }, 1000);
-            try {
-              while (!timedOut && text.length < 8192) {
-                const { done, value } = await reader.read();
-                if (done) { text = (text + decoder.decode()).slice(0, 8192); break; }
-                text = (text + decoder.decode(value, { stream: true })).slice(0, 8192);
-                if (text.length >= 8192) { void reader.cancel(); break; }
-              }
-            } catch { return null; }
-            finally {
-              clearTimeout(timeout);
-              readers.delete(reader);
-            }
-            if (timedOut) return null;
-            return body(text);
-          };
-          const originalFetch = globalThis.fetch;
-          const capturedFetch = originalFetch && async function(input, init = {}) {
-            if (!control.active) return originalFetch.apply(this, arguments);
-            const includeBodies = control.includeBodies;
-            const request = input instanceof Request ? input : null;
-            const started = Date.now();
-            const item = {
-              kind: 'fetch',
-              method: init.method || request?.method || 'GET',
-              url: redactURL(request?.url || input),
-              requestHeaders: headers(init.headers || request?.headers),
-              requestBody: includeBodies ? body(init.body) : null
-            };
-            try {
-              const response = await originalFetch.apply(this, arguments);
-              const result = { ...item, status: response.status, responseHeaders: headers(response.headers), durationMs: Date.now() - started };
-              if (!includeBodies) {
-                send(result);
-              } else {
-                try {
-                  void readResponseBody(response.clone())
-                    .then(responseBody => send({ ...result, responseBody }))
-                    .catch(() => send({ ...result, responseBody: null }));
-                } catch { send({ ...result, responseBody: null }); }
-              }
-              return response;
-            } catch (error) {
-              send({ ...item, error: String(error?.name || 'FetchError'), durationMs: Date.now() - started });
-              throw error;
-            }
-          };
-          if (capturedFetch) globalThis.fetch = capturedFetch;
-          const xhr = globalThis.XMLHttpRequest?.prototype;
-          const open = xhr?.open;
-          const setRequestHeader = xhr?.setRequestHeader;
-          const xhrSend = xhr?.send;
-          const capturedOpen = open && function(method, url) {
-            if (control.active) this.__oxCapture = { includeBodies: control.includeBodies, kind: 'xhr', method, url: redactURL(url), started: Date.now() };
-            return open.apply(this, arguments);
-          };
-          const capturedSetRequestHeader = setRequestHeader && function(key, value) {
-            const item = this.__oxCapture;
-            if (control.active && item) {
-              (item.requestHeaders || (item.requestHeaders = {}))[key] = sensitive.test(key) ? '[REDACTED]' : String(value).slice(0, 2048);
-            }
-            return setRequestHeader.apply(this, arguments);
-          };
-          const capturedXHRSend = xhrSend && function(value) {
-            const item = this.__oxCapture;
-            if (!control.active || !item) return xhrSend.apply(this, arguments);
-            item.requestBody = item.includeBodies ? body(value) : null;
-            this.addEventListener('loadend', () => {
-              if (!control.active) return;
-              let responseBody = null;
-              const responseHeaders = {};
-              if (item.includeBodies) { try { responseBody = body(this.responseText); } catch {} }
-              try {
-                for (const line of this.getAllResponseHeaders().trim().split(/[\r\n]+/)) {
-                  const index = line.indexOf(':');
-                  if (index > 0) {
-                    const key = line.slice(0, index);
-                    responseHeaders[key] = sensitive.test(key) ? '[REDACTED]' : line.slice(index + 1).trim().slice(0, 2048);
-                  }
-                }
-              } catch {}
-              const { includeBodies, ...event } = item;
-              send({ ...event, status: this.status, responseHeaders, responseBody, durationMs: Date.now() - item.started });
-            }, { once: true });
-            return xhrSend.apply(this, arguments);
-          };
-          if (capturedOpen) xhr.open = capturedOpen;
-          if (capturedSetRequestHeader) xhr.setRequestHeader = capturedSetRequestHeader;
-          if (capturedXHRSend) xhr.send = capturedXHRSend;
-          const submit = event => {
-            if (!control.active) return;
-            const form = event.target;
-            let requestBody = null;
-            if (control.includeBodies) {
-              try { requestBody = body(new FormData(form)); } catch {}
-            }
-            send({ kind: 'form', method: (form.method || 'GET').toUpperCase(), url: redactURL(form.action || location.href), requestBody });
-          };
-          addEventListener('submit', submit, true);
-          let observer = null;
-          try {
-            observer = new PerformanceObserver(list => {
-              if (!control.active) return;
-              for (const item of list.getEntries()) send({ kind: 'resource', url: redactURL(item.name), initiatorType: item.initiatorType, durationMs: Math.round(item.duration) });
-            });
-            observer.observe({ entryTypes: ['resource'] });
-          } catch {}
-          const OriginalWebSocket = globalThis.WebSocket;
-          const CapturedWebSocket = OriginalWebSocket && new Proxy(OriginalWebSocket, {
-            construct(target, args) {
-              if (control.active) send({ kind: 'websocket', url: redactURL(args[0]), event: 'open' });
-              return Reflect.construct(target, args);
-            }
-          });
-          if (CapturedWebSocket) globalThis.WebSocket = CapturedWebSocket;
-          control.stop = () => {
-            control.active = false;
-            if (capturedFetch && globalThis.fetch === capturedFetch) globalThis.fetch = originalFetch;
-            if (capturedOpen && xhr.open === capturedOpen) xhr.open = open;
-            if (capturedSetRequestHeader && xhr.setRequestHeader === capturedSetRequestHeader) xhr.setRequestHeader = setRequestHeader;
-            if (capturedXHRSend && xhr.send === capturedXHRSend) xhr.send = xhrSend;
-            removeEventListener('submit', submit, true);
-            observer?.disconnect();
-            for (const reader of readers) void reader.cancel().catch(() => {});
-            readers.clear();
-            if (CapturedWebSocket && globalThis.WebSocket === CapturedWebSocket) globalThis.WebSocket = OriginalWebSocket;
-            if (globalThis.__oxCaptureControl === control) delete globalThis.__oxCaptureControl;
-            return true;
-          };
-          return true;
-        })();
-        """#
     }
 
 }

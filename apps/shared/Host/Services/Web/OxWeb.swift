@@ -105,7 +105,7 @@ nonisolated enum OxWeb {
                 var fields = jsValueToJSON(options)?.objectValue ?? [:]
                 let purpose = fields.removeValue(forKey: "purpose")?.stringValue ?? ""
                 let arguments = JSONValue.object(fields)
-                return env.call(suspendingTimeout: action == "waitForURL" || action == "showPage") {
+                return env.call(suspendingTimeout: ["waitForURL", "waitForEvent", "showPage"].contains(action)) {
                     try await $0.browserOperation(action: action, arguments: arguments, purpose: purpose)
                 }
             }
@@ -129,11 +129,9 @@ nonisolated enum OxWeb {
             pdf: (value) => __nativeWebBrowser('pdf', __oxOptions(value, 'ox.web.browser.pdf')),
             screenshot: (value) => __nativeWebBrowser('screenshot', __oxOptions(value, 'ox.web.browser.screenshot')),
             addInitScript: (value) => __nativeWebBrowser('addInitScript', __oxOptions(value, 'ox.web.browser.addInitScript')),
-            startCapture: (value) => __nativeWebBrowser('startCapture', __oxOptions(value, 'ox.web.browser.startCapture')),
-            markCapture: (value) => __nativeWebBrowser('markCapture', __oxOptions(value, 'ox.web.browser.markCapture')),
-            listCapturedEvents: (value) => __nativeWebBrowser('listCapturedEvents', __oxOptions(value, 'ox.web.browser.listCapturedEvents')),
-            readCapturedEvent: (value) => __nativeWebBrowser('readCapturedEvent', __oxOptions(value, 'ox.web.browser.readCapturedEvent')),
-            stopCapture: (value) => __nativeWebBrowser('stopCapture', __oxOptions(value, 'ox.web.browser.stopCapture'))
+            events: (value) => __nativeWebBrowser('events', __oxOptions(value, 'ox.web.browser.events')),
+            waitForEvent: (value) => __nativeWebBrowser('waitForEvent', __oxOptions(value, 'ox.web.browser.waitForEvent')),
+            readEventBody: (value) => __nativeWebBrowser('readEventBody', __oxOptions(value, 'ox.web.browser.readEventBody'))
           }
         """
     )

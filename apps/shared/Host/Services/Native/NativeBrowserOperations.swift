@@ -5,7 +5,8 @@ extension NativeServiceOperations {
         let fields = args.objectValue ?? [:]
         switch actionID {
         case "newPage":
-            return try await openBrowserPage(url: fields["url"]?.stringValue ?? "")
+            return try await openBrowserPage(url: fields["url"]?.stringValue ?? "",
+                                             networkContent: fields["networkContent"]?.stringValue.flatMap(BrowserEventLog.NetworkContent.init) ?? .omit)
         case "pages":
             return listBrowserPages()
         case "frames":
@@ -19,7 +20,7 @@ extension NativeServiceOperations {
             return .object(["closed": .bool(true)])
         default:
             let session = try browserSession(arguments: fields)
-            if ["evaluate", "pdf", "screenshot", "waitForURL"].contains(actionID) {
+            if ["evaluate", "pdf", "screenshot", "waitForURL", "waitForEvent"].contains(actionID) {
                 return try await performBrowserOperation(actionID, fields: fields, session: session, purpose: purpose)
             }
             guard let page = session.page, let action = await serviceManager.browserService.inspectionAction() else {
@@ -72,25 +73,15 @@ extension NativeServiceOperations {
         case "addInitScript":
             let landed = try await session.addInitScript(fields["script"]?.stringValue ?? "", domains: fields["domains"]?.arrayValue?.compactMap(\.stringValue) ?? [], authorizeSite: authorizeSite)
             return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case "startCapture":
-            let capture = try await session.startCapture(includeBodies: fields["includeBodies"]?.boolValue ?? false, reload: fields["reload"]?.boolValue ?? false)
-            return .object([
-                "active": .bool(true), "includeBodies": .bool(fields["includeBodies"]?.boolValue ?? false),
-                "reloaded": .bool(capture.reloaded), "url": capture.url.map { .string($0.absoluteString) } ?? .null,
-            ])
-        case "markCapture":
-            return .object(["marked": .bool(session.markCapture(fields["label"]?.stringValue ?? ""))])
-        case "listCapturedEvents":
-            return try session.listCapturedEvents(after: fields["after"]?.stringValue, limit: fields["limit"]?.intValue ?? 500,
-                                                 origin: fields["origin"]?.stringValue, pathPrefix: fields["pathPrefix"]?.stringValue,
-                                                 kinds: fields["kinds"]?.arrayValue?.compactMap(\.stringValue))
-        case "readCapturedEvent":
-            guard let event = try await session.readCapturedEvent(id: fields["id"]?.stringValue ?? "", bodyMode: fields["bodyMode"]?.stringValue ?? "raw", authorizeSite: authorizeSite) else {
-                throw RuntimeError.bridge("ox.web.browser.readCapturedEvent requires a valid captured event id.")
-            }
-            return event
-        case "stopCapture":
-            return .object(["stopped": .bool(try await session.stopCapture(discard: fields["discard"]?.boolValue ?? false))])
+        case "events":
+            return try await session.events(after: fields["after"]?.stringValue,
+                                            names: fields["event"]?.stringValue.map { [$0] },
+                                            limit: fields["limit"]?.intValue ?? 200, authorizeSite: authorizeSite)
+        case "waitForEvent":
+            return try await session.waitForEvent([fields["event"]?.stringValue ?? ""],
+                                                  timeoutMilliseconds: fields["timeoutMs"]?.intValue ?? 15_000, authorizeSite: authorizeSite)
+        case "readEventBody":
+            return try await session.readEventBody(id: fields["id"]?.stringValue ?? "", mode: fields["mode"]?.stringValue ?? "raw", authorizeSite: authorizeSite)
         default:
             throw Service.InvokeError.unknown("ox.web.browser.\(actionID)")
         }

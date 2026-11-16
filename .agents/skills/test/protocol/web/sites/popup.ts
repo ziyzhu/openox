@@ -25,10 +25,15 @@ export const popup: Site = {
       count(counters, "callback");
       return redirect("/", { "set-cookie": setCookie("popup_session", sessions.create(accounts[0]!)) });
     }
+    if (url.pathname === "/status") return json({ ok: true });
+    if (url.pathname === "/download") {
+      count(counters, "download");
+      return new Response("fixture", { headers: { "content-type": "application/octet-stream", "content-disposition": "attachment; filename=fixture.bin" } });
+    }
     if (url.pathname === "/sessions") {
       const account = sessions.account(request);
       return json(account ? [{ id: account.id, label: account.label, url: `${origin(consumer)}/` }] : []);
     }
-    return page("Popup consumer", `<h1>Popup consumer</h1><a id="sign-in" target="_blank" href="${origin(provider)}/authorize">Sign in in a new window</a><button id="script-sign-in" onclick="window.open('${origin(provider)}/authorize', 'signin', 'width=400,height=600')">Sign in with a script window</button><button id="alert" onclick="alert('Popup fixture alert')">Show alert</button>`);
+    return page("Popup consumer", `<h1>Popup consumer</h1><a id="sign-in" target="_blank" href="${origin(provider)}/authorize">Sign in in a new window</a><button id="script-sign-in" onclick="window.open('${origin(provider)}/authorize', 'signin', 'width=400,height=600')">Sign in with a script window</button><button id="alert" onclick="alert('Popup fixture alert')">Show alert</button><button id="diagnostics" onclick="console.warn('Popup fixture warning'); fetch('/status'); setTimeout(() => { throw new Error('Popup fixture failure'); })">Diagnostics</button><a id="download" href="/download">Download</a>`);
   },
 };

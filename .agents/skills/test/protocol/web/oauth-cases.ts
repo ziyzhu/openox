@@ -66,17 +66,38 @@ export const oauthCases: Case[] = [
     name: "popup-window-open", site: "popup",
     async run(h) {
       const opened = await h.turn(`const page = await ox.web.browser.newPage({ purpose: "Open popup consumer", url: fixtureTargets["web:ox-popup.localhost:login"] });
+const start = (await ox.web.browser.events({ purpose: "Read initial events", pageId: page.pageId })).nextCursor;
+const diagnostics = ox.web.browser.waitForEvent({ purpose: "Wait for page error", pageId: page.pageId, event: "pageerror", timeoutMs: 10000 });
+await ox.web.browser.evaluate({ purpose: "Trigger diagnostics", frameId: page.mainFrameId, script: "document.querySelector('#diagnostics').click(); return true;" });
+const pageerror = await diagnostics;
 await ox.web.browser.evaluate({ purpose: "Open script window", frameId: page.mainFrameId, script: "document.querySelector('#script-sign-in').click(); return true;" });
 const landed = await ox.web.browser.waitForURL({ purpose: "Wait for provider", pageId: page.pageId, url: "*ox-popup-idp.localhost*/authorize", timeoutMs: 10000 });
 const frames = await ox.web.browser.frames({ purpose: "Inspect provider", pageId: page.pageId });
 await ox.web.browser.evaluate({ purpose: "Trigger alert", frameId: frames.frames.find(frame => frame.isMainFrame).id, script: "alert('Popup provider alert'); return true;" });
-const snapshot = await ox.web.browser.snapshot({ purpose: "Read dialogs", frameId: frames.frames.find(frame => frame.isMainFrame).id });
-return { landed, dialogs: snapshot.javaScriptDialogs, pages: await ox.web.browser.pages({ purpose: "Count pages" }) };`);
+const after = await ox.web.browser.events({ purpose: "Read caused events", pageId: page.pageId, after: start });
+const dialogs = await ox.web.browser.events({ purpose: "Read dialogs", pageId: page.pageId, after: start, event: "dialog" });
+return { landed, pageerror, events: after.events, dialogs: dialogs.events, recording: after.recording, pages: await ox.web.browser.pages({ purpose: "Count pages" }) };`);
       assert.match(opened.landed.url, /ox-popup-idp\.localhost.*\/authorize/, "window.open did not navigate the agent page");
       assert.equal(h.site("popup").counters.authorization, 1);
-      assert.deepEqual(opened.dialogs.map((dialog: { type: string; message: string }) => [dialog.type, dialog.message]), [["alert", "Popup provider alert"]]);
+      assert.equal(opened.recording, true);
+      const kinds = new Set(opened.events.map((event: { event: string }) => event.event));
+      for (const kind of ["console", "pageerror", "request", "response", "framenavigated", "domcontentloaded", "load"]) assert.ok(kinds.has(kind), `missing ${kind} event`);
+      assert.match(opened.pageerror.message, /Popup fixture failure/);
+      assert.ok(opened.events.some((event: { event: string; type?: string; text?: string }) => event.event === "console" && event.type === "warning" && event.text?.includes("Popup fixture warning")));
+      assert.ok(opened.events.some((event: { event: string; url?: string; status?: number }) => event.event === "response" && event.url?.endsWith("/status") && event.status === 200));
+      assert.deepEqual(opened.dialogs.map((dialog: { type: string; message: string; disposition: string }) => [dialog.type, dialog.message, dialog.disposition]), [["alert", "Popup provider alert", "dismissed"]]);
+      assert.ok(opened.events.every((event: { id: string; event: string }) => event.event !== "dialog" || opened.dialogs.some((dialog: { id: string }) => dialog.id === event.id)));
       assert.equal(opened.pages.pages.filter((page: { owned: boolean }) => page.owned).length, 1, "window.open must reuse the agent page");
-      return "script window.open navigated the same agent page, waitForURL matched a glob, and an alert was dismissed and reported by snapshot";
+      const download = await h.turn(`const { pages } = await ox.web.browser.pages({ purpose: "Find popup page" });
+const page = pages.find(page => page.owned);
+await ox.web.browser.goto({ purpose: "Return to consumer", pageId: page.pageId, url: fixtureTargets["web:ox-popup.localhost:login"] });
+const frames = await ox.web.browser.frames({ purpose: "Find consumer", pageId: page.pageId });
+const waiting = ox.web.browser.waitForEvent({ purpose: "Wait for download", pageId: page.pageId, event: "download", timeoutMs: 10000 });
+await ox.web.browser.evaluate({ purpose: "Start download", frameId: frames.frames.find(frame => frame.isMainFrame).id, script: "document.querySelector('#download').click(); return true;" });
+return await waiting;`);
+      assert.equal(download.disposition, "rejected");
+      assert.equal(download.suggestedFilename, "fixture.bin");
+      return "window.open reused the page; console, pageerror, network, lifecycle, dialog and download events were recorded and awaited through events and waitForEvent";
     },
   },
   {

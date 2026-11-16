@@ -34,25 +34,36 @@ extension BrowserSession {
         }
 
         func handleJavaScriptPrompt(message: String, defaultText: String?, initiatedBy frame: WebPage.FrameInfo) async -> WebPage.JavaScriptPromptResult {
-            guard record("prompt", message, frame) else {
+            guard record("prompt", message, frame, defaultValue: defaultText) else {
                 return await SystemPresenter().handleJavaScriptPrompt(message: message, defaultText: defaultText, initiatedBy: frame)
             }
             return .cancel
         }
 
-        private func record(_ type: String, _ message: String, _ frame: WebPage.FrameInfo) -> Bool {
-            guard let session else { return true }
+        func handleFileInputPrompt(parameters: WKOpenPanelParameters, initiatedBy frame: WebPage.FrameInfo) async -> WebPage.FileInputPromptResult {
+            guard let session, session.events.enabled, (try? session.manager.actionScheduler.requireNoPresentation(session)) != nil else {
+                return await SystemPresenter().handleFileInputPrompt(parameters: parameters, initiatedBy: frame)
+            }
+            session.events.append("filechooser", ["isMultiple": .bool(parameters.allowsMultipleSelection), "disposition": .string("cancelled")])
+            return .cancel
+        }
+
+        private func record(_ type: String, _ message: String, _ frame: WebPage.FrameInfo, defaultValue: String? = nil) -> Bool {
+            guard let session, session.events.enabled else { return false }
             let presented = (try? session.manager.actionScheduler.requireNoPresentation(session)) == nil
+            guard !presented else {
+                Log.webView.info("BrowserSession.dialog session=\(session.logLabel) type=\(type) disposition=user")
+                return false
+            }
             let origin = frame.securityOrigin
-            session.recordedDialogs.append(.object([
+            session.events.append("dialog", [
                 "type": .string(type),
-                "message": .string(String(message.prefix(BrowserSession.maximumDialogMessageCharacters))),
+                "message": .string(LogPrivacy.text(String(message.prefix(BrowserSession.maximumDialogMessageCharacters)), limit: BrowserSession.maximumDialogMessageCharacters)),
+                "defaultValue": defaultValue.map { .string(String($0.prefix(BrowserSession.maximumDialogMessageCharacters))) } ?? .null,
                 "origin": .string("\(origin.protocol)://\(origin.host)\(origin.port == 0 ? "" : ":\(origin.port)")"),
-                "timestamp": .double(Date().timeIntervalSince1970 * 1_000),
-            ]))
-            session.recordedDialogs = Array(session.recordedDialogs.suffix(BrowserSession.maximumRecordedDialogs))
-            Log.webView.info("BrowserSession.dialog session=\(session.logLabel) type=\(type) host=\(origin.host) disposition=\(presented ? "user" : "dismissed")")
-            return !presented
+                "disposition": .string("dismissed"),
+            ])
+            return true
         }
     }
 }
@@ -90,6 +101,7 @@ extension BrowserSession {
         configureScripts(for: url, in: session)
         if action.target == nil {
             Log.webView.info("Service.navigation popup-request domain=\(domain) session=\(session.logLabel) url=\(LogPrivacy.url(url?.absoluteString ?? "?"))")
+            session.events.append("popup", ["url": .string(LogPrivacy.url(url?.absoluteString ?? "")), "disposition": .string("samePage")])
             session.page.load(action.request)
             return .cancel
         }
@@ -99,6 +111,11 @@ extension BrowserSession {
 
     func decidePolicy(for response: WebPage.NavigationResponse, in session: BrowserSession) async -> WKNavigationResponsePolicy {
         guard response.canShowMimeType else {
+            session.events.append("download", [
+                "url": .string(LogPrivacy.url(response.response.url?.absoluteString ?? "")),
+                "suggestedFilename": .string(response.response.suggestedFilename ?? ""),
+                "disposition": .string("rejected"),
+            ])
             if owns(session) {
                 await receive(.becameDownload, from: session)
             }

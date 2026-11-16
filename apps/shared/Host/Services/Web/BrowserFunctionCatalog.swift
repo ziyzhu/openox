@@ -41,8 +41,14 @@ nonisolated enum BrowserFunctionCatalog {
     static let legacyAttachmentApproval = "ox.service.attach:ios:browser"
 
     static let actions: [Action] = [
-        Action(id: "newPage", label: "New Page", description: "Open an explicit conversation-owned page. At most six agent pages may be open across the active Profile; opening pages count. At capacity reuse a page or close one. Never silently replaces or evicts pages.",
-               inputSchema: object(["url": string(minimum: 1, maximum: 8_192)], required: ["url"]),
+        Action(id: "newPage", label: "New Page", description: "Open an explicit conversation-owned page. At most six agent pages may be open across the active Profile; opening pages count. At capacity reuse a page or close one. Never silently replaces or evicts pages. The page records events from its first load; networkContent embed also records bounded, redacted request and response bodies.",
+               inputSchema: object([
+                   "url": string(minimum: 1, maximum: 8_192),
+                   "networkContent": .object([
+                       "type": .string("string"), "enum": .array([.string("omit"), .string("embed")]),
+                       "description": .string("Network body recording. Defaults to omit."),
+                   ]),
+               ], required: ["url"]),
                outputSchema: object(["pageId": string(), "mainFrameId": string()], required: ["pageId", "mainFrameId"])),
         Action(id: "pages", label: "List Pages", description: "List every live agent page in the active Profile, including pages owned by other conversations, which count toward the six-page limit. Only owned pages expose full URLs and titles and accept page operations; other pages show their origin. Discover frame targets with frames.",
                inputSchema: object(),
@@ -95,7 +101,7 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "snapshot",
             label: "Snapshot",
-            description: "Observe a bounded, read-only snapshot of the explicitly selected frame document without returning input values. Optionally scope with a CSS selector. Includes page identity, navigation generation, loading, security, frame discovery, recent auto-dismissed JavaScript dialogs, and coverage limits; does not infer application readiness or authentication. Control id and name attributes are separate strings capped at 256 characters. Uses the same site authorization as evaluate. Discover fresh frame targets with frames; stale targets fail without fallback.",
+            description: "Observe a bounded, read-only snapshot of the explicitly selected frame document without returning input values. Optionally scope with a CSS selector. Includes page identity, navigation generation, loading, security, frame discovery, and coverage limits; does not infer application readiness or authentication. Control id and name attributes are separate strings capped at 256 characters. Uses the same site authorization as evaluate. Discover fresh frame targets with frames; stale targets fail without fallback.",
             inputSchema: observationOptions,
             outputSchema: pageState
         ),
@@ -118,7 +124,7 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "showPage",
             label: "Show Page",
-            description: "Present the exact live page with Done/Cancel after clearing capture and the init script. Await user interaction and return its status in the same execution. Completed acknowledges interaction, not task success.",
+            description: "Present the exact live page with Done/Cancel after pausing event recording and clearing the init script. Await user interaction and return its status in the same execution. Completed acknowledges interaction, not task success.",
             inputSchema: object(["pageId": pageID], required: ["pageId"]),
             outputSchema: object([
                 "status": .object([
@@ -173,92 +179,57 @@ nonisolated enum BrowserFunctionCatalog {
             outputSchema: object(["url": nullableString], required: ["url"])
         ),
         Action(
-            id: "startCapture",
-            label: "Start Network Capture",
-            description: "Start a fresh redacted network capture on an explicit page and its future documents without delaying page requests.",
+            id: "events",
+            label: "Read Events",
+            description: "Read an explicit page's recorded events in order, like page.on() handlers run after the fact. Pass nextCursor as after for incremental reads; save a cursor before a step to read only what it caused. Reads do not consume events. The page keeps its latest 500 events; gap reports evicted unread events. Bodies are omitted; use readEventBody.",
             inputSchema: object([
                 "pageId": pageID,
-                "includeBodies": .object([
-                    "type": .string("boolean"),
-                    "description": .string("Capture bounded request and response bodies. Defaults to false."),
-                ]),
-                "reload": .object([
-                    "type": .string("boolean"),
-                    "description": .string("Reload after installing capture when initial document-load traffic is required. Defaults to false."),
-                ]),
+                "event": eventName,
+                "after": string(description: "Opaque nextCursor from an earlier read of this page.", minimum: 1, maximum: 100),
+                "limit": .object(["type": .string("integer"), "minimum": .int(1), "maximum": .int(500), "description": .string("Maximum returned events. Defaults to 200.")]),
             ], required: ["pageId"]),
             outputSchema: object([
-                "active": boolean,
-                "includeBodies": boolean,
-                "reloaded": boolean,
-                "url": nullableString,
-            ], required: ["active", "includeBodies", "reloaded", "url"])
-        ),
-        Action(
-            id: "markCapture",
-            label: "Mark Network Capture",
-            description: "Add a labeled marker to the active network capture.",
-            inputSchema: object(
-                ["pageId": pageID, "label": string(minimum: 1, maximum: 200)],
-                required: ["pageId", "label"]
-            ),
-            outputSchema: object(["marked": boolean], required: ["marked"])
-        ),
-        Action(
-            id: "listCapturedEvents",
-            label: "List Captured Events",
-            description: "List captured event metadata without bodies. Filter by origin, path prefix, or kind; use nextCursor as after for incremental reads. Reads do not consume events. Capture is main-document instrumentation, not a complete network trace.",
-            inputSchema: object([
-                "pageId": pageID,
-                "after": string(description: "Opaque nextCursor from an earlier read of this capture. Restarting or discarding capture invalidates it.", minimum: 1, maximum: 100),
-                "limit": .object(["type": .string("integer"), "minimum": .int(1), "maximum": .int(500), "description": .string("Maximum returned events. Defaults to 500.")]),
-                "origin": string(description: "Exact HTTP(S) or WebSocket origin, including a non-default port when present.", minimum: 1, maximum: 2_048),
-                "pathPrefix": string(description: "Prefix matched against the captured URL path.", minimum: 1, maximum: 2_048),
-                "kinds": .object(["type": .string("array"), "items": capturedEventProperties["kind"]!, "minItems": .int(1), "maxItems": .int(6), "uniqueItems": .bool(true)]),
-            ], required: ["pageId"]),
-            outputSchema: object([
-                "active": boolean,
-                "dropped": integer(minimum: 0),
+                "events": .object(["type": .string("array"), "items": event]),
+                "nextCursor": string(description: "Opaque position; advances past filtered-out events too."),
+                "hasMore": .object(["type": .string("boolean"), "description": .string("Unscanned events remain.")]),
+                "gap": .object(["type": .string("boolean"), "description": .string("Unread events before this cursor were evicted.")]),
                 "evicted": integer(minimum: 0),
-                "events": .object([
-                    "type": .string("array"),
-                    "items": object(capturedEventProperties, required: ["id", "kind", "timestamp"]),
-                ]),
-                "nextCursor": string(description: "Opaque scan position; advances past filtered-out records too."),
-                "hasMore": .object(["type": .string("boolean"), "description": .string("Unscanned records remain in this capture.")]),
-                "gap": .object(["type": .string("boolean"), "description": .string("Unread records before this cursor were evicted. Check dropped separately for rejected records.")]),
+                "dropped": integer(minimum: 0),
+                "recording": boolean,
                 "coverage": string(),
-            ], required: ["active", "dropped", "evicted", "events", "nextCursor", "hasMore", "gap", "coverage"])
+            ], required: ["events", "nextCursor", "hasMore", "gap", "evicted", "dropped", "recording", "coverage"])
         ),
         Action(
-            id: "readCapturedEvent",
-            label: "Read Captured Event",
-            description: "Read one captured event. bodyMode defaults to raw bounded, redacted bodies; shape returns bounded JSON field/type structure without scalar values. Body completeness is unknown; invalid_json can mean non-JSON or clipped content. Shape field names may still be private.",
+            id: "waitForEvent",
+            label: "Wait for Event",
+            description: "Wait for an explicit page's next matching event, like page.waitForEvent(). Only events recorded after the call starts resolve it; read events for earlier ones.",
+            inputSchema: object([
+                "pageId": pageID,
+                "event": eventName,
+                "timeoutMs": .object([
+                    "type": .string("integer"), "minimum": .int(100), "maximum": .int(120_000),
+                    "description": .string("Maximum wait in milliseconds. Defaults to 15000."),
+                ]),
+            ], required: ["pageId", "event"]),
+            outputSchema: event
+        ),
+        Action(
+            id: "readEventBody",
+            label: "Read Event Body",
+            description: "Read the bounded, redacted bodies of one request or response event from a page opened with networkContent embed. mode defaults to raw; shape returns JSON field/type structure without scalar values. Body completeness is unknown; invalid_json can mean non-JSON or clipped content. Shape field names may still be private.",
             inputSchema: object([
                 "pageId": pageID,
                 "id": string(minimum: 1, maximum: 100),
-                "bodyMode": .object(["type": .string("string"), "enum": .array([.string("raw"), .string("shape")])]),
+                "mode": .object(["type": .string("string"), "enum": .array([.string("raw"), .string("shape")])]),
             ], required: ["pageId", "id"]),
-            outputSchema: object(capturedEventProperties.merging([
+            outputSchema: object([
+                "id": string(),
                 "requestBody": nullableString,
                 "responseBody": nullableString,
                 "requestShape": .object(["type": .array([.string("object"), .string("null")])]),
                 "responseShape": .object(["type": .array([.string("object"), .string("null")])]),
                 "bodyCoverage": object(["request": bodyCoverage, "response": bodyCoverage], required: ["request", "response"]),
-            ]) { _, value in value }, required: ["id", "kind", "timestamp"])
-        ),
-        Action(
-            id: "stopCapture",
-            label: "Stop Network Capture",
-            description: "Stop network capture, optionally discarding its current records.",
-            inputSchema: object([
-                "pageId": pageID,
-                "discard": .object([
-                    "type": .string("boolean"),
-                    "description": .string("Discard captured records after stopping. Defaults to false."),
-                ]),
-            ], required: ["pageId"]),
-            outputSchema: object(["stopped": boolean], required: ["stopped"])
+            ], required: ["id"])
         ),
     ]
 
@@ -321,10 +292,6 @@ nonisolated enum BrowserFunctionCatalog {
             ].map(JSONValue.string)),
         ]),
         "frameId": nullableString,
-        "javaScriptDialogs": .object(["type": .string("array"), "maxItems": .int(BrowserSession.maximumRecordedDialogs), "items": object([
-            "type": .object(["type": .string("string"), "enum": .array(["alert", "confirm", "prompt"].map(JSONValue.string))]),
-            "message": string(), "origin": string(), "timestamp": .object(["type": .string("number"), "description": .string("Milliseconds since the Unix epoch.")]),
-        ], required: ["type", "message", "origin", "timestamp"])]),
         "frames": frames,
         "framesTruncated": boolean,
         "document": object([
@@ -348,7 +315,7 @@ nonisolated enum BrowserFunctionCatalog {
             "truncated": boolean,
             "coverage": string(),
         ], required: ["scope", "scopeFound", "readyState", "busy", "headings", "dialogs", "messages", "controls", "embeddedFrames", "truncated", "coverage"]),
-    ], required: ["pageID", "navigationGeneration", "url", "title", "estimatedProgress", "isLoading", "hasOnlySecureContent", "isBlockedByScreenTime", "fullscreenState", "frameId", "javaScriptDialogs", "frames", "framesTruncated", "document"])
+    ], required: ["pageID", "navigationGeneration", "url", "title", "estimatedProgress", "isLoading", "hasOnlySecureContent", "isBlockedByScreenTime", "fullscreenState", "frameId", "frames", "framesTruncated", "document"])
     private static let exportOptions = object([
         "pageId": pageID,
         "filename": string(description: "Optional file basename, never a path.", minimum: 1, maximum: 255),
@@ -367,30 +334,36 @@ nonisolated enum BrowserFunctionCatalog {
         "shapeTruncated": boolean,
         "bodyCompleteness": .object(["type": .string("string"), "enum": .array([.string("unknown")])]),
     ], required: ["status", "shapeTruncated", "bodyCompleteness"])
-    private static let capturedEventProperties: [String: JSONValue] = [
+    private static let eventName: JSONValue = .object([
+        "type": .string("string"),
+        "enum": .array(BrowserEventLog.names.map(JSONValue.string)),
+    ])
+    private static let event = object([
         "id": string(),
-        "kind": .object([
-            "type": .string("string"),
-            "enum": .array(["mark", "fetch", "xhr", "form", "resource", "websocket"].map(JSONValue.string)),
-        ]),
-        "timestamp": .object([
-            "type": .string("number"),
-            "description": .string("Milliseconds since the Unix epoch."),
-        ]),
-        "label": string(),
+        "event": eventName,
+        "timestamp": .object(["type": .string("number"), "description": .string("Milliseconds since the Unix epoch.")]),
+        "frameId": nullableString,
+        "origin": nullableString,
         "site": nullableString,
-        "frameURL": string(),
-        "method": string(),
         "url": string(),
+        "type": string(description: "console: warning or error; dialog: alert, confirm or prompt."),
+        "text": string(),
+        "message": string(),
+        "stack": string(),
+        "defaultValue": nullableString,
+        "disposition": .object(["type": .string("string"), "enum": .array(["dismissed", "user", "samePage", "rejected", "cancelled"].map(JSONValue.string))]),
+        "suggestedFilename": string(),
+        "isMultiple": boolean,
+        "parentId": nullableString,
+        "resourceType": string(),
+        "method": string(),
+        "status": integer(minimum: 0),
         "requestHeaders": .object(["type": .string("object"), "additionalProperties": string()]),
         "responseHeaders": .object(["type": .string("object"), "additionalProperties": string()]),
-        "status": integer(minimum: 0),
+        "hasBody": boolean,
+        "failure": string(),
         "durationMs": .object(["type": .string("number")]),
-        "started": .object(["type": .string("number")]),
-        "error": string(),
-        "initiatorType": string(),
-        "event": string(),
-    ]
+    ], required: ["id", "event", "timestamp"], additional: true)
     private static let stringArray: JSONValue = .object(["type": .string("array"), "items": string()])
     private static let navigationResult = object([
         "navigated": boolean,
@@ -399,12 +372,13 @@ nonisolated enum BrowserFunctionCatalog {
 
     private static func object(
         _ properties: [String: JSONValue] = [:],
-        required: [String] = []
+        required: [String] = [],
+        additional: Bool = false
     ) -> JSONValue {
         var schema: [String: JSONValue] = [
             "type": .string("object"),
             "properties": .object(properties),
-            "additionalProperties": .bool(false),
+            "additionalProperties": .bool(additional),
         ]
         if !required.isEmpty { schema["required"] = .array(required.map(JSONValue.string)) }
         return .object(schema)

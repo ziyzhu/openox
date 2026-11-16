@@ -2,7 +2,7 @@ import Foundation
 import WebKit
 
 extension NativeServiceOperations {
-    func openBrowserPage(url raw: String) async throws -> JSONValue {
+    func openBrowserPage(url raw: String, networkContent: BrowserEventLog.NetworkContent) async throws -> JSONValue {
         guard let url = URL(string: raw), BrowserNavigation.allowsServiceNavigation(url),
               let inspection = await serviceManager.browserService.inspectionAction() else {
             throw RuntimeError.bridge("ox.web.browser.newPage requires an absolute public HTTPS URL. Simulator builds also allow loopback HTTP.")
@@ -10,12 +10,12 @@ extension NativeServiceOperations {
         let service = serviceManager.browserService
         let action = Service.Action(service: service, definition: inspection.definition, baseURL: url,
                                     role: .blockingAction, scripts: inspection.scripts, scopeID: id)
-        let page = try await service.openOwnedPage(for: action, owner: .browser(id))
+        let page = try await service.openOwnedPage(for: action, owner: .browser(id), events: networkContent)
         do {
             let frames = try await page.discoverFrames()
             guard let main = frames.first(where: \.isMainFrame) else { throw Service.EvalError.notReady }
             _ = serviceManager.browserActionSessions.session(for: service, page: page, ownerID: id)
-            Log.webView.info("Browser.open owner=\(id) page=\(page.logLabel)")
+            Log.webView.info("Browser.open owner=\(id) page=\(page.logLabel) networkContent=\(networkContent.rawValue)")
             return .object(["pageId": .string(page.id.uuidString), "mainFrameId": .string(main.id)])
         } catch {
             serviceManager.browserSessions.close(page)

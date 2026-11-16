@@ -105,7 +105,7 @@ final class BrowserSessionStore {
         register(page, domain: domain, owner: owner)
     }
 
-    func open(for action: Service.Action, purpose: Purpose) async throws -> BrowserSession {
+    func open(for action: Service.Action, purpose: Purpose, events: BrowserEventLog.NetworkContent? = nil) async throws -> BrowserSession {
         let page: BrowserSession
         if case .session = purpose, let existing = sessionPage(for: action) {
             if existing.openingTask == nil {
@@ -120,6 +120,10 @@ final class BrowserSessionStore {
             }
             page = BrowserSession(manager: action.service.manager)
             page.scopeID = action.scopeID
+            if let events {
+                page.events.enabled = true
+                page.events.networkContent = events
+            }
             if action.service.isWebService { page.frameServiceSources[action.service.domain] = action.scripts }
             register(page, domain: action.service.domain, owner: purpose)
             page.openingTask = Task { @MainActor [weak page] in

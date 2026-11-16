@@ -132,9 +132,8 @@ final class BrowserSession: NSObject {
     var omittedFrames = 0
     var frameTargets: [String: FrameTarget] = [:]
     var frameServiceSources: [String: String] = [:]
-    var recordedDialogs: [JSONValue] = []
+    let events: BrowserEventLog
 
-    nonisolated static let maximumRecordedDialogs = 10
     nonisolated static let maximumDialogMessageCharacters = 1_000
 
     init(manager: ServiceManager) {
@@ -148,10 +147,12 @@ final class BrowserSession: NSObject {
         self.navigationDecider = decider
         self.dialogPresenter = presenter
         self.userContentController = controller
+        self.events = BrowserEventLog(label: String(id.uuidString.prefix(8)))
         super.init()
         decider.session = self
         presenter.session = self
         controller.installBridgeHandlers(self)
+        events.install(on: controller)
         controller.addScriptMessageHandler(SecretBridge(page: self), contentWorld: .page, name: SecretBridge.channelName)
         Log.webView.info("BrowserSession.created session=\(logLabel)")
     }
@@ -198,6 +199,7 @@ final class BrowserSession: NSObject {
         navigationTask = nil
         page.stopLoading()
         _ = transitionNavigation(.terminated(error), on: self)
+        events.close()
         isOpen = false
         manager.actionScheduler.discard(self, error: error)
         userContentController.removeAllScriptMessageHandlers()
@@ -212,11 +214,22 @@ final class BrowserSession: NSObject {
         userContentController.removeAllUserScripts()
         userContentController.addUserScript(WKUserScript(source: Self.frameIdentityScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         userContentController.addUserScript(WKUserScript(source: Self.windowOpenScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        if events.enabled { userContentController.addUserScript(events.userScript) }
         userContentController.addBridgeUserScripts()
         userContentController.addUserScript(WKUserScript(source: frameServicesScript(self), injectionTime: .atDocumentStart, forMainFrameOnly: false))
         for script in additionalUserScripts { userContentController.addUserScript(script) }
         scriptMode = mode
         Log.webView.info("BrowserSession.scripts session=\(logLabel) services=\(frameServiceSources.count) mode=\(mode.rawValue)")
+    }
+
+    func setEventRecording(paused: Bool) async {
+        guard events.enabled, events.paused != paused else { return }
+        events.setPaused(paused)
+        scriptMode = nil
+        configureScripts(for: page.url, in: self)
+        for frame in [nil] + frameTargets.values.compactMap(\.info) {
+            _ = try? await evalOnce(self, BrowserEventLog.pauseScript(paused), timeout: 1, frame: frame)
+        }
     }
 
     var logLabel: String { String(id.uuidString.prefix(8)) }

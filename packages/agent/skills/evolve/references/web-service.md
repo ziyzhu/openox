@@ -40,7 +40,7 @@ Default to observed same-origin structured `fetch`, then stable fetched HTML wit
 - Before implementing session discovery, login, authenticated behavior, or repairing legacy authentication, read `references/web-authentication.md`. Preserve current website data and login state.
 - Before implementing bot-control or payment handoffs, read `references/web-handoffs.md`. For transaction fulfillment, also read `skills/checkout/SKILL.md`.
 - Before setting or replacing the product favicon, read `references/service-icon.md`; its verification must pass before inspection or invocation.
-- For new web authentication, implement and inspect listSessions and executable login before authenticated exploration. Open the observed entry point, then invoke login with explicit frameId, selected auth, and optional account reference. Login only prepares or advances one step. Present that same page with ox.web.browser.showPage({ purpose, pageId }) for manual sign-in, bot control, or payment without replay, URL/state actions, or polling. Stop capture and remove the init script before credentials are entered.
+- For new web authentication, implement and inspect listSessions and executable login before authenticated exploration. Open the observed entry point, then invoke login with explicit frameId, selected auth, and optional account reference. Login only prepares or advances one step. Present that same page with ox.web.browser.showPage({ purpose, pageId }) for manual sign-in, bot control, or payment without replay, URL/state actions, or polling. showPage pauses event recording and removes the init script before credentials are entered.
 - Login completion acknowledges user interaction, not authentication. Discover sessions afterward and verify account/tenant identity before sensitive actions. Repair obsolete web authentication using the current Evolve contract, not a compatibility handoff. API credentials, OAuth callbacks, and native OS grants still require their actual security checks.
 
 ## Author service.json
@@ -111,7 +111,7 @@ For live-page handoffs, follow `references/web-handoffs.md`. If the user's visib
 4. Check applicable empty, terminal pagination, missing-resource, stale-state, concurrency, and authentication boundaries. Exercise declared handoffs through their standard APIs at safe boundaries. Do not change live authentication state merely to test another branch.
 5. Execute only mutations authorized by the request under runtime Action policies, without another approval form. A successful requested mutation verifies the handler; never repeat it for testing. Inspect completed or uncertain effects read-only and label unexecuted handlers partially verified.
 6. Reconcile affected skills within scope. Confirm the final source, validation, verification, discoverability, VFS manifest, and inspected contracts agree. Re-read only when changes or final review require it rather than once per numbered step.
-7. If capture or document-start scripts were used, stop capture with `discard: true` and clear scripts; confirm cleanup before completion or abandonment. Report capabilities, checks, remaining human steps, and verified boundaries in everyday language, distinguishing drafts from working capabilities.
+7. If embedded network bodies or document-start scripts were used, close those authoring pages; confirm cleanup before completion or abandonment. Report capabilities, checks, remaining human steps, and verified boundaries in everyday language, distinguishing drafts from working capabilities.
 
 ## Recovery
 

@@ -304,6 +304,7 @@ extension BrowserSession {
             let queued = queuedInvocationCount(in: session)
             let phase = session.navigationPhase.logLabel
             guard transitionNavigation(event, on: session) else { return }
+            session.events.append("crash")
             let message = "Service.navigation event=process-terminated domain=\(domain) session=\(session.logLabel) phase=\(phase) active=\(active) queued=\(queued)"
             if active == 0, queued == 0 {
                 Log.webView.info(message)

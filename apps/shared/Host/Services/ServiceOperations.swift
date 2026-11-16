@@ -566,6 +566,7 @@ final class ServiceOperations {
             outcome = await native.presentations.serviceHandoff.present(session: handoff)
         }
         await capture?.remove()
+        await browser.finishUserInteraction()
         if let capture {
             Log.service.info("Service.login trace domain=\(service.domain) page=\(page.logLabel) steps=\(capture.steps.count) truncated=\(capture.truncated) outcome=\(outcome.rawValue)")
             if outcome == .completed, lease.isActive, !Task.isCancelled {

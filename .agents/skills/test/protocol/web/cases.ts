@@ -260,7 +260,14 @@ return null;`);
       assert.ok(!JSON.stringify(cancelled).includes("<user_interaction>"), "Cancel must not enqueue a new user message");
       assert.equal(h.site("card").counters.passwordSubmissions ?? 0, 0);
       assert.deepEqual(await h.turn(invokeScript("web:ox-card.localhost:listSessions")), []);
-      return "explicit login presentation was cancelled without credential submission or reopening, and released its page reservation";
+      const recorded = await h.turn(`const page = (await ox.web.browser.pages({ purpose: "Find sign-in page" })).pages.find(page => page.owned);
+const before = await ox.web.browser.events({ purpose: "Read events after handoff", pageId: page.pageId });
+const frames = await ox.web.browser.frames({ purpose: "Find sign-in document", pageId: page.pageId });
+await ox.web.browser.evaluate({ purpose: "Log after handoff", frameId: frames.frames.find(frame => frame.isMainFrame).id, script: "console.error('after handoff'); return true;" });
+const after = await ox.web.browser.events({ purpose: "Read resumed events", pageId: page.pageId, after: before.nextCursor, event: "console" });
+return { recording: after.recording, texts: after.events.map(event => event.text) };`);
+      assert.deepEqual(recorded, { recording: true, texts: ["after handoff"] }, "event recording must resume after the handoff");
+      return "explicit login presentation was cancelled without credential submission or reopening, released its page reservation, and resumed event recording";
     },
   },
   {

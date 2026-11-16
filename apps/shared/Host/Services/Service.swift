@@ -559,9 +559,9 @@ final class Service: NSObject, Identifiable {
         try await openOwnedPage(for: action, owner: .session(action.session?.objectValue?["id"]?.stringValue))
     }
 
-    func openOwnedPage(for action: Action, owner: BrowserSessionStore.Purpose) async throws -> BrowserSession {
+    func openOwnedPage(for action: Action, owner: BrowserSessionStore.Purpose, events: BrowserEventLog.NetworkContent? = nil) async throws -> BrowserSession {
         guard invalidationTask == nil else { throw EvalError.contextInvalidated }
-        return try await manager.browserSessions.open(for: action, purpose: owner)
+        return try await manager.browserSessions.open(for: action, purpose: owner, events: events)
     }
 
     func openInspectionPage(browserSessionID: UUID? = nil) async throws -> InspectionPage {

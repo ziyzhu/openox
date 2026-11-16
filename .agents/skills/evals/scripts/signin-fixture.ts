@@ -21,7 +21,7 @@ function state(host: string, step: string) {
   const value = page(host, step);
   return {
     ...value, url: `https://${host}/login`, title: "Fixture sign-in", estimatedProgress: 1,
-    hasOnlySecureContent: true, isBlockedByScreenTime: false, fullscreenState: "notInFullscreen", frameId: value.frames[0]!.id, javaScriptDialogs: [],
+    hasOnlySecureContent: true, isBlockedByScreenTime: false, fullscreenState: "notInFullscreen", frameId: value.frames[0]!.id,
     document: { ...value.document, scope: null, scopeFound: true, readyState: "complete", busy: false,
       dialogs: [], embeddedFrames: [], coverage: "Visible light DOM only",
       controls: value.document.controls.map(control => ({ ...control, id: null, name: null, role: "input", required: true })),
