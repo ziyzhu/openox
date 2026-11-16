@@ -9,6 +9,12 @@ struct WhatsNewRelease: Identifiable {
 
 enum WhatsNew {
     static let releases: [WhatsNewRelease] = [
+        WhatsNewRelease(version: "1.1.0", items: [
+            "Log back in directly from a failed reply when your model provider account is signed out.",
+            "Keep your reading position when loading older messages, with improved scrolling and keyboard behavior.",
+            "Ask Ox to attach or detach services in a conversation, with attachments preserved when you reopen it.",
+            "Diagnostic logs now stay with each Profile and are included when you export it."
+        ]),
         WhatsNewRelease(version: "1.0.30", items: [
             "See suggestions for previously visited websites as you type in the message composer.",
             "Retry a failed reply without adding another message to the conversation.",

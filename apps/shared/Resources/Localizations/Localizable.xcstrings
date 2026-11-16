@@ -1,6 +1,50 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Log back in directly from a failed reply when your model provider account is signed out." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型服务商账号退出登录后，可直接从失败的回复中重新登录。"
+          }
+        }
+      }
+    },
+    "Keep your reading position when loading older messages, with improved scrolling and keyboard behavior." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加载更早的消息时保持阅读位置，并改进滚动和键盘表现。"
+          }
+        }
+      }
+    },
+    "Ask Ox to attach or detach services in a conversation, with attachments preserved when you reopen it." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让 Ox 在对话中添加或移除服务，重新打开对话时保留已添加的服务。"
+          }
+        }
+      }
+    },
+    "Diagnostic logs now stay with each Profile and are included when you export it." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "诊断日志随各自的资料库存储，并包含在资料库导出中。"
+          }
+        }
+      }
+    },
     "See suggestions for previously visited websites as you type in the message composer." : {
       "extractionState" : "manual",
       "localizations" : {
