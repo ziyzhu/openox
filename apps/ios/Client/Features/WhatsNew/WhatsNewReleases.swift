@@ -10,6 +10,8 @@ struct WhatsNewRelease: Identifiable {
 enum WhatsNew {
     static let releases: [WhatsNewRelease] = [
         WhatsNewRelease(version: "1.1.0", items: [
+            "Use passkeys on supported websites, with clearer handoffs and better handling of automatic sign-in with saved accounts.",
+            "More reliable browser automation when navigating websites and creating reusable website tools.",
             "Log back in directly from a failed reply when your model provider account is signed out.",
             "Keep your reading position when loading older messages, with improved scrolling and keyboard behavior.",
             "Ask Ox to attach or detach services in a conversation, with attachments preserved when you reopen it.",

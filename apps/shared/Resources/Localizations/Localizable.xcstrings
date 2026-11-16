@@ -1,6 +1,28 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Use passkeys on supported websites, with clearer handoffs and better handling of automatic sign-in with saved accounts." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在支持的网站上使用通行密钥，登录接管更清晰，使用已保存账号自动登录的处理也得到改进。"
+          }
+        }
+      }
+    },
+    "More reliable browser automation when navigating websites and creating reusable website tools." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改进浏览网站和创建可重复使用的网站工具时的自动化可靠性。"
+          }
+        }
+      }
+    },
     "Log back in directly from a failed reply when your model provider account is signed out." : {
       "extractionState" : "manual",
       "localizations" : {
