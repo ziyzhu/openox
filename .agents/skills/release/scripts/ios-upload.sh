@@ -5,8 +5,8 @@ usage() {
   cat <<'EOF'
 Usage: ios-upload.sh --build <number> --out <directory> [--upload]
 
-Archives apps/ios for App Store Connect with cloud-managed signing, exports only
-the app-store-connect method, verifies the signed app, and uploads with --upload.
+Archives apps/ios unsigned, exports with cloud-managed App Store Connect signing,
+verifies the signed app, and uploads with --upload.
 
 Required environment: ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY_PATH, OX_DEVELOPMENT_TEAM, OX_BUNDLE_IDENTIFIER.
 EOF
@@ -69,7 +69,7 @@ run_logged archive xcodebuild archive \
   -project "$ios/Ox.xcodeproj" -scheme ios -configuration Release \
   -destination "generic/platform=iOS" \
   -archivePath "$archive" -derivedDataPath "$out/DerivedData" \
-  "${auth[@]}" \
+  CODE_SIGNING_ALLOWED=NO \
   CURRENT_PROJECT_VERSION="$build" COMPILER_INDEX_STORE_ENABLE=NO
 
 app="$archive/Products/Applications/Ox.app"
