@@ -1010,7 +1010,7 @@ struct ConversationPage: View {
                 .id("__stopped")
                 .padding(.top, ConversationTranscriptMetrics.blockSpacing)
         case .failed(let message):
-            TurnEndingCard.failed(message: message, onRetry: failedTurnRetry)
+            TurnEndingCard.failed(message: message, onRetry: failedTurnRetry, onLogin: failedTurnLogin)
                 .id("__failed")
                 .padding(.top, ConversationTranscriptMetrics.blockSpacing)
         case nil:
@@ -1023,6 +1023,16 @@ struct ConversationPage: View {
         return {
             Log.ui.info("ConversationPage.resumeStopped conversation=\(conversation.id)")
             latestSubmissionID = conversation.enqueue(L10n.string("Continue", comment: "Message sent when the user resumes a stopped conversation reply.")).id
+        }
+    }
+
+    private var failedTurnLogin: (() -> Void)? {
+        guard case .failed = conversation.turnEnding,
+              let account = providerRegistry.client(id: conversation.modelSelection.providerID)?.subscriptionAccount,
+              !account.isSignedIn else { return nil }
+        return {
+            Log.ui.info("ConversationPage.loginFailed conversation=\(conversation.id) provider=\(conversation.modelSelection.providerID)")
+            modalPresentation = .modelPicker
         }
     }
 

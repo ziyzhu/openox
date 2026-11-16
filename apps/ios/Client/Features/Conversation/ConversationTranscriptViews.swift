@@ -109,14 +109,20 @@ struct TurnEndingCard: View {
         )
     }
 
-    static func failed(message: String, onRetry: (() -> Void)?) -> TurnEndingCard {
+    static func failed(message: String, onRetry: (() -> Void)?, onLogin: (() -> Void)? = nil) -> TurnEndingCard {
         TurnEndingCard(
             title: Text("Failed", comment: "Card shown after a conversation reply that ended with an error."),
             systemImage: "exclamationmark.circle.fill",
             iconTint: Theme.Colors.error,
             message: message,
             accessibilityIdentifier: "conversation.failed",
-            action: onRetry.map {
+            action: onLogin.map {
+                Action(
+                    title: Text("Log in", comment: "Button that opens model provider authentication after a failed reply."),
+                    accessibilityIdentifier: "conversation.failed.login",
+                    perform: $0
+                )
+            } ?? onRetry.map {
                 Action(
                     title: Text("Retry", comment: "Button that tries a failed action again."),
                     accessibilityIdentifier: "conversation.failed.retry",
