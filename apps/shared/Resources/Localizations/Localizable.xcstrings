@@ -1,13 +1,13 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Use passkeys on supported websites, with clearer handoffs and better handling of automatic sign-in with saved accounts." : {
+    "Added passkey sign-in support for compatible websites, with improved automatic sign-in and clearer handoffs." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在支持的网站上使用通行密钥，登录接管更清晰，使用已保存账号自动登录的处理也得到改进。"
+            "value" : "新增网站通行密钥登录支持，并改进自动登录，让需要你完成的登录步骤更清晰。"
           }
         }
       }
