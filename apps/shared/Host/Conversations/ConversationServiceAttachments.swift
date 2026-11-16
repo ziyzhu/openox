@@ -193,13 +193,17 @@ final class ConversationServiceAttachments {
         let removed = services.filter { candidate in
             !replacement.contains { $0 === candidate }
         }
+        let added = replacement.filter { candidate in
+            !services.contains { $0 === candidate }
+        }
         cancelInteractions(Set(removed.filter { serviceManager.service(domain: $0.domain) !== $0 }.map(\.domain)))
         services = replacement
         Log.session.info("Conversation.setAttachedServices id=\(id) attached=\(replacement.map(\.domain).joined(separator: ",")) selected=\(conversation.isSelected)")
         if conversation.isSelected {
             serviceManager.setAttachedServices(loadedServices, for: id)
         }
-        for svc in replacement {
+        for svc in added {
+            Log.session.info("Conversation.serviceManifest prepare id=\(id) domain=\(svc.domain)")
             Task { _ = await svc.loadManifest(reason: .attach) }
         }
     }
