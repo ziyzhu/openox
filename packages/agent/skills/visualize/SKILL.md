@@ -34,6 +34,8 @@ Show the drawing with `![Short title](<name>.svg)` on its own line. Give necessa
 
 ## Revise and finish
 
+Writing a file does not display it. Embed `![Short title](path)` on its own line for the visual result, or use `[Short title](path)` for supporting files. HTML is live, SVG is a static image without scripts, images and video render inline, and other file types appear as rows. Attaching a file sends it to the model, not to the conversation UI.
+
 Read an existing file completely before editing, following `ox.fs.read` continuation offsets. Revise the same path: existing messages open its current contents, not historical bytes. Moving or renaming retires old references, so embed the new path again. Use `ox.fs.copy` only for an independent copy.
 
 Distinguish sourced facts, adjustable assumptions, and calculated estimates. For analysis, include relevant attribution, dates, units, formulas, and limits in the result. Do not invent provenance or describe an illustrative model as a verified prediction. Keep the reply brief when the file carries the result.

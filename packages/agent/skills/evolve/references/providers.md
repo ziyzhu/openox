@@ -34,6 +34,8 @@ Start from `get` for an existing provider, or a compatible bundled definition as
 
 Updating the catalog is not a request to switch the current conversation or new-conversation default. Explain any selected model that would become unavailable and resolve the user's intent before removing it. A model-list update alone should not require reconnecting unchanged credentials.
 
+When the user requests a new-conversation default, read live `app/providers.json` and preserve unrelated fields. Change provider definitions and `defaultModel` in separate writes. Select exact configured `providerID` and picker `modelID` values with supported `reasoningEffort` and existing authentication. Use `ox.fs.edit` for the focused change, then inspect fresh app status to verify the effective selection. Changing this default does not switch the current conversation; use `ox.conversation.setModel` only when that change is requested.
+
 ## Connect and verify
 
 Use `ox.provider.authenticate({ purpose, id })` for all provider credential setup, including API keys the user already has and managed OAuth. The existing provider interface handles getting a key, entering its value, and saving it; the user does not define Secret field names. Never use `ox.secret.add` for provider setup. The agent never receives credential values. Honor cancellation and denied approvals; never collect API keys in conversation or extract them from website state.
