@@ -20,6 +20,7 @@ final class StorageRoot {
     private(set) var activeScope: ProfileScope {
         didSet {
             let scope = activeScope
+            LogFile.shared.activate(in: scope)
             Self.scopeBox.withLock { $0 = scope }
         }
     }
@@ -165,6 +166,7 @@ final class StorageRoot {
         let active = profile.id == activeId
         do {
             if active { try await beforeProfileChange?() }
+            LogFile.shared.synchronize()
             let data = try await DurableProfileStore.shared.exportProfile(profile) { progress in
                 Task { @MainActor in
                     guard let current = self.exportProgress else { return }
@@ -235,6 +237,7 @@ final class StorageRoot {
         do {
             if active { try await beforeProfileChange?() }
             try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
+            if active { LogFile.shared.suspend(in: activeScope) }
             let (copied, inventory) = try await Task.detached(priority: .userInitiated) { try ProfileMigrator.copyProfile(profile, to: parent) }.value
             let prepared = try await migrate(copied)
             try profileStore.remember(prepared)
@@ -252,6 +255,7 @@ final class StorageRoot {
                 if active { try? await activate(profile) }
             }
             if active { try? await profileDidChange?() }
+            if active { LogFile.shared.activate(in: activeScope) }
             Log.app.error("StorageRoot.move failed id=\(profile.id) error=\(error.localizedDescription)")
             throw error
         }

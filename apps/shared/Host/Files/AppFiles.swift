@@ -38,7 +38,7 @@ extension Conversation {
         case "read":
             guard !directory else { throw RuntimeError.bridge("Cannot read an app directory") }
             if path == "app/logs.jsonl", requestedPath != path {
-                throw RuntimeError.bridge("Read or search app/logs.jsonl explicitly; app-wide logs are excluded from directory searches")
+                throw RuntimeError.bridge("Read or search app/logs.jsonl explicitly; Profile logs are excluded from directory searches")
             }
             let text = try await appFileText(path: path, action: action)
             guard text.utf8.count <= 32 * 1024 * 1024 else { throw RuntimeError.bridge("App file exceeds the read safety limit") }
@@ -115,8 +115,8 @@ extension Conversation {
                 "host": .object(["allowConnections": .bool(try HostConfiguration.load().allowConnections)]),
             ]))
         case "app/logs.jsonl":
-            try await requireApproval(action: Actions.appLogs, purpose: "Read app-wide diagnostic logs")
-            let snapshot = try await LogFile.shared.snapshot()
+            try await requireApproval(action: Actions.appLogs, purpose: "Read Profile diagnostic logs")
+            let snapshot = try await LogFile.shared.snapshot(in: scope)
             return try await Task.detached(priority: .userInitiated) {
                 let formatter = ISO8601DateFormatter()
                 formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

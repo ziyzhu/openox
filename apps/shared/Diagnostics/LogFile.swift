@@ -10,8 +10,7 @@ nonisolated final class LogFile: @unchecked Sendable {
     private static let flushThreshold = 64
     private static let flushDelay: TimeInterval = 2
 
-    private static let directory = AppStoragePaths.applicationSupport
-    static let fileURL = AppStoragePaths.logs
+    private var fileURL: URL?
 
     private let queue = DispatchQueue(label: "ai.openox.logfile", qos: .utility)
     private let oslog = os.Logger(subsystem: Bundle.main.bundleIdentifier ?? "ai.openox", category: "LogFile")
@@ -50,6 +49,9 @@ nonisolated final class LogFile: @unchecked Sendable {
             let line = Line(ts: self.timestamp.string(from: date), level: level.name, category: category, thread: thread, loc: location, msg: message)
             guard let data = try? self.encoder.encode(line) else { return }
             self.pending.append(data)
+            if self.fileURL == nil, self.pending.count > Self.flushThreshold {
+                self.pending.removeFirst()
+            }
             if self.pending.count >= Self.flushThreshold {
                 self.flush()
             } else if !self.flushScheduled {
@@ -60,6 +62,33 @@ nonisolated final class LogFile: @unchecked Sendable {
                 }
             }
         }
+    }
+
+    func activate(in scope: ProfileScope) {
+        let destination = Self.url(in: scope)
+        queue.sync {
+            guard fileURL != destination else { return }
+            flush()
+            try? handle?.close()
+            handle = nil
+            fileURL = destination
+            flush()
+        }
+    }
+
+    func suspend(in scope: ProfileScope) {
+        let source = Self.url(in: scope)
+        queue.sync {
+            guard fileURL == source else { return }
+            flush()
+            try? handle?.close()
+            handle = nil
+            fileURL = nil
+        }
+    }
+
+    private static func url(in scope: ProfileScope) -> URL {
+        ProfileIO.portableStateDirectory(scope.root).appendingPathComponent("logs.jsonl", isDirectory: false)
     }
 
     func synchronize() {
@@ -100,24 +129,25 @@ nonisolated final class LogFile: @unchecked Sendable {
         }
     }
 
-    func snapshot() async throws -> [LogEntry] {
-        try await read { data in
+    func snapshot(in scope: ProfileScope) async throws -> [LogEntry] {
+        try await read(at: Self.url(in: scope)) { data, _ in
             data.split(separator: 0x0A).compactMap { self.entry($0) }
         }
     }
 
-    func page(limit: Int = 2_000, cursor: String? = nil, level: Logger.Level = .debug,
+    func page(in scope: ProfileScope, limit: Int = 2_000, cursor: String? = nil, level: Logger.Level = .debug,
               category: String? = nil, query: String? = nil, since: Date? = nil) async throws -> Page {
-        try await read { data in
+        try await read(at: Self.url(in: scope)) { data, fileURL in
             guard (1...2_000).contains(limit) else { throw ReadError.invalidLimit }
             if data.isEmpty {
                 guard cursor == nil else { throw ReadError.expiredCursor }
                 return Page(entries: [], nextCursor: nil)
             }
-            let attributes = try FileManager.default.attributesOfItem(atPath: Self.fileURL.path)
-            guard let file = (attributes[.systemFileNumber] as? NSNumber)?.stringValue else {
+            let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+            guard let inode = (attributes[.systemFileNumber] as? NSNumber)?.stringValue else {
                 throw CocoaError(.fileReadUnknown)
             }
+            let file = Self.digest(Data(fileURL.path.utf8)) + ":" + inode
             let encoder = JSONEncoder()
             encoder.outputFormatting = .sortedKeys
             let filters = Self.digest(try encoder.encode(Filters(level: level.name, category: category, query: query, since: since)))
@@ -169,14 +199,14 @@ nonisolated final class LogFile: @unchecked Sendable {
                         thread: line.thread, location: line.loc, message: line.msg)
     }
 
-    private func read<T: Sendable>(_ body: @escaping @Sendable (Data) throws -> T) async throws -> T {
+    private func read<T: Sendable>(at fileURL: URL, _ body: @escaping @Sendable (Data, URL) throws -> T) async throws -> T {
         try await withCheckedThrowingContinuation { continuation in
             queue.async {
                 do {
                     self.flush()
-                    let data = FileManager.default.fileExists(atPath: Self.fileURL.path)
-                        ? try Data(contentsOf: Self.fileURL) : Data()
-                    continuation.resume(returning: try body(data))
+                    let data = FileManager.default.fileExists(atPath: fileURL.path)
+                        ? try Data(contentsOf: fileURL) : Data()
+                    continuation.resume(returning: try body(data, fileURL))
                 } catch {
                     continuation.resume(throwing: error)
                 }
@@ -185,7 +215,7 @@ nonisolated final class LogFile: @unchecked Sendable {
     }
 
     private func flush() {
-        guard !pending.isEmpty else { return }
+        guard fileURL != nil, !pending.isEmpty else { return }
         let chunk = pending
         pending.removeAll(keepingCapacity: true)
         do {
@@ -205,26 +235,31 @@ nonisolated final class LogFile: @unchecked Sendable {
 
     private func openHandle() throws -> FileHandle {
         if let handle { return handle }
+        guard let fileURL else { throw CocoaError(.fileNoSuchFile) }
         let fm = FileManager.default
-        if !fm.fileExists(atPath: Self.directory.path) {
-            try fm.createDirectory(at: Self.directory, withIntermediateDirectories: true)
+        let directory = fileURL.deletingLastPathComponent()
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        guard (try? fileURL.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true else {
+            throw CocoaError(.fileWriteNoPermission)
         }
-        if !fm.fileExists(atPath: Self.fileURL.path) {
-            fm.createFile(atPath: Self.fileURL.path, contents: nil)
+        if !fm.fileExists(atPath: fileURL.path) {
+            fm.createFile(atPath: fileURL.path, contents: nil)
         }
-        try? AppStoragePaths.excludeFromBackup(Self.fileURL)
-        let h = try FileHandle(forWritingTo: Self.fileURL)
+        try? AppStoragePaths.excludeFromBackup(fileURL)
+        let h = try FileHandle(forWritingTo: fileURL)
         try h.seekToEnd()
         handle = h
         return h
     }
 
     private func compact() throws {
+        guard let fileURL else { return }
         try handle?.close()
         handle = nil
-        let data = try Data(contentsOf: Self.fileURL)
+        let data = try Data(contentsOf: fileURL)
         let cut = data.count - Self.compactBytes
         let start = data[cut...].firstIndex(of: 0x0A).map { $0 + 1 } ?? cut
-        try data[start...].write(to: Self.fileURL, options: .atomic)
+        try data[start...].write(to: fileURL, options: .atomic)
+        try AppStoragePaths.excludeFromBackup(fileURL)
     }
 }

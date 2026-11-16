@@ -27,7 +27,14 @@ actor ProfileRepository {
         guard destination != profile.url else { return nil }
         guard !FileManager.default.fileExists(atPath: destination.path) else { throw ProfileError.nameExists(name) }
         try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
-        try FileManager.default.moveItem(at: profile.url, to: destination)
+        let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
+        LogFile.shared.suspend(in: scope)
+        do {
+            try FileManager.default.moveItem(at: profile.url, to: destination)
+        } catch {
+            if StorageRoot.currentScope?.profileID == profile.id { LogFile.shared.activate(in: scope) }
+            throw error
+        }
         var renamed = profile; renamed.name = destination.lastPathComponent; renamed.url = destination
         return renamed
     }
@@ -37,14 +44,28 @@ actor ProfileRepository {
         let destination = base.appendingPathComponent(profile.name)
         guard !FileManager.default.fileExists(atPath: destination.path) else { throw ProfileError.nameExists(profile.name) }
         try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
-        try FileManager.default.moveItem(at: profile.url, to: destination)
+        let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
+        LogFile.shared.suspend(in: scope)
+        do {
+            try FileManager.default.moveItem(at: profile.url, to: destination)
+        } catch {
+            if StorageRoot.currentScope?.profileID == profile.id { LogFile.shared.activate(in: scope) }
+            throw error
+        }
         var moved = profile; moved.url = destination; moved.location = location
         return moved
     }
 
     func deleteProfile(_ profile: Profile) async throws {
         try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
-        if FileManager.default.fileExists(atPath: profile.url.path) { try FileManager.default.removeItem(at: profile.url) }
+        let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
+        LogFile.shared.suspend(in: scope)
+        do {
+            if FileManager.default.fileExists(atPath: profile.url.path) { try FileManager.default.removeItem(at: profile.url) }
+        } catch {
+            if StorageRoot.currentScope?.profileID == profile.id { LogFile.shared.activate(in: scope) }
+            throw error
+        }
         let predecessor = ProfileIO.stateDirectory(profile.id)
         if FileManager.default.fileExists(atPath: predecessor.path) { try FileManager.default.removeItem(at: predecessor) }
         deleted = deleted.filter { $0.key.profileID != profile.id }

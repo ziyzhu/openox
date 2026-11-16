@@ -911,23 +911,36 @@ contents rather than device storage.
 
 ## Logs
 
-`Library/Application Support/logs.jsonl` is the durable structured log. Each
+`<Profile>/.ox/logs.jsonl` is the Profile-owned structured diagnostic log. Each
 line contains timestamp, level, category, source location, and message. Writes
 flush periodically, on a pending threshold, and during lifecycle transitions.
 When the file exceeds 10 MiB, compaction retains roughly the newest 5 MiB of
-complete lines. There is no age-based expiry.
+complete lines. There is no age-based expiry. Activation flushes and closes the
+previous Profile's log before switching destinations. Before the first Profile
+activates, at most 64 startup entries are buffered for that Profile; OS logging
+remains available if activation fails. Rename, move, and deletion suspend the
+active writer before changing its folder.
 
-This file is the sole app diagnostic store. The CLI and other Clients read a
-filtered, cursor-paginated history through `logs.list` (up to 2,000 records per
-page). The approval-gated virtual `app/logs.jsonl` view redacts retained entries, including previous app runs, clips individual messages at 2,048 characters with an explicit truncated field, and preserves chronological order. Agent read/grep output uses ordinary filesystem bounds; directory searches cannot read this protected view. Each operation observes a fresh snapshot; offsets are not durable cursors across compaction. Snapshot reads flush pending writes and run on the log file's serial utility queue; redacted view serialization runs off MainActor. No Logs row or viewer appears in
-Settings, and no separate in-memory history is retained. The existing JSONL path
-and record format are unchanged, so previously written logs remain readable
-without a migration. RPC cursors carry only transient read positions and filter
-bindings; no pagination index or cursor state is persisted. They survive appends
-and restarts, but fail explicitly after compaction or file replacement.
+The CLI and other Clients read the active Profile through `logs.list` (up to
+2,000 records per page). The approval-gated virtual `app/logs.jsonl` view reads
+the conversation's Profile, redacts retained entries including previous runs,
+clips individual messages at 2,048 characters with an explicit truncated field,
+and preserves chronological order. Directory searches exclude this protected
+view. Each operation observes a fresh snapshot; offsets are not durable cursors
+across compaction. Snapshot reads flush pending writes on the serial utility
+queue; redacted serialization runs off MainActor. RPC cursors bind the Profile
+path, file identity, and filters; switching Profiles, compaction, or replacement
+expires mismatched cursors. No pagination state is persisted.
 
-Logs stay outside Profiles, Files, iCloud, and backup. Logs may contain user data
-needed for diagnosis but never credentials or reusable secrets.
+Logs travel with Profile folders and explicit Profile exports, remain excluded
+from automatic device backup, and follow Profile deletion. Log writes do not
+trigger Profile content reloads. The JSONL record format is unchanged; missing
+logs start empty without a Profile schema milestone. The predecessor app-wide
+`Library/Application Support/logs.jsonl` is retained untouched for recovery,
+never imported into a Profile or exposed by Profile log readers because its
+entries can mix multiple Profiles. Older builds continue using that predecessor
+file and cannot import backups containing `state/logs.jsonl`. Logs may contain
+user data needed for diagnosis but never credentials or reusable secrets.
 
 ## Retention summary
 
@@ -955,7 +968,7 @@ needed for diagnosis but never credentials or reusable secrets.
 | Pi Durable temporary-conversation caches | Caches (explicit launch opt-in) | Purgeable; no backup/sync/export | System eviction, app deletion, or explicit QA cleanup after close |
 | Pi Durable upstream storage diagnostics | Caches (DEBUG Simulator only) | Purgeable; no backup/sync/export | Removed after each request; crash remnants by system eviction or QA cleanup |
 | Folder grants | Application Support | Excluded from backup | Remove or replace grant |
-| App logs | Application Support | Excluded from backup | Retention compaction |
+| Profile logs | <Profile>/.ox/logs.jsonl | Excluded from device backup; travels with folder and exports | Retention compaction or Profile deletion |
 
 ## API service credentials
 

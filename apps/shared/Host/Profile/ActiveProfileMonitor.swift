@@ -16,6 +16,7 @@ nonisolated enum ProfileContentArea: String, CaseIterable, Sendable {
         guard itemComponents.starts(with: rootComponents), itemComponents.count > rootComponents.count else {
             return all
         }
+        if Array(itemComponents.dropFirst(rootComponents.count)) == [".ox", "logs.jsonl"] { return [] }
         switch itemComponents[rootComponents.count] {
         case "MEMORY.md": return [.memory]
         case "skills": return [.skills]
@@ -109,6 +110,7 @@ final class ActiveProfileMonitor {
     }
 
     private func record(_ areas: Set<ProfileContentArea>) {
+        guard !areas.isEmpty else { return }
         pending.formUnion(areas)
         debounceTask?.cancel()
         debounceTask = Task { @MainActor [weak self] in

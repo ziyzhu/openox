@@ -23,7 +23,6 @@ nonisolated enum AppStoragePaths {
     static let state = applicationSupport.appendingPathComponent("state.json", isDirectory: false)
     static let repositoriesConfiguration = configuration.appendingPathComponent("service-repositories.json", isDirectory: false)
     static let mountedRepositories = configuration.appendingPathComponent("mounted-repositories.json", isDirectory: false)
-    static let logs = applicationSupport.appendingPathComponent("logs.jsonl", isDirectory: false)
     static let externalProfiles = configuration.appendingPathComponent("external-profiles.json", isDirectory: false)
     static let deviceFolderGrants = configuration.appendingPathComponent("device-folder-grants.json", isDirectory: false)
     static let legacySchedules = applicationSupport.appendingPathComponent("scheduled-skills.json", isDirectory: false)

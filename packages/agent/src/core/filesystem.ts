@@ -428,7 +428,7 @@ export class AgentFileSystem {
     if (operation === "grep" && base !== "conversations" && !base.startsWith("conversations/")) candidates.paths = candidates.paths.filter(path => !/^conversations\/[^/]+\/(conversation\.json|turns\.jsonl|metadata|history)$/.test(path));
     if (operation === "grep" && base !== "app/logs.jsonl" && env.mounts.some(mount => mount.path === "app") && candidates.paths.includes("app/logs.jsonl")) {
       candidates.paths = candidates.paths.filter(path => path !== "app/logs.jsonl");
-      candidates.diagnostics.push({ path: "app/logs.jsonl", message: "App-wide logs are excluded from directory searches; read or search this path explicitly with approval." });
+      candidates.diagnostics.push({ path: "app/logs.jsonl", message: "Profile logs are excluded from directory searches; read or search this path explicitly with approval." });
     }
     if (operation === "grep") return grepFiles(env, candidates, args, match, position, context, root.kind === "file");
     const paths = candidates.paths.filter(path => match.test(relativePath(base, path)));
