@@ -1,6 +1,6 @@
 ---
 name: test
-description: "Validate versioned protocol boundaries and predecessor-to-current storage upgrades. Coordinate the three maintained suites: protocol validation, backward compatibility, and real-provider evals."
+description: "Validate versioned protocol boundaries and predecessor-to-current storage upgrades. Coordinate the three maintained suites: protocol validation, backward compatibility, and real-provider evals. Plan and report opt-in controlled benchmarks for task completion, latency and cost."
 ---
 
 # Test
@@ -17,6 +17,14 @@ packaging and compilation. Exploratory UI verification belongs to gym.
 | Protocol validation | `bun run test:protocol` | Component versions, accepted/rejected requests, mutation and reconnect behavior |
 | Backward compatibility | [Storage compatibility](references/storage-compatibility.md) | Actual X-written snapshots opened by Y, preserved data and second-launch stability |
 | Evals | `bun run evals --help`; [evals](../evals/SKILL.md) | Real provider/model, production prompts, tool receipts and basic prompting results |
+
+## Benchmarking
+
+Use [benchmarking](references/benchmarking.md) for controlled completion-rate, latency
+and cost comparisons. It provides a counterbalanced plan generator and evidence-based
+reporter; experiment-specific device execution reuses existing infrastructure. This
+is not a fourth correctness suite, a default CI gate, or authorization to spend on
+real providers. Keep plans, task-specific drivers and raw evidence outside the checkout.
 
 ## Protocol validation
 
