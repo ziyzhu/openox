@@ -15,6 +15,9 @@ public protocol OxFunctionBridge: AnyObject {
     func analyzeVision(filename: String, purpose: String) async throws -> JSONValue?
     func fileSystemOperation(name: String, arguments: JSONValue) async throws -> JSONValue?
     func findServices(query: String, purpose: String) async throws -> JSONValue?
+    func attachService(domain: String, purpose: String) async throws -> JSONValue?
+    func detachService(domain: String, purpose: String) async throws -> JSONValue?
+    func listAttachedServices(purpose: String) async throws -> JSONValue?
     func listServices(kind: String?, purpose: String) async throws -> JSONValue?
     func inspectService(domain: String, cursor: String?, purpose: String) async throws -> JSONValue?
     func validateService(domain: String, purpose: String) async throws -> JSONValue?

@@ -63,7 +63,7 @@ try {
     await writeFile(join(evidence,`${temporary ? "temporary" : "saved"}-${conversation.conversationId}.json`),JSON.stringify(result,null,2),{mode:0o600});
     assert.equal(result.value.profile.name,name);
     assert.equal(result.value.count,functionNames.length);
-    assert.deepEqual(result.value.skills,["checkout","evolve","import-memory","visualize"]);
+    assert.deepEqual(result.value.skills,["authentication","checkout","evolve","onboard","visualize"]);
     assert.equal(result.value.appRemoved,true);
     assert.equal(result.value.memory.truncated,false);
     assert.equal(result.value.invalid.length,2);

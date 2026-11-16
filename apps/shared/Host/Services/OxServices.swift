@@ -57,6 +57,33 @@ nonisolated enum OxServices {
         namespace: "service",
         schema: {
             [
+                ("ox.service.listAttached", .object([
+                    "description": .string(ModelGuidance.text("ox.service.listAttached")),
+                    "inputSchema": .object(["type": .string("object"), "properties": .object([:]), "additionalProperties": .bool(false)]),
+                    "outputSchema": .object(["type": .string("array"), "items": snapshotSchema]),
+                ])),
+                ("ox.service.attach", .object([
+                    "description": .string(ModelGuidance.text("ox.service.attach")),
+                    "inputSchema": .object([
+                        "type": .string("object"),
+                        "properties": .object(["domain": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(500)])]),
+                        "required": .array([.string("domain")]), "additionalProperties": .bool(false),
+                    ]),
+                    "outputSchema": snapshotSchema,
+                ])),
+                ("ox.service.detach", .object([
+                    "description": .string(ModelGuidance.text("ox.service.detach")),
+                    "inputSchema": .object([
+                        "type": .string("object"),
+                        "properties": .object(["domain": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(500)])]),
+                        "required": .array([.string("domain")]), "additionalProperties": .bool(false),
+                    ]),
+                    "outputSchema": .object([
+                        "type": .string("object"),
+                        "properties": .object(["domain": .object(["type": .string("string")]), "detached": .object(["type": .string("boolean"), "const": .bool(true)])]),
+                        "required": .array([.string("domain"), .string("detached")]), "additionalProperties": .bool(false),
+                    ]),
+                ])),
                 (
                     "ox.service.list",
                     .object([
@@ -191,6 +218,19 @@ nonisolated enum OxServices {
             ]
         },
         installNatives: { ctx, env in
+            let attachBlock: @convention(block) (String, String) -> JSValue = { domain, purpose in
+                env.call { try await $0.attachService(domain: domain, purpose: purpose) }
+            }
+            ctx.setObject(attachBlock as AnyObject, forKeyedSubscript: "__nativeServiceAttach" as NSString)
+            let detachBlock: @convention(block) (String, String) -> JSValue = { domain, purpose in
+                env.call { try await $0.detachService(domain: domain, purpose: purpose) }
+            }
+            ctx.setObject(detachBlock as AnyObject, forKeyedSubscript: "__nativeServiceDetach" as NSString)
+            let listAttachedBlock: @convention(block) (String) -> JSValue = { purpose in
+                env.call { try await $0.listAttachedServices(purpose: purpose) }
+            }
+            ctx.setObject(listAttachedBlock as AnyObject, forKeyedSubscript: "__nativeServiceListAttached" as NSString)
+
             let listBlock: @convention(block) (JSValue, JSValue) -> JSValue = { kindValue, purposeValue in
                 let kind = kindValue.isString ? kindValue.toString() : nil
                 return env.call { try await $0.listServices(kind: kind, purpose: purposeValue.toString()!) }
@@ -231,6 +271,9 @@ nonisolated enum OxServices {
 
         },
         jsFragment: """
+          attach: (value) => { const options = __oxOptions(value, 'ox.service.attach'); return __nativeServiceAttach(String(options.domain), String(options.purpose)); },
+          detach: (value) => { const options = __oxOptions(value, 'ox.service.detach'); return __nativeServiceDetach(String(options.domain), String(options.purpose)); },
+          listAttached: (value) => { const options = __oxOptions(value, 'ox.service.listAttached'); return __nativeServiceListAttached(String(options.purpose)); },
           list: (value) => { const options = __oxOptions(value, 'ox.service.list'); return __nativeServiceList(options.kind == null ? null : String(options.kind), String(options.purpose)); },
           inspect: (value) => { const options = __oxOptions(value, 'ox.service.inspect'); return __nativeServiceInspect(String(options.domain), options.cursor ?? null, String(options.purpose)); },
           validate: (value) => { const options = __oxOptions(value, 'ox.service.validate'); return __nativeServiceValidate(String(options.domain), String(options.purpose)); },

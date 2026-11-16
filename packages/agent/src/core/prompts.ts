@@ -77,13 +77,13 @@ export function composeTurnSections(state: TurnState, scaffold: PromptScaffold, 
   const services = state.services?.length ? ["<services>", ...[...state.services].sort((a, b) => ordered(a.domain, b.domain)).flatMap(service => [
     "  <service>", `    <domain>${escapeXml(service.domain)}</domain>`,
     ...(service.description ? [`    <description>${escapeXml(normalized(service.description))}</description>`] : []), "  </service>"]), "</services>",
-    "These services are in this conversation, selected by the user or used earlier. Inspect a service for its actions before invoking it; other services remain available on demand."].join("\n")
-    : "No services are in this conversation yet; services remain available on demand.";
+    "These services are attached to this conversation. Inspect a service for its actions before invoking it; other services remain available on demand."].join("\n")
+    : "No services are attached to this conversation yet; services remain available on demand.";
   const replies = host?.presentation === "conversation-bubbles"
     ? "Replies render as Markdown conversation bubbles. Put ![title](path) on its own line to show a file inline, or use a direct public image URL. Link supporting files with [title](path). A fenced mermaid block renders as a diagram."
     : "Replies render as text with Markdown support. Link supporting files with [title](path).";
   const files = state.filePaths.length === 0 ? "No files are attached to this conversation." : state.filePaths.map(path => `- \`${path}\``).join("\n");
   const storage = state.storageMode === "persisted" ? persistedStorage : host?.externalFiles === false ? temporaryProfileStorage : temporaryStorage;
-  return { skills, hosts: hostContext ? hostContextText(hostContext) : "No host context is available.", replies, selected_services: services,
+  return { skills, hosts: hostContext ? hostContextText(hostContext) : "No host context is available.", replies, attached_services: services,
     conversation_files: files, storage, language: responseDirective(state.responseLanguage) || "Reply in the language the user writes in." };
 }

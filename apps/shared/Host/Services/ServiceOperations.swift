@@ -10,6 +10,7 @@ final class ServiceOperations {
     let resolveConversationAttachments: ([JSONValue]) async throws -> [WebsiteAttachment]
     let resolveService: (String) async throws -> Service
     let resolveAction: (String) async throws -> (Service, String)
+    let setServiceAttached: ((String, Bool) -> Void)?
     let attachedDomains: () -> Set<String>
     let requireApproval: (String, ActionPolicy?, Any?, String?, String?) async throws -> Void
     let presentControl: (ServiceControl, Service) async -> JSONValue?
@@ -31,6 +32,7 @@ final class ServiceOperations {
         },
         resolveService: @escaping (String) async throws -> Service,
         resolveAction: @escaping (String) async throws -> (Service, String),
+        setServiceAttached: ((String, Bool) -> Void)? = nil,
         attachedDomains: @escaping () -> Set<String> = { [] },
         approve: @escaping (String, ActionPolicy?, Any?, String?, String?) async throws -> Void,
         presentControl: @escaping (ServiceControl, Service) async -> JSONValue?,
@@ -48,6 +50,7 @@ final class ServiceOperations {
         self.resolveConversationAttachments = resolveConversationAttachments
         self.resolveService = resolveService
         self.resolveAction = resolveAction
+        self.setServiceAttached = setServiceAttached
         self.attachedDomains = attachedDomains
         self.requireApproval = approve
         self.presentControl = presentControl
@@ -460,6 +463,34 @@ final class ServiceOperations {
             }
             Log.session.info("bridge.service.inspect domain=\(cleanDomain) count=\(details.count) continued=\(cursor != nil) more=\(result["nextCursor"] != nil)")
             return .object(result)
+        }
+    }
+
+    func attachService(domain: String, purpose: String) async throws -> JSONValue? {
+        try await tracked(Actions.serviceAttach, .object(["domain": .string(domain)]), purpose: purpose) {
+            guard let setServiceAttached else { throw RuntimeError.bridge("This caller cannot attach services") }
+            let service = try await resolveService(domain)
+            try Task.checkCancellation()
+            setServiceAttached(service.domain, true)
+            Log.session.info("bridge.service.attach domain=\(service.domain)")
+            return try serviceSnapshot(service)
+        }
+    }
+
+    func detachService(domain: String, purpose: String) async throws -> JSONValue? {
+        try await tracked(Actions.serviceDetach, .object(["domain": .string(domain)]), purpose: purpose) {
+            guard let setServiceAttached else { throw RuntimeError.bridge("This caller cannot detach services") }
+            setServiceAttached(domain, false)
+            Log.session.info("bridge.service.detach domain=\(domain)")
+            return .object(["domain": .string(domain), "detached": .bool(true)])
+        }
+    }
+
+    func listAttachedServices(purpose: String) async throws -> JSONValue? {
+        try await tracked(Actions.serviceListAttached, .object([:]), purpose: purpose) {
+            let services = attachedDomains().sorted().compactMap { serviceManager.service(domain: $0) }
+            Log.session.info("bridge.service.listAttached count=\(services.count)")
+            return .array(try services.map { try serviceSnapshot($0) })
         }
     }
 

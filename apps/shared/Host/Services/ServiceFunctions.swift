@@ -70,6 +70,18 @@ extension Conversation: OxFunctionBridge {
         try await serviceOperations.disconnectRepository(repository: repository, purpose: purpose)
     }
 
+    public func attachService(domain: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.attachService(domain: domain, purpose: purpose)
+    }
+
+    public func detachService(domain: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.detachService(domain: domain, purpose: purpose)
+    }
+
+    public func listAttachedServices(purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.listAttachedServices(purpose: purpose)
+    }
+
     public func listServices(kind: String?, purpose: String) async throws -> JSONValue? {
         try await serviceOperations.listServices(kind: kind, purpose: purpose)
     }

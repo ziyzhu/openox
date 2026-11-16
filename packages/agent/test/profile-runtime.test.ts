@@ -414,7 +414,7 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(modelRequests[0]!.systemPrompt).not.toContain("<ox>");
     expect(modelRequests[0]!.messages.every(message => message.role !== "system")).toBe(true);
     expect(JSON.stringify(modelRequests[0]!.messages)).not.toContain("<turn-state>");
-    expect(modelRequests[0]!.systemPrompt).not.toContain("<attached_services>");
+    expect(modelRequests[0]!.systemPrompt).toContain("<attached_services>");
     expect(modelRequests[0]!.systemPrompt).toContain("- `mounts/` — folders the user granted on the Profile's Files page\n  - `mounts/a/` — Taxes");
     expect(modelRequests[0]!.systemPrompt).not.toContain("<mounted_folders>");
     expect(modelRequests[0]!.systemPrompt).toContain("<hosts>\nActive host/Profile:");
@@ -431,7 +431,7 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(modelRequests[1]!.systemPrompt).toContain("frozen memory");
     expect(modelRequests[1]!.systemPrompt).not.toContain("new live memory");
     expect(modelRequests[1]!.systemPrompt).not.toContain("mounts/a");
-    expect(modelRequests[1]!.systemPrompt).not.toContain("<attached_services>");
+    expect(modelRequests[1]!.systemPrompt).toContain("<attached_services>");
     const isolatedCreated = await adapter.command({ action: "conversationCreate" }) as typeof created;
     const isolated = await adapter.command({ action: "attach", config: { ...config, isolatedFiles: true }, conversationID: isolatedCreated.reference.conversationID }) as typeof attached;
     await adapter.command({ action: "run", reference: isolated.reference, content: "files" });

@@ -24,7 +24,7 @@ uses pageId for lifecycle/navigation/handoff, and frameId for document inspectio
 scripts, and web service invocation. Discover fresh document IDs after navigation.
 The active Profile allows six agent pages total; frames do not count separately.
 Direct ox service commands retain Host-managed routing and address services by domain.
-Service inspection and invocation load the current valid source on demand and surface a conversation chip. There are no agent-facing attach, detach, or listAttached functions; chips do not grant permissions. Conversation `--attach` selects user context, not an execution prerequisite.
+Service inspection and invocation load the current valid source on demand without adding conversation chips. Use `ox.service.attach`, `ox.service.listAttached`, and `ox.service.detach` through the VM to manage explicit conversation attachments. Chips do not grant permissions. Conversation `--attach` attaches user context, not an execution prerequisite.
 
 ## Choose the correct surface
 

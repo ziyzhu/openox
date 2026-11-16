@@ -64,8 +64,10 @@ final class ConversationServiceAttachments {
             var updated = services
             updated[index] = service
             replace(updated)
-        } else {
-            replace(services + [service])
+        }
+        loadedDomains.insert(service.domain)
+        if conversation.isSelected {
+            serviceManager.setAttachedServices(loadedServices, for: id)
         }
         Log.session.info("Conversation.service resolved id=\(id) domain=\(service.domain) source=\(service.sourceVersion ?? "none")")
         return service
@@ -92,8 +94,7 @@ final class ConversationServiceAttachments {
         if normalized.count != supplied.count {
             Log.session.warning("Conversation.setAttachedServices deduplicated id=\(id) supplied=\(supplied.count) unique=\(normalized.count)")
         }
-        let visibleDomains = Set(services.map(\.domain))
-        let normalizedDomains = normalized.map(\.domain).filter { domains.contains($0) || !visibleDomains.contains($0) }
+        let normalizedDomains = normalized.map(\.domain)
         guard normalizedDomains != domains else {
             replace(normalized)
             return
@@ -111,6 +112,13 @@ final class ConversationServiceAttachments {
         }
         conversation.onPersistableChange?()
         return true
+    }
+
+    func detach(domain: String) {
+        domains.removeAll { $0 == domain }
+        replace(services.filter { $0.domain != domain })
+        conversation.onPersistableChange?()
+        Log.session.info("Conversation.detachService id=\(id) domain=\(domain)")
     }
 
     func attach(domains requested: [String]) -> Bool {
@@ -153,8 +161,7 @@ final class ConversationServiceAttachments {
             Log.session.warning("Conversation.resolveAttachedServices deduplicated id=\(id) stored=\(domains.count) unique=\(normalizedDomains.count)")
             domains = normalizedDomains
         }
-        let visible = Self.uniqueDomains(domains + services.map(\.domain))
-        replace(visible.compactMap { serviceManager.service(domain: $0) })
+        replace(domains.compactMap { serviceManager.service(domain: $0) })
     }
 
     private static func uniqueDomains(_ domains: [String]) -> [String] {

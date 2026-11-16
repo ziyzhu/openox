@@ -376,6 +376,10 @@ final class Conversation: Identifiable {
                 try await serviceAttachments.resolveService(domain)
             },
             resolveAction: { [unowned self] name in try await serviceAttachments.target(name, label: "ox.service.invoke") },
+            setServiceAttached: { [unowned self] domain, attached in
+                if attached { _ = serviceAttachments.attach(domains: [domain]) }
+                else { serviceAttachments.detach(domain: domain) }
+            },
             attachedDomains: { [unowned self] in Set(attachedServices.map(\.domain)) },
             approve: { [unowned self] action, defaultPolicy, args, purpose, prompt in
                 try await requireApproval(
