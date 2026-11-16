@@ -107,6 +107,8 @@ final class BrowserSession: NSObject {
 
     let id = UUID()
     var scopeID: UUID?
+    var lastActiveAt = Date()
+    var activeBrowserOperations: Set<UUID> = []
     let page: WebPage
     let navigationDecider: NavigationDecider
     let dialogPresenter: DialogPresenter
@@ -234,6 +236,15 @@ final class BrowserSession: NSObject {
 
     var logLabel: String { String(id.uuidString.prefix(8)) }
     var isReady: Bool { if case .ready = navigationPhase { true } else { false } }
+    var isIdle: Bool {
+        guard openingTask == nil, !page.isLoading, secretAttempt == nil,
+              pendingEvaluations.isEmpty, activeBrowserOperations.isEmpty,
+              manager.actionScheduler.isIdle(self) else { return false }
+        switch navigationPhase {
+        case .ready, .unavailable: return true
+        case .pending, .reserved, .navigating, .settling, .verifying: return false
+        }
+    }
     func finishEvaluation(_ id: UUID, with result: Result<Any?, any Error>) {
         guard let pending = pendingEvaluations.removeValue(forKey: id) else { return }
         pending.timeout.cancel()

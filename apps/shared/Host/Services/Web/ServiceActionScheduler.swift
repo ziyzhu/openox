@@ -199,6 +199,7 @@ final class ServiceActionScheduler {
     private func release(_ page: BrowserSession, reservation: UUID) {
         guard let queue = queues[ObjectIdentifier(page)], queue.reservation == reservation else { return }
         queue.reservation = nil
+        page.lastActiveAt = Date()
         Log.service.info("ServiceActionScheduler presentation-released domain=\(queue.page.domain) page=\(page.logLabel)")
         advance(page)
     }
@@ -285,6 +286,7 @@ final class ServiceActionScheduler {
     }
 
     private func start(_ action: ScheduledAction, in queue: PageQueue, blocking: Bool) {
+        queue.page.lastActiveAt = Date()
         queue.occupancy.start(action, blocking: blocking)
         let kind = action.kind
         if action.needsNavigation(on: queue.page) { action.kind = .navigation }
@@ -320,6 +322,7 @@ final class ServiceActionScheduler {
 
     private func finish(_ action: ScheduledAction, in queue: PageQueue) {
         guard queue.occupancy.finish(action.id) else { return }
+        queue.page.lastActiveAt = Date()
         action.task = nil
         Log.service.info("ServiceActionScheduler released id=\(action.id.uuidString.prefix(8)) name=\(action.name) page=\(queue.page.logLabel) active=\(queue.occupancy.actions.count) pending=\(queue.pending.count)")
         if queue.isOpen { queue.page.advancePage(queue.page) }

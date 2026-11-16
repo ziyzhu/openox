@@ -35,7 +35,7 @@ final class BrowserSessionStore {
 
     private var entries: [ObjectIdentifier: Entry] = [:]
 
-    static let maximumAgentPages = 6
+    static let maximumAgentPages = 8
 
     var sessions: [BrowserSession] { entries.values.map { $0.owned.page } }
 
@@ -43,6 +43,7 @@ final class BrowserSessionStore {
         guard let page = sessions.first(where: { $0.id.uuidString == id && $0.scopeID == scopeID }), contains(page) else {
             throw OxFunctionError(code: "page_unavailable", message: "The selected page is closed or unavailable.", recovery: "List owned pages with pages and explicitly open a new page if needed. Do not replay uncertain writes.")
         }
+        page.lastActiveAt = Date()
         return page
     }
 
@@ -51,6 +52,7 @@ final class BrowserSessionStore {
         guard matches.count == 1, let page = matches.first, contains(page) else {
             throw OxFunctionError(code: "frame_unavailable", message: "The selected frame document is unavailable.", recovery: "List the page's frames and select a fresh frameId. Do not replay uncertain writes.")
         }
+        page.lastActiveAt = Date()
         return page
     }
 
@@ -115,8 +117,13 @@ final class BrowserSessionStore {
             page = existing
         } else {
             if action.scopeID != nil, sessions.count(where: { $0.scopeID != nil && $0.isOpen }) >= Self.maximumAgentPages {
-                Log.webView.warning("BrowserSession.open rejected=page_limit scope=\(action.scopeID?.uuidString ?? "none") limit=\(Self.maximumAgentPages)")
-                throw OxFunctionError(code: "page_limit_reached", message: "The active Profile already has six agent pages open.", recovery: "List pages to see every page counting toward the limit, then reuse or close one of this conversation's pages before opening another.")
+                guard let oldest = sessions.filter({ $0.scopeID != nil && $0.isOpen && $0.isIdle })
+                    .min(by: { ($0.lastActiveAt, $0.id.uuidString) < ($1.lastActiveAt, $1.id.uuidString) }) else {
+                    Log.webView.warning("BrowserSession.open rejected=page_limit scope=\(action.scopeID?.uuidString ?? "none") limit=\(Self.maximumAgentPages)")
+                    throw OxFunctionError(code: "page_limit_reached", message: "The active Profile already has eight agent pages in use.", recovery: "List pages and wait for an active operation or user interaction to finish. Opening a page reclaims the oldest idle page when at capacity.")
+                }
+                Log.webView.info("BrowserSession.reclaim session=\(oldest.logLabel) scope=\(oldest.scopeID?.uuidString ?? "none") lastActiveAt=\(oldest.lastActiveAt.ISO8601Format())")
+                close(oldest)
             }
             page = BrowserSession(manager: action.service.manager)
             page.scopeID = action.scopeID
@@ -149,6 +156,7 @@ final class BrowserSessionStore {
             if case .browser = purpose { close(page, error: error) }
             throw error
         }
+        page.lastActiveAt = Date()
         return page
     }
 
@@ -193,7 +201,7 @@ final class BrowserSessionStore {
         let idle = entries.values.filter {
             guard case .session = $0.owned.owner else { return false }
             let page = $0.owned.page
-            return page.openingTask == nil && page.navigationPhase.load == nil && page.manager.actionScheduler.isIdle(page)
+            return page.isIdle
         }.map { $0.owned.page }
         for page in idle { close(page) }
         if !idle.isEmpty { Log.webView.info("BrowserSession.release reason=\(reason) count=\(idle.count)") }

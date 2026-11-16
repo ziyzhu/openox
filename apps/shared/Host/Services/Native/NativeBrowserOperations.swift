@@ -13,13 +13,20 @@ extension NativeServiceOperations {
             return try await listBrowserFrames(pageID: fields["pageId"]?.stringValue ?? "")
         case "close":
             let page = try serviceManager.browserSessions.requirePage(fields["pageId"]?.stringValue ?? "", scopeID: id)
-            guard serviceManager.actionScheduler.isIdle(page) else {
+            guard page.isIdle else {
                 throw OxFunctionError(code: "page_busy", message: "The selected page is busy.", recovery: "Wait for its active operation or user handoff to finish before closing it.")
             }
             serviceManager.browserActionSessions.closePage(page)
             return .object(["closed": .bool(true)])
         default:
             let session = try browserSession(arguments: fields)
+            guard let selectedPage = session.page else { throw Service.EvalError.notReady }
+            let operationID = UUID()
+            selectedPage.activeBrowserOperations.insert(operationID)
+            defer {
+                selectedPage.activeBrowserOperations.remove(operationID)
+                selectedPage.lastActiveAt = Date()
+            }
             if ["evaluate", "pdf", "screenshot", "waitForURL", "waitForEvent"].contains(actionID) {
                 return try await performBrowserOperation(actionID, fields: fields, session: session, purpose: purpose)
             }

@@ -41,7 +41,7 @@ nonisolated enum BrowserFunctionCatalog {
     static let legacyAttachmentApproval = "ox.service.attach:ios:browser"
 
     static let actions: [Action] = [
-        Action(id: "newPage", label: "New Page", description: "Open an explicit conversation-owned page. At most six agent pages may be open across the active Profile; opening pages count. At capacity reuse a page or close one. Never silently replaces or evicts pages. The page records events from its first load; networkContent embed also records bounded, redacted request and response bodies.",
+        Action(id: "newPage", label: "New Page", description: "Open an explicit conversation-owned page. At most eight agent pages may be open across the active Profile; opening pages count. At capacity, closes the least recently active idle page, including another conversation's page, and returns a fresh page with new IDs. Fails if every page is busy. Reuse owned pages when useful and close them when no longer needed. The page records events from its first load; networkContent embed also records bounded, redacted request and response bodies.",
                inputSchema: object([
                    "url": string(minimum: 1, maximum: 8_192),
                    "networkContent": .object([
@@ -50,11 +50,11 @@ nonisolated enum BrowserFunctionCatalog {
                    ]),
                ], required: ["url"]),
                outputSchema: object(["pageId": string(), "mainFrameId": string()], required: ["pageId", "mainFrameId"])),
-        Action(id: "pages", label: "List Pages", description: "List every live agent page in the active Profile, including pages owned by other conversations, which count toward the six-page limit. Only owned pages expose full URLs and titles and accept page operations; other pages show their origin. Discover frame targets with frames.",
+        Action(id: "pages", label: "List Pages", description: "List every live agent page in the active Profile, including pages owned by other conversations, which count toward the eight-page limit. Pages are sorted oldest lastActiveAt first; lastActiveAt is an ISO 8601 timestamp updated by page operations, not by listing. busy pages cannot be reclaimed. Opening at capacity reclaims the oldest idle page. Only owned pages expose full URLs and titles and accept page operations; other pages show their origin. Discover frame targets with frames.",
                inputSchema: object(),
                outputSchema: object(["pages": .object(["type": .string("array"), "items": object([
-                   "pageId": string(), "url": nullableString, "title": string(), "isLoading": boolean, "busy": boolean, "owned": boolean,
-               ], required: ["pageId", "url", "title", "isLoading", "busy", "owned"])]), "limit": integer(minimum: 1)], required: ["pages", "limit"])),
+                   "pageId": string(), "url": nullableString, "title": string(), "isLoading": boolean, "busy": boolean, "owned": boolean, "lastActiveAt": string(),
+               ], required: ["pageId", "url", "title", "isLoading", "busy", "owned", "lastActiveAt"])]), "limit": integer(minimum: 1)], required: ["pages", "limit"])),
         Action(id: "frames", label: "List Frames", description: "List fresh document targets of an explicit owned page, including the main document. Frame discovery is bounded; cross-origin parents may be unknown. A replaced document invalidates its frameId.",
                inputSchema: object(["pageId": pageID], required: ["pageId"]),
                outputSchema: object(["frames": frames, "framesTruncated": boolean], required: ["frames", "framesTruncated"])),

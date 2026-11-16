@@ -22,7 +22,7 @@ Do not select or infer a web-page engine. The Host owns service adapters and ren
 In a conversation VM, the agent explicitly opens/lists/closes pages through ox.web.browser,
 uses pageId for lifecycle/navigation/handoff, and frameId for document inspection,
 scripts, and web service invocation. Discover fresh document IDs after navigation.
-The active Profile allows six agent pages total; frames do not count separately.
+The active Profile allows eight agent pages total; frames do not count separately. pages exposes lastActiveAt and busy, sorted oldest first. At capacity newPage closes the oldest idle page across conversations and returns fresh IDs; active operations, opening/loading pages, secrets, and user handoffs are protected. Close owned idle pages when no longer needed.
 Direct ox service commands retain Host-managed routing and address services by domain.
 Service inspection and invocation load the current valid source on demand without adding conversation chips. Use `ox.service.attach`, `ox.service.listAttached`, and `ox.service.detach` through the VM to manage explicit conversation attachments. Chips do not grant permissions. Conversation `--attach` attaches user context, not an execution prerequisite.
 

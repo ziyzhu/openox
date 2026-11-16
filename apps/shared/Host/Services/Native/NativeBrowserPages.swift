@@ -11,6 +11,12 @@ extension NativeServiceOperations {
         let action = Service.Action(service: service, definition: inspection.definition, baseURL: url,
                                     role: .blockingAction, scripts: inspection.scripts, scopeID: id)
         let page = try await service.openOwnedPage(for: action, owner: .browser(id), events: networkContent)
+        let operationID = UUID()
+        page.activeBrowserOperations.insert(operationID)
+        defer {
+            page.activeBrowserOperations.remove(operationID)
+            page.lastActiveAt = Date()
+        }
         do {
             let frames = try await page.discoverFrames()
             guard let main = frames.first(where: \.isMainFrame) else { throw Service.EvalError.notReady }
@@ -26,7 +32,7 @@ extension NativeServiceOperations {
     func listBrowserPages() -> JSONValue {
         let pages = serviceManager.browserSessions.sessions
             .filter { $0.scopeID != nil && $0.isOpen }
-            .sorted { ($0.scopeID != id ? 1 : 0, $0.id.uuidString) < ($1.scopeID != id ? 1 : 0, $1.id.uuidString) }
+            .sorted { ($0.lastActiveAt, $0.id.uuidString) < ($1.lastActiveAt, $1.id.uuidString) }
         let values: [JSONValue] = pages.map { page in
             let owned = page.scopeID == id
             let url = owned ? page.page.url?.absoluteString : page.page.url.flatMap(Self.origin)
@@ -35,8 +41,9 @@ extension NativeServiceOperations {
                 "url": url.map(JSONValue.string) ?? .null,
                 "title": .string(owned ? page.page.title : ""),
                 "isLoading": .bool(page.page.isLoading),
-                "busy": .bool(!serviceManager.actionScheduler.isIdle(page)),
+                "busy": .bool(!page.isIdle),
                 "owned": .bool(owned),
+                "lastActiveAt": .string(page.lastActiveAt.ISO8601Format(.init(includingFractionalSeconds: true))),
             ])
         }
         Log.webView.info("Browser.pages owner=\(id) owned=\(pages.count { $0.scopeID == id }) total=\(pages.count)")
@@ -45,6 +52,12 @@ extension NativeServiceOperations {
 
     func listBrowserFrames(pageID: String, attached: [Service] = []) async throws -> JSONValue {
         let page = try serviceManager.browserSessions.requirePage(pageID, scopeID: id)
+        let operationID = UUID()
+        page.activeBrowserOperations.insert(operationID)
+        defer {
+            page.activeBrowserOperations.remove(operationID)
+            page.lastActiveAt = Date()
+        }
         guard page.secretAttempt?.holdsValues != true else {
             throw OxFunctionError(code: "page_locked", message: "The page holds a saved secret.", recovery: "Wait for the secret operation to finish.")
         }

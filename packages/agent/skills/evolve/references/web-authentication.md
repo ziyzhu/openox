@@ -6,7 +6,7 @@ A session is a currently authenticated website context, not an open page, rememb
 
 ## Pages and documents
 
-The agent owns page selection and lifecycle. Use `ox.web.browser.newPage({ purpose, url })` to obtain `pageId` and `mainFrameId`, or reuse an owned page from `ox.web.browser.pages({ purpose })` and discover its documents with `ox.web.browser.frames({ purpose, pageId })`. At most six agent pages may be open across the active Profile; `pages` lists all of them. Close unused idle pages explicitly; the Host never silently evicts or replaces them.
+The agent owns page selection and lifecycle. Use `ox.web.browser.newPage({ purpose, url })` to obtain `pageId` and `mainFrameId`, or reuse an owned page from `ox.web.browser.pages({ purpose })` and discover its documents with `ox.web.browser.frames({ purpose, pageId })`. At most eight agent pages may be open across the active Profile; `pages` lists all of them. Close owned idle pages when no longer needed. pages returns lastActiveAt and busy, sorted oldest first. At capacity newPage closes the oldest idle page across conversations and returns fresh IDs; busy pages are protected.
 
 Every web service invocation requires a live `frameId`, including main-document calls. Invoke the service matching the frame's observed origin; the Host loads its current valid source on demand without a separate attachment call. Navigation replaces document targets: rediscover frames instead of reusing a stale ID, reopening the provider homepage, or replaying the triggering step. `pageId` survives navigation and is used for navigation and presentation. Frames do not count as pages. Cross-origin parent IDs may be null; incomplete frame discovery does not establish absence.
 
