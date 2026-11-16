@@ -972,6 +972,8 @@ struct ConversationPage: View {
         recordsTail: Bool = false
     ) -> some View {
         let measuresTail = recordsTail && sendHandoff == .idle
+        let earlierAnchorID = scroller.earlierRevealAnchorID
+        let windowStart = transcriptWindow.range.lowerBound
         let row = conversationBlockHost(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
             .padding(.top, block.spacingBefore)
             .onGeometryChange(for: CGFloat?.self) {
@@ -979,6 +981,16 @@ struct ConversationPage: View {
             } action: {
                 guard let bottom = $0 else { return }
                 scroller.transcriptTail = bottom
+            }
+            .onGeometryChange(for: ConversationViewportController.BlockFrame?.self) { geometry in
+                let viewport = geometry.bounds(of: .scrollView(axis: .vertical))
+                guard block.id == earlierAnchorID || viewport?.intersects(CGRect(origin: .zero, size: geometry.size)) == true else { return nil }
+                return ConversationViewportController.BlockFrame(
+                    rect: geometry.frame(in: .scrollView(axis: .vertical)),
+                    windowStart: windowStart
+                )
+            } action: {
+                scroller.measureBlock(block.id, frame: $0)
             }
 
         if identified {
@@ -1114,7 +1126,11 @@ struct ConversationPage: View {
             }
             .onScrollPhaseChange { old, new in
                 scroller.phaseChanged(from: old, to: new)
-                guard new == .idle, transcriptWindow.hasEarlier, scroller.beginEarlierReveal(after: old) else { return }
+                guard new == .idle, transcriptWindow.hasEarlier,
+                      scroller.beginEarlierReveal(
+                        after: old,
+                        windowStart: max(0, transcriptWindow.range.lowerBound - TranscriptWindow.batchSize)
+                      ) else { return }
                 transcriptWindow.revealEarlier()
                 logTranscriptWindow(reason: "earlier", total: totalBlockCount)
             }
@@ -1143,6 +1159,9 @@ struct ConversationPage: View {
             .onChange(of: totalBlockCount) { _, total in
                 transcriptWindow.reconcile(total: total)
                 logTranscriptWindow(reason: "blocks", total: total)
+            }
+            .onChange(of: blocks.map(\.id)) { _, ids in
+                scroller.blocksChanged(ids)
             }
             .onChange(of: conversation.isBusy) { _, busy in
                 logTranscriptWindow(reason: busy ? "busy" : "settled", total: totalBlockCount)

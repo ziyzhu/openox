@@ -109,6 +109,11 @@ final class ConversationViewportController {
         }
     }
 
+    nonisolated struct BlockFrame: Equatable, Sendable {
+        let rect: CGRect
+        let windowStart: Int
+    }
+
     private enum Motion: Equatable {
         case stationary
         case user(ScrollPhase)
@@ -128,7 +133,7 @@ final class ConversationViewportController {
         case followingBottom
         case sending(UUID)
         case followingTurn(UUID)
-        case revealingEarlier(content: CGFloat, top: CGFloat)
+        case revealingEarlier(id: UUID, offset: CGFloat, windowStart: Int)
         case reading
     }
 
@@ -156,9 +161,10 @@ final class ConversationViewportController {
     }
     @ObservationIgnored private var inputFocused = false
     @ObservationIgnored private var visibleTargetID: UUID?
+    @ObservationIgnored private var visibleBlockFrames: [UUID: BlockFrame] = [:]
     @ObservationIgnored private var pendingFrame: Frame?
     @ObservationIgnored private var animatingCorrectionTop: CGFloat?
-    @ObservationIgnored private var presentation = Presentation.reading {
+    private var presentation = Presentation.reading {
         didSet { updateSizeChangeAnchor() }
     }
     @ObservationIgnored private var layoutLogStart: Frame?
@@ -169,12 +175,14 @@ final class ConversationViewportController {
     }
 
     func openAtBottom(conversationID: String, onSettled: @escaping () -> Void) {
+        endEarlierReveal(reason: "opened")
         self.conversationID = conversationID
         pendingFrame = pendingFrame ?? frame
         frame = nil
         viewportHold = nil
         inputFocused = false
         visibleTargetID = nil
+        visibleBlockFrames.removeAll()
         presentation = .opening(onSettled)
         resetLayoutLog()
         showsJumpButton = false
@@ -184,7 +192,9 @@ final class ConversationViewportController {
     }
 
     func close() {
+        endEarlierReveal(reason: "closed")
         presentation = .reading
+        visibleBlockFrames.removeAll()
         frame = nil
         pendingFrame = nil
         geometryFrameDriver.cancel()
@@ -192,6 +202,7 @@ final class ConversationViewportController {
     }
 
     func holdForSend(_ id: UUID) {
+        endEarlierReveal(reason: "send")
         presentation = .sending(id)
         showsJumpButton = false
         viewportHold = nil
@@ -234,6 +245,7 @@ final class ConversationViewportController {
     }
 
     func rideToBottom() {
+        endEarlierReveal(reason: "bottom")
         presentation = .reading
         guard frame?.jumpDistance ?? .infinity > 1 else {
             motion = .stationary
@@ -248,19 +260,45 @@ final class ConversationViewportController {
         }
     }
 
-    func beginEarlierReveal(after phase: ScrollPhase) -> Bool {
+    func beginEarlierReveal(after phase: ScrollPhase, windowStart: Int) -> Bool {
         guard phase.isUserDriven,
               case .reading = presentation,
               let frame = pendingFrame ?? frame,
-              frame.visualTop < frame.container * 2 else { return false }
-        presentation = .revealingEarlier(content: frame.content, top: frame.visualTop)
-        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=revealEarlier phase=begin \(logSnapshot)")
+              frame.visualTop < frame.container * 2,
+              let anchor = visibleBlockFrames.filter({
+                  $0.value.rect.maxY > frame.insetTop && $0.value.rect.minY < frame.insetTop + frame.container
+              }).min(by: { $0.value.rect.minY < $1.value.rect.minY }) else { return false }
+        viewportHold = nil
+        presentation = .revealingEarlier(id: anchor.key, offset: anchor.value.rect.minY, windowStart: windowStart)
+        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=revealEarlier phase=begin anchor=\(anchor.key) expectedOffset=\(anchor.value.rect.minY) windowStart=\(windowStart) \(logSnapshot)")
         return true
+    }
+
+    var earlierRevealAnchorID: UUID? {
+        if case .revealingEarlier(let id, _, _) = presentation { id } else { nil }
+    }
+
+    func measureBlock(_ id: UUID, frame: BlockFrame?) {
+        visibleBlockFrames[id] = frame
+        geometryFrameDriver.schedule()
+    }
+
+    func blocksChanged(_ ids: [UUID]) {
+        let renderedIDs = Set(ids)
+        if case .revealingEarlier(let id, _, _) = presentation, !renderedIDs.contains(id) {
+            endEarlierReveal(reason: "anchorRemoved")
+        }
+        visibleBlockFrames = visibleBlockFrames.filter { renderedIDs.contains($0.key) }
     }
 
     func focusChanged(_ focused: Bool, slack: CGFloat, source: String) {
         guard inputFocused != focused else { return }
         inputFocused = focused
+        if case .revealingEarlier = presentation {
+            Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=focus source=\(source) focused=\(focused) hold=historyAnchor \(logSnapshot)")
+            geometryFrameDriver.schedule()
+            return
+        }
         if focused {
             if case .followingBottom = presentation { presentation = .reading }
             guard let frame else {
@@ -316,6 +354,7 @@ final class ConversationViewportController {
     func phaseChanged(from old: ScrollPhase, to new: ScrollPhase) {
         guard old != new else { return }
         if new.isUserDriven {
+            endEarlierReveal(reason: "gesture")
             switch presentation {
             case .followingBottom, .followingTurn, .sending, .revealingEarlier: presentation = .reading
             case .opening, .reading: break
@@ -329,29 +368,49 @@ final class ConversationViewportController {
     }
 
     func geometryChanged(_ new: Frame) {
-        keepEarlierRevealInPlace(new)
         pendingFrame = new
         geometryFrameDriver.schedule()
     }
 
-    private func keepEarlierRevealInPlace(_ frame: Frame) {
-        guard case .revealingEarlier(let content, let top) = presentation else { return }
-        let growth = frame.content - content
-        guard abs(growth) > 0.5 else { return }
-        let target = top + growth
-        presentation = .revealingEarlier(content: frame.content, top: target)
+    private func keepEarlierRevealInPlace() {
+        guard case .revealingEarlier(let id, let offset, let windowStart) = presentation,
+              let frame else { return }
+        guard let block = visibleBlockFrames[id] else {
+            endEarlierReveal(reason: "anchorUnavailable")
+            return
+        }
+        guard block.windowStart == windowStart else { return }
+        let displacement = block.rect.minY - offset
+        guard abs(displacement) > 1 else {
+            endEarlierReveal(reason: "restored", actualOffset: block.rect.minY)
+            return
+        }
+        let target = min(max(0, frame.visualTop + displacement), frame.endTop)
+        guard abs(target - frame.visualTop) > 0.5 else {
+            endEarlierReveal(reason: "boundary", actualOffset: block.rect.minY)
+            return
+        }
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             position.scrollTo(y: target)
         }
-        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=revealEarlier growth=\(Int(growth)) targetTop=\(Int(target)) \(logSnapshot)")
+        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=revealEarlier phase=correct anchor=\(id) expectedOffset=\(offset) actualOffset=\(block.rect.minY) correction=\(displacement) targetTop=\(target) \(logSnapshot)")
+    }
+
+    private func endEarlierReveal(reason: String, actualOffset: CGFloat? = nil) {
+        guard case .revealingEarlier(let id, let offset, _) = presentation else { return }
+        presentation = .reading
+        if inputFocused, let frame { viewportHold = .reader(top: frame.visualTop) }
+        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=revealEarlier phase=end reason=\(reason) anchor=\(id) expectedOffset=\(offset) actualOffset=\(actualOffset ?? visibleBlockFrames[id]?.rect.minY ?? offset) \(logSnapshot)")
     }
 
     private func commitPendingGeometry() {
-        guard let pendingFrame else { return }
-        self.pendingFrame = nil
-        commitGeometry(pendingFrame)
+        if let pendingFrame {
+            self.pendingFrame = nil
+            commitGeometry(pendingFrame)
+        }
+        keepEarlierRevealInPlace()
     }
 
     private func commitGeometry(_ new: Frame) {
@@ -434,6 +493,7 @@ final class ConversationViewportController {
 
     private func applyViewportHold(animation: Animation? = nil) {
         if case .sending = presentation { return }
+        if case .revealingEarlier = presentation { return }
         guard let frame, let viewportHold else { return }
         let top = viewportHold.expectedTop(in: frame)
         guard abs(top - frame.visualTop) > 0.5 else {
