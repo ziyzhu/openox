@@ -1,7 +1,7 @@
 import Foundation
 
 struct TranscriptWindow: Equatable {
-    static let batchSize = 8
+    static let batchSize = 16
 
     private(set) var range = 0..<0
 
