@@ -26,6 +26,7 @@ extension EnvironmentValues {
         set { self[ConversationLinkHandlerKey.self] = newValue }
     }
     @Entry var conversationFileResolver: ConversationFileResolver? = nil
+    @Entry var conversationViewport: ConversationViewportController? = nil
 }
 
 enum ConversationLinkDestination: Equatable {

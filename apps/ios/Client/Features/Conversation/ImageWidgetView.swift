@@ -24,10 +24,14 @@ struct ImageWidgetView: View {
     @State private var state = LoadState.loading
     @State private var preview: Preview?
     @State private var retry = 0
+    @Environment(\.conversationViewport) private var viewport
 
     var body: some View {
         surface
             .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .scrollView(axis: .vertical)) } action: { old, new in
+                viewport?.contentResized(from: old, to: new)
+            }
             .task(id: LoadRequest(image: image, retry: retry)) { await load() }
             .fullScreenCover(item: $preview) { preview in
                 FileScreen(onDismiss: { self.preview = nil }, dismissIdentifier: A11yID.ConversationControls.Message.imageClose) { _ in

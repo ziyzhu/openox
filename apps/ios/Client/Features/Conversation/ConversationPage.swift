@@ -380,8 +380,7 @@ struct ConversationPage: View {
         .overlay(alignment: .bottom) {
             if !showsComposer, dockedPrompt == nil, scroller.showsJumpButton {
                 ScrollToBottomButton(composerButtonSize: composerButtonSize) {
-                    transcriptWindow.showLatest(total: totalBlockCount)
-                    DispatchQueue.main.async { scroller.rideToBottom() }
+                    scroller.rideToBottom()
                 }
                     .padding(.bottom, Theme.Spacing.md)
                     .transition(.opacity)
@@ -1036,7 +1035,10 @@ struct ConversationPage: View {
         return {
             guard !conversation.isBusy, case .failed = conversation.turnEnding else { return }
             Log.ui.info("ConversationPage.retryFailed conversation=\(conversation.id)")
-            latestSubmissionID = conversation.retryFailedTurn()?.id
+            guard let receipt = conversation.retryFailedTurn() else { return }
+            if conversation.anchor(forSubmissionID: receipt.id) != nil {
+                latestSubmissionID = receipt.id
+            }
         }
     }
 
@@ -1086,6 +1088,7 @@ struct ConversationPage: View {
                         )
                     }
                 )
+                .environment(\.conversationViewport, scroller)
             }
             .overlayPreferenceValue(LivePageCardAnchorKey.self) { anchors in
                 ConversationInlineServicePages(
@@ -1500,8 +1503,7 @@ struct ConversationPage: View {
                         floatsTopStrip: floatsTopStrip,
                         composerButtonSize: composerButtonSize
                     ) {
-                        transcriptWindow.showLatest(total: totalBlockCount)
-                        DispatchQueue.main.async { scroller.rideToBottom() }
+                        scroller.rideToBottom()
                     }
                         .transition(.opacity)
                 }
@@ -1536,8 +1538,7 @@ struct ConversationPage: View {
             .overlay(alignment: .top) {
                 if scroller.showsJumpButton {
                     ScrollToBottomButton(composerButtonSize: composerButtonSize) {
-                        transcriptWindow.showLatest(total: totalBlockCount)
-                        DispatchQueue.main.async { scroller.rideToBottom() }
+                        scroller.rideToBottom()
                     }
                         .offset(y: -Theme.Size.minimumTouchTarget - Theme.Spacing.xs)
                         .transition(.opacity)

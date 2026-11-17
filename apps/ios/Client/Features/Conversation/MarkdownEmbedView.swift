@@ -5,6 +5,7 @@ struct MarkdownEmbedView: View {
     let path: String
     @Environment(\.conversationFileResolver) private var resolver
     @Environment(\.conversationLinkHandler) private var openLink
+    @Environment(\.conversationViewport) private var viewport
     @State private var resolution: Resolution?
 
     private enum Resolution: Equatable {
@@ -27,6 +28,11 @@ struct MarkdownEmbedView: View {
 
     private var fileContent: some View {
         content
+            .environment(\.conversationViewport, nil)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .scrollView(axis: .vertical)) } action: { old, new in
+                viewport?.contentResized(from: old, to: new)
+            }
             .task(id: ResolveKey(path: path, revision: resolver?.revision)) {
                 let file = await resolver?.resolve(path)
                 guard !Task.isCancelled else { return }

@@ -24,8 +24,6 @@ final class ConversationViewportController {
         let restingInset: CGFloat
         var lifted = false
 
-        var pinsEnd: Bool { slack == 0 }
-
         func rests(in frame: Frame) -> Bool {
             frame.insetBottom <= restingInset + 0.5
         }
@@ -128,12 +126,14 @@ final class ConversationViewportController {
         }
     }
 
+    private enum LoadingAnchor {
+        case bottom(() -> Void)
+        case message(id: UUID, offset: CGFloat, windowStart: Int)
+    }
+
     private enum Presentation {
-        case opening(() -> Void)
-        case followingBottom
+        case loading(LoadingAnchor)
         case sending(UUID)
-        case followingTurn(UUID)
-        case revealingEarlier(id: UUID, offset: CGFloat, windowStart: Int)
         case reading
     }
 
@@ -164,6 +164,7 @@ final class ConversationViewportController {
     @ObservationIgnored private var visibleBlockFrames: [UUID: BlockFrame] = [:]
     @ObservationIgnored private var pendingFrame: Frame?
     @ObservationIgnored private var animatingCorrectionTop: CGFloat?
+    @ObservationIgnored private var contentResizeTarget: CGFloat?
     private var presentation = Presentation.reading {
         didSet { updateSizeChangeAnchor() }
     }
@@ -183,11 +184,12 @@ final class ConversationViewportController {
         inputFocused = false
         visibleTargetID = nil
         visibleBlockFrames.removeAll()
-        presentation = .opening(onSettled)
+        contentResizeTarget = nil
+        presentation = .loading(.bottom(onSettled))
         resetLayoutLog()
         showsJumpButton = false
-        move(to: .bottom)
-        position.scrollTo(edge: .bottom)
+        motion = .stationary
+        position = ScrollPosition(edge: .bottom)
         if pendingFrame != nil { geometryFrameDriver.schedule() }
     }
 
@@ -197,6 +199,7 @@ final class ConversationViewportController {
         visibleBlockFrames.removeAll()
         frame = nil
         pendingFrame = nil
+        contentResizeTarget = nil
         geometryFrameDriver.cancel()
         resetLayoutLog()
     }
@@ -225,17 +228,17 @@ final class ConversationViewportController {
 
     func endSendHandoff() {
         guard case .sending(let id) = presentation else { return }
-        presentation = .followingTurn(id)
-        if let frame = pendingFrame ?? frame { updateJumpButton(frame) }
-        preserveTurn(id)
+        presentation = .reading
+        if let frame = pendingFrame ?? frame {
+            position.scrollTo(y: frame.visualTop)
+            updateJumpButton(frame)
+        }
+        motion = .stationary
+        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=sendAnchored target=\(id) \(logSnapshot)")
     }
 
     func preserveTurn(_ id: UUID) {
-        switch presentation {
-        case .sending(let targetID), .followingTurn(let targetID):
-            guard targetID == id else { return }
-        case .opening, .followingBottom, .revealingEarlier, .reading: return
-        }
+        guard case .sending(let targetID) = presentation, targetID == id else { return }
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
@@ -249,7 +252,7 @@ final class ConversationViewportController {
         presentation = .reading
         guard frame?.jumpDistance ?? .infinity > 1 else {
             motion = .stationary
-            position.scrollTo(edge: .bottom)
+            if let frame { position.scrollTo(y: frame.visualTop) }
             Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=scroll target=bottom disposition=alreadyAtBottom \(logSnapshot)")
             return
         }
@@ -269,23 +272,26 @@ final class ConversationViewportController {
                   $0.value.rect.maxY > frame.insetTop && $0.value.rect.minY < frame.insetTop + frame.container
               }).min(by: { $0.value.rect.minY < $1.value.rect.minY }) else { return false }
         viewportHold = nil
-        presentation = .revealingEarlier(id: anchor.key, offset: anchor.value.rect.minY, windowStart: windowStart)
+        presentation = .loading(.message(id: anchor.key, offset: anchor.value.rect.minY, windowStart: windowStart))
         Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=revealEarlier phase=begin anchor=\(anchor.key) expectedOffset=\(anchor.value.rect.minY) windowStart=\(windowStart) \(logSnapshot)")
         return true
     }
 
     var earlierRevealAnchorID: UUID? {
-        if case .revealingEarlier(let id, _, _) = presentation { id } else { nil }
+        if case .loading(.message(let id, _, _)) = presentation { id } else { nil }
     }
 
     func measureBlock(_ id: UUID, frame: BlockFrame?) {
         visibleBlockFrames[id] = frame
+        if id == earlierRevealAnchorID {
+            keepEarlierRevealInPlace()
+        }
         geometryFrameDriver.schedule()
     }
 
     func blocksChanged(_ ids: [UUID]) {
         let renderedIDs = Set(ids)
-        if case .revealingEarlier(let id, _, _) = presentation, !renderedIDs.contains(id) {
+        if case .loading(.message(let id, _, _)) = presentation, !renderedIDs.contains(id) {
             endEarlierReveal(reason: "anchorRemoved")
         }
         visibleBlockFrames = visibleBlockFrames.filter { renderedIDs.contains($0.key) }
@@ -294,13 +300,12 @@ final class ConversationViewportController {
     func focusChanged(_ focused: Bool, slack: CGFloat, source: String) {
         guard inputFocused != focused else { return }
         inputFocused = focused
-        if case .revealingEarlier = presentation {
+        if case .loading(.message) = presentation {
             Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=focus source=\(source) focused=\(focused) hold=historyAnchor \(logSnapshot)")
             geometryFrameDriver.schedule()
             return
         }
         if focused {
-            if case .followingBottom = presentation { presentation = .reading }
             guard let frame else {
                 viewportHold = nil
                 Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=focus source=\(source) focused=true hold=none \(logSnapshot)")
@@ -354,10 +359,14 @@ final class ConversationViewportController {
     func phaseChanged(from old: ScrollPhase, to new: ScrollPhase) {
         guard old != new else { return }
         if new.isUserDriven {
+            contentResizeTarget = nil
             endEarlierReveal(reason: "gesture")
             switch presentation {
-            case .followingBottom, .followingTurn, .sending, .revealingEarlier: presentation = .reading
-            case .opening, .reading: break
+            case .loading(.bottom(let completion)):
+                presentation = .reading
+                completion()
+            case .loading(.message), .sending: presentation = .reading
+            case .reading: break
             }
             viewportHold = nil
             motion = .user(new)
@@ -369,12 +378,47 @@ final class ConversationViewportController {
 
     func geometryChanged(_ new: Frame) {
         pendingFrame = new
+        if let contentResizeTarget, abs(new.visualTop - contentResizeTarget) <= 1 {
+            self.contentResizeTarget = nil
+        }
         geometryFrameDriver.schedule()
     }
 
+    func contentResized(from old: CGRect, to new: CGRect) {
+        guard case .reading = presentation,
+              !isUserScrolling,
+              let frame = pendingFrame ?? frame,
+              old.height > 0,
+              abs(new.width - old.width) <= 0.5,
+              old.maxY <= frame.insetTop + 0.5 else { return }
+        let delta = new.height - old.height
+        guard abs(delta) > 0.5 else { return }
+        switch motion {
+        case .stationary, .programmatic(.viewportClearance): break
+        case .user, .programmatic: return
+        }
+        let target = max(0, (contentResizeTarget ?? frame.visualTop) + delta)
+        switch viewportHold {
+        case .reader:
+            viewportHold = .reader(top: target)
+        case .promptReader(let id, _):
+            viewportHold = .promptReader(id, top: target)
+        case .tail, .promptBottom: return
+        case nil: break
+        }
+        contentResizeTarget = target
+        move(to: .viewportClearance)
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            position.scrollTo(y: target)
+        }
+        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=contentResize correction=\(delta) targetTop=\(target) \(logSnapshot)")
+    }
+
     private func keepEarlierRevealInPlace() {
-        guard case .revealingEarlier(let id, let offset, let windowStart) = presentation,
-              let frame else { return }
+        guard case .loading(.message(let id, let offset, let windowStart)) = presentation,
+              let frame = pendingFrame ?? frame else { return }
         guard let block = visibleBlockFrames[id] else {
             endEarlierReveal(reason: "anchorUnavailable")
             return
@@ -399,7 +443,7 @@ final class ConversationViewportController {
     }
 
     private func endEarlierReveal(reason: String, actualOffset: CGFloat? = nil) {
-        guard case .revealingEarlier(let id, let offset, _) = presentation else { return }
+        guard case .loading(.message(let id, let offset, _)) = presentation else { return }
         presentation = .reading
         if inputFocused, let frame { viewportHold = .reader(top: frame.visualTop) }
         Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=revealEarlier phase=end reason=\(reason) anchor=\(id) expectedOffset=\(offset) actualOffset=\(actualOffset ?? visibleBlockFrames[id]?.rect.minY ?? offset) \(logSnapshot)")
@@ -410,7 +454,6 @@ final class ConversationViewportController {
             self.pendingFrame = nil
             commitGeometry(pendingFrame)
         }
-        keepEarlierRevealInPlace()
     }
 
     private func commitGeometry(_ new: Frame) {
@@ -420,10 +463,10 @@ final class ConversationViewportController {
             Log.ui.info("ConversationUX.geometry conversation=\(conversationID) source=scroll \(new.summary) owner=\(motion.label)")
         }
         stageLayoutLog(from: old, to: new)
-        if case .opening(let completion) = presentation {
-            guard new.container > 0 else { return }
-            if placeOpeningAtBottom(new) { return }
-            presentation = .followingBottom
+        if case .loading(.bottom(let completion)) = presentation {
+            guard new.container > 0, new.distanceFromEnd <= 1 else { return }
+            presentation = .reading
+            position.scrollTo(y: new.visualTop)
             motion = .stationary
             showsJumpButton = false
             completion()
@@ -432,9 +475,13 @@ final class ConversationViewportController {
         }
         updateJumpButton(new)
         let keyboardMoved = old.map { abs($0.insetBottom - new.insetBottom) > 0.5 } ?? false
+        let viewportChanged = old.map { abs($0.container - new.container) > 0.5 || abs($0.insetTop - new.insetTop) > 0.5 } ?? false
         viewportHold?.observe(new)
-        applyViewportHold(animation: keyboardMoved ? Self.keyboardAnimation : nil)
+        if keyboardMoved || viewportChanged {
+            applyViewportHold(animation: keyboardMoved ? Self.keyboardAnimation : nil)
+        }
         if case .programmatic(.bottom) = motion, new.distanceFromEnd <= 1 {
+            position.scrollTo(y: new.visualTop)
             motion = .stationary
         } else if case .programmatic(.viewportClearance) = motion {
             motion = .stationary
@@ -443,14 +490,6 @@ final class ConversationViewportController {
            viewportHold?.settles(in: new) == true {
             self.viewportHold = nil
         }
-    }
-
-    private func placeOpeningAtBottom(_ frame: Frame) -> Bool {
-        guard frame.container > 0, frame.distanceFromEnd > 1 else { return false }
-        move(to: .bottom)
-        position.scrollTo(edge: .bottom)
-        Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=openingCorrection \(logSnapshot)")
-        return true
     }
 
     private func stageLayoutLog(from old: Frame?, to new: Frame) {
@@ -493,7 +532,7 @@ final class ConversationViewportController {
 
     private func applyViewportHold(animation: Animation? = nil) {
         if case .sending = presentation { return }
-        if case .revealingEarlier = presentation { return }
+        if case .loading = presentation { return }
         guard let frame, let viewportHold else { return }
         let top = viewportHold.expectedTop(in: frame)
         guard abs(top - frame.visualTop) > 0.5 else {
@@ -511,6 +550,7 @@ final class ConversationViewportController {
 
     private func move(to target: Target) {
         if target != .viewportClearance {
+            contentResizeTarget = nil
             viewportHold = nil
         }
         motion = .programmatic(target)
@@ -524,10 +564,9 @@ final class ConversationViewportController {
 
     private var pinsEnd: Bool {
         switch presentation {
-        case .opening, .followingBottom: return true
-        case .sending, .followingTurn, .revealingEarlier, .reading: break
+        case .loading(.bottom): return true
+        case .loading(.message), .sending, .reading: break
         }
-        if case .tail(let hold) = viewportHold { return hold.pinsEnd }
         if case .promptBottom = viewportHold { return true }
         return false
     }

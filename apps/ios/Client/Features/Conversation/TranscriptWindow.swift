@@ -39,10 +39,6 @@ struct TranscriptWindow: Equatable {
         range = max(0, range.lowerBound - Self.batchSize)..<range.upperBound
     }
 
-    mutating func showLatest(total: Int) {
-        range = Self.tailRange(total: total)
-    }
-
     private static func tailRange(total: Int) -> Range<Int> {
         max(0, total - batchSize)..<total
     }
