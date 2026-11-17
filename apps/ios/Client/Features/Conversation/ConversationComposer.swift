@@ -802,28 +802,42 @@ struct ConversationComposer: View, Equatable {
         }
     }
 
+    private enum TrailingControl {
+        case send
+        case openWebsite
+        case stop
+        case attaching
+        case speech
+        case hidden
+    }
+
+    private var trailingControlState: TrailingControl {
+        if isEditingMessage { return canSubmit ? .send : .hidden }
+        if composer.isImporting { return isBusy ? .stop : .attaching }
+        if composer.canSubmit { return composer.websiteURL != nil ? .openWebsite : .send }
+        if isBusy, !composer.suppressesStopControl { return .stop }
+        return composer.isEmpty ? .speech : .hidden
+    }
+
     @ViewBuilder
     private var trailingControl: some View {
-        if isEditingMessage, canSubmit {
+        switch trailingControlState {
+        case .send:
             composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.ConversationControls.send, fill: Theme.Colors.primary, event: .send, action: submit)
-        } else if isEditingMessage {
-            EmptyView()
-        } else if composer.isImporting, isBusy {
+        case .openWebsite:
+            composerButton(systemName: "globe", label: String(localized: "Open website"), id: A11yID.ConversationControls.openWebsite, action: submit)
+        case .stop:
             composerButton(systemName: "stop.fill", label: A11yLabel.stop, id: A11yID.ConversationControls.stop, event: .stop, action: onStop)
-        } else if composer.isImporting {
+        case .attaching:
             CellularAutomatonLoader.small
                 .frame(width: composerButtonSize, height: composerButtonSize)
                 .padding(.trailing, 6)
                 .padding(.vertical, 5)
                 .accessibilityLabel("Attaching")
-        } else if composer.canSubmit, composer.websiteURL != nil {
-            composerButton(systemName: "globe", label: String(localized: "Open website"), id: A11yID.ConversationControls.openWebsite, action: submit)
-        } else if composer.canSubmit {
-            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.ConversationControls.send, fill: Theme.Colors.primary, event: .send, action: submit)
-        } else if isBusy, !composer.suppressesStopControl {
-            composerButton(systemName: "stop.fill", label: A11yLabel.stop, id: A11yID.ConversationControls.stop, event: .stop, action: onStop)
-        } else if composer.isEmpty {
+        case .speech:
             speechControl
+        case .hidden:
+            EmptyView()
         }
     }
 

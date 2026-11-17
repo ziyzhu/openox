@@ -22,20 +22,6 @@ private struct DelayedActivityKey: Equatable {
 }
 
 struct ConversationPage: View {
-    private enum SendHandoff: Equatable {
-        case idle
-        case waitingForAnchor(submissionID: UUID, origin: CGPoint)
-        case positioned(submissionID: UUID, offset: CGFloat, anchorTop: CGFloat, origin: CGPoint)
-        case animating(UUID)
-
-        var origin: CGPoint? {
-            switch self {
-            case .waitingForAnchor(_, let origin), .positioned(_, _, _, let origin): origin
-            case .idle, .animating: nil
-            }
-        }
-    }
-
     let conversation: Conversation
     let historyOpenRequestID: UUID
     let isCurrentConversation: () -> Bool
@@ -65,11 +51,8 @@ struct ConversationPage: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.requestReview) private var requestReview
     @State private var latestSubmissionID: UUID?
-    @State private var sendHandoff = SendHandoff.idle
+    @State private var sendHandoff = ConversationSendHandoff.idle
     @State private var composerInputFrame = CGRect.zero
-    @State private var submissionFrame = CGRect.null
-    @State private var sendFlightBubble: SendFlight.Bubble?
-    @State private var sendFlightPath: SendFlight.Path?
     @State private var sendTranscriptTail: CGFloat = 0
 
     private var holdsTranscript: Bool {
@@ -1304,19 +1287,19 @@ struct ConversationPage: View {
                 .modifier(ViewportFloorFrame(layout: viewportLayout, includesAnchorFloor: true))
                 .id(submissionID)
                 .onGeometryChange(for: CGRect?.self) { geometry in
-                    guard case .waitingForAnchor(let id, _) = sendHandoff, id == submissionID else { return nil }
+                    guard case .waitingForAnchor(let capture) = sendHandoff, capture.submissionID == submissionID else { return nil }
                     return geometry.frame(in: .global)
                 } action: { frame in
                     guard let frame, latestSubmissionID == submissionID else { return }
-                    submissionFrame = frame
+                    sendHandoff.measure(frame: frame, submissionID: submissionID)
                 }
                 .onGeometryChange(for: CGFloat?.self) { geometry in
-                    guard case .positioned(let id, _, _, _) = sendHandoff, id == submissionID else { return nil }
+                    guard case .positioned(let capture, _, _) = sendHandoff, capture.submissionID == submissionID else { return nil }
                     return geometry.frame(in: .global).minY
                 } action: { top in
                     guard let top, latestSubmissionID == submissionID,
-                          case .positioned(let id, _, let anchorTop, _) = sendHandoff,
-                          id == submissionID else { return }
+                          case .positioned(let capture, _, let anchorTop) = sendHandoff,
+                          capture.submissionID == submissionID else { return }
                     if abs(top - anchorTop) < 1 {
                         animateSendRise(submissionID)
                     } else {
@@ -1345,11 +1328,11 @@ struct ConversationPage: View {
 
     private func anchorBecameReady(_ anchorID: TurnID, anchorTop: CGFloat) async {
         guard latestSubmissionID == anchorID, submissionAnchor != nil,
-              case .waitingForAnchor(let submissionID, let origin) = sendHandoff,
-              submissionID == anchorID else { return }
+              case .waitingForAnchor(let capture) = sendHandoff,
+              capture.submissionID == anchorID else { return }
 
-        let offset = reduceMotion ? 0 : max(0, sendStartTop(origin) - anchorTop)
-        sendHandoff = .positioned(submissionID: submissionID, offset: offset, anchorTop: anchorTop, origin: origin)
+        let offset = reduceMotion ? 0 : max(0, sendStartTop(capture.origin) - anchorTop)
+        sendHandoff = .positioned(capture, offset: offset, anchorTop: anchorTop)
         scroller.beginSendHandoff(anchorID)
     }
 
@@ -1359,10 +1342,10 @@ struct ConversationPage: View {
 
     private var sendRiseOffset: CGFloat {
         switch sendHandoff {
-        case .waitingForAnchor(_, let origin):
-            guard !reduceMotion, !submissionFrame.isNull else { return 0 }
-            return max(0, sendStartTop(origin) - submissionFrame.minY)
-        case .positioned(_, let offset, _, _): return offset
+        case .waitingForAnchor(let capture):
+            guard !reduceMotion, !capture.frame.isNull else { return 0 }
+            return max(0, sendStartTop(capture.origin) - capture.frame.minY)
+        case .positioned(_, let offset, _): return offset
         case .idle, .animating: return 0
         }
     }
@@ -1370,8 +1353,7 @@ struct ConversationPage: View {
     private var sendFlight: SendFlight? {
         guard !reduceMotion, sendHandoff != .idle else { return nil }
         return SendFlight(origin: sendHandoff.origin) { bubble in
-            guard sendFlightPath == nil else { return }
-            sendFlightBubble = bubble
+            sendHandoff.capture(bubble: bubble)
         }
     }
 
@@ -1379,14 +1361,14 @@ struct ConversationPage: View {
         CGPoint(x: textOrigin.x - UserBubble.textInset.width, y: textOrigin.y - UserBubble.textInset.height)
     }
 
-    private func risingSendFlightPath(offset: CGFloat, anchorTop: CGFloat, origin: CGPoint) -> SendFlight.Path? {
-        guard let sendFlightBubble, !submissionFrame.isNull else { return nil }
+    private func risingSendFlightPath(capture: ConversationSendHandoff.Capture, offset: CGFloat, anchorTop: CGFloat) -> SendFlight.Path? {
+        guard let bubble = capture.bubble, !capture.frame.isNull else { return nil }
         let end = CGPoint(
-            x: submissionFrame.minX + sendFlightBubble.frame.minX,
-            y: anchorTop + sendFlightBubble.frame.minY
+            x: capture.frame.minX + bubble.frame.minX,
+            y: anchorTop + bubble.frame.minY
         )
         return SendFlight.Path(
-            origin: sendFlightBubbleOrigin(origin),
+            origin: sendFlightBubbleOrigin(capture.origin),
             start: CGPoint(x: end.x, y: end.y + offset),
             end: end
         )
@@ -1395,38 +1377,37 @@ struct ConversationPage: View {
     @ViewBuilder
     private var sendFlightOverlay: some View {
         if sendHandoff != .idle,
-           let sendFlightBubble,
-           let path = sendFlightPath ?? sendHandoff.origin.map({ .resting(at: sendFlightBubbleOrigin($0)) }) {
+           let bubble = sendHandoff.bubble,
+           let path = sendHandoff.path ?? sendHandoff.origin.map({ .resting(at: sendFlightBubbleOrigin($0)) }) {
             GeometryReader { proxy in
                 SendFlightBubbleView(
-                    bubble: sendFlightBubble,
+                    bubble: bubble,
                     path: path,
                     page: proxy.frame(in: .global).origin,
-                    elapsed: sendFlightPath == nil ? 0 : SendFlight.rise.settlingDuration
+                    elapsed: sendHandoff.path == nil ? 0 : SendFlight.rise.settlingDuration
                 )
             }
-            .animation(.linear(duration: SendFlight.rise.settlingDuration), value: sendFlightPath)
+            .animation(.linear(duration: SendFlight.rise.settlingDuration), value: sendHandoff.path)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
     }
 
     private var sendRiseOpacity: Double {
-        guard case .waitingForAnchor = sendHandoff else { return 1 }
-        return reduceMotion || submissionFrame.isNull ? 0 : 1
+        guard case .waitingForAnchor(let capture) = sendHandoff else { return 1 }
+        return reduceMotion || capture.frame.isNull ? 0 : 1
     }
 
     private func animateSendRise(_ submissionID: UUID) {
-        guard case .positioned(let id, let offset, let anchorTop, let origin) = sendHandoff,
-              id == submissionID else { return }
+        guard case .positioned(let capture, let offset, let anchorTop) = sendHandoff,
+              capture.submissionID == submissionID else { return }
         let anchorID = submissionID
         Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=animating submission=\(submissionID) anchor=\(anchorID) rise=\(Int(offset)) historyRise=\(Int(offset))")
         withAnimation(reduceMotion ? nil : .spring(SendFlight.rise), completionCriteria: .logicallyComplete) {
-            sendFlightPath = risingSendFlightPath(offset: offset, anchorTop: anchorTop, origin: origin)
-            sendHandoff = .animating(submissionID)
+            let path = risingSendFlightPath(capture: capture, offset: offset, anchorTop: anchorTop)
+            sendHandoff = .animating(submissionID, bubble: capture.bubble, path: path)
         } completion: {
-            guard sendHandoff == .animating(submissionID) else { return }
-            sendFlightPath = nil
+            guard case .animating(let id, _, _) = sendHandoff, id == submissionID else { return }
             sendHandoff = .idle
             scroller.endSendHandoff()
             Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=settled submission=\(submissionID) anchor=\(anchorID)")
@@ -1715,10 +1696,7 @@ struct ConversationPage: View {
     private func holdForSend(_ receipt: Conversation.SubmissionReceipt) {
         releaseAnchorFloor(reason: "send")
         latestSubmissionID = receipt.id
-        submissionFrame = .null
-        sendFlightBubble = nil
-        sendFlightPath = nil
-        sendHandoff = .waitingForAnchor(submissionID: receipt.id, origin: composerInputFrame.origin)
+        sendHandoff = .waitingForAnchor(.init(submissionID: receipt.id, origin: composerInputFrame.origin))
         scroller.holdForSend(receipt.id)
     }
 
