@@ -64,18 +64,13 @@ private enum CompactPage: String {
     case workspace
 }
 
-private enum CompactConversationTransition: Equatable {
+private enum ConversationTransition: Equatable {
     case idle
     case closing(UUID)
-    case opening(UUID)
+    case opening
 
     var isClosing: Bool {
         if case .closing = self { true } else { false }
-    }
-
-    var openingConversationId: UUID? {
-        guard case .opening(let id) = self else { return nil }
-        return id
     }
 }
 
@@ -496,8 +491,7 @@ struct RootView: View {
     @State private var splitSidebarWidth: CGFloat?
     @State private var compactSidebarSummaries: [ConversationMeta] = []
     @State private var compactSidebarCurrentId: UUID?
-    @State private var compactConversationTransition = CompactConversationTransition.idle
-    @State private var pendingConversationPresentationId: UUID?
+    @State private var conversationTransition = ConversationTransition.idle
     @State private var composerFocusRequest: ComposerFocusRequest?
     @State private var presentation: Presentation?
     @State private var browserBlockerOwner = UUID()
@@ -875,8 +869,7 @@ struct RootView: View {
         ZStack {
             if let conversation = conversations.current,
                conversations.openingId == nil,
-               !compactConversationTransition.isClosing,
-               pendingConversationPresentationId == nil || pendingConversationPresentationId == conversation.id {
+               !conversationTransition.isClosing {
                 ConversationPage(conversation: conversation,
                          historyOpenRequestID: conversationHistoryRequestID,
                          isCurrentConversation: { conversations.current === conversation },
@@ -913,8 +906,7 @@ struct RootView: View {
 
             if conversations.current == nil
                 || conversations.openingId != nil
-                || compactConversationTransition.isClosing
-                || pendingConversationPresentationId != nil {
+                || conversationTransition != .idle {
                 Group {
                     if let progress = storage.migrationProgress {
                         ProfileMigrationProgressView(stage: progress,
@@ -1001,13 +993,13 @@ struct RootView: View {
 
     private func openConversationFromSidebar(_ id: UUID) {
         guard !isSplitLayout, showSidebar else {
-            compactConversationTransition = .idle
+            conversationTransition = .idle
             openConversation(id)
             return
         }
         compactSidebarCurrentId = id
         guard conversations.currentId != id else {
-            compactConversationTransition = .idle
+            conversationTransition = .idle
             openConversation(id)
             setSidebar(false)
             return
@@ -1015,30 +1007,32 @@ struct RootView: View {
         Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellClosing")
         conversations.open(id)
         guard conversations.currentId != id else {
-            compactConversationTransition = .idle
+            conversationTransition = .idle
             Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellOpening source=memory")
             setSidebar(false)
             return
         }
-        pendingConversationPresentationId = id
-        compactConversationTransition = .closing(id)
+        conversationTransition = .closing(id)
         setSidebar(false, completionCriteria: .removed) {
-            guard compactConversationTransition == .closing(id) else { return }
-            compactConversationTransition = .opening(id)
+            guard conversationTransition == .closing(id) else { return }
+            conversationTransition = .opening
             Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellOpening")
         }
     }
 
     private func finishConversationOpening(_ visibleId: UUID) {
-        guard pendingConversationPresentationId == visibleId, conversations.openingId == nil else { return }
+        guard isAwaitingPresentation(of: visibleId) else { return }
         DispatchQueue.main.async {
-            guard pendingConversationPresentationId == visibleId, conversations.openingId == nil else { return }
+            guard isAwaitingPresentation(of: visibleId) else { return }
             withAnimation(reduceMotion ? nil : Theme.Animation.quick) {
-                pendingConversationPresentationId = nil
-                compactConversationTransition = .idle
+                conversationTransition = .idle
             }
             Log.ui.info("ConversationUX.lifecycle conversation=\(visibleId) phase=shellReady")
         }
+    }
+
+    private func isAwaitingPresentation(of visibleId: UUID) -> Bool {
+        conversationTransition == .opening && conversations.openingId == nil && conversations.currentId == visibleId
     }
 
     private func openConversation(_ id: UUID) {
@@ -1046,7 +1040,7 @@ struct RootView: View {
             conversationHistoryRequestID = UUID()
             return
         }
-        pendingConversationPresentationId = id
+        conversationTransition = .opening
         conversations.open(id)
     }
 
@@ -1254,8 +1248,7 @@ struct RootView: View {
                 let composer = ConversationComposerModel()
                 composer.attach(outcome.staged)
                 sharedNoteComposer = (ObjectIdentifier(conversation), composer)
-                compactConversationTransition = .idle
-                pendingConversationPresentationId = nil
+                conversationTransition = .idle
                 presentation = nil
                 setSidebar(false)
                 requestComposerFocus(for: conversation, reason: "sharedFiles")
