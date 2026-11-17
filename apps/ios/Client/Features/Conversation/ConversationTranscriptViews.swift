@@ -5,7 +5,7 @@ import WebKit
 private struct AttachmentThumb: View {
     let attachment: FileItem
     let sourceID: String
-    let onOpen: (FileItem, String) -> Void
+    let onOpen: (FileItem) -> Void
 
     var body: some View {
         FileThumbnail(
@@ -14,7 +14,7 @@ private struct AttachmentThumb: View {
             previewSourceID: sourceID
         )
         .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-        .onTapGesture { onOpen(attachment, sourceID) }
+        .onTapGesture { onOpen(attachment) }
         .accessibilityAddTraits(.isButton)
     }
 }
@@ -475,7 +475,7 @@ struct UserBubble: View {
     let text: String
     let attachments: [FileItem]
     let sourcePrefix: String
-    let onOpenAttachment: (FileItem, String) -> Void
+    let onOpenAttachment: (FileItem) -> Void
     @Environment(\.sendFlight) private var sendFlight
 
     var body: some View {
@@ -526,7 +526,7 @@ private struct UserSkillBubble: View {
     let invocation: UserSkillInvocation
     let attachments: [FileItem]
     let sourcePrefix: String
-    let onOpenAttachment: (FileItem, String) -> Void
+    let onOpenAttachment: (FileItem) -> Void
     let onOpenSkill: (Skill) -> Void
 
     var body: some View {
@@ -621,7 +621,7 @@ private struct InteractionResponseBubble: View {
 
 struct QueuedBubble: View {
     let message: Conversation.QueuedMessage
-    let onOpenAttachment: (FileItem, String) -> Void
+    let onOpenAttachment: (FileItem) -> Void
     let onOpenSkill: (Skill) -> Void
     let onCancel: () -> Void
 
@@ -685,7 +685,7 @@ struct BlockView: View, Equatable {
     var allowsLoader = true
     let controls: MessageControls
     let fileControls: FileControls
-    let onOpenAttachment: (FileItem, String) -> Void
+    let onOpenAttachment: (FileItem) -> Void
     let onOpenSkill: (Skill) -> Void
     let onOpenLink: (URL) -> Void
 
@@ -944,7 +944,7 @@ struct BlockView: View, Equatable {
     }
 
     private func fileRow(_ file: FileItem, sourceID: String) -> some View {
-        Button { onOpenAttachment(file, sourceID) } label: {
+        Button { onOpenAttachment(file) } label: {
             ConversationFileRow(file: file, previewSourceID: sourceID)
         }
         .buttonStyle(.plain)

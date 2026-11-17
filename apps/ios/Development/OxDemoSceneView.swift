@@ -86,7 +86,7 @@ struct OxDemoSceneView: View {
                                 text: playback.conversation.prompt,
                                 attachments: [],
                                 sourcePrefix: "demo",
-                                onOpenAttachment: { _, _ in }
+                                onOpenAttachment: { _ in }
                             )
                             .accessibilityIdentifier(A11yID.ConversationControls.Message.user)
                         }
@@ -149,8 +149,7 @@ struct OxDemoSceneView: View {
             isEmbedded: playback.scene == .creative,
             iconButtonSize: iconButtonSize,
             composerButtonSize: composerButtonSize,
-            onOpenAttachment: { _, _ in },
-            onOpenConversationFile: { _ in },
+            onOpenAttachment: { _ in },
             onPasteImages: { _ in },
             onOpenService: { _ in },
             onRemoveService: { _ in },

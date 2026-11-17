@@ -224,8 +224,7 @@ struct ConversationComposer: View, Equatable {
     let isEmbedded: Bool
     let iconButtonSize: CGFloat
     let composerButtonSize: CGFloat
-    let onOpenAttachment: (FileItem, String) -> Void
-    let onOpenConversationFile: (FileItem) -> Void
+    let onOpenAttachment: (FileItem) -> Void
     let onPasteImages: ([PastedComposerImage]) -> Void
     let onOpenService: (Service) -> Void
     let onRemoveService: (Service) -> Void
@@ -357,7 +356,7 @@ struct ConversationComposer: View, Equatable {
                             DraftAttachmentChip(
                                 attachment: attachment,
                                 sourceID: sourceID,
-                                onOpen: { onOpenAttachment(attachment, sourceID) }
+                                onOpen: { onOpenAttachment(attachment) }
                             ) {
                                 composer.removeDraftAttachment(item)
                             }
@@ -629,7 +628,7 @@ struct ConversationComposer: View, Equatable {
             ForEach(conversationFiles) { file in
                 Button {
                     Log.ui.info("ConversationComposer.fileSelect conversation=\(sessionID) filename=\(file.fileName)")
-                    onOpenConversationFile(file)
+                    onOpenAttachment(file)
                 } label: {
                     Label(
                         file.userFacingName,

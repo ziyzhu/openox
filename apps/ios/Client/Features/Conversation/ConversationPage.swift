@@ -3,7 +3,6 @@ import AVFAudio
 import UIKit
 import WebKit
 import PhotosUI
-import QuickLook
 import UniformTypeIdentifiers
 import StoreKit
 
@@ -78,7 +77,6 @@ struct ConversationPage: View {
         case camera
         case photos
         case files
-        case attachment(URL)
         case conversationFiles
 
         var id: String {
@@ -88,7 +86,6 @@ struct ConversationPage: View {
             case .camera: "camera"
             case .photos: "photos"
             case .files: "files"
-            case .attachment(let url): "attachment:\(url.absoluteString)"
             case .conversationFiles: "conversationFiles"
             }
         }
@@ -191,16 +188,6 @@ struct ConversationPage: View {
                     modalPresentation = nil
                 }
             }
-        )
-    }
-
-    private var previewAttachmentURL: Binding<URL?> {
-        Binding(
-            get: {
-                guard case .attachment(let url) = modalPresentation else { return nil }
-                return url
-            },
-            set: { url in modalPresentation = url.map(ModalPresentation.attachment) }
         )
     }
 
@@ -349,7 +336,6 @@ struct ConversationPage: View {
                     if mountsComposer {
                         composerDock(
                             isConversationEmpty: conversation.canChangeRetention && blocks.isEmpty,
-                            totalBlockCount: totalBlockCount,
                             floatsTopStrip: floatsTopStrip
                         )
                         .frame(height: webInputFocused ? 0 : nil, alignment: .bottom)
@@ -357,7 +343,7 @@ struct ConversationPage: View {
                         .allowsHitTesting(!webInputFocused)
                         .accessibilityHidden(webInputFocused)
                     } else if let dockedPrompt {
-                        promptDock(dockedPrompt, totalBlockCount: totalBlockCount)
+                        promptDock(dockedPrompt)
                     }
                 }
                 .frame(maxWidth: Theme.ContainerWidth.readable)
@@ -453,7 +439,6 @@ struct ConversationPage: View {
                   reason == .oldDeviceUnavailable || reason == .newDeviceAvailable else { return }
             speechInput.interrupt()
         }
-        .quickLookPreview(previewAttachmentURL)
         .onAppear {
             ClientAutomation.composer = composer
         }
@@ -514,7 +499,7 @@ struct ConversationPage: View {
                         Log.ui.info("ConversationPage.filePreview select conversation=\(conversation.id) filename=\(file.fileName)")
                     }
                     .presentationDetents([.medium, .large])
-                case .camera, .photos, .files, .attachment:
+                case .camera, .photos, .files:
                     EmptyView()
                 }
             }
@@ -528,7 +513,7 @@ struct ConversationPage: View {
                     if let image { ingestCameraImage(image) }
                 }
                 .ignoresSafeArea()
-            case .modelPicker, .serviceDetail, .photos, .files, .attachment, .conversationFiles:
+            case .modelPicker, .serviceDetail, .photos, .files, .conversationFiles:
                 EmptyView()
             }
         }
@@ -885,13 +870,11 @@ struct ConversationPage: View {
 
     private func composerBlock(
         isConversationEmpty: Bool,
-        floatsTopStrip: Bool,
-        isEmbedded: Bool
+        floatsTopStrip: Bool
     ) -> some View {
         inputBar(
             isConversationEmpty: isConversationEmpty,
-            floatsTopStrip: floatsTopStrip,
-            isEmbedded: isEmbedded
+            floatsTopStrip: floatsTopStrip
         )
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
                 guard viewportLayout.measureComposerHeight(height) else { return }
@@ -920,7 +903,7 @@ struct ConversationPage: View {
                 editableBlock: editableBlock(block)
             ),
             fileControls: fileControls,
-            onOpenAttachment: { file, sourceID in openAttachment(file, sourceID: sourceID) },
+            onOpenAttachment: { openAttachment($0) },
             onOpenSkill: { openSkill($0) },
             onOpenLink: { openLink($0) }
         )
@@ -1047,7 +1030,7 @@ struct ConversationPage: View {
     private func queuedRow(_ queued: Conversation.QueuedMessage, identified: Bool = true) -> some View {
         let row = QueuedBubble(
             message: queued,
-            onOpenAttachment: { file, sourceID in openAttachment(file, sourceID: sourceID) },
+            onOpenAttachment: { openAttachment($0) },
             onOpenSkill: { openSkill($0) }
         ) { conversation.cancelQueued(queued.id) }
             .transition(.opacity)
@@ -1079,7 +1062,6 @@ struct ConversationPage: View {
         GeometryReader { outer in
             ScrollView {
                 transcriptRows(
-                    blocks: blocks,
                     renderedBlocks: blocks,
                     latestCanvasBlockIDs: latestCanvasBlockIDs,
                     scrollToTurn: { id in
@@ -1219,7 +1201,6 @@ struct ConversationPage: View {
     }
 
     private func transcriptRows(
-        blocks: [ConversationBlock],
         renderedBlocks: [ConversationBlock],
         latestCanvasBlockIDs: [URL: UUID],
         scrollToTurn: @escaping (TurnID) async -> Void
@@ -1405,8 +1386,7 @@ struct ConversationPage: View {
     private func animateSendRise(_ submissionID: UUID) {
         guard case .positioned(let capture, let offset, let anchorTop) = sendHandoff,
               capture.submissionID == submissionID else { return }
-        let anchorID = submissionID
-        Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=animating submission=\(submissionID) anchor=\(anchorID) rise=\(Int(offset)) historyRise=\(Int(offset))")
+        Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=animating submission=\(submissionID) rise=\(Int(offset))")
         withAnimation(reduceMotion ? nil : .spring(SendFlight.rise), completionCriteria: .logicallyComplete) {
             let path = risingSendFlightPath(capture: capture, offset: offset, anchorTop: anchorTop)
             sendHandoff = .animating(submissionID, bubble: capture.bubble, path: path)
@@ -1414,7 +1394,7 @@ struct ConversationPage: View {
             guard case .animating(let id, _, _) = sendHandoff, id == submissionID else { return }
             sendHandoff = .idle
             scroller.endSendHandoff()
-            Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=settled submission=\(submissionID) anchor=\(anchorID)")
+            Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=settled submission=\(submissionID)")
         }
         if anyInputFocused { prepareComposerSubmission() }
     }
@@ -1436,8 +1416,7 @@ struct ConversationPage: View {
 
     private func inputBar(
         isConversationEmpty: Bool,
-        floatsTopStrip: Bool,
-        isEmbedded: Bool
+        floatsTopStrip: Bool
     ) -> some View {
         ConversationComposer(
             composer: composer,
@@ -1454,11 +1433,10 @@ struct ConversationPage: View {
             isBusy: conversation.isBusy,
             followIntents: conversation.followIntents,
             floatsTopStrip: floatsTopStrip,
-            isEmbedded: isEmbedded,
+            isEmbedded: false,
             iconButtonSize: iconButtonSize,
             composerButtonSize: composerButtonSize,
-            onOpenAttachment: { file, sourceID in openAttachment(file, sourceID: sourceID) },
-            onOpenConversationFile: { openAttachment($0) },
+            onOpenAttachment: { openAttachment($0) },
             onPasteImages: ingestPastedImages,
             onOpenService: { serviceDetailPresentation.wrappedValue = $0 },
             onRemoveService: removeService,
@@ -1488,10 +1466,9 @@ struct ConversationPage: View {
 
     private func composerDock(
         isConversationEmpty: Bool,
-        totalBlockCount: Int,
         floatsTopStrip: Bool
     ) -> some View {
-        composerBlock(isConversationEmpty: isConversationEmpty, floatsTopStrip: floatsTopStrip, isEmbedded: false)
+        composerBlock(isConversationEmpty: isConversationEmpty, floatsTopStrip: floatsTopStrip)
             .transition(.opacity.animation(Theme.Animation.quick))
             .overlay(alignment: .top) {
                 if scroller.showsJumpButton {
@@ -1515,10 +1492,7 @@ struct ConversationPage: View {
             )
     }
 
-    private func promptDock(
-        _ pending: Conversation.PendingPrompt,
-        totalBlockCount: Int
-    ) -> some View {
+    private func promptDock(_ pending: Conversation.PendingPrompt) -> some View {
         ConversationPromptCard(
             pending: pending,
             conversation: conversation,
@@ -1751,7 +1725,7 @@ struct ConversationPage: View {
         }
     }
 
-    private func openAttachment(_ att: FileItem, sourceID _: String? = nil) {
+    private func openAttachment(_ att: FileItem) {
         Log.ui.info("ConversationPage.openAttachment conversation=\(conversation.id) kind=\(att.kind.rawValue) name=\(att.displayName)")
         navigationFile = att
     }
