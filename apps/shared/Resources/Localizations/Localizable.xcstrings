@@ -1,6 +1,39 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Keep your reading position as messages and previews finish loading, with fewer unexpected scroll jumps." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "消息和预览加载完成时保持阅读位置，减少意外的滚动跳动。"
+          }
+        }
+      }
+    },
+    "View more messages at once when opening a conversation or loading earlier history." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开对话或加载更早的历史记录时，一次显示更多消息。"
+          }
+        }
+      }
+    },
+    "Smoother transitions when sending messages and switching composer controls, with improved support for Reduce Motion." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送消息和切换输入框控件时过渡更流畅，并改进对“减弱动态效果”的支持。"
+          }
+        }
+      }
+    },
     "Added passkey sign-in support for compatible websites, with improved automatic sign-in and clearer handoffs." : {
       "extractionState" : "manual",
       "localizations" : {

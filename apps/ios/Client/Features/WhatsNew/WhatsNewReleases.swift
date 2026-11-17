@@ -9,6 +9,11 @@ struct WhatsNewRelease: Identifiable {
 
 enum WhatsNew {
     static let releases: [WhatsNewRelease] = [
+        WhatsNewRelease(version: "1.1.1", items: [
+            "Keep your reading position as messages and previews finish loading, with fewer unexpected scroll jumps.",
+            "View more messages at once when opening a conversation or loading earlier history.",
+            "Smoother transitions when sending messages and switching composer controls, with improved support for Reduce Motion."
+        ]),
         WhatsNewRelease(version: "1.1.0", items: [
             "Added passkey sign-in support for compatible websites, with improved automatic sign-in and clearer handoffs.",
             "More reliable browser automation when navigating websites and creating reusable website tools.",
