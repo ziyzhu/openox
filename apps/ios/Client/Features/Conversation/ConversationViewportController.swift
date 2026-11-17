@@ -286,7 +286,6 @@ final class ConversationViewportController {
         if id == earlierRevealAnchorID {
             keepEarlierRevealInPlace()
         }
-        geometryFrameDriver.schedule()
     }
 
     func blocksChanged(_ ids: [UUID]) {
@@ -595,7 +594,10 @@ private final class ConversationViewportFrameDriver {
     }
 
     func schedule() {
-        guard link == nil else { return }
+        if let link {
+            link.isPaused = false
+            return
+        }
         let proxy = ConversationViewportFrameProxy { [weak self] in
             self?.fire()
         }
@@ -610,8 +612,12 @@ private final class ConversationViewportFrameDriver {
     }
 
     private func fire() {
-        cancel()
+        link?.isPaused = true
         handler()
+    }
+
+    isolated deinit {
+        link?.invalidate()
     }
 }
 
