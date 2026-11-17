@@ -61,7 +61,7 @@ demo access also stay outside Git.
 
 Current English promotional text, supplied by the operator:
 
-> A self-evolving agent that runs on your phone
+> A self-evolving bot that runs locally on your phone.
 
 Require this exact text in every configured English locale of the intended
 version. During release preparation, set it when missing or different, then read

@@ -206,7 +206,7 @@ try {
             blockers.push(`What's New for ${locale} differs from the in-app ${version} entry; keep App Store and in-app notes identical.`);
           }
         }
-        if (locale.startsWith("en") && localization.attributes.promotionalText !== "A self-evolving agent that runs on your phone") {
+        if (locale.startsWith("en") && localization.attributes.promotionalText !== "A self-evolving bot that runs locally on your phone.") {
           blockers.push(`Promotional text differs from approved copy in ${locale}; apply the approved English text during release preparation and verify readback.`);
         }
         media[locale] = {
