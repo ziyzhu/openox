@@ -369,13 +369,14 @@ struct RequestCardOptions: View {
                     selection: selection,
                     isConfirmed: options.contains(selection) || resolution == nil
                 )
-                .transition(.scale(scale: 0.97).combined(with: .opacity))
+                .transition(.opacity.animation(Theme.Animation.quick))
             } else {
                 optionButtons
                     .disabled(submittedSelection != nil)
-                    .transition(.opacity)
+                    .transition(.opacity.animation(Theme.Animation.quick))
             }
         }
+        .animation(reduceMotion ? nil : Theme.Animation.standard, value: selection)
         .task(id: submittedSelection) {
             guard let submittedSelection else { return }
             do {
@@ -515,7 +516,7 @@ struct RequestCardOptions: View {
     private func select(_ option: String) {
         guard effectiveSelection == nil else { return }
         Haptics.impact(.requestAnswered)
-        withAnimation(reduceMotion ? nil : Theme.Animation.handoff) {
+        withAnimation(Theme.Animation.quick) {
             submittedSelection = option
         }
     }

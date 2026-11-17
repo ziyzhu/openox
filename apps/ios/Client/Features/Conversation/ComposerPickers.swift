@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ComposerServicePicker: View {
     @Bindable var composer: ConversationComposerModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let excludedDomains: Set<String>
     let composerHeight: CGFloat
     let onSelect: (Service) -> Void
@@ -23,10 +24,10 @@ struct ComposerServicePicker: View {
                     .padding(.bottom, composerHeight + Theme.Spacing.xs)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 }
-                .transition(.opacity)
+                .transition(.opacity.animation(Theme.Animation.quick))
             }
         }
-        .animation(Theme.Animation.standard, value: isMentioning)
+        .animation(reduceMotion ? nil : Theme.Animation.quick, value: isMentioning)
     }
 
     private var isMentioning: Bool {
@@ -36,6 +37,7 @@ struct ComposerServicePicker: View {
 
 struct ComposerSlashPicker: View {
     @Bindable var composer: ConversationComposerModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let isFocused: Bool
     let composerHeight: CGFloat
     let onSelect: (Skill) -> Void
@@ -56,15 +58,16 @@ struct ComposerSlashPicker: View {
                     .padding(.bottom, composerHeight + Theme.Spacing.xs)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 }
-                .transition(.opacity)
+                .transition(.opacity.animation(Theme.Animation.quick))
             }
         }
-        .animation(Theme.Animation.standard, value: suggestions.isEmpty)
+        .animation(reduceMotion ? nil : Theme.Animation.quick, value: suggestions.isEmpty)
     }
 }
 
 struct ComposerWebsitePicker: View {
     @Bindable var composer: ConversationComposerModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let isFocused: Bool
     let composerHeight: CGFloat
     let onSelect: (String) -> Void
@@ -80,10 +83,10 @@ struct ComposerWebsitePicker: View {
                     .padding(.horizontal, Theme.Spacing.md)
                     .padding(.bottom, composerHeight + Theme.Spacing.xs)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .transition(.opacity)
+                    .transition(.opacity.animation(Theme.Animation.quick))
             }
         }
-        .animation(Theme.Animation.standard, value: suggestions.isEmpty)
+        .animation(reduceMotion ? nil : Theme.Animation.quick, value: suggestions.isEmpty)
         .task(id: isFocused) {
             guard isFocused else { return }
             sites = await serviceManager.visitedSites()

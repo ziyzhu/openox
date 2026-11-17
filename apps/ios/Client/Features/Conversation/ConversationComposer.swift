@@ -466,7 +466,7 @@ struct ConversationComposer: View, Equatable {
                 .frame(height: Theme.Spacing.lg)
             }
         }
-        .animation(Theme.Animation.standard, value: isResting)
+        .animation(reduceMotion ? nil : Theme.Animation.standard, value: isResting)
     }
 
     private var inputBarTopSpacing: CGFloat {
@@ -478,7 +478,7 @@ struct ConversationComposer: View, Equatable {
         VStack(alignment: .leading, spacing: Self.topStripSpacing) {
             if showsTopStrip && !floatsTopStrip {
                 composerTopStrip
-                    .transition(topStripTransition)
+                    .transition(.opacity.animation(Theme.Animation.quick))
             }
 
             VStack(alignment: .leading, spacing: 0) {
@@ -503,9 +503,10 @@ struct ConversationComposer: View, Equatable {
             if showsTopStrip && floatsTopStrip {
                 composerTopStrip
                     .offset(y: -Self.floatingTopStripClearance)
-                    .transition(topStripTransition)
+                    .transition(.opacity.animation(Theme.Animation.quick))
             }
         }
+        .animation(reduceMotion ? nil : Theme.Animation.standard, value: showsTopStrip)
     }
 
     private var composerGlass: Glass {
@@ -514,10 +515,6 @@ struct ConversationComposer: View, Equatable {
 
     private var composerShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
-    }
-
-    private var topStripTransition: AnyTransition {
-        .scale(scale: 0.8).combined(with: .opacity)
     }
 
     private var showsTopStrip: Bool {
@@ -797,12 +794,17 @@ struct ConversationComposer: View, Equatable {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            trailingControl
-                .padding(.bottom, 1)
+            ZStack {
+                trailingControl
+                    .id(trailingControlState)
+                    .transition(.opacity.animation(Theme.Animation.quick))
+            }
+            .animation(reduceMotion ? nil : Theme.Animation.quick, value: trailingControlState)
+            .padding(.bottom, 1)
         }
     }
 
-    private enum TrailingControl {
+    private enum TrailingControl: Hashable {
         case send
         case openWebsite
         case stop
@@ -855,7 +857,7 @@ struct ConversationComposer: View, Equatable {
             .foregroundStyle(speech.isPresented ? Theme.Colors.onPrimary : Theme.Colors.onSurface)
             .frame(width: composerButtonSize, height: composerButtonSize)
             .background(speechControlFill, in: Circle())
-            .scaleEffect(speech.isRecording ? 1.12 : 1)
+            .scaleEffect(!reduceMotion && speech.isRecording ? 1.12 : 1)
             .padding(.leading, 4)
             .padding(.trailing, 6)
             .padding(.vertical, 5)

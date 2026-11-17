@@ -369,6 +369,7 @@ struct ConversationPage: View {
                     scroller.promptWillChange(to: id)
                 }
                 .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0), value: dockedPrompt?.id)
+                .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0), value: mountsComposer)
                 .transaction(value: dockedPrompt?.id) { transaction in
                     transaction.addAnimationCompletion(criteria: .logicallyComplete) {
                         scroller.promptDidChange(to: dockedPrompt?.id)
@@ -1491,7 +1492,7 @@ struct ConversationPage: View {
         floatsTopStrip: Bool
     ) -> some View {
         composerBlock(isConversationEmpty: isConversationEmpty, floatsTopStrip: floatsTopStrip, isEmbedded: false)
-            .transition(.opacity)
+            .transition(.opacity.animation(Theme.Animation.quick))
             .overlay(alignment: .top) {
                 if scroller.showsJumpButton {
                     ScrollToBottomControl(
@@ -1544,7 +1545,7 @@ struct ConversationPage: View {
                         .transition(.opacity)
                 }
             }
-            .transition(.opacity)
+            .transition(.opacity.animation(Theme.Animation.quick))
             .onAppear {
                 Log.ui.info("ConversationUX.promptDock conversation=\(conversation.id) prompt=\(pending.id) kind=\(pending.kind.rawValue) secret=\(pending.secretEntry != nil) phase=presented")
             }
@@ -1719,7 +1720,7 @@ struct ConversationPage: View {
         Log.ui.info("ConversationPage.beginEditing conversation=\(conversation.id) block=\(block.id) chars=\(text.count)")
         composer.setAttachmentMenuPresented(false)
         editDraft = AttributedString(text)
-        withAnimation(Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
+        withAnimation(reduceMotion ? nil : Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
             editedBlockID = block.id
         } completion: {
             composerFocused = true
@@ -1731,7 +1732,7 @@ struct ConversationPage: View {
         guard !trimmed.isEmpty else { return }
         Log.ui.info("ConversationPage.commitEdit conversation=\(conversation.id) block=\(blockID) chars=\(trimmed.count)")
         prepareComposerSubmission()
-        withAnimation(Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
+        withAnimation(reduceMotion ? nil : Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
             editedBlockID = nil
             editDraft = AttributedString()
         } completion: {
@@ -1742,7 +1743,7 @@ struct ConversationPage: View {
     private func cancelEditing(reason: String, keepFocus: Bool) {
         guard let editedBlockID else { return }
         Log.ui.info("ConversationPage.cancelEditing conversation=\(conversation.id) block=\(editedBlockID) reason=\(reason)")
-        withAnimation(Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
+        withAnimation(reduceMotion ? nil : Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
             self.editedBlockID = nil
             editDraft = AttributedString()
         } completion: {
