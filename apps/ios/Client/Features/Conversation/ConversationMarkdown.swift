@@ -97,9 +97,9 @@ struct StreamingMarkdownText: View {
             }
             if input.isStreaming { fadeKey = generation }
             latest = input
-            if snapshot.blocks.isEmpty, scheduled == nil, !input.isStreaming,
-               let blocks = MarkdownParser.shared.cached(input.source) {
-                snapshot = Snapshot(input: input, blocks: blocks, generation: generation, fadeKey: fadeKey)
+            if snapshot.blocks.isEmpty, scheduled == nil, !input.isStreaming {
+                snapshot = Snapshot(input: input, blocks: MarkdownParser.shared.blocks(input.source),
+                                    generation: generation, fadeKey: fadeKey)
                 return
             }
             pending = (input, generation, fadeKey)
@@ -711,12 +711,12 @@ private actor MarkdownParser {
         return cache
     }()
 
-    nonisolated func cached(_ source: String) -> [MarkdownBlock]? {
-        cache.object(forKey: TextRenderCachePolicy.key(source))?.blocks
-    }
-
     func parse(_ source: String) throws -> [MarkdownBlock] {
         try Task.checkCancellation()
+        return blocks(source)
+    }
+
+    nonisolated func blocks(_ source: String) -> [MarkdownBlock] {
         let key = TextRenderCachePolicy.key(source)
         if let hit = cache.object(forKey: key) { return hit.blocks }
         let blocks = MarkdownBlock.parse(source)
