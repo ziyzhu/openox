@@ -9,6 +9,12 @@ on:
       build:
         type: string
         default: ""
+      prepared-build:
+        type: string
+        default: ""
+      prepared-artifact:
+        type: string
+        default: ""
   workflow_dispatch:
     inputs:
       mode:
@@ -24,14 +30,25 @@ on:
 permissions: {}
 
 concurrency:
-  group: ios-upload
+  group: ${{ github.event_name == 'workflow_dispatch' && 'ios-upload' || format('ios-upload-{0}', github.run_id) }}
   cancel-in-progress: false
 
 jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main' && inputs.prepared-build == ''
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ios-prepare.yml
+    with:
+      mode: ${{ inputs.mode }}
+      build: ${{ inputs.build }}
+    secrets: inherit
+
   upload:
-    if: github.ref == 'refs/heads/main'
+    needs: prepare
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && inputs.mode == 'upload' && (needs.prepare.result == 'success' || (needs.prepare.result == 'skipped' && inputs.prepared-build != '')) }}
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 30
     environment: appstore
     permissions:
       contents: read
@@ -39,10 +56,9 @@ jobs:
       ASC_BYPASS_KEYCHAIN: "1"
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      OX_DEVELOPMENT_TEAM: ${{ vars.OX_DEVELOPMENT_TEAM }}
       OX_BUNDLE_IDENTIFIER: ${{ vars.OX_BUNDLE_IDENTIFIER }}
-      MODE: ${{ inputs.mode }}
-      BUILD_INPUT: ${{ inputs.build }}
+      BUILD: ${{ inputs.prepared-build || needs.prepare.outputs.build }}
+      ARTIFACT: ${{ inputs.prepared-artifact || needs.prepare.outputs.artifact }}
     steps:
       - name: Check build source credential
         if: inputs.mode == 'upload'
@@ -57,40 +73,15 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
-        with:
-          bun-version-file: .bun-version
-      - run: |
-          version="$(bun --no-env-file -p 'require("./.github/ci.json").xcode')"
-          echo "DEVELOPER_DIR=/Applications/Xcode_$version.app/Contents/Developer" >> "$GITHUB_ENV"
-      - run: brew install asc
-      - run: git config --global lfs.fetchexclude 'prebuilt/**'
-      - name: Import archive signing identity
-        env:
-          IOS_SIGNING_P12_BASE64: ${{ secrets.IOS_SIGNING_P12_BASE64 }}
-          IOS_SIGNING_P12_PASSWORD: ${{ secrets.IOS_SIGNING_P12_PASSWORD }}
+      - name: Check prepared build inputs
         run: |
-          set -euo pipefail
-          [ -n "$IOS_SIGNING_P12_BASE64" ] && [ -n "$IOS_SIGNING_P12_PASSWORD" ] || {
-            echo "::error::Set IOS_SIGNING_P12_BASE64 and IOS_SIGNING_P12_PASSWORD in the appstore environment to an existing Apple Development identity."
-            exit 1
-          }
-          keychain="$RUNNER_TEMP/ios-signing.keychain-db"
-          password="$(openssl rand -hex 32)"
-          echo "::add-mask::$password"
-          umask 077
-          printf '%s' "$IOS_SIGNING_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/ios-signing.p12"
-          trap 'rm -f "$RUNNER_TEMP/ios-signing.p12"' EXIT
-          security create-keychain -p "$password" "$keychain"
-          security set-keychain-settings -lut 21600 "$keychain"
-          security unlock-keychain -p "$password" "$keychain"
-          security import "$RUNNER_TEMP/ios-signing.p12" -k "$keychain" -P "$IOS_SIGNING_P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
-          security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
-          security find-identity -v -p codesigning "$keychain" | grep -q 'Apple Development:' || {
-            echo "::error::The imported certificate has no valid Apple Development signing identity."
-            exit 1
-          }
+          [[ "$BUILD" =~ ^[1-9][0-9]*$ ]] && [[ "$ARTIFACT" =~ ^[1-9][0-9]*$ ]]
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ env.ARTIFACT }}
+          path: ${{ runner.temp }}/ios-upload
+          merge-multiple: true
+      - run: brew install asc
       - name: App Store Connect key
         env:
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
@@ -103,37 +94,23 @@ jobs:
           chmod 700 "$(dirname "$ASC_PRIVATE_KEY_PATH")"
           (umask 077 && printf '%s\n' "$ASC_PRIVATE_KEY" > "$ASC_PRIVATE_KEY_PATH")
           grep -q 'BEGIN PRIVATE KEY' "$ASC_PRIVATE_KEY_PATH" || { echo "::error::ASC_PRIVATE_KEY is not a .p8 key"; exit 1; }
-      - id: plan
-        name: Build number
+      - name: Verify prepared build and upload
         run: |
           set -euo pipefail
-          build="$BUILD_INPUT"
-          if [ -z "$build" ]; then
-            latest="$(asc builds list --app "$OX_BUNDLE_IDENTIFIER" --sort -uploadedDate --limit 200 --output json | jq '[.data[].attributes.version | tonumber] | max // 0')"
-            build=$((latest + 1))
-          fi
-          echo "build=$build" >> "$GITHUB_OUTPUT"
-          echo "### Ox build $build ($MODE) from \`$GITHUB_SHA\`" >> "$GITHUB_STEP_SUMMARY"
-      - run: bun --no-env-file install --frozen-lockfile
-      - run: bun --no-env-file run build:agent
-      - name: Archive, export, verify${{ inputs.mode == 'upload' && ', upload' || '' }}
-        env:
-          BUILD: ${{ steps.plan.outputs.build }}
-        run: |
-          set -euo pipefail
-          args=(--build "$BUILD" --out "$OUT")
-          [ "$MODE" != upload ] || args+=(--upload)
-          .agents/skills/release/scripts/ios-upload.sh "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
+          unzip -q "$OUT/Ox.ipa" -d "$OUT/payload"
+          app="$OUT/payload/Payload/Ox.app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist")" = "$BUILD"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")" = "$OX_BUNDLE_IDENTIFIER"
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Info.plist")"
+          codesign --verify --deep --strict "$app"
+          asc builds upload --app "$OX_BUNDLE_IDENTIFIER" --ipa "$OUT/Ox.ipa" --version "$version" --build-number "$BUILD" --wait
       - name: Record build source
         if: inputs.mode == 'upload'
         env:
-          BUILD: ${{ steps.plan.outputs.build }}
           GH_TOKEN: ${{ secrets.BUILD_SOURCE_TOKEN }}
         run: gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/ios-build-$BUILD" -f sha="$GITHUB_SHA"
       - name: Assign to TestFlight gamma
         if: inputs.mode == 'upload'
-        env:
-          BUILD: ${{ steps.plan.outputs.build }}
         run: |
           set -euo pipefail
           build=(--app "$OX_BUNDLE_IDENTIFIER" --build-number "$BUILD" --platform IOS)
@@ -141,16 +118,4 @@ jobs:
           asc builds add-groups "${build[@]}" --group gamma | tee -a "$GITHUB_STEP_SUMMARY"
           echo "Assigned build $BUILD to gamma. External beta review submission is manual." >> "$GITHUB_STEP_SUMMARY"
       - if: always()
-        run: |
-          rm -rf "$RUNNER_TEMP/asc"
-          rm -f "$RUNNER_TEMP/ios-signing.p12"
-          if [ -f "$RUNNER_TEMP/ios-signing.keychain-db" ]; then
-            security delete-keychain "$RUNNER_TEMP/ios-signing.keychain-db"
-          fi
-      - if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: ios-upload-logs
-          path: ${{ runner.temp }}/ios-upload/*.log
-          if-no-files-found: ignore
-          retention-days: 7
+        run: rm -rf "$RUNNER_TEMP/asc"

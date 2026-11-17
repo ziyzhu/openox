@@ -10,7 +10,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.ref == 'refs/heads/main' && 'ios-upload' || format('ci-{0}', github.ref) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -47,7 +47,7 @@ jobs:
               packages/agent/build.ts|packages/agent/native-guidance.ts|packages/agent/tsconfig.json|packages/agent/UPSTREAM_LICENSE.txt|packages/protocol/tsconfig.json|\
               package.json|*/package.json|bun.lock|bunfig.toml|.npmrc|.bun-version|.github/ci.json|\
               .agents/lib.ts|.agents/skills/build/scripts/*|.agents/skills/release/scripts/ios-upload.sh|\
-              .github/workflows/ci.yml|.github/workflows/ios-release.yml)
+              .github/workflows/ci.yml|.github/workflows/ios-prepare.yml|.github/workflows/ios-release.yml)
                 relevant=true
                 printf 'iOS input matched: %q\n' "$path"
                 break
@@ -105,12 +105,24 @@ jobs:
       - if: matrix.target == 'macos'
         run: bun --no-env-file run test:native
 
+  ios-prepare:
+    needs: ios-changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 && needs.ios-changes.outputs.relevant == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ios-prepare.yml
+    with:
+      mode: upload
+    secrets: inherit
+
   testflight:
-    needs: [ios-changes, checks, apps]
+    needs: [ios-changes, checks, apps, ios-prepare]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 && needs.ios-changes.outputs.relevant == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/ios-release.yml
     with:
       mode: upload
+      prepared-build: ${{ needs.ios-prepare.outputs.build }}
+      prepared-artifact: ${{ needs.ios-prepare.outputs.artifact }}
     secrets: inherit

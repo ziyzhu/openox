@@ -41,8 +41,11 @@ These modes are mutually exclusive with other CI modes; `--out` remains standalo
 The macOS-only mode does not create or modify iOS configuration.
 
 The GitHub CI workflow runs `--ios-only` and `--macos-only` in parallel matrix jobs,
-with `test:native` once in the macOS job. TestFlight waits for both targets and
-portable checks to pass. The four-platform CLI matrix runs separately. Both `--native`
+with `test:native` once in the macOS job. Relevant initial pushes to `main` prepare
+the signed IPA alongside validation; TestFlight upload waits for both targets,
+portable checks, and IPA preparation to pass. Main CI and manual iOS releases share
+a serialization group to protect build-number selection. The four-platform CLI
+matrix runs separately. Both `--native`
 and `--native-only` run `test:native` exactly once: the two retained Swift/portable
 search contract cases. Portable test commands exclude that macOS-only file rather
 than silently skipping it on Linux. Native builds do not launch or exercise either app.

@@ -1,0 +1,138 @@
+name: Prepare iOS IPA
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        type: string
+        default: dry-run
+      build:
+        type: string
+        default: ""
+    outputs:
+      build:
+        value: ${{ jobs.prepare.outputs.build }}
+      artifact:
+        value: ${{ jobs.prepare.outputs.artifact }}
+
+permissions: {}
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-26
+    timeout-minutes: 90
+    environment: appstore
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      artifact: ${{ steps.ipa.outputs.artifact-id }}
+    permissions:
+      contents: read
+    env:
+      ASC_BYPASS_KEYCHAIN: "1"
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      OX_DEVELOPMENT_TEAM: ${{ vars.OX_DEVELOPMENT_TEAM }}
+      OX_BUNDLE_IDENTIFIER: ${{ vars.OX_BUNDLE_IDENTIFIER }}
+      MODE: ${{ inputs.mode }}
+      BUILD_INPUT: ${{ inputs.build }}
+    steps:
+      - name: Check build source credential
+        if: inputs.mode == 'upload'
+        env:
+          BUILD_SOURCE_TOKEN: ${{ secrets.BUILD_SOURCE_TOKEN }}
+        run: |
+          if [ -z "$BUILD_SOURCE_TOKEN" ]; then
+            echo "::error::Set the appstore environment secret BUILD_SOURCE_TOKEN to a repository-scoped token with Contents and Workflows write permissions."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: .bun-version
+      - run: |
+          version="$(bun --no-env-file -p 'require("./.github/ci.json").xcode')"
+          echo "DEVELOPER_DIR=/Applications/Xcode_$version.app/Contents/Developer" >> "$GITHUB_ENV"
+      - run: brew install asc
+      - run: git config --global lfs.fetchexclude 'prebuilt/**'
+      - name: Import archive signing identity
+        env:
+          IOS_SIGNING_P12_BASE64: ${{ secrets.IOS_SIGNING_P12_BASE64 }}
+          IOS_SIGNING_P12_PASSWORD: ${{ secrets.IOS_SIGNING_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          [ -n "$IOS_SIGNING_P12_BASE64" ] && [ -n "$IOS_SIGNING_P12_PASSWORD" ] || {
+            echo "::error::Set IOS_SIGNING_P12_BASE64 and IOS_SIGNING_P12_PASSWORD in the appstore environment to an existing Apple Development identity."
+            exit 1
+          }
+          keychain="$RUNNER_TEMP/ios-signing.keychain-db"
+          password="$(openssl rand -hex 32)"
+          echo "::add-mask::$password"
+          umask 077
+          printf '%s' "$IOS_SIGNING_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/ios-signing.p12"
+          trap 'rm -f "$RUNNER_TEMP/ios-signing.p12"' EXIT
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/ios-signing.p12" -k "$keychain" -P "$IOS_SIGNING_P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
+          security find-identity -v -p codesigning "$keychain" | grep -q 'Apple Development:' || {
+            echo "::error::The imported certificate has no valid Apple Development signing identity."
+            exit 1
+          }
+      - name: App Store Connect key
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          ASC_PRIVATE_KEY_PATH="$RUNNER_TEMP/asc/AuthKey.p8"
+          echo "ASC_PRIVATE_KEY_PATH=$ASC_PRIVATE_KEY_PATH" >> "$GITHUB_ENV"
+          echo "OUT=$RUNNER_TEMP/ios-upload" >> "$GITHUB_ENV"
+          mkdir -p "$(dirname "$ASC_PRIVATE_KEY_PATH")"
+          chmod 700 "$(dirname "$ASC_PRIVATE_KEY_PATH")"
+          (umask 077 && printf '%s\n' "$ASC_PRIVATE_KEY" > "$ASC_PRIVATE_KEY_PATH")
+          grep -q 'BEGIN PRIVATE KEY' "$ASC_PRIVATE_KEY_PATH" || { echo "::error::ASC_PRIVATE_KEY is not a .p8 key"; exit 1; }
+      - id: plan
+        name: Build number
+        run: |
+          set -euo pipefail
+          build="$BUILD_INPUT"
+          if [ -z "$build" ]; then
+            latest="$(asc builds list --app "$OX_BUNDLE_IDENTIFIER" --sort -uploadedDate --limit 200 --output json | jq '[.data[].attributes.version | tonumber] | max // 0')"
+            build=$((latest + 1))
+          fi
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "### Ox build $build ($MODE) from \`$GITHUB_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+      - run: bun --no-env-file install --frozen-lockfile
+      - run: bun --no-env-file run build:agent
+      - name: Archive, export, verify
+        env:
+          BUILD: ${{ steps.plan.outputs.build }}
+        run: |
+          set -euo pipefail
+          .agents/skills/release/scripts/ios-upload.sh --build "$BUILD" --out "$OUT" | tee -a "$GITHUB_STEP_SUMMARY"
+      - id: ipa
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: ios-ipa-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ios-upload/export/Ox.ipa
+          if-no-files-found: error
+          retention-days: 7
+      - if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/asc"
+          rm -f "$RUNNER_TEMP/ios-signing.p12"
+          if [ -f "$RUNNER_TEMP/ios-signing.keychain-db" ]; then
+            security delete-keychain "$RUNNER_TEMP/ios-signing.keychain-db"
+          fi
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: ios-upload-logs
+          path: ${{ runner.temp }}/ios-upload/*.log
+          if-no-files-found: ignore
+          retention-days: 7
