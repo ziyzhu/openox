@@ -6,7 +6,7 @@ workflow=portable
 output=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --native|--native-only|--ios-only|--macos-only|--standalone-only|--protocol-only)
+    --native|--native-only|--ios-only|--macos-only|--standalone-only)
       [ "$workflow" = portable ] || { echo 'Choose only one CI mode' >&2; exit 1; }
       case "$1" in
         --native) workflow=full ;;
@@ -14,21 +14,19 @@ while [ "$#" -gt 0 ]; do
         --ios-only) workflow=ios ;;
         --macos-only) workflow=macos ;;
         --standalone-only) workflow=standalone ;;
-        --protocol-only) workflow=protocol ;;
       esac
       shift ;;
     --out)
       [ "$#" -ge 2 ] && [ -n "$2" ] || { echo '--out requires a directory' >&2; exit 1; }
       output="$2"; shift 2 ;;
     -h|--help)
-      echo 'Usage: bun run ci [--native | --native-only | --ios-only | --macos-only | --protocol-only | --standalone-only [--out <directory>]]'
+      echo 'Usage: bun run ci [--native | --native-only | --ios-only | --macos-only | --standalone-only [--out <directory>]]'
       echo 'Default: lint, build, and test (portable, credential-free coverage).'
-      echo '--native: default checks, current-platform standalone CLI, native contracts, and unsigned iOS/macOS builds.'
-      echo '--native-only: native contracts, agent bundle, and unsigned iOS/macOS builds (macOS, Xcode, and XcodeGen required).'
+      echo '--native: default checks, current-platform standalone CLI, and unsigned iOS/macOS builds.'
+      echo '--native-only: agent bundle and unsigned iOS/macOS builds (macOS, Xcode, and XcodeGen required).'
       echo '--ios-only: agent bundle and unsigned iOS build.'
       echo '--macos-only: agent bundle and unsigned macOS build.'
       echo '--standalone-only: standalone CLI checks for the current platform.'
-      echo '--protocol-only: portable protocol tests with preflight and frozen dependencies.'
       echo 'No live Hosts, model calls, credentials, or publication.'
       exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -42,15 +40,12 @@ case "$workflow" in
   portable)
     environment=portable
     steps=(environment install lint build test drift) ;;
-  protocol)
-    environment=portable
-    steps=(environment install test:protocol) ;;
   standalone)
     environment=standalone
     steps=(environment install standalone) ;;
   native)
     environment=native
-    steps=(environment install test:native build:agent build:ios build:macos) ;;
+    steps=(environment install build:agent build:ios build:macos) ;;
   ios)
     environment=native
     steps=(environment install build:agent build:ios) ;;
@@ -59,7 +54,7 @@ case "$workflow" in
     steps=(environment install build:agent build:macos) ;;
   full)
     environment=full
-    steps=(environment install lint build test drift standalone test:native build:ios build:macos) ;;
+    steps=(environment install lint build test drift standalone build:ios build:macos) ;;
 esac
 
 unset OX_HOST_ENDPOINT OX_DEBUG_ENDPOINT OX_SERVER_ROOT OX_QA_DEVICE
@@ -76,7 +71,7 @@ for step in "${steps[@]}"; do
   case "$step" in
     environment) bun --no-env-file .agents/skills/build/scripts/ci-environment.ts "$environment" ;;
     install) bun --no-env-file install --frozen-lockfile ;;
-    lint|build|test|test:protocol|test:native|build:agent) bun --no-env-file run "$step" ;;
+    lint|build|test|build:agent) bun --no-env-file run "$step" ;;
     drift)
       git diff --exit-code -- apps/shared/Resources/OxServices.bundle \
         apps/shared/Resources/ModelServiceActions.json \

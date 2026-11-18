@@ -5,9 +5,8 @@ description: Run the real-provider eval suite with production Ox prompts and age
 
 # Ox evals
 
-Evals are one of the three maintained suites, alongside protocol validation and
-storage backward compatibility. Read [the runner guide](references/suite.md) before
-running or changing cases. Build owns offline case/catalog validation.
+Read [the runner guide](references/suite.md) before running or changing cases.
+Build owns offline case/catalog validation.
 
 Use real models with production prompts and the production Pi agent loop. Stub
 `ox.*` observations and effects, never model replies. The default baseline covers

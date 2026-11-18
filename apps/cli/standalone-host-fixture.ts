@@ -1,4 +1,4 @@
-import { RPC_VERSION, validateParams, validateResult } from "../../../../../packages/protocol/src/index.ts";
+import { RPC_VERSION, validateParams, validateResult } from "../../packages/protocol/src/index.ts";
 
 const conversationId = "standalone-smoke";
 const text = "Hello from the fixture.";
@@ -19,7 +19,6 @@ const results: Record<string, unknown> = {
   "conversations.get": { data: snapshot },
 };
 
-// Fixture transport only: real CLI processes and shared contract validation exercise the boundary.
 export function hostFixtureReply(request: { jsonrpc?: string; id?: string | number; method: string; params?: Record<string, unknown> }) {
   const reply = { jsonrpc: "2.0", id: request.id ?? null };
   if (request.jsonrpc !== "2.0") return { ...reply, error: { code: -32600, message: "Invalid Request" } };

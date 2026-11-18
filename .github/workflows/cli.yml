@@ -5,7 +5,6 @@ on:
   push:
     branches: [main]
     paths:
-      - ".agents/skills/test/protocol/client-host/**"
       - ".agents/skills/build/checks/**"
       - ".agents/skills/build/scripts/**"
       - "tsconfig.base.json"
@@ -22,7 +21,6 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - ".agents/skills/test/protocol/client-host/**"
       - ".agents/skills/build/checks/**"
       - ".agents/skills/build/scripts/**"
       - "tsconfig.base.json"

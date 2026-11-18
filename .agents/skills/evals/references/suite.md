@@ -2,22 +2,17 @@
 
 For sign-in efficiency, select `signin-password`, `signin-provider`, and
 `signin-manual` with identical GPT model IDs, `--repeat 3`, and `--baseline <ref>`.
-These use stateful observations modeled on the native website fixtures. Manual
+These use stateful sign-in observations. Manual
 sign-in returns the current showPage completed status in the same execution; it excludes
 human typing time. The additional signin-code, signin-passkey, signin-bot,
 signin-cancelled, signin-incomplete, signin-rejected, signin-existing, and
 signin-choose-manual cases cover method routing, human handoff, cancellation,
 unverified completion, credential rejection, session reuse, and saved-account choice. Reports record elapsed time, model responses, tool/function calls,
 input/output tokens, cache reads/writes, total tokens and provider-reported cost.
-Native fixture timing is separate: `bun run test:web --device ox-N --case <name>
---repeat 3 --app <Ox.app>` records elapsedMs, scriptTurns and resultBytes with Mock;
-these are deterministic driver steps and serialized result bytes, not model token
-usage or evidence of model behavior. Native elapsed time includes fixture setup
-inside the case and CLI/UI overhead. Only compare identical cases and runners.
 
 Evals run real models through the production Pi loop and Ox prompts, with local
-stateful `ox.*` stubs. They do not connect to a simulator or live Host. VM and native
-bridge behavior is verified independently by integration tests.
+stateful `ox.*` stubs. They do not connect to a simulator or live Host and do not
+verify native VM or bridge behavior.
 
 ```sh
 bun run evals --list
@@ -111,10 +106,3 @@ operations use the production filesystem logic over in-memory storage seeded fro
 are explicit stub results for `ox.user.choose`. Browser, payment, service, and media
 results are simulated observations, not evidence of platform rendering or external
 success. Each run starts from a fresh runtime and stub copy.
-
-Run `bun .agents/skills/test/protocol/native/vm.ts --device ox-N --host <ws-url>` on a fresh QA build to compare
-`vm functions` with the per-namespace `packages/agent/src/functions/*/contracts.json` files and exercise the real VM.
-Update that snapshot from the native catalog only for reviewed contract changes.
-The runner uses a new QA Profile, exercises temporary and saved conversations,
-restores the previous Profile, and retains evidence outside Git. It requires the
-normal QA simulator preparation and uses Mock without model inference.

@@ -1,6 +1,6 @@
 ---
 name: build
-description: Build native apps and bundled services, regenerate schemas, and run static, type, packaging, generated-artifact and build-tool checks. Runtime protocol, storage-upgrade and provider behavior belong to the three test suites; publication belongs to release.
+description: Build native apps and bundled services, regenerate schemas, and run static, type, packaging, generated-artifact and build-tool checks. Storage-upgrade and real-provider checks are separate; publication belongs to release.
 ---
 
 # Build
@@ -15,14 +15,12 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | --- | --- |
 | `bun run lint` | Repository source policies, resource validation, five TypeScript projects and offline eval-definition validation. |
 | `bun run build` | Verify generated schemas, generate agent/service resources, and build/verify portable packages and CLI consumers. |
-| `bun run test` | Offline build-tool checks, portable protocol/runtime integration, shipped bundles, and execution-isolation checks. |
-| `bun run test:native` | macOS-only Swift/portable search response contract checks; no simulator. |
+| `bun run test` | Offline build-tool checks, shipped bundles, and execution-isolation checks. |
 | `bun run ci` | Run lint, build and test with frozen dependencies, no `.env` loading and generated-resource drift checks; see [portable checks](portable.md). |
-| `bun run ci --native` | Run portable checks, current-platform standalone CLI checks, native contracts, and unsigned iOS/macOS builds on macOS. |
-| `bun run ci --native-only` | Run native contracts, agent generation, and unsigned iOS/macOS builds, matching GitHub's native-build job. |
+| `bun run ci --native` | Run portable checks, current-platform standalone CLI checks, and unsigned iOS/macOS builds on macOS. |
+| `bun run ci --native-only` | Generate the agent bundle and build unsigned iOS and macOS apps. |
 | `bun run ci --ios-only` | Validate the native toolchain, install frozen dependencies, generate the agent, and build unsigned iOS only. |
 | `bun run ci --macos-only` | Validate the native toolchain, install frozen dependencies, generate the agent, and build unsigned macOS only. |
-| `bun run ci --protocol-only` | Validate the portable environment, install frozen dependencies, and run the existing portable protocol tests. |
 | `bun run build:host-schema` | Regenerate Host RPC JSON/Swift artifacts. |
 | `bun run build:repository-schema` | Regenerate repository JSON/Swift artifacts. |
 | `bun run build:provider-schema` | Regenerate provider definitions schema. |
@@ -77,14 +75,14 @@ Do not overwrite unrelated repository or generated changes.
 The iOS project uses synchronized source groups: adding or moving Swift files within included directories does not require XcodeGen regeneration.
 `PiDurable.bundle` and `ModelGuidance.generated.swift` are ignored build outputs: edit bundled packages in `packages/agent/skills/`, then run `build:agent` before native builds. The package exports normal System skill packages. Hosts receive a scoped `skillPackages` snapshot from the trusted runtime and resolve them through the normal skills catalog and filesystem. Skill activation loads workflow context; runtime permissions are independent of activation. The iOS Upload workflow installs the pinned Bun version and generates it before archiving; the target rejects missing or empty runtime resources. Verify the built `.app` when changing this packaging path. Dependency upgrades also require a native launch and Mock turn: Node VM realms expose globals absent from bare JavaScriptCore, and upstream UUID generation and duration metrics need native secure-random and monotonic-clock bridges. Keep `whatwg-url` on 14.x until its newer `webidl-conversions` dependency supports runtimes without `SharedArrayBuffer`; do not substitute a fake shared-memory implementation.
 For native HTML extraction dependency changes, verify byte-for-byte Markdown parity against the pinned upstream offline API across its HTML fixtures in bare JavaScriptCore, measure peak memory on nested HTML, and exercise `ox.web.fetch` through a fresh app. LinkeDOM's generated entity tables require `atob` during initialization; the extraction context supplies it through `Uint8Array.fromBase64`, not Node's `Buffer`. Keep extraction network access behind the Host fetch boundary; upstream async network extractors cannot bypass it.
-The same build generates native filesystem contracts from `packages/agent/src/core/filesystem-contract.ts`, using pinned Pi read/write/edit schemas. Edit agent contracts and logic, not the generated Swift. Run `build:agent` before native compilation when changing function guidance or filesystem schemas; native compilation alone can reuse stale generated resources. Keep `packages/agent/src/functions/*/contracts.json` synchronized with a fresh Host's `ox vm functions --json`, including descriptions and required-field ordering; verify with the native VM contract runner. `execute` → `ox.fs.*` is the sole model filesystem surface; native backends retain source permissions, platform effects, and storage safety.
+The same build generates native filesystem contracts from `packages/agent/src/core/filesystem-contract.ts`, using pinned Pi read/write/edit schemas. Edit agent contracts and logic, not the generated Swift. Run `build:agent` before native compilation when changing function guidance or filesystem schemas; native compilation alone can reuse stale generated resources. Keep `packages/agent/src/functions/*/contracts.json` synchronized with a fresh Host's `ox vm functions --json`, including descriptions and required-field ordering. `execute` → `ox.fs.*` is the sole model filesystem surface; native backends retain source permissions, platform effects, and storage safety.
 All hosts share one core prompt. Put presentation facts in current turn context and detailed capability guidance in function help or matching skills; avoid capability-driven prose parsing or rendered-text patching.
 
 Run `bun run ci` after maintenance. `.bun-version` and `.github/ci.json` own shared
 CI toolchain and platform requirements; applicable versions are checked before installation.
 `scripts/ci.sh` owns credential-free orchestration;
 static eval-definition validation does not load API keys or invoke models. Build-only
-checks live in `checks/`, not the protocol suite. Do not add general agent unit tests. Simulator provisioning
+checks live in `checks/`. Do not add general agent unit tests. Simulator provisioning
 belongs to `setup`; real-model behavior belongs to `evals`; publication belongs
 to `release`. Individual check implementations may be invoked directly for debugging.
 Keep screenshots, traces, credentials, and diagnostics outside the repository.

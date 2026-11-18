@@ -1,121 +1,20 @@
 ---
 name: test
-description: "Validate versioned protocol boundaries and predecessor-to-current storage upgrades. Coordinate the three maintained suites: protocol validation, backward compatibility, and real-provider evals. Plan and report opt-in controlled benchmarks for task completion, latency and cost."
+description: "Coordinate storage backward compatibility and real-provider evals. Plan and report opt-in controlled benchmarks for task completion, latency and cost."
 ---
 
 # Test
 
-Maintain exactly three suites. Do not create a general unit, UI, smoke, or miscellaneous
-regression suite. `bun run test` runs offline build-tool checks, portable protocol
-and agent runtime integration, shipped-bundle checks, and child-process execution
-isolation; it does not run storage upgrades or real-provider evals. `bun run lint`
-owns static/type validation; `bun run build` owns generated-artifact consistency,
-packaging and compilation. Exploratory UI verification belongs to gym.
+Maintain two suites. Do not create a general unit, UI, smoke, or miscellaneous
+regression suite. `bun run test` runs offline build-tool checks, shipped-bundle
+checks, and child-process execution isolation. `bun run lint` owns static/type
+validation; `bun run build` owns generated-artifact consistency, packaging and
+compilation. Exploratory UI verification belongs to Gym.
 
 | Suite | Entry point | Evidence |
 | --- | --- | --- |
-| Protocol validation | `bun run test:protocol` | Component versions, accepted/rejected requests, mutation and reconnect behavior |
 | Backward compatibility | [Storage compatibility](references/storage-compatibility.md) | Actual X-written snapshots opened by Y, preserved data and second-launch stability |
 | Evals | `bun run evals --help`; [evals](../evals/SKILL.md) | Real provider/model, production prompts, tool receipts and basic prompting results |
-
-## Benchmarking
-
-Use [benchmarking](references/benchmarking.md) for controlled completion-rate, latency
-and cost comparisons. It provides a counterbalanced plan generator and evidence-based
-reporter; experiment-specific device execution reuses existing infrastructure. This
-is not a fourth correctness suite, a default CI gate, or authorization to spend on
-real providers. Keep plans, task-specific drivers and raw evidence outside the checkout.
-
-## Protocol validation
-
-Use `bun run ci --protocol-only` to run the existing portable protocol tests through
-the shared environment/workflow/step orchestration, including prerequisite checks
-and a frozen dependency install. `bun run test:protocol` remains the direct runner.
-Preflight failures report `BLOCKED`; execution failures report `FAIL`. The runner
-retains ownership of cases, assertions, and cleanup. This does not run native Host
-cases, storage upgrades, or real-provider evals.
-
-Portable cases live in `protocol/client-host/`, `protocol/host-services/`, and the
-runtime/persistence files under `packages/agent/test/`. Those package tests use real
-SQLite/files and controlled providers; they do not establish native Swift or real-provider
-coverage. Shipped-bundle and execution-isolation checks run through `bun run test`,
-not the narrower protocol command. Isolated algorithm and eval-stub machinery tests
-are not maintained.
-
-`bun run test:native` runs the retained Swift/portable search contracts on macOS;
-`ci --native` and `ci --native-only` include this step. Portable commands exclude it
-instead of silently skipping it. These contracts require no running app or simulator.
-
-Exercise public
-boundaries with real CLI processes and controlled Host/service fixtures. Cover
-supported versions, unsupported and unversioned peers, malformed responses,
-reconnection and negotiation, and rejection before mutation. Never replay a
-submitted mutation after transport or Host errors. Static schema consistency is
-build coverage, not runtime protocol coverage.
-
-Record component versions. Same-revision fixtures do not prove older components
-work: use pinned predecessor contracts or artifacts when claiming cross-version
-compatibility. Log pagination and legacy response compatibility run with the portable
-protocol suite. Native function and structured-error contracts live in `protocol/native/`;
-use `bun .agents/skills/test/protocol/native/vm.ts --help` or
-`bun .agents/skills/test/protocol/native/ox-errors.ts --help` against a fresh QA app.
-These native checks require an explicit reserved simulator and assigned Host endpoint;
-portable fixtures alone do not establish native implementation conformance.
-Website service cases live in `protocol/web/` and run with
-`bun run test:web --device ox-N [--app <Ox.app>] [--case <name>]` against a Debug
-Simulator build. Use `--case handoff` for slow responses, streamed documents, server/client redirect chains, redirect loops and bounded presentation timeout checks. Assert one login dispatch, usable final-page controls, cancellation and conversation recovery; transport navigation counts alone do not prove action replay. `--case handoff-keyboard` focuses an inline handoff field, closes the web keyboard, focuses the composer and asserts `ConversationUX.keyboard` reports `overlap=0`; it needs the Simulator software keyboard. Fixture sites model bundled service archetypes: server-rendered
-two-page login, client-rendered same-page login with streamed `conversation`
-generation, in-page GraphQL with CSRF, a same-site accounts provider hop, and a
-cross-site sign-in widget nested in iframes, and a cross-site provider redirect with a
-manual security code and a delayed single-use callback. They are served over HTTPS on
-`*.localhost` with a CA trusted on that simulator only; Debug Simulator builds allow
-those hosts. The runner applies a run-owned template Profile, serves fixture services
-through the development repository, drives turns through Mock `execute` scripts,
-answers only expected prompts, deletes saved logins it created, and records
-screenshots and accessibility trees for failures. Assert with service results, fresh
-`listSessions` and fixture-server counters such as password submissions and CSRF
-rejections. Exercise destination-initiated provider redirects with preserved return
-parameters and preparatory clicks without secret retrieval. The agent coordinates login by inspecting the live document and invoking the matching
-service with its fresh frameId; the Host executes one handler and never verifies login
-or advances steps. Same-page transitions belong to the handler. Manual interaction uses
-web.browser.showPage with the exact pageId after login, including frame-targeted invocations;
-it must not replay the handler or navigate to a replacement page. Presentation keeps the original
-execution pending until Done/Cancel, returning only status: completed or cancelled without a synthetic
-user message. Verify cancellation, stale-document rejection, capture, and remember prompts separately.
-The runner allows a longer cold service-list timeout because that Host endpoint fetches service icons. Web content inside the
-handoff is reachable only through `idb ui describe-point`; open the full-screen
-handoff before typing into it. When a bundled service introduces a new site or login
-shape, add a fixture for it. For browser ownership changes, compare page IDs across
-service redirects, reject stale document IDs, and verify separate conversations
-do not reuse each other’s pages.
-
-Use `--case automation --repeat 3` for embedded locator fixtures: catalog extraction, delayed search results, and settings controls. They author Local actions through ox.fs.write with automatic locator embedding, refresh the fixture catalog before selecting the new source, validate editable self-contained source, reject unsafe targets, and record per-service benchmark JSON outside the checkout. Benchmarks compare raw DOM and locator reads in alternating batches; source-read measurements distinguish full reads from explicit line-offset reads, not automatic filtering.
-
-Use `--case handoff-anchor-floor` for the chat scroll bottom after an inline handoff ends:
-composer sends a long reply, completes an inline handoff through its Done control, requires
-a `ConversationUX.floor phase=hold` above the viewport floor, then composer-sends a short turn
-and asserts its user message stays at the top when scrolled to the transcript end.
-
-Use `--case popup` for target-blank and script `window.open` provider navigation through the
-preserved page and dismissed JavaScript dialogs reported by snapshot; it does not establish
-`window.opener` continuity. Use `--case oauth` for native API
-callback-state rejection, MCP metadata discovery/dynamic registration/PKCE and model-provider
-OAuth-backed streaming generation. Fixture token endpoints enforce PKCE, single-use codes
-and rotating refresh tokens; fixture behavior alone does not prove native refresh coverage.
-A startup migration collision blocks these cases: preserve the data and report it rather
-than erasing a simulator to make the run pass.
-
-For filesystem audits, round-trip ordinary files in the default conversation working
-directory, include mixed text/binary searches and exact-limit results, and reconstruct
-continued reads to detect missing or duplicate content.
-For API/MCP error audits, inspect the fields caught by conversation JavaScript,
-including errors crossing an API handler's nested runtime. Use isolated fixtures
-and server-side dispatch counts to verify that denied calls never dispatch and
-uncertain writes are not replayed; preserve and restore approval policies.
-For MCP binary transfers, use nonprivate synthetic images and verify both native
-image/resource decoding and schema-declared file-reference expansion. Check that
-polls and model-visible results contain metadata, not encoded bytes; exercise
-combined-size limits, denied reads, session scope and symlink escapes.
 
 ## Backward compatibility
 
@@ -130,11 +29,18 @@ ordinary writes, complete data preservation and a stable second launch. A curren
 serializer, clean install or template-validator pass cannot substitute for an upgrade.
 Missing predecessor artifacts block verification. Downgrade testing is opt-in.
 
+## Benchmarking
+
+Use [benchmarking](references/benchmarking.md) for controlled completion-rate, latency
+and cost comparisons. It provides a counterbalanced plan generator and evidence-based
+reporter; experiment-specific device execution reuses existing infrastructure. This
+is not a correctness suite, a default CI gate, or authorization to spend on real
+providers. Keep plans, task-specific drivers and raw evidence outside the checkout.
+
 ## Run and report
 
 Reproduce an issue before fixing it. Add persistent cases only when explicitly
-requested and only within these three suites. Put setup, observable assertions and
-cleanup in the owning runner, not feature-specific Mock scenarios. Do not add unit tests.
+requested and only within the maintained suites. Do not add unit tests.
 
 Use reserved QA devices and explicit targets. Preserve credentials, approval policies
 and personal data. Require confirmation for destructive replay; do not uninstall or

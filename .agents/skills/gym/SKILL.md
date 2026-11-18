@@ -17,13 +17,9 @@ Also use the agent-independent `ios-simulator` and `ox-cli` skills. Consult inst
 
 ## Relationship to deterministic tests
 
-Ox Gym does not replace build checks or the three maintained suites: protocol validation,
-storage backward compatibility and real-provider evals. It explores realistic combinations
-and surfaces evidence fixed checks may miss. Add a persistent case only when explicitly
-requested and within one of those three suites.
-
-Do not use Gym as an archive for deterministic regression runners. Protocol checks
-belong to the protocol suite; out-of-scope runners should be removed, not relocated here.
+Ox Gym does not replace build checks, storage backward compatibility, or real-provider
+evals. It explores realistic combinations and surfaces evidence fixed checks may miss.
+Do not use Gym as an archive for deterministic regression runners.
 
 ## Roles
 
