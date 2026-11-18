@@ -512,7 +512,6 @@ final class ServiceOperations {
             for entry in try await serviceManager.serviceSourceListings() {
                 guard var fields = entry.objectValue, let domain = fields["domain"]?.stringValue else { continue }
                 fields["login"] = .string("unknown")
-                fields["saved"] = .bool(serviceManager.savedDomains.contains(domain))
                 if let name = serviceManager.serviceNames[domain] { fields["name"] = .string(name) }
                 fields["attached"] = .bool(attachedDomains().contains(domain))
                 if fields["validationError"] == nil, let service = services[domain] {
@@ -767,7 +766,6 @@ final class ServiceOperations {
         let name: String
         let description: String?
         let login: Service.LoginState
-        let saved: Bool
         let attached: Bool
         let matchedAction: MatchedAction?
 
@@ -786,7 +784,6 @@ final class ServiceOperations {
             name = snapshot.name
             description = snapshot.description
             login = snapshot.login
-            saved = snapshot.saved
             self.attached = snapshot.attached
             matchedAction = match.matchedActionID.flatMap { id in
                 match.matchedAction.map { MatchedAction(id: id, label: $0) }

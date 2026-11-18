@@ -175,12 +175,11 @@ extension Conversation {
             try next.validate()
             try await replaceAppProviderCatalog(next, expected: expected)
         case "app/services.json":
-            guard Set(fields.keys) == ["format", "names", "saved"] else { throw RuntimeError.bridge("Unsupported service preference fields") }
+            guard Set(fields.keys) == ["format", "names"] else { throw RuntimeError.bridge("Unsupported service preference fields") }
             let next = try JSONDecoder().decode(ServicePreferences.self, from: Data(content.utf8))
             try next.validate()
             let current = try ServicePreferences.load()
-            guard Set(next.saved).subtracting(current.saved).allSatisfy({ serviceManager.service(domain: $0) != nil }),
-                  Set(next.names.keys).subtracting(current.names.keys).allSatisfy({ serviceManager.service(domain: $0) != nil }) else {
+            guard Set(next.names.keys).subtracting(current.names.keys).allSatisfy({ serviceManager.service(domain: $0) != nil }) else {
                 throw RuntimeError.bridge("New service preferences must refer to existing services")
             }
             try Task.checkCancellation()

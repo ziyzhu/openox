@@ -321,12 +321,8 @@ private struct ServicePickerPanel: View {
         }
         let matches = await serviceManager.search(trimmed, filter: .all)
         if Task.isCancelled { return }
-        let saved = serviceManager.savedDomains
         let filtered = matches.filter { !excludedDomains.contains($0.service.domain) }
         let ranked = filtered.enumerated().sorted { lhs, rhs in
-            let lSaved = saved.contains(lhs.element.service.domain)
-            let rSaved = saved.contains(rhs.element.service.domain)
-            if lSaved != rSaved { return lSaved }
             if trimmed.isEmpty {
                 let lhsRank = ServiceListOrder.rank(lhs.element.service.domain)
                 let rhsRank = ServiceListOrder.rank(rhs.element.service.domain)

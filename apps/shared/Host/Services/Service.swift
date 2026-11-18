@@ -231,7 +231,6 @@ final class Service: NSObject, Identifiable {
         let name: String
         let description: String?
         let login: LoginState
-        let saved: Bool
         let attached: Bool
     }
 
@@ -384,7 +383,6 @@ final class Service: NSObject, Identifiable {
             name: title,
             description: summary.isEmpty ? nil : summary,
             login: loginState,
-            saved: manager.isSaved(self),
             attached: attached
         )
     }

@@ -6,15 +6,12 @@ struct BrowserStartPage: View {
     @ScaledMetric(relativeTo: .caption) private var tileWidth: CGFloat = 76
 
     private var websites: [(service: Service, url: URL)] {
-        let saved = serviceManager.savedDomains
         return serviceManager.services
             .compactMap { service in
                 guard service.webService != nil, let url = service.definition.baseURL else { return nil }
                 return (service, url)
             }
             .sorted { lhs, rhs in
-                let lhsSaved = saved.contains(lhs.service.domain)
-                if lhsSaved != saved.contains(rhs.service.domain) { return lhsSaved }
                 let lhsRank = ServiceListOrder.rank(lhs.service.domain)
                 let rhsRank = ServiceListOrder.rank(rhs.service.domain)
                 if lhsRank != rhsRank { return lhsRank < rhsRank }

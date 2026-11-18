@@ -46,7 +46,6 @@ nonisolated enum ApplicationStorageMigrator {
         migrateActionApprovalPolicies()
         migrateFilesPolicies()
         migrateFolderOwnership()
-        migrateSavedServices()
         do {
             try migrateSettingsStorage()
             try migratePolicyStorage()
@@ -253,15 +252,6 @@ nonisolated enum ApplicationStorageMigrator {
             defaults.synchronize()
             Log.app.info("StorageMigrator.filesPolicies migrated=true")
         } catch { Log.app.error("StorageMigrator.filesPolicies failed error=\(error.localizedDescription)") }
-    }
-
-    private static func migrateSavedServices(defaults: UserDefaults = .standard) {
-        guard let stored = legacyPreference(ServiceManager.savedKey, defaults: defaults) as? [String] else { return }
-        let retained = stored.filter { $0 != BrowserFunctionCatalog.internalDomain && $0 != "ios:files" }
-        guard retained != stored else { return }
-        defaults.set(retained, forKey: ServiceManager.savedKey)
-        defaults.synchronize()
-        Log.app.info("StorageMigrator.savedServices retiredBrowser=\(stored.count - retained.count)")
     }
 
     private static func canonicalApprovalAction(_ action: String) -> String {

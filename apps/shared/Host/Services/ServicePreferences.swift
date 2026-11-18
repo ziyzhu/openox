@@ -3,11 +3,9 @@ import Foundation
 nonisolated struct ServicePreferences: Codable, Equatable, Sendable {
     var format = 1
     var names: [String: String] = [:]
-    var saved: [String] = []
 
     func validate() throws {
-        guard format == 1, Set(saved).count == saved.count,
-              saved.allSatisfy({ !$0.isEmpty }), names.keys.allSatisfy({ !$0.isEmpty }) else {
+        guard format == 1, names.keys.allSatisfy({ !$0.isEmpty }) else {
             throw StorageMigrationError.invalidApplicationStorage("service preferences")
         }
     }

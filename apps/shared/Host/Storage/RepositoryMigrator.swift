@@ -253,7 +253,6 @@ nonisolated enum RepositoryMigrator {
     private static func renameServiceReferences(_ renamed: [String: String]) throws {
         guard !renamed.isEmpty else { return }
         var preferences = try ServicePreferences.load()
-        preferences.saved = Array(Set(preferences.saved.map { renamed[$0] ?? $0 })).sorted()
         preferences.names = Dictionary(preferences.names.map { (renamed[$0.key] ?? $0.key, $0.value) }) { current, _ in current }
         try preferences.save()
         var policies = try ActionPolicyConfiguration.load()

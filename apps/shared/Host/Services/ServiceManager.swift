@@ -91,13 +91,12 @@ final class ServiceManager {
     }
 
     enum Filter: String, CaseIterable, Identifiable {
-        case all, web, api, local, iOS, mcp, saved
+        case all, web, api, local, iOS, mcp
         var id: String { rawValue }
     }
 
     private var preferences: ServicePreferences
     var serviceNames: [String: String] { preferences.names }
-    var savedDomains: Set<String> { Set(preferences.saved) }
 
     func renameService(_ service: Service, to name: String) {
         var next = preferences
@@ -114,12 +113,6 @@ final class ServiceManager {
         preferences = next
     }
 
-    private func removeSavedDomain(_ domain: String) throws {
-        var next = preferences
-        next.saved.removeAll { $0 == domain }
-        try replaceServicePreferences(next)
-    }
-
     private(set) var actionPolicies: ActionPolicyConfiguration
 
     @ObservationIgnored private var attachedServiceDomainsByConversation: [UUID: Set<String>] = [:]
@@ -127,7 +120,6 @@ final class ServiceManager {
     @ObservationIgnored var openingWebConversations: [UUID: WebConversation.Opening] = [:]
 
     nonisolated static let serviceNamesKey = "serviceDisplayNames"
-    nonisolated static let savedKey = "savedServices"
     nonisolated static let actionPoliciesKey = "actionApprovalPolicies"
     nonisolated static let legacyAutoApproveActionsKey = "autoApproveActions"
     nonisolated static let legacyAutoApproveAllKey = "autoApproveAll"
@@ -263,20 +255,6 @@ final class ServiceManager {
         }
     }
 
-    func isSaved(_ service: Service) -> Bool { savedDomains.contains(service.domain) }
-
-    func setSaved(_ service: Service, _ saved: Bool) {
-        guard isSaved(service) != saved else { return }
-        var next = preferences
-        next.saved = Array(saved ? savedDomains.union([service.domain]) : savedDomains.subtracting([service.domain])).sorted()
-        do {
-            try replaceServicePreferences(next)
-            Log.service.info("ServiceManager.setSaved domain=\(service.domain) saved=\(saved)")
-        } catch {
-            Log.service.error("ServiceManager.setSaved failed error=\(error.localizedDescription)")
-        }
-    }
-
     var defaultActionPolicy: ActionPolicy? {
         get { actionPolicies.defaultPolicy }
         set {
@@ -379,7 +357,6 @@ final class ServiceManager {
             reindexMonoRepository()
         }
         Log.service.info("RemoteMCP.save id=\(service.domain) updated=\(replacing != nil) reused=\(existing != nil)")
-        setSaved(service, true)
         return service
     }
 
@@ -389,7 +366,6 @@ final class ServiceManager {
             _ = try await deleteLocalService(domain: service.domain, locale: monoRepositoryLocale)
         }
         await service.remoteMCPService?.remove()
-        try removeSavedDomain(service.domain)
         clearMCPApprovals(service)
         if let remaining = self.service(domain: service.domain) { remaining.resetMCPCapabilities() }
         monoRepositoryRevision &+= 1
@@ -752,7 +728,6 @@ final class ServiceManager {
         let kind = try await repository.deleteLocalService(id: domain)
         _ = await loadRepositories(locale: locale)
         if service(domain: domain) == nil {
-            try removeSavedDomain(domain)
             let previous = attachedDomains
             for conversationID in Array(attachedServiceDomainsByConversation.keys) {
                 attachedServiceDomainsByConversation[conversationID]?.remove(domain)
@@ -1019,7 +994,6 @@ final class ServiceManager {
         case .local: return base.filter { $0.service.isLocalService }
         case .iOS: return base.filter { $0.service.isIOSService }
         case .mcp: return base.filter { $0.service.isMCPService }
-        case .saved: return base.filter { isSaved($0.service) }
         }
     }
 

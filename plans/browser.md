@@ -68,7 +68,7 @@ Entry points (approved direction: combined chat/URL composer and inline browsing
 - [x] Remove the standalone URL suggestion and Browser attachment-menu row after verifying their replacement.
 - [x] Reuse `LivePageCard` and browser content with expand/collapse and close. All inline web views omit the browser bar; expanded browsers retain editable address and navigation. Keep inline/expanded/collapsing presentation explicit so the same WebPage is never attached to two views. The browser is temporary; conversation changes and relaunch do not restore it.
 - [x] Empty Browser: let `ServiceBrowserSession` start without an initial URL, auto-focus the address field, and show a start page instead of a blank web view.
-- [x] Start page: list web services (saved first) by name, favicon, and manifest `baseUrl`; tapping one navigates the same session. Saved services and website data are still app-wide, not Profile-owned. No new persisted state.
+- [x] Start page: list web services by name, favicon, and manifest `baseUrl`; tapping one navigates the same session. Website data is still app-wide, not Profile-owned. No new persisted state.
 - [x] Show a neutral empty state when no web services exist; address entry stays primary. Not simulator-verified because bundled services are always present.
 - [ ] Address submission: bare domains resolve to `https://`; non-URL text is rejected with an alert. Decide whether non-URL text is rejected or sent to a web search before shipping (search provider choice must stay neutral).
 

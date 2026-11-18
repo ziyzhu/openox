@@ -8,11 +8,11 @@ nonisolated enum OxServices {
             "description": .object(["type": .string("string")]),
             "kind": .object(["type": .string("string"), "enum": .array(["web", "api", "ios", "mcp"].map(JSONValue.string))]),
             "login": .object(["type": .string("string"), "enum": .array(["notRequired", "signedIn", "signedOut", "authorized", "notAuthorized", "unknown"].map(JSONValue.string))]),
-            "saved": .object(["type": .string("boolean")]), "attached": .object(["type": .string("boolean")]),
+            "attached": .object(["type": .string("boolean")]),
             "reloaded": .object(["type": .string("boolean")]), "endpoint": .object(["type": .string("string")]),
             "transport": .object(["type": .string("string")]), "faviconUrl": .object(["type": .array([.string("string"), .string("null")])]),
             "repository": .object(["type": .string("string")]), "repositoryProvenance": .object(["type": .string("string")]),
-        ]), "required": .array(["domain", "name", "kind", "login", "saved", "attached"].map(JSONValue.string)), "additionalProperties": .bool(false),
+        ]), "required": .array(["domain", "name", "kind", "login", "attached"].map(JSONValue.string)), "additionalProperties": .bool(false),
     ])
 
     static let inspectionSchema: JSONValue = .object([

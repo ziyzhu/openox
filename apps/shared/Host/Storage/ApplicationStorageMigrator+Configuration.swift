@@ -113,10 +113,6 @@ nonisolated extension ApplicationStorageMigrator {
             guard let value = value as? [String: String] else { throw StorageMigrationError.invalidApplicationStorage("service names") }
             next.names = value
         }
-        if let value = legacyPreference(ServiceManager.savedKey, defaults: defaults) {
-            guard let value = value as? [String] else { throw StorageMigrationError.invalidApplicationStorage("saved services") }
-            next.saved = Array(Set(value)).sorted()
-        }
         try next.validate()
         if exists {
             guard next == current else { throw StorageMigrationError.collision("service preferences") }
@@ -125,7 +121,7 @@ nonisolated extension ApplicationStorageMigrator {
             guard try ServicePreferences.load() == next else { throw StorageMigrationError.invalidApplicationStorage("service preferences publication") }
             Log.app.info("StorageMigrator.servicePreferences done format=1")
         }
-        try removeMigratedPreferences([ServiceManager.serviceNamesKey, ServiceManager.savedKey], defaults: defaults)
+        try removeMigratedPreferences([ServiceManager.serviceNamesKey], defaults: defaults)
     }
 
     private static func removeMigratedPreferences(_ keys: [String], defaults: UserDefaults) throws {

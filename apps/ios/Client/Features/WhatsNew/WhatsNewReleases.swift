@@ -140,7 +140,7 @@ enum WhatsNew {
             "When a ChatGPT session can no longer be refreshed, Ox now asks you to sign in again."
         ]),
         WhatsNewRelease(version: "1.0.13", items: [
-            "Open the browser directly: Choose Browser from the composer’s + menu without asking the agent. Typing a domain or URL also offers a direct-open suggestion. The start page includes service websites, with saved services first.",
+            "Open the browser directly: Choose Browser from the composer’s + menu without asking the agent. Typing a domain or URL also offers a direct-open suggestion. The start page includes service websites.",
             "Smoother browsing: Refined address-bar editing, inline clearing, loading progress, navigation controls, and gestures. Improved recovery after canceled navigation.",
             "Refreshed design: Updated Ox icons, neutral grey surfaces, consistent orange controls, and clearer contrast in light and dark themes.",
             "Better conversation flow: Smoother Send transitions, better-timed loading indicators, and simpler conversation actions.",

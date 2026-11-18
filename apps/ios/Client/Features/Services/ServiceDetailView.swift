@@ -14,7 +14,7 @@ enum ServiceDetailPrimaryAction {
 
     func systemImage(isAttached: Bool) -> String {
         switch self {
-        case .startConversation: "paperclip"
+        case .startConversation: "plus"
         case .attach: isAttached ? "minus.circle" : "plus.circle"
         }
     }
@@ -95,15 +95,6 @@ struct ServiceDetailView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: Theme.Spacing.sm) {
-                    let saved = serviceManager.isSaved(service)
-                    Button {
-                        serviceManager.setSaved(service, !saved)
-                    } label: {
-                        Label(saved ? "Saved" : "Save",
-                              systemImage: saved ? "bookmark.fill" : "bookmark")
-                    }
-                    .accessibilityIdentifier(A11yID.ConversationControls.Attach.save(service.domain))
-
                     if let primaryAction, let onPrimaryAction {
                         Button {
                             onPrimaryAction()

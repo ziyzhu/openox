@@ -9521,13 +9521,13 @@
         }
       }
     },
-    "Open the browser directly: Choose Browser from the composer’s + menu without asking the agent. Typing a domain or URL also offers a direct-open suggestion. The start page includes service websites, with saved services first." : {
+    "Open the browser directly: Choose Browser from the composer’s + menu without asking the agent. Typing a domain or URL also offers a direct-open suggestion. The start page includes service websites." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "直接打开浏览器：无需询问智能体，即可从输入框的“+”菜单中选择“浏览器”。输入域名或网址时，也会显示直接打开的建议。起始页包含各项服务的网站，并优先显示已保存的服务。"
+            "value" : "直接打开浏览器：无需询问智能体，即可从输入框的“+”菜单中选择“浏览器”。输入域名或网址时，也会显示直接打开的建议。起始页包含各项服务的网站。"
           }
         }
       }

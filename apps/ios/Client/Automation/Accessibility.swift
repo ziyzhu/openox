@@ -266,7 +266,6 @@ nonisolated enum A11yID {
             static func retryMCP(_ id: String) -> String { "conversation.attach.retryMCP.\(id)" }
             static let mcpEndpoint = "conversation.attach.mcpEndpoint"
             static func startConversation(_ domain: String) -> String { "conversation.attach.startConversation.\(domain)" }
-            static func save(_ domain: String) -> String { "conversation.attach.save.\(domain)" }
             static func service(_ domain: String) -> String { "conversation.attach.service.\(domain)" }
             static func domain(_ domain: String) -> String { "conversation.attach.domain.\(domain)" }
             static func login(_ domain: String) -> String { "conversation.attach.login.\(domain)" }

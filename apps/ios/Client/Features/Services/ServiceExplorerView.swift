@@ -476,7 +476,6 @@ private extension ServiceManager.Filter {
         case .local: return "Local"
         case .iOS: return "iOS"
         case .mcp: return "MCP"
-        case .saved: return "Saved"
         }
     }
 
@@ -488,7 +487,6 @@ private extension ServiceManager.Filter {
         case .local: return "folder"
         case .iOS: return "iphone"
         case .mcp: return "point.3.connected.trianglepath.dotted"
-        case .saved: return "bookmark"
         }
     }
 }
