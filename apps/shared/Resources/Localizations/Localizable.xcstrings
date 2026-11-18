@@ -1,13 +1,79 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Move between conversations and history faster, with clearer transitions." : {
+    "Move between conversations and history faster, with smoother transitions." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在对话与历史记录之间更快切换，过渡效果更清晰。"
+            "value" : "在对话与历史记录之间更快切换，过渡更流畅。"
+          }
+        }
+      }
+    },
+    "Suggested follow-ups now appear as tappable rows below the latest response." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "建议的后续操作现在以可点按的行显示在最新回复下方。"
+          }
+        }
+      }
+    },
+    "The conversation list shows titles on up to two lines with exact activity dates." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对话列表中的标题最多显示两行，并显示确切的活动日期。"
+          }
+        }
+      }
+    },
+    "Long conversations open faster, and long reasoning stays responsive as it streams." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "长对话打开更快，长推理内容在生成时保持流畅。"
+          }
+        }
+      }
+    },
+    "Simpler service management, with a plus button to add services and a trash button to detach them." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务管理更简单：使用加号按钮添加服务，使用垃圾桶按钮移除服务。"
+          }
+        }
+      }
+    },
+    "Diffs in replies read more clearly, with colored markers instead of tinted rows." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回复中的差异对比更清晰，以彩色标记代替着色行。"
+          }
+        }
+      }
+    },
+    "Updated built-in services with more travel, registration, messaging, export, and account actions." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内置服务已更新，新增更多出行、注册、消息、导出和账户相关操作。"
           }
         }
       }
