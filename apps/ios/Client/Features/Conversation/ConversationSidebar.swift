@@ -277,15 +277,16 @@ private struct SidebarRow: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: Theme.Spacing.sm) {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                     Text(meta.displayTitle)
                         .font(Theme.Fonts.bodyMd)
                         .foregroundStyle(Theme.Colors.onSurface)
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .truncationMode(.tail)
-                    TimelineView(.periodic(from: .now, by: 60)) { context in
+                        .multilineTextAlignment(.leading)
+                    TimelineView(.everyMinute) { context in
                         Text(lastModifiedText(relativeTo: context.date))
-                            .font(Theme.Fonts.captionSm)
+                            .font(Theme.Fonts.bodySm)
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .lineLimit(1)
                     }
@@ -309,32 +310,14 @@ private struct SidebarRow: View {
     }
 
     private func lastModifiedText(relativeTo now: Date) -> String {
-        let minute: TimeInterval = 60
-        let hour = 60 * minute
-        let day = 24 * hour
-        let week = 7 * day
-        let month = 30 * day
-        let elapsed = max(0, now.timeIntervalSince(meta.activityDate))
-        guard elapsed >= minute else { return L10n.string("Just now") }
-
-        let components: DateComponents
-        switch elapsed {
-        case ..<hour:
-            components = DateComponents(minute: -Int(elapsed / minute))
-        case ..<day:
-            components = DateComponents(hour: -Int(elapsed / hour))
-        case ..<week:
-            components = DateComponents(day: -Int(elapsed / day))
-        case ..<month:
-            components = DateComponents(weekOfMonth: -Int(elapsed / week))
-        default:
-            components = DateComponents(month: -Int(elapsed / month))
-        }
-
-        let formatter = RelativeDateTimeFormatter()
+        var calendar = Calendar.current
+        calendar.locale = AppLocale.resolvedLocale
+        let isToday = calendar.isDate(meta.activityDate, inSameDayAs: now)
+        let formatter = DateFormatter()
         formatter.locale = AppLocale.resolvedLocale
-        formatter.unitsStyle = .full
-        return formatter.localizedString(from: components)
+        formatter.dateStyle = isToday ? .none : .short
+        formatter.timeStyle = isToday ? .short : .none
+        return formatter.string(from: meta.activityDate)
     }
 
     private var accessibilityValue: String {
