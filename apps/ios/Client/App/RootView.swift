@@ -676,6 +676,7 @@ struct RootView: View {
                     }
                     .onDisappear { conversation.setTranscriptVisible(false) }
                     .id(ObjectIdentifier(conversation))
+                    .opacity(conversationTransition == .idle ? 1 : 0)
             }
 
             if conversations.current == nil
@@ -690,7 +691,7 @@ struct RootView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Theme.Colors.conversationSurface)
+                .background(Theme.Colors.conversationSurface.opacity(isSplitLayout ? 1 : 0))
                 .transition(.opacity)
                 .zIndex(1)
             }

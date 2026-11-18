@@ -126,6 +126,7 @@ struct ConversationPage: View {
     }
 
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -229,7 +230,7 @@ struct ConversationPage: View {
                         }
                 }
         }
-        .background(Theme.Colors.conversationSurface)
+        .background(Theme.Colors.conversationSurface.opacity(horizontalSizeClass == .compact ? 0 : 1))
     }
 
     private var page: some View {
@@ -362,7 +363,8 @@ struct ConversationPage: View {
                     }
                 }
         }
-        .background(Theme.Colors.conversationSurface)
+        .background(Theme.Colors.conversationSurface.opacity(horizontalSizeClass == .compact ? 0 : 1))
+        .containerBackground(Theme.Colors.conversationSurface.opacity(horizontalSizeClass == .compact ? 0 : 1), for: .navigation)
         .background(ConversationWebInputFocus(isFocused: $webInputFocused))
         .overlay(alignment: .bottom) {
             if !showsComposer, dockedPrompt == nil, scroller.showsJumpButton {
