@@ -133,7 +133,7 @@ enum DeviceTemplate {
             }
             try applyDefaults(decoded.userDefaults?.app, to: .standard)
             try applyDefaults(decoded.userDefaults?.appGroup, to: group)
-            StorageMigrator.migrateApplicationStorage()
+            StorageMigrator.migrateApp()
             if let settings = decoded.settings {
                 if let language = settings.language {
                     var value = try AppSettings.load()

@@ -96,9 +96,16 @@ final class StorageRoot {
         guard let chosen = profiles.first(where: { $0.id == storedActiveId }) ?? profiles.first else {
             throw StorageMigrationError.activeProfileUnavailable
         }
-        let migrated = try await migrate(chosen)
+        let migrated: Profile
+        do { migrated = try await migrate(chosen) }
+        catch {
+            if (error as? StorageMigrationError)?.requiresUserAction == true { throw error }
+            guard let fallback = profiles.first(where: { $0.id != chosen.id && $0.version == ProfileSchema.current }) else { throw error }
+            Log.app.error("StorageRoot.resolve deferred id=\(chosen.id) version=\(chosen.version) fallback=\(fallback.id) retry=nextLaunch error=\(error.localizedDescription)")
+            migrated = try await migrate(fallback)
+        }
         update(migrated.id) { $0 = migrated }
-        try await activate(migrated)
+        try await activate(migrated, persist: migrated.id == chosen.id)
         Log.app.info("StorageRoot.resolve profiles=\(self.profiles.count) iCloud=\(self.iCloudAvailable) root=\(self.root.path)")
     }
 
@@ -126,7 +133,13 @@ final class StorageRoot {
         let startedAt = Date()
         isBusy = true
         defer { isBusy = false }
-        let migrated = try await migrate(profile)
+        let migrated: Profile
+        do { migrated = try await migrate(profile) }
+        catch {
+            if (error as? StorageMigrationError)?.requiresUserAction == true { throw error }
+            Log.app.error("StorageRoot.switch deferred id=\(profile.id) version=\(profile.version) retained=\(self.activeId?.uuidString ?? "none") retry=nextSwitch error=\(error.localizedDescription)")
+            return
+        }
         Log.app.info("StorageRoot.switch prepared id=\(profile.id) durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1_000))")
         update(migrated.id) { $0 = migrated }
         try await activate(migrated)
@@ -398,14 +411,14 @@ final class StorageRoot {
         switchEpoch += 1
     }
 
-    private func activate(_ profile: Profile, previousProfileClosed: Bool = false) async throws {
+    private func activate(_ profile: Profile, previousProfileClosed: Bool = false, persist: Bool = true) async throws {
         let scope = isActive(profile) ? activeScope : ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
         let changingProfile = activeScope.profileID != nil && activeScope.root != scope.root
         if changingProfile && !previousProfileClosed { try await beforeProfileChange?() }
         do {
             if changingProfile && !previousProfileClosed { try await DurableProfileStore.shared.close(in: activeScope) }
             _ = try await DurableProfileStore.shared.session(in: scope)
-            try storeActiveProfile(profile.id)
+            if persist { try storeActiveProfile(profile.id) }
         } catch {
             if changingProfile { try? await profileDidChange?() }
             throw error

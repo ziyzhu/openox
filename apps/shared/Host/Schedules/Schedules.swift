@@ -301,10 +301,10 @@ final class Schedules {
         preparation = nil
     }
 
-    func load(retry: Bool = false) async throws {
+    func load() async throws {
         let scope = StorageRoot.shared.scope
         guard loadedScope != scope || !isLoaded else { return }
-        if !retry, loadedScope == scope, let message = preparation?.failureMessage {
+        if loadedScope == scope, let message = preparation?.failureMessage {
             throw StorageMigrationError.recoveryRequired(message)
         }
         guard scope.profileID != nil else {
@@ -342,7 +342,7 @@ final class Schedules {
                 all = []
                 loading = nil
             }
-            Log.app.error("Schedules.load needsRecovery=true sourcePreserved=true error=\(error.localizedDescription)")
+            Log.app.error("Schedules.load unavailable sourcePreserved=true deferred=nextActivation error=\(error.localizedDescription)")
             throw error
         }
     }

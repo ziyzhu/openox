@@ -13,6 +13,13 @@ nonisolated enum StorageMigrationError: LocalizedError {
     case recoveryRequired(String)
     case unsupportedProfileVersion(String, String)
 
+    var requiresUserAction: Bool {
+        switch self {
+        case .activeProfileUnavailable, .externalProfileUnavailable, .unsupportedProfileVersion: true
+        default: false
+        }
+    }
+
     var errorDescription: String? {
         switch self {
         case .activeProfileUnavailable: "Ox can’t find this Profile’s folder. If it’s in iCloud Drive, make sure iCloud is on, then try again."
@@ -44,57 +51,47 @@ nonisolated enum StoragePreparation: Equatable, Sendable {
 
 nonisolated enum StorageMigrator {
     @MainActor
-    static func migrateApplicationStorage() {
+    static func migrateApp() {
         ApplicationStorageMigrator.migrate()
     }
 
     @MainActor
     static func prepare(storage: StorageRoot, services: ServiceManager) async throws {
         Log.app.info("StorageMigrator.prepare start")
-        try ProfileMigrator.recoverPublications()
-        try ProfileMigrator.privatizeAbandonedProfileStages()
-        try ApplicationStorageMigrator.validateApplicationStorage()
-        try CredentialMigrator.migrateLegacySecrets()
-        try CredentialMigrator.migrateSecretStorage()
-        try CredentialMigrator.migrateManagedOAuthAccounts()
-        try CredentialMigrator.migratePublicationToken()
+        attempt("app.publications") { try ProfileMigrator.recoverPublications() }
+        attempt("app.abandonedStages") { try ProfileMigrator.privatizeAbandonedProfileStages() }
+        attempt("app.validate") { try ApplicationStorageMigrator.validateApplicationStorage() }
+        attempt("app.legacySecrets") { try CredentialMigrator.migrateLegacySecrets() }
+        attempt("app.secretStorage") { try CredentialMigrator.migrateSecretStorage() }
+        attempt("app.managedOAuth") { try CredentialMigrator.migrateManagedOAuthAccounts() }
+        attempt("app.publicationToken") { try CredentialMigrator.migratePublicationToken() }
         try await storage.resolve()
-        try CredentialMigrator.migrateSecretProviderKeys()
-        try CredentialMigrator.removeVerifiedLegacyProviderKeys()
-        let scope = storage.scope
-        try await Task.detached(priority: .userInitiated) { try RepositoryMigrator.migrateIntoProfile(scope) }.value
-        await services.prepareStorage()
-        let legacyAccounts = Set(try Credentials.accounts(prefix: "service:api:"))
-        Log.app.info("StorageMigrator.apiServiceCredentials pending=\(legacyAccounts.count)")
-        if !legacyAccounts.isEmpty {
-            let manifests = try await services.storageManifestFiles()
-            try CredentialMigrator.migrateAPIServiceOAuthAccounts(manifests: manifests, legacyAccounts: legacyAccounts)
-            try CredentialMigrator.migrateSecretAPIServiceCredentials(manifests: manifests, legacyAccounts: legacyAccounts)
-        }
+        await migrateProfile(storage.scope, services: services)
         Log.app.info("StorageMigrator.prepare done profile=\(storage.activeId?.uuidString ?? "nil")")
     }
 
     @MainActor
-    static func recoverOptionalStorage(services: ServiceManager, activateSchedules: @MainActor () async throws -> Void) async -> Bool {
-        guard !Task.isCancelled else { return false }
-        if services.localRecoveryMessage != nil {
-            do {
-                try await services.retryLocalStorage()
-                Log.app.info("StorageMigrator.recovery done resource=local")
-            } catch {
-                Log.app.warning("StorageMigrator.recovery deferred resource=local error=\(error.localizedDescription)")
-            }
-        }
-        guard !Task.isCancelled else { return false }
-        if Schedules.shared.preparation?.failureMessage != nil {
-            do {
-                try await Schedules.shared.load(retry: true)
-                try await activateSchedules()
-                Log.app.info("StorageMigrator.recovery done resource=schedules")
-            } catch {
-                Log.app.warning("StorageMigrator.recovery deferred resource=schedules error=\(error.localizedDescription)")
-            }
-        }
-        return services.localRecoveryMessage == nil && Schedules.shared.preparation == .ready
+    private static func migrateProfile(_ scope: ProfileScope, services: ServiceManager) async {
+        attempt("profile.providerKeys") { try CredentialMigrator.migrateSecretProviderKeys() }
+        attempt("profile.legacyProviderKeys") { try CredentialMigrator.removeVerifiedLegacyProviderKeys() }
+        do { try await Task.detached(priority: .userInitiated) { try RepositoryMigrator.migrateIntoProfile(scope) }.value }
+        catch { logDeferred("profile.repositories", error) }
+        await services.prepareStorage()
+        do {
+            let legacyAccounts = Set(try Credentials.accounts(prefix: "service:api:"))
+            Log.app.info("StorageMigrator.apiServiceCredentials pending=\(legacyAccounts.count)")
+            guard !legacyAccounts.isEmpty else { return }
+            let manifests = try await services.storageManifestFiles()
+            attempt("profile.apiServiceOAuth") { try CredentialMigrator.migrateAPIServiceOAuthAccounts(manifests: manifests, legacyAccounts: legacyAccounts) }
+            attempt("profile.apiServiceCredentials") { try CredentialMigrator.migrateSecretAPIServiceCredentials(manifests: manifests, legacyAccounts: legacyAccounts) }
+        } catch { logDeferred("profile.apiServiceCredentials", error) }
+    }
+
+    private static func attempt(_ step: String, _ body: () throws -> Void) {
+        do { try body() } catch { logDeferred(step, error) }
+    }
+
+    private static func logDeferred(_ step: String, _ error: Error) {
+        Log.app.error("StorageMigrator.deferred step=\(step) sourcePreserved=true retry=nextLaunch error=\(error.localizedDescription)")
     }
 }

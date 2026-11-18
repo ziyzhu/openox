@@ -25,7 +25,7 @@ final class MacHostApplication: NSObject, NSApplicationDelegate {
     private var signals: [DispatchSourceSignal] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        StorageMigrator.migrateApplicationStorage()
+        StorageMigrator.migrateApp()
         let host = HostRuntime(
             serviceManager: ServiceManager(nativeServices: MacNativeServiceCatalog()),
             presentations: MacAppPresentations().presentations,

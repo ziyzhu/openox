@@ -226,19 +226,6 @@ final class ServiceManager {
         reloadPersistedStorage()
     }
 
-    var localRecoveryMessage: String? {
-        guard let local = repositories.first(where: { $0.id == Repository.localID }),
-              case .failed(let message) = local.state else { return nil }
-        return message
-    }
-
-    func retryLocalStorage() async throws {
-        await repository.prepareStorage(retry: true)
-        await refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
-        if let message = localRecoveryMessage { throw Repository.Failure(message: message) }
-        if case .failed(let message) = repositoryState { throw Repository.Failure(message: message) }
-    }
-
     func storageManifestFiles() async throws -> [Repository.ManifestFile] {
         try await repository.monoRepository().webManifests
     }

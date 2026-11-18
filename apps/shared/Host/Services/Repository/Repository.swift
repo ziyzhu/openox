@@ -274,7 +274,7 @@ actor Repository {
         configuration = Configuration()
     }
 
-    func prepareStorage(retry: Bool = false) {
+    func prepareStorage() {
         if let scope = StorageRoot.currentScope, let profileID = scope.profileID, scope != profileScope {
             profileScope = scope
             repositoriesRoot = scope.root.appendingPathComponent("repositories", isDirectory: true)
@@ -290,8 +290,7 @@ actor Repository {
             unmountedCatalog = nil
             Log.service.info("Repository.profile bound id=\(profileID.uuidString)")
         }
-        if retry { localPreparation = nil }
-        else if localPreparation?.failureMessage != nil { return }
+        if localPreparation?.failureMessage != nil { return }
         do {
             guard profileScope?.profileID != nil else { throw StorageMigrationError.activeProfileUnavailable }
             if localPreparation == nil {
@@ -304,7 +303,7 @@ actor Repository {
             let message = Self.errorMessage(error)
             localPreparation = .needsRecovery(message)
             activeSources = activeSources.filter { $0.value.provenance != .local }
-            Log.service.error("Repository.local needsRecovery=true sourcePreserved=true error=\(message)")
+            Log.service.error("Repository.local unavailable sourcePreserved=true deferred=nextActivation error=\(message)")
         }
     }
 

@@ -22,9 +22,7 @@ struct RepositoriesView: View {
                   case .failed(let message) = repository.state
             else { return nil }
             underlyingMessages.insert(message)
-            if repository.id == "local", manager.localRecoveryMessage != nil {
-                return String(localized: "Local repository is unavailable. Ox will retry automatically.")
-            }
+            if repository.id == Repository.localID { return nil }
             return "\(repository.name): \(message)"
         }
         if case .failed(let message) = manager.repositoryState,
@@ -373,9 +371,7 @@ struct RepositoryDetailView: View {
     }
 
     private var errorMessage: String? {
-        if repositoryID == "local", manager.localRecoveryMessage != nil {
-            return String(localized: "Local repository is unavailable. Ox will retry automatically.")
-        }
+        if repositoryID == Repository.localID, case .failed = repository?.state { return nil }
         if case .failed(let message) = manager.repositoryState { return message }
         guard let repository,
               case .failed(let message) = repository.state

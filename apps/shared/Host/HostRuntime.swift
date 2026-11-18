@@ -17,7 +17,6 @@ final class HostRuntime: OxHost {
     private let activateSchedules: @MainActor () async throws -> Void
     private let deactivateSchedules: @MainActor () async -> Void
     private var preparation: Preparation?
-    private var optionalRecovery: Task<Void, Never>?
     private var profileSummaryLoad: Task<Void, Never>?
 
     init(
@@ -63,7 +62,6 @@ final class HostRuntime: OxHost {
     }
 
     deinit {
-        optionalRecovery?.cancel()
         profileSummaryLoad?.cancel()
     }
 
@@ -84,8 +82,7 @@ final class HostRuntime: OxHost {
         }
         await profileSummaryLoad?.value
         do { try await activateSchedules() }
-        catch { Log.app.warning("HostRuntime schedules unavailable recoveryRequired=true error=\(error.localizedDescription)") }
-        resumeOptionalStorageRecovery()
+        catch { Log.app.warning("HostRuntime schedules unavailable deferred=nextActivation error=\(error.localizedDescription)") }
         Log.app.info("HostRuntime Profile changed id=\(StorageRoot.shared.activeId?.uuidString ?? "none") durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1_000))")
     }
 
@@ -109,44 +106,6 @@ final class HostRuntime: OxHost {
 
     func prepare() async throws {
         try await awaitPreparation(\.profile)
-    }
-
-    func executionAvailabilityChanged() {
-        if executionAvailable {
-            resumeOptionalStorageRecovery()
-        } else {
-            optionalRecovery?.cancel()
-        }
-    }
-
-    private func resumeOptionalStorageRecovery() {
-        guard executionAvailable else { return }
-        if let current = optionalRecovery {
-            if current.isCancelled {
-                Task {
-                    await current.value
-                    resumeOptionalStorageRecovery()
-                }
-            }
-            return
-        }
-        guard let profile = preparation?.profile,
-              services.localRecoveryMessage != nil || Schedules.shared.preparation?.failureMessage != nil else { return }
-        optionalRecovery = Task { @MainActor in
-            defer { optionalRecovery = nil }
-            do {
-                try await profile.value
-                var delay: Double = 2
-                while !Task.isCancelled {
-                    try await Task.sleep(for: .seconds(delay))
-                    if await StorageMigrator.recoverOptionalStorage(services: services, activateSchedules: activateSchedules) { return }
-                    delay = min(delay * 3, 300)
-                }
-            } catch is CancellationError {
-            } catch {
-                Log.app.error("HostRuntime optionalRecovery blocked error=\(error.localizedDescription)")
-            }
-        }
     }
 
     private func awaitPreparation(_ stage: KeyPath<Preparation, Task<Void, Error>>) async throws {
@@ -197,7 +156,7 @@ final class HostRuntime: OxHost {
                 try await UserMemory.shared.waitUntilCurrent()
                 await services.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
                 do { try await activateSchedules() }
-                catch { Log.app.warning("HostRuntime schedules unavailable recoveryRequired=true error=\(error.localizedDescription)") }
+                catch { Log.app.warning("HostRuntime schedules unavailable deferred=nextActivation error=\(error.localizedDescription)") }
                 #if DEBUG && targetEnvironment(simulator)
                 try await DeviceTemplate.finish(conversations: conversations)
                 #endif
@@ -205,7 +164,6 @@ final class HostRuntime: OxHost {
                 state = .running
                 Log.app.info("HostRuntime profile prepared")
                 Task { await ProviderRegistry.shared.refreshStaleModels() }
-                resumeOptionalStorageRecovery()
             } catch {
                 if self.preparation?.id == id {
                     state = .failed(error.localizedDescription)

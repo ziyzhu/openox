@@ -255,12 +255,14 @@ Provider media uses request-owned verified bytes, and preview/share/HTML sibling
 
 ## Compatibility gate
 
-`StorageMigrator` coordinates startup and recovery. App-wide structural
-migrations run before the Host and its storage consumers are constructed. Host
-preparation then validates application storage, migrates the selected Profile,
-and prepares the Local service repository before conversations, service discovery, or
-search indexing load persisted state. Selecting or opening another Profile also
-migrates it before publishing its `ProfileScope`.
+`StorageMigrator` coordinates three levels. App: `migrateApp` runs structural
+migrations before the Host and its storage consumers are constructed. Profile:
+Host preparation validates application storage, migrates the selected Profile,
+its repositories and its Profile-bound credentials, and prepares the Local
+service repository before conversations, service discovery, or search indexing
+load persisted state. Selecting or opening another Profile also migrates it
+before publishing its `ProfileScope`. Conversation: `ConversationMigrator`
+converts one conversation when it is opened.
 
 `ProfileMigrator` owns ordered Profile milestones and publication recovery;
 `ApplicationStorageMigrator`, `CredentialMigrator`, and `RepositoryMigrator`
@@ -268,10 +270,11 @@ own their scoped transforms. `StorageMigrationSupport` shares stateless helpers.
 The coordinator preserves prerequisite ordering. Service-repository repair remains
 structurally detected because the old Local layouts predate a shared application
 schema marker. Profile milestone identifiers are immutable after any build can
-stamp them. Unknown Profile versions and unsuccessful migrations fail closed at
-the loading screen rather than allowing consumers to interpret incompatible
-data; an unknown version specifically directs the user to the Ox build that last
-opened the Profile or a newer one.
+stamp them. Unsuccessful migrations are logged and deferred without user-facing
+errors or timed retries; consumers never interpret unmigrated data. A failed
+selected Profile falls back to another current Profile without changing the
+stored selection. An unknown version or unreachable folder still fails closed
+and directs the user to update Ox or locate the folder.
 
 Local repository and scheduled-skill preparation failures isolate those resources
 instead of blocking a compatible Profile. Normal resource access and writes remain

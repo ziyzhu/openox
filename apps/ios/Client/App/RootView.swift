@@ -202,14 +202,13 @@ private extension View {
 struct RootView: View {
     private enum StartupRecovery: Equatable {
         case manual
-        case whenAvailable
         case updateBuild
         case locateFolder
         case missingFolder
 
         var title: LocalizedStringKey {
             switch self {
-            case .manual, .whenAvailable: "Ox Couldn't Open Your Data"
+            case .manual: "Ox Couldn't Open Your Data"
             case .updateBuild: "Update Ox to Continue"
             case .locateFolder, .missingFolder: "Profile Folder Not Found"
             }
@@ -220,12 +219,13 @@ struct RootView: View {
         case idle
         case openingStorage
         case loadingProfile
+        case deferred
         case failed(message: String, recovery: StartupRecovery)
         case ready
 
         var canBegin: Bool {
             switch self {
-            case .idle, .failed: true
+            case .idle, .deferred, .failed: true
             case .openingStorage, .loadingProfile, .ready: false
             }
         }
@@ -234,7 +234,7 @@ struct RootView: View {
             switch (self, listing) {
             case (.failed, _): .unavailable
             case (.ready, _), (_, .partial), (_, .paging), (_, .complete): .ready
-            case (.idle, .pending), (.openingStorage, .pending), (.loadingProfile, .pending): .loading
+            case (.idle, .pending), (.openingStorage, .pending), (.loadingProfile, .pending), (.deferred, .pending): .loading
             }
         }
     }
@@ -360,7 +360,7 @@ struct RootView: View {
                     activeProfileMonitor.deactivate()
                     conversations.flushAll()
                 case .active:
-                    if case .failed(_, .whenAvailable) = startup { bootstrap() }
+                    if startup == .deferred { bootstrap() }
                     conversations.current?.setTranscriptVisible(true)
                     Task {
                         await storage.revalidateActive()
@@ -374,7 +374,7 @@ struct RootView: View {
             }
             .environment(\.locale, AppLocale.shared.locale)
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.protectedDataDidBecomeAvailableNotification)) { _ in
-                if case .failed(_, .whenAvailable) = startup { bootstrap() }
+                if startup == .deferred { bootstrap() }
             }
     }
 
@@ -979,24 +979,25 @@ struct RootView: View {
                 monitorActiveProfile()
                 importSharedNotes()
             } catch {
-                let keychainError = error as NSError
-                let recovery: StartupRecovery
+                let systemError = error as NSError
+                let recovery: StartupRecovery?
                 if case .unsupportedProfileVersion? = error as? StorageMigrationError {
                     recovery = .updateBuild
                 } else if case .externalProfileUnavailable? = error as? StorageMigrationError {
                     recovery = .locateFolder
                 } else if case .activeProfileUnavailable? = error as? StorageMigrationError {
                     recovery = .missingFolder
-                } else if keychainError.domain == NSOSStatusErrorDomain && keychainError.code == Int(errSecMissingEntitlement) {
+                } else if systemError.domain == NSOSStatusErrorDomain && systemError.code == Int(errSecMissingEntitlement) {
                     recovery = .updateBuild
-                } else if keychainError.domain == NSOSStatusErrorDomain
-                    && [Int(errSecInteractionNotAllowed), Int(errSecNotAvailable)].contains(keychainError.code) {
-                    recovery = .whenAvailable
                 } else {
-                    recovery = .manual
+                    recovery = nil
                 }
-                startup = .failed(message: error.localizedDescription, recovery: recovery)
-                Log.app.error("RootView.startup failed domain=\(keychainError.domain) code=\(keychainError.code) recovery=\(String(describing: recovery)) error=\(error.localizedDescription)")
+                if let recovery {
+                    startup = .failed(message: error.localizedDescription, recovery: recovery)
+                } else {
+                    transitionStartup(to: .deferred)
+                }
+                Log.app.error("RootView.startup failed domain=\(systemError.domain) code=\(systemError.code) recovery=\(recovery.map { String(describing: $0) } ?? "deferred") retry=foreground error=\(error.localizedDescription)")
             }
         }
     }

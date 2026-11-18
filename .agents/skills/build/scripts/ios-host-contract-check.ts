@@ -163,8 +163,8 @@ export async function check(): Promise<string> {
     ConversationMigrator: new Set([...migrationFiles, "apps/shared/Host/Durable/DurableFileStore.swift"]),
   };
   const scopedCompatibility: Record<string, string> = {
-    "StorageMigrator apps/ios/Client/App/App.swift": "migrateApplicationStorage",
-    "StorageMigrator apps/ios/Development/DeviceTemplate.swift": "migrateApplicationStorage",
+    "StorageMigrator apps/ios/Client/App/App.swift": "migrateApp",
+    "StorageMigrator apps/ios/Development/DeviceTemplate.swift": "migrateApp",
     "ProfileMigrator apps/shared/Host/Files/VirtualFileSystem.swift": "legacyWorkflowLocation",
     "ConversationMigrator apps/shared/Host/Conversations/ConversationServiceAttachments.swift": "migratedServiceDomains",
     "ConversationMigrator apps/shared/Host/Conversations/ConversationDocument.swift": "isRenameAction",

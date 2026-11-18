@@ -15,12 +15,12 @@ final class IOSHost: OxHost {
     var executionAvailable: Bool { runtime.executionAvailable }
 
     convenience init() {
-        StorageMigrator.migrateApplicationStorage()
+        StorageMigrator.migrateApp()
         self.init(preparedServices: ServiceManager(), presentations: .live)
     }
 
     convenience init(serviceManager: ServiceManager, presentations: AppPresentations) {
-        StorageMigrator.migrateApplicationStorage()
+        StorageMigrator.migrateApp()
         serviceManager.reloadPersistedStorage()
         self.init(preparedServices: serviceManager, presentations: presentations)
     }
@@ -50,7 +50,6 @@ final class IOSHost: OxHost {
     }
 
     private func executionAvailabilityChanged() {
-        runtime.executionAvailabilityChanged()
         conversations.suspendModelPreparation()
         connectionLifecycleTask?.cancel()
         connectionLifecycleTask = Task { [weak self] in
