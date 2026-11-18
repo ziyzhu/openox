@@ -15,7 +15,7 @@ enum ServiceDetailPrimaryAction {
     func systemImage(isAttached: Bool) -> String {
         switch self {
         case .startConversation: "plus"
-        case .attach: isAttached ? "minus.circle" : "plus.circle"
+        case .attach: isAttached ? "trash" : "plus.circle"
         }
     }
 
