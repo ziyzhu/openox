@@ -145,7 +145,7 @@ private struct DiffHunkBody: View {
     private var attributed: NSAttributedString {
         let value = NSMutableAttributedString()
         for (index, line) in lines.enumerated() {
-            value.append(NSAttributedString(string: line.text + (index == lines.count - 1 ? "" : "\n"), attributes: [
+            value.append(NSAttributedString(string: DiffColors.marker(line.kind) + line.text + (index == lines.count - 1 ? "" : "\n"), attributes: [
                 .font: font,
                 .foregroundColor: DiffColors.foreground(line.kind),
             ]))
@@ -191,17 +191,6 @@ private struct DiffHunkBody: View {
             }
             .fixedSize(horizontal: true, vertical: true)
             .frame(minWidth: minWidth, minHeight: font.lineHeight * CGFloat(lines.count), alignment: .leading)
-            .background {
-                GeometryReader { geometry in
-                    VStack(spacing: 0) {
-                        ForEach(lines.indices, id: \.self) { index in
-                            DiffColors.background(lines[index].kind)
-                                .frame(height: geometry.size.height / CGFloat(max(1, lines.count)))
-                        }
-                    }
-                }
-                .allowsHitTesting(false)
-            }
             .padding(.horizontal, Theme.Spacing.lg)
         }
         .excludesCompactPageSwitch()
@@ -223,12 +212,11 @@ enum DiffColors {
         }
     }
 
-    static func background(_ kind: DiffDocument.Kind) -> Color {
+    static func marker(_ kind: DiffDocument.Kind) -> String {
         switch kind {
-        case .addition: addition.dynamic.opacity(0.12)
-        case .deletion: deletion.dynamic.opacity(0.12)
-        case .hunk: metadata.dynamic.opacity(0.08)
-        case .context, .metadata: .clear
+        case .addition: "+"
+        case .deletion: "−"
+        case .context, .metadata, .hunk: " "
         }
     }
 }

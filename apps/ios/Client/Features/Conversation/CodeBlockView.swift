@@ -8,15 +8,13 @@ struct CodeBlockHeader<Controls: View>: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Theme.Spacing.sm) {
-            Text(DiffDocument.supports(language) ? "Changes" : language ?? "Text")
+            Text(DiffDocument.supports(language) ? "Diff" : language ?? "Text")
                 .font(Theme.Fonts.caption.weight(.medium))
                 .foregroundStyle(Theme.Colors.onSurface)
             Spacer(minLength: 0)
             if DiffDocument.supports(language), let code, !isStreaming {
                 let document = DiffDocument(code)
-                if document.files.isEmpty {
-                    DiffChangeCounts(additions: document.additions, deletions: document.deletions)
-                } else {
+                if !document.files.isEmpty {
                     Text(document.files.count == 1 ? "1 file" : "\(document.files.count) files")
                         .font(Theme.Fonts.caption)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)

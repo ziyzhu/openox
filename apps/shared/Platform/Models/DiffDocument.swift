@@ -86,8 +86,6 @@ nonisolated struct DiffDocument: Sendable {
     let lines: [Line]
     let files: [File]
     let codeLines: [CodeLine]
-    var additions: Int { lines.count { $0.kind == .addition } }
-    var deletions: Int { lines.count { $0.kind == .deletion } }
 
     static func supports(_ language: String?) -> Bool {
         ["diff", "patch"].contains(language?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "")
