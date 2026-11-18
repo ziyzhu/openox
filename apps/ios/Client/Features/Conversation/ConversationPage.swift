@@ -366,13 +366,12 @@ struct ConversationPage: View {
         .background(Theme.Colors.conversationSurface.opacity(horizontalSizeClass == .compact ? 0 : 1))
         .containerBackground(Theme.Colors.conversationSurface.opacity(horizontalSizeClass == .compact ? 0 : 1), for: .navigation)
         .background(ConversationWebInputFocus(isFocused: $webInputFocused))
-        .overlay(alignment: .bottom) {
-            if !showsComposer, dockedPrompt == nil, scroller.showsJumpButton {
-                ScrollToBottomButton(composerButtonSize: composerButtonSize) {
+        .overlay(alignment: .bottomTrailing) {
+            if !showsComposer, dockedPrompt == nil {
+                ScrollToBottomButton(isPresented: scroller.showsJumpButton, composerButtonSize: composerButtonSize) {
                     scroller.rideToBottom()
                 }
                     .padding(.bottom, Theme.Spacing.md)
-                    .transition(.opacity)
             }
         }
         .overlay(alignment: .bottom) {
@@ -1447,26 +1446,20 @@ struct ConversationPage: View {
     ) -> some View {
         composerBlock(isConversationEmpty: isConversationEmpty, floatsTopStrip: floatsTopStrip)
             .transition(.opacity.animation(Theme.Animation.quick))
-            .overlay(alignment: .top) {
-                if scroller.showsJumpButton {
-                    ScrollToBottomControl(
-                        composer: composer,
-                        composerFocused: composerFocused,
-                        isEditingMessage: editedBlockID != nil,
-                        hasFiles: !conversationFiles.isEmpty,
-                        hasAttachedServices: !conversation.attachedServices.isEmpty,
-                        floatsTopStrip: floatsTopStrip,
-                        composerButtonSize: composerButtonSize
-                    ) {
-                        scroller.rideToBottom()
-                    }
-                        .transition(.opacity)
+            .overlay(alignment: .topTrailing) {
+                ScrollToBottomControl(
+                    isPresented: scroller.showsJumpButton,
+                    composer: composer,
+                    composerFocused: composerFocused,
+                    isEditingMessage: editedBlockID != nil,
+                    hasFiles: !conversationFiles.isEmpty,
+                    hasAttachedServices: !conversation.attachedServices.isEmpty,
+                    floatsTopStrip: floatsTopStrip,
+                    composerButtonSize: composerButtonSize
+                ) {
+                    scroller.rideToBottom()
                 }
             }
-            .animation(
-                reduceMotion ? nil : Theme.Animation.standard,
-                value: scroller.showsJumpButton
-            )
     }
 
     private func promptDock(_ pending: Conversation.PendingPrompt) -> some View {
@@ -1487,14 +1480,11 @@ struct ConversationPage: View {
             .shadow(color: .black.opacity(0.08), radius: 16, y: 4)
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.bottom, Theme.Spacing.sm)
-            .overlay(alignment: .top) {
-                if scroller.showsJumpButton {
-                    ScrollToBottomButton(composerButtonSize: composerButtonSize) {
-                        scroller.rideToBottom()
-                    }
-                        .offset(y: -Theme.Size.minimumTouchTarget - Theme.Spacing.xs)
-                        .transition(.opacity)
+            .overlay(alignment: .topTrailing) {
+                ScrollToBottomButton(isPresented: scroller.showsJumpButton, composerButtonSize: composerButtonSize) {
+                    scroller.rideToBottom()
                 }
+                    .offset(y: -Theme.Size.minimumTouchTarget - Theme.Spacing.xs)
             }
             .transition(.opacity.animation(Theme.Animation.quick))
             .onAppear {

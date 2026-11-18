@@ -1,25 +1,44 @@
 import SwiftUI
 
 struct ScrollToBottomButton: View {
+    static func touchTargetInset(_ composerButtonSize: CGFloat) -> CGFloat {
+        max(0, (Theme.Size.minimumTouchTarget - composerButtonSize) / 2)
+    }
+
+    let isPresented: Bool
     let composerButtonSize: CGFloat
     let action: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        Button(action: action) {
-            Image(systemName: "arrow.down")
-                .font(.system(.subheadline, weight: .medium))
-                .foregroundStyle(Theme.Colors.onSurface)
-                .frame(width: composerButtonSize, height: composerButtonSize)
+        ZStack {
+            if isPresented {
+                Button(action: action) {
+                    Image(systemName: "arrow.down")
+                        .font(.system(.subheadline, weight: .medium))
+                        .foregroundStyle(Theme.Colors.onSurface)
+                        .frame(width: composerButtonSize, height: composerButtonSize)
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: Circle())
+                .minimumTouchTarget()
+                .accessibilityLabel(A11yLabel.scrollToBottom)
+                .accessibilityIdentifier(A11yID.ConversationControls.scrollToBottom)
+                .transition(reduceMotion ? .opacity : .scale(scale: 0.5).combined(with: .opacity))
+            }
         }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Circle())
-        .minimumTouchTarget()
-        .accessibilityLabel(A11yLabel.scrollToBottom)
-        .accessibilityIdentifier(A11yID.ConversationControls.scrollToBottom)
+        .frame(
+            width: max(composerButtonSize, Theme.Size.minimumTouchTarget),
+            height: max(composerButtonSize, Theme.Size.minimumTouchTarget)
+        )
+        .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: isPresented)
+        .padding(.trailing, Theme.Spacing.xl - Self.touchTargetInset(composerButtonSize))
     }
 }
 
 struct ScrollToBottomControl: View {
+    let isPresented: Bool
     let composer: ConversationComposerModel
     let composerFocused: Bool
     let isEditingMessage: Bool
@@ -30,12 +49,11 @@ struct ScrollToBottomControl: View {
     let action: () -> Void
 
     var body: some View {
-        ScrollToBottomButton(composerButtonSize: composerButtonSize, action: action)
+        ScrollToBottomButton(isPresented: isPresented, composerButtonSize: composerButtonSize, action: action)
             .offset(y: offset)
     }
 
     private var offset: CGFloat {
-        let touchTargetInset = max(0, (Theme.Size.minimumTouchTarget - composerButtonSize) / 2)
         let isResting = !composerFocused && composer.isEmpty && !isEditingMessage
         let showsTopStrip = isEditingMessage || hasFiles || hasAttachedServices
         let firstSurfaceTop = ConversationComposer.firstSurfaceTopOffset(
@@ -43,7 +61,8 @@ struct ScrollToBottomControl: View {
             showsTopStrip: showsTopStrip,
             floatsTopStrip: floatsTopStrip
         )
-        return firstSurfaceTop - ConversationComposer.surfaceSpacing - composerButtonSize - touchTargetInset
+        return firstSurfaceTop - ConversationComposer.surfaceSpacing - composerButtonSize
+            - ScrollToBottomButton.touchTargetInset(composerButtonSize)
     }
 }
 

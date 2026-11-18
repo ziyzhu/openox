@@ -257,8 +257,13 @@ final class ConversationViewportController {
             return
         }
         move(to: .bottom)
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            showsJumpButton = false
+        }
         Log.ui.info("ConversationUX.intent conversation=\(conversationID) kind=scroll target=bottom disposition=animated \(logSnapshot)")
-        withAnimation(Theme.Animation.drop) {
+        withAnimation(Theme.Animation.ride) {
             position.scrollTo(edge: .bottom)
         }
     }
@@ -572,6 +577,7 @@ final class ConversationViewportController {
 
     private func updateJumpButton(_ frame: Frame) {
         if case .sending = presentation { return }
+        if case .programmatic(.bottom) = motion { return }
         let shows = frame.jumpDistance > Self.jumpThreshold
         guard shows != showsJumpButton else { return }
         showsJumpButton = shows
