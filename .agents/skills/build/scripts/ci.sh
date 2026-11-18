@@ -76,7 +76,7 @@ for step in "${steps[@]}"; do
       git diff --exit-code -- apps/shared/Resources/OxServices.bundle \
         apps/shared/Resources/ModelServiceActions.json \
         packages/agent/skills/evolve/references/model-schemas.md
-      echo 'PASS lint, build, and test (storage upgrades and real-provider evals not run)' ;;
+      echo 'PASS lint, build, and test (storage upgrades and live Host checks not run)' ;;
     standalone)
       if [ -n "$output" ]; then
         bun --no-env-file run --cwd apps/cli standalone:check --out "$output"

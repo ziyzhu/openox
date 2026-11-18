@@ -1,6 +1,6 @@
 # Benchmarking
 
-Use controlled benchmarks for task completion, latency and cost comparisons. This is an opt-in measurement workflow under test, not a fourth correctness suite or a default CI gate. Gym discovers issues through simulated user interaction; benchmarks measure a predeclared comparison. Use existing build, setup, ox-cli and evals guidance for their owning operations.
+Use controlled benchmarks for task completion, latency and cost comparisons. This is an opt-in measurement workflow under test, not a correctness suite or a default CI gate. Gym discovers issues through simulated user interaction; benchmarks measure a predeclared comparison. Use existing build, setup and ox-cli guidance for their owning operations.
 
 **Define the experiment.** Declare the question, two arms, representative cases, repetitions, required correctness checks, deadline, timing boundary and primary metric before inspecting outcomes. Declare which effects and real-provider spending the current request authorizes; a saved plan is not authorization for future paid runs. Prefer at least four repetitions per case for equal first-arm counts. Three repetitions leave a 2:1 split, not perfect balance. Choose counts before running; never stop early because results look favorable.
 

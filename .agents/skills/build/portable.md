@@ -1,9 +1,9 @@
 # Portable verification
 
 CI installs with the frozen lockfile, then runs `lint`, `build`, and `test`.
-These cover static/type checks, eval-definition validation, agent/service generation,
-package consumers, offline build-tool safety checks, shipped bundles, and
-child-process execution isolation. It clears live-target variables and disables `.env` loading.
+These cover static/type checks, agent/service generation, package consumers,
+offline build-tool safety checks, and shipped bundles. CI clears live-target
+variables and disables `.env` loading.
 No simulator, credentials, real model calls, or publication are required.
 
 Run `bun run ci --native` on macOS for portable checks, the current platform's

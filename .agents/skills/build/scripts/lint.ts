@@ -14,4 +14,3 @@ for (const check of [publicBoundary, hostPlatforms, hostContract, filesystemPath
 }
 
 await run(["bun", "--no-env-file", ".agents/skills/build/scripts/typecheck.ts"]);
-await run(["bun", "--no-env-file", ".agents/skills/evals/scripts/runner.ts", "--validate"]);

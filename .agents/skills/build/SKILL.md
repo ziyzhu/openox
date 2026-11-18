@@ -1,6 +1,6 @@
 ---
 name: build
-description: Build native apps and bundled services, regenerate schemas, and run static, type, packaging, generated-artifact and build-tool checks. Storage-upgrade and real-provider checks are separate; publication belongs to release.
+description: Build native apps and bundled services, regenerate schemas, and run static, type, packaging, generated-artifact and build-tool checks. Storage upgrades and live Host verification are separate; publication belongs to release.
 ---
 
 # Build
@@ -13,9 +13,9 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 
 | Command | Purpose |
 | --- | --- |
-| `bun run lint` | Repository source policies, resource validation, five TypeScript projects and offline eval-definition validation. |
+| `bun run lint` | Repository source policies, resource validation, and five TypeScript projects. |
 | `bun run build` | Verify generated schemas, generate agent/service resources, and build/verify portable packages and CLI consumers. |
-| `bun run test` | Offline build-tool checks, shipped bundles, and execution-isolation checks. |
+| `bun run test` | Offline build-tool and shipped-bundle checks. |
 | `bun run ci` | Run lint, build and test with frozen dependencies, no `.env` loading and generated-resource drift checks; see [portable checks](portable.md). |
 | `bun run ci --native` | Run portable checks, current-platform standalone CLI checks, and unsigned iOS/macOS builds on macOS. |
 | `bun run ci --native-only` | Generate the agent bundle and build unsigned iOS and macOS apps. |
@@ -39,11 +39,10 @@ a Simulator; use it as the first compile check, then `build:ios` before iOS veri
 `lint` validates public/private-content boundaries, iOS Client-Host layering,
 platform source ownership, unsafe absolute-path slicing, bundled skill packages and links,
 translations, provider models, and bundled service manifests/installers. It runs the explicit check list in `scripts/lint.ts`
-against the full repository, then checks TypeScript and eval definitions without generating
-or fixing files. Keep cross-file and resource checks here rather than forcing them into
+against the full repository, then checks TypeScript without generating or fixing files. Keep cross-file and resource checks here rather than forcing them into
 per-file JavaScript lint rules. `build` checks schema consistency before generating
 resources and verifying packages; native compilation remains explicit through
-`build:ios` and `build:macos`. `.agents/tsconfig.json` includes test, eval, Gym, demo,
+`build:ios` and `build:macos`. `.agents/tsconfig.json` includes test, Gym, demo,
 setup, build, and release code.
 
 ## Maintain generated sources
@@ -80,9 +79,7 @@ All hosts share one core prompt. Put presentation facts in current turn context 
 
 Run `bun run ci` after maintenance. `.bun-version` and `.github/ci.json` own shared
 CI toolchain and platform requirements; applicable versions are checked before installation.
-`scripts/ci.sh` owns credential-free orchestration;
-static eval-definition validation does not load API keys or invoke models. Build-only
-checks live in `checks/`. Do not add general agent unit tests. Simulator provisioning
-belongs to `setup`; real-model behavior belongs to `evals`; publication belongs
-to `release`. Individual check implementations may be invoked directly for debugging.
+`scripts/ci.sh` owns credential-free orchestration. Build-only checks live in `checks/`.
+Do not add general agent unit tests. Simulator provisioning belongs to `setup`;
+publication belongs to `release`. Individual checks may be invoked directly for debugging.
 Keep screenshots, traces, credentials, and diagnostics outside the repository.

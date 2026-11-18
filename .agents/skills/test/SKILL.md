@@ -1,20 +1,14 @@
 ---
 name: test
-description: "Coordinate storage backward compatibility and real-provider evals. Plan and report opt-in controlled benchmarks for task completion, latency and cost."
+description: "Verify storage backward compatibility, check agent behavior on a QA Host, and plan opt-in controlled benchmarks for task completion, latency and cost."
 ---
 
 # Test
 
-Maintain two suites. Do not create a general unit, UI, smoke, or miscellaneous
-regression suite. `bun run test` runs offline build-tool checks, shipped-bundle
-checks, and child-process execution isolation. `bun run lint` owns static/type
+Storage backward compatibility is the maintained test suite. `bun run test` runs
+offline build-tool and shipped-bundle checks. `bun run lint` owns static/type
 validation; `bun run build` owns generated-artifact consistency, packaging and
 compilation. Exploratory UI verification belongs to Gym.
-
-| Suite | Entry point | Evidence |
-| --- | --- | --- |
-| Backward compatibility | [Storage compatibility](references/storage-compatibility.md) | Actual X-written snapshots opened by Y, preserved data and second-launch stability |
-| Evals | `bun run evals --help`; [evals](../evals/SKILL.md) | Real provider/model, production prompts, tool receipts and basic prompting results |
 
 ## Backward compatibility
 
@@ -29,6 +23,34 @@ ordinary writes, complete data preservation and a stable second launch. A curren
 serializer, clean install or template-validator pass cannot substitute for an upgrade.
 Missing predecessor artifacts block verification. Downgrade testing is opt-in.
 
+## Targeted agent verification
+
+Use [Ox CLI](../ox-cli/SKILL.md) against an explicit reserved QA Host and a disposable
+Profile. Pick the provider and exact model ID from `ox host providers`. Use Mock
+for deterministic Host checks; real inference requires explicit authorization and
+a bounded run. Stage only synthetic data. For example, verify that an answer comes
+from a file rather than from the prompt:
+
+```sh
+ox --host "$QA_HOST" conversation new --temporary --provider "$PROVIDER" --model "$MODEL" --json
+```
+
+Set `CONVERSATION` to the returned `conversationId`.
+
+```sh
+ox --host "$QA_HOST" --conversation "$CONVERSATION" vm call ox.fs.write \
+  --args '{"purpose":"Seed QA fixture","path":"notes.txt","content":"Meeting code: MAPLE-739"}'
+ox --host "$QA_HOST" --conversation "$CONVERSATION" conversation send \
+  'Read notes.txt and tell me the meeting code.' --json
+ox --host "$QA_HOST" --conversation "$CONVERSATION" conversation inspect --messages --json
+ox --host "$QA_HOST" --conversation "$CONVERSATION" conversation logs --json
+```
+
+Require a completed turn, the expected answer, and a successful `AgentCall.end`
+for `ox.fs.read` scoped to that turn. A CLI run exercises the real Host; it does not
+inject tool responses or score a baseline. Use controlled fixture services for
+scripted responses, never real inboxes or accounts as stand-ins.
+
 ## Benchmarking
 
 Use [benchmarking](references/benchmarking.md) for controlled completion-rate, latency
@@ -40,7 +62,7 @@ providers. Keep plans, task-specific drivers and raw evidence outside the checko
 ## Run and report
 
 Reproduce an issue before fixing it. Add persistent cases only when explicitly
-requested and only within the maintained suites. Do not add unit tests.
+requested and only within the storage compatibility suite. Do not add unit tests.
 
 Use reserved QA devices and explicit targets. Preserve credentials, approval policies
 and personal data. Require confirmation for destructive replay; do not uninstall or

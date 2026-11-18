@@ -17,8 +17,8 @@ Also use the agent-independent `ios-simulator` and `ox-cli` skills. Consult inst
 
 ## Relationship to deterministic tests
 
-Ox Gym does not replace build checks, storage backward compatibility, or real-provider
-evals. It explores realistic combinations and surfaces evidence fixed checks may miss.
+Ox Gym does not replace build checks or storage backward compatibility. It explores
+realistic combinations and surfaces evidence fixed checks may miss.
 Do not use Gym as an archive for deterministic regression runners.
 
 ## Roles
