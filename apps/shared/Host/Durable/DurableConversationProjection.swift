@@ -2,6 +2,7 @@ import Foundation
 
 nonisolated enum DurableConversationProjection {
     private struct Decoration {
+        let turnID: TurnID
         let generation: ModelGeneration
         let steps: [Step]
 
@@ -19,9 +20,9 @@ nonisolated enum DurableConversationProjection {
     static func turns(from entries: [JSONValue], scope: ProfileScope, files: FileDirectoryListing? = nil) throws -> [Turn] {
         let annotations = annotations(from: entries, scope: scope, files: files)
         let decorations = annotations.flatMap { turn -> [Decoration] in
-            guard case .agent(let agent, _) = turn else { return [] }
+            guard case .agent(let agent, let id) = turn else { return [] }
             return agent.generations.map { generation in
-                Decoration(generation: generation, steps: agent.steps.filter { $0.generation == generation.id })
+                Decoration(turnID: id, generation: generation, steps: agent.steps.filter { $0.generation == generation.id })
             }
         }
         var builder = Builder(annotations: annotations, decorations: decorations)
@@ -71,6 +72,7 @@ nonisolated enum DurableConversationProjection {
         let annotations: [Turn]
         let decorations: [Decoration]
         var turns: [Turn] = []
+        var usedTurnIDs = Set<TurnID>()
         var agent: AgentTurn?
         var agentID: TurnID?
         var toolDecorations: [StepID: [Step]] = [:]
@@ -94,8 +96,9 @@ nonisolated enum DurableConversationProjection {
                 let exact = rich.filter { abs($0.0.at.timeIntervalSince(user.timestamp)) < 0.001 }
                 let matched = exact.last ?? (rich.count == 1 ? rich.first : nil)
                 let skill = matched?.0.skillInvocation.flatMap { $0.expandedIntent == intent ? $0 : nil }
-                let id = turnID ?? TurnID(StableID.uuid(namespace + ":user"))
-                turns.append(.user(UserTurn(intent: intent, attachments: attachments, at: user.timestamp,
+                let id = turnID ?? unused(matched?.1) ?? TurnID(StableID.uuid(namespace + ":user"))
+                usedTurnIDs.insert(id)
+                turns.append(.user(UserTurn(intent: intent, attachments: attachments, at: matched?.0.at ?? user.timestamp,
                                             submissionID: matched?.0.submissionID, skillInvocation: skill,
                                             scheduleName: matched?.0.scheduleName), id: id))
             case .assistant(let assistant):
@@ -107,12 +110,17 @@ nonisolated enum DurableConversationProjection {
             }
         }
 
+        func unused(_ id: TurnID?) -> TurnID? {
+            id.flatMap { usedTurnIDs.contains($0) || $0 == agentID ? nil : $0 }
+        }
+
         mutating func appendAssistant(_ assistant: AssistantMessage, namespace: String, turnID: TurnID?) {
             let candidates = decorations.filter { decoration in
                 guard decoration.generation.model == assistant.model else { return false }
                 let calls = assistant.content.toolCalls
                 if calls.isEmpty {
-                    return abs(decoration.generation.at.timeIntervalSince(assistant.timestamp)) < 0.001
+                    let recorded = decoration.generation.assistantMessage?.timestamp ?? decoration.generation.at
+                    return abs(recorded.timeIntervalSince(assistant.timestamp)) < 0.001
                         && decoration.generation.assistantMessage?.content == assistant.content
                 }
                 return calls.allSatisfy { call in
@@ -123,7 +131,7 @@ nonisolated enum DurableConversationProjection {
             let rich = candidates.last
             if agent == nil {
                 agent = AgentTurn(at: assistant.timestamp, generations: [], steps: [], outcome: .running)
-                agentID = turnID ?? TurnID(StableID.uuid(namespace + ":agent"))
+                agentID = turnID ?? unused(rich?.turnID) ?? TurnID(StableID.uuid(namespace + ":agent"))
             }
             let generationID = AgentGenerationID(StableID.uuid(namespace + ":generation"))
             agent?.generations.append(ModelGeneration(id: generationID, at: assistant.timestamp, model: assistant.model,
@@ -218,6 +226,7 @@ nonisolated enum DurableConversationProjection {
             if let last = current.generations.last {
                 current.outcome = last.assistantMessage?.stopReason == .toolUse ? .cancelled(at: last.at) : last.outcome
             } else { current.outcome = .cancelled(at: current.at) }
+            usedTurnIDs.insert(id)
             turns.append(.agent(current, id: id))
             agent = nil
             agentID = nil

@@ -381,6 +381,7 @@ final class ConversationManager {
             in: scope
         )
         register(conversation, as: state.conversationID)
+        persist(conversation)
         setCurrent(conversation)
         Log.session.info("ConversationManager.import conversation=\(conversation.id) turns=\(state.turns.count)")
         return conversation
@@ -946,8 +947,9 @@ final class ConversationManager {
                 try await OxHostProtocol.prepareDurableTemporaryConversation(conversation, caseID: OxHostProtocol.durableTemporarySessionID ?? UUID())
             } else {
                 let oldID = ConversationID(conversation.id)
+                let existing = try? DurableProfileStore.shared.reference(for: oldID, in: conversation.scope)
                 let reference: DurableConversationReference
-                if let existing = try? DurableProfileStore.shared.reference(for: oldID, in: conversation.scope) { reference = existing }
+                if let existing { reference = existing }
                 else if let origin = conversation.durableForkSource {
                     reference = try await DurableProfileStore.shared.fork(in: conversation.scope, from: origin.reference,
                         beforeUser: origin.users, title: conversation.metadata.title)
@@ -964,7 +966,7 @@ final class ConversationManager {
                     records[reference.compatibilityID] = record
                     accessOrdinals[reference.compatibilityID] = accessOrdinals.removeValue(forKey: oldID)
                 }
-                persist(conversation)
+                if existing == nil { persist(conversation) }
             }
             try await afterPreparation?()
             conversation.durablePreparation = nil

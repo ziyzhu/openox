@@ -156,8 +156,11 @@ nonisolated struct ConversationLoadResult: Sendable {
 
     @concurrent
     func preparingDocument() async -> Self {
-        Self(state: state, needsPersistence: needsPersistence,
-             document: document ?? ConversationDocument.restoring(state.turns))
+        let document = document ?? ConversationDocument.restoring(state.turns)
+        var meta = state.meta
+        meta.lastMessageAt = document.lastMessageAt
+        return Self(state: ConversationState(meta: meta, turns: state.turns, context: state.context),
+                    needsPersistence: needsPersistence, document: document)
     }
 
     func replacingMeta(_ meta: ConversationMeta) -> Self {
