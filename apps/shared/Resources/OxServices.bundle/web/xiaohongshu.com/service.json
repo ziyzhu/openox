@@ -847,6 +847,136 @@
           }
         }
       }
+    },
+    {
+      "id": "openConversation",
+      "label": "Open private conversation (may mark seen)",
+      "description": "Open one loaded private conversation by returned inbox ID for reading. May mark messages seen; never sends or accepts requests.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requested",
+          "id"
+        ],
+        "properties": {
+          "requested": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "getConversation",
+      "label": "Read opened conversation",
+      "description": "Read rendered incoming and outgoing message turns from the already-open exact conversation. Does not open threads or send messages; unsupported media remain marked unknown.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 100
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "items",
+          "nextCursor",
+          "coverage"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "direction",
+                "text",
+                "timeLabel",
+                "contentType",
+                "unsupported"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "incoming",
+                    "outgoing",
+                    "system",
+                    "unknown"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                },
+                "timeLabel": {
+                  "type": "string"
+                },
+                "contentType": {
+                  "type": "string"
+                },
+                "unsupported": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "coverage": {
+            "type": "string"
+          }
+        }
+      }
     }
   ],
   "locales": {

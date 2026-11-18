@@ -241,6 +241,86 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "id": "listCreditCardTransactions",
+      "label": "Read Robinhood card transactions",
+      "description": "Read transactions for the single credit customer matching the signed-in web account, with explicit classification limitations.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 100
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "dateRaw": {
+                  "type": "string"
+                },
+                "amountMicro": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "merchant": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "dateRaw",
+                "amountMicro",
+                "amount",
+                "merchant"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "coverage": {
+            "type": "string"
+          },
+          "observedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "coverage",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }

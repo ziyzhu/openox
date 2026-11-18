@@ -133,8 +133,8 @@ const pageError = (root = document) => [...root.querySelectorAll("[role='alert']
   .filter(Boolean)
   .join(" | ")
   .slice(0, 200);
-const bankLoginStep=async()=>waitForStep({challenge:()=>[...document.querySelectorAll('input[autocomplete="one-time-code"],iframe[src*="captcha"]')].find(usable),credentials:()=>{const root=document.getElementById('signin-form'),username=root?.querySelector('#oid'),password=root?.querySelector('#pass'),submit=root?.querySelector('#secure-signin-submit');return usable(username)&&usable(password)&&usable(submit)?{username,password,submit,root}:null;}});
-action('login',{async invoke(input,context){const step=await bankLoginStep();if(step.kind==='unknown'&&!input?.account)throw Error('Bank of America sign-in screen not ready; automatic sign-in stopped.');if(step.kind!=='credentials')return null;if(!input?.account||input.account.serviceID!=='web:secure.bankofamerica.com')return null;if(pageError(step.match.root))throw Error('Bank of America sign-in reports an error; stopped without retrying.');const account=await context.secret(input.account);typeInto(step.match.username,account.username);typeInto(step.match.password,account.password);if(!usable(step.match.submit))throw Error('Bank login button unavailable.');step.match.submit.click();return null;}});
+const bankLoginStep=async()=>waitForStep({differentUsername:()=>{if(usable(document.getElementById('oid')))return null;const select=document.getElementById('prefill-oid'),link=document.getElementById('login-diff-oid-link');return usable(select)&&usable(link)?link:null;},challenge:()=>[...document.querySelectorAll('input[autocomplete="one-time-code"],iframe[src*="captcha"]')].find(usable),credentials:()=>{const root=document.getElementById('signin-form'),username=root?.querySelector('#oid'),password=root?.querySelector('#pass'),submit=root?.querySelector('#secure-signin-submit');return usable(username)&&usable(password)&&usable(submit)?{username,password,submit,root}:null;}});
+action('login',{async invoke(input,context){const step=await bankLoginStep();if(step.kind==='differentUsername'){if(input?.account?.serviceID==='web:secure.bankofamerica.com')step.match.click();return null;}if(step.kind==='unknown'&&!input?.account)throw Error('Bank of America sign-in screen not ready; automatic sign-in stopped.');if(step.kind!=='credentials')return null;if(!input?.account||input.account.serviceID!=='web:secure.bankofamerica.com')return null;if(pageError(step.match.root))throw Error('Bank of America sign-in reports an error; stopped without retrying.');const account=await context.secret(input.account);typeInto(step.match.username,account.username);typeInto(step.match.password,account.password);if(!usable(step.match.submit))throw Error('Bank login button unavailable.');step.match.submit.click();return null;}});
 action('listSessions', { async invoke() {
             let j;
             try {
@@ -298,7 +298,7 @@ action('listSessions', { async invoke() {
         return [];
     };
     const mapTxn = (t) => ({
-        date: t?.formattedTxnDate ?? null,
+        date: t?.formattedTxnDate ?? t?.formattedPostedDate ?? null,
         description: t?.preferredDescription ?? t?.customizedDescription ?? null,
         amount: t?.amount?.amount ?? null,
         displayAmount: t?.amount?.displayAmount ?? null,
@@ -308,14 +308,22 @@ action('listSessions', { async invoke() {
         transactionToken: t?.transactionToken ?? null,
     });
     action("listTransactions", {
-        async invoke({ accountToken, limit = 50 } = {}) {
+        async invoke({ accountToken, limit = 50, statementDate } = {}) {
             const token = requireToken(accountToken);
             const selected=(await fetchAccounts()).find(a=>a.accountToken===token);
             if(!selected)throw Error('Account token not found; refresh account list');
             if(/rewards|credit|visa|mastercard/i.test(selected.name||'')){
                 const res=await fetch(ORIGIN+'/myaccounts/details/card/account-details.go?adx='+encodeURIComponent(token),{credentials:'include',cache:'no-store'});
                 if(!res.ok)throw Error('Credit-card activity HTTP '+res.status);
-                const doc=new DOMParser().parseFromString(await res.text(),'text/html');
+                let doc=new DOMParser().parseFromString(await res.text(),'text/html');
+                if(statementDate){
+                    const options=[...doc.querySelectorAll('#goto_select_trans_top option')];
+                    const selectedOption=options.find(o=>{const d=new Date(o.textContent.trim());return Number.isFinite(d.getTime())&&[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')===statementDate;});
+                    if(!selectedOption)throw Error('Requested BofA statement cycle is not available');
+                    const url=new URL(selectedOption.value,ORIGIN);if(url.origin!==ORIGIN||url.searchParams.get('adx')!==token)throw Error('BofA statement link account mismatch');
+                    const periodResponse=await fetch(url.href,{credentials:'include',cache:'no-store'});if(!periodResponse.ok)throw Error('BofA statement activity HTTP '+periodResponse.status);
+                    doc=new DOMParser().parseFromString(await periodResponse.text(),'text/html');
+                }
                 if(!doc.querySelector('#transactions')||!doc.body.textContent.includes(selected.mask))throw Error('Credit-card transaction table or account identity unavailable');
                 const rows=[...doc.querySelectorAll('#transactions tr')].filter(row=>row.querySelector('.trans-date-cell'));
                 if(!rows.length)throw Error('Credit-card table has no verified transaction rows');

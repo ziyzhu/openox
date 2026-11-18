@@ -8,7 +8,7 @@
     {
       "id": "login",
       "label": "Sign in to USCIS",
-      "description": "Use a saved USCIS email and password on the official sign-in form; leave two-factor verification, Login.gov, and unsupported steps to the user.",
+      "description": "Prepare USCIS sign-in; route selected Login.gov accounts to their provider without accessing provider credentials. Leave verification and unsupported steps to the user.",
       "requireAuth": false,
       "requireApproval": false,
       "inputSchema": {
@@ -407,6 +407,249 @@
           }
         }
       }
+    },
+    {
+      "id": "prepareBiometricsReschedule",
+      "label": "Prepare biometrics rescheduling",
+      "description": "Select a truthful reason and advance to appointment identification only; does not book or submit a rescheduling request.",
+      "baseUrl": "https://my.uscis.gov/accounts/biometrics/overview",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "Inability to obtain leave from employment or caregiver responsibilities",
+              "Significant life events such as a wedding, funeral, or graduation ceremony",
+              "Illness, medical appointment, or hospitalization",
+              "Late delivered or undelivered biometric services appointment notice",
+              "Inability to obtain transportation to the appointment location",
+              "Previously planned travel"
+            ]
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "headings",
+          "fields"
+        ],
+        "properties": {
+          "headings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "type",
+                "label"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "fillBiometricsLookup",
+      "label": "Fill biometrics appointment lookup",
+      "description": "Fill existing appointment identification fields and read matching ASC options without searching or changing an appointment.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receipt",
+          "date",
+          "time",
+          "birthDate",
+          "office"
+        ],
+        "properties": {
+          "receipt": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string"
+          },
+          "birthDate": {
+            "type": "string"
+          },
+          "office": {
+            "type": "string"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "options",
+          "errors"
+        ],
+        "properties": {
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "findBiometricsAppointment",
+      "label": "Find existing biometrics appointment",
+      "description": "Search the completed existing-appointment identification form and read next-step locations; never confirms or books a new appointment.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "fillBiometricsTime",
+      "label": "Enter current biometrics time",
+      "description": "Set and verify the existing appointment time in the masked field without submitting any form.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "time"
+        ],
+        "properties": {
+          "time": {
+            "type": "string",
+            "pattern": "^(0[1-9]|1[0-2]):[0-5][0-9] (AM|PM)$"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "time",
+          "submitted"
+        ],
+        "properties": {
+          "time": {
+            "type": "string"
+          },
+          "submitted": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "id": "checkBiometricsOffice",
+      "label": "Check biometrics office availability",
+      "description": "List offices by state or inspect an office calendar without selecting a date or confirming rescheduling. Requires existing appointment lookup completed.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "office": {
+            "type": "string"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "offices",
+          "text"
+        ],
+        "properties": {
+          "offices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+  "auth": [
+    {
+      "type": "password"
+    },
+    {
+      "type": "provider",
+      "service": "web:secure.login.gov"
     }
   ]
 }

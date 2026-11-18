@@ -1,6 +1,192 @@
+function createEmbeddedAutomation({ timeout = 5000 } = {}) {
+  const normalize = value => String(value ?? "").replace(/\s+/g, " ").trim();
+  const matches = (actual, expected, exact = false) => exact
+    ? normalize(actual) === normalize(expected)
+    : normalize(actual).toLowerCase().includes(normalize(expected).toLowerCase());
+  const visible = element => {
+    if (!element.isConnected || element.closest('[hidden], [inert], [aria-hidden="true"]')) return false;
+    for (let node = element; node?.nodeType === 1; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse") return false;
+    }
+    return element.getClientRects().length > 0;
+  };
+  const disabled = element => element.matches(":disabled") || !!element.closest('[aria-disabled="true"], [inert]');
+  const label = element => {
+    const ids = element.getAttribute("aria-labelledby");
+    if (ids) {
+      const text = normalize(ids.split(/\s+/).map(id => element.ownerDocument.getElementById(id)?.textContent ?? "").join(" "));
+      if (text) return text;
+    }
+    if (element.hasAttribute("aria-label")) return normalize(element.getAttribute("aria-label"));
+    if (element.labels?.length) return normalize(Array.from(element.labels, item => item.textContent).join(" "));
+    if (element.tagName === "IMG") return normalize(element.getAttribute("alt"));
+    if (element.tagName === "INPUT" && ["submit", "reset", "button"].includes(element.type)) return normalize(element.value);
+    return normalize(element.getAttribute("title") || (["INPUT", "TEXTAREA", "SELECT"].includes(element.tagName) ? "" : element.textContent));
+  };
+  const role = element => {
+    const explicit = element.getAttribute("role")?.trim().split(/\s+/)[0];
+    if (explicit) return explicit;
+    const tag = element.tagName;
+    if (tag === "INPUT") {
+      const type = element.type;
+      if (["button", "submit", "reset", "image"].includes(type)) return "button";
+      if (["checkbox", "radio"].includes(type)) return type;
+      if (type === "range") return "slider";
+      if (type === "number") return "spinbutton";
+      if (type === "search") return "searchbox";
+      if (["text", "email", "tel", "url"].includes(type)) return "textbox";
+      return "";
+    }
+    if (tag === "A") return element.hasAttribute("href") ? "link" : "";
+    if (tag === "SELECT") return element.multiple || element.size > 1 ? "listbox" : "combobox";
+    if (/^H[1-6]$/.test(tag)) return "heading";
+    return ({ BUTTON: "button", TEXTAREA: "textbox", OPTION: "option", IMG: "img", UL: "list", OL: "list", LI: "listitem", TABLE: "table", TR: "row", TD: "cell", TH: "columnheader", DIALOG: "dialog", MAIN: "main", NAV: "navigation" })[tag] ?? "";
+  };
+  const duration = value => {
+    const ms = value ?? timeout;
+    if (!Number.isFinite(ms) || ms < 0 || ms > 30000) throw new Error("Automation timeout must be between 0 and 30000 ms");
+    return ms;
+  };
+  duration(timeout);
+  const pause = () => new Promise(resolve => setTimeout(resolve, 25));
+  const locator = (resolve, description) => {
+    const unique = () => {
+      const elements = resolve();
+      if (elements.length > 1) throw new Error(`Strict locator matched ${elements.length} elements: ${description}`);
+      return elements[0];
+    };
+    const wait = async (predicate, options = {}) => {
+      const deadline = Date.now() + duration(options.timeout);
+      for (;;) {
+        const element = unique();
+        if (predicate(element)) return element;
+        if (Date.now() >= deadline) throw new Error(`Locator condition timed out: ${description}`);
+        await pause();
+      }
+    };
+    const actionable = options => wait(element => element && visible(element) && !disabled(element), options);
+    const clickElement = element => {
+      element.scrollIntoView({ block: "center", inline: "center" });
+      const rect = element.getBoundingClientRect();
+      const hit = element.ownerDocument.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      if (!hit || hit !== element && !element.contains(hit)) throw new Error(`Locator is obscured: ${description}`);
+      if (!element.isConnected || disabled(element)) throw new Error(`Locator became unavailable: ${description}`);
+      element.click();
+    };
+    const api = {
+      ...queries(() => resolve()),
+      filter({ hasText }) {
+        if (typeof hasText !== "string") throw new Error("filter requires a string hasText");
+        return locator(() => resolve().filter(element => matches(element.textContent, hasText)), `${description}.filter`);
+      },
+      nth(index) {
+        if (!Number.isSafeInteger(index) || index < 0) throw new Error("nth requires a nonnegative integer");
+        return locator(() => resolve().slice(index, index + 1), `${description}.nth(${index})`);
+      },
+      first() { return api.nth(0); },
+      last() { return locator(() => resolve().slice(-1), `${description}.last()`); },
+      async count() { return resolve().length; },
+      async isVisible() { const element = unique(); return !!element && visible(element); },
+      async waitFor({ state = "visible", ...options } = {}) {
+        if (!["attached", "detached", "visible", "hidden"].includes(state)) throw new Error("Unsupported locator state");
+        await wait(element => state === "attached" ? !!element : state === "detached" ? !element : state === "visible" ? !!element && visible(element) : !element || !visible(element), options);
+      },
+      async innerText(options) { return (await wait(element => !!element, options)).innerText; },
+      async textContent(options) { return (await wait(element => !!element, options)).textContent; },
+      async getAttribute(name, options) { return (await wait(element => !!element, options)).getAttribute(name); },
+      async allTextContents() { return resolve().map(element => element.textContent ?? ""); },
+      async click(options) { clickElement(await actionable(options)); },
+      async fill(value, options) {
+        if (typeof value !== "string") throw new Error("fill requires a string");
+        const element = await actionable(options);
+        if (element.readOnly) throw new Error(`Locator is read-only: ${description}`);
+        if (element.tagName === "INPUT" && !["text", "email", "password", "search", "tel", "url", "number"].includes(element.type)) throw new Error("Unsupported input type for fill");
+        const view = element.ownerDocument.defaultView;
+        const prototype = element.tagName === "INPUT" ? view.HTMLInputElement.prototype : element.tagName === "TEXTAREA" ? view.HTMLTextAreaElement.prototype : null;
+        element.focus();
+        if (prototype) Object.getOwnPropertyDescriptor(prototype, "value").set.call(element, value);
+        else if (element.isContentEditable) element.textContent = value;
+        else throw new Error("fill requires an input, textarea, or contenteditable element");
+        element.dispatchEvent(new view.Event("input", { bubbles: true }));
+        element.dispatchEvent(new view.Event("change", { bubbles: true }));
+      },
+      async check(options) { await api.setChecked(true, options); },
+      async uncheck(options) { await api.setChecked(false, options); },
+      async setChecked(checked, options) {
+        if (typeof checked !== "boolean") throw new Error("setChecked requires a boolean");
+        const element = await actionable(options);
+        if (element.tagName !== "INPUT" || !["checkbox", "radio"].includes(element.type)) throw new Error("setChecked requires a checkbox or radio input");
+        if (element.checked === checked) return;
+        clickElement(element);
+        if (element.checked !== checked) throw new Error("Checked state unverified after dispatch; inspect before retrying");
+      },
+      async selectOption(value, options) {
+        const values = Array.isArray(value) ? value : [value];
+        if (values.some(item => typeof item !== "string")) throw new Error("selectOption accepts string values only");
+        const element = await actionable(options);
+        if (element.tagName !== "SELECT" || !element.multiple && values.length !== 1) throw new Error("Invalid selectOption target or values");
+        const selected = Array.from(element.options).filter(option => values.includes(option.value));
+        if (values.some(value => !selected.some(option => option.value === value)) || selected.some(option => option.disabled || option.parentElement?.disabled)) throw new Error("Select option is missing or disabled");
+        for (const option of element.options) option.selected = values.includes(option.value);
+        const view = element.ownerDocument.defaultView;
+        element.dispatchEvent(new view.Event("input", { bubbles: true }));
+        element.dispatchEvent(new view.Event("change", { bubbles: true }));
+        return selected.map(option => option.value);
+      },
+    };
+    return api;
+  };
+  function queries(roots) {
+    const find = predicate => [...new Set(roots().flatMap(root => Array.from(root.querySelectorAll("*"))))].filter(predicate);
+    return {
+      locator(selector) { return locator(() => [...new Set(roots().flatMap(root => Array.from(root.querySelectorAll(selector))))], "css locator"); },
+      getByRole(expected, { name, exact = false, includeHidden = false } = {}) {
+        return locator(() => find(element => role(element) === expected && (includeHidden || visible(element)) && (name === undefined || matches(label(element), name, exact))), `role=${expected}`);
+      },
+      getByLabel(text, { exact = false } = {}) {
+        return locator(() => find(element => element.matches("input, textarea, select, button, [contenteditable], [aria-label], [aria-labelledby]") && matches(label(element), text, exact)), "label locator");
+      },
+      getByText(text, { exact = false } = {}) {
+        return locator(() => find(element => !element.matches("script, style, head, title") && matches(element.textContent, text, exact)
+          && !Array.from(element.children).some(child => matches(child.textContent, text, exact))), "text locator");
+      },
+      getByPlaceholder(text, { exact = false } = {}) {
+        return locator(() => find(element => element.hasAttribute("placeholder") && matches(element.getAttribute("placeholder"), text, exact)), "placeholder locator");
+      },
+      getByTestId(value) { return locator(() => find(element => element.getAttribute("data-testid") === value), "test id locator"); },
+    };
+  }
+  return queries(() => [document]);
+}
+
 const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
 
 window.ox.install(({ action }) => {
+    action('getConversation',{async invoke({id,limit=100}){
+        const end=Date.now()+12000;let root=null;
+        while(Date.now()<end){
+            const active=document.querySelector('.xhs-im-conv-item--active');
+            if(active?.getAttribute('data-conv-id')===id){root=document.querySelector('.xhs-im-msg-list');if(root?.querySelector('.chat-item'))break;}
+            await new Promise(r=>setTimeout(r,150));
+        }
+        if(!root?.querySelector('.chat-item')||document.querySelector('.xhs-im-conv-item--active')?.getAttribute('data-conv-id')!==id)throw Error('Requested conversation is not verified open with rendered message rows');
+        let timeLabel='';const rows=[];
+        for(const e of root.children){
+            if(e.classList.contains('xhs-im-msg-list__time-divider')){timeLabel=cleanText(e.textContent);continue;}
+            if(!e.classList.contains('chat-item'))continue;
+            rows.push({id:e.getAttribute('data-message-id')||'',direction:e.querySelector('.chat-item__content--right')?'outgoing':e.querySelector('.chat-item__content--left')?'incoming':e.querySelector('.chat-item__pure')?'system':'unknown',text:cleanText(e.querySelector('.xhs-im-bubble__text,.xhs-im-bubble__unsupported-text')?.textContent||e.textContent),timeLabel,contentType:e.getAttribute('data-content-type')||'',unsupported:!!e.querySelector('.xhs-im-bubble__unsupported')});
+        }
+        return {id,name:cleanText(document.querySelector('.xhs-im-chat-window__header-name')?.textContent),items:rows.slice(-Math.min(200,Math.max(1,Number(limit)||100))),nextCursor:null,coverage:'rendered_message_turns_only; preceding_history_pagination_not_established; unsupported_media_not_interpreted'};
+    }});
+
+    action('openConversation',{async invoke({id}){
+        if(!/^[a-fA-F0-9]{24}$/.test(id))throw Error('Invalid conversation ID');
+        const automation=createEmbeddedAutomation({timeout:8000});
+        await automation.locator('.xhs-im-conv-item[data-conv-id="'+id+'"]').click();
+        return {requested:true,id};
+    }});
+
     action('listInbox', {async invoke(args){
         const end=Date.now()+15000;let list=null,rows=[];
         while(Date.now()<end){
@@ -314,27 +500,27 @@ window.ox.install(({ action }) => {
         return result;
     };
     const openNoteSearch = async (query) => {
+        const ready = () => {
+            const store = getStore("search");
+            if (location.pathname !== "/search_result_ai" || searchQuery() !== query ||
+                store?.searchContext?.keyword !== query || store?.state !== "success" || !Array.isArray(store?.feeds)) return false;
+            const ids = new Set(store.feeds.map(item => item.id));
+            const cards = collectNoteCards(50);
+            return cards.length > 0 && cards.every(item => ids.has(noteIdOf(item.url)));
+        };
         const alreadyLoaded = location.pathname === "/search_result_ai" && searchQuery() === query;
-        if (alreadyLoaded) {
-            if (visibleSearchCount() === 0)
-                noteChannelTab()?.click();
-            const rendered = await waitForRender(() => visibleSearchCount() > 0);
-            if (!rendered)
-                throw new Error(`search results never rendered: ${pageContext()}`);
-            return;
+        if (!alreadyLoaded) {
+            const keyword = encodeURIComponent(encodeURIComponent(query));
+            spaNavigate(`/search_result_ai?keyword=${keyword}&source=web_explore_feed`);
         }
-        const previousFirst = collectSearchNotes()[0] ?? null;
-        const previousSignature = noteSignature();
-        const keyword = encodeURIComponent(encodeURIComponent(query));
-        spaNavigate(`/search_result_ai?keyword=${keyword}&source=web_explore_feed`);
-        const rendered = await waitForRender(() => {
-            const rows = collectSearchNotes().filter(isVisible);
-            if (searchQuery() !== query || rows.length === 0)
-                return false;
-            return rows[0] !== previousFirst || noteSignature() !== previousSignature;
-        });
-        if (!rendered)
-            throw new Error(`search results never rendered: ${pageContext()}`);
+        const deadline = Date.now() + 15000;
+        while (Date.now() < deadline) {
+            const problem = pageProblem();
+            if (problem) throw new Error("Xiaohongshu search blocked: " + problem);
+            if (ready()) return;
+            await sleep(150);
+        }
+        throw new Error("Xiaohongshu search did not produce query-matched, loaded results; stale feed cards were not returned.");
     };
     action("search", {
         invoke({ query, limit = 10, cursor } = {}) {
@@ -615,43 +801,23 @@ window.ox.install(({ action }) => {
         async invoke({ url } = {}) {
             try {
                 const id = goToNote(String(url));
-                await waitForNoteDom();
-                const title = cleanText(document.querySelector("#detail-title, .title")?.textContent);
-                const desc = cleanText(document.querySelector("#detail-desc, .desc, .note-text")?.textContent);
-                const author = cleanText(document.querySelector(".username, .author-wrapper .name")?.textContent);
-                // Scope counts to the note's engagement bar (`.engage-bar`, older builds
-                // `.interact-container`) so we don't pick up a comment's counters
-                // (`.like-wrapper .count` also matches every comment row). The bar's
-                // counts hydrate a beat after the title, so wait for the like count to
-                // carry a digit (a genuine 0-like note just falls through after timeout).
-                const barOf = () => document.querySelector(".engage-bar, .interact-container");
-                const bar = await waitFor(() => {
-                    const b = barOf();
-                    return b && /\d/.test(b.querySelector(".like-wrapper .count")?.textContent || "") ? b : null;
-                }, { timeoutMs: 4000 }).catch(() => barOf());
-                const countAt = (sel) => {
-                    const s = cleanText(bar?.querySelector(sel)?.textContent);
-                    return /^\d/.test(s) ? s : "0";
-                };
-                const tags = [];
-                document.querySelectorAll('#detail-desc a.tag, #detail-desc a[href*="search_result"]').forEach((el) => {
-                    const t = cleanText(el.textContent);
-                    if (t)
-                        tags.push(t);
-                });
-                if (!title && !author)
-                    throw new Error("note page rendered without title or author");
+                const note = await waitFor(() => {
+                    if (xhsErrored()) throw new Error('Note page blocked or unavailable');
+                    const n = getStore("note")?.noteDetailMap?.[id]?.note;
+                    return n?.noteId === id && typeof n.desc === "string" && n.user?.userId ? n : null;
+                }, { timeoutMs: 12000 });
+                const info = note.interactInfo || {};
                 return {
-                    id,
-                    title,
-                    author,
-                    authorUrl: "",
-                    content: desc,
-                    likes: countAt(".like-wrapper .count"),
-                    collects: countAt(".collect-wrapper .count"),
-                    comments: countAt(".chat-wrapper .count"),
-                    tags,
-                    cover: "",
+                    id: note.noteId,
+                    title: cleanText(note.title),
+                    author: cleanText(note.user.nickname || note.user.nickName),
+                    authorUrl: ORIGIN + '/user/profile/' + note.user.userId,
+                    content: cleanText(note.desc),
+                    likes: numText(info.likedCount),
+                    collects: numText(info.collectedCount),
+                    comments: numText(info.commentCount),
+                    tags: (note.tagList || []).map(t => cleanText(t.name)).filter(Boolean),
+                    cover: note.imageList?.[0]?.urlDefault || note.imageList?.[0]?.urlPre || '',
                     url: String(url),
                 };
             }

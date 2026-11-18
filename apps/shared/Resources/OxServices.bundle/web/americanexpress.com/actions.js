@@ -199,8 +199,9 @@ window.ox.install(({ action }) => {
     action('listCardBalances',{async invoke(){return {items:await overviewCards(),nextCursor:null};}});
 
     action('listRecentTransactions',{async invoke(args){
-        const deadline=Date.now()+20000;
-        while(Date.now()<deadline&&!document.getElementById('myca-feed-search'))await new Promise(r=>setTimeout(r,150));
+        const stamp=()=>[...document.querySelectorAll('[data-testid="activity-feed-transaction-row"]')].map(r=>r.textContent).join('|');
+        const before=stamp();const changed=await selectPaymentCard(args.lastDigits);
+        await amexPaymentWait(()=>{const title=[...document.querySelectorAll('main h1,main h2')].map(e=>e.textContent).join(' ');return title.includes(args.lastDigits)&&document.getElementById('myca-feed-search')&&(!changed||stamp()!==before);});
         const headings=[...document.querySelectorAll('main h1,main h2')].map(e=>e.textContent).join(' ');
         if(!headings.includes(args.lastDigits)||!headings.toLowerCase().includes(args.cardName.toLowerCase()))throw Error('Selected card mismatch; select requested card before reading');
         const range=document.querySelector('[data-testid="date-picker-popover-button"]')?.textContent.trim();

@@ -423,4 +423,53 @@ window.ox.install(({ action }) => {
             };
         },
     });
+
+ action('getTravelFlightPairs',{async invoke(args){const GATEWAY='https://secure.chase.com/svc/wr/profile/l4/gateway/chase-travel/loyalty/bank-rewards/cte-app/v1';const headers=()=>({accept:'application/json','x-jpmc-csrf-token':'NONE','x-jpmc-channel':'id=C30',channeltype:'WEB',onlineindicator:'true',mockindicator:'false','x-jpmc-client-request-id':crypto.randomUUID()});const get=async path=>{const r=await fetch(GATEWAY+path,{credentials:'include',cache:'no-store',headers:headers()});if(!r.ok)throw Error('Travel GET '+path.split('?')[0]+' HTTP '+r.status);return r.json();};const post=async(path,data)=>{const r=await fetch(GATEWAY+path,{method:'POST',credentials:'include',headers:{...headers(),'content-type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw Error('Travel search '+path+' HTTP '+r.status);return r.json();};const profile=await get('/travel-profiles?all-accounts-hidden-indicator=true');if(!profile.onlineProfileIdentifier)throw Error('Authenticated Travel profile unavailable');if(args.returnDate <= args.departureDate) throw Error('Return must follow departure.');
+        const lookup = async (code, allowCity) => {
+            const j = await post('/autosuggest/search', {sq:{st:code,sf:['arrival-airport']},sel:false,rec:null,c:'flights'});
+            if(!Array.isArray(j.s)) throw Error('Airport lookup response is incomplete.');
+            const all=j.s.flatMap(x=>[x,...(x.sl||[])]);
+            const x=all.find(x=>x.cd===code && (allowCity ? x.iaa : !x.iaa)) || all.find(x=>x.cd===code);
+            if(!x) throw Error('Airport '+code+' was not found.');
+            return {code:x.cd,type:x.iaa?'City':'Airport',name:x.n,shortName:x.n,country:x.c,cityName:x.cn,stateCode:x.sc,countryCode:x.cc,locationId:x.lId,timeZone:x.tzi?.tz};
+        };
+        const from=await lookup(args.origin,false),to=await lookup(args.destination,args.destination==='DFW');
+        const created=await post('/flight/search/roundtrip',{currency:'USD',journeys:[{departure:from,arrival:to,travelDate:{date:args.departureDate,timeWindow:0}},{arrival:from,departure:to,travelDate:{date:args.returnDate,timeWindow:0}}],passengers:[{count:1,type:'Adult'}],filters:{connection:{nonStopOnly:true,maximumConnectingPoints:3},airlines:{allow:[],onlineConnectionOnly:false},unrestrictedFaresOnly:false,refundableOnly:false,brandedFares:true,upsell:false,timeFilters:[],excludeBasicEconomy:false},journeyType:'roundtrip',cabinType:'Economy',isMixAndMatch:true});
+        if(!created.sessionId)throw Error('Flight search did not return a search identifier.');
+        const req={sessionId:created.sessionId,journeyType:'outbound',outBoundFareOptionId:'',paging:{pageSize:50,pageNumber:1,orderBy:'recommended'},facets:null,isMixAndMatch:true,comboFares:true,quickSortingOptions:['recommended','price Asc','journeyTime Asc']};
+        let j; const deadline=Date.now()+18000;
+        do{j=await post('/proxy/api/air/v1.0/search/legwiseResults',req);if(Array.isArray(j.itineraries)&&j.itineraries.length)break;if(/complete|finished/i.test(String(j.status)))break;await new Promise(r=>setTimeout(r,350));}while(Date.now()<deadline);
+        if(!Array.isArray(j?.itineraries))throw Error('Flight results schema not available.');
+        if(!j.itineraries.length&&!/complete|finished/i.test(String(j.status)))throw Error('Flight results are still loading.');
+
+        const chosen=j.itineraries.filter(i=>i.journeys?.[0]?.segments?.length===1).find(i=>{const f=i.journeys[0].segments[0].flight;return f.departure.dateTime.slice(11,16)===args.outboundTime&&(f.marketingCarrier?.name||'').toLowerCase().includes(args.airline.toLowerCase());});
+        if(!chosen)throw Error('Requested nonstop outbound was not found.');
+        const fare=(chosen.fareOptions||[]).find(f=>f.fareFamily?.name?.toLowerCase()===args.fareName.toLowerCase());if(!fare?.refId)throw Error('Requested outbound fare is unavailable.');
+        const inboundReq={...req,journeyType:'inbound',outBoundFareOptionId:fare.refId,paging:{pageSize:50,pageNumber:1,orderBy:'price Asc'}};
+        const incoming=await post('/proxy/api/air/v1.0/search/legwiseResults',inboundReq);if(!Array.isArray(incoming.itineraries))throw Error('Paired return results incomplete.');
+        const asFlight=i=>{const s=i.journeys[0].segments;const f=s[0].flight,l=s.at(-1).flight;return {departure:f.departure.dateTime,arrival:l.arrival.dateTime,origin:f.departure.airport.code,destination:l.arrival.airport.code,flightNumber:String(f.marketingCarrier?.code||'')+' '+String(f.flightNumber||''),airline:f.marketingCarrier?.name||''};};
+        const items=incoming.itineraries.filter(i=>i.journeys?.[0]?.segments?.length===1).filter(i=>asFlight(i).airline.toLowerCase().includes(args.airline.toLowerCase())).flatMap(i=>(i.fareOptions||[]).filter(f=>f.fareFamily?.name?.toLowerCase()===args.fareName.toLowerCase()).map(f=>({flight:asFlight(i),fareName:f.fareFamily.name,cash:f.displayPrice.total.payable.options.cashOnly.value,rawTotal:f.displayFare?.totalAmount??f.displayPrice.total.payable.options.cashOnly.value,mixedFare:!!f.comboFare}))).slice(0,args.limit||30);
+        return {searchId:created.sessionId,outbound:asFlight(chosen),outboundFare:fare.fareFamily.name,currency:incoming.currency||'USD',items,nextCursor:null,resultCount:incoming.resultCount||items.length,status:String(incoming.status||'')};
+ }});
+
+ action('getTravelRoundTripOptions',{async invoke(args){const GATEWAY='https://secure.chase.com/svc/wr/profile/l4/gateway/chase-travel/loyalty/bank-rewards/cte-app/v1';const headers=()=>({accept:'application/json','x-jpmc-csrf-token':'NONE','x-jpmc-channel':'id=C30',channeltype:'WEB',onlineindicator:'true',mockindicator:'false','x-jpmc-client-request-id':crypto.randomUUID()});const get=async path=>{const r=await fetch(GATEWAY+path,{credentials:'include',cache:'no-store',headers:headers()});if(!r.ok)throw Error('Travel GET '+path.split('?')[0]+' HTTP '+r.status);return r.json();};const post=async(path,data)=>{const r=await fetch(GATEWAY+path,{method:'POST',credentials:'include',headers:{...headers(),'content-type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw Error('Travel search '+path+' HTTP '+r.status);return r.json();};const profile=await get('/travel-profiles?all-accounts-hidden-indicator=true');if(!profile.onlineProfileIdentifier)throw Error('Authenticated Travel profile unavailable');if(args.returnDate <= args.departureDate) throw Error('Return must follow departure.');
+        const lookup = async (code, allowCity) => {
+            const j = await post('/autosuggest/search', {sq:{st:code,sf:['arrival-airport']},sel:false,rec:null,c:'flights'});
+            if(!Array.isArray(j.s)) throw Error('Airport lookup response is incomplete.');
+            const all=j.s.flatMap(x=>[x,...(x.sl||[])]);
+            const x=all.find(x=>x.cd===code && (allowCity ? x.iaa : !x.iaa)) || all.find(x=>x.cd===code);
+            if(!x) throw Error('Airport '+code+' was not found.');
+            return {code:x.cd,type:x.iaa?'City':'Airport',name:x.n,shortName:x.n,country:x.c,cityName:x.cn,stateCode:x.sc,countryCode:x.cc,locationId:x.lId,timeZone:x.tzi?.tz};
+        };
+        const from=await lookup(args.origin,false),to=await lookup(args.destination,args.destination==='DFW');
+        const created=await post('/flight/search/roundtrip',{currency:'USD',journeys:[{departure:from,arrival:to,travelDate:{date:args.departureDate,timeWindow:0}},{arrival:from,departure:to,travelDate:{date:args.returnDate,timeWindow:0}}],passengers:[{count:1,type:'Adult'}],filters:{connection:{nonStopOnly:true,maximumConnectingPoints:3},airlines:{allow:[],onlineConnectionOnly:false},unrestrictedFaresOnly:false,refundableOnly:false,brandedFares:true,upsell:false,timeFilters:[],excludeBasicEconomy:false},journeyType:'roundtrip',cabinType:'Economy',isMixAndMatch:true});
+        if(!created.sessionId)throw Error('Flight search did not return a search identifier.');
+        const req={sessionId:created.sessionId,journeyType:'outbound',outBoundFareOptionId:'',paging:{pageSize:args.limit||10,pageNumber:1,orderBy:'recommended'},facets:null,isMixAndMatch:true,comboFares:true,quickSortingOptions:['recommended','price Asc','journeyTime Asc']};
+        let j; const deadline=Date.now()+18000;
+        do{j=await post('/proxy/api/air/v1.0/search/legwiseResults',req);if(Array.isArray(j.itineraries)&&j.itineraries.length)break;if(/complete|finished/i.test(String(j.status)))break;await new Promise(r=>setTimeout(r,350));}while(Date.now()<deadline);
+        if(!Array.isArray(j?.itineraries))throw Error('Flight results schema not available.');
+        if(!j.itineraries.length&&!/complete|finished/i.test(String(j.status)))throw Error('Flight results are still loading.');
+        const items=j.itineraries.map(i=>{const journey=i.journeys?.[0],segments=journey?.segments||[],first=segments[0]?.flight,last=segments.at(-1)?.flight;if(!first||!last)throw Error('Incomplete flight journey.');return {airline:first.marketingCarrier?.name||first.operatingCarrier?.name||'',departure:first.departure.dateTime,arrival:last.arrival.dateTime,origin:first.departure.airport.code,destination:last.arrival.airport.code,durationMinutes:journey.durationInMinutes,stops:Math.max(0,segments.length-1),fares:(i.fareOptions||[]).filter(f=>typeof f.displayPrice?.total?.payable?.options?.cashOnly?.value==='number').map(f=>({name:f.fareFamily?.name||f.fareCategory||'',cash:f.displayPrice.total.payable.options.cashOnly.value}))};});
+        return {currency:j.currency||'USD',priceBasis:'Starting round-trip fares for outbound choices; return flight selection not yet confirmed.',resultCount:j.resultCount||items.length,status:String(j.status||''),items,nextCursor:null};
+ }});
 });

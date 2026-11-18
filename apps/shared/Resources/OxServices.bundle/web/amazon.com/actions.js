@@ -79,6 +79,21 @@ const amazonOrderPage = (orders) => ({
     consumed: orders.length,
 });
 window.ox.install(({ action }) => {
+    action('signOut', { async invoke() {
+      const a = [...document.querySelectorAll('a')].find(a => a.textContent.trim() === 'Sign Out' && (a.getAttribute('onclick') || '').includes('/gp/flex/sign-out.html'));
+      if (!a) throw Error('Amazon sign-out control unavailable');
+      const source = a.getAttribute('onclick');
+      const path = source.match(/['"](\/gp\/flex\/sign-out\.html[^'"]*)['"]/)?.[1];
+      if (!path) throw Error('Amazon sign-out destination unavailable');
+      const r = await fetch(path, {credentials:'include', cache:'no-store'});
+      if (!r.ok) throw Error('Sign-out request outcome unverified: HTTP ' + r.status);
+      const check = await fetch('/', {credentials:'include',cache:'no-store'});
+      const d = new DOMParser().parseFromString(await check.text(),'text/html');
+      const label = (d.querySelector('#nav-link-accountList')?.textContent || '').replace(/\s+/g,' ').trim();
+      if (!/hello,?\s*sign in/i.test(label)) throw Error('Sign-out sent; signed-out state not verified');
+      return {signedOut:true};
+    } });
+
     const ORIGIN = "https://www.amazon.com";
     const RANKING_ROOTS = {
         bestsellers: "/Best-Sellers/zgbs",
@@ -310,12 +325,12 @@ window.ox.install(({ action }) => {
             const html = await r.text();
             const d = new DOMParser().parseFromString(html, 'text/html');
             if (u.pathname.startsWith('/ap/signin') || d.querySelector('form[name="signIn"]')) return [];
-            const label = clean(d.querySelector('#nav-link-accountList-nav-line-1')?.textContent);
+            const label = clean(d.querySelector('#nav-link-accountList-nav-line-1')?.textContent || d.querySelector('#nav-link-accountList')?.textContent);
             const ids = [...html.matchAll(/customerI[dD]["']?\s*:\s*["']([A-Z0-9]+)["']/g)].map(m => m[1]);
             const unique = [...new Set(ids.filter(id => id.length > 5 && id !== '0'))];
             const attrId = d.querySelector('[data-csa-c-customer-id]')?.getAttribute('data-csa-c-customer-id');
             if (attrId && !unique.includes(attrId)) unique.push(attrId);
-            if (!d.querySelector('.ya-card-row') || !label || /hello,?\s*sign in/i.test(label) || unique.length !== 1)
+            if (!label || /hello,?\s*sign in/i.test(label) || unique.length !== 1)
                 throw Error('Amazon current account identity unavailable');
             return [{ id: unique[0], label, url: ORIGIN + GATED_PATH }];
         } });

@@ -374,6 +374,14 @@
         "listSessions": {
           "label": "列出已登录账号",
           "description": "发现当前已通过身份验证的账号。错误不代表没有账号。"
+        },
+        "getTravelFlightPairs": {
+          "label": "比较准确往返航班组合价格",
+          "description": "只读查询指定去程航班和舱等对应的返程组合报价，不更改购物车、不预订或付款。"
+        },
+        "getTravelRoundTripOptions": {
+          "label": "列出去程航班及往返起价",
+          "description": "只读查询去程航班及往返起价，需选择返程才能确认组合总价，不预订或付款。"
         }
       }
     }
@@ -1103,6 +1111,320 @@
           "readabilityVerified"
         ]
       }
+    },
+    {
+      "id": "getTravelFlightPairs",
+      "label": "Compare exact round-trip flight pairs",
+      "description": "Read return flights priced against a specific outbound flight and fare. Makes no cart, booking, or payment changes. Returns same-brand pair prices, not outbound starting quotes.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "destination": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "departureDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "returnDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "default": 10
+          },
+          "outboundTime": {
+            "type": "string",
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$"
+          },
+          "airline": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fareName": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "departureDate",
+          "returnDate",
+          "outboundTime",
+          "airline",
+          "fareName"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "outbound": {
+            "type": "object",
+            "properties": {
+              "departure": {
+                "type": "string"
+              },
+              "arrival": {
+                "type": "string"
+              },
+              "origin": {
+                "type": "string"
+              },
+              "destination": {
+                "type": "string"
+              },
+              "flightNumber": {
+                "type": "string"
+              },
+              "airline": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "departure",
+              "arrival",
+              "origin",
+              "destination",
+              "flightNumber",
+              "airline"
+            ],
+            "additionalProperties": false
+          },
+          "outboundFare": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "flight": {
+                  "type": "object",
+                  "properties": {
+                    "departure": {
+                      "type": "string"
+                    },
+                    "arrival": {
+                      "type": "string"
+                    },
+                    "origin": {
+                      "type": "string"
+                    },
+                    "destination": {
+                      "type": "string"
+                    },
+                    "flightNumber": {
+                      "type": "string"
+                    },
+                    "airline": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "departure",
+                    "arrival",
+                    "origin",
+                    "destination",
+                    "flightNumber",
+                    "airline"
+                  ],
+                  "additionalProperties": false
+                },
+                "fareName": {
+                  "type": "string"
+                },
+                "cash": {
+                  "type": "number"
+                },
+                "rawTotal": {
+                  "type": "number"
+                },
+                "mixedFare": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "flight",
+                "fareName",
+                "cash",
+                "rawTotal",
+                "mixedFare"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "resultCount": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "searchId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "outbound",
+          "outboundFare",
+          "currency",
+          "items",
+          "nextCursor",
+          "resultCount",
+          "status",
+          "searchId"
+        ],
+        "additionalProperties": false
+      },
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel"
+    },
+    {
+      "id": "getTravelRoundTripOptions",
+      "label": "List round-trip departure options",
+      "description": "Search round-trip flights and return outbound choices with starting round-trip cash fares. A return-flight selection is still required to confirm the final price. Dallas DFW includes all Dallas airports when the location service provides a city group.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "destination": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "departureDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "returnDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "default": 10
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "departureDate",
+          "returnDate"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "priceBasis": {
+            "type": "string"
+          },
+          "resultCount": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "airline": {
+                  "type": "string"
+                },
+                "departure": {
+                  "type": "string"
+                },
+                "arrival": {
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string"
+                },
+                "destination": {
+                  "type": "string"
+                },
+                "durationMinutes": {
+                  "type": "number"
+                },
+                "stops": {
+                  "type": "integer"
+                },
+                "fares": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "cash": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "cash"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "airline",
+                "departure",
+                "arrival",
+                "origin",
+                "destination",
+                "durationMinutes",
+                "stops",
+                "fares"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "currency",
+          "priceBasis",
+          "resultCount",
+          "status",
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "baseUrl": "https://secure.chase.com/web/auth/dashboard#/dashboard/travel"
     }
   ],
   "faviconUrl": "https://openox.ai/assets/services/secure.chase.com/favicon.png"

@@ -2221,6 +2221,31 @@
           }
         }
       }
+    },
+    {
+      "id": "signOut",
+      "label": "Sign out",
+      "description": "Signs out of the current Amazon website account and verifies the signed-out state.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "baseUrl": "https://www.amazon.com/",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedOut": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedOut"
+        ],
+        "additionalProperties": false
+      }
     }
   ],
   "locales": {

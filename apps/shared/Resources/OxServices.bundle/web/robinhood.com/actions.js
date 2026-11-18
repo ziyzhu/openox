@@ -48,4 +48,19 @@ action('getCreditCardAccessDetails',{async invoke(){
  return {roles,capabilities:capabilities.map(({feature,scope,mode})=>({feature,scope,mode})),authConditions,observedAt:new Date().toISOString()};
 }});
 
+action('listCreditCardTransactions',{async invoke({limit=100,cursor}={}){
+ if(!await ready())throw Error('Robinhood sign-in required');
+ let auth;try{auth=JSON.parse(localStorage.getItem('web:auth_state')||'null');}catch{throw Error('Robinhood web authentication state is unreadable');}
+ if(!auth?.access_token||!auth.user_uuid)throw Error('Active Robinhood authentication unavailable');
+ const call=async(query,operationName,variables)=>{const r=await fetch('https://api.robinhood.com/creditcard/graphql',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json',Authorization:'Bearer '+auth.access_token},body:JSON.stringify({query,operationName,variables})});if(!r.ok)throw Error('Robinhood credit API HTTP '+r.status);const j=await r.json();if(j.errors?.length)throw Error('Robinhood credit query rejected: '+j.errors.map(e=>e.message).join('; ').slice(0,350));return j.data;};
+ const identity=(await call('query CriticalDataLoaderQuery { authIdentity { rhUserId creditCustomers { id } } }','CriticalDataLoaderQuery',{}))?.authIdentity;
+ if(!identity||identity.rhUserId!==auth.user_uuid)throw Error('Credit customer identity does not match signed-in brokerage account');
+ if(!Array.isArray(identity.creditCustomers)||identity.creditCustomers.length!==1)throw Error('A single verified credit customer is required');
+ const q={creditCustomerId:identity.creditCustomers[0].id,filters:{values:[]},sortDetails:{field:'TIME',ascending:false},limit};
+ if(cursor){const schema=await call('query CreditSearchSchema { __type(name: "TransactionSearchRequest") { inputFields { name } } }','CreditSearchSchema',{});if(!schema?.__type?.inputFields?.some(f=>f.name==='cursor'))throw Error('Credit transaction cursor input is not verified');q.cursor=cursor;}
+ const data=await call('query TransactionListQuery($q: TransactionSearchRequest!) { transactionSearch(q: $q) { items { id amountMicro transactionAt merchantDetails { merchantName } } cursor } }','TransactionListQuery',{q});
+ const result=data?.transactionSearch;if(!result||!Array.isArray(result.items))throw Error('Credit transaction result is malformed');
+ return {items:result.items.map(t=>{const amountMicro=String(t.amountMicro);if(!Number.isFinite(Number(amountMicro)))throw Error('Credit transaction amount is invalid');return {id:String(t.id),dateRaw:String(t.transactionAt),amountMicro,amount:Number(amountMicro)/1000000,merchant:t.merchantDetails?.merchantName||null};}),nextCursor:result.cursor||null,coverage:'Newest-first credit-card records. API micro amounts converted at 1,000,000 per USD. Pending status and transaction type are not exposed by this query; payments and refunds require classification.',observedAt:new Date().toISOString()};
+}});
+
 });

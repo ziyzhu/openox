@@ -42,7 +42,9 @@ window.ox.install(({action}) => {
  const controls=()=>[...document.querySelectorAll('a,button,ui-button,[role="button"]')];
  const statements=controls().find(e=>clean(e.textContent)==='Statements');
  if(statements)statements.click();
- const end=Date.now()+8000;while(Date.now()<end&&!/Statements|Export Transactions/i.test(document.body.innerText))await new Promise(r=>setTimeout(r,150));
+ const ready=()=>[...document.querySelectorAll('h1,h2,h3')].some(e=>clean(e.textContent)==='Statements')&&controls().some(e=>/export transactions|download statement/i.test(e.textContent+' '+(e.getAttribute('aria-label')||'')));
+ const end=Date.now()+15000;while(Date.now()<end&&!ready())await new Promise(r=>setTimeout(r,150));
+ if(!ready())throw Error('Apple Card Statements page did not finish loading; expense coverage is unverified');
  return {statementsAvailable:!!statements,exportAvailable:controls().some(e=>/export transactions/i.test(e.textContent)),controls:controls().filter(e=>/statement|export|download|activity|transaction/i.test(e.textContent)).map(e=>({tag:e.tagName,label:clean(e.textContent).slice(0,150),id:e.id||''})).slice(0,30),notices:[...document.querySelectorAll('h1,h2,h3,[role="alert"]')].map(e=>clean(e.textContent)).filter(Boolean).slice(0,20)};
  }});
  const signIn=()=>Array.from(document.querySelectorAll('ui-button,button,[role=button]')).find(e=>clean(e.textContent)==='Sign In' && getComputedStyle(e).display!=='none');
@@ -56,6 +58,29 @@ window.ox.install(({action}) => {
   }
   throw Error('Apple Card session discovery incomplete: neither authenticated account nor signed-out landing page was established');
  }});
+
+ action('getTransactionExport',{async invoke({startDate,endDate}){
+  if(!store())throw Error('Apple Card account is not authenticated');
+  const click=e=>{const target=e.querySelector('button')||e;target.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));target.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));target.click();};
+  const text=e=>clean(e.textContent);
+  let dialog=document.querySelector('dialog');
+  if(!dialog||!dialog.textContent.includes('Export Transactions')){
+   const nav=[...document.querySelectorAll('a')].find(e=>text(e)==='Statements');if(nav)nav.click();
+   const end=Date.now()+15000;let exportButton;while(Date.now()<end){exportButton=[...document.querySelectorAll('ui-button')].find(e=>text(e)==='Export Transactions');if(exportButton)break;await new Promise(r=>setTimeout(r,150));}
+   if(!exportButton)throw Error('Apple Card transaction export button unavailable');click(exportButton);
+   const endDialog=Date.now()+8000;while(Date.now()<endDialog){dialog=document.querySelector('dialog');if(dialog?.textContent.includes('Export Transactions'))break;await new Promise(r=>setTimeout(r,100));}
+  }
+  if(!dialog)throw Error('Apple Card export dialog unavailable');
+  const dateButtons=[...dialog.querySelectorAll('ui-button')].filter(e=>Number.isFinite(Date.parse(text(e))));
+  const iso=value=>{const d=new Date(value);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');};
+  const dates=dateButtons.map(e=>iso(text(e)));if(dates.length!==2||dates[0]!==startDate||dates[1]!==endDate)throw Error('Apple Card export date selection does not match the requested range; select the dates on the live export dialog');
+  if(!dialog.textContent.includes('Comma Separated Values (CSV)'))throw Error('Apple Card export format is not CSV');
+  const submit=[...dialog.querySelectorAll('ui-button')].find(e=>text(e)==='Export');if(!submit)throw Error('Apple Card Export control unavailable');
+  const original=URL.createObjectURL;let captured=null;
+  URL.createObjectURL=function(blob){if(blob instanceof Blob)captured=blob;return original.call(this,blob);};
+  try{click(submit);const end=Date.now()+25000;while(Date.now()<end&&!captured)await new Promise(r=>setTimeout(r,100));if(!captured)throw Error('Apple Card export was initiated, but its CSV data was not captured; inspect the live download before repeating');const csv=await captured.text();if(!csv||csv.length>2000000)throw Error('Apple Card CSV export is empty or exceeds safe text limit');return {startDate,endDate,format:'CSV',csv,observedAt:new Date().toISOString()};}finally{URL.createObjectURL=original;}
+ }});
+ action('signOut',{async invoke(){const s=store();if(!s||typeof s.signOut!=='function')throw Error('Authenticated Apple Card sign-out handler unavailable');await s.signOut();return {requested:true};}});
  action('login',{async invoke(){
   if(store())throw Error('Apple Card is already signed in; existing authentication was preserved');
   const deadline=Date.now()+18000;let opened=false;

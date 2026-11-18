@@ -2,7 +2,7 @@
   "domain": "uber.com",
   "faviconUrl": "https://openox.ai/assets/services/uber.com/favicon.png",
   "name": "Uber",
-  "description": "Read past and upcoming rides, view basic rider profile, search pickup and drop-off locations, and open Uber for manual booking. No ride requests or cancellations.",
+  "description": "Read Uber rides and prepare live ride options for user review. Never requests or cancels a ride.",
   "baseUrl": "https://riders.uber.com/trips",
   "actions": [
     {
@@ -358,6 +358,79 @@
       },
       "requireAuth": false,
       "requireApproval": false
+    },
+    {
+      "id": "prepareRideReview",
+      "label": "Prepare ride review",
+      "description": "Load live ride quotes for serialized Uber pickup and dropoff locations. Leaves ride selection and requesting to the user.",
+      "baseUrl": "https://m.uber.com/go/product-selection?pickup={pickup}&drop%5B0%5D={dropoff}",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pickup": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dropoff": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "pickup",
+          "dropoff"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "eta": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "fares": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "label",
+                "eta",
+                "fares"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "requestButton": {
+            "type": "string"
+          },
+          "ready": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "options",
+          "requestButton",
+          "ready"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }

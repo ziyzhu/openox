@@ -558,7 +558,7 @@
     {
       "id": "listInbox",
       "label": "Read recent inbox previews",
-      "description": "Read the currently rendered recent conversation previews; does not open threads or mark them read. Requests and older unloaded conversations are not included.",
+      "description": "Read loaded conversation previews from the current inbox or a selected business tab without opening threads. Requests are never accepted; hidden requests and unloaded history are not included.",
       "baseUrl": "https://www.instagram.com/direct/inbox/",
       "blocking": true,
       "requireAuth": true,
@@ -570,6 +570,14 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 30
+          },
+          "tab": {
+            "type": "string",
+            "enum": [
+              "Primary",
+              "General",
+              "Requests"
+            ]
           }
         },
         "additionalProperties": false

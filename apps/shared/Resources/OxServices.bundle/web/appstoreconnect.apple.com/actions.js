@@ -223,7 +223,7 @@ const log = (...args) => console.log(...args);
             const j = parseJson(text, 'Session discovery');
             const team = j?.provider?.publicProviderId;
             const u = j?.user;
-            const id = u?.dsId;
+            const id = u?.prsId ?? u?.dsId;
             if (!team || !id)
                 throw Error('App Store Connect account identity unavailable');
             return [{ id: String(id) + ':' + String(team), label: String(u.emailAddress || u.fullName || id) + ' — ' + String(j.provider.name || team), url: ORIGIN + '/' }];

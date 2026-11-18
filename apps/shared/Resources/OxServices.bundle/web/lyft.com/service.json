@@ -101,6 +101,63 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "id": "listSessions",
+      "label": "Check Lyft sign-in",
+      "description": "Recognize the observed signed-out Lyft form; signed-in identity discovery requires verification after sign-in.",
+      "baseUrl": "https://account.lyft.com/auth",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "login",
+      "label": "Sign in to Lyft",
+      "description": "Open Lyft’s phone-number and verification-code sign-in for manual completion.",
+      "baseUrl": "https://account.lyft.com/auth",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "null"
+      }
+    }
+  ],
+  "auth": [
+    {
+      "type": "code"
     }
   ]
 }
