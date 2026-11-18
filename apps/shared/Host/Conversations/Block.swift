@@ -129,11 +129,27 @@ nonisolated struct Reasoning: Identifiable, Equatable, Hashable, Codable {
         self.text = text
     }
 
+    private final class Paragraphs: Sendable {
+        let values: [String]
+        init(_ values: [String]) { self.values = values }
+    }
+
+    nonisolated(unsafe) private static let paragraphCache: NSCache<NSString, Paragraphs> = {
+        let cache = NSCache<NSString, Paragraphs>()
+        cache.countLimit = 2048
+        cache.totalCostLimit = 8 * 1024 * 1024
+        return cache
+    }()
+
     static func paragraphs(_ text: String) -> [String] {
-        text.components(separatedBy: "\n")
+        let key = text as NSString
+        if let cached = paragraphCache.object(forKey: key) { return cached.values }
+        let values = text.components(separatedBy: "\n")
             .split(whereSeparator: { $0.trimmingCharacters(in: .whitespaces).isEmpty })
             .map { plain($0.joined(separator: " ")) }
             .filter { !$0.isEmpty }
+        paragraphCache.setObject(Paragraphs(values), forKey: key, cost: key.length * 2)
+        return values
     }
 
     private static func plain(_ source: String) -> String {
