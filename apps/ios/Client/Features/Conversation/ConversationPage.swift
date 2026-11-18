@@ -395,7 +395,6 @@ struct ConversationPage: View {
                 )
             }
         }
-        .overlay { sendFlightOverlay }
         let observedTranscript = composedTranscript
         .onChange(of: speechInput.notice) { _, message in
             guard let message else { return }
@@ -1288,10 +1287,8 @@ struct ConversationPage: View {
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
                     scroller.measureAnchorContent($0)
                 }
-                .environment(\.sendFlight, sendFlight)
-                .coordinateSpace(.named(SendFlight.coordinateSpace))
                 .offset(y: sendRiseOffset)
-                .opacity(sendRiseOpacity)
+                .animation(reduceMotion ? nil : ConversationSendHandoff.reveal) { $0.opacity(sendRiseOpacity) }
                 .modifier(ViewportFloorFrame(layout: viewportLayout, includesAnchorFloor: true))
                 .id(submissionID)
                 .onGeometryChange(for: CGRect?.self) { geometry in
@@ -1358,63 +1355,22 @@ struct ConversationPage: View {
         }
     }
 
-    private var sendFlight: SendFlight? {
-        guard !reduceMotion, sendHandoff != .idle else { return nil }
-        return SendFlight(origin: sendHandoff.origin) { bubble in
-            sendHandoff.capture(bubble: bubble)
-        }
-    }
-
-    private func sendFlightBubbleOrigin(_ textOrigin: CGPoint) -> CGPoint {
-        CGPoint(x: textOrigin.x - UserBubble.textInset.width, y: textOrigin.y - UserBubble.textInset.height)
-    }
-
-    private func risingSendFlightPath(capture: ConversationSendHandoff.Capture, offset: CGFloat, anchorTop: CGFloat) -> SendFlight.Path? {
-        guard let bubble = capture.bubble, !capture.frame.isNull else { return nil }
-        let end = CGPoint(
-            x: capture.frame.minX + bubble.frame.minX,
-            y: anchorTop + bubble.frame.minY
-        )
-        return SendFlight.Path(
-            origin: sendFlightBubbleOrigin(capture.origin),
-            start: CGPoint(x: end.x, y: end.y + offset),
-            end: end
-        )
-    }
-
-    @ViewBuilder
-    private var sendFlightOverlay: some View {
-        if sendHandoff != .idle,
-           let bubble = sendHandoff.bubble,
-           let path = sendHandoff.path ?? sendHandoff.origin.map({ .resting(at: sendFlightBubbleOrigin($0)) }) {
-            GeometryReader { proxy in
-                SendFlightBubbleView(
-                    bubble: bubble,
-                    path: path,
-                    page: proxy.frame(in: .global).origin,
-                    elapsed: sendHandoff.path == nil ? 0 : SendFlight.rise.settlingDuration
-                )
-            }
-            .animation(.linear(duration: SendFlight.rise.settlingDuration), value: sendHandoff.path)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-        }
-    }
-
     private var sendRiseOpacity: Double {
-        guard case .waitingForAnchor(let capture) = sendHandoff else { return 1 }
-        return reduceMotion || capture.frame.isNull ? 0 : 1
+        switch sendHandoff {
+        case .waitingForAnchor(let capture) where reduceMotion || capture.frame.isNull: 0
+        case .waitingForAnchor, .positioned: reduceMotion ? 1 : ConversationSendHandoff.revealStartOpacity
+        case .idle, .animating: 1
+        }
     }
 
     private func animateSendRise(_ submissionID: UUID) {
-        guard case .positioned(let capture, let offset, let anchorTop) = sendHandoff,
+        guard case .positioned(let capture, let offset, _) = sendHandoff,
               capture.submissionID == submissionID else { return }
         Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=animating submission=\(submissionID) rise=\(Int(offset))")
-        withAnimation(reduceMotion ? nil : .spring(SendFlight.rise), completionCriteria: .logicallyComplete) {
-            let path = risingSendFlightPath(capture: capture, offset: offset, anchorTop: anchorTop)
-            sendHandoff = .animating(submissionID, bubble: capture.bubble, path: path)
+        withAnimation(reduceMotion ? nil : .spring(ConversationSendHandoff.rise), completionCriteria: .logicallyComplete) {
+            sendHandoff = .animating(submissionID)
         } completion: {
-            guard case .animating(let id, _, _) = sendHandoff, id == submissionID else { return }
+            guard case .animating(let id) = sendHandoff, id == submissionID else { return }
             sendHandoff = .idle
             scroller.endSendHandoff()
             Log.ui.info("ConversationUX.sendHandoff conversation=\(conversation.id) phase=settled submission=\(submissionID)")
@@ -1473,7 +1429,6 @@ struct ConversationPage: View {
                 conversation.stopCurrentTurn()
             },
             onSpeechBegin: beginSpeech,
-            hidesPlaceholder: sendFlight != nil,
             onInputFrameChange: { composerInputFrame = $0 }
         )
         .equatable()

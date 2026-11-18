@@ -224,7 +224,6 @@ struct ConversationComposer: View, Equatable {
     let onStop: () -> Void
     let onSpeechBegin: (Bool) -> Void
     var serviceScrollProgress: CGFloat? = nil
-    var hidesPlaceholder = false
     var onInputFrameChange: (CGRect) -> Void = { _ in }
 
     private let textLineFragmentPadding: CGFloat = 5
@@ -264,7 +263,6 @@ struct ConversationComposer: View, Equatable {
             && lhs.iconButtonSize == rhs.iconButtonSize
             && lhs.composerButtonSize == rhs.composerButtonSize
             && lhs.serviceScrollProgress == rhs.serviceScrollProgress
-            && lhs.hidesPlaceholder == rhs.hidesPlaceholder
     }
 
     private var empty: Bool {
@@ -662,7 +660,7 @@ struct ConversationComposer: View, Equatable {
 
     private var composerRow: some View {
         ZStack(alignment: .leading) {
-            if inputText.isEmpty, !hidesPlaceholder, !speech.isPresented {
+            if inputText.isEmpty, !speech.isPresented {
                 Group {
                     if isEditingMessage {
                         Text("Edit message", comment: "Placeholder shown while editing a previously sent message.")
