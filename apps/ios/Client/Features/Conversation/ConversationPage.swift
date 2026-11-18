@@ -1089,7 +1089,10 @@ struct ConversationPage: View {
                     scrollToTurn: { id in
                         await anchorBecameReady(
                             id,
-                            anchorTop: outer.frame(in: .global).minY
+                            anchorTop: outer.frame(in: .global).minY,
+                            sourceBlockIDs: sourceBlockIDs,
+                            sourceStart: sourceRange.lowerBound,
+                            total: totalBlockCount
                         )
                     }
                 )
@@ -1334,14 +1337,23 @@ struct ConversationPage: View {
         .background(KeyboardDismissPadding(padding: viewportLayout.composerHeight))
     }
 
-    private func anchorBecameReady(_ anchorID: TurnID, anchorTop: CGFloat) async {
-        guard latestSubmissionID == anchorID, submissionAnchor != nil,
+    private func anchorBecameReady(
+        _ anchorID: TurnID,
+        anchorTop: CGFloat,
+        sourceBlockIDs: [UUID],
+        sourceStart: Int,
+        total: Int
+    ) async {
+        guard latestSubmissionID == anchorID, let submissionAnchor,
               case .waitingForAnchor(let capture) = sendHandoff,
               capture.submissionID == anchorID else { return }
 
         let offset = reduceMotion ? 0 : max(0, sendStartTop(capture.origin) - anchorTop)
         sendHandoff = .positioned(capture, offset: offset, anchorTop: anchorTop)
         scroller.beginSendHandoff(anchorID)
+        if !capture.readingHistory, transcriptWindow.trim(above: submissionAnchor.id, in: sourceBlockIDs, startingAt: sourceStart) {
+            logTranscriptWindow(reason: "trim", total: total)
+        }
     }
 
     private func sendStartTop(_ origin: CGPoint) -> CGFloat {
@@ -1643,7 +1655,7 @@ struct ConversationPage: View {
     private func holdForSend(_ receipt: Conversation.SubmissionReceipt) {
         releaseAnchorFloor(reason: "send")
         latestSubmissionID = receipt.id
-        sendHandoff = .waitingForAnchor(.init(submissionID: receipt.id, origin: composerInputFrame.origin))
+        sendHandoff = .waitingForAnchor(.init(submissionID: receipt.id, origin: composerInputFrame.origin, readingHistory: scroller.showsJumpButton))
         scroller.holdForSend(receipt.id)
     }
 

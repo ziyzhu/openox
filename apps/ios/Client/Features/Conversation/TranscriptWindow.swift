@@ -35,6 +35,14 @@ struct TranscriptWindow: Equatable {
         return true
     }
 
+    mutating func trim(above id: UUID, in blockIDs: [UUID], startingAt lowerBound: Int) -> Bool {
+        guard let index = blockIDs.firstIndex(of: id) else { return false }
+        let anchor = lowerBound + index
+        guard anchor - range.lowerBound > Self.batchSize * 2 else { return false }
+        range = anchor - Self.batchSize..<range.upperBound
+        return true
+    }
+
     mutating func revealEarlier() {
         range = max(0, range.lowerBound - Self.batchSize)..<range.upperBound
     }

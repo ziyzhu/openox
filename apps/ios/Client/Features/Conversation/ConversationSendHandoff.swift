@@ -8,6 +8,7 @@ enum ConversationSendHandoff: Equatable {
     struct Capture: Equatable {
         let submissionID: UUID
         let origin: CGPoint
+        let readingHistory: Bool
         var frame = CGRect.null
     }
 
