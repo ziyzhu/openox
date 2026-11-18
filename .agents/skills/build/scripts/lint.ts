@@ -6,9 +6,10 @@ import { check as filesystemPaths } from "./filesystem-path-check.ts";
 import { check as skills } from "./skills-check.ts";
 import { check as localizations } from "./localization-check.ts";
 import { check as providers } from "./providers.ts";
+import { check as sourceSizes } from "./source-size-check.ts";
 import { check as services } from "./services-check.ts";
 
-for (const check of [publicBoundary, hostPlatforms, hostContract, filesystemPaths, skills, localizations, providers, services]) {
+for (const check of [publicBoundary, hostPlatforms, hostContract, filesystemPaths, skills, localizations, providers, services, sourceSizes]) {
   await runCheck(check);
 }
 
