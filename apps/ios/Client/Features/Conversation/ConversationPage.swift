@@ -998,6 +998,24 @@ struct ConversationPage: View {
         }
     }
 
+    @ViewBuilder
+    private var followIntentRows: some View {
+        if !conversation.isBusy, conversation.turnEnding == nil, !conversation.followIntents.isEmpty {
+            FollowIntentList(intents: conversation.followIntents, onSelect: sendFollowIntent)
+                .id("__followIntents")
+                .transition(.opacity)
+        }
+    }
+
+    private func sendFollowIntent(_ intent: FollowIntent) {
+        guard ensureModelAccess() else { return }
+        prepareComposerSubmission()
+        sendTranscriptTail = scroller.transcriptTail
+        let receipt = conversation.enqueue(intent.message)
+        holdForSend(receipt)
+        Log.ui.info("ConversationPage.followIntent send conversation=\(conversation.id) submission=\(receipt.id) chars=\(intent.message.count)")
+    }
+
     private var stoppedTurnResume: (() -> Void)? {
         guard isModelConfigured else { return nil }
         return {
@@ -1228,12 +1246,14 @@ struct ConversationPage: View {
                 if let queued = anchoredQueuedMessage {
                     activityRow(blocks: renderedBlocks)
                     turnEndingRow
+                    followIntentRows
                     ForEach(conversation.queuedMessages.filter { $0.id != queued.id }) { queued in
                         queuedRow(queued)
                     }
                 } else if !hasAnchor {
                     activityRow(blocks: renderedBlocks)
                     turnEndingRow
+                    followIntentRows
                     queuedRows
                 }
             }
@@ -1261,6 +1281,7 @@ struct ConversationPage: View {
                         }
                         activityRow(blocks: renderedBlocks)
                         turnEndingRow
+                        followIntentRows
                         queuedRows
                     }
                 }
@@ -1433,7 +1454,6 @@ struct ConversationPage: View {
             isConversationEmpty: isConversationEmpty,
             isTemporary: conversation.isTemporary,
             isBusy: conversation.isBusy,
-            followIntents: conversation.followIntents,
             floatsTopStrip: floatsTopStrip,
             isEmbedded: false,
             iconButtonSize: iconButtonSize,

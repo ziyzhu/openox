@@ -144,7 +144,6 @@ struct OxDemoSceneView: View {
             isConversationEmpty: false,
             isTemporary: false,
             isBusy: playback.isStreaming,
-            followIntents: [],
             floatsTopStrip: playback.scene != .creative && !playback.attachedServices.isEmpty,
             isEmbedded: playback.scene == .creative,
             iconButtonSize: iconButtonSize,

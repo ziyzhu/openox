@@ -190,18 +190,6 @@ struct ConversationComposer: View, Equatable {
         return Theme.Spacing.sm + restingOffset + surfaceTouchInset + floatingOffset
     }
 
-    private enum ComposerIntent: Identifiable {
-        case suggested(FollowIntent)
-        case importMemory
-
-        var id: String {
-            switch self {
-            case .suggested(let intent): "suggested:\(intent.id)"
-            case .importMemory: "importMemory"
-            }
-        }
-    }
-
     private struct ImportMemoryOpportunity: Equatable {
         let sessionID: UUID
         let isEligible: Bool
@@ -219,7 +207,6 @@ struct ConversationComposer: View, Equatable {
     let isConversationEmpty: Bool
     let isTemporary: Bool
     let isBusy: Bool
-    let followIntents: [FollowIntent]
     let floatsTopStrip: Bool
     let isEmbedded: Bool
     let iconButtonSize: CGFloat
@@ -272,7 +259,6 @@ struct ConversationComposer: View, Equatable {
             && lhs.isConversationEmpty == rhs.isConversationEmpty
             && lhs.isTemporary == rhs.isTemporary
             && lhs.isBusy == rhs.isBusy
-            && lhs.followIntents == rhs.followIntents
             && lhs.floatsTopStrip == rhs.floatsTopStrip
             && lhs.isEmbedded == rhs.isEmbedded
             && lhs.iconButtonSize == rhs.iconButtonSize
@@ -482,7 +468,7 @@ struct ConversationComposer: View, Equatable {
 
             VStack(alignment: .leading, spacing: 0) {
                 composerDraftStrip
-                followIntentStrip
+                importMemoryStrip
                 composerRow
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -520,16 +506,8 @@ struct ConversationComposer: View, Equatable {
         isEditingMessage || !conversationFiles.isEmpty || !attachedServices.isEmpty
     }
 
-    private var showsFollowIntents: Bool {
-        !isEditingMessage
-            && composer.draft.isEmpty
-            && composer.draftAttachments.isEmpty
-            && (!followIntents.isEmpty || showsImportMemoryIntent)
-    }
-
     private var showsDefaultIntents: Bool {
-        followIntents.isEmpty
-            && !isEditingMessage
+        !isEditingMessage
             && composer.draft.isEmpty
             && composer.draftAttachments.isEmpty
             && isConversationEmpty
@@ -547,48 +525,29 @@ struct ConversationComposer: View, Equatable {
             && (hasShownImportMemory || importMemoryIntentDisplays < 3)
     }
 
-    private var visibleFollowIntents: [ComposerIntent] {
-        if !followIntents.isEmpty { return followIntents.map(ComposerIntent.suggested) }
-        return showsImportMemoryIntent ? [.importMemory] : []
-    }
-
     @ViewBuilder
-    private var followIntentStrip: some View {
-        if showsFollowIntents {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: Theme.Spacing.sm) {
-                    ForEach(visibleFollowIntents) { intent in
-                        followIntentButton(intent)
-                    }
-                }
+    private var importMemoryStrip: some View {
+        if showsImportMemoryIntent {
+            importMemoryButton
                 .padding(.horizontal, Theme.Spacing.md)
                 .padding(.top, Theme.Spacing.xs)
-            }
-            .excludesCompactPageSwitch()
+                .excludesCompactPageSwitch()
         }
     }
 
-    private func followIntentButton(_ intent: ComposerIntent) -> some View {
+    private var importMemoryButton: some View {
         Button {
-            switch intent {
-            case .suggested(let suggestion):
-                let message = suggestion.message
-                composer.draft = message
-                Log.ui.info("ConversationComposer.followIntent send conversation=\(sessionID) chars=\(message.count)")
-                submit()
-            case .importMemory:
-                Task { @MainActor in
-                    await Skills.shared.waitUntilCurrent()
-                    guard let skill = Skills.shared.skill(named: "onboard"), skill.owner == .system else {
-                        Log.ui.error("ConversationComposer.importMemoryIntent unavailable conversation=\(sessionID)")
-                        return
-                    }
-                    Log.ui.info("ConversationComposer.importMemoryIntent send conversation=\(sessionID)")
-                    onSubmitSkill(skill, String(localized: "Import memory to Ox"))
+            Task { @MainActor in
+                await Skills.shared.waitUntilCurrent()
+                guard let skill = Skills.shared.skill(named: "onboard"), skill.owner == .system else {
+                    Log.ui.error("ConversationComposer.importMemoryIntent unavailable conversation=\(sessionID)")
+                    return
                 }
+                Log.ui.info("ConversationComposer.importMemoryIntent send conversation=\(sessionID)")
+                onSubmitSkill(skill, String(localized: "Import memory to Ox"))
             }
         } label: {
-            followIntentTitle(intent)
+            Text("Import memory to Ox")
                 .font(Theme.Fonts.labelMd)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .lineLimit(1)
@@ -601,22 +560,7 @@ struct ConversationComposer: View, Equatable {
         }
         .buttonStyle(.plain)
         .minimumTouchTarget()
-        .accessibilityIdentifier(followIntentIdentifier(intent))
-    }
-
-    private func followIntentTitle(_ intent: ComposerIntent) -> Text {
-        switch intent {
-        case .suggested(let suggestion):
-            Text(verbatim: suggestion.label)
-        case .importMemory: Text("Import memory to Ox")
-        }
-    }
-
-    private func followIntentIdentifier(_ intent: ComposerIntent) -> String {
-        switch intent {
-        case .suggested: A11yID.ConversationControls.followIntent
-        case .importMemory: A11yID.ConversationControls.importMemory
-        }
+        .accessibilityIdentifier(A11yID.ConversationControls.importMemory)
     }
 
     private var filesAccessibilityLabel: String {

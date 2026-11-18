@@ -1039,3 +1039,36 @@ struct ResponseFooterBlockView: View, Equatable {
             .contentShape(Rectangle())
     }
 }
+
+struct FollowIntentList: View {
+    let intents: [FollowIntent]
+    let onSelect: (FollowIntent) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(intents.enumerated()), id: \.element.id) { index, intent in
+                if index > 0 {
+                    Divider()
+                }
+                Button { onSelect(intent) } label: {
+                    HStack(spacing: Theme.Spacing.md) {
+                        Image(systemName: "arrow.turn.down.right")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        Text(verbatim: intent.label)
+                            .font(Theme.Fonts.bodyMd)
+                            .foregroundStyle(Theme.Colors.onSurface)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.vertical, Theme.Spacing.md)
+                    .frame(minHeight: Theme.Size.minimumTouchTarget)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(A11yID.ConversationControls.followIntent)
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+}
