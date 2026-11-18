@@ -81,7 +81,7 @@ actor DurableProfileStore {
 
     func command(scope: ProfileScope, value: JSONValue) async throws -> JSONValue {
         let session = try await session(in: scope)
-        return try JSONDecoder().decode(JSONValue.self, from: Data(try await session.runtime.command(value.jsonString()).utf8))
+        return try await JSONValue.decode(Data(try await session.runtime.command(value.jsonString()).utf8))
     }
 
     func readFile(scope: ProfileScope, file: JSONValue) async throws -> Data {

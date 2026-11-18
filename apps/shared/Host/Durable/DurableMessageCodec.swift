@@ -159,7 +159,7 @@ nonisolated enum DurableMessageCodec {
             }
             let path = file.fileName
             let request = JSONValue.object(["action": .string("fileStat"), "path": .string(path)])
-            let metadata = try JSONDecoder().decode(JSONValue.self, from: Data(try await reader.command(request.jsonString()).utf8))
+            let metadata = try await JSONValue.decode(Data(try await reader.command(request.jsonString()).utf8))
             guard let descriptor = metadata.objectValue?["file"], descriptor != .null else {
                 verified.append(.text(TextContent("[File unavailable: \(file.displayName)]")))
                 continue

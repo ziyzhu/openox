@@ -103,7 +103,7 @@ nonisolated public indirect enum JSONValue: Codable, Equatable, Sendable {
 
     @concurrent
     public static func decode(_ data: Data) async throws -> JSONValue {
-        try JSONDecoder().decode(Self.self, from: data)
+        try JSONValueParser.parse(data)
     }
 
     @concurrent
@@ -117,5 +117,229 @@ nonisolated public indirect enum JSONValue: Codable, Equatable, Sendable {
             return nil
         }
         return JSONValue.from(any)
+    }
+}
+
+nonisolated private struct JSONValueParser {
+    private static let maximumDepth = 512
+    private let bytes: UnsafeBufferPointer<UInt8>
+    private var index = 0
+    private var depth = 0
+
+    private init(bytes: UnsafeBufferPointer<UInt8>) {
+        self.bytes = bytes
+    }
+
+    static func parse(_ data: Data) throws -> JSONValue {
+        try data.withUnsafeBytes { raw in
+            var parser = JSONValueParser(bytes: raw.bindMemory(to: UInt8.self))
+            parser.skipWhitespace()
+            let value = try parser.value()
+            parser.skipWhitespace()
+            guard parser.index == parser.bytes.count else { throw parser.failure("Unexpected content after JSON value") }
+            return value
+        }
+    }
+
+    private func failure(_ message: String) -> DecodingError {
+        .dataCorrupted(DecodingError.Context(codingPath: [], debugDescription: "\(message) at byte \(index)"))
+    }
+
+    private var current: UInt8? { index < bytes.count ? bytes[index] : nil }
+
+    private mutating func skipWhitespace() {
+        while let byte = current, byte == 0x20 || byte == 0x0A || byte == 0x0D || byte == 0x09 { index += 1 }
+    }
+
+    private mutating func consume(_ byte: UInt8) -> Bool {
+        guard current == byte else { return false }
+        index += 1
+        return true
+    }
+
+    private mutating func value() throws -> JSONValue {
+        switch current {
+        case UInt8(ascii: "{"): return try object()
+        case UInt8(ascii: "["): return try array()
+        case UInt8(ascii: "\""): return .string(try string())
+        case UInt8(ascii: "t"): try literal("true"); return .bool(true)
+        case UInt8(ascii: "f"): try literal("false"); return .bool(false)
+        case UInt8(ascii: "n"): try literal("null"); return .null
+        case nil: throw failure("Unexpected end of JSON")
+        default: return try number()
+        }
+    }
+
+    private mutating func literal(_ text: String) throws {
+        for byte in text.utf8 {
+            guard consume(byte) else { throw failure("Invalid literal") }
+        }
+    }
+
+    private mutating func enterContainer() throws {
+        depth += 1
+        guard depth <= Self.maximumDepth else { throw failure("JSON nesting is too deep") }
+        index += 1
+        skipWhitespace()
+    }
+
+    private mutating func object() throws -> JSONValue {
+        try enterContainer()
+        defer { depth -= 1 }
+        var fields: [String: JSONValue] = [:]
+        if consume(UInt8(ascii: "}")) { return .object(fields) }
+        while true {
+            guard current == UInt8(ascii: "\"") else { throw failure("Expected object key") }
+            let key = try string()
+            skipWhitespace()
+            guard consume(UInt8(ascii: ":")) else { throw failure("Expected colon") }
+            skipWhitespace()
+            let value = try value()
+            if fields[key] == nil { fields[key] = value }
+            skipWhitespace()
+            if consume(UInt8(ascii: "}")) { return .object(fields) }
+            guard consume(UInt8(ascii: ",")) else { throw failure("Expected comma or closing brace") }
+            skipWhitespace()
+            if consume(UInt8(ascii: "}")) { return .object(fields) }
+        }
+    }
+
+    private mutating func array() throws -> JSONValue {
+        try enterContainer()
+        defer { depth -= 1 }
+        var values: [JSONValue] = []
+        if consume(UInt8(ascii: "]")) { return .array(values) }
+        while true {
+            values.append(try value())
+            skipWhitespace()
+            if consume(UInt8(ascii: "]")) { return .array(values) }
+            guard consume(UInt8(ascii: ",")) else { throw failure("Expected comma or closing bracket") }
+            skipWhitespace()
+            if consume(UInt8(ascii: "]")) { return .array(values) }
+        }
+    }
+
+    private mutating func string() throws -> String {
+        index += 1
+        let start = index
+        while let byte = current {
+            switch byte {
+            case UInt8(ascii: "\""):
+                let text = String(decoding: UnsafeBufferPointer(rebasing: bytes[start..<index]), as: UTF8.self)
+                index += 1
+                return text
+            case UInt8(ascii: "\\"):
+                return try escapedString(prefix: Array(bytes[start..<index]))
+            case ..<0x20:
+                throw failure("Unescaped control character in string")
+            default:
+                index += 1
+            }
+        }
+        throw failure("Unterminated string")
+    }
+
+    private mutating func escapedString(prefix: [UInt8]) throws -> String {
+        var utf8 = prefix
+        while let byte = current {
+            index += 1
+            switch byte {
+            case UInt8(ascii: "\""):
+                return String(decoding: utf8, as: UTF8.self)
+            case UInt8(ascii: "\\"):
+                guard let escape = current else { throw failure("Unterminated escape") }
+                index += 1
+                switch escape {
+                case UInt8(ascii: "\""), UInt8(ascii: "\\"), UInt8(ascii: "/"): utf8.append(escape)
+                case UInt8(ascii: "b"): utf8.append(0x08)
+                case UInt8(ascii: "f"): utf8.append(0x0C)
+                case UInt8(ascii: "n"): utf8.append(0x0A)
+                case UInt8(ascii: "r"): utf8.append(0x0D)
+                case UInt8(ascii: "t"): utf8.append(0x09)
+                case UInt8(ascii: "u"): utf8.append(contentsOf: try unicodeEscape())
+                default: throw failure("Invalid escape")
+                }
+            case ..<0x20:
+                throw failure("Unescaped control character in string")
+            default:
+                utf8.append(byte)
+            }
+        }
+        throw failure("Unterminated string")
+    }
+
+    private mutating func unicodeEscape() throws -> String.UTF8View {
+        var value = try hexQuad()
+        switch value {
+        case 0xD800...0xDBFF:
+            guard consume(UInt8(ascii: "\\")), consume(UInt8(ascii: "u")) else { throw failure("Unpaired surrogate") }
+            let low = try hexQuad()
+            guard (0xDC00...0xDFFF).contains(low) else { throw failure("Unpaired surrogate") }
+            value = 0x10000 + ((value - 0xD800) << 10) + (low - 0xDC00)
+        case 0xDC00...0xDFFF:
+            throw failure("Unpaired surrogate")
+        default:
+            break
+        }
+        guard let scalar = Unicode.Scalar(value) else { throw failure("Invalid unicode escape") }
+        return String(Character(scalar)).utf8
+    }
+
+    private mutating func hexQuad() throws -> UInt32 {
+        var value: UInt32 = 0
+        for _ in 0..<4 {
+            guard let byte = current, let digit = Self.hexDigit(byte) else { throw failure("Invalid unicode escape") }
+            value = value << 4 | digit
+            index += 1
+        }
+        return value
+    }
+
+    private static func hexDigit(_ byte: UInt8) -> UInt32? {
+        switch byte {
+        case UInt8(ascii: "0")...UInt8(ascii: "9"): UInt32(byte - UInt8(ascii: "0"))
+        case UInt8(ascii: "a")...UInt8(ascii: "f"): UInt32(byte - UInt8(ascii: "a") + 10)
+        case UInt8(ascii: "A")...UInt8(ascii: "F"): UInt32(byte - UInt8(ascii: "A") + 10)
+        default: nil
+        }
+    }
+
+    private var atDigit: Bool { current.map { (UInt8(ascii: "0")...UInt8(ascii: "9")).contains($0) } ?? false }
+
+    private mutating func digits() throws {
+        guard atDigit else { throw failure("Invalid number") }
+        while atDigit { index += 1 }
+    }
+
+    private mutating func number() throws -> JSONValue {
+        let start = index
+        _ = consume(UInt8(ascii: "-"))
+        if consume(UInt8(ascii: "0")) {
+            if atDigit { throw failure("Invalid number") }
+        } else {
+            try digits()
+        }
+        let integerEnd = index
+        var fractionIsZero = true
+        if consume(UInt8(ascii: ".")) {
+            let fractionStart = index
+            try digits()
+            fractionIsZero = bytes[fractionStart..<index].allSatisfy { $0 == UInt8(ascii: "0") }
+        }
+        let hasFraction = integerEnd != index
+        var hasExponent = false
+        if consume(UInt8(ascii: "e")) || consume(UInt8(ascii: "E")) {
+            hasExponent = true
+            if !consume(UInt8(ascii: "+")) { _ = consume(UInt8(ascii: "-")) }
+            try digits()
+        }
+        let text = String(decoding: UnsafeBufferPointer(rebasing: bytes[start..<index]), as: UTF8.self)
+        if !hasExponent, fractionIsZero {
+            let integer = hasFraction ? String(decoding: UnsafeBufferPointer(rebasing: bytes[start..<integerEnd]), as: UTF8.self) : text
+            if let value = Int(integer) { return .int(value) }
+        }
+        guard let double = Double(text), double.isFinite else { throw failure("Number is out of range") }
+        if hasFraction || hasExponent, let value = Int(exactly: double) { return .int(value) }
+        return .double(double)
     }
 }

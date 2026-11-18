@@ -52,7 +52,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
     }
 
     func command(_ value: JSONValue) async throws -> JSONValue {
-        try JSONDecoder().decode(JSONValue.self, from: Data(try await command(value.jsonString()).utf8))
+        try await JSONValue.decode(Data(try await command(value.jsonString()).utf8))
     }
 
     func fileMounts(scope: UUID) async throws -> ReadOnlyFiles {
