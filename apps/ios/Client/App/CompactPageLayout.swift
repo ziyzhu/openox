@@ -88,7 +88,11 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
 
     private let minimumDistance: CGFloat = 8
     private let horizontalIntentRatio: CGFloat = 1.2
-    private let maximumBlurRadius: CGFloat = 5
+    private let maximumBlurRadius: CGFloat = 28
+    private let hiddenWorkspaceDimming = 0.85
+    private let sidebarEntranceDelay = 0.05
+    private let sidebarExit = Animation.linear(duration: 0.13)
+    private let sidebarExitFade = Animation.linear(duration: 0.05).delay(0.12)
 
     private var travel: CGFloat {
         let settled = page == .sidebar ? size.width : 0
@@ -105,7 +109,30 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
     }
 
     private var blurRadius: CGFloat {
-        blurAllowed ? maximumBlurRadius * min(1, progress * 5) : 0
+        blurAllowed ? maximumBlurRadius * progress : 0
+    }
+
+    private var workspaceOpacity: Double {
+        if reduceMotion { return 1 - Double(progress) }
+        return progress < 1 ? 1 - Double(progress) * hiddenWorkspaceDimming : 0
+    }
+
+    private var sidebarOpacity: Double {
+        if reduceMotion { return Double(progress) }
+        return progress > 0 ? 1 : 0
+    }
+
+    private var sidebarMotion: Animation {
+        page == .sidebar ? Theme.Animation.page.delay(sidebarEntranceDelay) : sidebarExit
+    }
+
+    private var sidebarVisibility: Animation {
+        page == .sidebar ? .linear(duration: 1.0 / 60).delay(sidebarEntranceDelay) : sidebarExitFade
+    }
+
+    private func retime(_ transaction: inout Transaction, with animation: Animation) {
+        guard !reduceMotion, transaction.animation != nil else { return }
+        transaction.animation = animation
     }
 
     var body: some View {
@@ -115,15 +142,17 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
                 .safeAreaPadding(safeAreaInsets)
                 .ignoresSafeArea(.container)
                 .blur(radius: blurRadius)
-                .offset(x: reduceMotion ? 0 : travel * 0.4)
-                .opacity(max(0, 1 - Double(progress) * 1.5))
+                .offset(x: reduceMotion ? 0 : travel / 2)
+                .opacity(workspaceOpacity)
                 .allowsHitTesting(page == .workspace && !interaction.actionsSuppressed)
                 .accessibilityHidden(page != .workspace)
 
             sidebar
                 .frame(width: size.width)
-                .offset(x: reduceMotion ? 0 : (travel - size.width) * 2 / 3)
-                .opacity(progress)
+                .offset(x: reduceMotion ? 0 : (travel - size.width) / 2)
+                .transaction(value: page) { retime(&$0, with: sidebarMotion) }
+                .opacity(sidebarOpacity)
+                .transaction(value: page) { retime(&$0, with: sidebarVisibility) }
                 .allowsHitTesting(page == .sidebar && !interaction.actionsSuppressed)
                 .accessibilityHidden(page != .sidebar)
         }

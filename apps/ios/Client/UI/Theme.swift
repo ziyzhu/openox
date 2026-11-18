@@ -109,6 +109,7 @@ enum Theme {
         static let standard = SwiftUI.Animation.smooth(duration: 0.2)
         static let handoff = SwiftUI.Animation.smooth(duration: 0.24)
         static let drop = SwiftUI.Animation.smooth(duration: 0.35)
+        static let page = SwiftUI.Animation.smooth(duration: 0.4)
         static let ride = SwiftUI.Animation.smooth(duration: 0.45)
         static let streamFade: Double = 0.2
         static let thinkingHold: Double = 1.2

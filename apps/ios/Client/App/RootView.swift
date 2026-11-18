@@ -916,10 +916,9 @@ struct RootView: View {
     }
 
     private static let sidebarSpring: Animation = .smooth(duration: 0.3)
-    private static let sidebarSettleAnimation: Animation = .spring(duration: 0.23, bounce: 0)
 
     private var sidebarAnimation: Animation {
-        reduceMotion ? Theme.Animation.quick : (isSplitLayout ? Self.sidebarSpring : Self.sidebarSettleAnimation)
+        reduceMotion ? Theme.Animation.quick : (isSplitLayout ? Self.sidebarSpring : Theme.Animation.page)
     }
 
     private func setSidebar(_ open: Bool) {
