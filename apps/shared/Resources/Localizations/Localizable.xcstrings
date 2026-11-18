@@ -1,6 +1,28 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Move between conversations and history faster, with clearer transitions." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在对话与历史记录之间更快切换，过渡效果更清晰。"
+          }
+        }
+      }
+    },
+    "Services you use are added to the conversation automatically, while permission and sign-in requirements stay in place." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用的服务会自动添加到对话中，权限和登录要求保持不变。"
+          }
+        }
+      }
+    },
     "Keep your reading position as messages and previews finish loading, with fewer unexpected scroll jumps." : {
       "extractionState" : "manual",
       "localizations" : {

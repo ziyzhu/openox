@@ -57,7 +57,6 @@ Action declarations:
 - Declare a JavaScript-identifier `id`, matching handler, user-facing `label` and `description`, concrete input/output schemas, and explicit `requireAuth` and `requireApproval`. Optional fields include stable public `defaultArgs` and action `baseUrl`.
 - Require approval for every create, update, delete, submission, or other external mutation.
 - Defaults must not be private, account-specific, resource-scoped, or expiring. Take request values such as locations, dates, times, queries, and identifiers as inputs or discovered state, never fixed in `baseUrl`, defaults, or handler code.
-- Locale overlays must translate the service name/description and all action labels/descriptions without changing capability or safety meaning.
 
 Execution pages:
 

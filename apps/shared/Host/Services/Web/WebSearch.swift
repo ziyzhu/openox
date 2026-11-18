@@ -91,9 +91,11 @@ extension Conversation {
 
     private func searchPage(domain: String, options: [String: JSONValue], purpose: String) async throws -> JSONValue {
         let service = "web:\(domain)"
-        guard let target = serviceManager.service(domain: domain), target.isWebService else {
+        guard serviceManager.service(domain: domain)?.isWebService == true else {
             throw OxSearch.failure("search_unsupported", "\(domain) has no available web service. Use Evolve to build and verify its standard search action, then retry this domain.")
         }
+        let target = try await serviceOperations.resolveService(domain)
+        try await serviceOperations.attachServiceIfNeeded(target, purpose: purpose)
         try await serviceManager.requireRepositoryAccess(for: target)
         guard await target.loadManifest(reason: .inspect) != nil else {
             throw OxSearch.failure("operation_failed", "\(service) capabilities are unavailable.")

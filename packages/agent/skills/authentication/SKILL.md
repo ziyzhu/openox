@@ -9,7 +9,7 @@ Establish the access needed for the original request, verify it through the serv
 
 ## Choose the service flow
 
-Use the known service kind and canonical domain, inspecting only when contracts or identity are missing. Invoke standard actions through `ox.service.invoke({ purpose, name, input: {} })`; their complete contracts are supplied upfront. Only web services require a live frameId and support website session descriptors. Non-web setup uses the Host's native interface, not Browser or website login. Attaching a service adds its conversation chip but does not authenticate it or grant permissions; inspection and invocation do not require attachment.
+Use the known service kind and canonical domain, inspecting only when contracts or identity are missing. Invoke standard actions through `ox.service.invoke({ purpose, name, input: {} })`; their complete contracts are supplied upfront. Only web services require a live frameId and support website session descriptors. Non-web setup uses the Host's native interface, not Browser or website login. Attaching a service adds its conversation chip but does not authenticate it or grant permissions; inspection does not require attachment. Invocation automatically attaches the service when needed, including standard setup actions, under normal attachment policy.
 
 | Kind | Check when access needs diagnosis | Establish access |
 | --- | --- | --- |

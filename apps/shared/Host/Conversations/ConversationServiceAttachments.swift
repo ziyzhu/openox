@@ -79,7 +79,8 @@ final class ConversationServiceAttachments {
             guard !parts[1].isEmpty, !parts[2].isEmpty else {
                 throw RuntimeError.bridge("\(label): service and action must be non-empty")
             }
-            let service = try await resolveService(parts[0] == "ios" ? "ios:\(parts[1])" : parts[1])
+            let domain = parts[0] == "ios" ? "ios:\(parts[1])" : parts[1]
+            let service = try await resolveService(domain)
             guard ServiceOperations.serviceKind(service) == parts[0] else {
                 throw Service.InvokeError.unknown(name)
             }

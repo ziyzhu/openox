@@ -24,7 +24,7 @@ uses pageId for lifecycle/navigation/handoff, and frameId for document inspectio
 scripts, and web service invocation. Discover fresh document IDs after navigation.
 The active Profile allows eight agent pages total; frames do not count separately. pages exposes lastActiveAt and busy, sorted oldest first. At capacity newPage closes the oldest idle page across conversations and returns fresh IDs; active operations, opening/loading pages, secrets, and user handoffs are protected. Close owned idle pages when no longer needed.
 Direct ox service commands retain Host-managed routing and address services by domain.
-Service inspection and invocation load the current valid source on demand without adding conversation chips. Use `ox.service.attach`, `ox.service.listAttached`, and `ox.service.detach` through the VM to manage explicit conversation attachments. Chips do not grant permissions. Conversation `--attach` attaches user context, not an execution prerequisite.
+Service inspection loads the current valid source without attaching it. Invocation automatically attaches its service to the conversation when needed, under normal attachment policy. Use `ox.service.attach`, `ox.service.listAttached`, and `ox.service.detach` through the VM to manage attachments explicitly. A later invocation reattaches a detached service. Attachment does not grant permissions or authentication.
 
 ## Choose the correct surface
 
@@ -197,11 +197,10 @@ external state. Supply `--approve` only when the user's request authorizes the
 effect. Treat `service eval` as arbitrary code on a Host-managed service page
 and keep it narrowly scoped.
 
-Native iOS actions also require their service to be attached to the selected
-conversation. A catalog search result alone is insufficient. Attach through the app's
-Services picker or the authorized conversation workflow before invoking
-`ios:<service>:<action>`; an unattached native service may report an unknown
-action even when it appears in the catalog.
+All service invocations automatically attach the matching service to the selected
+conversation when needed. The existing attachment and action policies still apply.
+Inspection alone does not attach a service, and automatic attachment does not grant
+native permissions or authenticate an account.
 
 For conversation-driven login or human verification, use VM page lifecycle functions
 and browser.showPage with the exact pageId. Explain the user's step before calling,

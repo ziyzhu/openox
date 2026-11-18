@@ -24,6 +24,7 @@ extension ServiceOperations {
         let scheduled = Service.Action(service: service, definition: definition, baseURL: baseURL,
                                        role: .blockingAction, scripts: service.resolutionState.resolved?.actions ?? "")
         let result = try await serviceManager.actionScheduler.schedule(scheduled, on: page, name: qualified) { page in
+            try self.requireAttachedService(service)
             try await self.serviceManager.requireInvocationAccess(for: service)
             try await self.serviceManager.requireInvocationAccess(for: owner)
             guard page.secretAttempt == nil else { throw Service.EvalError.contextInvalidated }

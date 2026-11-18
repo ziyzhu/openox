@@ -1,6 +1,19 @@
 import Foundation
 
 extension ServiceOperations {
+    func attachServiceIfNeeded(_ service: Service, purpose: String) async throws {
+        guard case .conversation = conversationOwner, !attachedDomains().contains(service.domain) else { return }
+        _ = try await attachService(domain: service.domain, purpose: purpose)
+    }
+
+    func requireAttachedService(_ service: Service) throws {
+        guard case .conversation = conversationOwner else { return }
+        guard attachedDomains().contains(service.domain) else {
+            Log.service.warning("ServiceOperations.invoke rejected domain=\(service.domain) reason=not-attached owner=\(conversationOwner.logLabel)")
+            throw Service.InvokeError.notAttached(service.domain)
+        }
+    }
+
     func invokeAction(name: String, args: JSONValue?, session: JSONValue? = nil, pageURL: String? = nil, frameID: String? = nil, purpose: String) async throws -> JSONValue? {
         let (service, actionID) = try await resolveAction(name)
         if service.isWebService, frameID == nil {
@@ -13,6 +26,8 @@ extension ServiceOperations {
         guard !service.isMCPService || serviceManager.service(domain: service.domain) === service else {
             throw RuntimeError.bridge("This MCP connection changed or was removed. Inspect the current service before invoking it.")
         }
+        try await attachServiceIfNeeded(service, purpose: purpose)
+        try requireAttachedService(service)
         let hostStandard = !service.isWebService && service.definition.standardServiceActions.contains { $0.id == actionID }
         if service.isMCPService, !hostStandard, await service.loadManifest(reason: .invoke) == nil {
             throw RuntimeError.bridge("Service capabilities are unavailable; invoke the server's authorize action if authorization is required")
@@ -70,6 +85,7 @@ extension ServiceOperations {
                     purpose: purpose
                 )
             }
+            try self.requireAttachedService(service)
             if hostStandard {
                 let value = try await self.invokeStandardServiceAction(service, actionID: actionID, purpose: purpose)
                 let violations = JSONSchemaValidator.validate(value ?? .null, against: action.outputSchema ?? .null, definitions: [:])
@@ -104,6 +120,7 @@ extension ServiceOperations {
                     return false
                 }
             }
+            try self.requireAttachedService(service)
             if let frameID {
                 return try await self.invokeFrameAction(service: service, actionID: actionID, input: input,
                                                        frameID: frameID, session: session, secrets: secrets, purpose: purpose)

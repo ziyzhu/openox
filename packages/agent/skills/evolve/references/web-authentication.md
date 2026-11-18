@@ -8,7 +8,7 @@ A session is a currently authenticated website context, not an open page, rememb
 
 The agent owns page selection and lifecycle. Use `ox.web.browser.newPage({ purpose, url })` to obtain `pageId` and `mainFrameId`, or reuse an owned page from `ox.web.browser.pages({ purpose })` and discover its documents with `ox.web.browser.frames({ purpose, pageId })`. At most eight agent pages may be open across the active Profile; `pages` lists all of them. Close owned idle pages when no longer needed. pages returns lastActiveAt and busy, sorted oldest first. At capacity newPage closes the oldest idle page across conversations and returns fresh IDs; busy pages are protected.
 
-Every web service invocation requires a live `frameId`, including main-document calls. Invoke the service matching the frame's observed origin; the Host loads its current valid source on demand without a separate attachment call. Navigation replaces document targets: rediscover frames instead of reusing a stale ID, reopening the provider homepage, or replaying the triggering step. `pageId` survives navigation and is used for navigation and presentation. Frames do not count as pages. Cross-origin parent IDs may be null; incomplete frame discovery does not establish absence.
+Every web service invocation requires a live `frameId`, including main-document calls. Invoke the service matching the frame's observed origin; invocation automatically attaches that service when needed under normal attachment policy. Navigation replaces document targets: rediscover frames instead of reusing a stale ID, reopening the provider homepage, or replaying the triggering step. `pageId` survives navigation and is used for navigation and presentation. Frames do not count as pages. Cross-origin parent IDs may be null; incomplete frame discovery does not establish absence.
 
 Use `ox.web.browser.snapshot({ purpose, frameId })` for bounded read-only document evidence without field values. The Host enforces service origin, secret ownership, and document identity. It does not choose another page, navigate to an action base URL, or recover a stale frame by falling back to the main document.
 
@@ -48,7 +48,7 @@ Trace steps contain event, origin, mainFrame, redacted route patterns, bounded c
 
 ## Recovery
 
-An unsupported contract is a normal service repair: inspect current source and live evidence, implement standard actions, preserve unrelated Local edits and website state, validate, and inspect the current contracts. Inspection and invocation load the current valid source on demand. Do not invent authenticated IDs from booleans.
+An unsupported contract is a normal service repair: inspect current source and live evidence, implement standard actions, preserve unrelated Local edits and website state, validate, and inspect the current contracts. Inspection loads the current valid source on demand; invocation automatically attaches the service when needed under normal attachment policy. Do not invent authenticated IDs from booleans.
 
 If fresh discovery finds a session but an action rejects it, inspect descriptor and execution-context differences before requesting login. Do not weaken checks or silently switch accounts. After uncertain effects, inspect current state before another attempt. Presentation failure is not evidence that the login or mutation failed; preserve the page and report unresolved blockers.
 

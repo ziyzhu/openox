@@ -656,6 +656,7 @@ final class Service: NSObject, Identifiable {
     enum InvokeError: LocalizedError {
         case denied(String)
         case unknown(String)
+        case notAttached(String)
         case requiresAuth(String)
         case authUnavailable(String)
         case invalidContract(String)
@@ -670,6 +671,7 @@ final class Service: NSObject, Identifiable {
             switch self {
             case .denied(let name): return "action \"\(name)\" denied by user"
             case .unknown(let name): return "unknown action \"\(name)\""
+            case .notAttached(let domain): return "Service \"\(domain)\" is not attached to this conversation. Attach it with ox.service.attach before invoking its actions."
             case .requiresAuth(let name): return "action \"\(name)\" requires login — the user is not logged in to this service. Ask them to log in, then retry."
             case .authUnavailable(let name): return "action \"\(name)\" could not verify the service login state. Retry after the service is available."
             case .invalidContract(let name): return "action \"\(name)\" has an invalid manifest contract"

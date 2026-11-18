@@ -87,12 +87,24 @@ extension OxHostProtocol {
         }
         Log.agent.debug("OxHostRPC.services.invoke id=\(reply.id) \(domain):\(action)")
         withService(domain: domain, serviceManager: serviceManager, reply: reply) { svc in
+            guard let conversation = conversationManager.current else {
+                return .failure(RuntimeError.bridge("session unavailable"))
+            }
             if command.session != nil || command.pageUrl != nil {
                 guard svc.isWebService else {
                     return .failure(RuntimeError.bridge("Session routing is supported only for web services"))
                 }
             }
+            if conversation.attachedService(domain: svc.domain) == nil {
+                let policy = serviceManager.actionPolicy(for: Actions.serviceAttach, default: Actions.defaultPolicy(for: Actions.serviceAttach))
+                guard policy == .allow && command.approve != false || policy == .ask && command.approve == true else {
+                    return .failure(Service.InvokeError.denied(Actions.serviceAttach))
+                }
+                _ = conversation.attachService(svc)
+                Log.session.info("OxHostRPC.services.invoke attached conversation=\(conversation.id) domain=\(svc.domain)")
+            }
             let approve: @MainActor (String, Any?) async -> Bool = { invokedName, _ in
+                guard conversation.attachedService(domain: svc.domain) != nil else { return false }
                 let invokedAction = invokedName.split(separator: ":").last.map(String.init) ?? action
                 let name = svc.definition.qualifiedActionName(invokedAction)
                 let actionDefault: ActionPolicy = svc.definition.action(invokedAction, includingStandard: true)?.requireApproval == false ? .allow : .ask

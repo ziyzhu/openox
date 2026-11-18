@@ -9,6 +9,10 @@ struct WhatsNewRelease: Identifiable {
 
 enum WhatsNew {
     static let releases: [WhatsNewRelease] = [
+        WhatsNewRelease(version: "1.1.2", items: [
+            "Move between conversations and history faster, with clearer transitions.",
+            "Services you use are added to the conversation automatically, while permission and sign-in requirements stay in place."
+        ]),
         WhatsNewRelease(version: "1.1.1", items: [
             "Keep your reading position as messages and previews finish loading, with fewer unexpected scroll jumps.",
             "View more messages at once when opening a conversation or loading earlier history.",
