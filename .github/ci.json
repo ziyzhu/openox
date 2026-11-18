@@ -1,7 +1,7 @@
 {
   "node": ">=24.22.1 <25",
   "npm": "11.19.0",
-  "xcode": "26.2",
+  "xcode": "27.1",
   "iosBundleIdentifier": "ai.openox.local",
   "cli": [
     { "platform": "darwin-arm64", "runner": "macos-15" },
