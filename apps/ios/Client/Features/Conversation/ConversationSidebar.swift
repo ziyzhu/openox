@@ -299,12 +299,6 @@ private struct SidebarRow: View {
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .accessibilityHidden(true)
                     }
-                    if meta.isFavorite {
-                        Image(systemName: "pin.fill")
-                            .font(.system(.caption, weight: .medium))
-                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                            .accessibilityHidden(true)
-                    }
                 }
             }
         }
