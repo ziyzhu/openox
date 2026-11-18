@@ -84,9 +84,11 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
 
     @State private var dragPhase = DragPhase.idle
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private let minimumDistance: CGFloat = 8
     private let horizontalIntentRatio: CGFloat = 1.2
+    private let maximumBlurRadius: CGFloat = 5
 
     private var travel: CGFloat {
         let settled = page == .sidebar ? size.width : 0
@@ -98,12 +100,21 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
         return travel / size.width
     }
 
+    private var blurAllowed: Bool {
+        !reduceMotion && !reduceTransparency
+    }
+
+    private var blurRadius: CGFloat {
+        blurAllowed ? maximumBlurRadius * min(1, progress * 5) : 0
+    }
+
     var body: some View {
         ZStack(alignment: .leading) {
             workspace
                 .environment(\.sidebarInteraction, interaction)
                 .safeAreaPadding(safeAreaInsets)
                 .ignoresSafeArea(.container)
+                .blur(radius: blurRadius)
                 .offset(x: reduceMotion ? 0 : travel * 0.4)
                 .opacity(max(0, 1 - Double(progress) * 1.5))
                 .allowsHitTesting(page == .workspace && !interaction.actionsSuppressed)
