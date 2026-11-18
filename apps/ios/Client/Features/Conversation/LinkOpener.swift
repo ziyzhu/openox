@@ -2,14 +2,32 @@ import SwiftUI
 import WebKit
 import UIKit
 
-struct ConversationFileResolver {
+struct ConversationFileResolver: Equatable {
+    let conversationID: UUID
     let revision: Int
     let resolve: (String) async -> FileItem?
     let read: (String) async throws -> JSONValue
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.conversationID == rhs.conversationID && lhs.revision == rhs.revision
+    }
+}
+
+struct OpenConversationAction: Equatable {
+    let sourceConversationID: UUID
+    let perform: (UUID) -> Void
+
+    func callAsFunction(_ id: UUID) {
+        perform(id)
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.sourceConversationID == rhs.sourceConversationID
+    }
 }
 
 private struct OpenConversationKey: EnvironmentKey {
-    static let defaultValue: ((UUID) -> Void)? = nil
+    static let defaultValue: OpenConversationAction? = nil
 }
 
 private struct ConversationLinkHandlerKey: EnvironmentKey {
@@ -17,7 +35,7 @@ private struct ConversationLinkHandlerKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    var openConversation: ((UUID) -> Void)? {
+    var openConversation: OpenConversationAction? {
         get { self[OpenConversationKey.self] }
         set { self[OpenConversationKey.self] = newValue }
     }

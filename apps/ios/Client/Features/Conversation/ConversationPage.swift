@@ -254,8 +254,12 @@ struct ConversationPage: View {
                 authProbe: authProbe
             )
         }
-        .environment(\.openConversation, onOpenConversation)
+        .environment(\.openConversation, OpenConversationAction(
+            sourceConversationID: conversation.id,
+            perform: onOpenConversation
+        ))
         .environment(\.conversationFileResolver, ConversationFileResolver(
+            conversationID: conversation.id,
             revision: conversation.filesRevision,
             resolve: { [conversation] path in await conversation.messageFile(path: path) },
             read: { [conversation] path in

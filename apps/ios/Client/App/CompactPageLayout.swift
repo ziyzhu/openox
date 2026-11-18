@@ -55,6 +55,17 @@ extension View {
     }
 }
 
+private struct PageDragSettleKey: TransactionKey {
+    static let defaultValue: Animation? = nil
+}
+
+private extension Transaction {
+    var pageDragSettle: Animation? {
+        get { self[PageDragSettleKey.self] }
+        set { self[PageDragSettleKey.self] = newValue }
+    }
+}
+
 enum CompactPage: String {
     case sidebar
     case workspace
@@ -91,8 +102,9 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
     private let maximumBlurRadius: CGFloat = 28
     private let hiddenWorkspaceDimming = 0.85
     private let sidebarEntranceDelay = 0.05
+    private let sidebarReveal: ClosedRange<CGFloat> = 0.05...0.2
     private let sidebarExit = Animation.linear(duration: 0.13)
-    private let sidebarExitFade = Animation.linear(duration: 0.05).delay(0.12)
+    private let sidebarExitFade = Animation.linear(duration: 0.05).delay(0.08)
 
     private var travel: CGFloat {
         let settled = page == .sidebar ? size.width : 0
@@ -119,7 +131,8 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
 
     private var sidebarOpacity: Double {
         if reduceMotion { return Double(progress) }
-        return progress > 0 ? 1 : 0
+        let reveal = (progress - sidebarReveal.lowerBound) / (sidebarReveal.upperBound - sidebarReveal.lowerBound)
+        return Double(min(1, max(0, reveal)))
     }
 
     private var sidebarMotion: Animation {
@@ -133,6 +146,10 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
     private func retime(_ transaction: inout Transaction, with animation: Animation) {
         guard !reduceMotion, transaction.animation != nil else { return }
         transaction.animation = animation
+    }
+
+    private func retimeSidebarMotion(_ transaction: inout Transaction) {
+        retime(&transaction, with: transaction.pageDragSettle ?? sidebarMotion)
     }
 
     var body: some View {
@@ -150,7 +167,7 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
             sidebar
                 .frame(width: size.width)
                 .offset(x: reduceMotion ? 0 : (travel - size.width) / 2)
-                .transaction(value: page) { retime(&$0, with: sidebarMotion) }
+                .transaction(value: page) { retimeSidebarMotion(&$0) }
                 .opacity(sidebarOpacity)
                 .transaction(value: page) { retime(&$0, with: sidebarVisibility) }
                 .allowsHitTesting(page == .sidebar && !interaction.actionsSuppressed)
@@ -239,12 +256,15 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
             bounce: 0,
             initialVelocity: initialVelocity
         )
-        withAnimation(animation, completionCriteria: .logicallyComplete) {
-            page = target
-            dragPhase = .idle
-        } completion: {
+        var transaction = Transaction(animation: animation)
+        transaction.pageDragSettle = animation
+        transaction.addAnimationCompletion(criteria: .logicallyComplete) {
             interaction.dragActive = false
             if opensSidebar, page == .sidebar, dragPhase == .idle { onOpened() }
+        }
+        withTransaction(transaction) {
+            page = target
+            dragPhase = .idle
         }
         Task { @MainActor in
             await Task.yield()

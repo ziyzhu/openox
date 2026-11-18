@@ -579,7 +579,7 @@ struct RootView: View {
             contentState: startup.sidebarContentState(listing: conversations.summaryListing),
             actionsEnabled: startup == .ready,
             summaries: summaries,
-            canLoadMore: showSidebar && conversations.summaryListing.hasMore,
+            canLoadMore: conversations.summaryListing.hasMore,
             activities: conversations.activities,
             currentId: currentId,
             showsCloseButton: !isSplitLayout,
