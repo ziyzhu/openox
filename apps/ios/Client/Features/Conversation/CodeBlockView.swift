@@ -7,7 +7,7 @@ struct CodeBlockHeader<Controls: View>: View {
     @ViewBuilder let controls: () -> Controls
 
     var body: some View {
-        HStack(alignment: .center, spacing: Theme.Spacing.sm) {
+        HStack(alignment: .top, spacing: Theme.Spacing.sm) {
             Text(DiffDocument.supports(language) ? "Changes" : language ?? "Text")
                 .font(Theme.Fonts.caption.weight(.medium))
                 .foregroundStyle(Theme.Colors.onSurface)

@@ -670,7 +670,7 @@ private struct CodeBlockCopyButton: View {
             Image(systemName: feedback.didCopy ? "checkmark" : "doc.on.doc")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Theme.Colors.onSurface)
-                .frame(width: 22, height: 22)
+                .frame(width: 22, height: 22, alignment: .trailing)
                 .minimumTouchTarget(alignment: .topTrailing)
         }
         .buttonStyle(.plain)
