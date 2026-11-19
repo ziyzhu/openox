@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Fixed conversations jumping and stuttering while swiping to history." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修复了滑动切换到历史记录时对话内容跳动、卡顿的问题。"
+          }
+        }
+      }
+    },
     "Move between conversations and history faster, with smoother transitions." : {
       "extractionState" : "manual",
       "localizations" : {

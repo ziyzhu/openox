@@ -9,6 +9,9 @@ struct WhatsNewRelease: Identifiable {
 
 enum WhatsNew {
     static let releases: [WhatsNewRelease] = [
+        WhatsNewRelease(version: "1.1.3", items: [
+            "Fixed conversations jumping and stuttering while swiping to history."
+        ]),
         WhatsNewRelease(version: "1.1.2", items: [
             "Move between conversations and history faster, with smoother transitions.",
             "Suggested follow-ups now appear as tappable rows below the latest response.",
