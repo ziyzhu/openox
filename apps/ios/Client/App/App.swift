@@ -140,9 +140,15 @@ private struct OxApplicationView: View {
             }
             .task(id: canPresentWhatsNew) {
                 guard canPresentWhatsNew, case .waiting = whatsNewLaunch else { return }
+                guard WhatsNew.isUnseen(since: appState.value.whatsNewSeenVersion) else {
+                    whatsNewLaunch = .finished
+                    return
+                }
                 do { try await client.prepare() } catch { return }
                 guard !Task.isCancelled, canPresentWhatsNew, case .waiting = whatsNewLaunch else { return }
-                let releases = WhatsNew.unseen(since: appState.value.whatsNewSeenVersion)
+                let catalog = await WhatsNew.load()
+                guard !Task.isCancelled, canPresentWhatsNew, case .waiting = whatsNewLaunch else { return }
+                let releases = WhatsNew.unseen(catalog ?? [], since: appState.value.whatsNewSeenVersion)
                 guard !releases.isEmpty else {
                     whatsNewLaunch = .finished
                     return

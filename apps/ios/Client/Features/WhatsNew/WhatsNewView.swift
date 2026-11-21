@@ -48,6 +48,8 @@ private struct WhatsNewPage: View {
     let release: WhatsNewRelease
     let onDone: () -> Void
 
+    @Environment(\.locale) private var locale
+
     var body: some View {
         VStack(spacing: 0) {
             ScrollView(.vertical) {
@@ -72,12 +74,12 @@ private struct WhatsNewPage: View {
                         .padding(.top, Theme.Spacing.xs)
 
                     VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                        ForEach(Array(release.items.enumerated()), id: \.offset) { index, item in
+                        ForEach(Array(release.items(for: locale).enumerated()), id: \.offset) { index, item in
                             HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.md) {
                                 Text(verbatim: "\(index + 1).")
                                     .font(Theme.Fonts.bodyMd.monospacedDigit())
                                     .foregroundStyle(Theme.Colors.primary)
-                                Text(LocalizedStringKey(item))
+                                Text(verbatim: item)
                                     .font(Theme.Fonts.bodyMd)
                                     .foregroundStyle(Theme.Colors.onSurface)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -113,40 +115,76 @@ private struct WhatsNewPage: View {
 }
 
 struct WhatsNewListView: View {
+    private enum Content {
+        case loading
+        case loaded([WhatsNewRelease])
+        case unavailable
+    }
+
+    @State private var content = Content.loading
     @State private var selected: WhatsNewRelease?
 
     var body: some View {
         ScrollView {
-            SettingsSection(layout: .group) {
-                VStack(spacing: 0) {
-                    ForEach(Array(WhatsNew.shipped.enumerated()), id: \.element.id) { index, release in
-                        if index > 0 {
-                            Divider().settingsContentInset()
-                        }
-                        Button { selected = release } label: {
-                            WhatsNewReleaseRow(release: release)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier(A11yID.WhatsNew.release(release.version))
-                    }
-                }
+            switch content {
+            case .loading:
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .settingsPagePadding()
+                    .accessibilityIdentifier(A11yID.WhatsNew.loading)
+            case .unavailable:
+                Text("Release notes are unavailable. Check your connection and try again.")
+                    .font(Theme.Fonts.bodyMd)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 560)
+                    .frame(maxWidth: .infinity)
+                    .settingsPagePadding()
+                    .accessibilityIdentifier(A11yID.WhatsNew.unavailable)
+            case .loaded(let releases):
+                releaseList(releases)
             }
-            .frame(maxWidth: 560)
-            .frame(maxWidth: .infinity)
-            .settingsPagePadding()
         }
         .scrollIndicators(.hidden)
         .background(Theme.Colors.background)
         .navigationTitle("What's New")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            let catalog = await WhatsNew.load()
+            guard !Task.isCancelled else { return }
+            let releases = WhatsNew.shipped(catalog ?? [])
+            content = releases.isEmpty ? .unavailable : .loaded(releases)
+        }
         .sheet(item: $selected) { release in
             WhatsNewView(releases: [release]) { selected = nil }
         }
+    }
+
+    private func releaseList(_ releases: [WhatsNewRelease]) -> some View {
+        SettingsSection(layout: .group) {
+            VStack(spacing: 0) {
+                ForEach(Array(releases.enumerated()), id: \.element.id) { index, release in
+                    if index > 0 {
+                        Divider().settingsContentInset()
+                    }
+                    Button { selected = release } label: {
+                        WhatsNewReleaseRow(release: release)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier(A11yID.WhatsNew.release(release.version))
+                }
+            }
+        }
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
+        .settingsPagePadding()
     }
 }
 
 private struct WhatsNewReleaseRow: View {
     let release: WhatsNewRelease
+
+    @Environment(\.locale) private var locale
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
@@ -154,8 +192,8 @@ private struct WhatsNewReleaseRow: View {
                 Text("Version \(release.version)")
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
-                if let first = release.items.first {
-                    Text(LocalizedStringKey(first))
+                if let first = release.items(for: locale).first {
+                    Text(verbatim: first)
                         .font(Theme.Fonts.bodySm)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .lineLimit(2)

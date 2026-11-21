@@ -13,6 +13,8 @@ nonisolated enum A11yID {
         static func page(_ version: String) -> String { "whatsNew.page.\(version)" }
         static func done(_ version: String) -> String { "whatsNew.done.\(version)" }
         static func release(_ version: String) -> String { "whatsNew.release.\(version)" }
+        static let loading = "whatsNew.loading"
+        static let unavailable = "whatsNew.unavailable"
     }
 
     enum NotificationSetup {
