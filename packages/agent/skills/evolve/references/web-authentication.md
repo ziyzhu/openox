@@ -34,7 +34,7 @@ Recognize the current screen, select only input.auth, and click the observed pro
 
 ## Automatic login authoring
 
-Build automatic login only after manual login and listSessions work. Use Browser for structural evidence, never real credential values. The Host records bounded structural login evidence during manual login, independently of saving credentials, and may offer to remember credentials after Done, not Cancel. Capture only recognizes fields with autocomplete username, email, and current-password.
+Build automatic login only after manual login and listSessions work. Use Browser for structural evidence, never real credential values. The Host records bounded structural login evidence during manual login, independently of saving credentials, and may offer to remember credentials after Done, not Cancel. Capture recognizes fields with autocomplete username, email, and current-password. On explicit Sign in or Log in form submission in the main HTTPS document, it can also pair a single untagged password field with a single recognized username or email field in the same form.
 
 Structural trace steps remain in user-owned Host diagnostics after Done, not in the function result or a continuation prompt. Use them only for a confirmed authoring defect; normal MFA, captcha, passkey, and consent are not defects. Trace recording ends with the interaction; credentials remain in Host-managed secret handling.
 

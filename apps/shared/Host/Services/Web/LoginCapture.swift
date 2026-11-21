@@ -83,7 +83,13 @@ final class LoginCapture: NSObject, WKScriptMessageHandler {
         switch kind {
         case "username": username = value
         case "email": email = value
-        case "password": password = value
+        case "password":
+            if let submittedUsername = body["username"] as? String {
+                guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.protocol == "https",
+                      !submittedUsername.isEmpty, submittedUsername.count <= 1024 else { return }
+                username = Value(text: submittedUsername, host: value.host)
+            }
+            password = value
         default: return
         }
     }
@@ -155,15 +161,36 @@ final class LoginCapture: NSObject, WKScriptMessageHandler {
         if (!type || !element.value) return;
         try { window.webkit.messageHandlers.oxLoginCapture.postMessage({ kind: type, value: element.value }); } catch { stop(); }
       };
+      const submitted = event => {
+        const form = event.target;
+        if (!event.isTrusted || window !== top || !(form instanceof HTMLFormElement)) return;
+        const submitter = event.submitter;
+        const label = (submitter instanceof HTMLInputElement ? submitter.value : submitter?.textContent ?? "")
+          .trim().toLowerCase().replace(/\s+/g, " ");
+        if (!["sign in", "log in", "login"].includes(label)) return;
+        const inputs = Array.from(form.elements).filter(element => element instanceof HTMLInputElement);
+        const passwords = inputs.filter(element => element.type === "password");
+        const usernames = inputs.filter(element => ["username", "email"].includes(kind(element)));
+        if (passwords.length !== 1 || usernames.length !== 1) return;
+        const [password] = passwords;
+        const [username] = usernames;
+        if (password.hasAttribute("autocomplete") || [username, password].some(element =>
+          element.matches(":disabled") || !element.getClientRects().length || !element.value)) return;
+        try {
+          window.webkit.messageHandlers.oxLoginCapture.postMessage({ kind: "password", value: password.value, username: username.value });
+        } catch { stop(); }
+      };
       const events = ["input", "change", "blur"];
       const changed = event => post(event.composedPath?.()[0] ?? event.target);
       const leaving = () => document.querySelectorAll("input[autocomplete]").forEach(post);
       const stop = () => {
         events.forEach(type => document.removeEventListener(type, changed, true));
+        document.removeEventListener("submit", submitted, true);
         window.removeEventListener("pagehide", leaving, true);
         delete window.__oxLoginCapture;
       };
       events.forEach(type => document.addEventListener(type, changed, true));
+      document.addEventListener("submit", submitted, true);
       window.addEventListener("pagehide", leaving, true);
       window.__oxLoginCapture = { stop };
     })();
