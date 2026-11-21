@@ -46,15 +46,19 @@ auth=(-allowProvisioningUpdates
   -authenticationKeyIssuerID "$ASC_ISSUER_ID")
 
 run_logged() {
-  local name="$1" log="$out/$1.log" status=0
-  shift
+  local name="$1" attempts="$2" log="$out/$1.log" attempt status
+  shift 2
   echo "==> $name"
-  "$@" >"$log" 2>&1 || status=$?
-  if [ "$status" != 0 ]; then
+  : >"$log"
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    status=0
+    "$@" >>"$log" 2>&1 || status=$?
+    [ "$status" != 0 ] || return 0
+    echo "$name attempt $attempt/$attempts failed with status $status" | tee -a "$log" >&2
     grep -E "error:|\*\* .* FAILED \*\*" "$log" | sort -u | tail -40 >&2 || true
-    tail -20 "$log" >&2
-    die "$name failed (log: $log)"
-  fi
+  done
+  tail -20 "$log" >&2
+  die "$name failed (log: $log)"
 }
 
 plist() { /usr/libexec/PlistBuddy -c "Print :$2" "$1"; }
@@ -65,7 +69,7 @@ printf '%s\n' "OX_DEVELOPMENT_TEAM = $OX_DEVELOPMENT_TEAM" "OX_BUNDLE_IDENTIFIER
 umask 022
 
 rm -rf "$archive" "$export_dir"
-run_logged archive xcodebuild archive \
+run_logged archive 1 xcodebuild archive \
   -project "$ios/Ox.xcodeproj" -scheme ios -configuration Release \
   -destination "generic/platform=iOS" \
   -archivePath "$archive" -derivedDataPath "$out/DerivedData" \
@@ -96,7 +100,7 @@ cat > "$options" <<EOF
 </dict>
 </plist>
 EOF
-run_logged export xcodebuild -exportArchive \
+run_logged export 2 xcodebuild -exportArchive \
   -archivePath "$archive" -exportOptionsPlist "$options" -exportPath "$export_dir" \
   "${auth[@]}"
 
