@@ -5,12 +5,13 @@ enum OxHostProtocol {
     static func handle(
         _ data: Data, host: any OxHost,
         admit: @escaping @MainActor () -> String? = { nil },
+        download: HostFileDownload,
         finished: @escaping @MainActor () -> Void = {},
         reply: @escaping @MainActor (Data) -> Void
     ) {
         Task { @MainActor in
             defer { finished() }
-            let response = await OxHostRPC.handle(data, host: host, admit: admit)
+            let response = await OxHostRPC.handle(data, host: host, download: download, admit: admit)
             guard let response else { return }
             do { reply(try await response.encoded()) }
             catch { Log.app.error("OxHostRPC response encoding failed error=\(error.localizedDescription)") }
@@ -18,7 +19,7 @@ enum OxHostProtocol {
     }
 
     @MainActor
-    static func invoke(_ method: Method, params: JSONValue, host: any OxHost, reply: OxHostRPC.Reply) throws {
+    static func invoke(_ method: Method, params: JSONValue, host: any OxHost, download: HostFileDownload, reply: OxHostRPC.Reply) throws {
         let data = try JSONEncoder().encode(params)
         func decode<T: Decodable>(_ type: T.Type) throws -> T {
             if type == EmptyRequest.self && params != .object([:]) {
@@ -42,6 +43,9 @@ enum OxHostProtocol {
         case .mountFolder: handleMountFolder(try decode(FolderProfileRequest.self), host: host, reply: reply)
         case .assignFolder: handleAssignFolder(try decode(FolderGrantRequest.self), host: host, reply: reply)
         case .unmountFolder: handleUnmountFolder(try decode(FolderGrantRequest.self), host: host, reply: reply)
+        case .downloadFile:
+            let request = try decode(DownloadFileRequest.self)
+            Task { await download.handle(request, conversations: conversations, reply: reply) }
         case .listRepositories: handleListRepositories(try decode(EmptyRequest.self), host: host, reply: reply)
         case .connectRepositoryFolder: handleConnectRepositoryFolder(try decode(MountedRepositoryRequest.self), host: host, reply: reply)
         case .disconnectRepositoryFolder: handleDisconnectRepositoryFolder(try decode(RepositoryIDRequest.self), host: host, reply: reply)

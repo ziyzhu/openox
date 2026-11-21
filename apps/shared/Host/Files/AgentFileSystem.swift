@@ -23,6 +23,39 @@ extension Conversation {
         return parts.joined(separator: "/")
     }
 
+    func downloadAttachmentPath(_ id: String) async throws -> String {
+        let attached = transcript.contains { block in
+            switch block.kind {
+            case .userText(_, let files), .userSkill(_, let files):
+                return files.contains { $0.id == id }
+            case .agentContent(let items):
+                return items.contains { if case .artifact(let file) = $0 { return file.id == id }; return false }
+            default:
+                return false
+            }
+        }
+        guard attached else { throw RuntimeError.bridge("Attachment not found in this conversation") }
+        try await durablePreparation?.value
+        guard let route = durableRoute else { throw RuntimeError.bridge("Agent filesystem is unavailable") }
+        let result = try await route.session.runtime.command(.object(["action": .string("fileStat"), "path": .string(id)]))
+        guard let path = result.objectValue?["file"]?.objectValue?["path"]?.stringValue else {
+            throw RuntimeError.bridge("Attachment file is unavailable")
+        }
+        return try await downloadFilePath("/" + path)
+    }
+
+    func downloadFilePath(_ path: String) async throws -> String {
+        try await durablePreparation?.value
+        guard let route = durableRoute else { throw RuntimeError.bridge("Agent filesystem is unavailable") }
+        let normalized = try await route.session.runtime.command(.object([
+            "action": .string("filesystemValidate"), "operation": .string("read"),
+            "arguments": .object(["path": .string(try resolveConversationFilePath(path)), "purpose": .string("Download file")]),
+            "profileID": .string(route.profileID.uuidString), "conversationID": .int(route.conversationID),
+        ]))
+        guard let source = normalized.objectValue?["path"]?.stringValue else { throw RuntimeError.bridge("Invalid download path") }
+        return source
+    }
+
     public func fileSystemOperation(name: String, arguments: JSONValue) async throws -> JSONValue? {
         let actions = ["stat": Actions.fsStat, "list": Actions.fsList, "read": Actions.fsRead, "write": Actions.fsWrite,
                        "edit": Actions.fsEdit, "rm": Actions.fsRm, "mkdir": Actions.fsMkdir, "move": Actions.fsMove, "copy": Actions.fsCopy,

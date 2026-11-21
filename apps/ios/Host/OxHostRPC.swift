@@ -24,7 +24,7 @@ enum OxHostRPC {
     private static func versions(_ values: [Int]) -> JSONValue { .array(values.map { .int($0) }) }
 
     static func handle(
-        _ data: Data, host: any OxHost,
+        _ data: Data, host: any OxHost, download: HostFileDownload,
         admit: @MainActor () -> String? = { nil }
     ) async -> JSONValue? {
         guard let value = try? await JSONValue.decode(data) else {
@@ -34,15 +34,15 @@ enum OxHostRPC {
             guard !requests.isEmpty, requests.count <= 64 else { return failure(id: .null, code: -32600, message: "Invalid Request") }
             var responses: [JSONValue] = []
             for value in requests {
-                if let response = await request(value, host: host, admit: admit) { responses.append(response) }
+                if let response = await request(value, host: host, download: download, admit: admit) { responses.append(response) }
             }
             return responses.isEmpty ? nil : .array(responses)
         }
-        return await request(value, host: host, admit: admit)
+        return await request(value, host: host, download: download, admit: admit)
     }
 
     private static func request(
-        _ value: JSONValue, host: any OxHost, admit: @MainActor () -> String?
+        _ value: JSONValue, host: any OxHost, download: HostFileDownload, admit: @MainActor () -> String?
     ) async -> JSONValue? {
         guard let fields = value.objectValue,
               fields["jsonrpc"] == .string("2.0"),
@@ -64,7 +64,7 @@ enum OxHostRPC {
                 reply.failure("Parameters must be an object", code: -32602)
                 return
             }
-            do { try OxHostProtocol.invoke(method, params: params, host: host, reply: reply) }
+            do { try OxHostProtocol.invoke(method, params: params, host: host, download: download, reply: reply) }
             catch { reply.failure("Invalid params", code: -32602) }
         }
         return fields["id"] == nil ? nil : response

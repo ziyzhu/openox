@@ -13,7 +13,7 @@ selector flag:
 
 - `ox profile` with `--host <ws-url>`: Profiles owned by that Host; `--profile <id>` scopes inspection or updates. Without `--host`, `--profile <path>` selects a directory for read-only disk inspection. With neither selector, `OX_HOST_ENDPOINT` selects Host-backed reads; otherwise reads use offline discovery.
 - `ox repository` with `--repository <path-or-url>`: a service repository; `list`, `connect`, and `disconnect` instead manage connections on `--host <ws-url>`.
-- `ox service` and `ox files` with `--host <ws-url>`: live services and authorized folders. `ox files` accepts `--profile <id>`. Commands stay two levels deep: `ox <namespace> <action> [arguments] [flags]`; do not add nested command groups.
+- `ox service` and `ox files` with `--host <ws-url>`: live services, authorized folders, and file downloads. Folder administration accepts `--profile <id>`; downloads use `--conversation <id>` or the active conversation. Commands stay two levels deep: `ox <namespace> <action> [arguments] [flags]`; do not add nested command groups.
 - `ox host` with `--host <ws-url>`: an Ox Host.
 - `ox conversation` and `ox vm` with `--host` and `--conversation <conversation-id>`: a conversation on that
   Host and its VM.
@@ -162,6 +162,16 @@ For live candidate comparison, use `ox vm call ox.repository.conflicts --args '{
 
 Inspect an action's input schema, authentication requirement, and approval
 requirement before invoking it.
+
+## Download files
+
+```sh
+ox --host <ws-url> --conversation <id> files download report.pdf --output ./report.pdf
+ox --host <ws-url> --conversation <id> conversation inspect --blocks --json
+ox --host <ws-url> --conversation <id> files download --attachment <attachment-id> --output ./upload.pdf
+```
+
+Use an attachment ID from the conversation blocks or a virtual file path such as a conversation-relative file or `mounts/<grant-id>/<file>`. The conversation must be loaded. Downloads preserve the stored bytes, use the Host's file-read policy and grants, and never overwrite an existing local file. The Host caps downloads at 32 MiB, with existing lower limits where applicable. Managed `app/` files and generated `tmp/` output are not downloadable.
 
 ## Connect a repository through Files
 

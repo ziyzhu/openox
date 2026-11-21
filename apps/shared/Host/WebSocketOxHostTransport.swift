@@ -17,6 +17,7 @@ final class WebSocketOxHostTransport {
         let scope: ProfileScope?
         let ingress: HostTransportIngress
         let address: String
+        let download: HostFileDownload
         var pending = 0
     }
 
@@ -176,7 +177,7 @@ final class WebSocketOxHostTransport {
     private func accept(_ connection: NWConnection, ingress: HostTransportIngress, address: String) {
         guard available, self.ingress == ingress, !listeners.isEmpty, connections.count < 8 else { connection.cancel(); return }
         let key = ObjectIdentifier(connection)
-        connections[key] = Client(connection: connection, scope: StorageRoot.currentScope, ingress: ingress, address: address)
+        connections[key] = Client(connection: connection, scope: StorageRoot.currentScope, ingress: ingress, address: address, download: HostFileDownload())
         connection.stateUpdateHandler = { [weak self, weak connection] state in
             Task { @MainActor [weak self, weak connection] in
                 guard let self, let connection, let client = self.connections[key], client.connection === connection else { return }
@@ -225,7 +226,7 @@ final class WebSocketOxHostTransport {
                             return "Profile changed; reconnect before continuing"
                         }
                         return nil
-                    }, finished: {
+                    }, download: client.download, finished: {
                         self.connections[key]?.pending -= 1
                     }) { reply in
                         self.send(reply, on: connection)

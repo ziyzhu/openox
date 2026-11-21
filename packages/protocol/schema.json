@@ -164,6 +164,37 @@
       },
       "additionalProperties": true
     },
+    "DownloadFileRequest": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "attachmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "transferId": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36
+        }
+      },
+      "additionalProperties": true
+    },
     "MountedRepositoryRequest": {
       "type": "object",
       "required": [
@@ -848,6 +879,36 @@
           "items": {
             "$ref": "#/definitions/FolderGrantRow"
           }
+        }
+      },
+      "additionalProperties": true
+    },
+    "DownloadFileResult": {
+      "type": "object",
+      "required": [
+        "transferId",
+        "offset",
+        "size",
+        "data"
+      ],
+      "properties": {
+        "transferId": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 33554432
+        },
+        "data": {
+          "type": "string",
+          "contentEncoding": "base64"
         }
       },
       "additionalProperties": true

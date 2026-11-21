@@ -327,6 +327,33 @@ extension Conversation {
         return (FileItem(fileName: reference, directory: route.fileScope?.root ?? scope.root, relativePath: actual, virtualPath: "/" + actual), .object(record))
     }
 
+    func downloadFileData(path: String) async throws -> Data {
+        try requireFileBackendScope()
+        let root = path.split(separator: "/").first
+        guard root != "tmp", !(root == "app" && appFilesAvailable) else {
+            throw RuntimeError.bridge("This virtual path cannot be downloaded")
+        }
+        try await requireApproval(action: Actions.fsRead, args: ["path": path], purpose: "Download file")
+        try requireFileBackendScope()
+        let data: Data
+        if let route = durableRoute, let durable = await durableFile(path: path) {
+            data = try await route.session.runtime.readFile(durable.record)
+        } else {
+            let location = try await fileSystemLocation(path)
+            switch location {
+            case .artifact, .deviceItem:
+                data = try await fileSystemMedia(path: path).data
+            case .repositoryItem(let id, let components):
+                data = try await fileRepository.readRepositoryFile(id, path: components, profileID: scope.profileID)
+            default:
+                throw RuntimeError.bridge("Download requires a conversation file, Profile file, repository file, or file in a granted folder")
+            }
+        }
+        try requireFileBackendScope()
+        guard data.count <= FileLimits.fileBytes else { throw FileError.fileTooLarge(bytes: data.count, limit: FileLimits.fileBytes) }
+        return data
+    }
+
     func fileSystemMedia(path: String) async throws -> FileSystemMedia {
         if let route = durableRoute, let durable = await durableFile(path: path) {
             let data = try await route.session.runtime.readFile(durable.record)

@@ -81,6 +81,14 @@
         "$ref": "./schema.json#/definitions/EmptyResult"
       }
     },
+    "files.download": {
+      "params": {
+        "$ref": "./schema.json#/definitions/DownloadFileRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/DownloadFileResult"
+      }
+    },
     "repositories.list": {
       "params": {
         "$ref": "./schema.json#/definitions/EmptyRequest"

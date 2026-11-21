@@ -17,7 +17,7 @@ const groups: Record<string, CommandGroup> = {
     ...REPOSITORY_SERVICE_COMMANDS,
     ...HOST_REPOSITORY_COMMANDS,
   }),
-  files: group("files", "Authorize folder access on the Host device (--host <ws-url>, --profile <id>).", FILE_COMMANDS),
+  files: group("files", "Manage Host folder access or download conversation files (--host <ws-url>).", FILE_COMMANDS),
   service: group("service", "Exercise live services through the selected Host (--host <ws-url>).", SERVICE_COMMANDS),
   host: group("host", "Inspect and operate an Ox Host (--host <ws-url>).", HOST_COMMANDS),
   conversation: group("conversation", "Drive and inspect conversations on the Host (--conversation <conversation-id>).", conversationCommands),

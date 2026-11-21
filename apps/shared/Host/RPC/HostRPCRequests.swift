@@ -14,6 +14,7 @@ extension OxHostProtocol {
         case mountFolder = "files.mount"
         case assignFolder = "files.assign"
         case unmountFolder = "files.unmount"
+        case downloadFile = "files.download"
         case listRepositories = "repositories.list"
         case connectRepositoryFolder = "repositories.connectFolder"
         case disconnectRepositoryFolder = "repositories.disconnectFolder"
@@ -79,6 +80,13 @@ extension OxHostProtocol {
     struct FolderGrantRequest: Decodable {
         let grantId: String
         let profileId: String?
+    }
+
+    struct DownloadFileRequest: Decodable {
+        let conversationId: String?
+        let path: String?
+        let attachmentId: String?
+        let transferId: String?
     }
 
     struct MountedRepositoryRequest: Decodable {

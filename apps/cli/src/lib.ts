@@ -169,7 +169,11 @@ const MOVED_COMMANDS: Record<string, string> = {
 };
 
 function validateContext(command: string, subcommand: string | undefined, context: CliContext): void {
-  if (context.conversation && command !== "conversation" && command !== "vm") throw new Error("--conversation applies only to ox conversation and ox vm");
+  const fileDownload = command === "files" && subcommand === "download";
+  if (context.conversation && command !== "conversation" && command !== "vm" && !fileDownload) {
+    throw new Error("--conversation applies only to ox conversation, ox vm, and ox files download");
+  }
+  if (context.profile && fileDownload) throw new Error("--profile does not apply to ox files download; use --conversation");
   if (context.conversation && command === "conversation" && (subcommand === "list" || subcommand === "new")) {
     throw new Error(`--conversation does not apply to ox conversation ${subcommand}`);
   }

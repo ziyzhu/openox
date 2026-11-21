@@ -1,5 +1,7 @@
+import { link, mkdtemp, open, rm } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { callHost } from "./host-rpc.ts";
+import { callHost, HostRPCClient } from "./host-rpc.ts";
 import { type CliContext, type SubCommand } from "./lib.ts";
 
 export function adminArgs(args: string[], strings: string[] = []) {
@@ -45,7 +47,66 @@ function command(method: string, usage: string, parameter?: string): SubCommand 
   } };
 }
 
+const downloadUsage = "files download (<path> | --attachment <id>) --output <local-path>";
+
+async function downloadFile(raw: string[], context: CliContext): Promise<void> {
+  const args = adminArgs(raw, ["output", "attachment"]);
+  if (args.values.help) {
+    console.log(`Usage: ox [--host <ws-url>] [--conversation <id>] ${downloadUsage} [--timeout 30000]`);
+    return;
+  }
+  const { output, attachment } = args.values;
+  const path = args.positionals[0];
+  if (typeof output !== "string" || !output || args.values.json || args.positionals.length > 1 || Boolean(path) === Boolean(attachment)) {
+    throw new Error(`Usage: ox ${downloadUsage}`);
+  }
+  const params = path ? { path } : { attachmentId: attachment };
+  const client = new HostRPCClient(context.host);
+  const destination = resolve(output);
+  const directory = await mkdtemp(join(dirname(destination), ".ox-download-"));
+  const temporary = join(directory, "file");
+  try {
+    const host = await client.describe(args.timeout);
+    if (!host.methods.includes("files.download")) throw new Error("Update the Host to a build supporting file downloads");
+    const file = await open(temporary, "wx", 0o600);
+    let offset = 0;
+    try {
+      let transferId: string | undefined;
+      let size: number | undefined;
+      do {
+        const result = await client.call("files.download", args.timeout,
+          transferId ? { transferId } : { ...params, conversationId: context.conversation ?? null });
+        const { transferId: id, size: bytes, offset: start, data } = result;
+        if (typeof id !== "string" || typeof bytes !== "number" || typeof data !== "string" || start !== offset
+          || (transferId !== undefined && (id !== transferId || bytes !== size))) {
+          throw new Error("Host returned an inconsistent file transfer");
+        }
+        const chunk = Buffer.from(data, "base64");
+        if (chunk.toString("base64") !== data || (chunk.length === 0 && offset < bytes) || offset + chunk.length > bytes) {
+          throw new Error("Host returned an invalid file chunk");
+        }
+        await file.writeFile(chunk);
+        offset += chunk.length;
+        transferId = id;
+        size = bytes;
+      } while (offset < size);
+    } finally {
+      await file.close();
+    }
+    try { await link(temporary, destination); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new Error(`Destination already exists: ${destination}`);
+      throw error;
+    }
+    console.log(`Downloaded ${offset} bytes to ${destination}`);
+  } finally {
+    client.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
 export const FILE_COMMANDS = {
+  download: { desc: downloadUsage, fn: downloadFile },
   list: command("files.list", "files list"),
   mount: command("files.mount", "files mount"),
   assign: command("files.assign", "files assign <unassigned-grant-id>", "grantId"),
