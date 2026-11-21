@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "When a website's automatic sign-in is missing or broken, Ox now builds or repairs it without asking first." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当网站的自动登录缺失或失效时，Ox 现在会直接构建或修复，无需先征求你的同意。"
+          }
+        }
+      }
+    },
     "Fixed conversations jumping and stuttering while swiping to history." : {
       "extractionState" : "manual",
       "localizations" : {

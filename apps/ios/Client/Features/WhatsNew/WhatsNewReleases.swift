@@ -9,6 +9,9 @@ struct WhatsNewRelease: Identifiable {
 
 enum WhatsNew {
     static let releases: [WhatsNewRelease] = [
+        WhatsNewRelease(version: "1.1.4", items: [
+            "When a website's automatic sign-in is missing or broken, Ox now builds or repairs it without asking first."
+        ]),
         WhatsNewRelease(version: "1.1.3", items: [
             "Fixed conversations jumping and stuttering while swiping to history."
         ]),
