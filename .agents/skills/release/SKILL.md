@@ -52,6 +52,8 @@ On an initial push run to `main` that changes iOS inputs, CI calls `.github/work
 
 The `appstore` environment secret `BUILD_SOURCE_TOKEN` needs Contents and Workflows write permissions. Prefer a token restricted to this repository; reusing a broader CLI token requires explicit operator approval. Only the build-source tagging step uses it. The built-in token can reject tags for older commits whose workflow files differ from current `main`; upload mode checks for the credential before uploading.
 
+The `appstore-announce` environment secret `RELEASE_TAG_TOKEN` needs the same Contents and Workflows write permissions to create `ios-v<version>` tags. Announce mode creates the tag before posting to Discord and deletes it if the post fails, so a failed run never repeats an announcement.
+
 App Store Connect owns current listing metadata, screenshots, and previews.
 Read its live state during a release; do not keep local metadata copies, media
 libraries, or inventory manifests in either repository. Keep drafts, captures,

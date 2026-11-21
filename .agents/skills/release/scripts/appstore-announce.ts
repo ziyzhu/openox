@@ -95,9 +95,18 @@ async function sourceCommit(version: Version, jwt: string): Promise<string | nul
   return stdout.split("\n").find((line) => line.endsWith(`\t${ref}`))?.split("\t")[0] ?? null;
 }
 
+async function gh(args: string[]): Promise<void> {
+  await run(["gh", "api", ...args], { capture: true, env: { GH_TOKEN: env("RELEASE_TAG_TOKEN") } });
+}
+
 async function pushTag(version: string, commit: string): Promise<void> {
-  await run(["git", "fetch", "--depth=1", "origin", commit]);
-  await run(["git", "push", "origin", `${commit}:refs/tags/${TAG_PREFIX}${version}`]);
+  await gh([`repos/${env("GITHUB_REPOSITORY")}/git/refs`, "-f", `ref=refs/tags/${TAG_PREFIX}${version}`, "-f", `sha=${commit}`]);
+  console.log(JSON.stringify({ event: "appstore_announce_tagged", version, commit }));
+}
+
+async function deleteTag(version: string): Promise<void> {
+  await gh(["-X", "DELETE", `repos/${env("GITHUB_REPOSITORY")}/git/refs/tags/${TAG_PREFIX}${version}`]);
+  console.log(JSON.stringify({ event: "appstore_announce_tag_rolled_back", version }));
 }
 
 async function newestAnnounced(): Promise<string | null> {
@@ -161,8 +170,14 @@ async function announce(mode: Mode): Promise<Outcome> {
     await post(env("DISCORD_TEST_WEBHOOK_URL"), body);
     return { kind: "tested", version: version.versionString };
   }
-  await post(env("DISCORD_WEBHOOK_URL"), body);
+  const webhook = env("DISCORD_WEBHOOK_URL");
   await pushTag(version.versionString, commit!);
+  try {
+    await post(webhook, body);
+  } catch (error) {
+    await deleteTag(version.versionString);
+    throw error;
+  }
   return { kind: "announced", version: version.versionString };
 }
 
