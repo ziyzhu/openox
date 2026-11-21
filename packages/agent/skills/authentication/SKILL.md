@@ -55,7 +55,7 @@ Honor the user's chosen method. When multiple advertised methods remain plausibl
 
 Manual sign-in always requires opening the actual live webpage with showPage; telling the user to sign in, returning a URL, or opening a background page does not present it. This applies to every manual attempt, including a human step reached after automatic progress.
 
-If login or session discovery is missing or defective, read `skills/evolve/SKILL.md`, its web-service reference, and `skills/evolve/references/web-authentication.md`. Build or repair support within the original task, preserve Local work and website state, validate, and verify through service actions. Do not leave a confirmed automatic-login defect as only a manual workaround. For an unimplemented sign-in provider, explain the limitation and offer to build it rather than connecting it unasked.
+If login or session discovery is missing or defective, read `skills/evolve/SKILL.md`, its web-service reference, and `skills/evolve/references/web-authentication.md`. Build or repair support within the original task, preserve Local work and website state, validate, and verify through service actions. Do not leave a confirmed automatic-login defect as only a manual workaround. Missing automatic login, including an unimplemented sign-in provider, is a missing capability: build or repair it without asking permission. When manual sign-in is needed first, present the page, then complete the automatic-login work after Done.
 
 ## Advance website sign-in and hand off
 
