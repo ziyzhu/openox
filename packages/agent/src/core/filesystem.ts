@@ -177,9 +177,11 @@ async function executeFileTool(operation: "read" | "write" | "edit", args: FileR
     if (operation === "read" && name === "agent") throw new FileError("not_supported", "Reading images is not supported; attach the file instead", args.path);
     throw new Error(`Filesystem tools cannot access invocation capability ${String(name)}`);
   } }) as unknown as ToolExecutionApi;
-  if (operation === "read") return tools.read.execute({ path: args.path!, offset: args.offset, limit: args.limit }, api, context);
-  if (operation === "write") return tools.write.execute({ path: args.path!, content: embedServiceAutomation(args.path!, args.content!) }, api, context);
-  return tools.edit.execute({ path: args.path!, edits: args.edits! }, api, context);
+  const result = operation === "read" ? await tools.read.execute({ path: args.path!, offset: args.offset, limit: args.limit }, api, context)
+    : operation === "write" ? await tools.write.execute({ path: args.path!, content: embedServiceAutomation(args.path!, args.content!) }, api, context)
+    : await tools.edit.execute({ path: args.path!, edits: args.edits! }, api, context);
+  if (result.sleep !== undefined || result.wait !== undefined) throw new FileError("not_supported", "File operation cannot park", args.path);
+  return result;
 }
 function readPage(result: ToolExecutionResult, args: FileRequest, totalLines: number) {
   const text = result.output?.flatMap(block => block.type === "text" ? [block.text] : []).join("\n") ?? "";
