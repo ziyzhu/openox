@@ -23,7 +23,7 @@
     "build:repository-schema": "bun .agents/skills/build/scripts/repository-contract.ts --write"
   },
   "dependencies": {
-    "typebox": "1.4.6"
+    "typebox": "1.4.7"
   },
   "devDependencies": {
     "@types/bun": "1.4.4",
