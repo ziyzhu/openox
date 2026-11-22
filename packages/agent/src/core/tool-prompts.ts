@@ -22,12 +22,19 @@ const commonContracts = {
       },
     },
   },
+  "ox.web.browser.newPage": webContracts["ox.web.browser.newPage"],
+  "ox.web.browser.frames": webContracts["ox.web.browser.frames"],
+  "ox.web.browser.goto": webContracts["ox.web.browser.goto"],
+  "ox.web.browser.evaluate": webContracts["ox.web.browser.evaluate"],
+  "ox.web.browser.snapshot": webContracts["ox.web.browser.snapshot"],
+  "ox.web.browser.showPage": webContracts["ox.web.browser.showPage"],
+  "ox.web.browser.close": webContracts["ox.web.browser.close"],
   "ox.service.inspect": serviceContracts["ox.service.inspect"],
   "ox.service.invoke": serviceContracts["ox.service.invoke"],
 };
 
-const commonDeclarations = ["fs", "web", "service"].map(namespace => {
-  const functions = Object.entries(commonContracts).filter(([name]) => name.startsWith(`ox.${namespace}.`))
+const commonDeclarations = ["fs", "web", "web.browser", "service"].map(namespace => {
+  const functions = Object.entries(commonContracts).filter(([name]) => name.slice(0, name.lastIndexOf(".")) === `ox.${namespace}`)
     .map(([name, contract]) => {
       const description = contract.description.replace(/: `await [^`]+`/g, "").replace(/`await (ox\.[\w.]+)\([^`]*\)`/g, "`$1`").replace(/`(ox\.[\w.]+)\([^`]*\)`/g, "`$1`").replaceAll("*/", "*\\/");
       const signature = renderToolSignature({ ...contract, name: name.split(".").at(-1)! });
