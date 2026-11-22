@@ -16,25 +16,28 @@ nonisolated enum ProcessStats {
     struct Sample {
         let cpuPercent: Double
         let footprintMB: Double
+        let virtualMB: Double
         let availableMB: Double
         let threadCount: Int
 
         var line: String {
             let avail = availableMB > 0 ? " avail=\(Int(availableMB))MB" : ""
-            return "cpu=\(Int(cpuPercent))% mem=\(Int(footprintMB))MB\(avail) threads=\(threadCount)"
+            return "cpu=\(Int(cpuPercent))% mem=\(Int(footprintMB))MB virt=\(Int(virtualMB))MB\(avail) threads=\(threadCount)"
         }
     }
 
     static func sample() -> Sample {
         let (cpu, threads) = cpuPercentAndThreadCount()
         let availableMB = availableMemoryMB
+        let memory = memoryMB()
         return Sample(cpuPercent: cpu,
-                      footprintMB: footprintMB(),
+                      footprintMB: memory.footprint,
+                      virtualMB: memory.virtual,
                       availableMB: availableMB,
                       threadCount: threads)
     }
 
-    private static func footprintMB() -> Double {
+    private static func memoryMB() -> (footprint: Double, virtual: Double) {
         var info = task_vm_info_data_t()
         var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
         let kr = withUnsafeMutablePointer(to: &info) {
@@ -42,8 +45,8 @@ nonisolated enum ProcessStats {
                 task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
             }
         }
-        guard kr == KERN_SUCCESS else { return 0 }
-        return Double(info.phys_footprint) / 1_048_576
+        guard kr == KERN_SUCCESS else { return (0, 0) }
+        return (Double(info.phys_footprint) / 1_048_576, Double(info.virtual_size) / 1_048_576)
     }
 
     private static func cpuPercentAndThreadCount() -> (Double, Int) {

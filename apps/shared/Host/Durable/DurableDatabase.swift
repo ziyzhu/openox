@@ -6,6 +6,7 @@ nonisolated final class DurableDatabase {
     private let url: URL
     private var connection: OpaquePointer?
     private var closed = false
+    private static let resultByteLimit = 64 * 1024 * 1024
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
     init(url: URL) { self.url = url }
@@ -46,6 +47,7 @@ nonisolated final class DurableDatabase {
         guard sqlite3_bind_parameter_count(statement) == params.count else { throw failure("SQL binding count mismatch") }
         for (index, value) in params.enumerated() { try bind(value, at: Int32(index + 1), to: statement) }
         var rows: [[String: Any]] = []
+        var bytes = 0
         while true {
             let code = sqlite3_step(statement)
             if code == SQLITE_DONE { break }
@@ -53,11 +55,15 @@ nonisolated final class DurableDatabase {
             if op == "get" || op == "all" {
                 var row: [String: Any] = [:]
                 for column in 0..<sqlite3_column_count(statement) {
-                    row[String(cString: sqlite3_column_name(statement, column))] = try value(at: column, in: statement)
+                    let cell = try value(at: column, in: statement)
+                    if let text = cell as? String { bytes += text.utf8.count }
+                    row[String(cString: sqlite3_column_name(statement, column))] = cell
                 }
+                guard bytes <= Self.resultByteLimit else { throw failure("SQL result exceeds the size limit") }
                 rows.append(row)
             }
         }
+        if bytes >= 1_048_576 { Log.agent.warning("DurableDatabase.largeResult op=\(op) rows=\(rows.count) bytes=\(bytes) sql=\(sql.prefix(80))") }
         if op == "runCounted" { return Int(sqlite3_changes(connection)) }
         if op == "get" { return rows.first.map { $0 as Any } ?? NSNull() }
         return op == "all" ? rows : NSNull()

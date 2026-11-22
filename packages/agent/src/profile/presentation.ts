@@ -67,10 +67,26 @@ async function ledger(tx: Tx, conversationID: ConversationId) {
   const entries: EntryRecord[] = [];
   let cursor: Cursor | undefined;
   do {
-    const page = await tx.scanEntries({ conversationId: conversationID }, 100, cursor);
+    const page = await tx.scanEntries({ conversationId: conversationID }, 16, cursor);
     entries.push(...page.items); cursor = page.next;
   } while (cursor);
   return entries.reverse();
+}
+async function storedTurns(tx: Tx, conversationID: ConversationId, wanted: Set<string>) {
+  const turns = new Map<string, JsonValue>();
+  let latest: number | null = null;
+  let cursor: Cursor | undefined;
+  do {
+    const page = await tx.scanEntries({ conversationId: conversationID }, wanted.size ? 16 : 1, cursor);
+    latest ??= page.items[0]?.id ?? null;
+    for (const entry of page.items) {
+      const turn = presentedTurn(entry);
+      const key = turnID(turn);
+      if (key && wanted.has(key) && !turns.has(key)) turns.set(key, turn!);
+    }
+    cursor = turns.size < wanted.size ? page.next : undefined;
+  } while (cursor);
+  return { turns, latest };
 }
 async function presentation(tx: Tx, id: ConversationId, change: ApplicationPresentationChange, latest: number | null, visible?: boolean) {
   const state = await tx.doc(ConversationPresentation, id);
@@ -198,14 +214,9 @@ export class ApplicationPresentation {
     if (!conversation) throw new Error("Conversation not found");
     await conversation.commit(async tx => {
       if (frozen.agent) await this.agentChange(tx, id, frozen.agent, true);
-      const entries = await ledger(tx, id);
-      const turns = new Map<string, JsonValue>();
-      for (const entry of entries) {
-        const turn = presentedTurn(entry);
-        const key = turnID(turn);
-        if (key) turns.set(key, turn!);
-      }
-      let latest = entries.at(-1)?.id ?? null;
+      const found = await storedTurns(tx, id, new Set((frozen.turns ?? []).map(turn => turnID(turn)!)));
+      const turns = found.turns;
+      let latest = found.latest;
       for (const turn of frozen.turns ?? []) {
         const key = turnID(turn)!;
         const stored = turns.get(key), encoded = canonicalJSON(turn);

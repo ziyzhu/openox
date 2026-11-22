@@ -135,7 +135,7 @@ export class ProfileRuntime {
     let cursor;
     let newest: number | null = null;
     do {
-      const page = await conversation.entries({}, 100, cursor, context);
+      const page = await conversation.entries({}, 16, cursor, context);
       newest ??= page.items[0]?.id ?? null;
       for (const entry of page.items) {
         if (entry.kind === "ox.native.metadata") return;

@@ -1,9 +1,11 @@
 import Foundation
+import CryptoKit
 
 actor ProfileRepository {
     static let shared = ProfileRepository()
     nonisolated let debugSaveGate = ProfileRepositorySaveGate()
     private var deleted: [ProfileScope: Set<ConversationID>] = [:]
+    private var savedTurns: [ProfileScope: [ConversationID: [TurnID: SHA256.Digest]]] = [:]
     var loadedSkills: [ProfileScope: (files: [DurableProfileFile], skills: [Skill])] = [:]
 
     nonisolated static func localDocuments() -> URL {
@@ -200,7 +202,20 @@ actor ProfileRepository {
             }
             var command: [String: JSONValue] = ["action": .string("applicationSave"), "reference": reference.value,
                 "metadata": .object(fields), "title": .string(meta.title ?? ""), "favorite": .bool(meta.isFavorite), "unread": .bool(meta.hasUnreadResponse)]
-            if let turns { command["turns"] = .array(try turns.map(encoded)) }
+            var digests: [TurnID: SHA256.Digest] = [:]
+            if let turns {
+                let previous = savedTurns[scope]?[request.conversationID] ?? [:]
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = .sortedKeys
+                var changed: [JSONValue] = []
+                for turn in turns {
+                    let data = try encoder.encode(turn)
+                    let digest = SHA256.hash(data: data)
+                    digests[turn.id] = digest
+                    if previous[turn.id] != digest { changed.append(try JSONDecoder().decode(JSONValue.self, from: data)) }
+                }
+                command["turns"] = .array(changed)
+            }
             if let model = meta.model {
                 command["agent"] = .object([
                     "model": .object(["provider": .string(model.providerID), "modelId": .string(model.modelID)]),
@@ -208,6 +223,7 @@ actor ProfileRepository {
                 ])
             }
             _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(command))
+            if turns != nil { savedTurns[scope, default: [:]][request.conversationID] = digests }
             return ConversationSaveReceipt(saveID: request.saveID, succeeded: true)
         } catch { Log.session.error("ProfileRepository.save conversation=\(request.conversationID) failed=\(error.localizedDescription)"); return ConversationSaveReceipt(saveID: request.saveID, succeeded: false) }
     }
@@ -216,6 +232,7 @@ actor ProfileRepository {
         let reference = try DurableProfileStore.shared.reference(for: id, in: scope)
         _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationDelete"), "reference": reference.value]))
         deleted[scope, default: []].insert(id)
+        savedTurns[scope]?[id] = nil
     }
 
     func virtualConversationMetadata(_ id: ConversationID, in scope: ProfileScope, snapshot: ConversationState? = nil) async throws -> Data {
