@@ -19,7 +19,7 @@
     "@openox/protocol": "workspace:*",
     "@ungap/structured-clone": "1.4.0",
     "abort-controller": "3.0.0",
-    "defuddle": "0.19.6",
+    "defuddle": "0.19.13",
     "linkedom": "0.18.15",
     "re2js": "2.10.0",
     "text-encoding": "0.7.0",
