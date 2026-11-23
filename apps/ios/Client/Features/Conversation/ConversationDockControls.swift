@@ -44,6 +44,7 @@ struct ScrollToBottomControl: View {
     let isEditingMessage: Bool
     let hasFiles: Bool
     let hasAttachedServices: Bool
+    var hasChildren = false
     let floatsTopStrip: Bool
     let composerButtonSize: CGFloat
     let action: () -> Void
@@ -55,7 +56,7 @@ struct ScrollToBottomControl: View {
 
     private var offset: CGFloat {
         let isResting = !composerFocused && composer.isEmpty && !isEditingMessage
-        let showsTopStrip = isEditingMessage || hasFiles || hasAttachedServices
+        let showsTopStrip = isEditingMessage || hasFiles || hasAttachedServices || hasChildren
         let firstSurfaceTop = ConversationComposer.firstSurfaceTopOffset(
             isResting: isResting,
             showsTopStrip: showsTopStrip,

@@ -201,6 +201,9 @@ struct ConversationComposer: View, Equatable {
     let speech: ConversationSpeechInput
     let attachedServices: [Service]
     let conversationFiles: [FileItem]
+    var children: [ChildConversationSnapshot] = []
+    var onOpenChild: (UUID) -> Void = { _ in }
+    var onDeleteChild: (UUID) -> Void = { _ in }
     let fieldFocused: FocusState<Bool>.Binding
     let isFieldFocused: Bool
     let sessionID: UUID
@@ -253,6 +256,7 @@ struct ConversationComposer: View, Equatable {
             && lhs.attachedServices.count == rhs.attachedServices.count
             && zip(lhs.attachedServices, rhs.attachedServices).allSatisfy { $0 === $1 }
             && lhs.conversationFiles == rhs.conversationFiles
+            && lhs.children == rhs.children
             && lhs.isFieldFocused == rhs.isFieldFocused
             && lhs.sessionID == rhs.sessionID
             && lhs.isConversationEmpty == rhs.isConversationEmpty
@@ -501,7 +505,7 @@ struct ConversationComposer: View, Equatable {
     }
 
     private var showsTopStrip: Bool {
-        isEditingMessage || !conversationFiles.isEmpty || !attachedServices.isEmpty
+        isEditingMessage || !conversationFiles.isEmpty || !attachedServices.isEmpty || !children.isEmpty
     }
 
     private var showsDefaultIntents: Bool {
@@ -609,6 +613,9 @@ struct ConversationComposer: View, Equatable {
                 HStack(spacing: Theme.Spacing.sm) {
                     if !conversationFiles.isEmpty {
                         filesButton
+                    }
+                    if !children.isEmpty {
+                        ConversationChildrenChip(children: children, onOpen: onOpenChild, onDelete: onDeleteChild)
                     }
                     ForEach(attachedServices) { attachedServicePill($0) }
                     if isEditingMessage {

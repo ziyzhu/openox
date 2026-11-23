@@ -3,6 +3,12 @@ import Foundation
 @MainActor
 public protocol OxFunctionBridge: AnyObject {
     func deleteConversation(id: String, purpose: String) async throws -> JSONValue?
+    func startChildConversation(options: JSONValue, purpose: String) async throws -> JSONValue?
+    func sendChildConversation(id: String, text: String, purpose: String) async throws -> JSONValue?
+    func waitChildConversation(id: String, timeoutSeconds: Int?, purpose: String) async throws -> JSONValue?
+    func readChildConversation(id: String, after: String?, purpose: String) async throws -> JSONValue?
+    func stopChildConversation(id: String, purpose: String) async throws -> JSONValue?
+    func listChildConversations(purpose: String) async throws -> JSONValue?
     func providerOperation(name: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?
     func secretOperation(name: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?
     func appModel(purpose: String) async throws -> JSONValue?

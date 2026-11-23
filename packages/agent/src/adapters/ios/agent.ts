@@ -711,7 +711,7 @@ export class IOSAgentAdapter {
     const sections = Object.entries(prompt.sections).map(([key, text]) => section(key, () => text, { tag: key !== "preamble" }));
     const turnState = async ({ conversationId, read }: Parameters<Parameters<typeof section>[1]>[0]) =>
       (await read.snapshot(ConversationApplicationMetadata, conversationId, context))?.fields.turnState as unknown as TurnState | undefined;
-    for (const key of ["skills", "hosts", "replies", "conversation_files", "storage", "language", "attached_services"] as const) {
+    for (const key of ["skills", "hosts", "replies", "conversation_files", "storage", "language", "attached_services", "child_conversations"] as const) {
       sections.push(section(key, async input => {
         const state = await turnState(input);
         return state ? composeOxTurnSections(state, config.promptState)[key] : undefined;

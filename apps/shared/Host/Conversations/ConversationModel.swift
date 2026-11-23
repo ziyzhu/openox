@@ -214,6 +214,8 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
     var preview: String?
     var hasUnreadResponse: Bool
     var scheduleID: UUID?
+    var parentID: UUID?
+    var childIDs: [UUID]
     var lastMessageAt: Date?
 
     init(
@@ -229,6 +231,8 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         preview: String?,
         hasUnreadResponse: Bool = false,
         scheduleID: UUID? = nil,
+        parentID: UUID? = nil,
+        childIDs: [UUID] = [],
         lastMessageAt: Date? = nil
     ) {
         self.schemaVersion = schemaVersion
@@ -243,6 +247,8 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         self.preview = preview
         self.hasUnreadResponse = hasUnreadResponse
         self.scheduleID = scheduleID
+        self.parentID = parentID
+        self.childIDs = childIDs
         self.lastMessageAt = lastMessageAt
     }
 
@@ -268,6 +274,8 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         case preview
         case hasUnreadResponse
         case scheduleID = "scheduledSkillID"
+        case parentID = "parentConversationID"
+        case childIDs = "childConversationIDs"
     }
 
     init(from decoder: Decoder) throws {
@@ -284,6 +292,8 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         preview = try values.decodeIfPresent(String.self, forKey: .preview)
         hasUnreadResponse = try values.decodeIfPresent(Bool.self, forKey: .hasUnreadResponse) ?? false
         scheduleID = try values.decodeIfPresent(UUID.self, forKey: .scheduleID)
+        parentID = try values.decodeIfPresent(UUID.self, forKey: .parentID)
+        childIDs = try values.decodeIfPresent([UUID].self, forKey: .childIDs) ?? []
         lastMessageAt = nil
     }
 }

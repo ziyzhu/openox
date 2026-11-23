@@ -30,6 +30,7 @@ nonisolated enum ConversationPromptState {
         filePaths: [String],
         isTemporary: Bool,
         responseLanguage: JSONValue,
+        children: [ChildConversationSnapshot],
         hostID: String,
         profileID: String
     ) -> JSONValue {
@@ -47,6 +48,7 @@ nonisolated enum ConversationPromptState {
             "grantedFolders": .array(grantedFolders.map { .object(["path": .string("mounts/\($0.id)"), "name": .string($0.name)]) }),
             "storageMode": .string(isTemporary ? "temporary" : "persisted"),
             "responseLanguage": responseLanguage,
+            "children": .array(children.map(\.value)),
         ])
     }
 

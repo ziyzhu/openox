@@ -3,6 +3,11 @@ import Foundation
 nonisolated enum Actions {
     static let conversationStart = "ox.conversation.start"
     static let conversationDelete = "ox.conversation.delete"
+    static let conversationSend = "ox.conversation.send"
+    static let conversationWait = "ox.conversation.wait"
+    static let conversationRead = "ox.conversation.read"
+    static let conversationStop = "ox.conversation.stop"
+    static let conversationChildren = "ox.conversation.children"
     static let providerDefault = "ox.provider.default"
     static let providerList = "ox.provider.list"
     static let providerGet = "ox.provider.get"
@@ -89,6 +94,7 @@ nonisolated enum Actions {
     static let userProgress = "ox.user.progress"
 
     static let builtIn = [
+        conversationStart, conversationSend, conversationWait, conversationRead, conversationStop, conversationChildren,
         conversationDelete, providerDefault, providerList, providerGet, providerModels, providerGenerate, providerValidate, providerSave, providerDelete,
         providerAuthenticate, providerDeauthenticate, secretList, secretAdd, secretDelete,
         appInfo, appProfile, appProfiles, appNotifications, appLanguage, appSetLanguage,
@@ -132,6 +138,9 @@ nonisolated enum Actions {
         return switch action {
         case conversationStart: L10n.string("Start conversation")
         case conversationDelete: L10n.string("Delete Conversation")
+        case conversationSend: L10n.string("Message a conversation")
+        case conversationWait, conversationRead, conversationChildren: L10n.string("Check a conversation")
+        case conversationStop: L10n.string("Stop a conversation")
         case providerDefault: L10n.string("Default model")
         case providerList: L10n.string("List model providers")
         case providerModels: L10n.string("List model providers")

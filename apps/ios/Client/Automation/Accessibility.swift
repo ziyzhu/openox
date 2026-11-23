@@ -221,6 +221,14 @@ nonisolated enum A11yID {
             static let save = "conversation.markdownFile.save"
         }
 
+        enum Children {
+            static let chip = "conversation.children"
+            static let parent = "conversation.children.parent"
+            static func item(_ id: UUID) -> String { "conversation.children.item.\(id.uuidString)" }
+            static func open(_ id: UUID) -> String { "conversation.children.open.\(id.uuidString)" }
+            static func delete(_ id: UUID) -> String { "conversation.children.delete.\(id.uuidString)" }
+        }
+
         enum FileItem {
             static let open = "conversation.file.open"
             static let list = "conversation.file.list"

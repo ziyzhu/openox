@@ -359,6 +359,30 @@ final class ConversationManager {
         return conversation
     }
 
+    func makeChildConversation(parentID: UUID, in scope: ProfileScope) async throws -> Conversation {
+        ensureRepositoryScope()
+        guard scope == repositoryScope, scope == storage.scope, contains(parentID) else {
+            throw RuntimeError.bridge("ox.conversation.start: the calling conversation must belong to the active Profile.")
+        }
+        let conversation = makeConversation(parentID: parentID)
+        register(conversation, as: ConversationID(conversation.id))
+        try await conversation.durablePreparation?.value
+        guard scope == repositoryScope, contains(conversation.id) else {
+            throw RuntimeError.bridge("ox.conversation.start: the active Profile changed.")
+        }
+        trimHydrated()
+        return conversation
+    }
+
+    func loadedConversation(_ rawID: UUID) -> Conversation? {
+        records[canonicalID(rawID)]?.hydration.conversation
+    }
+
+    func summary(_ rawID: UUID) -> ConversationMeta? {
+        guard contains(rawID) else { return nil }
+        return records[canonicalID(rawID)]?.hydration.meta
+    }
+
     func readableConversationState(_ id: ConversationID, in scope: ProfileScope) -> ConversationState? {
         guard scope == repositoryScope, scope == storage.scope, contains(id.rawValue),
               let conversation = records[id]?.hydration.conversation, !conversation.isTemporary else { return nil }
@@ -725,6 +749,10 @@ final class ConversationManager {
         let id = ConversationID(rawID)
         guard var record = records[id] else { return nil }
         let wasCurrent = currentId == rawID
+        if let parentID = record.hydration.meta.parentID {
+            Log.session.info("delegation.delete parent=\(parentID) child=\(rawID) wasRunning=\(record.hydration.conversation?.isBusy == true)")
+            forgetDeletedChild(rawID, parentID: parentID)
+        }
         if record.hydration.conversation?.isTemporary == true {
             discardTemporary(id)
             if wasCurrent { startNewConversation() }
@@ -884,7 +912,8 @@ final class ConversationManager {
     private func makeConversation(
         retention: ConversationRetention = .persisted,
         executionLease: Conversation.ExecutionLease = .userInitiated,
-        scheduleID: UUID? = nil
+        scheduleID: UUID? = nil,
+        parentID: UUID? = nil
     ) -> Conversation {
         let client = providerRegistry.newSessionClient
         let selection = providerRegistry.sessionModel
@@ -901,7 +930,8 @@ final class ConversationManager {
             serviceManager: serviceManager,
             retention: retention,
             executionLease: executionLease,
-            scheduleID: scheduleID
+            scheduleID: scheduleID,
+            parentID: parentID
         )
         attachPersistence(conversation)
         Log.session.info("ConversationManager created conversation=\(conversation.id) retention=\(String(describing: retention))")

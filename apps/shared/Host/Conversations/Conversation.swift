@@ -8,6 +8,7 @@ final class Conversation: Identifiable {
     private(set) var id: UUID
     let createdAt: Date
     let scheduleID: UUID?
+    let parentID: UUID?
     let javaScriptOutputs = JavaScriptOutputStore()
     var appFileRevisions: [String: String] = [:]
     @ObservationIgnored private(set) var durableRoute: DurableConversationRoute?
@@ -268,6 +269,22 @@ final class Conversation: Identifiable {
     var customTitle: String?
 
     var isFavorite = false
+
+    private(set) var childIDs: [UUID] = []
+
+    func addChild(_ childID: UUID) {
+        guard !childIDs.contains(childID) else { return }
+        childIDs.append(childID)
+        Log.session.info("Conversation.addChild id=\(id) child=\(childID) count=\(childIDs.count)")
+        onPersistableChange?()
+    }
+
+    func removeChild(_ childID: UUID) {
+        guard let index = childIDs.firstIndex(of: childID) else { return }
+        childIDs.remove(at: index)
+        Log.session.info("Conversation.removeChild id=\(id) child=\(childID) count=\(childIDs.count)")
+        onPersistableChange?()
+    }
 
     func setFavorite(_ favorite: Bool) {
         guard isFavorite != favorite else { return }
@@ -743,10 +760,12 @@ final class Conversation: Identifiable {
          serviceManager: ServiceManager,
          retention: ConversationRetention = .persisted,
          executionLease: ExecutionLease = .userInitiated,
-         scheduleID: UUID? = nil) {
+         scheduleID: UUID? = nil,
+         parentID: UUID? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.scheduleID = scheduleID
+        self.parentID = parentID
         self.client = client
         self.modelSelection = ModelSelection(
             region: selection.region,
@@ -852,7 +871,8 @@ final class Conversation: Identifiable {
             serviceManager: serviceManager,
             retention: retention,
             executionLease: executionLease,
-            scheduleID: meta.scheduleID
+            scheduleID: meta.scheduleID,
+            parentID: meta.parentID
         )
         monoRepositoryHash = meta.monoRepositoryHash
         customTitle = meta.title
@@ -860,6 +880,7 @@ final class Conversation: Identifiable {
         document = restoredDocument ?? ConversationDocument.restoring(turns)
         let recovered = document.turns != turns
         hasUnreadResponse = meta.hasUnreadResponse
+        childIDs = meta.childIDs
         serviceAttachments.restore(meta.attachedServiceDomains)
         lastActivityAt = meta.lastActivity
         Log.session.info("Conversation restored id=\(meta.id) turns=\(turns.count) blocks=\(transcript.count) services=\(attachedServices.count) recovered=\(recovered) context=pending")
@@ -878,6 +899,8 @@ final class Conversation: Identifiable {
             preview: transcriptPreview,
             hasUnreadResponse: hasUnreadResponse,
             scheduleID: scheduleID,
+            parentID: parentID,
+            childIDs: childIDs,
             lastMessageAt: lastMessageAt
         )
     }
@@ -1421,7 +1444,7 @@ final class Conversation: Identifiable {
         submissionID: SubmissionID
     ) -> SubmissionReceipt {
         publishFollowIntents([])
-        if document.turns.isEmpty, submissions.isEmpty, scheduleID == nil, scheduleName == nil {
+        if document.turns.isEmpty, submissions.isEmpty, scheduleID == nil, parentID == nil, scheduleName == nil {
             feedback.startedConversation(firstSubmissionID: submissionID.rawValue)
         }
         let posting = !isBusy
@@ -1515,6 +1538,7 @@ final class Conversation: Identifiable {
     }
 
     func stopCurrentTurn() {
+        conversationManager?.stopChildren(of: self)
         guard isBusy else {
             Log.session.info("Conversation.stopCurrentTurn ignored id=\(id) reason=idle")
             return
@@ -1807,6 +1831,7 @@ final class Conversation: Identifiable {
             filePaths: referencedFiles.compactMap(\.virtualPath),
             isTemporary: retention == .temporary,
             responseLanguage: AppLocale.shared.responseLanguage,
+            children: conversationManager?.children(of: self) ?? [],
             hostID: Device.hostID,
             profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"
         )

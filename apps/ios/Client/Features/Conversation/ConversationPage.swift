@@ -305,6 +305,11 @@ struct ConversationPage: View {
             .safeAreaBar(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     pageTopBar(blockCount: totalBlockCount)
+                    if conversation.parentID != nil {
+                        ConversationParentLink(title: parentTitle) {
+                            if let parentID = conversation.parentID { onOpenConversation(parentID) }
+                        }
+                    }
                     if modelAccessNeedsAttention {
                         ConversationModelAccessNotice { modalPresentation = .modelPicker }
                     }
@@ -753,6 +758,18 @@ struct ConversationPage: View {
         }
     }
 
+    private var childConversations: [ChildConversationSnapshot] {
+        conversation.conversationManager?.children(of: conversation) ?? []
+    }
+
+    private var parentTitle: String? {
+        conversation.parentID.flatMap { conversation.conversationManager?.summary($0)?.displayTitle }
+    }
+
+    private func deleteChild(_ id: UUID) {
+        _ = conversation.conversationManager?.delete(id)
+    }
+
     private var conversationFiles: [FileItem] {
         var seen = Set<String>()
         return (messageFiles + conversation.referencedFiles).filter { seen.insert($0.fileName.lowercased()).inserted }
@@ -835,7 +852,6 @@ struct ConversationPage: View {
         case .startedConversation(let id, let title):
             Button { onOpenConversation(id) } label: {
                 HStack(spacing: Theme.Spacing.md) {
-                    Image(systemName: "bubble.left.and.bubble.right")
                     Text(title)
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1419,6 +1435,9 @@ struct ConversationPage: View {
             speech: speechInput,
             attachedServices: conversation.attachedServices,
             conversationFiles: conversationFiles,
+            children: childConversations,
+            onOpenChild: onOpenConversation,
+            onDeleteChild: deleteChild,
             fieldFocused: $composerFocused,
             isFieldFocused: composerFocused,
             sessionID: conversation.id,
@@ -1470,6 +1489,7 @@ struct ConversationPage: View {
                     isEditingMessage: editedBlockID != nil,
                     hasFiles: !conversationFiles.isEmpty,
                     hasAttachedServices: !conversation.attachedServices.isEmpty,
+                    hasChildren: !conversation.childIDs.isEmpty,
                     floatsTopStrip: floatsTopStrip,
                     composerButtonSize: composerButtonSize
                 ) {
