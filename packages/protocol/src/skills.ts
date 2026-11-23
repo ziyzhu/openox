@@ -4,6 +4,11 @@ export const SKILL_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const MAXIMUM_SKILL_BYTES = 524_288;
 export const MAXIMUM_SKILL_FILES = 64;
 
+export function isReservedRepositorySkillName(name: string, source: "built-in" | "external"): boolean {
+  return RESERVED_SKILL_NAMES.some(reserved => reserved === name)
+    && !(source === "built-in" && SYSTEM_SKILL_NAMES.some(system => system === name));
+}
+
 export interface SkillMeta {
   name: string;
   description: string;

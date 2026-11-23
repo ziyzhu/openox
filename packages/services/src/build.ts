@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, writeFile, cp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { isReservedRepositorySkillName } from "@openox/protocol/skills";
 import { readSkills } from "./skills.ts";
 import {
   buildService,
@@ -45,12 +46,13 @@ type ArtifactOptions = {
   name?: string;
   domains?: string[];
   catalogKinds?: CatalogKind[];
+  includeSystemSkills?: boolean;
 };
 
 export async function buildArtifacts(outDir: string, options: ArtifactOptions = {}): Promise<RepositoryPackage> {
   if (resolve(outDir) === BUILTIN_REPOSITORY_ROOT) throw new Error("Cannot export over the built-in repository source");
   const sourcePackage = validateRepositoryPackage(
-    JSON.parse(await readFile(join(BUILTIN_REPOSITORY_ROOT, "repository.json"), "utf8")),
+    JSON.parse(await readFile(join(BUILTIN_REPOSITORY_ROOT, "repository.json"), "utf8")), "built-in",
   );
   if ("error" in sourcePackage) throw new Error(sourcePackage.error);
   const domains = options.domains ?? sourcePackage.services
@@ -113,7 +115,9 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
     && JSON.stringify(services) !== JSON.stringify([...sourcePackage.services].sort((a, b) => a.localeCompare(b)))) {
     throw new Error("Built-in repository.json does not match built-in service directories");
   }
-  const skillResult = readSkills(BUILTIN_REPOSITORY_ROOT, sourcePackage.skills);
+  const skillSource = options.includeSystemSkills === false ? "external" : "built-in";
+  const skills = sourcePackage.skills.filter(name => !isReservedRepositorySkillName(name, skillSource));
+  const skillResult = readSkills(BUILTIN_REPOSITORY_ROOT, skills, skillSource);
   if (!skillResult.ok) throw new Error(skillResult.error);
   for (const skill of skillResult.skills) {
     await cp(join(BUILTIN_REPOSITORY_ROOT, "skills", skill.name), join(outDir, "skills", skill.name), { recursive: true });
@@ -123,9 +127,9 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
     name: options.name ?? sourcePackage.name,
     contentHash: await contentHash(outDir),
     services,
-    skills: sourcePackage.skills,
+    skills,
   };
-  const validated = validateRepositoryPackage(repository);
+  const validated = validateRepositoryPackage(repository, skillSource);
   if ("error" in validated) throw new Error(validated.error);
   await writeFile(join(outDir, "repository.json"), `${JSON.stringify(validated, null, 2)}\n`);
   return validated;

@@ -5,7 +5,7 @@ import { loadIOSManifest, loadMCPManifest } from "../../../../packages/services/
 import { validateRepositoryPackage, repositoryServiceKind, repositoryServiceIdentity } from "../../../../packages/protocol/src/repository.ts";
 
 export async function check(): Promise<string> {
-  const repository = validateRepositoryPackage(await Bun.file(join(BUILTIN_REPOSITORY_ROOT, "repository.json")).json());
+  const repository = validateRepositoryPackage(await Bun.file(join(BUILTIN_REPOSITORY_ROOT, "repository.json")).json(), "built-in");
   if ("error" in repository) throw new Error(repository.error);
   const failures: string[] = [];
   for (const service of repository.services) {

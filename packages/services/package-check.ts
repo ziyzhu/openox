@@ -63,7 +63,8 @@ try {
     'import { repositoryRoot } from "@openox/services";',
     'import { readSkill, readSkills } from "@openox/services/skills";',
     'const repository = await Bun.file(`${repositoryRoot}/repository.json`).json();',
-    'const result = readSkills(repositoryRoot, repository.skills);',
+    'const result = readSkills(repositoryRoot, repository.skills, "built-in");',
+    'if (readSkills(repositoryRoot, repository.skills).ok) throw new Error("external skill loading accepted System names");',
     'if (!result.ok) throw new Error(result.error);',
     'if (result.skills.length !== repository.skills.length) throw new Error("repository skills differ");',
     'const fixtureRoot = join(import.meta.dir, "fixture");',
@@ -83,8 +84,9 @@ try {
   ].join("\n"));
   const repositoryRoot = await run(["bun", checkPath], installDirectory);
   const raw = JSON.parse(await readFile(join(repositoryRoot, "repository.json"), "utf8"));
-  const repository = validateRepositoryPackage(raw);
-  if ("error" in repository || repository.services.length === 0) throw new Error("installed repository is invalid or empty");
+  const repository = validateRepositoryPackage(raw, "built-in");
+  if ("error" in repository || repository.services.length === 0 || repository.skills.length === 0) throw new Error("installed repository is invalid or empty");
+  if (!("error" in validateRepositoryPackage(raw))) throw new Error("external repository validation accepted System names");
   console.log(`PASS ${report.name}@${report.version} services=${repository.services.length} skills=${repository.skills.length} ${report.size} bytes packed, ${report.unpackedSize} bytes unpacked`);
   if (outputArgument >= 0) console.log(`Tarball ${tarball}`);
 } finally {

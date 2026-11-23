@@ -1,6 +1,6 @@
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
-import { RESERVED_SKILL_NAMES } from "./skills.ts";
+import { isReservedRepositorySkillName } from "./skills.ts";
 
 export const REPOSITORY_VERSIONS = [3] as const;
 
@@ -41,7 +41,7 @@ export function qualifiedRepositoryServiceID(kind: RepositoryServiceKind, identi
   return kind === "ios" && identity.startsWith("ios:") ? identity : `${kind}:${identity}`;
 }
 
-export function validateRepositoryPackage(raw: unknown): RepositoryPackage | { error: string } {
+export function validateRepositoryPackage(raw: unknown, source: "built-in" | "external" = "external"): RepositoryPackage | { error: string } {
   if (!Value.Check(RepositoryPackageSchema, raw)) return { error: "invalid repository.json" };
   const repository = raw as RepositoryPackage;
   const identities = new Set<string>();
@@ -51,6 +51,6 @@ export function validateRepositoryPackage(raw: unknown): RepositoryPackage | { e
     identities.add(identity);
   }
   if (new Set(repository.skills).size !== repository.skills.length) return { error: "duplicate skill name" };
-  if (repository.skills.some(name => RESERVED_SKILL_NAMES.some(reserved => reserved === name))) return { error: "reserved system skill name" };
+  if (repository.skills.some(name => isReservedRepositorySkillName(name, source))) return { error: "reserved system skill name" };
   return repository;
 }

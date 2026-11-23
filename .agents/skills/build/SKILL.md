@@ -66,8 +66,10 @@ after provider changes; shared Swift changes require both native builds.
 `apps/shared/Resources/OxServices.bundle/` is the single built-in repository source.
 Both native targets compile `apps/shared` and their own platform sources; neither compiles the other app. `lint` enforces this boundary and rejects OS conditionals in native Swift sources. Keep shared/platform Swift filenames distinct: localization extraction writes their `.stringsdata` outputs into the same target directory.
 `build:services` validates it, refreshes its content hash without rewriting service
-files, and generates model-action resources.
-Package builds copy this source.
+files, and generates model-action resources. It mirrors `packages/agent/skills/`
+into `OxServices.bundle/skills/` for repository browsing and exports. Keep the
+manifest's skill names in sync and check in the regenerated mirror; the agent
+still loads the trusted packages from its own bundle. Package builds copy the repository source.
 Build and lint use the protocol package's manifest and installer validators; Ox runs the same validators from `PiDurable.bundle/service-validation.js` in JavaScriptCore. Keep contract rules there, not in parallel Swift validators. Native filesystem and network-policy checks remain in Swift. These checks are not live service verification. Bundled installers register handlers through `window.ox.install`; the Host runtime owns dispatch and error logging. Do not replace `window.ox` or retain a second dispatcher.
 Native targets default to MainActor with approachable concurrency. Use worker actors or `@concurrent` async helpers for CPU work and synchronous I/O; `nonisolated async` and inherited `Task` closures alone do not establish an off-main boundary. Publish observable state on MainActor after validating the captured scope or revision.
 Do not overwrite unrelated repository or generated changes.

@@ -4,20 +4,30 @@ import { ROOT, runCheck } from "../../../lib.ts";
 import { parseSkill, isSkillResourcePath, SYSTEM_SKILL_NAMES, RESERVED_SKILL_NAMES } from "../../../../packages/protocol/src/skills.ts";
 import { composeOxTurnSections } from "../../../../packages/agent/src/core/ox-prompts.ts";
 import { bundledSkills } from "../../../../packages/agent/src/core/bundled-skills.ts";
+import { validateRepositoryPackage } from "../../../../packages/protocol/src/repository.ts";
+import { BUILTIN_REPOSITORY_ROOT } from "../../../../packages/services/src/service.ts";
 
 export async function check(): Promise<string> {
   const root = join(ROOT, "packages/agent/skills");
   const files = new Map<string, string>();
-  const collect = async (directory: string, prefix = "") => {
+  const collect = async (directory: string, target: Map<string, string>, prefix = "") => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       const relative = prefix + entry.name;
       if (!/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(relative) || entry.isSymbolicLink()) throw new Error(`Invalid bundled skill resource: ${relative}`);
-      if (entry.isDirectory()) await collect(join(directory, entry.name), relative + "/");
-      else if (entry.isFile()) files.set(relative, await readFile(join(directory, entry.name), "utf8"));
+      if (entry.isDirectory()) await collect(join(directory, entry.name), target, relative + "/");
+      else if (entry.isFile()) target.set(relative, await readFile(join(directory, entry.name), "utf8"));
       else throw new Error(`Unsupported skill resource: ${relative}`);
     }
   };
-  await collect(root);
+  await collect(root, files);
+  const repository = validateRepositoryPackage(await Bun.file(join(BUILTIN_REPOSITORY_ROOT, "repository.json")).json(), "built-in");
+  if ("error" in repository) throw new Error(repository.error);
+  if (JSON.stringify([...repository.skills].sort()) !== JSON.stringify([...SYSTEM_SKILL_NAMES].sort())) throw new Error("Built-in repository skills differ from active System names");
+  const mirrored = new Map<string, string>();
+  await collect(join(BUILTIN_REPOSITORY_ROOT, "skills"), mirrored);
+  if (mirrored.size !== files.size || [...files].some(([path, text]) => mirrored.get(path) !== text)) {
+    throw new Error("Built-in repository skill files differ from packages/agent/skills; run bun run build:services");
+  }
   const exported = new Map<string, string>(bundledSkills.flatMap(skill => Object.entries(skill.files).map(([path, text]) => [`${skill.name}/${path}`, text] as const)));
   if (JSON.stringify([...files.keys()].sort()) !== JSON.stringify([...exported.keys()].sort())) throw new Error("Bundled skill package inventory differs from source");
   if (JSON.stringify(bundledSkills.map(skill => skill.name).sort()) !== JSON.stringify([...SYSTEM_SKILL_NAMES].sort())) throw new Error("Bundled skill names differ from active System names");

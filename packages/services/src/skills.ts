@@ -2,7 +2,7 @@ import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
-  RESERVED_SKILL_NAMES, SKILL_NAME_RE, MAXIMUM_SKILL_BYTES, MAXIMUM_SKILL_FILES,
+  isReservedRepositorySkillName, SKILL_NAME_RE, MAXIMUM_SKILL_BYTES, MAXIMUM_SKILL_FILES,
   parseSkill, isSkillResourcePath, type Skill, type SkillResult,
 } from "@openox/protocol/skills";
 
@@ -35,14 +35,14 @@ export function readSkill(directory: string, name: string): Skill {
   return { ...skill, resources: files };
 }
 
-export function readSkills(repositoryDir: string, declared?: readonly string[]): SkillResult {
+export function readSkills(repositoryDir: string, declared?: readonly string[], source: "built-in" | "external" = "external"): SkillResult {
   const root = join(repositoryDir, "skills");
   try {
     if (existsSync(root) && lstatSync(root).isSymbolicLink()) throw new Error("symbolic skill roots are unsupported");
     const names = declared ?? (existsSync(root) ? readdirSync(root) : []);
     if (new Set(names).size !== names.length) throw new Error("duplicate skill names");
     const skills = names.map(name => {
-      if (!SKILL_NAME_RE.test(name) || RESERVED_SKILL_NAMES.some(reserved => reserved === name)) throw new Error(`invalid or reserved skill name: ${name}`);
+      if (!SKILL_NAME_RE.test(name) || isReservedRepositorySkillName(name, source)) throw new Error(`invalid or reserved skill name: ${name}`);
       return readSkill(join(root, name), name);
     });
     return { ok: true, skills: skills.sort((a, b) => a.name.localeCompare(b.name)) };

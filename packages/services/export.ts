@@ -10,6 +10,6 @@ const output = resolve(outputArgument);
 if (existsSync(output)) throw new Error(`export destination already exists: ${output}`);
 const repository = await buildArtifacts(output, {
   name: "Built-in",
-  ...(args.includes("--web-only") ? { catalogKinds: [] } : {}),
+  ...(args.includes("--web-only") ? { catalogKinds: [], includeSystemSkills: false } : {}),
 });
 console.log(`exported ${output} services=${repository.services.length} hash=${repository.contentHash?.slice(0, 12)}`);

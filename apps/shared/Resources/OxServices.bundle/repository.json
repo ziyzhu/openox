@@ -91,5 +91,11 @@
     "web:xiaohongshu.com",
     "web:youtube.com"
   ],
-  "skills": []
+  "skills": [
+    "authentication",
+    "checkout",
+    "evolve",
+    "onboard",
+    "visualize"
+  ]
 }

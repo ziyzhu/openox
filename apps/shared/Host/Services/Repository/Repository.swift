@@ -392,6 +392,7 @@ actor Repository {
             }
             var repositorySkills: [Skill] = []
             for name in loaded.package.skills {
+                if loaded.descriptor.provenance == .bundled, ModelGuidance.bundledSkillNames.contains(name) { continue }
                 do {
                     var skill = try SkillFiles.load(directory: loaded.root.appendingPathComponent("skills/\(name)"))
                     skill.source = .repository(id: loaded.descriptor.id, name: loaded.descriptor.name, writable: loaded.descriptor.provenance == .local)
@@ -657,7 +658,10 @@ actor Repository {
               package.name.count <= 100,
               package.services.count <= 256, package.skills.count <= 256,
               Set(package.skills).count == package.skills.count,
-              package.skills.allSatisfy({ SkillFiles.isLocalName($0) && !SkillFiles.reservedNames.contains($0) }) else {
+              package.skills.allSatisfy({ name in
+                  SkillFiles.isLocalName(name) && (!SkillFiles.reservedNames.contains(name)
+                      || (provenance == .bundled && ModelGuidance.bundledSkillNames.contains(name)))
+              }) else {
             throw Failure(message: "repository.json metadata is invalid")
         }
         if let hash = package.contentHash,
