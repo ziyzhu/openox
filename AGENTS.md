@@ -64,7 +64,7 @@ Related:
 After you push a change:
 1. monitor CI, if failed, fix it and push again.
 
-## OpenOx Rules
+## Repository Rules
 
 1. The app must remain neutral to LLM provider.
 1. Logs are user-owned on-device diagnostics.
