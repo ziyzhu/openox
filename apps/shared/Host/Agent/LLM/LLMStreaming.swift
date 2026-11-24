@@ -38,7 +38,7 @@ nonisolated enum StreamingHTTP {
         noHTTPError: () -> any Error
     ) async throws -> Response {
         LogContext.latency?.mark(.httpStarted)
-        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        let (bytes, response) = try await URLSession.shared.bytes(for: request, delegate: ConnectionMetrics(label: label))
         LogContext.latency?.mark(.responseHeaders)
         guard let http = response as? HTTPURLResponse else {
             Log.network.error("\(label) non-HTTP response")
@@ -47,6 +47,35 @@ nonisolated enum StreamingHTTP {
         let diagnostics = responseDiagnostics(http)
         Log.network.info("\(label) response status=\(http.statusCode)\(diagnostics.isEmpty ? "" : " \(diagnostics)")")
         return Response(http: http, bytes: bytes, label: label)
+    }
+
+    static func preconnect(_ url: URL, label: String) async -> Bool {
+        var request = URLRequest(url: url, timeoutInterval: 5)
+        request.httpMethod = "HEAD"
+        do {
+            _ = try await URLSession.shared.data(for: request, delegate: ConnectionMetrics(label: label))
+            return true
+        } catch {
+            if !Task.isCancelled { Log.network.warning("\(label) preconnect failed error=\(LogPrivacy.text(error.localizedDescription, limit: 2_048))") }
+            return false
+        }
+    }
+
+    private final class ConnectionMetrics: NSObject, URLSessionTaskDelegate {
+        private let label: String
+
+        init(label: String) {
+            self.label = label
+        }
+
+        func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+            guard let transaction = metrics.transactionMetrics.last else { return }
+            func milliseconds(_ start: Date?, _ end: Date?) -> String {
+                guard let start, let end else { return "n/a" }
+                return String(Int(end.timeIntervalSince(start) * 1_000))
+            }
+            Log.network.info("\(label) connection reused=\(transaction.isReusedConnection) protocol=\(transaction.networkProtocolName ?? "unknown") dnsMs=\(milliseconds(transaction.domainLookupStartDate, transaction.domainLookupEndDate)) connectMs=\(milliseconds(transaction.connectStartDate, transaction.connectEndDate)) tlsMs=\(milliseconds(transaction.secureConnectionStartDate, transaction.secureConnectionEndDate)) serverMs=\(milliseconds(transaction.requestEndDate, transaction.responseStartDate))")
+        }
     }
 
     private static func responseDiagnostics(_ response: HTTPURLResponse) -> String {

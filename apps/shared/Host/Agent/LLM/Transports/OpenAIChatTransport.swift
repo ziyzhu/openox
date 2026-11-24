@@ -156,6 +156,13 @@ public struct OpenAIChatTransport: ProviderClient {
         )
     }
 
+    public var preparationRequiresPrompt: Bool { false }
+
+    public func prepare(model: ProviderModel, systemPrompt: String?, tools: [any AgentTool], sessionID: String) async -> LLMPreparationOutcome {
+        guard let endpoint = try? await auth.resolve(forceRefresh: false) else { return .unavailable }
+        return await StreamingHTTP.preconnect(endpoint.url, label: "\(displayName).warmup") ? .ready : .unavailable
+    }
+
     public func stream(
         model: ProviderModel,
         systemPrompt: String?,
