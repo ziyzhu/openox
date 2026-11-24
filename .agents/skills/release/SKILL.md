@@ -5,86 +5,23 @@ description: Prepare and verify OpenOx iOS App Store, npm, and standalone CLI re
 
 # Release
 
-Run from the selected OpenOx checkout on `main` and follow its `AGENTS.md`.
-Before preparing a release, inspect `git status` and run `git pull --ff-only`
-to update `main` before release inspection or changes. Preserve local work; if
-the pull cannot fast-forward, resolve that before continuing release preparation.
-Choose the storage compatibility, App Store, or package workflow below. A requested
-App Store release preparation starts by creating or reusing the intended draft
-version in App Store Connect without selecting or attaching a build. Do not require
-a released-source baseline, clean working tree, or completed release notes merely
-to create the draft. Build/upload and build attachment are later steps, performed
-only when requested; do not choose an existing build during draft preparation.
-Release-note translation and application of the approved English promotional text
-are authorized within the requested metadata scope without additional approval prompts.
-App Review submission and final release are manual. Package publication requires
-explicit user authorization. Never publish as a verification step or invoke this
-skill's publisher from ordinary CI.
-Website and infrastructure deployment remain in `openox-dev`.
+Work on `main`. Before preparing a release, inspect `git status` and update with `git pull --ff-only`. Preserve local work; stop if the pull cannot fast-forward. Never publish as a verification step. Website and infrastructure deployment remain in `openox-dev`.
 
 ## Storage compatibility
 
-For every persisted-storage change, including development work outside a release,
-follow the test-owned [storage compatibility procedure](../test/references/storage-compatibility.md)
-and update its canonical [storage map](../test/references/storage.md) when affected.
-The test skill owns upgrade cases and evidence; release consumes their results.
-Require before/after device templates backed by actual build-written snapshots;
-verify newer readers with older data and second-launch stability. Downgrade
-compatibility, older-reader testing, and downgrade approval are not release gates.
-Test downgrades only when explicitly requested; report known limitations without
-blocking the release.
-`StorageMigrator` coordinates startup and recovery; scoped Profile, application-storage, credential, and repository migrators own compatibility transforms.
+For persisted-storage changes, follow the test-owned [compatibility procedure](../test/references/storage-compatibility.md) and update the [storage map](../test/references/storage.md) as needed. Before release, require actual predecessor-written data, successful upgrade and normal writes, and a stable second launch. Downgrade testing is opt-in and not a release gate; report known limitations.
 
 ## App Store releases
 
-Use the installed `asc-cli` skill for App Store Connect operations and
-[demo](../demo/SKILL.md) for requested screenshots or video capture. The app ID
-is `6802224502`. Follow [references/release-flow.md](references/release-flow.md)
-for draft creation, inspection, release notes, and later build/staging handoff.
-This workflow is not for TestFlight-only distribution. Start with
-`bun .agents/skills/release/scripts/ios-inspect.ts --help`, then follow the
-inspection step in the release flow. Resolve the last released source commit through
-App Store Connect and `ios-build-<number>` tag provenance before asking the operator;
-follow the release flow's exact build-ID matching procedure. The script is
-read-only; its report is evidence, not proof of submission readiness.
+Use the installed `asc-cli` skill for App Store Connect and check `asc auth status`. The app ID is `6802224502`. Follow the [App Store release flow](references/release-flow.md) for provenance, listing metadata, release notes, and staging. Keep private artifacts and credentials outside Git.
 
-On an initial push run to `main` that changes iOS inputs, CI calls `.github/workflows/ios-prepare.yml` alongside validation to archive, export, and verify the IPA. `.github/workflows/ci.yml` owns that path filter; bundled agent skills are shipped content, not docs-only changes. After checks, both native builds, and preparation succeed, CI calls `.github/workflows/ios-release.yml` with the prepared build number and immutable artifact ID. Only the IPA crosses jobs; signing credentials stay on the preparation runner and are cleaned up. Upload verifies its build number, bundle identifier, and signature. Main CI and manual iOS releases share the `ios-upload` concurrency group so build-number selection remains serialized through upload. Reusable upload calls use a run-specific group to avoid blocking their caller. Manual dry-run and upload dispatch prepare their own IPA. CI assigns uploaded builds to `gamma` but does not submit beta app review; external testing may require manual review submission. Import an existing Apple Development identity from the `appstore` secrets `IOS_SIGNING_P12_BASE64` and `IOS_SIGNING_P12_PASSWORD` into a temporary keychain for archiving, then apply cloud-managed distribution signing during export. Reuse the identity rather than creating certificates on fresh runners. Unsigned archives lose capability entitlements during export. Always delete the temporary keychain and certificate file. Do not upload merely to verify workflow changes.
+Start requested App Store release preparation by creating or reusing a **draft without attaching a build**. A released baseline, clean working tree, and finished notes are not prerequisites for creating the draft. Build/upload and attachment are later, separately requested steps. Do not submit App Review or release the app; the operator does both manually.
 
-The `appstore` environment secret `BUILD_SOURCE_TOKEN` needs Contents and Workflows write permissions. Prefer a token restricted to this repository; reusing a broader CLI token requires explicit operator approval. Only the build-source tagging step uses it. The built-in token can reject tags for older commits whose workflow files differ from current `main`; upload mode checks for the credential before uploading.
-
-The `appstore-announce` environment secret `RELEASE_TAG_TOKEN` needs the same Contents and Workflows write permissions to create `ios-v<version>` tags. Announce mode creates the tag before posting to Discord and deletes it if the post fails, so a failed run never repeats an announcement.
-
-App Store Connect owns current listing metadata, screenshots, and previews.
-Read its live state during a release; do not keep local metadata copies, media
-libraries, or inventory manifests in either repository. Keep drafts, captures,
-downloads, validation output, and CLI input files in a private temporary workspace
-outside the repositories. Credentials, signing material, review contacts, and
-demo access also stay outside Git.
-
-Current English promotional text, supplied by the operator:
-
-> A self-evolving bot that runs locally on your phone.
-
-Require this exact text in every configured English locale of the intended
-version. During release preparation, set it when missing or different, then read
-it back; reporting drift alone is insufficient. A release request authorizes
-applying this approved copy, not inventing replacement copy. Preserve non-English
-promotional text unless a change is requested. Do not automatically translate the
-tagline or use it as release notes.
-What's New must communicate only changes users can actually see or feel: new
-capabilities, visible improvements, and fixes to problems they experience. Omit
-internal refactors, tooling, infrastructure, and implementation details unless
-expressed as a concrete user-facing benefit. Do not invent benefits to fill notes.
-For app updates, require saved, nonempty **What's New in This Version** text in
-every configured locale, including `zh-Hans`; English text alone is insufficient.
-Review translations before staging and verify all locales afterward. Preserve
-other metadata and media unless changes are requested.
+For TestFlight-only distribution or upload maintenance, see [iOS CI upload and announcement](references/ios-ci.md). CI assigns builds to `gamma` but does not submit Beta App Review. Do not upload just to verify a workflow change.
 
 ## Prepare packages
 
-Follow repository `AGENTS.md` for commit/version requirements. Package metadata
-and package-owned build/check scripts remain the sources of truth. Preserve
-unrelated changes. Update the selected package's `package.json` version on `main`.
+Update the selected package’s `package.json` on `main`. Package metadata and package-owned checks are the sources of truth.
 
 | Package | Directory | Release tag |
 | --- | --- | --- |
@@ -92,34 +29,12 @@ unrelated changes. Update the selected package's `package.json` version on `main
 | `@openox/protocol` | `packages/protocol` | `protocol-v<version>` |
 | `@openox/services` | `packages/services` | `services-v<version>` |
 
-Publish the protocol version required by services before publishing services.
-Services checks install local protocol and services tarballs together, so
-verification requires no prior publication. Run `bun run build:services` from
-the repository root before checking the services package.
-
-Run `bun run ci`; CLI releases also require the four-platform standalone checks
-in `.github/workflows/cli.yml`. Each package's `package-check.ts` creates
-and verifies its tarball. Keep release artifacts outside the repository.
+Run `bun run ci` and the relevant package-owned `package-check.ts`. Run `bun run build:services` before checking the services package; its checks install local protocol and services tarballs together, so verification needs no prior publication. CLI releases also require the four-platform standalone checks in `.github/workflows/cli.yml`. Keep release artifacts outside Git.
 
 ## Publish packages
 
-The authorized `.github/workflows/npm-release.yml` workflow owns publication and
-CLI GitHub Release delivery. It validates release tags, repository ancestry, and
-artifacts before invoking `.agents/skills/release/scripts/npm-publish.ts` with an
-explicit package and verified tarball. Tags must match the package version and
-point to a commit on `main`. Do not create or push release tags without authorization.
+Publication requires explicit authorization; do not create or push release tags without permission. Publish the protocol version required by services first. The authorized `.github/workflows/npm-release.yml` workflow validates package tags, main ancestry, and artifacts before invoking `scripts/npm-publish.ts` with an explicit package and verified tarball. CLI tags require all four standalone platforms to pass; the workflow publishes archives, `SHA256SUMS`, and `install.sh` to a CLI GitHub Release after npm publication.
 
-First npm releases require an authorized interactive publish of the verified
-tarball with two-factor authentication. Subsequent releases use npm Trusted
-Publishing through the workflow's `npm-publish` environment. CLI tags require
-all four standalone platforms to pass before npm publication; after publication,
-the workflow uploads archives, `SHA256SUMS`, and `install.sh` to a CLI-specific
-GitHub Release.
+First npm releases require authorized interactive publication of the verified tarball with two-factor authentication. Later releases use Trusted Publishing through the `npm-publish` environment. The publisher checks package name, version, archive name, and integrity; an identical published version is a no-op and different contents fail closed. `--dry-run` still queries npm and exercises publication validation; it is not an offline test.
 
-The publisher validates package name, version, archive name, and npm integrity.
-An already-published matching version is a no-op; different contents fail closed.
-Its `--dry-run` still queries npm and exercises publication validation, so it is
-not an offline test. Do not run it merely to verify a tooling reorganization.
-
-Report the package/version, artifact checks, publication result, and unperformed
-steps. Never expose signing keys, npm tokens, or reusable credentials.
+Report package/version, artifact checks, publication result, and unperformed steps. Never expose signing keys, npm tokens, or reusable credentials.

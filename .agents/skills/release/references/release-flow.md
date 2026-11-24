@@ -25,6 +25,16 @@ Check each subcommand's `--help` before use.
 3. Confirm the SHA exists locally and is an ancestor of the intended source with `git cat-file -e <sha>^{commit}` and `git merge-base --is-ancestor <sha> HEAD`. Save the version/build/tag/SHA evidence in the private temporary workspace, then pass that SHA as `--since` to release inspection. This ASC-verified chain establishes the baseline without operator confirmation.
 4. Ask the operator only if ASC provenance is unavailable, missing, ambiguous, or inconsistent, or the released commit is not an ancestor of the intended source. Report what was checked; never guess the baseline. An unavailable baseline blocks release-note derivation, not draft creation.
 
+## Listing metadata
+
+App Store Connect owns listing metadata, screenshots, and previews. Read live state; don’t keep local copies or media inventories. Keep drafts, captures, CLI inputs, signing materials, review contacts, and demo access in private workspaces outside the repositories.
+
+Use this exact operator-approved promotional text in every configured English locale:
+
+> A self-evolving bot that runs locally on your phone.
+
+Release preparation authorizes applying this text and translating release notes. Set missing or differing English promotional text and read it back. Preserve non-English promotional text unless explicitly asked to change it; do not translate the tagline or use it as release notes. For requested simulator screenshots or video, use the `ios-simulator` skill.
+
 ## What's New in This Version
 
 1. Draft the App Store Connect `whatsNew` field from actual user-visible changes since the last released version. Do not include unshipped work, internal implementation details, or screenshot-only fixtures as shipped features.
@@ -39,9 +49,9 @@ Check each subcommand's `--help` before use.
 
 ## Stage
 
-1. Record the exact version/build, What's New text, approved English promotional text, and intended remote changes for the handoff. Set missing or differing English promotional text to the operator-approved copy in SKILL.md as part of release preparation. Preserve non-English promotional text, descriptions, URLs, screenshots, and previews unless a separate change was requested.
+1. Record the exact version/build, What's New text, approved English promotional text, and intended remote changes for the handoff. Set missing or differing English promotional text to the operator-approved copy above as part of release preparation. Preserve non-English promotional text, descriptions, URLs, screenshots, and previews unless a separate change was requested.
 2. Only when build attachment is requested, select the exact processed build with verified source provenance. Run available dry runs, apply only the intended fields, and attach that build without an additional approval prompt. Otherwise leave the draft without a selected build. Stop at preparation if no processed build or signed IPA from the requested release is available.
-3. If media changes are requested, use the demo workflow, current Apple specifications, and synthetic content. Keep assets outside Git, inspect existing remote media, and validate and visually review replacements before applying the requested changes.
+3. If media changes are requested, use current Apple specifications and synthetic content. Keep assets outside Git, inspect existing remote media, and validate and visually review replacements before applying the requested changes.
 4. Wait for build/media processing and run the strongest available readiness validation. Read back What's New for every configured locale, require nonempty text for app updates, compare changed notes with the intended text, rerun inspection with the selected build, require exact approved promotional text in every configured English locale, and verify the selected build. Confirm unrelated fields and locales are unchanged. A successful write alone does not establish readiness. Report blockers and warnings; do not change privacy, pricing, agreements, or other account state beyond the requested scope.
 
 ## Manual submission and release

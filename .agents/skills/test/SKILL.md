@@ -7,8 +7,8 @@ description: "Verify storage backward compatibility, check agent behavior on a Q
 
 Storage backward compatibility is the maintained test suite. `bun run test` runs
 offline build-tool and shipped-bundle checks. `bun run lint` owns static/type
-validation; `bun run build` owns generated-artifact consistency, packaging and
-compilation. Exploratory UI verification belongs to Gym.
+validation; `bun run build` checks generated artifacts and builds portable packages.
+Native builds are separate. Exploratory UI verification belongs to Gym.
 
 ## Backward compatibility
 

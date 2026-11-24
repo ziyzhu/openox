@@ -34,39 +34,9 @@ Distinguish service-specific defects from reusable authoring-loop issues. Prefer
 
 Use the current session as the notification destination unless the user specifies a developer channel or issue tracker. Send or file external notifications only within that authorization. Keep unresolved findings in the final handoff with their impact and next step; do not silently discard them because the service eventually succeeded.
 
-## Copy Local source to the desktop
+## Export or sync existing Local services
 
-Use this workflow to copy a device's Local repository for inspection, backup, or requested promotion. It is a one-way snapshot, not a Git clone, sync, or authorization to promote services. Preserve the device's files and keep exports in a new private directory outside the checkout unless the user specifies another destination; never overwrite existing desktop files without confirmation.
-
-Target the source Host explicitly, not the default simulator. For the user's iPhone, use `ws://iphone-17-pro-max.taile57b1f.ts.net:9876`, keep Tailscale connected, and keep Ox open. For a simulator, use its assigned endpoint. Select a loaded conversation in the intended Profile with `--conversation <full-id>`; follow the `ox-cli` skill if it needs hydration. The iPhone Host disconnects when Ox leaves the foreground and can relaunch, unloading the conversation; reads are idempotent, so retry after reconnecting and rehydrate with `ox --conversation <full-id> conversation inspect`.
-
-```sh
-ox --host <ws-url> repository list --json
-ox --host <ws-url> --conversation <full-id> vm help ox.fs.list
-ox --host <ws-url> --conversation <full-id> vm help ox.fs.read
-ox --host <ws-url> --conversation <full-id> vm call ox.fs.list --args '{"purpose":"Export Local repository","path":"repositories/local"}' --json
-ox --host <ws-url> --conversation <full-id> vm call ox.fs.read --args '{"purpose":"Export repository metadata","path":"repositories/local/repository.json"}' --json
-```
-
-1. Confirm Local is available and choose the whole repository or the requested service subtree. Include `repository.json` for a repository snapshot and preserve all relative paths, including service resources and skills. Do not reconstruct source from conversation text or logs.
-2. Recursively list each directory with `ox.fs.list`. Follow every `nextCursor` with the same path and options until complete; inspect `truncated` rather than assuming one page contains everything.
-3. Read each text file with `ox.fs.read`. Follow `nextOffset` until `truncated` is false and write the decoded `text` to the matching desktop path, not the CLI JSON envelope. Pages omit the newline at each page boundary, so append `\n` to every truncated page that does not end with one, then confirm each file's byte count equals the listed `size`. Virtual paths take no trailing slash. Reject paths that escape the export directory.
-4. Treat non-null `unsupported`, unreadable files, diagnostics, or truncation without continuation as incomplete. This text reader does not export binary bytes, and PDF reads extract text rather than the original file. Report those files and use a separately verified byte-preserving export route when needed; never silently omit them or claim a complete repository copy.
-5. Avoid concurrent Local edits during export. Compare directory listings, file sizes, and modification times before and after; retry changed files and report that the API does not provide an atomic snapshot. Report exported paths, file count, and any incomplete files. For a complete repository, run `ox --repository <desktop-export-path> repository validate`; validation does not replace live service verification.
-
-Copying out does not change source selection, reload attachments, or require a Files picker. `ox repository` operates on desktop paths or repository URLs; it cannot directly open an iPhone's virtual path. `ox.fs.copy` is not a device-to-desktop transfer command. Keep service repairs authored through Ox rather than editing the exported copy into a second implementation.
-
-## Sync Local into the built-in bundle
-
-Use this when the user asks to bring a device's Local services into `apps/shared/Resources/OxServices.bundle/`. The request authorizes updating built-in services that Local overrides; each Local-only service still needs the user's explicit approval by name before it is added. Local skills and non-service files are reported, not synced.
-
-1. Export the device's `repositories/local/` and `repositories/bundled/` with the copy workflow above into separate directories. The device's bundled copy is the base its Local overrides were forked from, unless the app was updated after the fork.
-2. Compare against current `origin/main`; when local `main` cannot fast-forward, extract its bundle with `git archive origin/main apps/shared/Resources/OxServices.bundle`. Classify each Local service directory: overlap when the bundle has the same identity, otherwise Local-only. Before changing files, report one table with a row per Local service: Take or Keep, and a one-line reason. Take covers overlaps with real changes and Local-only services worth proposing; Keep covers overlaps byte-identical to the bundle apart from a trailing newline (suggest deleting the Local copy; on approval, recheck file sizes against the export and call `ox.service.delete`, which prompts on the device), broken or failing services, personal endpoints such as the user's own Tailscale hosts, and services needing more work.
-3. Exclude services that are currently broken: a domain missing from `ox --host <ws-url> service list --json`, a failed `ox --repository <export> repository validate`, or recent `ServiceManager.listServices invalid`, `Service.dispatcher unavailable`, `installation=missing`, or handler errors for the domain in `ox --host <ws-url> host logs --level error --grep <domain>`. The device validator can reject schemas the desktop validator accepts, so check both. Return those to Ox for repair instead of shipping them.
-4. For each overlap, compare the device bundled base with the checkout's file. If identical, the Local file replaces the checkout file. If the checkout changed since that build, merge with `git merge-file -p <checkout-file> <device-bundled-file> <local-file>` and show the user every conflict and every hunk where Local removes checkout-only changes. Never drop newer built-in fixes silently. Keep the built-in `faviconUrl` unless the Local icon is newly verified.
-5. Ask the user which Local-only services to add, listing each with its description and actions. Add approved ones through `references/promotion.md`, including its icon workflow, and register them in the bundle's `repository.json`. Local icons from Google's favicon cache or under 128 px fail promotion; ask Ox to check the product's main public site for sized touch icons such as `/apple-touch-icon-180x180.png` and manifest icons. A public service without `listSessions`/`login` cannot take `pageUrl`, so a per-tenant platform such as a storefront host is unusable until it declares them.
-6. Run `bun run build:services` and `bun run lint`, and confirm the bundle diff contains only the synced services and index changes. Restore any service the checkout compiler rejects and return its diagnostics to Ox; do not hand-edit Ox-authored source.
-7. Report per service: replaced, merged, conflicted, skipped as broken, or awaiting approval, plus which actions lack the live verification `references/promotion.md` requires. Leave the device's Local source and source selections unchanged.
+Follow the [Local source workflows](references/local-sources.md) to export a device’s repository or sync requested overrides into the built-in bundle. Export does not authorize promotion; adding a Local-only service to the bundle requires explicit approval by name.
 
 ## Deliver the service
 

@@ -52,7 +52,7 @@ verified. Keep templates, snapshots, and evidence in a private workspace outside
 Git. Record the exact source revisions, build identities, schema milestones,
 snapshot hashes, and affected storage owners for both sides.
 
-Use the [setup skill](../../setup/SKILL.md) device-template workflow. Capture
+Use the [device-template workflow](../../setup/references/device-templates.md). Capture
 `before` from the actual predecessor build before changing its data; capture
 `after` from the changed build after migration and representative ordinary writes.
 Logical templates serialized with current types and provenance labels alone do

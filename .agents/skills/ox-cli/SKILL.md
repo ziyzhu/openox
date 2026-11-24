@@ -5,232 +5,49 @@ description: Use the terminal as an Ox Client. Connect to an Ox Host; discover, 
 
 # Ox CLI
 
-`ox` is an Ox Client for the terminal. Consult `ox --help` and the relevant
-command help before guessing flags.
+`ox` is a terminal Client. Check `ox --help` and the relevant action’s `--help`. Commands stay two levels deep: `ox <namespace> <action>`.
 
-Commands are grouped by the resource they act on, and each group has one
-selector flag:
+## Choose a Host and resource
 
-- `ox profile` with `--host <ws-url>`: Profiles owned by that Host; `--profile <id>` scopes inspection or updates. Without `--host`, `--profile <path>` selects a directory for read-only disk inspection. With neither selector, `OX_HOST_ENDPOINT` selects Host-backed reads; otherwise reads use offline discovery.
-- `ox repository` with `--repository <path-or-url>`: a service repository; `list`, `connect`, and `disconnect` instead manage connections on `--host <ws-url>`.
-- `ox service` and `ox files` with `--host <ws-url>`: live services, authorized folders, and file downloads. Folder administration accepts `--profile <id>`; downloads use `--conversation <id>` or the active conversation. Commands stay two levels deep: `ox <namespace> <action> [arguments] [flags]`; do not add nested command groups.
-- `ox host` with `--host <ws-url>`: an Ox Host.
-- `ox conversation` and `ox vm` with `--host` and `--conversation <conversation-id>`: a conversation on that
-  Host and its VM.
+Run `ox host list` to discover reachable simulator Hosts and Tailscale peers (`--all` includes unavailable candidates). For live work, select the intended Host with `--host <ws-url>` or `OX_HOST_ENDPOINT`. A `ws://` endpoint without a port uses 9876; `wss://` uses 443. For simulator UI work, use the `ios-simulator` skill and the reserved device’s explicit UDID.
 
-Do not select or infer a web-page engine. The Host owns service adapters and rendering.
-In a conversation VM, the agent explicitly opens/lists/closes pages through ox.web.browser,
-uses pageId for lifecycle/navigation/handoff, and frameId for document inspection,
-scripts, and web service invocation. Discover fresh document IDs after navigation.
-The active Profile allows eight agent pages total; frames do not count separately. pages exposes lastActiveAt and busy, sorted oldest first. At capacity newPage closes the oldest idle page across conversations and returns fresh IDs; active operations, opening/loading pages, secrets, and user handoffs are protected. Close owned idle pages when no longer needed.
-Direct ox service commands retain Host-managed routing and address services by domain.
-Service inspection loads the current valid source without attaching it. Invocation automatically attaches its service to the conversation when needed, under normal attachment policy. Use `ox.service.attach`, `ox.service.listAttached`, and `ox.service.detach` through the VM to manage attachments explicitly. A later invocation reattaches a detached service. Attachment does not grant permissions or authentication.
+| Resource | Selector and use |
+| --- | --- |
+| `host` | `--host` for status (`describe`), providers, and logs. |
+| `conversation`, `vm` | `--host` and `--conversation <full-id>` for a conversation and its actual VM. Don’t rely on the active conversation when another is intended. |
+| `profile` | `--host` and `--profile <id>` for the Host’s Profiles; `--profile <path>` for offline read-only inspection. Without selectors, `OX_HOST_ENDPOINT` controls Host-backed reads. |
+| `repository` | `--repository <path-or-url>` for offline inspection and validation; `list`, `connect`, and `disconnect` manage connections on `--host`. |
+| `service`, `files` | `--host` for live services, folder grants, and downloads. Folder administration accepts `--profile`; downloads accept `--conversation`. |
 
-## Choose the correct surface
+To inspect skills, use `profile skills` for Profile files, `repository skills` for repository files, or `vm skills` for what the conversation agent can see.
 
-- Use `ox host list` to find reachable simulator Hosts and online Tailscale peers (`ws://<ip>:9876`, plus `wss://<name>` on 443 for non-iOS peers behind HTTPS); use `--all` to include unavailable candidates. A `ws://` endpoint without a port uses 9876; `wss://` uses 443.
-- Use `ox host logs`, `ox host providers`, and `ox host describe` for Host introspection.
-- To debug behavior from logs, start with `ox host logs --summary --since <time>`: it counts rows by level, category, and event (the first message token, such as `Conversation.runOne`), errors first, with each group's last time. Then scope with `ox --conversation <full-id> conversation logs`, which keeps rows mentioning that conversation id, and narrow with `--level warning`, `--category`, or `--json`. Times are UTC. Turn-scoped lines carry `conversation=`, `submission=`, and `turn=`; `durable=` is the Pi Durable integer id, not a conversation id. Conversation logs cannot also take `--grep`; filter their `--json` output.
-- For agent-loop diagnostics, filter logs by `AgentLatency.summary`, `AgentModel.end`, or `AgentCall.`. Correlate `conversation`, `submission`, and `turn`; `tools` counts model-tool executions, while `functions` counts nested `ox.*` invocations. For browser efficiency, compare `totalMs`, `modelRoundTrips` (excluding compaction), `browserCalls`, and `browserResultBytes` (successful serialized invocation results, not model-visible bytes). Browser call counts include failed and unfinished calls; result bytes do not. `handoffMs` is user time in login, verification, and other handoffs; subtract it from `totalMs` and `toolWallMs` before judging agent speed. These metrics do not verify task completion. Token totals cover reported model usage, including compaction; check `usageComplete`, `missingUsage`, and `unfinishedCalls` before treating a summary as complete. All-zero provider usage is conservatively reported as unknown, not measured zero.
-- Use `ox conversation` to create, open, drive, respond to, stop, inspect, and watch conversations; `ox conversation send`
-  runs the real conversation turn, including tools, services, and compaction.
-- Use `ox vm` for VM functions, VM-visible skills, and execution through the
-  agent's actual capability boundary.
-- Use `ox profile` for direct Profile file reads.
-- Use `ox repository` for offline repository, service manifest, action, and
-  skill inspection.
-- Use `ox service list`, `ox service invoke`, and the other `ox service` actions for live service operations. `ox service mcp` exposes actions as MCP tools over stdio.
-- Skills come from three sources: `ox profile skills` (a Profile's files),
-  `ox repository skills` (a repository's files), and `ox vm skills` (what the
-  agent in a conversation actually sees).
-- Use `idb` with the `ios-simulator` skill to verify conversation projection changes; the repository has no dedicated conversation projection fixture command.
-- Use the agent-independent `ios-simulator` skill and native tools for iOS Simulator interaction.
-
-## Connect to a Host and VM
-
-Target the default DEBUG iOS Simulator Host with `ox vm`. Pass
-`--host <ws-url>` or set `OX_HOST_ENDPOINT` for another Host.
+## Drive a conversation and inspect its VM
 
 ```sh
-ox conversation list
-ox conversation inspect
-ox host logs --level warning
-ox host logs --all --level warning --grep timeout
-ox host logs --page --limit 100 --json
-ox host logs --cursor '<nextCursor>' --limit 100 --json
-ox host logs --summary --since <ISO-8601>
-ox --conversation <conversation-id> conversation logs --summary
-ox vm inspect
-ox vm functions
-ox vm help ox.fs.read
-ox vm skills
-ox vm skills <name>
+ox --host "$HOST" conversation list
+ox --host "$HOST" host providers
+ox --host "$HOST" conversation new --json
 ```
 
-Create and drive a conversation through the real agent loop:
+Set `CONVERSATION` to the returned full conversation ID. To choose a model, pass both `--provider <id>` and `--model <id>` when creating the conversation. `--attach <domain,...>` is optional.
 
 ```sh
-ox conversation new --provider <provider-id> --model <model-id> --attach <domain,...> --json
-ox --conversation <conversation-id> conversation send 'Your request' --json
-printf '%s' 'Your request' | ox --conversation <conversation-id> conversation send - --json
-ox --conversation <conversation-id> conversation watch --pending --messages
+ox --host "$HOST" --conversation "$CONVERSATION" conversation send 'Your request' --json
+ox --host "$HOST" --conversation "$CONVERSATION" conversation inspect --json
+ox --host "$HOST" --conversation "$CONVERSATION" conversation watch --pending --messages
+ox --host "$HOST" --conversation "$CONVERSATION" vm inspect
+ox --host "$HOST" --conversation "$CONVERSATION" vm help ox.fs.read
 ```
 
-Provider, model, and attachment flags are optional; pass provider and model together when choosing a model. Use the returned conversation ID for subsequent commands. `send` waits for the turn outcome by default; use `--no-wait` to return after submission, then `watch` to follow progress. A pending prompt may require a response before the run can continue.
+`send` runs the real agent loop and waits by default; pass `--no-wait` to submit and then watch, or `-` to read the message from stdin. Inspect any pending prompt before replying; never infer approval. Use `vm functions` and `vm help <function>` to discover live contracts. Prefer `vm call` over arbitrary `vm eval`; pass sensitive or large arguments through `--args-file -` and keep credentials out of terminal output and arguments.
 
-Use `--conversation <conversation-id>` when the active conversation is not the intended VM:
+For conversation hydration, pending prompts, and app configuration, follow [conversation and VM operations](references/conversations.md). To author or repair services through a real Ox conversation, use [develop-services](../develop-services/SKILL.md).
 
-```sh
-ox --conversation <conversation-id> conversation inspect
-ox --conversation <conversation-id> vm inspect
-ox --conversation <conversation-id> vm call ox.fs.read --args '<json>'
-```
+## Inspect resources and invoke services
 
-For filesystem staging, use `ox.fs.list` without a path to discover the conversation's working directory, or read the metadata's `workingDirectory`. Do not construct a writable path from the public conversation UUID: the working-directory identifier can differ. `/tmp` is read-only execution output, not a staging destination. Relative ordinary file paths resolve in the current working directory.
+- [Profiles, repositories, and files](references/profiles-repositories-files.md): read or administer Profiles, validate service sources, download files, and connect repositories through the Host’s Files picker.
+- [Live services](references/live-services.md): inspect contracts, invoke actions, choose sessions, and use stdio MCP. The Host owns service routing and rendering. An invocation can access authenticated data or change external state; only pass `--approve` when the user has authorized that effect.
 
-Current Hosts expose app configuration through `ox.fs.read` under `app/`: `settings.json`, `providers.json`, and `services.json` contain editable configuration; `status.json` is generated app and Host state; `policy.json` and `actions/<encodeURIComponent(action)>.json` expose approval policies. Read `app/logs.jsonl` explicitly for approval-gated, redacted diagnostics; directory searches exclude its contents. Prefer `ox host logs` for scoped CLI diagnostics. App files are unavailable if the Profile already owns an `app` path.
+## Diagnose a Host
 
-Change app configuration only for an explicit user request. Read the current file first and prefer `ox.fs.edit`; validation, stale-revision checks, filesystem policies, and semantic Action approvals still apply. Provider definitions and `defaultModel` require separate writes; model selection requires an existing exact picker model ID and authentication. Provider removal may clear credentials. Only `settings.json`, `providers.json`, and `services.json` are writable; app files cannot be created, deleted, moved, copied, or attached. Temporary conversations cannot change app configuration. Older Hosts may not expose this mount; inspect the live function contracts and filesystem before using it.
-
-A saved conversation may be listed before it is hydrated. Current Hosts load full-UUID conversation reads, sends, stops, and responses without changing the selected conversation. Prefixes resolve only hydrated conversations and can be ambiguous; use full IDs for Client routing. VM commands still require a hydrated conversation. For those commands or older Hosts, run `ox --conversation <full-id> conversation open`; this selects it and discards an outgoing temporary conversation. For a pending choice or authorized approval, inspect with `ox --conversation <id> conversation inspect --pending --json`, then use `ox --conversation <id> conversation respond <answer> --prompt <prompt-id>`. Use a returned option label or an allowed custom answer; never infer approval. Stale IDs are rejected. Credential entry and app-only interactions remain in Ox. Human interaction through browser.showPage asynchronously waits for Done/Cancel and returns only `status: "completed"` or `status: "cancelled"` in the original execution and turn. Completed is acknowledgment, not verified login or task success. A login interaction can also offer to remember credentials before returning; inspect the live page and pending prompt separately. Older Hosts without `conversations.open` or `conversations.respond` require the app sidebar and prompt UI; in the idb accessibility tree, `conversation.confirm.Approve` is active while `conversation.confirm.receipt.Approve` records an approval already completed.
-
-Prefer `ox vm call <ox.function> --args <json>` for normal operations. It
-preserves the Host's schemas, permissions, approvals, and service attachments.
-Use `--args-file -` for sensitive or large arguments. Use `ox vm eval` only
-when arbitrary development JavaScript is necessary.
-
-Read a function contract before calling an unfamiliar function:
-
-```sh
-ox vm functions --json
-ox vm help <ox.function>
-```
-
-## Delegate service authoring to Ox
-
-Use the `develop-services` skill for the service evolution and developer-feedback loop.
-Drive an Ox conversation on the user-selected simulator through the built-in
-`skills/evolve/SKILL.md` System skill for service exploration, authoring, repair, and live
-verification. While observing the run, use conversation history and structured logs to
-identify friction, repeated failures, and missing capabilities. Fix the underlying
-harness issues and improve tools, instructions, diagnostics, or verification
-where the evidence supports a reusable improvement. Exercise the affected flow
-through Ox again so future authoring is faster and more reliable. Keep service
-behavior authored inside Ox.
-
-## Administer a Profile
-
-Manage Profiles through their owning Host:
-
-```sh
-ox --host <ws-url> profile list --json
-ox --host <ws-url> profile create --name <name> --json
-ox --host <ws-url> profile select <id>
-ox --host <ws-url> profile inspect <id> --json
-ox --host <ws-url> profile rename <id> --name <name>
-ox --host <ws-url> --profile <id> profile update --memory-file <path>
-```
-
-Create does not select the new Profile. Selection and updates reject running conversations; stop them explicitly first. Name and memory updates use existing Host persistence, not replacement of `profile.json`. Inspect after a failed update before retrying, because earlier writes may have succeeded.
-
-For offline inspection, discover iCloud Profiles on macOS and select one by directory. Unset `OX_HOST_ENDPOINT` for discovery so `profile list` does not query a Host; an explicit `--profile <path>` selects offline reads without unsetting it:
-
-```sh
-env -u OX_HOST_ENDPOINT ox profile list [--json]
-ox --profile <path> profile memory
-ox --profile <path> profile skills [name] [--json]
-ox --profile <path> profile files [filename] [--json]
-ox --profile <path> profile conversations [id] [--json]
-```
-
-Profile inspection is read-only. Reading iCloud Drive may require Files & Folders
-permission for the terminal or agent host.
-
-## Inspect service repositories
-
-```sh
-ox --repository <path-or-url> repository inspect
-ox --repository <path-or-url> repository validate
-ox --repository <git-url> repository verify
-ox --repository <path-or-url> repository serve [--port 8100]
-ox --repository <path-or-url> repository services [domain] [--json]
-ox --repository <path-or-url> repository actions <domain> [--json]
-ox --repository <path-or-url> repository skills [name] [--json]
-```
-
-For live candidate comparison, use `ox vm call ox.repository.conflicts --args '{"purpose":"Compare service sources","service":"<domain>","compare":true}'`. It returns complete per-candidate file hashes and sizes without changing active sources or reloading services. Never use `ox.repository.resolve` merely to compare copies; comparison errors do not establish equality.
-
-Inspect an action's input schema, authentication requirement, and approval
-requirement before invoking it.
-
-## Download files
-
-```sh
-ox --host <ws-url> --conversation <id> files download report.pdf --output ./report.pdf
-ox --host <ws-url> --conversation <id> conversation inspect --blocks --json
-ox --host <ws-url> --conversation <id> files download --attachment <attachment-id> --output ./upload.pdf
-```
-
-Use an attachment ID from the conversation blocks or a virtual file path such as a conversation-relative file or `mounts/<grant-id>/<file>`. The conversation must be loaded. Downloads preserve the stored bytes, use the Host's file-read policy and grants, and never overwrite an existing local file. The Host caps downloads at 32 MiB, with existing lower limits where applicable. Managed `app/` files and generated `tmp/` output are not downloadable.
-
-## Connect a repository through Files
-
-```sh
-ox --host <ws-url> files mount --timeout 120000
-ox --host <ws-url> files list --json
-ox --host <ws-url> repository connect mounts/<grant-id>[/subfolder]
-ox --host <ws-url> repository list --json
-ox --host <ws-url> service sync
-ox --host <ws-url> repository disconnect <repository-id>
-ox --host <ws-url> files unmount <grant-id>
-```
-
-The Host's native picker grants access; a CLI-local path cannot authorize remote access. Connection is explicit and persistent, separate from managed Local. Source must use the current repository version; it is read in place without migration or Git seeding. Current Hosts expose repository files under `repositories/<repository-id>/...`; only files inside Local are writable through that view. Edit connected repositories through the granted Files mount or your editor, not their read-only repository view. Revocation makes connected services unavailable; disconnect does not delete their files. Grant IDs are stable for one grant and never reused for a new authorization. Mounts belong to the selected Profile; `--profile <id>` scopes `files` commands without switching. Existing grants appear as unassigned until `files assign <id>` or explicit assignment in Profile → Files. No Files service attachment is required. Mounted services follow the grant's Profile. Older builds do not enforce ownership and can discard ownership fields on writes; downgrade requires review.
-
-## Exercise live services through a Host
-
-```sh
-ox [--host <ws-url>] service list [--json] [--timeout 30000]
-ox [--host <ws-url>] service invoke <domain>:<action> --args '<json>' [--session '<descriptor>' | --session-file <path|->] [--page-url <https-url>] [--approve] [--timeout 30000]
-ox [--host <ws-url>] service eval <domain> --script '<javascript>' [--timeout 30000]
-ox [--host <ws-url>] service reload <domain> [--timeout 30000]
-ox [--host <ws-url>] service refresh-auth <domain> [--timeout 30000]
-ox [--host <ws-url>] service sync [--timeout 60000]
-```
-
-Opening or attaching a service does not check access or request setup. Invoke the service type's standard actions through `ox.service.invoke`: web listSessions/login, API credentialStatus/configureCredentials, MCP connectionStatus/authorize, and iOS permissionStatus/requestPermission. These actions accept empty input; web target routing uses the input-resolved action/service baseUrl unless top-level pageUrl overrides it; session selects account/context, not the destination. Full standard contracts are supplied upfront. `ox.service.inspect` returns service metadata, standardActions availability, complete non-standard contracts (up to ten), typed secret references, and nextCursor. Reuse those contracts immediately; inspect with nextCursor for additional pages or without it for a later refresh. Inspection policies still apply; discovery failure throws and never establishes that actions are absent. API configuration is not server verification; MCP connectivity is not tool authorization; device permission is not account access. Ask/Block fail without discovery, and errors never establish absence. Website completion only acknowledges interaction. Ordinary website invocations without `--session` or `--session-file` discover fresh sessions under normal Action policies and use the first returned descriptor, including when `--page-url` is provided. Explicit descriptors take precedence, are revalidated, and fail rather than switching accounts if stale. Discover and pass a descriptor for a specific account/tenant or account-stable consequential work; do not preflight every action. No sessions leaves public actions public and protected actions authentication-required. `--page-url` independently selects the initial navigation target within the selected account/context and also routes initial default discovery. It can combine with `--session` or `--session-file`. Without `--page-url`, the input-resolved action/service baseUrl wins even when a session is selected; session.url is validated context metadata only. Both destinations must remain within the service domain, and fresh target-page discovery must confirm the selected account/tenant. Website interaction requires the conversation VM; direct Host invocation does not bypass it. Existing saved signIn and access-check policies remain authoritative for the corresponding Host setup/status actions.
-
-Use `ox [--host <ws-url>] service mcp [--timeout 30000]` as a stdio MCP server. It exposes the Host's available actions with stable tool names and input/output schemas; arguments wrap action data in `input`, with optional `session` and `pageUrl` beside it. Successful results wrap action output in `value`, returned as both MCP `structuredContent` and JSON text; failures use `isError` without structured success output. Action metadata requires an updated Host. Discovery refreshes every ten seconds and signals tool-list changes. Remote MCP tools appear after Host discovery; the adapter never initiates authorization or grants approval. Stdout is reserved for MCP messages; diagnostics use stderr.
-
-Treat `invoke` as a real action that may read authenticated data or mutate
-external state. Supply `--approve` only when the user's request authorizes the
-effect. Treat `service eval` as arbitrary code on a Host-managed service page
-and keep it narrowly scoped.
-
-All service invocations automatically attach the matching service to the selected
-conversation when needed. The existing attachment and action policies still apply.
-Inspection alone does not attach a service, and automatic attachment does not grant
-native permissions or authenticate an account.
-
-For conversation-driven login or human verification, use VM page lifecycle functions
-and browser.showPage with the exact pageId. Explain the user's step before calling,
-await the result in the same execution, stop dependent work on cancelled, and verify fresh
-state after completed. Never select a page engine or replay an action to recover its page.
-
-## Diagnose live connection failures
-
-1. Confirm the Host is running.
-2. Run `ox vm inspect` or `ox service list` as the smallest probe.
-3. Check `--host`, `OX_HOST_ENDPOINT`, then the compatibility
-   `OX_DEBUG_ENDPOINT`.
-4. Run `ox host logs --level warning` before widening to device logs.
-
-A dispatcher-unavailable error does not establish a broken service implementation.
-Inspect `service list` navigation state and `Service.navigation` logs first; a
-terminated web process can leave a resident page unavailable. Verify recovery with
-a new read-only invocation, never by automatically replaying an interrupted write.
-Use `ox.repository.conflicts` to distinguish Local overrides from Built-in sources.
-
-Report the exact command, Host endpoint selection method, target resource, and
-relevant failure text when blocked. Never print credentials or repository URLs
-containing credentials.
+Start with `ox --host "$HOST" host describe` or `vm inspect`. Read `host logs --summary --since <ISO-8601>` and narrow with `--level warning` or `--conversation <full-id> conversation logs`. See [Host diagnostics](references/diagnostics.md) for log interpretation, latency metrics, and connection or service failures. Report the exact target and failure without credentials.
