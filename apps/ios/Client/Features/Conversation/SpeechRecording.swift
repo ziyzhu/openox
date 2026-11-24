@@ -14,7 +14,7 @@ final class OnDeviceSpeechRecording {
     private var resultsTask: Task<String, Error>?
     private var audioSessionActive = false
 
-    func prepare(locale: Locale) async throws -> Bool {
+    func prepare(locale: Locale, onTranscript: @escaping (String) -> Void) async throws -> Bool {
         var needsAnotherPress = false
         switch AVAudioApplication.shared.recordPermission {
         case .undetermined:
@@ -32,13 +32,13 @@ final class OnDeviceSpeechRecording {
         try Task.checkCancellation()
         if SpeechTranscriber.isAvailable,
            let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) {
-            let transcriber = SpeechTranscriber(locale: supported, preset: .transcription)
+            let transcriber = SpeechTranscriber(locale: supported, preset: .progressiveTranscription)
             module = transcriber
-            resultsTask = transcriptionTask(transcriber.results) { $0.text }
+            resultsTask = transcriptionTask(transcriber.results, onTranscript: onTranscript) { $0.text }
         } else if let supported = await DictationTranscriber.supportedLocale(equivalentTo: locale) {
-            let transcriber = DictationTranscriber(locale: supported, preset: .longDictation)
+            let transcriber = DictationTranscriber(locale: supported, preset: .progressiveLongDictation)
             module = transcriber
-            resultsTask = transcriptionTask(transcriber.results) { $0.text }
+            resultsTask = transcriptionTask(transcriber.results, onTranscript: onTranscript) { $0.text }
         } else {
             throw SpeechInputError.unsupportedLanguage
         }
@@ -132,13 +132,16 @@ final class OnDeviceSpeechRecording {
 
     private func transcriptionTask<Results: AsyncSequence & Sendable>(
         _ results: Results,
+        onTranscript: @escaping (String) -> Void,
         text: @escaping (Results.Element) -> AttributedString
     ) -> Task<String, Error> where Results.Element: SpeechModuleResult {
         Task {
             var transcript = ""
             for try await result in results {
                 try Task.checkCancellation()
-                if result.isFinal { transcript += String(text(result).characters) }
+                let segment = String(text(result).characters)
+                if result.isFinal { transcript += segment }
+                onTranscript(result.isFinal ? transcript : transcript + segment)
             }
             return transcript
         }

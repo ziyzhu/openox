@@ -141,12 +141,32 @@
         }
       }
     },
+    "Nothing was sent. Your words are in the draft." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未发送任何内容，你说的话已保留在草稿中。"
+          }
+        }
+      }
+    },
     "Release notes are unavailable. Check your connection and try again." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "暂时无法获取更新说明。请检查网络连接后重试。"
+          }
+        }
+      }
+    },
+    "Slide up to cancel" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上滑取消"
           }
         }
       }
@@ -12884,16 +12904,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文本文件过大（%1$lld 字节；上限 %2$lld 字节）。"
-          }
-        }
-      }
-    },
-    "The draft changed while recording. Nothing was sent." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "录音期间草稿已更改，未发送任何内容。"
           }
         }
       }

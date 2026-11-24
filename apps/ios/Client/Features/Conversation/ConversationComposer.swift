@@ -471,6 +471,12 @@ struct ConversationComposer: View, Equatable {
             VStack(alignment: .leading, spacing: 0) {
                 composerDraftStrip
                 importMemoryStrip
+                if speech.showsTranscript {
+                    HoldToTalkTranscript(speech: speech)
+                        .padding(.horizontal, Theme.Spacing.lg)
+                        .padding(.top, Theme.Spacing.md)
+                        .transition(.opacity)
+                }
                 composerRow
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -486,11 +492,27 @@ struct ConversationComposer: View, Equatable {
             reduceMotion ? nil : .spring(duration: 0.28, bounce: 0),
             value: speech.isPresented
         )
+        .animation(
+            reduceMotion ? nil : .spring(duration: 0.28, bounce: 0),
+            value: speech.showsTranscript
+        )
         .overlay(alignment: .topLeading) {
             if showsTopStrip && floatsTopStrip {
                 composerTopStrip
                     .offset(y: -Self.floatingTopStripClearance)
                     .transition(.opacity.animation(Theme.Animation.quick))
+            }
+        }
+        .overlay(alignment: .top) {
+            if speech.isPresented {
+                Color.clear
+                    .frame(height: 0)
+                    .overlay(alignment: .bottom) {
+                        HoldToTalkStatus(speech: speech)
+                            .fixedSize()
+                            .padding(.bottom, Theme.Spacing.sm + (showsTopStrip && floatsTopStrip ? Self.floatingTopStripClearance : 0))
+                    }
+                    .transition(.opacity)
             }
         }
         .animation(reduceMotion ? nil : Theme.Animation.standard, value: showsTopStrip)

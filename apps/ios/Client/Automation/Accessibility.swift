@@ -171,6 +171,7 @@ nonisolated enum A11yID {
         static let cancelEdit = "conversation.cancelEdit"
         static let speechHold = "conversation.speechHold"
         static let speechStatus = "conversation.speechStatus"
+        static let speechTranscript = "conversation.speechTranscript"
         static let send = "conversation.send"
         static let stop = "conversation.stop"
         static let activity = "conversation.activity"

@@ -10,6 +10,17 @@ final class ConversationSpeechInput {
         case cancel
     }
 
+    enum Outcome {
+        case send(String)
+        case draft(String)
+
+        var text: String {
+            switch self {
+            case .send(let text), .draft(let text): text
+            }
+        }
+    }
+
     enum State: Equatable {
         case idle
         case preparing(holding: Bool)
@@ -20,6 +31,7 @@ final class ConversationSpeechInput {
 
     private(set) var state = State.idle
     private(set) var level: Float = 0
+    private(set) var transcript = ""
     private(set) var startedAt = Date()
     private(set) var usesAccessibleControls = false
     var notice: String?
@@ -28,7 +40,7 @@ final class ConversationSpeechInput {
     @ObservationIgnored private var sessionID: UUID?
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var deadline: Task<Void, Never>?
-    @ObservationIgnored private var completion: ((String) -> Void)?
+    @ObservationIgnored private var completion: ((Outcome) -> Void)?
 
     var isPresented: Bool { state != .idle }
 
@@ -40,7 +52,11 @@ final class ConversationSpeechInput {
         if case .recording(let action) = state { action } else { .send }
     }
 
-    func begin(accessible: Bool = false, completion: @escaping (String) -> Void) {
+    var showsTranscript: Bool {
+        isPresented && !transcript.isEmpty
+    }
+
+    func begin(accessible: Bool = false, completion: @escaping (Outcome) -> Void) {
         guard state == .idle else { return }
         let id = UUID()
         let recording = OnDeviceSpeechRecording()
@@ -50,12 +66,16 @@ final class ConversationSpeechInput {
         usesAccessibleControls = accessible
         state = .preparing(holding: true)
         level = 0
+        transcript = ""
         notice = nil
         Log.ui.info("SpeechInput.prepare session=\(id) locale=\(AppLocale.shared.locale.identifier)")
         task = Task { [self] in
             defer { if Task.isCancelled { recording.cancel() } }
             do {
-                let setup = try await recording.prepare(locale: AppLocale.shared.locale)
+                let setup = try await recording.prepare(locale: AppLocale.shared.locale) { [weak self] text in
+                    guard self?.sessionID == id else { return }
+                    self?.transcript = text
+                }
                 try Task.checkCancellation()
                 guard sessionID == id else { return }
                 guard !setup, state == .preparing(holding: true) else {
@@ -142,7 +162,7 @@ final class ConversationSpeechInput {
                     return
                 }
                 Log.ui.info("SpeechInput.completed session=\(id) chars=\(text.count)")
-                completion?(text)
+                completion?(.send(text))
             } catch where !(error is CancellationError) {
                 guard sessionID == id else { return }
                 fail(error)
@@ -154,8 +174,7 @@ final class ConversationSpeechInput {
         if case .preparing = state {
             state = .preparing(holding: false)
         } else if isPresented {
-            cancel(reason: "interrupted")
-            notice = L10n.string("Recording interrupted. Nothing was sent.", comment: "")
+            stop(reason: "interrupted", notice: L10n.string("Recording interrupted. Nothing was sent.", comment: ""))
         }
     }
 
@@ -172,12 +191,12 @@ final class ConversationSpeechInput {
         completion = nil
         state = .idle
         level = 0
+        transcript = ""
     }
 
     private func fail(_ error: Error) {
         Log.ui.error("SpeechInput.failed error=\(error.localizedDescription)")
-        cancel(reason: "error")
-        notice = error.localizedDescription
+        stop(reason: "error", notice: error.localizedDescription)
         Haptics.error(.speechFailed)
     }
 
@@ -186,8 +205,19 @@ final class ConversationSpeechInput {
         deadline = Task {
             do { try await Task.sleep(for: .seconds(seconds)) }
             catch { return }
-            cancel(reason: "timeout")
-            notice = message
+            stop(reason: "timeout", notice: message)
         }
+    }
+
+    private func stop(reason: String, notice lost: String) {
+        let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let completion = completion
+        cancel(reason: reason)
+        guard !text.isEmpty else {
+            notice = lost
+            return
+        }
+        Log.ui.info("SpeechInput.kept reason=\(reason) chars=\(text.count)")
+        completion?(.draft(text))
     }
 }

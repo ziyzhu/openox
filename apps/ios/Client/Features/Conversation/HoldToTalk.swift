@@ -120,16 +120,6 @@ struct HoldToTalkWaveform: View {
         (speech.selection == .cancel ? Theme.Colors.error : Theme.Colors.primary).color(for: colorScheme)
     }
 
-    private var status: LocalizedStringKey {
-        switch speech.state {
-        case .idle: ""
-        case .preparing, .starting: "Preparing speech…"
-        case .finalizing: "Transcribing and sending…"
-        case .recording(.cancel): "Release to cancel"
-        case .recording(.send): "Release to send"
-        }
-    }
-
     var body: some View {
         Group {
             if speech.isRecording {
@@ -142,7 +132,7 @@ struct HoldToTalkWaveform: View {
         }
         .frame(maxWidth: .infinity, maxHeight: 22)
         .accessibilityElement()
-        .accessibilityLabel(status)
+        .accessibilityLabel(speech.status)
         .accessibilityIdentifier(A11yID.ConversationControls.speechStatus)
         .accessibilityAction(named: Text("Stop and send")) { speech.release(action: .send) }
         .accessibilityAction(named: Text("Cancel")) { speech.cancel(reason: "accessibilityCancel") }
@@ -170,5 +160,58 @@ struct HoldToTalkWaveform: View {
                 }
             }
         }
+    }
+}
+
+private extension ConversationSpeechInput {
+    var status: LocalizedStringKey {
+        switch state {
+        case .idle: ""
+        case .preparing, .starting: "Preparing speech…"
+        case .finalizing: "Transcribing and sending…"
+        case .recording(.cancel): "Release to cancel"
+        case .recording(.send): "Release to send"
+        }
+    }
+}
+
+struct HoldToTalkStatus: View {
+    let speech: ConversationSpeechInput
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var isCancelling: Bool { speech.selection == .cancel }
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Text(speech.status)
+                .foregroundStyle((isCancelling ? Theme.Colors.error : Theme.Colors.onSurface).color(for: colorScheme))
+            if speech.state == .recording(.send) {
+                Text("Slide up to cancel", comment: "Hint shown next to Release to send while holding to talk.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .font(Theme.Fonts.captionMd)
+        .lineLimit(1)
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.sm)
+        .glassEffect(
+            isCancelling ? .regular.tint(Theme.Colors.error.color(for: colorScheme).opacity(0.18)) : .regular,
+            in: Capsule()
+        )
+        .accessibilityHidden(true)
+    }
+}
+
+struct HoldToTalkTranscript: View {
+    let speech: ConversationSpeechInput
+
+    var body: some View {
+        Text(speech.transcript)
+            .font(Theme.Fonts.bodyMd)
+            .foregroundStyle(Theme.Colors.onSurface)
+            .lineLimit(3)
+            .truncationMode(.head)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier(A11yID.ConversationControls.speechTranscript)
     }
 }

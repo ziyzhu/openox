@@ -1620,9 +1620,10 @@ struct ConversationPage: View {
         let draftID = composer.draftID
         let draft = composer.attributedDraft
         composer.setAttachmentMenuPresented(false)
-        speechInput.begin(accessible: accessible) { text in
-            guard composer.draftID == draftID, composer.attributedDraft == draft else {
-                speechInput.notice = L10n.string("The draft changed while recording. Nothing was sent.", comment: "")
+        speechInput.begin(accessible: accessible) { outcome in
+            guard case .send(let text) = outcome, composer.draftID == draftID, composer.attributedDraft == draft else {
+                composer.appendDictation(outcome.text)
+                speechInput.notice = L10n.string("Nothing was sent. Your words are in the draft.", comment: "Notice shown when voice input stops early and the recognized words are kept as a draft.")
                 return
             }
             composer.appendDictation(text)
