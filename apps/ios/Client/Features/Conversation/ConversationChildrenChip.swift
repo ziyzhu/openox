@@ -37,15 +37,19 @@ struct ConversationChildrenChip: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: "arrow.triangle.branch")
-                    .accessibilityHidden(true)
                 Text("Conversations")
-                Text(verbatim: "· \(children.count)")
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                Text(children.count, format: .number)
+                    .font(Theme.Fonts.captionMd.monospacedDigit())
+                    .padding(.horizontal, 6)
+                    .frame(minWidth: 20)
+                    .frame(height: Theme.Size.chipHeight - 12)
+                    .background(Theme.Colors.onSurface.opacity(0.10), in: Capsule())
+                    .accessibilityHidden(true)
             }
             .font(Theme.Fonts.labelMd)
             .foregroundStyle(Theme.Colors.onSurface)
-            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.leading, Theme.Spacing.md)
+            .padding(.trailing, 6)
             .frame(height: Theme.Size.chipHeight)
             .contentShape(Capsule())
         }
