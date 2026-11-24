@@ -1,6 +1,6 @@
 ---
 name: gym
-description: Simulate diverse persona-conditioned users through Ox's live iOS interface with Mock or bounded real model providers, using seeded subagent sessions to surface functional, UX, visual, accessibility, performance, reliability, provider, state, privacy, localization, and observability issues. Use for exploratory, comparative, stress, or replay simulation campaigns; not for unit-only model evaluation or direct service authoring.
+description: Simulate diverse persona-conditioned users through Ox's live iOS interface with Mock or bounded real model providers, using seeded sessions to surface functional, UX, visual, accessibility, performance, reliability, provider, state, privacy, localization, and observability issues. Use for exploratory, comparative, stress, or replay simulation campaigns; not for unit-only model evaluation or direct service authoring.
 ---
 
 # Ox Gym
@@ -13,7 +13,7 @@ Exercise Ox as a user would, preserve observable evidence, and return prioritize
 - Read [references/session-protocol.md](references/session-protocol.md) before driving simulators or delegating sessions.
 - Read [references/findings.md](references/findings.md) before judging sessions or writing the report.
 
-Also use the agent-independent `ios-simulator` and `ox-cli` skills. Consult installed native-tool and Ox help instead of guessing commands or flags.
+Use the [simulator setup](../setup/references/simulator.md) and [Ox CLI](../ox-cli/SKILL.md) guides. Consult installed tool help instead of guessing flags.
 
 ## Relationship to deterministic tests
 
@@ -23,7 +23,7 @@ Do not use Gym as an archive for deterministic regression runners.
 
 ## Roles
 
-Keep one coordinator responsible for the campaign, simulator allocation, guardrails, reproduction, and final findings. When subagents are available, assign one isolated user-driver subagent to each active session. Give a driver only its session manifest, relevant skill instructions, owned simulator, evidence directory, and operational constraints; do not give it suspected bugs or conclusions from other sessions.
+Keep one coordinator responsible for the campaign, simulator allocation, guardrails, reproduction, and final findings. Use one isolated driver per active session when possible; otherwise the coordinator drives sessions sequentially from their manifests and reports the lack of driver isolation. Give each isolated driver only its manifest, instructions, simulator, evidence directory, and constraints, not suspected bugs or conclusions from other sessions.
 
 The user driver is distinct from the Ox model provider under test. Hold the driver model and instructions stable when comparing Ox providers or builds.
 
@@ -40,7 +40,7 @@ Default to `explore`. Use a recorded seed for every campaign and derived seed fo
 
 1. Resolve mode, session count, providers, comparison targets, authorized effects, and available numbered QA simulators. Default to six sessions when the request gives no count; session count is not simulator count. Do not make paid real-provider calls unless the current request authorizes them and their count is bounded.
 2. Discover configured models and eligible dimension values, then generate the session plan and its owned `/tmp/ox-gym.*` directory with `scripts/plan-run.ts`. Pass supported additional axes with `--dimension`, provider and model identifiers only, and never credentials. Pass `--authorize-real` only when the current request authorizes real-provider calls. Use `--previous` only when the user explicitly supplies prior ephemeral manifests for cumulative coverage.
-3. Materialize every selected dimension into concrete setup, prompts, fixtures, and actions before delegation. Verify the provider and language, then set `materializationStatus`, `providerVerification`, and `executionAuthorized` to ready values. Never delegate a planner-only session. Remove or mark a value unavailable when it cannot actually be exercised. Keep manifests, logs, screenshots, short screen recordings, traces, and reports inside the planner-created directory. Do not write campaign artifacts into the repository or a Profile.
+3. Materialize every selected dimension into concrete setup, prompts, fixtures, and actions before starting the session. Verify the provider and language, then set `materializationStatus`, `providerVerification`, and `executionAuthorized` to ready values. Never run a planner-only session. Remove or mark a value unavailable when it cannot actually be exercised. Keep manifests, logs, screenshots, short screen recordings, traces, and reports inside the planner-created directory. Do not write campaign artifacts into the repository or a Profile.
 4. Follow [simulator setup](../setup/references/simulator.md) for reservation, runtime, and common-state rules. Claim only fixed `ox-1` through `ox-5` simulators. Give every concurrent process its own numbered simulator and matching service and debug ports from `.agents/skills/setup/scripts/qa-config.ts`; use its repository port only for explicit repository installation or sync verification.
 5. Before interaction timing begins, build with `xcodebuild` and install through `simctl`, launch Ox with bundled services, discover its Host, and establish the session's initial simulator appearance, language, model, and state. Reuse a verified prebuilt app where appropriate, but rebuild and reinstall after switching worktrees.
 6. Run sessions sequentially on the reserved simulator by default. Only use multiple simulators when parallel execution is requested; bound concurrency to the requested level and available resources, keeping one coordinator slot available. Have each driver follow the session protocol and return structured evidence.

@@ -1,6 +1,6 @@
 ---
 name: release
-description: Prepare and verify OpenOx iOS App Store, npm, and standalone CLI releases, and design or verify persisted-storage changes during development. Use for storage migrations and before/after compatibility templates, App Store metadata and manual review handoff, package checks, and authorized publication. App Store operations use asc-cli; commit/version rules remain in AGENTS.md.
+description: Prepare and verify OpenOx iOS App Store, npm, and standalone CLI releases, and design or verify persisted-storage changes during development. Use for storage migrations and before/after compatibility templates, App Store metadata and manual review handoff, package checks, and authorized publication. App Store operations use the `asc` CLI; commit/version rules remain in AGENTS.md.
 ---
 
 # Release
@@ -13,7 +13,7 @@ For persisted-storage changes, follow the test-owned [compatibility procedure](.
 
 ## App Store releases
 
-Use the installed `asc-cli` skill for App Store Connect and check `asc auth status`. The app ID is `6802224502`. Follow the [App Store release flow](references/release-flow.md) for provenance, listing metadata, release notes, and staging. Keep private artifacts and credentials outside Git.
+Use the [App Store Connect CLI](https://asccli.sh) (`asc`). Check `asc auth status` and use an existing App Store Connect API key if needed. The app ID is `6802224502`. Follow the [App Store release flow](references/release-flow.md) for provenance, listing metadata, release notes, and staging. Keep private artifacts and credentials outside Git.
 
 Start requested App Store release preparation by creating or reusing a **draft without attaching a build**. A released baseline, clean working tree, and finished notes are not prerequisites for creating the draft. Build/upload and attachment are later, separately requested steps. Do not submit App Review or release the app; the operator does both manually.
 

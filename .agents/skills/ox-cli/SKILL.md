@@ -9,7 +9,7 @@ description: Use the terminal as an Ox Client. Connect to an Ox Host; discover, 
 
 ## Choose a Host and resource
 
-Run `ox host list` to discover reachable simulator Hosts and Tailscale peers (`--all` includes unavailable candidates). For live work, select the intended Host with `--host <ws-url>` or `OX_HOST_ENDPOINT`. A `ws://` endpoint without a port uses 9876; `wss://` uses 443. For simulator UI work, use the `ios-simulator` skill and the reserved device’s explicit UDID.
+Run `ox host list` to discover reachable simulator Hosts and Tailscale peers (`--all` includes unavailable candidates). For live work, select the intended Host with `--host <ws-url>` or `OX_HOST_ENDPOINT`. A `ws://` endpoint without a port uses 9876; `wss://` uses 443. For simulator UI work, follow [simulator setup](../setup/references/simulator.md) and use the reserved device’s explicit UDID.
 
 | Resource | Selector and use |
 | --- | --- |

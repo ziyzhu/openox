@@ -1,6 +1,6 @@
 # Session protocol
 
-Each user-driver subagent owns one session at a time. Its assignment must include the session ID and seed, persona, intent and success condition, exact prompt or prompt sequence, verified Ox provider target, simulator and endpoints, concrete setup and action policy, initial state, allowed effects, time, model-call and step budgets, and evidence directory. Do not delegate unless `materializationStatus` and `providerVerification` are ready and `executionAuthorized` is true.
+Each driver owns one session at a time. Its assignment must include the session ID and seed, persona, intent and success condition, exact prompt or prompt sequence, verified Ox provider target, simulator and endpoints, concrete setup and action policy, initial state, allowed effects, time, model-call and step budgets, and evidence directory. Do not start a session unless `materializationStatus` and `providerVerification` are ready and `executionAuthorized` is true.
 
 ## Isolation
 
@@ -57,7 +57,7 @@ Record every artifact in `result.json` with its kind, relative path, capture tim
 
 Do not photograph or record credential entry, authentication codes, provider keys, or other reusable secrets. If an unrelated secret appears unexpectedly, stop capture and exclude that artifact from the report. Keep all raw evidence inside the assigned temporary directory.
 
-Do not run heavy traces during ordinary discovery. When the coordinator requests reproduction, record one deterministic interaction with native `xcrun xctrace` and avoid concurrent diagnostics. Read the `ios-simulator` skill and installed help for target/template support and recording finalization. App-only host resource samples exclude separate WebKit helpers; state that limitation when it matters.
+Do not run heavy traces during ordinary discovery. When the coordinator requests reproduction, record one deterministic interaction with native `xcrun xctrace` and avoid concurrent diagnostics. Consult `xcrun xctrace record --help` for target and template support and how to finalize recordings. App-only host resource samples exclude separate WebKit helpers; state that limitation when it matters.
 
 ## Session result
 

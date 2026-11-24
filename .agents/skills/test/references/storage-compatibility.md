@@ -110,8 +110,7 @@ Run this gate after every coordinator or scoped migrator change, including refac
 4. Run `bun run lint`, `bun run build`, and `bun run test`.
 5. Confirm the installed app reaches its normal UI and logs `StorageMigrator.prepare done` followed by `HostRuntime storage prepared` and `HostRuntime profile prepared`.
 
-Use the shared `ios-simulator` skill for build/install/launch and container inspection,
-and `setup` for OpenOx's scheme, bundle identity, and assigned launch port.
+Use [simulator setup](../../setup/references/simulator.md) for the build, install, launch, and port assignment. Resolve the installed data container with `xcrun simctl get_app_container <UDID> <bundle-id> data`.
 Use task-specific DerivedData outside the repository. Installing the new app must
 preserve the predecessor container; do not uninstall or erase as upgrade setup.
 

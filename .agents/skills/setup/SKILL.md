@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Set up an OpenOx checkout for CLI, macOS Host, iOS, or Pi development, including dependencies, simulator provisioning, signing, bundled services, first launch, and contribution preparation. Use when a contributor asks to get OpenOx running, prepare a contribution, configure a coding agent, or diagnose a setup failure.
+description: Set up OpenOx for CLI, macOS Host, or iOS development. Use for dependencies, simulator provisioning, signing, bundled services, first launch, contribution preparation, or setup troubleshooting.
 ---
 
 # Setup
@@ -64,8 +64,6 @@ No Apple Account is needed. Install the required [runtime in Xcode](https://deve
 
 For seeded QA, use [device templates](references/device-templates.md). [ChatGPT login transfer](references/chatgpt-login.md) is a separate, opt-in workflow.
 
-## Pi and contributing
-
-Run Pi from the checkout root and trust the project after reviewing its local configuration. Pi discovers repository skills in `.agents/skills/`; no project settings file or provider pin is needed. The simulator runners require Bun and native iOS tools, not Pi.
+## Contributing
 
 For source changes, run `bun run lint`, `bun run build`, and `bun run test`, and build each affected native target. The [build guide](../build/SKILL.md) covers native builds and project generation; regenerate the tracked iOS project when `apps/ios/project.yml` changes. Follow the [release guide](../release/SKILL.md#app-store-releases) only for App Store work. Keep credentials and diagnostics outside Git, and report what you actually verified and any remaining blockers.

@@ -33,7 +33,7 @@ Use this exact operator-approved promotional text in every configured English lo
 
 > A self-evolving bot that runs locally on your phone.
 
-Release preparation authorizes applying this text and translating release notes. Set missing or differing English promotional text and read it back. Preserve non-English promotional text unless explicitly asked to change it; do not translate the tagline or use it as release notes. For requested simulator screenshots or video, use the `ios-simulator` skill.
+Release preparation authorizes applying this text and translating release notes. Set missing or differing English promotional text and read it back. Preserve non-English promotional text unless explicitly asked to change it; do not translate the tagline or use it as release notes. For requested simulator screenshots or video, reserve a simulator per [simulator setup](../../setup/references/simulator.md) and capture with `xcrun simctl io <UDID> screenshot <path.png>` or `xcrun simctl io <UDID> recordVideo <path.mov>`.
 
 ## What's New in This Version
 
