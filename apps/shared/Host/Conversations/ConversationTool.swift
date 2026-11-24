@@ -27,7 +27,7 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
                 ]),
                 "source": .object([
                     "type": .string("string"),
-                    "description": .string("JavaScript snippet body. Use `await`; print model-visible data with `console.log` or a top-level `return`."),
+                    "description": .string("JavaScript snippet body. Use `await`; emit text with `console.log` or `return`, and images with `await image(block)`."),
                     "minLength": .int(1),
                     "maxLength": .int(100_000),
                 ])
@@ -80,7 +80,9 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
         var logs: [VirtualMachineLog]
         var failure: String?
         do {
-            let out = try await session.virtualMachine.run(source: source, bridge: session)
+            let out = try await session.virtualMachine.run(source: source, bridge: session) { attachment in
+                try session.appendTransientAttachment(attachment)
+            }
             logs = out.logs
             if let value = out.value {
                 logs.append(VirtualMachineLog(level: "log", message: value.stringValue ?? value.jsonString()))

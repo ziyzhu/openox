@@ -81,14 +81,15 @@ public actor VirtualMachine {
     public func run(
         source: String,
         bridge: any OxFunctionBridge,
-        timeout: TimeInterval = VirtualMachine.defaultTimeout
+        timeout: TimeInterval = VirtualMachine.defaultTimeout,
+        imageOutput: (@MainActor @Sendable (TransientAttachment) throws -> Void)? = nil
     ) async throws -> VirtualMachineOutput {
         let previous = tail
         let runtime = runtime
         let execution = Task {
             await previous?.value
             try Task.checkCancellation()
-            return try await runtime.run(source: source, bridge: bridge, timeout: timeout)
+            return try await runtime.run(source: source, bridge: bridge, timeout: timeout, imageOutput: imageOutput)
         }
         tail = Task { _ = try? await execution.value }
         return try await withTaskCancellationHandler {
@@ -103,9 +104,10 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
     private var thread: VirtualMachineThread { VirtualMachineThread.shared }
     private var vm: JSVirtualMachine?
 
-    func run(source: String, bridge: (any OxFunctionBridge)?, request: APIRequest? = nil, timeout: TimeInterval) async throws -> VirtualMachineOutput {
+    func run(source: String, bridge: (any OxFunctionBridge)?, request: APIRequest? = nil, timeout: TimeInterval,
+             imageOutput: (@MainActor @Sendable (TransientAttachment) throws -> Void)? = nil) async throws -> VirtualMachineOutput {
         let handle = RunHandle()
-        let environment = RunEnvironment(bridge: bridge, handle: handle, request: request)
+        let environment = RunEnvironment(bridge: bridge, handle: handle, request: request, imageOutput: imageOutput)
         let started = Date()
         let elapsedMs: @Sendable () -> Int = { Int(Date().timeIntervalSince(started) * 1000) }
 
@@ -238,6 +240,9 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
             return
         }
         let env = OxFunctionEnvironment(makePromise: makePromise, bridge: { environment.activeBridge })
+        if let imageOutput = environment.imageOutput {
+            installImageOutput(into: ctx, env: env, output: imageOutput)
+        }
 
         for tool in OxFunctionCatalog.all {
             tool.installNatives(ctx, env)
@@ -417,6 +422,55 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
         }
     }
 
+    private func installImageOutput(
+        into ctx: JSContext,
+        env: OxFunctionEnvironment,
+        output: @escaping @MainActor @Sendable (TransientAttachment) throws -> Void
+    ) {
+        let maxEncodedBytes = ((WebFetchClient.maximumBytes + 2) / 3) * 4
+        let emit: @convention(block) (String, String) -> JSValue = { mimeType, base64 in
+            env.call { _ in
+                let attachment = try await Task.detached(priority: .userInitiated) {
+                    guard base64.utf8.count <= maxEncodedBytes else { throw WebAttachmentError.tooLarge }
+                    guard mimeType.hasPrefix("image/"), let data = Data(base64Encoded: base64) else {
+                        throw WebAttachmentError.invalidImage
+                    }
+                    return try WebAttachmentFactory.make(data: data, filename: "Image", mimeType: mimeType)
+                }.value
+                try Task.checkCancellation()
+                try output(attachment)
+                Log.agent.info("snippet image output mimeType=\(attachment.mimeType) bytes=\(attachment.data.count)")
+                return nil
+            }
+        }
+        ctx.setObject(emit as AnyObject, forKeyedSubscript: "__nativeImage" as NSString)
+        ctx.evaluateScript("""
+        (() => {
+          const emit = __nativeImage;
+          delete globalThis.__nativeImage;
+          let queue = Promise.resolve();
+          Object.defineProperty(globalThis, 'image', {
+            value: async (value) => {
+              if (value && typeof value === 'object' && typeof value.image_url === 'string') value = value.image_url;
+              if (typeof value === 'string') {
+                const prefix = /^data:(image\\/[a-z0-9.+-]+);base64,/i.exec(value);
+                if (prefix) value = { type: 'image', mimeType: prefix[1], data: value.slice(prefix[0].length) };
+              }
+              const { type, mimeType, data } = value ?? {};
+              if (type !== 'image' || typeof mimeType !== 'string' ||
+                  !/^image\\/[a-z0-9.+-]+$/i.test(mimeType) || typeof data !== 'string') {
+                throw new TypeError('image() expects an image block or a Base64 image data URL');
+              }
+              if (data.length > \(maxEncodedBytes)) throw new RangeError('image() exceeds the 10 MiB per-source limit');
+              const emitted = queue.then(() => emit(mimeType.toLowerCase(), data));
+              queue = emitted.catch(() => {});
+              await emitted;
+            }, writable: false, configurable: false,
+          });
+        })();
+        """)
+    }
+
     private func makeContext(environment: RunEnvironment) -> JSContext? {
         let vm = vm ?? JSVirtualMachine()
         self.vm = vm
@@ -465,11 +519,14 @@ nonisolated private final class RunEnvironment: @unchecked Sendable {
     weak var handle: RunHandle?
 
     let request: APIRequest?
+    let imageOutput: (@MainActor @Sendable (TransientAttachment) throws -> Void)?
 
-    init(bridge: (any OxFunctionBridge)?, handle: RunHandle, request: APIRequest?) {
+    init(bridge: (any OxFunctionBridge)?, handle: RunHandle, request: APIRequest?,
+         imageOutput: (@MainActor @Sendable (TransientAttachment) throws -> Void)?) {
         self.bridge = bridge
         self.handle = handle
         self.request = request
+        self.imageOutput = imageOutput
     }
 
     var activeBridge: (any OxFunctionBridge)? {

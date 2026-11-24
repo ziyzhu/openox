@@ -58,7 +58,7 @@ export function executeGuidance(input: ExecuteGuidanceInput) {
   if (typeof input?.catalog !== "string" || ![input.timeoutSeconds, input.maxLines, input.maxBytes].every(value => Number.isSafeInteger(value) && value > 0)
     || ![input.maxFetches ?? 8, input.maxTransientAttachments ?? 4].every(value => Number.isSafeInteger(value) && value >= 0)) throw new Error("Invalid execution guidance facts");
   return [
-    "Run JavaScript as an async function body. Top-level await and return work. Print model-visible results with console.log or return. Use only exposed capabilities; no shell, Node, or direct filesystem access.",
+    "Run JavaScript as an async function body. Top-level await and return work. Emit text with console.log or return. Use await image(block) to send a Base64 image block from ox.fs.read or an image data URL to the model, not the conversation UI; it does not save a file or fetch remote URLs. Images share the transient attachment limits. Do not print Base64. Use only exposed capabilities; no shell, Node, or direct filesystem access.",
     input.catalog,
     "The catalog contains summaries, not full contracts. Use the declarations below immediately; executions are JavaScript, not TypeScript. Before using other unfamiliar functions, print their synchronous .help(), batching needed contracts with independent work in the same execution. Reuse contracts already supplied here or by ox.service.inspect. Operational calls require a short purpose; help and ox.provider.schema() do not. Use ox.fs for files.",
     "Common built-in functions:\n```ts\n" + commonDeclarations + "\n```",
