@@ -43,6 +43,8 @@ Stop an existing Host before launching another. Verify its status in the menu ba
 
 Use a Mac with Xcode that supports the phone’s iOS version. The iPhone must run iOS 26 or later. Sign in to your Apple Account under **Xcode → Settings → Accounts**. A direct Xcode install does not require App Store Connect access, membership on the OpenOx team, or Beta App Review.
 
+After `bun install`, run `bun run setup:iphone` for the guided setup. It asks for your signing team ID (or accepts `--team-id <ID>`), suggests IDs from local Apple Development signing identities when available, and generates a unique bundle ID for a new `LocalOnly` config. It preserves existing config files, builds the bundled resources, and opens the Xcode project. Then follow steps 3–4 below. For manual setup or an iCloud build, start at step 1.
+
 1. From the checkout root, prepare the bundled resources:
    ```sh
    bun run build:services

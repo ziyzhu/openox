@@ -15,6 +15,7 @@
     "build:ios": "bun .agents/skills/build/scripts/xcode-build.ts ios",
     "build:services": "bun .agents/skills/build/scripts/ios-services-build.ts",
     "build:agent": "bun packages/agent/build.ts",
+    "setup:iphone": "bun .agents/skills/setup/scripts/iphone.ts",
     "sim:bootstrap": "bun .agents/skills/setup/scripts/bootstrap.ts",
     "sim:launch": "bun .agents/skills/setup/scripts/template.ts",
     "sim:website-export": "bun .agents/skills/setup/scripts/website-export.ts",
