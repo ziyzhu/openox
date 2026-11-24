@@ -15,24 +15,47 @@ Read before creating or substantially revising HTML. Build the requested experie
 
 Design the bounded inline conversation card first, with useful content and the primary control visible at phone width; expansion is optional. Support 320 px through iPad without horizontal page scrolling, clipped labels, fixed outer widths, or fixed viewport heights. Wrap or stack controls. Do not rely on expansion, hover, or desktop width.
 
-Default to Ox's existing theme, not a custom dashboard skin, font, gradient, or decorative chrome unless requested. Use one readable column, equal outer-edge padding normally 16 px, transparent outer background, spacing and tonal grouping rather than borders/shadows. Do not imitate Host navigation, composer, or approval controls.
+Make the result feel like part of the conversation, not a separate dashboard. Match the conversation background edge to edge, with one readable column and one layer of equal padding (normally 16 px). Keep the heading, explanation, and controls on that background. Give only the plot, illustration, or other content that needs a boundary a subtle rounded surface; don't nest it in another filled card. Avoid pure-black panels, gradients, shadows, decorative borders, and imitations of Host navigation or composer controls.
 
-Define root-scoped palette variables and reuse them in HTML and SVG:
+Use this baseline with your own root ID and only the rules the result needs. The palette matches Ox's conversation and control colors in both appearances.
 
-| Variable | Light | Dark |
-| --- | --- | --- |
-| surface | #FFFFFF | #1C1C1E |
-| surface-sunken | #F2F2F7 | #2C2C2E |
-| background | #F2F2F7 | #0A0A0A |
-| on-surface | #000000 | #ECECEC |
-| on-surface-muted | #8E8E93 | #9A9A9A |
-| primary | #FFA500 | #F5A030 |
-| primary-pressed | #D87A0A | #C77410 |
-| error | #B8422E | #E25A45 |
+```css
+body { margin: 0; }
+#result {
+  color-scheme: light dark;
+  --conversation: light-dark(#fff, #0a0a0a);
+  --surface: light-dark(#f8f8f8, #1c1c1e);
+  --surface-sunken: light-dark(#f2f2f7, #2c2c2e);
+  --on-surface: light-dark(#000, #ececec);
+  --on-surface-muted: light-dark(#666, #9a9a9a);
+  --primary: light-dark(#ffa500, #f5a030);
+  box-sizing: border-box;
+  padding: 16px;
+  background: var(--conversation);
+  color: var(--on-surface);
+  font: 400 1.0625rem/1.4 -apple-system, system-ui, sans-serif;
+}
+#result h1 {
+  margin: 0 0 8px;
+  font: 600 1.375rem/1.2 ui-rounded, -apple-system, system-ui, sans-serif;
+}
+#result p { margin: 0 0 12px; }
+#result .muted { color: var(--on-surface-muted); }
+#result .stage { background: var(--surface); border-radius: 18px; }
+#result .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 12px; }
+#result button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  color: var(--on-surface);
+  font: 600 0.9375rem/1.2 ui-rounded, -apple-system, system-ui, sans-serif;
+}
+```
 
-Support `color-scheme: light dark` and `prefers-color-scheme: dark`; maintain text contrast and subtle large fills. Reserve gold for at most one primary action or active series per visible region. Use surface-sunken for recessed accents.
-
-Match system body typography at 17 px/400 (`-apple-system, system-ui, sans-serif`), rounded headings at 22 px/600, and rounded labels at 17 px/600 (`ui-rounded, -apple-system, system-ui, sans-serif`). Monospace is for code or numeric diagnostics; use at most two sizes per visible region. Use the 4/8/12/16/24/32 px spacing scale, 12 px input radii, 18 px group radii, capsule buttons, and touch targets at least 44 px in both dimensions.
+Keep routine playback, reset, and view controls neutral. Use gold for at most one action or data series that genuinely deserves emphasis, with a contrasting foreground. For toggles, pair a visible selected state with `aria-pressed`; keep keyboard focus distinct. Reuse the same palette in SVG and canvas, updating canvas drawing colors when `prefers-color-scheme` changes. Use the 4/8/12/16/24/32 px spacing scale, 12 px input radii, and 44 px minimum touch targets.
 
 ## Write the file
 
@@ -68,4 +91,4 @@ Reference sibling media paths directly in `src`, never host filesystem paths. Fo
 
 Use semantic headings/lists/tables, labeled native controls, native tab order, retained focus, and labels/shapes in addition to color. Name SVG accessibly and provide text alternatives for relationships. Announce changing results with restrained `aria-live`. Avoid animation unless it explains a state change; honor reduced motion.
 
-Read the file back to check path, size, content policy, responsive layout, labels, IDs, and default state. Test baseline/reset, adjustable extremes, invalid/missing inputs, and both sides of thresholds. Check units, calculations, and agreement between prose, labels, and graphics; show unavailable results instead of NaN, infinity, or stale data. Exercise primary workflow, navigation, draft preservation, pending/failure states, duplicate prevention, and closing/reopening without assuming persistence. Report what was actually exercised; source inspection alone is not rendered UI or live-service verification.
+Read the file back to check path, size, content policy, responsive layout, labels, IDs, and default state. Test baseline/reset, adjustable extremes, invalid/missing inputs, and both sides of thresholds. At phone width in both appearances, check that the result flows into the transcript without a contrasting outer card and that its main controls are easy to find. Check units, calculations, and agreement between prose, labels, and graphics; show unavailable results instead of NaN, infinity, or stale data. Exercise primary workflow, navigation, draft preservation, pending/failure states, duplicate prevention, and closing/reopening without assuming persistence. Report what was actually exercised; source inspection alone is not rendered UI or live-service verification.
