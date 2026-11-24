@@ -4,6 +4,8 @@ struct ThinkingRow: View {
     private let singleLineHeight = ConversationTranscriptMetrics.thinkingRowHeight
     let trace: ThinkingTrace
     let sourceInvocations: [Invocation]
+    let changedSkills: [Skill]
+    let blockID: UUID
     let startedAt: Date
     let isLive: Bool
     var allowsLoader = true
@@ -57,9 +59,52 @@ struct ThinkingRow: View {
     private var sources: [InvocationFormat.Source] {
         guard !isLive else { return [] }
         var seen: Set<String> = []
+        let changedSkillNames = Set(changes.skills.map { $0.name.lowercased() })
         return sourceInvocations.flatMap {
             InvocationFormat.sources($0, serviceManager: serviceManager) ?? []
-        }.filter { seen.insert($0.id).inserted }
+        }.filter { source in
+            !Self.describesSkill(source, in: changedSkillNames) && seen.insert(source.id).inserted
+        }
+    }
+
+    private var changes: (conversations: [(id: UUID, title: String)], schedules: [ConversationScheduleRow], skills: [Skill]) {
+        guard !isLive else { return ([], [], []) }
+        return (
+            sourceInvocations.compactMap { ConversationBlock.startedConversation($0) },
+            sourceInvocations.compactMap { ConversationScheduleRow(invocation: $0) },
+            changedSkills.filter { $0.owner != .system }
+        )
+    }
+
+    private func startedConversationChip(id: UUID, title: String) -> some View {
+        Button { openConversation?(id) } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.triangle.branch")
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .frame(width: 16, height: 20)
+                    .accessibilityHidden(true)
+                Text(verbatim: title)
+                    .font(Theme.Fonts.caption)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: 240, alignment: .leading)
+            }
+            .padding(.leading, 8)
+            .padding(.trailing, 10)
+            .dashedChipOutline()
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: Theme.Size.minimumTouchTarget)
+        .contentShape(Rectangle())
+        .accessibilityLabel(Text(verbatim: "\(L10n.string("New conversation")): \(title)"))
+        .accessibilityIdentifier("conversation.message.startedConversation.\(id.uuidString)")
+    }
+
+    private static func describesSkill(_ source: InvocationFormat.Source, in names: Set<String>) -> Bool {
+        if let skill = source.skill { return names.contains(skill.name.lowercased()) }
+        guard let path = source.filePath?.lowercased() else { return false }
+        return names.contains { path == "skills/\($0)/skill.md" }
     }
     private func previewLabel(_ entry: TraceEntry) -> String {
         switch entry {
@@ -90,7 +135,8 @@ struct ThinkingRow: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(accessibilityLabel)
-                    if !sources.isEmpty {
+                    let changes = changes
+                    if !sources.isEmpty || !changes.conversations.isEmpty || !changes.schedules.isEmpty || !changes.skills.isEmpty {
                         SourceChipList(sources: sources) { source in
                             SourceChipButton(source: source, accessibilityIdentifier: "conversation.source.\(source.id)") {
                                 if case .conversation(let id) = source.icon {
@@ -98,6 +144,15 @@ struct ThinkingRow: View {
                                 } else if let url = source.url {
                                     LinkOpener.open(url: url, serviceManager: serviceManager)
                                 }
+                            }
+                        } trailing: {
+                            ForEach(changes.conversations, id: \.id) { startedConversationChip(id: $0.id, title: $0.title) }
+                            ForEach(changes.schedules, id: \.scheduleID) { $0 }
+                            ForEach(changes.skills, id: \.id) { skill in
+                                ConversationSkillRow(
+                                    skill: skill,
+                                    accessibilityIdentifier: A11yID.ConversationControls.Message.skillResult(skill.id, blockID: blockID)
+                                )
                             }
                         }
                     }
@@ -661,16 +716,19 @@ private struct SourceFileView: View {
     }
 }
 
-private struct SourceChipList<Chip: View>: View {
+private struct SourceChipList<Chip: View, Trailing: View>: View {
     let sources: [InvocationFormat.Source]
     let chip: (InvocationFormat.Source) -> Chip
+    let trailing: Trailing
 
     init(
         sources: [InvocationFormat.Source],
-        @ViewBuilder chip: @escaping (InvocationFormat.Source) -> Chip
+        @ViewBuilder chip: @escaping (InvocationFormat.Source) -> Chip,
+        @ViewBuilder trailing: () -> Trailing
     ) {
         self.sources = sources
         self.chip = chip
+        self.trailing = trailing()
     }
 
     var body: some View {
@@ -680,10 +738,21 @@ private struct SourceChipList<Chip: View>: View {
                     chip(sources[index])
                         .fixedSize(horizontal: true, vertical: false)
                 }
+                trailing
+                    .fixedSize(horizontal: true, vertical: false)
             }
         }
         .scrollIndicators(.hidden)
         .excludesCompactPageSwitch()
+    }
+}
+
+extension SourceChipList where Trailing == EmptyView {
+    init(
+        sources: [InvocationFormat.Source],
+        @ViewBuilder chip: @escaping (InvocationFormat.Source) -> Chip
+    ) {
+        self.init(sources: sources, chip: chip) { EmptyView() }
     }
 }
 

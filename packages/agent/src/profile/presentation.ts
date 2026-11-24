@@ -20,6 +20,7 @@ export interface ApplicationPresentationChange {
   favorite?: boolean;
   unread?: boolean;
   turns?: JsonValue[];
+  created?: string[];
 }
 const reserved = new Set(["id", "profileID", "conversationID", "identity", "agent", "model", "title", "favorite", "unread", "read", "readState", "presentation", "isFavorite", "hasUnreadResponse", "lastReadEntryID"]);
 function validate(change: ApplicationPresentationChange) {
@@ -30,6 +31,7 @@ function validate(change: ApplicationPresentationChange) {
   if (change.favorite !== undefined && typeof change.favorite !== "boolean") throw new Error("Invalid conversation favorite");
   if (change.unread !== undefined && typeof change.unread !== "boolean") throw new Error("Invalid conversation unread state");
   if (change.turns !== undefined && (!Array.isArray(change.turns) || change.turns.some(turn => !turnID(turn)))) throw new Error("Presentation turns require stable IDs");
+  if (change.created !== undefined && (!Array.isArray(change.created) || change.created.some(id => typeof id !== "string"))) throw new Error("Invalid created presentation turns");
   if (change.agent !== undefined) {
     if (!change.agent || typeof change.agent !== "object" || Object.keys(change.agent).some(key => !["model", "thinkingLevel"].includes(key))) throw new Error("Invalid application agent choices");
     if (change.agent.model != null && (!change.agent.model.modelId || typeof change.agent.model.modelId !== "string")) throw new Error("Invalid canonical model ID");
@@ -214,7 +216,8 @@ export class ApplicationPresentation {
     if (!conversation) throw new Error("Conversation not found");
     await conversation.commit(async tx => {
       if (frozen.agent) await this.agentChange(tx, id, frozen.agent, true);
-      const found = await storedTurns(tx, id, new Set((frozen.turns ?? []).map(turn => turnID(turn)!)));
+      const created = new Set(frozen.created ?? []);
+      const found = await storedTurns(tx, id, new Set((frozen.turns ?? []).map(turn => turnID(turn)!).filter(key => !created.has(key))));
       const turns = found.turns;
       let latest = found.latest;
       for (const turn of frozen.turns ?? []) {

@@ -16,34 +16,28 @@ struct ConversationSkillRow: View {
         Button {
             presentedSkill = displayedSkill
         } label: {
-            HStack(spacing: Theme.Spacing.md) {
+            HStack(spacing: 6) {
                 Image(systemName: "doc.text")
                     .environment(\.symbolVariants, .none)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .frame(width: 16, height: 20)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(verbatim: "/\(displayedSkill.displayName)")
-                        .font(Theme.Fonts.bodyMd)
-                        .foregroundStyle(Theme.Colors.onSurface)
-                    if !displayedSkill.description.isEmpty {
-                        Text(verbatim: displayedSkill.description)
-                            .font(Theme.Fonts.caption)
-                            .lineLimit(2)
-                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                            .multilineTextAlignment(.leading)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.right")
+                Text(verbatim: "/\(displayedSkill.displayName)")
                     .font(Theme.Fonts.caption)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .accessibilityHidden(true)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: 240, alignment: .leading)
             }
-            .padding(Theme.Spacing.lg)
-            .conversationCardOutline(cornerRadius: Theme.Radius.xl)
-            .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.xl))
+            .padding(.leading, 8)
+            .padding(.trailing, 10)
+            .dashedChipOutline()
         }
         .buttonStyle(.plain)
+        .frame(minHeight: Theme.Size.minimumTouchTarget)
+        .contentShape(Rectangle())
+        .accessibilityLabel(Text(verbatim: "/\(displayedSkill.displayName)"))
+        .accessibilityHint(Text(verbatim: displayedSkill.description))
         .accessibilityIdentifier(accessibilityIdentifier)
         .sheet(item: $presentedSkill) { selected in
             NavigationStack {

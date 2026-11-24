@@ -322,6 +322,7 @@ final class ConversationManager {
                     let prepared = await loaded.preparingDocument()
                     guard repositoryScope == scope else { throw CancellationError() }
                     conversation = restoredConversation(from: prepared, in: scope)
+                    conversation.storedTurns = loaded.state.turns
                     register(conversation, as: reference.compatibilityID)
                 }
                 try await conversation.prepareDurableRecovery()
@@ -597,6 +598,7 @@ final class ConversationManager {
             }
             let restored = record.persistence.isDirty ? loaded.replacingMeta(record.hydration.meta) : loaded
             let conversation = self.restoredConversation(from: restored, in: scope)
+            conversation.storedTurns = loaded.state.turns
             record.hydration = .loaded(conversation)
             self.records[id] = record
             self.touch(id)
@@ -1066,7 +1068,8 @@ final class ConversationManager {
     private func launch(_ request: ConversationSaveRequest, in record: inout Record) {
         let scopedRepository = repository
         let storageScope = repositoryScope
-        let worker = Task { await scopedRepository.saveConversation(request, in: storageScope) }
+        let storedTurns = record.hydration.conversation?.storedTurns
+        let worker = Task { await scopedRepository.saveConversation(request, storedTurns: storedTurns, in: storageScope) }
         record.persistence = .saving(request, nil, worker)
         Task { [weak self] in
             let result = await worker.value
@@ -1079,6 +1082,9 @@ final class ConversationManager {
               var record = records[id],
               case .saving(let inFlight, let pendingLatest, _) = record.persistence,
               inFlight.saveID == result.saveID else { return }
+        if result.succeeded, case .conversation(let state) = inFlight.payload {
+            record.hydration.conversation?.storedTurns = state.turns
+        }
         if let pendingLatest {
             launch(pendingLatest, in: &record)
         } else if result.succeeded {

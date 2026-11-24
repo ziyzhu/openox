@@ -10,7 +10,6 @@ struct ConversationBlock: Identifiable, Equatable {
         case userText(String, attachments: [FileItem])
         case userSkill(UserSkillInvocation, attachments: [FileItem])
         case agentContent(ContentItem)
-        case startedConversation(UUID, title: String)
         case thinking(ThinkingTrace)
         case contextCompaction(ContextCompaction)
         case serviceControl(ServiceControl, interactionID: UUID?)
@@ -23,14 +22,30 @@ struct ConversationBlock: Identifiable, Equatable {
     let kind: Kind
     let spacingBefore: CGFloat
     var sourceInvocations: [Invocation] = []
+    var changedSkills: [Skill] = []
     var isLiveThinking = false
     var scheduleName: String? = nil
 
     var isUserInitiated: Bool {
         switch kind {
         case .userText, .userSkill: true
-        case .agentContent, .startedConversation, .thinking, .contextCompaction, .serviceControl, .responseFooter: false
+        case .agentContent, .thinking, .contextCompaction, .serviceControl, .responseFooter: false
         }
+    }
+
+    static func startedConversation(_ invocation: Invocation) -> (id: UUID, title: String)? {
+        guard invocation.name == Actions.conversationStart,
+              case .succeeded(let result?) = invocation.outcome,
+              let rawID = result.objectValue?["id"]?.stringValue,
+              let id = UUID(uuidString: rawID) else { return nil }
+        let title = invocation.args.objectValue?["title"]?.stringValue?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return (id, title.isEmpty ? L10n.string("New conversation") : title)
+    }
+
+    var changedSkill: Skill? {
+        guard case .agentContent(.skill(let skill)) = kind else { return nil }
+        return skill
     }
 
     var isResponseFooter: Bool {
@@ -87,12 +102,12 @@ extension ConversationBlock {
             return Self.serviceControlText(control)
         case .thinking(let trace):
             return trace.invocations
-                .filter { $0.name != Actions.conversationStart }
-                .map(\.purpose)
+                .map { invocation in
+                    guard let started = Self.startedConversation(invocation) else { return invocation.purpose }
+                    return "\(L10n.string("New conversation")): \(started.title)"
+                }
                 .filter { !$0.isEmpty }
                 .joined(separator: "\n")
-        case .startedConversation(_, let title):
-            return "\(L10n.string("New conversation")): \(title)"
         case .userText, .userSkill, .contextCompaction, .responseFooter:
             return ""
         }
@@ -162,24 +177,6 @@ extension ConversationBlock {
                     kind: .thinking(trace),
                     spacingBefore: ConversationTranscriptMetrics.blockSpacing
                 ))
-                for invocation in trace.invocations {
-                    guard invocation.name == Actions.conversationStart,
-                          case .succeeded(let result?) = invocation.outcome,
-                          let rawID = result.objectValue?["id"]?.stringValue,
-                          let conversationID = UUID(uuidString: rawID) else { continue }
-                    let title = invocation.args.objectValue?["title"]?.stringValue?
-                        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    projectedTurns[turnIndex].blocks.append(ConversationBlock(
-                        id: StableID.uuid("conversation.started.\(invocation.id)"),
-                        sourceBlockID: block.id,
-                        createdAt: block.createdAt,
-                        kind: .startedConversation(
-                            conversationID,
-                            title: title.isEmpty ? L10n.string("New conversation") : title
-                        ),
-                        spacingBefore: ConversationTranscriptMetrics.blockSpacing
-                    ))
-                }
                 continue
             }
             guard case .agentContent(let items) = block.kind else {
@@ -244,7 +241,7 @@ extension ConversationBlock {
                     case .progress: return true
                     case .serviceControl, .serviceInspector, .shoveler, .video, .image, .artifact, .skill: return false
                     }
-                case .startedConversation, .serviceControl: return false
+                case .serviceControl: return false
                 default: return true
                 }
             }
@@ -277,10 +274,12 @@ extension ConversationBlock {
             if let lastThinking = turnBlocks.lastIndex(where: \.isThinking) {
                 turnBlocks[lastThinking].sourceInvocations = invocations
                 turnBlocks[lastThinking].isLiveThinking = thinkingActivity?.turnID == turn.id
+                turnBlocks[lastThinking].changedSkills = turnBlocks.compactMap(\.changedSkill)
+                turnBlocks.removeAll { $0.changedSkill != nil }
             }
             if let lastResponse = turnBlocks.last(where: { block in
                 switch block.kind {
-                case .agentContent, .thinking, .startedConversation, .serviceControl: true
+                case .agentContent, .thinking, .serviceControl: true
                 default: false
                 }
             }) {
@@ -309,6 +308,7 @@ extension ConversationBlock {
                     Theme.Size.minimumTouchTarget - ConversationTranscriptMetrics.thinkingRowHeight
                 ),
                 sourceInvocations: block.sourceInvocations,
+                changedSkills: block.changedSkills,
                 isLiveThinking: block.isLiveThinking
             )
         }

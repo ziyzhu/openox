@@ -640,6 +640,7 @@ final class Conversation: Identifiable {
 
     @ObservationIgnored weak var conversationManager: ConversationManager?
     @ObservationIgnored var onPersistableChange: (() -> Void)?
+    @ObservationIgnored var storedTurns: [Turn]?
     @ObservationIgnored var onPrivateDataTemporaryContinuation: ((ConversationContinuation) -> Void)?
 
     static let abortedAnswer = "The user stopped before answering."

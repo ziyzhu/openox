@@ -13,29 +13,26 @@ struct ConversationScheduleRow: View {
 
     var body: some View {
         Button { showsDetails = true } label: {
-            HStack(spacing: Theme.Spacing.md) {
+            HStack(spacing: 6) {
                 Image(systemName: "clock")
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .frame(width: 16, height: 20)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(verbatim: schedule?.name ?? fallbackTitle)
-                        .font(Theme.Fonts.bodyMd)
-                        .foregroundStyle(Theme.Colors.onSurface)
-                    Text(verbatim: subtitle)
-                        .font(Theme.Fonts.caption)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.right")
+                Text(verbatim: "\(schedule?.name ?? fallbackTitle) · \(subtitle)")
                     .font(Theme.Fonts.caption)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .accessibilityHidden(true)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: 240, alignment: .leading)
             }
-            .padding(Theme.Spacing.lg)
-            .conversationCardOutline(cornerRadius: Theme.Radius.xl)
-            .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.xl))
+            .padding(.leading, 8)
+            .padding(.trailing, 10)
+            .dashedChipOutline()
         }
         .buttonStyle(.plain)
+        .frame(minHeight: Theme.Size.minimumTouchTarget)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
         .accessibilityIdentifier(accessibilityIdentifier)
         .sheet(isPresented: $showsDetails) {
             NavigationStack {

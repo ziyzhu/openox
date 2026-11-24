@@ -95,6 +95,8 @@ struct OxDemoSceneView: View {
                         ThinkingRow(
                             trace: thinking,
                             sourceInvocations: [],
+                            changedSkills: [],
+                            blockID: StableID.uuid("demo.thinking"),
                             startedAt: playback.thinkingStartedAt,
                             isLive: thinking.completedAt == nil
                         )

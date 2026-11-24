@@ -649,24 +649,19 @@ struct BlockView: View, Equatable {
         case .agentContent(let item):
             agentContentBubble([item])
         case let .thinking(trace):
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                ThinkingRow(
-                    trace: trace,
-                    sourceInvocations: block.sourceInvocations,
-                    startedAt: block.createdAt,
-                    isLive: isThinkingTail,
-                    allowsLoader: allowsLoader
-                )
-                .padding(.horizontal, 4)
-                ForEach(trace.invocations) { invocation in
-                    if let row = ConversationScheduleRow(invocation: invocation) {
-                        row
-                    }
-                }
-            }
+            ThinkingRow(
+                trace: trace,
+                sourceInvocations: block.sourceInvocations,
+                changedSkills: block.changedSkills,
+                blockID: block.id,
+                startedAt: block.createdAt,
+                isLive: isThinkingTail,
+                allowsLoader: allowsLoader
+            )
+            .padding(.horizontal, 4)
         case .contextCompaction:
             contextCompactionDivider
-        case .startedConversation, .serviceControl, .responseFooter:
+        case .serviceControl, .responseFooter:
             EmptyView()
         }
     }
