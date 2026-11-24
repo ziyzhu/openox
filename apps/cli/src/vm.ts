@@ -147,19 +147,13 @@ async function skills(args: string[], context: CliContext): Promise<void> {
   const result = await request("vm.call", context, options.timeoutMs, name
     ? { function: "ox.fs.read", arguments: { path: `skills/${name}/SKILL.md`, purpose: "Read VM skill" } }
     : { function: "ox.fs.ls", arguments: { path: "skills", purpose: "List VM skills" } });
-  const value = valueObject(result);
   if (options.json) {
     printVMJSON(result);
     return;
   }
-  if (name) {
-    if (typeof value.text !== "string") fail("VM skill is not readable text");
-    process.stdout.write(value.text.endsWith("\n") ? value.text : `${value.text}\n`);
-    return;
-  }
-  const items = Array.isArray(value.items) ? value.items : [];
-  for (const item of items) console.log(String(object(item).path ?? ""));
-  if (value.truncated === true) console.log(terminalText("Results truncated", [C.dim]));
+  const value = result.value;
+  if (typeof value !== "string") return fail("VM skills result is not readable text");
+  process.stdout.write(value.endsWith("\n") ? value : `${value}\n`);
 }
 
 async function request(

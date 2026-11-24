@@ -134,7 +134,7 @@ extension Scenario {
             await ox.fs.write({ path: "artifacts/agent-note.md", content: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40"><text x="8" y="26">Hello</text></svg>', purpose: "Create agent note" });
             await ox.fs.edit({ path: "artifacts/agent-note.md", edits: [{ oldText: "Hello", newText: "Hello, Ox!" }], purpose: "Edit agent note" });
             await ox.fs.move({ from: "artifacts/agent-note.md", to: "artifacts/agent-image.svg", purpose: "Rename agent note" });
-            console.log((await ox.fs.read({ path: "artifacts/agent-image.svg", purpose: "Read agent image" })).text);
+            console.log(await ox.fs.read({ path: "artifacts/agent-image.svg", purpose: "Read agent image" }));
             """)]
         }
         guard ctx.toolResults.last?.isError == false,

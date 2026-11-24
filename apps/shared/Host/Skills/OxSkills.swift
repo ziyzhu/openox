@@ -79,7 +79,7 @@ nonisolated enum OxSkills {
             let offset = 1;
             let characters = 0;
             while (true) {
-              const file = await ox.fs.read({path, offset, purpose: String(options.purpose)});
+              const file = await __nativeFS('read', {path, offset, purpose: String(options.purpose)});
               if (typeof file.text !== 'string') throw new Error('Skill script could not be read completely');
               characters += file.text.length;
               if (characters > 524288) throw new Error('Skill script exceeds size limit');

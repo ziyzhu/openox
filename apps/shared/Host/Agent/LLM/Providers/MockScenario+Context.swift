@@ -52,7 +52,7 @@ extension Scenario {
                 const files = await ox.fs.find({ path: "skills", pattern: "**/SKILL.md", purpose: "Find bundled skills" });
                 const guide = await ox.fs.read({ path: "skills/manage-skills/SKILL.md", purpose: "Activate the bundled authoring skill" });
                 const references = await ox.fs.ls({ path: "skills/manage-skills/references", purpose: "List skill references" });
-                console.log({ count: files.paths.length, guide: guide.text.includes("# Manage Skills"), references: references.items.length });
+                console.log({ count: files.split('\\n').length, guide: guide.includes("# Manage Skills"), references: references.split('\\n').length });
                 """)]
             }
             guard !result.isError, result.activatedSkills.contains(where: { $0.name == "manage-skills" }),
@@ -108,7 +108,7 @@ extension Scenario {
     static let appInformation = Scenario(name: "app-information") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute("""
-            const info = JSON.parse((await ox.fs.read({ path: "app/status.json", purpose: "Read app identity" })).text).app;
+            const info = JSON.parse(await ox.fs.read({ path: "app/status.json", purpose: "Read app identity" })).app;
             const model = await ox.conversation.model({ purpose: "Read current model" });
             console.log({ info, model });
             """)]
@@ -127,8 +127,9 @@ extension Scenario {
             return [execute("""
             try {
               const result = await ox.fs.grep({ path: "app/logs.jsonl", pattern: '"category":"Session"', literal: true, limit: 3, purpose: "Read diagnostic logs" });
-              const valid = result.matches.length > 0 && result.matches.length <= 3 && result.matches.every(entry => entry.text.includes('"category":"Session"'));
-              console.log(JSON.stringify({ valid, count: result.matches.length, truncated: result.truncated }));
+              const matches = result.split('\\n').filter(line => /^app\\/logs\\.jsonl:\\d+: /.test(line));
+              const valid = matches.length > 0 && matches.length <= 3 && matches.every(line => line.includes('"category":"Session"'));
+              console.log(JSON.stringify({ valid, count: matches.length }));
             } catch (error) {
               console.log(JSON.stringify({ error: String(error) }));
             }

@@ -24,14 +24,14 @@ extension Scenario {
         if ctx.turn == 0 {
             return [execute("""
             const purpose = "Verify and restore new-conversation model preferences";
-            const read = async () => JSON.parse((await ox.fs.read({ path: "app/providers.json", purpose })).text);
+            const read = async () => JSON.parse(await ox.fs.read({ path: "app/providers.json", purpose }));
             const write = async selection => {
               const catalog = await read();
               catalog.defaultModel = selection;
               await ox.fs.write({ path: "app/providers.json", content: JSON.stringify(catalog), purpose });
               return (await read()).defaultModel ?? null;
             };
-            const baseline = JSON.parse((await ox.fs.read({ path: "app/status.json", purpose })).text).defaultModel;
+            const baseline = JSON.parse(await ox.fs.read({ path: "app/status.json", purpose })).defaultModel;
             const current = await ox.conversation.model({ purpose });
             const original = (await read()).defaultModel ?? null;
             if (original && original.providerID !== "mock") throw Error("Use automatic or Mock defaults for this fixture");
@@ -39,7 +39,7 @@ extension Scenario {
               const selection = { providerID: "mock", modelID: baseline.model.id === "mock-text-only" ? "mock" : "mock-text-only" };
               if ((await write(selection)).modelID !== selection.modelID) throw Error("Default model selection failed");
               if ((await write(selection)).modelID !== selection.modelID) throw Error("Default model no-op failed");
-              if (JSON.parse((await ox.fs.read({ path: "app/status.json", purpose })).text).defaultModel.model.id !== selection.modelID) throw Error("Default model reader failed");
+              if (JSON.parse(await ox.fs.read({ path: "app/status.json", purpose })).defaultModel.model.id !== selection.modelID) throw Error("Default model reader failed");
               if (await write(null) !== null || await write(null) !== null) throw Error("Automatic reset failed");
               const setDefault = ({ selection }) => write({ providerID: selection.provider, modelID: selection.model, reasoningEffort: selection.thinkingLevel });
               for (const setter of [setDefault, ox.conversation.setModel]) {
@@ -56,7 +56,7 @@ extension Scenario {
             } finally {
               await write(original);
             }
-            const restored = JSON.parse((await ox.fs.read({ path: "app/status.json", purpose })).text).defaultModel;
+            const restored = JSON.parse(await ox.fs.read({ path: "app/status.json", purpose })).defaultModel;
             if (restored.configured !== baseline.configured || restored.provider.id !== baseline.provider.id || restored.model.id !== baseline.model.id || restored.thinkingLevel !== baseline.thinkingLevel) throw Error("Default model restoration failed");
             console.log("DEFAULT_MODEL_VERIFIED_AND_RESTORED");
             """)]

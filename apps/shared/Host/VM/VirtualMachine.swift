@@ -366,6 +366,7 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
           if (error != null) throw Object.assign(new TypeError(name + ': ' + error + __oxHelpDetail(name)), { code: 'invalid_argument', recovery: 'Correct the reported fields using ' + name + '.help() before calling again.' });
           return value;
         };
+        \(OxFileSystem.textPageJS)
         const ox = {
         \(oxMembers)
         };

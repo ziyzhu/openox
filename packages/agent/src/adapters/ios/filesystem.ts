@@ -10,10 +10,12 @@ import { conversationRecordPath } from "../../profile/file-store";
 import { profileMounts } from "../../profile/filesystem";
 
 export interface NativeFileMount { path: string; access: "readOnly" | "readWrite" }
+type ReadImage = { type: "image"; data: string; mimeType: string; note: string };
 export async function invokeFilesystem(runtime: ProfileRuntime, capability: string, mounts: NativeFileMount[], operation: FileOperation, args: FileRequest, signal: AbortSignal) {
   if (!capability || !Array.isArray(mounts) || !["stat", "list", "read", "write", "edit", "rm", "mkdir", "move", "copy", "glob", "grep"].includes(operation)) throw new Error("Invalid filesystem capability");
   const context = withAbortSignal(signal, BACKGROUND_CONTEXT);
   const originals = new Map<string, string>();
+  let image: ReadImage | undefined;
   const call = async <T>(op: string, path: string, values: object = {}) => {
     signal.throwIfAborted();
     const result = await native<{ value?: T; error?: { code: ConstructorParameters<typeof FileError>[0]; message: string } }>("fileBackend", { capability, op, path, ...values }, signal);
@@ -26,7 +28,12 @@ export async function invokeFilesystem(runtime: ProfileRuntime, capability: stri
     info: path => call<FileInfo>("info", path),
     list: path => call<FileInfo[]>("list", path),
     read: async path => {
-      const result = await call<{ text: string | null; unsupported: string | null; truncated: boolean }>("read", path);
+      const result = await call<{ text: string | null; unsupported: string | null; truncated: boolean } | ReadImage>("read", path,
+        operation === "read" && args.byteOffset === undefined ? { includeImage: true } : {});
+      if ("type" in result) {
+        image = result;
+        throw new FileError("not_supported", "Image is not text", path);
+      }
       if (result.unsupported || result.text === null) throw new FileError("not_supported", result.unsupported ?? "File is not readable text", path);
       if (result.truncated) throw new FileError("invalid", "Source exceeds the filesystem read safety limit", path);
       if (operation === "edit") originals.set(path, result.text);
@@ -66,7 +73,7 @@ export async function invokeFilesystem(runtime: ProfileRuntime, capability: stri
     if (operation === "read" && /^skills\/[^/]+\/SKILL\.md$/.test(canonical(args.path ?? ""))) await call("activate", canonical(args.path!));
     return result;
   } catch (error) {
-    if (operation === "read" && error instanceof FileError && error.code === "not_supported") return { path: canonical(args.path!), text: null, truncated: false, unsupported: error.message, nextOffset: null, diagnostics: [] };
+    if (operation === "read" && error instanceof FileError && error.code === "not_supported") return image ?? { path: canonical(args.path!), text: null, truncated: false, unsupported: error.message, nextOffset: null, diagnostics: [] };
     throw error;
   } finally { await env.cleanup(BACKGROUND_CONTEXT); }
 }

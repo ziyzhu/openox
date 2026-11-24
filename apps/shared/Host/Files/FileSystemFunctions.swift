@@ -57,7 +57,7 @@ extension Conversation {
                     "mtimeMs": fields["mtimeMs"] ?? .int(0), "cloud": fields["cloud"] ?? .null])
             })
         case "read":
-            value = try await readFileBackend(path: path)
+            value = try await readFileBackend(path: path, includeImage: arguments.objectValue?["includeImage"]?.boolValue == true)
         case "write":
             let fields = arguments.objectValue
             if let base64 = fields?["base64"]?.stringValue {
@@ -197,28 +197,42 @@ extension Conversation {
         return Array(Dictionary(saved.map { ($0.id, $0) } + loaded.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest }).values)
     }
 
-    private func readFileBackend(path: String) async throws -> JSONValue {
+    private func readFileBackend(path: String, includeImage: Bool) async throws -> JSONValue {
         let parts = path.split(separator: "/")
         let root = parts.first.map(String.init) ?? ""
         let conversationFile = root == "conversations" && !(parts.count == 3 && ["conversation.json", "turns.jsonl"].contains(String(parts[2])))
         if let route = durableRoute, conversationFile || root == "artifacts" || !VirtualFileSystem.hostRoots.contains(root) || (!isTemporary && root == "MEMORY.md") {
             let record = try await route.session.runtime.command(.object(["action": .string("fileStat"), "path": .string(path), "byPath": .bool(true)]))
             if record.objectValue?["file"] != .null, record.objectValue?["file"] != nil {
-                let media = try await fileSystemMedia(path: path)
-                let result = try await Task.detached(priority: .userInitiated) {
-                    try media.read()
-                }.value
-                let unsupported = media.kind == .image
-                    ? try ModelPromptRenderer.shared.render(.imageReadGuidance, input: .object(["path": .string(path)])) : result.unsupported
-                return fileSystemReadJSON(path: path, result: FileLibrary.Read(text: result.text, truncated: result.truncated, unsupported: unsupported))
+                return try await readMediaBackend(path: path, includeImage: includeImage)
             }
         }
         let location = try await fileSystemLocation(path)
         try Task.checkCancellation()
         try await self.authorizeFileAccess(location, operation: .read)
+        switch location {
+        case .artifact where includeImage, .deviceItem where includeImage:
+            return try await readMediaBackend(path: location.path, includeImage: includeImage)
+        default:
+            break
+        }
         let result = try await fileSystemRead(location)
         Log.session.info("bridge.fs.read path=\(location.path) text=\(result.text?.count ?? 0) truncated=\(result.truncated)")
         return fileSystemReadJSON(path: location.path, result: result)
+    }
+
+    private func readMediaBackend(path: String, includeImage: Bool) async throws -> JSONValue {
+        let media = try await fileSystemMedia(path: path)
+        if includeImage, media.kind == .image, let image = await Task.detached(priority: .userInitiated, operation: {
+            try? ImagePreparer.prepare(media.data)
+        }).value {
+            return .object(["type": .string("image"), "data": .string(image.data.base64EncodedString()),
+                "mimeType": .string(image.mimeType), "note": .string("Image read from \(path).")])
+        }
+        let result = try await Task.detached(priority: .userInitiated) { try media.read() }.value
+        let unsupported = media.kind == .image
+            ? try ModelPromptRenderer.shared.render(.imageReadGuidance, input: .object(["path": .string(path)])) : result.unsupported
+        return fileSystemReadJSON(path: path, result: FileLibrary.Read(text: result.text, truncated: result.truncated, unsupported: unsupported))
     }
 
     public func attachFileSystem(path: String, purpose: String) async throws -> JSONValue? {

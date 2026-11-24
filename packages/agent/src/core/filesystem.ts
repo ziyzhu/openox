@@ -188,7 +188,7 @@ function readPage(result: ToolExecutionResult, args: FileRequest, totalLines: nu
   const clippedLine = result.diagnostics?.some(value => value.code === "truncated" && value.severity === "warn") ?? false;
   const next = (args.offset ?? 1) + text.split("\n").length;
   const truncated = clippedLine || next <= totalLines;
-  const diagnostics = clippedLine ? [{ path: args.path!, message: "One line exceeds the 50 KiB read limit. Its remainder cannot be resumed with line offsets; resume with byteOffset: 0 and nextByteOffset." }] : [];
+  const diagnostics = clippedLine ? [{ path: args.path!, message: "One line exceeds the 50 KiB read limit. Its remainder cannot be resumed with line offsets; restart with byteOffset: 0 and follow the byte offset continuation." }] : [];
   return { path: args.path, text, truncated, unsupported: null, nextOffset: truncated && !clippedLine ? next : null, diagnostics };
 }
 async function readBytes(env: MountedExecutionEnv, args: FileRequest, context: Context) {

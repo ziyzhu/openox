@@ -139,6 +139,9 @@ actor DurableAgentHost {
         if operation == "activate", capability.operation != "read" {
             throw RuntimeError.bridge("Filesystem search cannot activate skills")
         }
+        if fields["includeImage"]?.boolValue == true, operation != "read" || capability.operation != "read" {
+            throw RuntimeError.bridge("Filesystem capability cannot read images")
+        }
         try Task.checkCancellation()
         let result: JSONValue
         if capability.roots.contains("app"), root == "app" {
