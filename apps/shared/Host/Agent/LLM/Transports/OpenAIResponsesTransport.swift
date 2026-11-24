@@ -75,9 +75,13 @@ public struct OpenAIResponsesTransport: ProviderClient {
         guard !(await OpenAIResponsesWebSocketPool.shared.fallbackActive(sessionID: sessionID)) else { return .unavailable }
         do {
             let endpoint = try await auth.resolve(forceRefresh: false)
+            let accountID = webSocketAccountID(endpoint: endpoint, accountHeader: accountHeader)
+            guard !(await OpenAIResponsesWebSocketPool.shared.holdsConnection(sessionID: sessionID, accountID: accountID)) else {
+                Log.network.info("\(displayName).warmup connection=pooled session=\(sessionID) outcome=ready")
+                return .ready
+            }
             let request = try webSocketRequest(endpoint: endpoint, cacheKey: sessionID)
-            let lease = await OpenAIResponsesWebSocketPool.shared.acquire(request: request, sessionID: sessionID,
-                accountID: webSocketAccountID(endpoint: endpoint, accountHeader: accountHeader))
+            let lease = await OpenAIResponsesWebSocketPool.shared.acquire(request: request, sessionID: sessionID, accountID: accountID)
             let (pong, completion) = AsyncThrowingStream<Void, Error>.makeStream()
             let pingTimeout = Task {
                 do { try await Task.sleep(for: .seconds(5)) } catch { return }

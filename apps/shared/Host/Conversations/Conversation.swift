@@ -120,7 +120,7 @@ final class Conversation: Identifiable {
     func setModelPreparationIntent(_ active: Bool) {
         guard modelPreparationIntent != active else { return }
         modelPreparationIntent = active
-        if client.preparationRequiresPrompt { scheduleModelPreparation() }
+        if client.preparationRequiresPrompt || (active && modelPreparationTask == nil) { scheduleModelPreparation() }
     }
 
     func suspendModelPreparation() {
@@ -143,6 +143,7 @@ final class Conversation: Identifiable {
         suspendModelPreparation()
         guard isSelected, !isBusy, execution.foregroundExecutionAvailable else { return }
         modelPreparationTask = Task { @MainActor [weak self] in
+            defer { if !Task.isCancelled { self?.modelPreparationTask = nil } }
             guard !Task.isCancelled, let self, self.isSelected, self.execution.foregroundExecutionAvailable else { return }
             let client = self.client
             let model = self.model

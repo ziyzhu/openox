@@ -82,7 +82,7 @@ actor OpenAIResponsesWebSocketPool {
     }
 
     private let clock = ContinuousClock()
-    private let idleDuration: Duration = .seconds(5 * 60)
+    private let idleDuration: Duration = .seconds(75)
     private let maximumAge: Duration = .seconds(55 * 60)
     private var activity = Activity.foreground
     private var entries: [Key: Entry] = [:]
@@ -102,6 +102,11 @@ actor OpenAIResponsesWebSocketPool {
     func fallbackActive(sessionID: String?) -> Bool {
         fallbackSessions = fallbackSessions.filter { $0.value > clock.now }
         return sessionID.flatMap { fallbackSessions[$0] } != nil
+    }
+
+    func holdsConnection(sessionID: String, accountID: String) -> Bool {
+        guard let entry = entries[Key(sessionID: sessionID, accountID: accountID)] else { return false }
+        return entry.busy || (entry.task.state == .running && entry.createdAt.duration(to: clock.now) < maximumAge)
     }
 
     func acquire(request: URLRequest, sessionID: String?, accountID: String) -> Lease {
