@@ -96,7 +96,7 @@ nonisolated enum DurableConversationProjection {
                 let exact = rich.filter { abs($0.0.at.timeIntervalSince(user.timestamp)) < 0.001 }
                 let matched = exact.last ?? (rich.count == 1 ? rich.first : nil)
                 let skill = matched?.0.skillInvocation.flatMap { $0.expandedIntent == intent ? $0 : nil }
-                let id = turnID ?? unused(matched?.1) ?? TurnID(StableID.uuid(namespace + ":user"))
+                let id = unused(turnID) ?? unused(matched?.1) ?? derivedTurnID(namespace + ":user")
                 usedTurnIDs.insert(id)
                 turns.append(.user(UserTurn(intent: intent, attachments: attachments, at: matched?.0.at ?? user.timestamp,
                                             submissionID: matched?.0.submissionID, skillInvocation: skill,
@@ -112,6 +112,17 @@ nonisolated enum DurableConversationProjection {
 
         func unused(_ id: TurnID?) -> TurnID? {
             id.flatMap { usedTurnIDs.contains($0) || $0 == agentID ? nil : $0 }
+        }
+
+        func derivedTurnID(_ namespace: String) -> TurnID {
+            var id = TurnID(StableID.uuid(namespace))
+            var collisions = 0
+            while unused(id) == nil {
+                collisions += 1
+                id = TurnID(StableID.uuid("\(namespace):\(collisions)"))
+            }
+            if collisions > 0 { Log.session.warning("PiDurable projection derived turn ID collided namespace=\(namespace) collisions=\(collisions)") }
+            return id
         }
 
         mutating func appendAssistant(_ assistant: AssistantMessage, namespace: String, turnID: TurnID?) {
@@ -131,7 +142,7 @@ nonisolated enum DurableConversationProjection {
             let rich = candidates.last
             if agent == nil {
                 agent = AgentTurn(at: assistant.timestamp, generations: [], steps: [], outcome: .running)
-                agentID = turnID ?? unused(rich?.turnID) ?? TurnID(StableID.uuid(namespace + ":agent"))
+                agentID = unused(turnID) ?? unused(rich?.turnID) ?? derivedTurnID(namespace + ":agent")
             }
             let generationID = AgentGenerationID(StableID.uuid(namespace + ":generation"))
             agent?.generations.append(ModelGeneration(id: generationID, at: assistant.timestamp, model: assistant.model,
