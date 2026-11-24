@@ -48,7 +48,7 @@ Use a Mac with Xcode that supports the phone’s iOS version. The iPhone must ru
    bun run build:services
    bun run build:agent
    ```
-2. If `apps/ios/Local.xcconfig` doesn’t exist, copy `apps/ios/LocalOnly.xcconfig.example` to that path for a build without iCloud, or use `apps/ios/Local.xcconfig.example` for iCloud. Set `OX_DEVELOPMENT_TEAM` to your own team ID and `OX_BUNDLE_IDENTIFIER` to your own unique bundle ID. Keep automatic signing enabled for both the app and the share extension.
+2. If `apps/ios/Local.xcconfig` doesn’t exist, copy `apps/ios/LocalOnly.xcconfig.example` to that path for a build without iCloud, or use `apps/ios/Local.xcconfig.example` for iCloud. Replace the example `OX_DEVELOPMENT_TEAM` with your signing team’s ID. If you don’t belong to a developer team, signing in to Xcode with a free Apple Account gives you a [Personal Team](https://developer.apple.com/support/compare-memberships/); see the App Groups caveat below. Replace `OX_BUNDLE_IDENTIFIER` with a unique reverse-DNS identifier you choose, such as `com.janedoe.openox`. You don’t need to own the domain or register the identifier manually. Keep automatic signing enabled for both the app and the share extension.
 3. Open `apps/ios/Ox.xcodeproj` in Xcode. Connect and unlock your iPhone, trust the Mac when prompted, and select the phone as the run destination for the `ios` scheme. If prompted, [enable Developer Mode](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device) on the phone and confirm after it restarts.
 4. Press **⌘R** to build, install, and launch Ox. Verify that onboarding or the main screen opens on the phone.
 
@@ -59,7 +59,8 @@ The iCloud build needs a paid team and the iCloud container `iCloud.<OX_BUNDLE_I
 No Apple Account is needed. Install the required [runtime in Xcode](https://developer.apple.com/documentation/xcode/downloading-and-installing-additional-xcode-components), then run `bun run build:services` and `bun run build:agent`.
 
 1. Use the fixed pool: `ox-1`–`ox-3` run iOS 26 and `ox-4`–`ox-5` run iOS 27. [Reserve one available simulator](references/simulator.md#ios-tools-and-simulator-pool) before booting, installing, or launching. Resolve its UDID and never target an implicit booted device.
-2. Keep your existing `apps/ios/Local.xcconfig`; if absent, copy `apps/ios/LocalOnly.xcconfig.example` and set your intended bundle ID. Follow the [first simulator run](references/simulator.md#first-simulator-run) for an ad-hoc build, install, and launch. Verify onboarding or the main screen.
+2. Keep your existing `apps/ios/Local.xcconfig`; if absent, copy `apps/ios/LocalOnly.xcconfig.example` to that path as-is. Follow the [first simulator run](references/simulator.md#first-simulator-run) for ad-hoc signing, which ignores the example team ID. Verify onboarding or the main screen.
+   - **Optional:** For a new simulator-only configuration, replace `com.example.openox` with a bundle ID of your choice.
 3. Release your claim when done and shut down the simulator if you booted it for this task. Leave other simulators and their data alone.
 
 For seeded QA, use [device templates](references/device-templates.md). [ChatGPT login transfer](references/chatgpt-login.md) is a separate, opt-in workflow.
