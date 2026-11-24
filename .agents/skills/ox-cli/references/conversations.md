@@ -1,6 +1,6 @@
 # Conversation and VM operations
 
-For filesystem staging, use `ox.fs.list` without a path to discover the conversation's working directory, or read the metadata's `workingDirectory`. Do not construct a writable path from the public conversation UUID: the working-directory identifier can differ. `/tmp` is read-only execution output, not a staging destination. Relative ordinary file paths resolve in the current working directory.
+For filesystem staging, use `ox.fs.ls` without a path to discover the conversation's working directory, or read the metadata's `workingDirectory`. Do not construct a writable path from the public conversation UUID: the working-directory identifier can differ. `/tmp` is read-only execution output, not a staging destination. Relative ordinary file paths resolve in the current working directory.
 
 Current Hosts expose app configuration through `ox.fs.read` under `app/`: `settings.json`, `providers.json`, and `services.json` contain editable configuration; `status.json` is generated app and Host state; `policy.json` and `actions/<encodeURIComponent(action)>.json` expose approval policies. Read `app/logs.jsonl` explicitly for approval-gated, redacted diagnostics; directory searches exclude its contents. Prefer `ox host logs` for scoped CLI diagnostics. App files are unavailable if the Profile already owns an `app` path.
 

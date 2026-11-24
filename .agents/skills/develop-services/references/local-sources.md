@@ -8,14 +8,14 @@ Target the source Host explicitly, not the default simulator. For the user's iPh
 
 ```sh
 ox --host <ws-url> repository list --json
-ox --host <ws-url> --conversation <full-id> vm help ox.fs.list
+ox --host <ws-url> --conversation <full-id> vm help ox.fs.ls
 ox --host <ws-url> --conversation <full-id> vm help ox.fs.read
-ox --host <ws-url> --conversation <full-id> vm call ox.fs.list --args '{"purpose":"Export Local repository","path":"repositories/local"}' --json
+ox --host <ws-url> --conversation <full-id> vm call ox.fs.ls --args '{"purpose":"Export Local repository","path":"repositories/local"}' --json
 ox --host <ws-url> --conversation <full-id> vm call ox.fs.read --args '{"purpose":"Export repository metadata","path":"repositories/local/repository.json"}' --json
 ```
 
 1. Confirm Local is available and choose the whole repository or the requested service subtree. Include `repository.json` for a repository snapshot and preserve all relative paths, including service resources and skills. Do not reconstruct source from conversation text or logs.
-2. Recursively list each directory with `ox.fs.list`. Follow every `nextCursor` with the same path and options until complete; inspect `truncated` rather than assuming one page contains everything.
+2. Recursively list each directory with `ox.fs.ls`. Follow every `nextCursor` with the same path and limit until complete; inspect `truncated` rather than assuming one page contains everything.
 3. Read each text file with `ox.fs.read`. Follow `nextOffset` until `truncated` is false and write the decoded `text` to the matching desktop path, not the CLI JSON envelope. Pages omit the newline at each page boundary, so append `\n` to every truncated page that does not end with one, then confirm each file's byte count equals the listed `size`. Virtual paths take no trailing slash. Reject paths that escape the export directory.
 4. Treat non-null `unsupported`, unreadable files, diagnostics, or truncation without continuation as incomplete. This text reader does not export binary bytes, and PDF reads extract text rather than the original file. Report those files and use a separately verified byte-preserving export route when needed; never silently omit them or claim a complete repository copy.
 5. Avoid concurrent Local edits during export. Compare directory listings, file sizes, and modification times before and after; retry changed files and report that the API does not provide an atomic snapshot. Report exported paths, file count, and any incomplete files. For a complete repository, run `ox --repository <desktop-export-path> repository validate`; validation does not replace live service verification.

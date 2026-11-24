@@ -74,7 +74,7 @@ export function filesSection(root: RootEntry[], folders: { path: string; name: s
   });
   if (shared.length > sharedEntryLimit) lines.push(`- …and ${shared.length - sharedEntryLimit} more`);
   const paths = cwd ? ["Use / for the Profile root and absolute paths such as /reports/report.md for shared files."] : [];
-  return [...lines, "", ...paths, "This is the top level only; use ox.fs.list for deeper levels."].join("\n");
+  return [...lines, "", ...paths, "This is the top level only; use ox.fs.ls for deeper levels."].join("\n");
 }
 
 export function childConversationsSection(children: ChildConversation[] = []) {

@@ -24,7 +24,7 @@ export const filesystemInputs = Object.fromEntries(Object.entries(tools).map(([n
 }]));
 const schemas = {
   stat: { inputSchema: input({ path }, ["path"]), outputSchema: item },
-  list: { inputSchema: input({ path, cursor, options: object({ limit: integer("Maximum entries.", 1, 100) }) }),
+  ls: { inputSchema: input({ path, cursor, limit: integer("Maximum entries.", 1, 100) }),
     outputSchema: object({ items: array(item), truncated: boolean("More entries remain."), nextCursor: nullableString }, ["items", "truncated", "nextCursor"]) },
   read: { inputSchema: { ...filesystemInputs.read, properties: { ...filesystemInputs.read.properties,
     byteOffset: integer("Zero-based UTF-8 byte offset for an 8 KiB text page; use instead of offset and limit.", 0, Number.MAX_SAFE_INTEGER),
@@ -49,11 +49,11 @@ const schemas = {
   rm: { inputSchema: input({ path, recursive: boolean("Explicitly trash a nonempty directory and all its contents, including dotfiles.") }, ["path"]), outputSchema: object({ path, deleted: boolean("Moved to native trash.") }, ["path", "deleted"]) },
   move: { inputSchema: input({ from: path, to: path }, ["from", "to"]), outputSchema: item },
   copy: { inputSchema: input({ from: path, to: path }, ["from", "to"]), outputSchema: item },
-  glob: { inputSchema: input({ path, cursor, pattern: string("Glob supporting *, **, and ?."), options: object({ limit: integer("Maximum paths.", 1, 1_000) }) }, ["pattern"]),
+  find: { inputSchema: input({ path, cursor, pattern: string("Glob supporting *, **, and ?."), limit: integer("Maximum paths.", 1, 1_000) }, ["pattern"]),
     outputSchema: object({ paths: array(path), diagnostics, truncated: boolean("Search is incomplete because a limit was reached or a directory was unavailable."), nextCursor: nullableString }, ["paths", "truncated", "nextCursor"]) },
-  grep: { inputSchema: input({ path, cursor, pattern: string("Regular expression or literal text."), options: object({
-    limit: integer("Maximum matches.", 1, 200), glob: string("Path glob."), ignoreCase: boolean("Ignore case."), literal: boolean("Literal search."), contextLines: integer("Context lines.", 0, 5),
-  }) }, ["pattern"]), outputSchema: object({ matches: array(object({ path, line: integer("Line number.", 1, Number.MAX_SAFE_INTEGER), text: string("Matched excerpt."),
+  grep: { inputSchema: input({ path, cursor, pattern: string("Regular expression or literal text."),
+    glob: string("Path glob."), ignoreCase: boolean("Ignore case."), literal: boolean("Literal search."), context: integer("Context lines.", 0, 5), limit: integer("Maximum matches.", 1, 200),
+  }, ["pattern"]), outputSchema: object({ matches: array(object({ path, line: integer("Line number.", 1, Number.MAX_SAFE_INTEGER), text: string("Matched excerpt."),
     before: array(string("Context.")), after: array(string("Context.")) }, ["path", "line", "text", "before", "after"])),
     scannedFiles: integer("Scanned files.", 0, 1_000), skippedFiles: integer("Unsupported files.", 0, 1_000), diagnostics, truncated: boolean("Search is incomplete because a limit was reached or a directory was unavailable."), nextCursor: nullableString },
     ["matches", "scannedFiles", "skippedFiles", "truncated", "nextCursor"]) },

@@ -146,7 +146,7 @@ async function skills(args: string[], context: CliContext): Promise<void> {
   const options = parseOutputOptions(rest, 60000);
   const result = await request("vm.call", context, options.timeoutMs, name
     ? { function: "ox.fs.read", arguments: { path: `skills/${name}/SKILL.md`, purpose: "Read VM skill" } }
-    : { function: "ox.fs.list", arguments: { path: "skills", purpose: "List VM skills" } });
+    : { function: "ox.fs.ls", arguments: { path: "skills", purpose: "List VM skills" } });
   const value = valueObject(result);
   if (options.json) {
     printVMJSON(result);

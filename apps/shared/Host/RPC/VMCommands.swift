@@ -39,7 +39,7 @@ extension OxHostProtocol {
                 let listing = try await route.session.host.fileSystem(owner: session, runtime: route.session.runtime,
                     profileID: route.profileID, operation: "list",
                     arguments: .object(["path": .string(""), "purpose": .string("Inspect filesystem"),
-                        "options": .object(["limit": .int(100)])]), mounts: session.fileSystemMounts)
+                        "limit": .int(100)]), mounts: session.fileSystemMounts)
                 roots = listing.objectValue?["items"]?.arrayValue?.compactMap { $0.objectValue?["path"]?.stringValue } ?? []
             } catch {
                 reply.failure(error.localizedDescription)

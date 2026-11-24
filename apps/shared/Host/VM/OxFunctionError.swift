@@ -76,11 +76,11 @@ nonisolated struct OxFunctionError: LocalizedError, Sendable {
         }
         if let error = error as? VirtualFileSystem.Error {
             let guidance: (String, String) = switch error {
-            case .invalidPath: ("invalid_path", "Use ox.fs.list to discover valid paths; do not use empty path segments or parent traversal.")
-            case .notDirectory: ("not_directory", "Use ox.fs.list to locate a directory, or ox.fs.read to read a file.")
-            case .notFile: ("not_file", "Use ox.fs.list to inspect this path and select a readable file.")
-            case .unsupportedMutation: ("not_supported", "Inspect the path with ox.fs.list and the operation's help. Use a writable destination; do not bypass source permissions.")
-            case .notEmpty: ("invalid_argument", "Use ox.fs.list to inspect the directory; pass recursive: true only when its contents should be removed.")
+            case .invalidPath: ("invalid_path", "Use ox.fs.ls to discover valid paths; do not use empty path segments or parent traversal.")
+            case .notDirectory: ("not_directory", "Use ox.fs.ls to locate a directory, or ox.fs.read to read a file.")
+            case .notFile: ("not_file", "Use ox.fs.ls to inspect this path and select a readable file.")
+            case .unsupportedMutation: ("not_supported", "Inspect the path with ox.fs.ls and the operation's help. Use a writable destination; do not bypass source permissions.")
+            case .notEmpty: ("invalid_argument", "Use ox.fs.ls to inspect the directory; pass recursive: true only when its contents should be removed.")
             case .crossFolderTransfer: ("not_supported", "Keep the source and destination inside the same chosen folder.")
             case .intoSourceTree: ("invalid_argument", "Choose a destination outside the source directory.")
             }
@@ -88,18 +88,18 @@ nonisolated struct OxFunctionError: LocalizedError, Sendable {
         }
         if let error = error as? SkillError {
             let guidance: (String, String) = switch error {
-            case .missing: ("not_found", "Use ox.fs.list on skills to discover an existing skill name.")
+            case .missing: ("not_found", "Use ox.fs.ls on skills to discover an existing skill name.")
             case .reserved: ("permission_denied", "Bundled System names are reserved. Copy the skill to a distinct name to customize it.")
             case .conflict: ("source_conflict", "Ask the user to choose the skill's source in Skills before using it.")
-            case .exists: ("already_exists", "Use ox.fs.list on skills and choose a distinct name; do not overwrite another skill.")
+            case .exists: ("already_exists", "Use ox.fs.ls on skills and choose a distinct name; do not overwrite another skill.")
             default: ("invalid_argument", "Inspect the skill operation's help and correct the reported input. For edits, read the file again and build a unique replacement.")
             }
             return Self(code: guidance.0, message: error.localizedDescription, recovery: guidance.1)
         }
         if let error = error as? FileError {
             let guidance: (String, String) = switch error {
-            case .missing: ("not_found", "Use ox.fs.list on the file's parent folder to discover an existing path.")
-            case .filenameExists: ("already_exists", "Use ox.fs.list on the destination folder and choose a distinct filename.")
+            case .missing: ("not_found", "Use ox.fs.ls on the file's parent folder to discover an existing path.")
+            case .filenameExists: ("already_exists", "Use ox.fs.ls on the destination folder and choose a distinct filename.")
             case .textNotFound, .textAmbiguous: ("edit_mismatch", "Read the file again with ox.fs.read and rebuild a unique replacement from its current text.")
             case .textTooLarge, .pdfTooLarge, .fileTooLarge: ("resource_limit", "Choose a smaller file within the reported size limit.")
             default: ("operation_failed", "Inspect the file and operation's help. Verify its availability, format, and any possible effects before retrying; do not repeat an unchanged request.")

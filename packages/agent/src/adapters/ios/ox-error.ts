@@ -4,12 +4,12 @@ export interface OxErrorFields { code: string; message: string; recovery: string
 const fallbackRecovery = "Inspect the relevant resource and help. Effects may have occurred; verify state before retrying a write. Do not repeat a cancelled or denied user interaction.";
 const fileRecovery: Record<FileError["code"], string> = {
   aborted: "Stop. Do not repeat the operation unless the user asks; inspect any possible effects before retrying a write.",
-  not_found: "Use ox.fs.list on the parent directory to discover an existing path before trying again.",
+  not_found: "Use ox.fs.ls on the parent directory to discover an existing path before trying again.",
   permission_denied: "Do not bypass source permissions. Use a writable destination, or ask the user to grant access through the normal interface.",
-  not_directory: "Use ox.fs.list to locate a directory, or ox.fs.read to read a file.",
-  is_directory: "Use ox.fs.list to inspect the directory and select a readable file.",
+  not_directory: "Use ox.fs.ls to locate a directory, or ox.fs.read to read a file.",
+  is_directory: "Use ox.fs.ls to inspect the directory and select a readable file.",
   invalid: "Inspect the operation's help and correct the reported input. For edits, read the file again and build unique, non-overlapping replacements.",
-  not_supported: "Inspect the operation's help and path with ox.fs.list. Choose a supported operation or writable destination; do not bypass source permissions.",
+  not_supported: "Inspect the operation's help and path with ox.fs.ls. Choose a supported operation or writable destination; do not bypass source permissions.",
   unknown: fallbackRecovery,
 };
 

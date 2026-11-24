@@ -16,7 +16,7 @@ export type FileOperation = "stat" | "list" | "read" | "write" | "edit" | "rm" |
 export interface FileRequest {
   path?: string; from?: string; to?: string; recursive?: boolean; purpose?: string; byteOffset?: number; offset?: number; limit?: number; content?: string; base64?: string;
   edits?: { oldText: string; newText: string }[]; pattern?: string; cursor?: string;
-  options?: { limit?: number; glob?: string; ignoreCase?: boolean; literal?: boolean; contextLines?: number };
+  glob?: string; ignoreCase?: boolean; literal?: boolean; context?: number;
 }
 type SearchMatch = { path: string; line: number; text: string; before: string[]; after: string[] };
 type FilePosition = { path: string; line?: number; size?: number; mtimeMs?: number };
@@ -40,9 +40,8 @@ function comparePaths(left: string, right: string) {
   return a.length - b.length;
 }
 function cursorQuery(env: MountedExecutionEnv, operation: FileOperation, args: FileRequest) {
-  const options = args.options ?? {};
-  return JSON.stringify([1, env.id, operation, args.path, args.pattern ?? null, options.limit ?? (operation === "list" ? 50 : 100),
-    options.glob ?? null, options.ignoreCase ?? false, options.literal ?? false, options.contextLines ?? 0]);
+  return JSON.stringify([1, env.id, operation, args.path, args.pattern ?? null, args.limit ?? (operation === "list" ? 50 : 100),
+    args.glob ?? null, args.ignoreCase ?? false, args.literal ?? false, args.context ?? 0]);
 }
 function cursorPosition(env: MountedExecutionEnv, operation: FileOperation, args: FileRequest): FilePosition | undefined {
   if (args.cursor === undefined) return;
@@ -121,8 +120,9 @@ export function resolveFileRequest(args: FileRequest, cwd: string): FileRequest 
   return { ...args, ...(args.from === undefined ? { path: resolve(args.path ?? ".") } : { from: resolve(args.from), to: resolve(args.to!) }) };
 }
 export function validateFileRequest(operation: FileOperation, args: FileRequest): FileRequest {
-  const schema = filesystemContract[`ox.fs.${operation}`]?.inputSchema;
-  if (!schema || !Value.Check(schema, args)) throw new FileError("invalid", `Invalid ox.fs.${operation} arguments`);
+  const name = operation === "list" ? "ls" : operation === "glob" ? "find" : operation;
+  const schema = filesystemContract[`ox.fs.${name}`]?.inputSchema;
+  if (!schema || !Value.Check(schema, args)) throw new FileError("invalid", `Invalid ox.fs.${name} arguments`);
   const path = canonical(args.from ?? args.path ?? ".");
   const destination = args.to === undefined ? undefined : canonical(args.to);
   if (destination !== undefined && (!destination || destination.length > 4_096 || destination.split("/").length > 64)) throw new FileError("invalid", "Invalid transfer destination", destination);
@@ -294,11 +294,10 @@ const relativePath = (base: string, path: string) => base && path !== base ? pat
 const searchBudget = (base: string) => base === "conversations" || base.startsWith("conversations/") ? 16 * 1024 * 1024 : 2 * 1024 * 1024;
 async function grepFiles(env: MountedExecutionEnv, candidates: Candidates, args: FileRequest, match: RE2JS, position: FilePosition | undefined, context: Context, singleFile: boolean) {
   const base = args.path!;
-  const options = args.options ?? {};
-  const count = options.limit ?? 100;
-  const filter = options.glob ? expression(options.glob, true) : undefined;
+  const count = args.limit ?? 100;
+  const filter = args.glob ? expression(args.glob, true) : undefined;
   const budget = singleFile || base === "app/logs.jsonl" && env.mounts.some(mount => mount.path === "app") ? 32 * 1024 * 1024 : searchBudget(base);
-  const contextLines = options.contextLines ?? 0;
+  const contextLines = args.context ?? 0;
   const matches: SearchMatch[] = [];
   let scannedFiles = 0;
   let skippedFiles = 0;
@@ -384,7 +383,7 @@ export class AgentFileSystem {
       const entries = getOrThrow(await env.listDir(path, context))
         .filter(entry => !position || comparePaths(canonical(entry.path), position.path) > 0)
         .sort((a, b) => comparePaths(canonical(a.path), canonical(b.path)));
-      const count = args.options?.limit ?? 50;
+      const count = args.limit ?? 50;
       const page = entries.slice(0, count);
       return { items: page.map(item), truncated: entries.length > count,
         nextCursor: nextCursor(env, operation, args, entries.length > count ? { path: canonical(page.at(-1)!.path) } : null) };
@@ -418,9 +417,8 @@ export class AgentFileSystem {
 
   private async search(env: MountedExecutionEnv, operation: "glob" | "grep", args: FileRequest, context: Context) {
     const base = args.path!;
-    const options = args.options ?? {};
-    const literal = operation === "grep" && options.literal;
-    const match = expression(literal ? escaped(args.pattern!) : args.pattern!, operation === "glob", options.ignoreCase);
+    const literal = operation === "grep" && args.literal;
+    const match = expression(literal ? escaped(args.pattern!) : args.pattern!, operation === "glob", args.ignoreCase);
     const position = cursorPosition(env, operation, args);
     const root = getOrThrow(await env.fileInfo(base, context));
     if (position?.line !== undefined) getOrThrow(await env.fileInfo(position.path, context));
@@ -434,7 +432,7 @@ export class AgentFileSystem {
     }
     if (operation === "grep") return grepFiles(env, candidates, args, match, position, context, root.kind === "file");
     const paths = candidates.paths.filter(path => match.test(relativePath(base, path)));
-    const count = options.limit ?? 100;
+    const count = args.limit ?? 100;
     const continuation = paths.length > count ? paths[count - 1]! : candidates.nextPath;
     return { paths: paths.slice(0, count), truncated: candidates.truncated || paths.length > count,
       nextCursor: nextCursor(env, operation, args, continuation === null ? null : { path: continuation }), diagnostics: candidates.diagnostics };

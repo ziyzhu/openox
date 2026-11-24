@@ -17,7 +17,7 @@ nonisolated enum OxFileSystem {
         },
         jsFragment: """
           stat: (value) => __nativeFS('stat', __oxOptions(value, 'ox.fs.stat')),
-          list: (value) => __nativeFS('list', __oxOptions(value, 'ox.fs.list')),
+          ls: (value) => __nativeFS('list', __oxOptions(value, 'ox.fs.ls')),
           read: (value) => __nativeFS('read', __oxOptions(value, 'ox.fs.read')),
           attach: (value) => __nativeFS('attach', __oxOptions(value, 'ox.fs.attach')),
           write: (value) => __nativeFS('write', __oxOptions(value, 'ox.fs.write')),
@@ -26,7 +26,7 @@ nonisolated enum OxFileSystem {
           mkdir: (value) => __nativeFS('mkdir', __oxOptions(value, 'ox.fs.mkdir')),
           move: (value) => __nativeFS('move', __oxOptions(value, 'ox.fs.move')),
           copy: (value) => __nativeFS('copy', __oxOptions(value, 'ox.fs.copy')),
-          glob: (value) => __nativeFS('glob', __oxOptions(value, 'ox.fs.glob')),
+          find: (value) => __nativeFS('glob', __oxOptions(value, 'ox.fs.find')),
           grep: (value) => __nativeFS('grep', __oxOptions(value, 'ox.fs.grep'))
         """
     )
