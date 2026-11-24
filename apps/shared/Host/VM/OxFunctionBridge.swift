@@ -31,7 +31,7 @@ public protocol OxFunctionBridge: AnyObject {
     func updateService(domain: String, fields: [String: JSONValue], purpose: String) async throws -> JSONValue?
     func deleteService(domain: String, purpose: String) async throws -> JSONValue?
     func appRepositories(purpose: String) async throws -> JSONValue?
-    func connectRepository(origin: String, purpose: String) async throws -> JSONValue?
+    func connectRepository(origin: String, commit: String?, purpose: String) async throws -> JSONValue?
     func repositoryConflicts(service: String?, compare: Bool, purpose: String) async throws -> JSONValue?
     func resolveRepositoryConflict(service: String, repository: String, purpose: String) async throws -> JSONValue?
     func syncRepository(repository: String, purpose: String) async throws -> JSONValue?

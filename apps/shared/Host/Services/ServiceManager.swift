@@ -607,9 +607,9 @@ final class ServiceManager {
         await refreshServices(locale: locale)
     }
 
-    func connectRepository(from origin: URL, locale: String?) async throws -> Repository.Descriptor {
+    func connectRepository(from origin: URL, commit: String?, locale: String?) async throws -> Repository.Descriptor {
         try await performRepositoryMutation(locale: locale, failureContext: "connect failed=") {
-            try await self.repository.install(from: origin)
+            try await self.repository.install(from: origin, commit: commit)
         } verify: { _ in
             guard case .ready = self.repositoryState,
                   let installed = self.repositories.first(where: { $0.origin == origin }) else {

@@ -47,10 +47,14 @@ extension Repository {
         return true
     }
 
-    func install(from origin: URL) async throws {
+    func install(from origin: URL, commit: String? = nil) async throws {
         try Self.validateOrigin(origin)
-        guard !configuration.repositories.contains(where: { $0.origin == origin }) else {
-            throw Failure(message: "Repository is already installed")
+        if let commit, !Self.isCommitHash(commit) {
+            throw Failure(message: "Use the full 40-character commit hash")
+        }
+        if let existing = configuration.repositories.first(where: { $0.origin == origin }) {
+            try await reinstall(existing, commit: commit)
+            return
         }
         let id = UUID().uuidString.lowercased()
         try FileManager.default.createDirectory(at: repositoriesRoot, withIntermediateDirectories: true)
@@ -58,14 +62,36 @@ extension Repository {
         let staging = repositoryStaging.appendingPathComponent("installing-\(id)", isDirectory: true)
         let destinationRoot = repositoriesRoot
         do {
-            Log.service.info("Repository.install origin=\(Self.redacted(origin)) id=\(id)")
-            let package = try await downloadSnapshot(from: origin, to: staging, provenance: .remote)
+            Log.service.info("Repository.install origin=\(Self.redacted(origin)) id=\(id) commit=\(commit ?? "head")")
+            let package = try await downloadSnapshot(from: origin, commit: commit, to: staging, provenance: .remote)
             guard repositoriesRoot == destinationRoot else { throw CancellationError() }
             let directoryName = try Self.availableDirectoryName(for: package.name, at: repositoriesRoot, excluding: configuration.repositories.compactMap(\.directoryName))
             let destination = repositoriesRoot.appendingPathComponent(directoryName, isDirectory: true)
             try publishSnapshot(at: destination, staging: staging, repositoryID: id, provenance: .remote, replacingExisting: false)
-            configuration.repositories.append(InstalledRepository(id: id, origin: origin, isEnabled: true, directoryName: directoryName))
+            configuration.repositories.append(InstalledRepository(id: id, origin: origin, isEnabled: true, directoryName: directoryName, commit: commit))
             try saveConfiguration()
+        } catch {
+            try? FileManager.default.removeItem(at: staging)
+            throw Failure(message: Self.errorMessage(error))
+        }
+    }
+
+    private func reinstall(_ stored: InstalledRepository, commit: String?) async throws {
+        try FileManager.default.createDirectory(at: repositoryStaging, withIntermediateDirectories: true)
+        let staging = repositoryStaging.appendingPathComponent("updating-\(stored.id)", isDirectory: true)
+        do {
+            Log.service.info("Repository.reinstall origin=\(Self.redacted(stored.origin)) id=\(stored.id) from=\(stored.commit ?? "head") to=\(commit ?? "head")")
+            try await replaceSnapshot(from: stored.origin, commit: commit, at: repositoryDirectory(stored.id), staging: staging, repositoryID: stored.id, provenance: .remote)
+            guard let index = configuration.repositories.firstIndex(where: { $0.id == stored.id }) else {
+                throw Failure(message: "Repository not found")
+            }
+            configuration.repositories[index].commit = commit
+            do {
+                try saveConfiguration()
+            } catch {
+                configuration.repositories[index].commit = stored.commit
+                throw error
+            }
         } catch {
             try? FileManager.default.removeItem(at: staging)
             throw Failure(message: Self.errorMessage(error))
@@ -86,8 +112,8 @@ extension Repository {
         try FileManager.default.createDirectory(at: repositoryStaging, withIntermediateDirectories: true)
         let staging = repositoryStaging.appendingPathComponent("updating-\(repositoryID)", isDirectory: true)
         do {
-            Log.service.info("Repository.update origin=\(Self.redacted(stored.origin)) id=\(repositoryID)")
-            try await replaceSnapshot(from: stored.origin, at: destination, staging: staging, repositoryID: repositoryID, provenance: .remote)
+            Log.service.info("Repository.update origin=\(Self.redacted(stored.origin)) id=\(repositoryID) commit=\(stored.commit ?? "head")")
+            try await replaceSnapshot(from: stored.origin, commit: stored.commit, at: destination, staging: staging, repositoryID: repositoryID, provenance: .remote)
         } catch {
             try? FileManager.default.removeItem(at: staging)
             throw Failure(message: Self.errorMessage(error))
@@ -148,15 +174,21 @@ extension Repository {
         let root = AppStoragePaths.developmentRepositorySnapshot
         let staging = root.deletingLastPathComponent().appendingPathComponent(".updating-development", isDirectory: true)
         do {
-            try await replaceSnapshot(from: developmentRemote, at: root, staging: staging, repositoryID: Self.developmentID, provenance: .development)
+            try await replaceSnapshot(from: developmentRemote, commit: nil, at: root, staging: staging, repositoryID: Self.developmentID, provenance: .development)
         } catch {
             throw Failure(message: Self.errorMessage(error))
         }
     }
 
-    private func downloadSnapshot(from origin: URL, to staging: URL, provenance: Descriptor.Provenance) async throws -> Package {
+    private func downloadSnapshot(from origin: URL, commit: String?, to staging: URL, provenance: Descriptor.Provenance) async throws -> Package {
         try? FileManager.default.removeItem(at: staging)
         let repository = try await SwiftGitX.Repository.clone(from: origin, to: staging)
+        if let commit {
+            guard let pinned: Commit = try? repository.show(id: OID(hex: commit)) else {
+                throw Failure(message: "Commit \(commit.prefix(8)) was not found in this repository")
+            }
+            try repository.reset(to: pinned, mode: .hard)
+        }
         guard let head = try repository.HEAD.target as? Commit else { throw Failure(message: "Repository HEAD is not a commit") }
         let package = try Self.loadPackage(at: staging, provenance: provenance)
         try FileManager.default.removeItem(at: staging.appendingPathComponent(".git", isDirectory: true))
@@ -164,10 +196,10 @@ extension Repository {
         return package
     }
 
-    private func replaceSnapshot(from origin: URL, at destination: URL, staging: URL, repositoryID: String, provenance: Descriptor.Provenance) async throws {
+    private func replaceSnapshot(from origin: URL, commit: String?, at destination: URL, staging: URL, repositoryID: String, provenance: Descriptor.Provenance) async throws {
         let destinationRoot = repositoriesRoot
         do {
-            _ = try await downloadSnapshot(from: origin, to: staging, provenance: provenance)
+            _ = try await downloadSnapshot(from: origin, commit: commit, to: staging, provenance: provenance)
             guard repositoriesRoot == destinationRoot else { throw CancellationError() }
             try publishSnapshot(at: destination, staging: staging, repositoryID: repositoryID, provenance: provenance)
         } catch {
@@ -242,6 +274,10 @@ extension Repository {
             suffix += 1
         }
         return candidate
+    }
+
+    nonisolated static func isCommitHash(_ value: String) -> Bool {
+        value.utf8.count == 40 && value.utf8.allSatisfy { (48...57).contains($0) || (97...102).contains($0) }
     }
 
     private static func validateOrigin(_ url: URL) throws {

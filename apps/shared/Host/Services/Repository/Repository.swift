@@ -194,6 +194,7 @@ actor Repository {
         var origin: URL
         var isEnabled: Bool
         var directoryName: String? = nil
+        var commit: String? = nil
     }
 
     struct Configuration: Codable {

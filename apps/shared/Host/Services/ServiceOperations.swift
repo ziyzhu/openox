@@ -298,9 +298,15 @@ final class ServiceOperations {
         }
     }
 
-    func connectRepository(origin: String, purpose: String) async throws -> JSONValue? {
+    func connectRepository(origin: String, commit: String?, purpose: String) async throws -> JSONValue? {
         let origin = origin.trimmingCharacters(in: .whitespacesAndNewlines)
+        let commit = commit?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let mounted = origin.hasPrefix("mounts/") || origin.hasPrefix("files/")
+        if let commit {
+            guard !mounted, Repository.isCommitHash(commit) else {
+                throw RuntimeError.bridge("ox.repository.connect: commit must be a full 40-character hash and applies only to Git URLs")
+            }
+        }
         if !mounted {
             guard let url = URL(string: origin), url.scheme == "https", url.host != nil,
                   url.user == nil, url.password == nil, url.fragment == nil else {
@@ -309,7 +315,7 @@ final class ServiceOperations {
         }
         return try await tracked(
             Actions.repositoryConnect,
-            .object(["origin": .string(origin)]),
+            .object(["origin": .string(origin), "commit": commit.map(JSONValue.string) ?? .null]),
             purpose: purpose
         ) {
             let locale = AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
@@ -318,12 +324,13 @@ final class ServiceOperations {
                 repository = try await self.serviceManager.connectMountedRepository(path: origin, locale: locale)
             } else {
                 guard let url = URL(string: origin) else { throw RuntimeError.bridge("Invalid repository origin") }
-                repository = try await self.serviceManager.connectRepository(from: url, locale: locale)
+                repository = try await self.serviceManager.connectRepository(from: url, commit: commit, locale: locale)
             }
             return .object([
                 "id": .string(repository.id),
                 "name": .string(repository.name),
                 "origin": .string(origin),
+                "commit": commit.map(JSONValue.string) ?? .null,
                 "serviceCount": .int(repository.serviceCount),
                 "skillCount": .int(repository.skills.count),
                 "connected": .bool(true),

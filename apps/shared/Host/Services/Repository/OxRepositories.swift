@@ -112,6 +112,7 @@ nonisolated enum OxRepositories {
                             "type": .string("object"),
                             "properties": .object([
                                 "origin": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(2048)]),
+                                "commit": .object(["type": .string("string"), "pattern": .string("^[0-9a-f]{40}$")]),
                             ]),
                             "required": .array([.string("origin")]),
                             "additionalProperties": .bool(false),
@@ -119,6 +120,7 @@ nonisolated enum OxRepositories {
                         "outputSchema": .object([
                             "type": .string("object"), "properties": .object([
                                 "id": .object(["type": .string("string")]), "name": .object(["type": .string("string")]), "origin": .object(["type": .string("string")]),
+                                "commit": .object(["type": .array([.string("string"), .string("null")])]),
                                 "serviceCount": .object(["type": .string("integer")]), "skillCount": .object(["type": .string("integer")]), "connected": .object(["type": .string("boolean"), "const": .bool(true)]),
                             ]), "required": .array(["id", "name", "origin", "serviceCount", "skillCount", "connected"].map(JSONValue.string)), "additionalProperties": .bool(false),
                         ]),
@@ -209,8 +211,9 @@ nonisolated enum OxRepositories {
             }
             ctx.setObject(resolveBlock as AnyObject, forKeyedSubscript: "__nativeRepositoryResolve" as NSString)
 
-            let connectRepositoryBlock: @convention(block) (String, JSValue) -> JSValue = { origin, purposeValue in
-                env.call(suspendingTimeout: true) { try await $0.connectRepository(origin: origin, purpose: purposeValue.toString()!) }
+            let connectRepositoryBlock: @convention(block) (String, JSValue, JSValue) -> JSValue = { origin, commitValue, purposeValue in
+                let commit = commitValue.isString ? commitValue.toString() : nil
+                return env.call(suspendingTimeout: true) { try await $0.connectRepository(origin: origin, commit: commit, purpose: purposeValue.toString()!) }
             }
             ctx.setObject(connectRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeRepositoryConnect" as NSString)
 
@@ -236,7 +239,7 @@ nonisolated enum OxRepositories {
           list: value => { const options = __oxOptions(value, 'ox.repository.list'); return __nativeRepositoryList(String(options.purpose)); },
             conflicts: (value) => { const options = __oxOptions(value, 'ox.repository.conflicts'); return __nativeRepositoryConflicts(options.service ?? null, options.compare ?? false, String(options.purpose)); },
             resolve: (value) => { const options = __oxOptions(value, 'ox.repository.resolve'); return __nativeRepositoryResolve(String(options.service), String(options.repository), String(options.purpose)); },
-            connect: (value) => { const options = __oxOptions(value, 'ox.repository.connect'); return __nativeRepositoryConnect(String(options.origin), String(options.purpose)); },
+            connect: (value) => { const options = __oxOptions(value, 'ox.repository.connect'); return __nativeRepositoryConnect(String(options.origin), options.commit ?? null, String(options.purpose)); },
             sync: (value) => { const options = __oxOptions(value, 'ox.repository.sync'); return __nativeRepositorySync(String(options.repository), String(options.purpose)); },
             enable: (value) => { const options = __oxOptions(value, 'ox.repository.enable'); return __nativeRepositoryEnable(String(options.repository), options.enabled, String(options.purpose)); },
             disconnect: (value) => { const options = __oxOptions(value, 'ox.repository.disconnect'); return __nativeRepositoryDisconnect(String(options.repository), String(options.purpose)); },

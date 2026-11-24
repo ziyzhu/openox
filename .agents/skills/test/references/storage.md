@@ -723,7 +723,7 @@ The kind and relative path are derived from the ID; for example,
 repositories are enabled and the user's whole-service choice for each conflict.
 Public HTTPS Git repositories are cloned into temporary staging directories.
 After validation, their `.git` metadata is removed and the resulting `HEAD`
-snapshot replaces `<Profile>/repositories/<repository name>/`. The folder name is chosen at installation, collision-safe, and stored alongside the installation UUID. These snapshots are visible in Files and follow the Profile's backup policy. Sync replaces local edits; disconnecting removes the connection and saved conflict choices without deleting files or website data.
+snapshot replaces `<Profile>/repositories/<repository name>/`. The folder name is chosen at installation, collision-safe, and stored alongside the installation UUID. An installation may also store an optional `commit`, a full 40-character hash: the snapshot is then taken at that commit instead of `HEAD`, and sync re-downloads the same commit. Records without `commit` follow `HEAD` as before, so the field needs no migration and format version 1 is unchanged; older builds ignore it and sync such a repository to `HEAD`. Connecting an origin that is already installed replaces its snapshot and `commit` in place, keeping its UUID, folder, and conflict choices. These snapshots are visible in Files and follow the Profile's backup policy. Sync replaces local edits; disconnecting removes the connection and saved conflict choices without deleting files or website data.
 
 The editable Local repository always exists at `<Profile>/repositories/Local/`.
 It is always enabled and cannot be removed. Local edits persist
