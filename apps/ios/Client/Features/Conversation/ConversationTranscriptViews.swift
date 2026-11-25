@@ -607,6 +607,7 @@ struct BlockView: View, Equatable {
     let onOpenAttachment: (FileItem) -> Void
     let onOpenSkill: (Skill) -> Void
     let onOpenLink: (URL) -> Void
+    @State private var links = LinkRouter()
 
     static func == (lhs: BlockView, rhs: BlockView) -> Bool {
         lhs.block == rhs.block
@@ -869,7 +870,7 @@ struct BlockView: View, Equatable {
 
     private func agentText(_ text: String, index: Int) -> some View {
         StreamingMarkdownText(source: text, accessibilityIdentifier: "message.\(block.id).item.\(index)", isStreaming: isStreamingTail)
-            .environment(\.conversationLinkHandler, onOpenLink)
+            .environment(\.conversationLinkHandler, links.routing(onOpenLink))
             .accessibilityIdentifier(A11yID.ConversationControls.Message.agent)
     }
 

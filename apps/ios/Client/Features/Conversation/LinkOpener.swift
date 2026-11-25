@@ -31,7 +31,7 @@ private struct OpenConversationKey: EnvironmentKey {
 }
 
 private struct ConversationLinkHandlerKey: EnvironmentKey {
-    static let defaultValue: ((URL) -> Void)? = nil
+    static let defaultValue: LinkRouter? = nil
 }
 
 extension EnvironmentValues {
@@ -39,12 +39,26 @@ extension EnvironmentValues {
         get { self[OpenConversationKey.self] }
         set { self[OpenConversationKey.self] = newValue }
     }
-    var conversationLinkHandler: ((URL) -> Void)? {
+    var conversationLinkHandler: LinkRouter? {
         get { self[ConversationLinkHandlerKey.self] }
         set { self[ConversationLinkHandlerKey.self] = newValue }
     }
     @Entry var conversationFileResolver: ConversationFileResolver? = nil
     @Entry var conversationViewport: ConversationViewportController? = nil
+}
+
+@MainActor
+final class LinkRouter {
+    private var route: (URL) -> Void = { _ in }
+
+    func routing(_ route: @escaping (URL) -> Void) -> LinkRouter {
+        self.route = route
+        return self
+    }
+
+    func callAsFunction(_ url: URL) {
+        route(url)
+    }
 }
 
 enum ConversationLinkDestination: Equatable {

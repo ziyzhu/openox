@@ -248,7 +248,7 @@ struct SelectableText: UIViewRepresentable {
         private var fadeColors: NSAttributedString?
         private var fadeLength = 0
         private var streaming = StreamingState.none
-        var conversationLinkHandler: ((URL) -> Void)?
+        var conversationLinkHandler: LinkRouter?
 
         var isStreaming: Bool {
             if case .none = streaming { return false }
@@ -261,7 +261,7 @@ struct SelectableText: UIViewRepresentable {
             case attributed(NSAttributedString, resetKey: Int)
         }
 
-        init(serviceManager: ServiceManager, conversationLinkHandler: ((URL) -> Void)?) {
+        init(serviceManager: ServiceManager, conversationLinkHandler: LinkRouter?) {
             self.serviceManager = serviceManager
             self.conversationLinkHandler = conversationLinkHandler
         }

@@ -163,6 +163,7 @@ struct StreamingFadeSelectableText: View {
     @State private var fadeDeadline: CFTimeInterval?
     @State private var settleTask: Task<Void, Never>?
     @State private var classifier = InlineClassifier()
+    @State private var isOnScreen = true
 
     init(
         markdown: String,
@@ -234,6 +235,10 @@ struct StreamingFadeSelectableText: View {
         .onChange(of: Marker(reset: resetKey, length: length), initial: true) { _, marker in
             absorb(marker.length, reset: marker.reset) { revealed.rangeOfComposedCharacterSequence(at: $0).location }
         }
+        .onScrollVisibilityChange(threshold: 0.01) { visible in
+            isOnScreen = visible
+            if !visible { settle() }
+        }
         .onDisappear { settleTask?.cancel() }
     }
 
@@ -247,7 +252,7 @@ struct StreamingFadeSelectableText: View {
         func isPlain(_ source: String, reset nextReset: Int) -> Bool {
             let total = source.utf8.count
             let needsReset = reset != nextReset
-                || (plain && (total < consumedUTF8 || !source.hasPrefix(previousSource)))
+                || (plain && (total < consumedUTF8 || !source.utf8.starts(with: previousSource.utf8)))
             if needsReset {
                 reset = nextReset
                 consumedUTF8 = 0
@@ -272,17 +277,22 @@ struct StreamingFadeSelectableText: View {
         let now = CACurrentMediaTime()
         let deadline = tracker.absorb(length, reset: reset, at: now, snap: snap)
         settleTask?.cancel()
-        guard let deadline else {
-            fadeDeadline = nil
+        guard let deadline, isOnScreen else {
+            settle()
             return
         }
         fadeDeadline = deadline
         settleTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(max(0, deadline - now)))
             guard !Task.isCancelled else { return }
-            tracker.settle()
-            fadeDeadline = nil
+            settle()
         }
+    }
+
+    private func settle() {
+        settleTask?.cancel()
+        tracker.settle()
+        fadeDeadline = nil
     }
 }
 

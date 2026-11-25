@@ -6,8 +6,6 @@ struct StreamingMarkdownText: View {
     let source: String
     let accessibilityIdentifier: String
     var isStreaming = true
-    @Environment(ServiceManager.self) private var serviceManager
-    @Environment(\.conversationLinkHandler) private var conversationLinkHandler
     @State private var availableWidth: CGFloat = 0
     @State private var buffer = Buffer()
 
@@ -45,11 +43,6 @@ struct StreamingMarkdownText: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: hasInteractiveCode ? .contain : .ignore)
         .accessibilityLabel(source, isEnabled: !hasInteractiveCode)
-        .environment(\.openURL, OpenURLAction { url in
-            if let conversationLinkHandler { conversationLinkHandler(url) }
-            else { LinkOpener.open(url: url, serviceManager: serviceManager) }
-            return .handled
-        })
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
         .onChange(of: Input(source: source, isStreaming: isStreaming), initial: true) { _, input in
             buffer.update(input)
@@ -94,11 +87,12 @@ struct StreamingMarkdownText: View {
         @ObservationIgnored private var settled = Settled()
         @ObservationIgnored private var prose: [SelectableText.StreamingProse] = []
         @ObservationIgnored private var scheduled: Task<Void, Never>?
+        @ObservationIgnored private var parsedAt: ContinuousClock.Instant?
 
         func update(_ input: Input) {
             guard latest != input else { return }
             let previous = latest?.source ?? snapshot.input.source
-            if !input.source.hasPrefix(previous) {
+            if !input.source.utf8.starts(with: previous.utf8) {
                 generation &+= 1
                 fadeKey = nil
                 settled = Settled()
@@ -119,10 +113,12 @@ struct StreamingMarkdownText: View {
             guard scheduled == nil, let pending else { return }
             let interval = snapshot.blocks.isEmpty || !pending.input.isStreaming ? 0
                 : pending.input.source.utf8.count > 2_048 ? 0.1 : 1.0 / 30.0
+            let wait = parsedAt.map { max(.zero, .seconds(interval) - $0.duration(to: .now)) } ?? .zero
             scheduled = Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .seconds(interval))
+                try? await Task.sleep(for: wait)
                 guard let self, !Task.isCancelled, let request = self.pending else { return }
                 self.pending = nil
+                parsedAt = .now
                 let parsed = try? await MarkdownParser.shared.snapshot(
                     source: request.input.source, isStreaming: request.input.isStreaming, settled: settled
                 )
@@ -357,8 +353,6 @@ struct MarkdownText: View {
     let textColor: DynamicColor
     let subtleColor: DynamicColor
     let accessibilityIdentifier: String
-    @Environment(ServiceManager.self) private var serviceManager
-    @Environment(\.conversationLinkHandler) private var conversationLinkHandler
     static let bodyFont = UIFont.preferredFont(forTextStyle: .body)
     @State private var availableWidth: CGFloat = 0
     @State private var blocks: [MarkdownRenderBlock] = []
@@ -390,22 +384,10 @@ struct MarkdownText: View {
                     )
             }
         }
-        .environment(\.openURL, OpenURLAction { url in
-            open(url)
-            return .handled
-        })
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
         .task(id: source) {
             guard let rendered = try? await MarkdownParser.shared.render(source), !Task.isCancelled else { return }
             blocks = rendered
-        }
-    }
-
-    private func open(_ url: URL) {
-        if let conversationLinkHandler {
-            conversationLinkHandler(url)
-        } else {
-            LinkOpener.open(url: url, serviceManager: serviceManager)
         }
     }
 }
@@ -429,17 +411,27 @@ nonisolated private enum MarkdownRenderBlock: Equatable, Sendable {
         }
     }
 
+    private static let proseByteLimit = 3_000
+
     static func group(_ blocks: [MarkdownBlock]) -> [MarkdownRenderBlock] {
         var grouped: [MarkdownRenderBlock] = []
+        var prose: [MarkdownBlock] = []
+        var proseBytes = 0
+        func closeProse() {
+            guard !prose.isEmpty else { return }
+            grouped.append(.prose(prose))
+            prose = []
+            proseBytes = 0
+        }
         for block in blocks {
             switch block {
             case .paragraph, .heading, .lists:
-                if case .prose(let prose) = grouped.last {
-                    grouped[grouped.count - 1] = .prose(prose + [block])
-                } else {
-                    grouped.append(.prose([block]))
-                }
+                let followsHeading = if case .heading = prose.last { true } else { false }
+                if proseBytes >= proseByteLimit, !followsHeading { closeProse() }
+                prose.append(block)
+                proseBytes += byteCount(block)
             case .embed:
+                closeProse()
                 switch grouped.last {
                 case .embeds(let embeds):
                     grouped[grouped.count - 1] = .embeds(embeds + [block])
@@ -449,10 +441,20 @@ nonisolated private enum MarkdownRenderBlock: Equatable, Sendable {
                     grouped.append(.block(block))
                 }
             case .code, .quote, .table, .rule:
+                closeProse()
                 grouped.append(.block(block))
             }
         }
+        closeProse()
         return grouped
+    }
+
+    private static func byteCount(_ block: MarkdownBlock) -> Int {
+        switch block {
+        case .paragraph(let text), .heading(_, let text): text.utf8.count
+        case .lists(let lists): lists.utf8Count
+        case .code, .quote, .table, .rule, .embed: 0
+        }
     }
 }
 
@@ -521,6 +523,8 @@ private struct MarkdownRenderBlockView: View {
 
 private struct MarkdownBlockView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(ServiceManager.self) private var serviceManager
+    @Environment(\.conversationLinkHandler) private var conversationLinkHandler
     let block: MarkdownBlock
     let textColor: DynamicColor
     let subtleColor: DynamicColor
@@ -546,6 +550,7 @@ private struct MarkdownBlockView: View {
                 ConversationMapView(source: body, accessibilityIdentifier: accessibilityIdentifier) {
                     codeBlock(body, language: language)
                 }
+                .environment(\.openURL, openURL)
             } else {
                 codeBlock(body, language: language)
             }
@@ -580,10 +585,19 @@ private struct MarkdownBlockView: View {
             }
             .excludesCompactPageSwitch()
             .defaultScrollAnchor(nil, for: .sizeChanges)
+            .environment(\.openURL, openURL)
         case .rule:
             Divider()
         case let .embed(alt, path):
             MarkdownEmbedView(alt: alt, path: path)
+        }
+    }
+
+    private var openURL: OpenURLAction {
+        OpenURLAction { [conversationLinkHandler, serviceManager] url in
+            if let conversationLinkHandler { conversationLinkHandler(url) }
+            else { LinkOpener.open(url: url, serviceManager: serviceManager) }
+            return .handled
         }
     }
 
@@ -1023,6 +1037,12 @@ nonisolated private extension Array where Element == MarkdownList {
     var characterCount: Int {
         reduce(0) { count, list in
             count + list.items.reduce(0) { $0 + $1.text.count + $1.children.characterCount }
+        }
+    }
+
+    var utf8Count: Int {
+        reduce(0) { count, list in
+            count + list.items.reduce(0) { $0 + $1.text.utf8.count + $1.children.utf8Count }
         }
     }
 }
