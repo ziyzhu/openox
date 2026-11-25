@@ -694,6 +694,11 @@ final class ServiceManager {
         try await repository.exportLocalRepository()
     }
 
+    func exportLocalPackage(named name: String, services: [String], skills: [String]) async throws -> LocalPackageExport {
+        for domain in services { try await validateService(domain: domain) }
+        return try await repository.exportLocalPackage(named: name, services: services, skills: skills)
+    }
+
     func importServicePackage(_ payload: ServicePackagePayload, replacing: Bool, locale: String?) async throws {
         guard let kind = ServicesMount.Kind(rawValue: payload.kind.rawValue) else {
             throw ServicePackageError.invalidPackage

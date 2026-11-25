@@ -67,6 +67,7 @@ nonisolated enum Actions {
     static let repositorySync = "ox.repository.sync"
     static let repositoryEnable = "ox.repository.enable"
     static let repositoryDisconnect = "ox.repository.disconnect"
+    static let repositoryExport = "ox.repository.export"
     static let serviceAttach = "ox.service.attach"
     static let serviceShowPage = "ox.service.showPage"
     static let serviceLogin = "ox.service.signIn"
@@ -105,7 +106,7 @@ nonisolated enum Actions {
         visionAnalyze,
         serviceFind, serviceList, serviceAttach, serviceDetach, serviceListAttached, serviceInspect, serviceCheckAccess, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryEnable, repositoryDisconnect,
-        repositoryConflicts, repositoryResolve,
+        repositoryConflicts, repositoryResolve, repositoryExport,
         serviceShowPage, serviceLogin,
         skillCreate, skillCopy, skillDelete, skillShare,
         scheduleCreate, scheduleList, scheduleDelete, scheduleEnable, scheduleRun, scheduleComplete,
@@ -190,6 +191,7 @@ nonisolated enum Actions {
         case repositoryConflicts: L10n.string("Conflicts")
         case repositoryResolve: L10n.string("Choose")
         case repositorySync: L10n.string("Sync")
+        case repositoryExport: L10n.string("Export Local Repository")
         case repositoryEnable: L10n.string("Repositories")
         case repositoryDisconnect: L10n.string("Remove Repository")
         case serviceAttach: L10n.string("Attach a service")

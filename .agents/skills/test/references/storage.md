@@ -666,6 +666,13 @@ intact. Repository packages using the reserved name must be renamed by their
 author; frozen invocations, schedules, and transcripts remain unchanged. Provider
 catalog storage and credential ownership are unchanged.
 
+The `2026-11-24-farm-skill` Profile milestone reserves `farm` for the bundled
+Ox Farm System skill. An existing Profile package moves to `user-farm`, preserving
+its resources and explicit user source selection. Unequal destination collisions
+stop migration with both packages intact. Repository packages using the reserved
+name must be renamed by their author; frozen invocations, schedules, and
+transcripts remain unchanged.
+
 Schedules are a version 1 Pi Durable session-scoped document, `ox.schedules`, in
 each Profile's `.ox/state.sqlite`. Its ID-keyed records hold prompt definitions,
 recurrence, optional condition/deadline and conversation references, execution

@@ -38,6 +38,7 @@ nonisolated enum ProfileSchema {
         "2026-10-20-schedules",
         "2026-10-21-response-preferences",
         "2026-10-22-profile-repositories",
+        "2026-11-24-farm-skill",
     ]
     static var current: String { versions.last! }
 
@@ -86,6 +87,8 @@ nonisolated enum ProfileMigrator {
     static let responsePreferencesVersion = "2026-10-21-response-preferences"
 
     static let repositoriesVersion = "2026-10-22-profile-repositories"
+
+    static let farmSkillVersion = "2026-11-24-farm-skill"
 
     static let lazyConversationVersion = "2026-10-15-lazy-conversations"
 
@@ -275,20 +278,28 @@ extension ProfileMigrator {
             Log.app.info("StorageMigrator.internalState published id=\(profile.id)")
         }
         var manifest = config
-        if ![responsePreferencesVersion, repositoriesVersion].contains(config.version) {
+        if ![responsePreferencesVersion, repositoriesVersion, farmSkillVersion].contains(config.version) {
             guard await materialize(at: profile.url, paths: ["MEMORY.md", "SOUL.md"]) else {
                 throw StorageMigrationError.invalidApplicationStorage("Profile preferences are not available yet")
             }
             let root = profile.url
             try await Task.detached(priority: .userInitiated) { try migrateResponsePreferences(at: root) }.value
         }
-        manifest.version = repositoriesVersion
-        if config.version != repositoriesVersion {
+        if config.version != farmSkillVersion {
+            let root = profile.url
+            guard await materialize(at: root.appendingPathComponent("skills/farm", isDirectory: true)),
+                  await materialize(at: root, paths: ["skill-selections.json"]) else {
+                throw StorageMigrationError.invalidApplicationStorage("Profile skills are not available yet")
+            }
+            try await Task.detached(priority: .userInitiated) { try migrateReservedSkill("farm", at: root) }.value
+        }
+        manifest.version = farmSkillVersion
+        if config.version != farmSkillVersion {
             try ProfileIO.writeConfig(manifest, to: profile.url)
             try syncDurableDirectory(profile.url)
         }
         var prepared = profile
-        prepared.version = repositoriesVersion
+        prepared.version = farmSkillVersion
         return prepared
     }
 
@@ -302,7 +313,7 @@ extension ProfileMigrator {
         }
         var migrated = profile
         migrated.version = config.version
-        if [internalStateVersion, lazyConversationVersion, schedulesVersion, responsePreferencesVersion, repositoriesVersion].contains(config.version) {
+        if [internalStateVersion, lazyConversationVersion, schedulesVersion, responsePreferencesVersion, repositoriesVersion, farmSkillVersion].contains(config.version) {
             await progress(String(localized: "Preparing Profile files…"))
             return try await prepareInternalState(migrated, config: config)
         }

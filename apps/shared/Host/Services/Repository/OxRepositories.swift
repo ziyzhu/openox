@@ -174,6 +174,32 @@ nonisolated enum OxRepositories {
                     ])
                 ),
                 (
+                    "ox.repository.export",
+                    .object([
+                        "description": .string(ModelGuidance.text("ox.repository.export")),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "name": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(100)]),
+                                "services": .object(["type": .string("array"), "maxItems": .int(256), "uniqueItems": .bool(true), "items": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(253)])]),
+                                "skills": .object(["type": .string("array"), "maxItems": .int(256), "uniqueItems": .bool(true), "items": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(100)])]),
+                            ]),
+                            "required": .array([.string("name")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object([
+                            "type": .string("object"), "properties": .object([
+                                "path": .object(["type": .string("string")]), "name": .object(["type": .string("string")]),
+                                "services": .object(["type": .string("array"), "items": .object(["type": .string("string")])]),
+                                "skills": .object(["type": .string("array"), "items": .object(["type": .string("string")])]),
+                                "manifest": .object(["type": .string("string")]),
+                                "files": .object(["type": .string("array"), "items": .object(["type": .string("string")])]),
+                                "bytes": .object(["type": .string("integer")]), "exported": .object(["type": .string("boolean"), "const": .bool(true)]),
+                            ]), "required": .array(["path", "name", "services", "skills", "manifest", "files", "bytes", "exported"].map(JSONValue.string)), "additionalProperties": .bool(false),
+                        ]),
+                    ])
+                ),
+                (
                     "ox.repository.disconnect",
                     .object([
                         "description": .string(ModelGuidance.text("ox.repository.disconnect")),
@@ -234,6 +260,15 @@ nonisolated enum OxRepositories {
             }
             ctx.setObject(disconnectRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeRepositoryDisconnect" as NSString)
 
+            let exportRepositoryBlock: @convention(block) (String, JSValue, JSValue, JSValue) -> JSValue = { name, servicesValue, skillsValue, purposeValue in
+                let services = jsValueToJSON(servicesValue)?.arrayValue?.compactMap(\.stringValue) ?? []
+                let skills = jsValueToJSON(skillsValue)?.arrayValue?.compactMap(\.stringValue) ?? []
+                return env.call(suspendingTimeout: true) {
+                    try await $0.exportRepository(name: name, services: services, skills: skills, purpose: purposeValue.toString()!)
+                }
+            }
+            ctx.setObject(exportRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeRepositoryExport" as NSString)
+
         },
         jsFragment: """
           list: value => { const options = __oxOptions(value, 'ox.repository.list'); return __nativeRepositoryList(String(options.purpose)); },
@@ -242,6 +277,7 @@ nonisolated enum OxRepositories {
             connect: (value) => { const options = __oxOptions(value, 'ox.repository.connect'); return __nativeRepositoryConnect(String(options.origin), options.commit ?? null, String(options.purpose)); },
             sync: (value) => { const options = __oxOptions(value, 'ox.repository.sync'); return __nativeRepositorySync(String(options.repository), String(options.purpose)); },
             enable: (value) => { const options = __oxOptions(value, 'ox.repository.enable'); return __nativeRepositoryEnable(String(options.repository), options.enabled, String(options.purpose)); },
+            export: (value) => { const options = __oxOptions(value, 'ox.repository.export'); return __nativeRepositoryExport(String(options.name), options.services ?? [], options.skills ?? [], String(options.purpose)); },
             disconnect: (value) => { const options = __oxOptions(value, 'ox.repository.disconnect'); return __nativeRepositoryDisconnect(String(options.repository), String(options.purpose)); },
         """
     )

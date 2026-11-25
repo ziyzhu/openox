@@ -3,6 +3,7 @@ import checkout from "../../skills/checkout/SKILL.md" with { type: "text" };
 import authentication from "../../skills/authentication/SKILL.md" with { type: "text" };
 import evolve from "../../skills/evolve/SKILL.md" with { type: "text" };
 import apiService from "../../skills/evolve/references/api-service.md" with { type: "text" };
+import farm from "../../skills/farm/SKILL.md" with { type: "text" };
 import helpers from "../../skills/evolve/references/helpers.js" with { type: "text" };
 import automationGuide from "../../skills/evolve/references/automation.md" with { type: "text" };
 import modelSchemas from "../../skills/evolve/references/model-schemas.md" with { type: "text" };
@@ -44,6 +45,7 @@ export const bundledSkills: readonly BundledSkill[] = Object.freeze([
     "references/providers.md": providers, "references/web-authentication.md": webAuthentication, "references/web-handoffs.md": webHandoffs,
     "references/web-capture.md": webCapture, "references/service-icon.md": serviceIcon, "references/search.md": search,
     "references/skills.md": skillGuide }),
+  skill("farm", farm),
   skill("onboard", onboard, { "references/import-memory.md": importMemory }),
   skill("visualize", visualize, { "references/html.md": html, "references/maps.md": maps, "references/reactive-example.md": reactiveExample }),
 ]);
