@@ -83,6 +83,11 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
         }
     }
 
+    private enum WorkspaceStage {
+        case onstage
+        case parked
+    }
+
     @Binding var page: CompactPage
     let size: CGSize
     let safeAreaInsets: EdgeInsets
@@ -94,6 +99,7 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
     let workspace: Workspace
 
     @State private var dragPhase = DragPhase.idle
+    @State private var workspaceStage = WorkspaceStage.onstage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -101,6 +107,7 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
     private let horizontalIntentRatio: CGFloat = 1.2
     private let maximumBlurRadius: CGFloat = 28
     private let hiddenWorkspaceDimming = 0.85
+    private let restingWorkspaceOpacity = 0.02
     private let sidebarEntranceDelay = 0.05
     private let sidebarReveal: ClosedRange<CGFloat> = 0.05...0.2
     private let sidebarExit = Animation.linear(duration: 0.13)
@@ -125,8 +132,23 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
     }
 
     private var workspaceOpacity: Double {
-        if reduceMotion { return 1 - Double(progress) }
-        return progress < 1 ? 1 - Double(progress) * hiddenWorkspaceDimming : 0
+        if reduceMotion { return max(restingWorkspaceOpacity, 1 - Double(progress)) }
+        return progress < 1 ? 1 - Double(progress) * hiddenWorkspaceDimming : restingWorkspaceOpacity
+    }
+
+    private var workspaceShift: CGFloat {
+        reduceMotion ? 0 : travel / 2
+    }
+
+    private var sidebarShift: CGFloat {
+        reduceMotion ? 0 : (travel - size.width) / 2
+    }
+
+    private var workspaceParking: CGAffineTransform {
+        switch workspaceStage {
+        case .onstage: .identity
+        case .parked: CGAffineTransform(translationX: size.width, y: 0)
+        }
     }
 
     private var sidebarOpacity: Double {
@@ -160,14 +182,15 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
                 .ignoresSafeArea(.container)
                 .geometryGroup()
                 .blur(radius: blurRadius)
-                .offset(x: reduceMotion ? 0 : travel / 2)
+                .visualEffect { [shift = workspaceShift] view, _ in view.offset(x: shift) }
+                .transformEffect(workspaceParking)
                 .opacity(workspaceOpacity)
                 .allowsHitTesting(page == .workspace && !interaction.actionsSuppressed)
                 .accessibilityHidden(page != .workspace)
 
             sidebar
                 .frame(width: size.width)
-                .offset(x: reduceMotion ? 0 : (travel - size.width) / 2)
+                .visualEffect { [shift = sidebarShift] view, _ in view.offset(x: shift) }
                 .transaction(value: page) { retimeSidebarMotion(&$0) }
                 .opacity(sidebarOpacity)
                 .transaction(value: page) { retime(&$0, with: sidebarVisibility) }
@@ -177,6 +200,18 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
         .background(Theme.Colors.conversationSurface, ignoresSafeAreaEdges: .all)
         .contentShape(Rectangle())
         .simultaneousGesture(pageDrag, isEnabled: gestureEnabled)
+        .transaction(value: page) { transaction in
+            transaction.addAnimationCompletion(criteria: .logicallyComplete) { parkWorkspaceWhenResting() }
+        }
+        .onChange(of: page) { _, page in
+            if page == .workspace { workspaceStage = .onstage }
+        }
+    }
+
+    private func parkWorkspaceWhenResting() {
+        guard page == .sidebar, dragPhase == .idle, workspaceStage == .onstage else { return }
+        workspaceStage = .parked
+        Log.ui.info("RootView.workspaceStage stage=parked")
     }
 
     private var pageDrag: some Gesture {
@@ -205,6 +240,7 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
                     if page == .workspace { onOpeningDrag() }
                     interaction.dragActive = true
                     interaction.actionsSuppressed = true
+                    workspaceStage = .onstage
                     dragPhase = .active(
                         origin: page,
                         translation: translation(value.translation.width, from: page)
@@ -262,6 +298,7 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
         transaction.addAnimationCompletion(criteria: .logicallyComplete) {
             interaction.dragActive = false
             if opensSidebar, page == .sidebar, dragPhase == .idle { onOpened() }
+            parkWorkspaceWhenResting()
         }
         withTransaction(transaction) {
             page = target
