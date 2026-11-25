@@ -268,11 +268,12 @@ final class ConversationSpeechInput {
     }
 
     private func fail(_ error: Error) {
-        Log.ui.error("SpeechInput.failed error=\(error.localizedDescription)")
+        let nsError = error as NSError
+        Log.ui.error("SpeechInput.failed state=\(String(describing: state)) domain=\(nsError.domain) code=\(nsError.code) error=\(error.localizedDescription)")
         let denied = error as? SpeechInputError == .microphonePermission
         stop(reason: "error", notice: Toast(
-            message: error.localizedDescription,
-            role: denied ? .error : .info,
+            message: error is SpeechInputError ? error.localizedDescription : SpeechInputError.unavailable.localizedDescription,
+            role: .error,
             action: denied ? .openSettings : nil,
             duration: 5
         ))

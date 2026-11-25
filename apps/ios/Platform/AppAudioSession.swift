@@ -5,12 +5,21 @@ import Synchronization
 nonisolated enum AppAudioSession {
     private static let queue = DispatchQueue(label: "ai.openox.audio-session", qos: .userInitiated)
     private static let activeOwner = Mutex<UUID?>(nil)
+    private static let recoverableCodes: Set<Int> = [
+        AVAudioSession.ErrorCode.expiredSession.rawValue,
+        AVAudioSession.ErrorCode.mediaServicesFailed.rawValue,
+    ]
 
     static func activateRecording(owner: UUID) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             queue.async {
                 continuation.resume(with: Result {
-                    try activate(owner: owner, category: .record, mode: .measurement, options: [.allowBluetoothHFP])
+                    do {
+                        try activate(owner: owner, category: .record, mode: .measurement, options: [.allowBluetoothHFP])
+                    } catch let error as NSError where recoverableCodes.contains(error.code) {
+                        Log.ui.error("AudioSession.activate retry owner=\(owner) code=\(error.code) error=\(error.localizedDescription)")
+                        try activate(owner: owner, category: .record, mode: .measurement, options: [.allowBluetoothHFP])
+                    }
                 })
             }
         }

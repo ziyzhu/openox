@@ -110,42 +110,52 @@ final class OnDeviceSpeechRecording {
     func start(onLevel: @escaping (Float) -> Void, onFailure: @escaping (Error) -> Void) async throws {
         var phase = ContinuousClock.now
         var phases: [String] = []
-        func mark(_ name: String) {
-            phases.append("\(name)=\(phase.duration(to: .now).formatted(.units(allowed: [.milliseconds])))")
+        var step = "format"
+        func mark(_ next: String) {
+            phases.append("\(step)=\(phase.duration(to: .now).formatted(.units(allowed: [.milliseconds])))")
             phase = .now
+            step = next
         }
-        guard let module, let analyzer,
-              let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [module]) else {
-            throw SpeechInputError.unavailable
+        do {
+            guard let module, let analyzer,
+                  let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [module]) else {
+                throw SpeechInputError.unavailable
+            }
+            mark("prepareToAnalyze")
+            audioSessionActive = true
+            async let audioSession: Void = AppAudioSession.activateRecording(owner: audioSessionID)
+            try await analyzer.prepareToAnalyze(in: format)
+            mark("audioSession")
+            try await audioSession
+            mark("engineSetup")
+            try Task.checkCancellation()
+            let engine = AVAudioEngine()
+            let inputFormat = engine.inputNode.outputFormat(forBus: 0)
+            guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
+                throw SpeechInputError.microphoneUnavailable
+            }
+            let input = try SpeechAudioInput(format: inputFormat, outputFormat: format) { level in
+                Task { @MainActor in onLevel(level) }
+            }
+            audioInput = input
+            engine.inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { buffer, _ in
+                input.append(buffer)
+            }
+            self.engine = engine
+            mark("analyzerStart")
+            try await analyzer.start(inputSequence: input.stream)
+            mark("engineStart")
+            try Task.checkCancellation()
+            engine.prepare()
+            try engine.start()
+            mark("started")
+            Log.ui.info("SpeechInput.capture started sampleRate=\(inputFormat.sampleRate) channels=\(inputFormat.channelCount) \(phases.joined(separator: " "))")
+        } catch where !(error is CancellationError) {
+            let nsError = error as NSError
+            Log.ui.error("SpeechInput.start failed step=\(step) domain=\(nsError.domain) code=\(nsError.code) \(phases.joined(separator: " ")) error=\(error.localizedDescription)")
+            guard !(error is SpeechInputError), ["audioSession", "engineSetup", "engineStart"].contains(step) else { throw error }
+            throw SpeechInputError.microphoneUnavailable
         }
-        mark("format")
-        audioSessionActive = true
-        async let audioSession: Void = AppAudioSession.activateRecording(owner: audioSessionID)
-        try await analyzer.prepareToAnalyze(in: format)
-        mark("prepareToAnalyze")
-        try await audioSession
-        mark("audioSession")
-        try Task.checkCancellation()
-        let engine = AVAudioEngine()
-        let inputFormat = engine.inputNode.outputFormat(forBus: 0)
-        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
-            throw SpeechInputError.unavailable
-        }
-        let input = try SpeechAudioInput(format: inputFormat, outputFormat: format) { level in
-            Task { @MainActor in onLevel(level) }
-        }
-        audioInput = input
-        engine.inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { buffer, _ in
-            input.append(buffer)
-        }
-        self.engine = engine
-        mark("engineSetup")
-        try await analyzer.start(inputSequence: input.stream)
-        mark("analyzerStart")
-        try Task.checkCancellation()
-        engine.prepare()
-        try engine.start()
-        mark("engineStart")
         if let resultsTask {
             Task {
                 do { _ = try await resultsTask.value }
@@ -153,7 +163,6 @@ final class OnDeviceSpeechRecording {
                 catch {}
             }
         }
-        Log.ui.info("SpeechInput.capture started sampleRate=\(inputFormat.sampleRate) channels=\(inputFormat.channelCount) \(phases.joined(separator: " "))")
     }
 
     func stopCapture() {
@@ -304,6 +313,7 @@ enum SpeechLanguage {
 nonisolated enum SpeechInputError: LocalizedError {
     case microphonePermission
     case unsupportedLanguage
+    case microphoneUnavailable
     case unavailable
 
     var errorDescription: String? {
@@ -312,6 +322,8 @@ nonisolated enum SpeechInputError: LocalizedError {
             L10n.string("Allow microphone access to use voice input.", comment: "")
         case .unsupportedLanguage:
             L10n.string("On-device speech recognition is unavailable for this language.", comment: "")
+        case .microphoneUnavailable:
+            L10n.string("Couldn't start the microphone. Please try again.", comment: "Shown when the audio session or microphone fails to start for voice input.")
         case .unavailable:
             L10n.string("Speech recognition is unavailable. Please try again.", comment: "")
         }
