@@ -27,6 +27,7 @@ struct ConversationSidebar: View {
 
     @State private var renaming: ConversationMeta?
     @State private var pendingDelete: ConversationMeta?
+    @State private var lastDeletedID: UUID?
     @State private var titleDraft = ""
     @State private var searchQuery = ""
     @State private var searchPresented = false
@@ -83,6 +84,7 @@ struct ConversationSidebar: View {
             Button("Delete", role: .destructive) {
                 guard let meta = pendingDelete else { return }
                 pendingDelete = nil
+                lastDeletedID = meta.id
                 onDelete(meta)
             }
         } message: {
@@ -164,6 +166,7 @@ struct ConversationSidebar: View {
                 }
                 Color.clear.frame(height: Theme.Spacing.md)
             }
+            .animation(.smooth(duration: 0.35), value: lastDeletedID)
             .padding(.top, Theme.Spacing.xs)
         }
         .scrollIndicators(.hidden)
@@ -228,6 +231,7 @@ struct ConversationSidebar: View {
             } preview: {
                 ConversationContextMenuPreview(meta: meta)
             }
+            .transition(.asymmetric(insertion: .identity, removal: .opacity.animation(.easeOut(duration: 0.15))))
             .id(meta.id.uuidString)
     }
 
