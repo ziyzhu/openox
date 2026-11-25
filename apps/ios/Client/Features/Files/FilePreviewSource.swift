@@ -197,3 +197,37 @@ struct FileShareButton<Label: View>: View {
         .disabled(!source.canShare)
     }
 }
+
+struct FileShareToolbarButton: View {
+    let file: FileItem
+    let scope: ProfileScope?
+
+    var body: some View {
+        FileShareButton(file: file, scope: scope) {
+            Image(systemName: "square.and.arrow.up")
+        }
+        .accessibilityLabel(A11yLabel.shareFile)
+        .accessibilityIdentifier(A11yID.Files.share(file.id))
+    }
+}
+
+struct FileShareGlassButton: View {
+    let file: FileItem
+    let scope: ProfileScope?
+
+    @ScaledMetric(relativeTo: .title3) private var size: CGFloat = 44
+
+    var body: some View {
+        FileShareButton(file: file, scope: scope) {
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(.title3, weight: .semibold))
+                .foregroundStyle(Theme.Colors.onSurface)
+                .frame(width: size, height: size)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Circle())
+        .accessibilityLabel(A11yLabel.shareFile)
+        .accessibilityIdentifier(A11yID.Files.share(file.id))
+    }
+}

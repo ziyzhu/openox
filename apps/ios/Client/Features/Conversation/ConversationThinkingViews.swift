@@ -689,6 +689,17 @@ private struct SourceFileView: View {
         }
         .navigationTitle((path as NSString).lastPathComponent)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if case .text(let text, false) = content {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ShareLink(item: text, preview: SharePreview((path as NSString).lastPathComponent)) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel(A11yLabel.shareFile)
+                    .accessibilityIdentifier("conversation.source.file.share")
+                }
+            }
+        }
         .task(id: path) {
             guard let resolver else {
                 content = .failed(String(localized: "File unavailable."))

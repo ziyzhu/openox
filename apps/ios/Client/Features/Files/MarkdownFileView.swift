@@ -92,6 +92,11 @@ struct MarkdownFileView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Colors.conversationSurface)
         .toolbar {
+            if mode == .viewing {
+                ToolbarItem(placement: .topBarTrailing) {
+                    FileShareToolbarButton(file: file, scope: scope)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 if case .ready(let document) = phase {
                     switch mode {

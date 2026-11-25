@@ -159,6 +159,7 @@ struct FileZoomPreviewScreen: View {
 
     let file: FileItem
     let chrome: Chrome
+    private let scope: ProfileScope?
     private let source: FilePreviewSource
     @State private var image: UIImage?
     @State private var pdfDocument: PDFDocument?
@@ -171,6 +172,7 @@ struct FileZoomPreviewScreen: View {
     init(file: FileItem, chrome: Chrome, scope: ProfileScope? = StorageRoot.currentScope) {
         self.file = file
         self.chrome = chrome
+        self.scope = scope
         source = FilePreviewSource(file: file, scope: scope)
     }
 
@@ -181,6 +183,8 @@ struct FileZoomPreviewScreen: View {
             case .immersive(let onDismiss):
                 FileScreen(onDismiss: onDismiss, dismissIdentifier: A11yID.Files.previewDismiss) { _ in
                     preview
+                } actions: {
+                    FileShareGlassButton(file: file, scope: scope)
                 }
             case .navigation:
                 preview
@@ -189,6 +193,11 @@ struct FileZoomPreviewScreen: View {
                     .navigationTitle(file.userFacingName)
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar(.visible, for: .navigationBar)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            FileShareToolbarButton(file: file, scope: scope)
+                        }
+                    }
             }
         }
         .onAppear {

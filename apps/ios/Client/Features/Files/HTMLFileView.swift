@@ -33,11 +33,7 @@ struct HTMLFileScreen: View {
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                FileShareButton(file: file, scope: scope) {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .accessibilityLabel(A11yLabel.shareFile)
-                .accessibilityIdentifier(A11yID.Files.share(file.id))
+                FileShareToolbarButton(file: file, scope: scope)
             }
         }
     }
