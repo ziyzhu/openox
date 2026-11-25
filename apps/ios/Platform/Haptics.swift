@@ -5,7 +5,6 @@ enum Haptics {
         case copy
         case fileSaveFailed
         case fileSaved
-        case holdToTalkHint
         case modelSelected
         case requestAnswered
         case send

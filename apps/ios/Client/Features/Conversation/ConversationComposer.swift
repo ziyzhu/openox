@@ -225,7 +225,7 @@ struct ConversationComposer: View, Equatable {
     let onCancelEdit: () -> Void
     let onSend: () -> Void
     let onStop: () -> Void
-    let onSpeechBegin: (Bool) -> Void
+    let onSpeechBegin: (ConversationSpeechInput.Trigger) -> Void
     var serviceScrollProgress: CGFloat? = nil
     var onInputFrameChange: (CGRect) -> Void = { _ in }
 
@@ -292,9 +292,12 @@ struct ConversationComposer: View, Equatable {
     }
 
     private var trailingControlsWidth: CGFloat {
-        canSubmit || composer.isImporting || isBusy || composer.isEmpty
-            ? trailingControlSize + 2
-            : Theme.Spacing.lg
+        let count = (showsSpeechControl ? 1 : 0) + (trailingControlState == .hidden ? 0 : 1)
+        return count == 0 ? Theme.Spacing.lg : CGFloat(count) * trailingControlSize + 2
+    }
+
+    private var showsSpeechTranscript: Bool {
+        speech.isPresented && !(speech.transcript.isEmpty && composer.draft.isEmpty)
     }
 
     var body: some View {
@@ -471,8 +474,8 @@ struct ConversationComposer: View, Equatable {
             VStack(alignment: .leading, spacing: 0) {
                 composerDraftStrip
                 importMemoryStrip
-                if speech.showsTranscript {
-                    HoldToTalkTranscript(speech: speech)
+                if showsSpeechTranscript {
+                    HoldToTalkTranscript(draft: composer.draft, transcript: speech.transcript)
                         .padding(.horizontal, Theme.Spacing.lg)
                         .padding(.top, Theme.Spacing.md)
                         .transition(.opacity)
@@ -494,7 +497,7 @@ struct ConversationComposer: View, Equatable {
         )
         .animation(
             reduceMotion ? nil : .spring(duration: 0.28, bounce: 0),
-            value: speech.showsTranscript
+            value: showsSpeechTranscript
         )
         .overlay(alignment: .topLeading) {
             if showsTopStrip && floatsTopStrip {
@@ -721,7 +724,7 @@ struct ConversationComposer: View, Equatable {
                 .textEditorStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .contentMargins(0, for: .scrollContent)
-                .frame(height: composerTextEditorHeight)
+                .frame(height: speech.isPresented ? min(composerTextEditorHeight, 40) : composerTextEditorHeight)
                 .padding(.top, -textEditorVerticalInset + textEditorOpticalOffset)
                 .padding(.bottom, -textEditorVerticalInset - textEditorOpticalOffset)
                 .focused(fieldFocused)
@@ -756,23 +759,36 @@ struct ConversationComposer: View, Equatable {
         .overlay {
             if speech.isPresented {
                 HoldToTalkWaveform(speech: speech)
-                    .padding(.leading, Theme.Spacing.lg)
+                    .padding(.leading, speech.showsCancel ? iconButtonSize : Theme.Spacing.lg)
                     .padding(.trailing, trailingControlsWidth + Theme.Spacing.sm)
                     .transition(.opacity)
             }
         }
         .overlay(alignment: .bottomLeading) {
-            if !speech.isPresented {
+            if speech.showsCancel {
+                speechCancelButton
+                    .padding(.bottom, 1)
+                    .transition(.opacity)
+            } else if !speech.isPresented {
                 attachButton
                     .padding(.bottom, 1)
                     .transition(.opacity)
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            ZStack {
-                trailingControl
-                    .id(trailingControlState)
-                    .transition(.opacity.animation(Theme.Animation.quick))
+            HStack(spacing: 0) {
+                if showsSpeechControl {
+                    speechControl
+                        .transition(.opacity.animation(Theme.Animation.quick))
+                }
+                ZStack {
+                    trailingControl
+                        .id(trailingControlState)
+                        .transition(.opacity.animation(Theme.Animation.quick))
+                }
+                .opacity(speech.isPresented ? 0 : 1)
+                .allowsHitTesting(!speech.isPresented)
+                .accessibilityHidden(speech.isPresented)
             }
             .animation(reduceMotion ? nil : Theme.Animation.quick, value: trailingControlState)
             .padding(.bottom, 1)
@@ -784,8 +800,11 @@ struct ConversationComposer: View, Equatable {
         case openWebsite
         case stop
         case attaching
-        case speech
         case hidden
+    }
+
+    private var showsSpeechControl: Bool {
+        !isEditingMessage && !composer.isImporting
     }
 
     private var trailingControlState: TrailingControl {
@@ -793,7 +812,7 @@ struct ConversationComposer: View, Equatable {
         if composer.isImporting { return isBusy ? .stop : .attaching }
         if composer.canSubmit { return composer.websiteURL != nil ? .openWebsite : .send }
         if isBusy, !composer.suppressesStopControl { return .stop }
-        return composer.isEmpty ? .speech : .hidden
+        return .hidden
     }
 
     @ViewBuilder
@@ -811,8 +830,6 @@ struct ConversationComposer: View, Equatable {
                 .padding(.trailing, 6)
                 .padding(.vertical, 5)
                 .accessibilityLabel("Attaching")
-        case .speech:
-            speechControl
         case .hidden:
             EmptyView()
         }
@@ -821,13 +838,34 @@ struct ConversationComposer: View, Equatable {
     private var speechControlFill: Color {
         switch speech.state {
         case .idle: .clear
-        case .recording(.cancel): Theme.Colors.error.color(for: colorScheme)
+        case .recording(.hold(.cancel)): Theme.Colors.error.color(for: colorScheme)
         default: Theme.Colors.primary.color(for: colorScheme)
         }
     }
 
+    private var speechControlIcon: String {
+        guard speech.state == .recording(.tap) else { return "mic.fill" }
+        return speech.destination == .send ? "arrow.up" : "checkmark"
+    }
+
+    private var speechCancelButton: some View {
+        Button {
+            Haptics.impact(.speechCancelled)
+            speech.cancel(reason: "cancelButton")
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(.body, weight: .medium))
+                .foregroundStyle(Theme.Colors.onSurface)
+                .frame(width: iconButtonSize, height: iconButtonSize)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.string("Cancel voice input", comment: "Accessibility label for the button that discards an in-progress voice recording."))
+        .accessibilityIdentifier(A11yID.ConversationControls.speechCancel)
+    }
+
     private var speechControl: some View {
-        Image(systemName: "mic.fill")
+        Image(systemName: speechControlIcon)
             .font(.system(.subheadline, weight: .bold))
             .foregroundStyle(speech.isPresented ? Theme.Colors.onPrimary : Theme.Colors.onSurface)
             .frame(width: composerButtonSize, height: composerButtonSize)
@@ -840,36 +878,29 @@ struct ConversationComposer: View, Equatable {
             .contentShape(Circle())
             .overlay {
                 HoldToTalkArea(
-                    canBegin: !composer.isImporting && !speech.isPresented,
-                    onTouchDown: { speechLayoutState = layoutState },
-                    onTap: {
-                        speechLayoutState = nil
-                        showHoldToTalkHint()
+                    canBegin: !composer.isImporting,
+                    onPress: {
+                        guard !speech.isPresented else {
+                            speech.finish()
+                            return
+                        }
+                        speechLayoutState = layoutState
+                        onSpeechBegin(.hold(.send))
                     },
-                    onBegin: { onSpeechBegin(false) },
                     onMove: { speech.move(to: $0, distance: $1) },
-                    onRelease: { speech.release() },
+                    onLift: { speech.lift() },
                     onCancel: { speech.interrupt() }
                 )
                 .accessibilityHidden(true)
             }
             .accessibilityElement()
             .accessibilityAddTraits(.isButton)
-            .accessibilityLabel("Hold to talk")
-            .accessibilityHint("Press and hold to talk.")
+            .accessibilityLabel("Voice input")
+            .accessibilityHint("Tap to start, or hold to talk and release to send.")
             .accessibilityIdentifier(A11yID.ConversationControls.speechHold)
             .accessibilityAction {
-                if speech.isPresented { speech.release(action: .send) } else { onSpeechBegin(true) }
+                if speech.isPresented { speech.finish() } else { onSpeechBegin(.tap) }
             }
-    }
-
-    private func showHoldToTalkHint() {
-        Haptics.impact(.holdToTalkHint)
-        speech.notice = L10n.string(
-            "Press and hold to talk.",
-            comment: "Hint shown when the user taps instead of holding the microphone button."
-        )
-        Log.ui.info("ConversationComposer.speechHint conversation=\(sessionID)")
     }
 
     private func setMenu(_ visible: Bool) {

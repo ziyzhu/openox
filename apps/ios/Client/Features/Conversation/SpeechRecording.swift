@@ -14,7 +14,11 @@ final class OnDeviceSpeechRecording {
     private var resultsTask: Task<String, Error>?
     private var audioSessionActive = false
 
-    func prepare(locale: Locale, onTranscript: @escaping (String) -> Void) async throws -> Bool {
+    func prepare(
+        locale: Locale,
+        onDownload: @escaping (Int) -> Void,
+        onTranscript: @escaping (String) -> Void
+    ) async throws -> Bool {
         var needsAnotherPress = false
         switch AVAudioApplication.shared.recordPermission {
         case .undetermined:
@@ -48,6 +52,14 @@ final class OnDeviceSpeechRecording {
         if assetStatus != .installed,
            let request = try await AssetInventory.assetInstallationRequest(supporting: [module]) {
             needsAnotherPress = true
+            let progress = request.progress
+            let reporting = Task {
+                while !Task.isCancelled {
+                    onDownload(Int(progress.fractionCompleted * 100))
+                    try? await Task.sleep(for: .milliseconds(200))
+                }
+            }
+            defer { reporting.cancel() }
             try await request.downloadAndInstall()
             let installedStatus = await AssetInventory.status(forModules: [module])
             Log.ui.info("SpeechInput.assets prepared status=\(String(describing: installedStatus))")
@@ -222,6 +234,23 @@ nonisolated private final class SpeechAudioInput: @unchecked Sendable {
     }
 }
 
+enum SpeechLanguage {
+    static let storageKey = "speech.language"
+
+    static var locale: Locale {
+        guard let identifier = UserDefaults.standard.string(forKey: storageKey), !identifier.isEmpty else {
+            return AppLocale.shared.locale
+        }
+        return Locale(identifier: identifier)
+    }
+
+    static func supported() async -> [Locale] {
+        var seen = Set<String>()
+        return (await SpeechTranscriber.supportedLocales + DictationTranscriber.supportedLocales)
+            .filter { seen.insert($0.identifier(.bcp47)).inserted }
+    }
+}
+
 nonisolated enum SpeechInputError: LocalizedError {
     case microphonePermission
     case unsupportedLanguage
@@ -230,7 +259,7 @@ nonisolated enum SpeechInputError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .microphonePermission:
-            L10n.string("Allow microphone access in Settings to use Hold to Talk.", comment: "")
+            L10n.string("Allow microphone access to use voice input.", comment: "")
         case .unsupportedLanguage:
             L10n.string("On-device speech recognition is unavailable for this language.", comment: "")
         case .unavailable:

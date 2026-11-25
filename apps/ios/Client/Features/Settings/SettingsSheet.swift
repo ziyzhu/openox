@@ -13,6 +13,8 @@ struct SettingsSheet: View {
     @State private var showOnboarding = false
     @State private var creatingProfile = false
     @State private var openingProfile = false
+    @State private var speechLocales: [Locale] = []
+    @AppStorage(SpeechLanguage.storageKey) private var speechLanguage = ""
     @State private var locatingProfileID: UUID?
     @State private var profileOpenErrorMessage: String?
     private let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
@@ -35,6 +37,14 @@ struct SettingsSheet: View {
 
     private var languageBinding: Binding<AppLocale.Language> {
         Binding(get: { appLocale.language }, set: { appLocale.language = $0 })
+    }
+
+    private func speechLanguageName(_ identifier: String) -> String {
+        appLocale.locale.localizedString(forIdentifier: identifier) ?? identifier
+    }
+
+    private var speechLanguageValue: Text {
+        speechLanguage.isEmpty ? Text("App language") : Text(verbatim: speechLanguageName(speechLanguage))
     }
 
     private var defaultModelValue: Text {
@@ -164,6 +174,34 @@ struct SettingsSheet: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier(A11yID.Settings.language)
+
+                            Divider().settingsContentInset()
+
+                            Menu {
+                                Picker(selection: $speechLanguage) {
+                                    Text("App language").tag("")
+                                    ForEach(speechLocales, id: \.identifier) { locale in
+                                        Text(verbatim: speechLanguageName(locale.identifier(.bcp47)))
+                                            .tag(locale.identifier(.bcp47))
+                                    }
+                                } label: {
+                                    EmptyView()
+                                }
+                            } label: {
+                                SettingsDisclosureRow(
+                                    title: "Voice input",
+                                    value: speechLanguageValue,
+                                    indicator: "chevron.up.chevron.down"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier(A11yID.Settings.speechLanguage)
+                            .task {
+                                let names = await SpeechLanguage.supported()
+                                speechLocales = names.sorted {
+                                    speechLanguageName($0.identifier(.bcp47)) < speechLanguageName($1.identifier(.bcp47))
+                                }
+                            }
 
                             Divider().settingsContentInset()
 

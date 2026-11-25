@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import Observation
+import UIKit
 
 @MainActor
 @Observable
@@ -10,32 +11,54 @@ final class ConversationSpeechInput {
         case cancel
     }
 
+    enum Trigger: Equatable {
+        case hold(ReleaseAction)
+        case tap
+
+        var name: String {
+            switch self {
+            case .hold: "hold"
+            case .tap: "tap"
+            }
+        }
+    }
+
+    enum Destination: String {
+        case send
+        case draft
+    }
+
     enum Outcome {
-        case send(String)
-        case draft(String)
+        case finished(String)
+        case interrupted(String)
 
         var text: String {
             switch self {
-            case .send(let text), .draft(let text): text
+            case .finished(let text), .interrupted(let text): text
             }
         }
     }
 
     enum State: Equatable {
         case idle
-        case preparing(holding: Bool)
-        case starting
-        case recording(ReleaseAction)
+        case preparing(Trigger?)
+        case downloading(percent: Int)
+        case starting(Trigger)
+        case recording(Trigger)
         case finalizing
     }
+
+    private static let tapDuration = Duration.milliseconds(350)
+    private static let captureTail = Duration.milliseconds(250)
 
     private(set) var state = State.idle
     private(set) var level: Float = 0
     private(set) var transcript = ""
-    private(set) var startedAt = Date()
-    private(set) var usesAccessibleControls = false
-    var notice: String?
+    private(set) var destination = Destination.send
+    var notice: Toast?
     @ObservationIgnored var composerFrame = CGRect.zero
+    @ObservationIgnored private var pressedAt = ContinuousClock.now
+    @ObservationIgnored private var recordingStartedAt = ContinuousClock.now
     @ObservationIgnored private var session: OnDeviceSpeechRecording?
     @ObservationIgnored private var sessionID: UUID?
     @ObservationIgnored private var task: Task<Void, Never>?
@@ -49,41 +72,60 @@ final class ConversationSpeechInput {
     }
 
     var selection: ReleaseAction {
-        if case .recording(let action) = state { action } else { .send }
+        if case .recording(.hold(let action)) = state { action } else { .send }
     }
 
-    var showsTranscript: Bool {
-        isPresented && !transcript.isEmpty
+    var isHandsFree: Bool {
+        switch state {
+        case .preparing(.some(.tap)), .starting(.tap), .recording(.tap): true
+        default: false
+        }
     }
 
-    func begin(accessible: Bool = false, completion: @escaping (Outcome) -> Void) {
+    var showsCancel: Bool {
+        switch state {
+        case .preparing(.none), .downloading: true
+        default: isHandsFree
+        }
+    }
+
+    func begin(_ trigger: Trigger, destination: Destination, completion: @escaping (Outcome) -> Void) {
         guard state == .idle else { return }
         let id = UUID()
         let recording = OnDeviceSpeechRecording()
+        let locale = SpeechLanguage.locale
         sessionID = id
         session = recording
         self.completion = completion
-        usesAccessibleControls = accessible
-        state = .preparing(holding: true)
+        self.destination = destination
+        pressedAt = .now
+        state = .preparing(trigger)
         level = 0
         transcript = ""
         notice = nil
-        Log.ui.info("SpeechInput.prepare session=\(id) locale=\(AppLocale.shared.locale.identifier)")
+        Log.ui.info("SpeechInput.prepare session=\(id) locale=\(locale.identifier) trigger=\(trigger.name) destination=\(destination.rawValue)")
         task = Task { [self] in
             defer { if Task.isCancelled { recording.cancel() } }
             do {
-                let setup = try await recording.prepare(locale: AppLocale.shared.locale) { [weak self] text in
-                    guard self?.sessionID == id else { return }
-                    self?.transcript = text
-                }
+                let setup = try await recording.prepare(
+                    locale: locale,
+                    onDownload: { [weak self] percent in self?.downloading(percent, session: id) },
+                    onTranscript: { [weak self] text in
+                        guard self?.sessionID == id else { return }
+                        self?.transcript = text
+                    }
+                )
                 try Task.checkCancellation()
                 guard sessionID == id else { return }
-                guard !setup, state == .preparing(holding: true) else {
+                guard !setup, case .preparing(let requested?) = state else {
                     cancel(reason: "prepared")
-                    notice = L10n.string("Ready. Hold the input area to talk, then release to send.", comment: "")
+                    notice = Toast(
+                        message: L10n.string("Voice input is ready. Tap or hold the microphone to talk.", comment: "Notice shown after microphone permission or the speech model finishes setting up."),
+                        duration: 5
+                    )
                     return
                 }
-                state = .starting
+                state = .starting(requested)
                 try await recording.start(
                     onLevel: { [weak self] level in
                         guard self?.sessionID == id else { return }
@@ -95,13 +137,13 @@ final class ConversationSpeechInput {
                     }
                 )
                 try Task.checkCancellation()
-                guard sessionID == id else { return }
-                startedAt = Date()
-                state = .recording(.send)
+                guard sessionID == id, case .starting(let trigger) = state else { return }
+                recordingStartedAt = .now
+                state = .recording(trigger)
+                UIApplication.shared.isIdleTimerDisabled = true
                 Haptics.impact(.speechStarted)
-                deadline?.cancel()
-                deadline = nil
-                Log.ui.info("SpeechInput.recording session=\(id)")
+                setDeadline(seconds: 300, message: L10n.string("Recording reached the five-minute limit. Nothing was sent.", comment: ""))
+                Log.ui.info("SpeechInput.recording session=\(id) trigger=\(trigger.name) startup=\(pressedAt.duration(to: .now))")
             } catch where !(error is CancellationError) {
                 guard sessionID == id else { return }
                 fail(error)
@@ -111,58 +153,61 @@ final class ConversationSpeechInput {
     }
 
     func move(to point: CGPoint, distance: CGFloat) {
-        guard isRecording else { return }
-        let action: ReleaseAction = distance >= 32 && exitsComposer(point) ? .cancel : .send
-        if selection != action {
-            state = .recording(action)
-            Haptics.selection(.speechActionChanged)
-            Log.ui.info("SpeechInput.selection action=\(action.rawValue)")
-        }
+        guard case .recording(.hold(let current)) = state else { return }
+        let action: ReleaseAction = distance >= 32 && exitsComposer(point, from: current) ? .cancel : .send
+        guard action != current else { return }
+        state = .recording(.hold(action))
+        Haptics.selection(.speechActionChanged)
+        Log.ui.info("SpeechInput.selection action=\(action.rawValue)")
     }
 
-    private func exitsComposer(_ point: CGPoint) -> Bool {
+    private func exitsComposer(_ point: CGPoint, from current: ReleaseAction) -> Bool {
         guard !composerFrame.isEmpty else { return false }
-        let slack: CGFloat = selection == .cancel ? 0 : 12
+        let slack: CGFloat = current == .cancel ? 0 : 12
         return point.y < composerFrame.minY - slack || point.x < composerFrame.minX - slack
     }
 
-    func release(action: ReleaseAction? = nil) {
-        let released = ContinuousClock.now
-        defer { Log.ui.info("SpeechInput.release handled duration=\(released.duration(to: .now))") }
-        if state == .starting {
-            cancel(reason: "releasedDuringStartup")
-            return
-        }
-        if case .preparing = state {
-            state = .preparing(holding: false)
-            return
-        }
-        guard isRecording, let recording = session, let id = sessionID else { return }
-        let action = action ?? selection
-        guard action != .cancel else {
+    func lift() {
+        let held = pressedAt.duration(to: .now)
+        switch state {
+        case .preparing(.some(.hold)):
+            state = .preparing(.tap)
+        case .starting(.hold):
+            state = .starting(.tap)
+        case .recording(.hold(.cancel)):
             cancel(reason: "slideCancel")
             Haptics.impact(.speechCancelled)
+        case .recording(.hold(.send)) where held < Self.tapDuration:
+            state = .recording(.tap)
+        case .recording(.hold(.send)):
+            finish()
+        default:
             return
         }
+        Log.ui.info("SpeechInput.lift held=\(held) handsFree=\(isHandsFree)")
+    }
+
+    func finish() {
+        guard case .recording(let trigger) = state, let recording = session, let id = sessionID else { return }
         state = .finalizing
         level = 0
-        recording.stopCapture()
         Haptics.impact(.speechStopped)
-        Log.ui.info("SpeechInput.release session=\(id) action=\(action.rawValue) duration=\(Date().timeIntervalSince(startedAt))")
+        Log.ui.info("SpeechInput.finish session=\(id) trigger=\(trigger.name) duration=\(recordingStartedAt.duration(to: .now))")
         setDeadline(seconds: 15, message: L10n.string("Transcription took too long. Nothing was sent. Please try again.", comment: ""))
         task = Task {
             do {
+                try await Task.sleep(for: Self.captureTail)
                 let text = try await recording.finish()
                 try Task.checkCancellation()
                 guard sessionID == id else { return }
                 let completion = self.completion
                 cancel(reason: "finished")
                 guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                    notice = L10n.string("No speech detected. Nothing was sent.", comment: "")
+                    notice = Toast(message: L10n.string("No speech detected. Nothing was sent.", comment: ""), duration: 5)
                     return
                 }
                 Log.ui.info("SpeechInput.completed session=\(id) chars=\(text.count)")
-                completion?(.send(text))
+                completion?(.finished(text))
             } catch where !(error is CancellationError) {
                 guard sessionID == id else { return }
                 fail(error)
@@ -171,10 +216,13 @@ final class ConversationSpeechInput {
     }
 
     func interrupt() {
-        if case .preparing = state {
-            state = .preparing(holding: false)
-        } else if isPresented {
-            stop(reason: "interrupted", notice: L10n.string("Recording interrupted. Nothing was sent.", comment: ""))
+        switch state {
+        case .idle, .downloading:
+            break
+        case .preparing:
+            state = .preparing(nil)
+        case .starting, .recording, .finalizing:
+            stop(reason: "interrupted", notice: Toast(message: L10n.string("Recording interrupted. Nothing was sent.", comment: ""), duration: 5))
         }
     }
 
@@ -192,11 +240,33 @@ final class ConversationSpeechInput {
         state = .idle
         level = 0
         transcript = ""
+        UIApplication.shared.isIdleTimerDisabled = false
+    }
+
+    private func downloading(_ percent: Int, session id: UUID) {
+        guard sessionID == id else { return }
+        switch state {
+        case .preparing:
+            deadline?.cancel()
+            deadline = nil
+            Log.ui.info("SpeechInput.download started session=\(id)")
+            state = .downloading(percent: percent)
+        case .downloading(let current) where current != percent:
+            state = .downloading(percent: percent)
+        default:
+            break
+        }
     }
 
     private func fail(_ error: Error) {
         Log.ui.error("SpeechInput.failed error=\(error.localizedDescription)")
-        stop(reason: "error", notice: error.localizedDescription)
+        let denied = error as? SpeechInputError == .microphonePermission
+        stop(reason: "error", notice: Toast(
+            message: error.localizedDescription,
+            role: denied ? .error : .info,
+            action: denied ? .openSettings : nil,
+            duration: 5
+        ))
         Haptics.error(.speechFailed)
     }
 
@@ -205,11 +275,11 @@ final class ConversationSpeechInput {
         deadline = Task {
             do { try await Task.sleep(for: .seconds(seconds)) }
             catch { return }
-            stop(reason: "timeout", notice: message)
+            stop(reason: "timeout", notice: Toast(message: message, duration: 5))
         }
     }
 
-    private func stop(reason: String, notice lost: String) {
+    private func stop(reason: String, notice lost: Toast) {
         let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         let completion = completion
         cancel(reason: reason)
@@ -218,6 +288,6 @@ final class ConversationSpeechInput {
             return
         }
         Log.ui.info("SpeechInput.kept reason=\(reason) chars=\(text.count)")
-        completion?(.draft(text))
+        completion?(.interrupted(text))
     }
 }

@@ -406,7 +406,7 @@ struct ConversationPage: View {
         let observedTranscript = composedTranscript
         .onChange(of: speechInput.notice) { _, message in
             guard let message else { return }
-            toast = Toast(message: message, duration: 5)
+            toast = message
             speechInput.notice = nil
         }
         .onChange(of: scenePhase) { _, phase in
@@ -1615,18 +1615,30 @@ struct ConversationPage: View {
         }
     }
 
-    private func beginSpeech(accessible: Bool) {
+    private func beginSpeech(_ trigger: ConversationSpeechInput.Trigger) {
         guard !composer.isImporting, !speechInput.isPresented else { return }
         let draftID = composer.draftID
         let draft = composer.attributedDraft
+        let destination: ConversationSpeechInput.Destination = composer.isEmpty ? .send : .draft
         composer.setAttachmentMenuPresented(false)
-        speechInput.begin(accessible: accessible) { outcome in
-            guard case .send(let text) = outcome, composer.draftID == draftID, composer.attributedDraft == draft else {
-                composer.appendDictation(outcome.text)
-                speechInput.notice = L10n.string("Nothing was sent. Your words are in the draft.", comment: "Notice shown when voice input stops early and the recognized words are kept as a draft.")
+        speechInput.begin(trigger, destination: destination) { outcome in
+            let unchanged = composer.draftID == draftID && composer.attributedDraft == draft
+            composer.appendDictation(outcome.text)
+            guard case .finished = outcome else {
+                speechInput.notice = Toast(
+                    message: L10n.string("Nothing was sent. Your words are in the draft.", comment: "Notice shown when voice input stops early and the recognized words are kept as a draft."),
+                    duration: 5
+                )
                 return
             }
-            composer.appendDictation(text)
+            guard destination == .send else { return }
+            guard unchanged else {
+                speechInput.notice = Toast(
+                    message: L10n.string("Nothing was sent. Your words are in the draft.", comment: "Notice shown when voice input stops early and the recognized words are kept as a draft."),
+                    duration: 5
+                )
+                return
+            }
             if let invocation = composer.slashInvocation {
                 submitSkill(invocation.skill, argument: invocation.argument)
             } else {

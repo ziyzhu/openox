@@ -3,11 +3,9 @@ import UIKit
 
 struct HoldToTalkArea: UIViewRepresentable {
     let canBegin: Bool
-    let onTouchDown: () -> Void
-    let onTap: () -> Void
-    let onBegin: () -> Void
+    let onPress: () -> Void
     let onMove: (CGPoint, CGFloat) -> Void
-    let onRelease: () -> Void
+    let onLift: () -> Void
     let onCancel: () -> Void
 
     func makeUIView(context: Context) -> Probe {
@@ -16,11 +14,9 @@ struct HoldToTalkArea: UIViewRepresentable {
 
     func updateUIView(_ view: Probe, context: Context) {
         view.canBegin = canBegin
-        view.onTouchDown = onTouchDown
-        view.onTap = onTap
-        view.onBegin = onBegin
+        view.onPress = onPress
         view.onMove = onMove
-        view.onRelease = onRelease
+        view.onLift = onLift
         view.onCancel = onCancel
     }
 
@@ -30,49 +26,41 @@ struct HoldToTalkArea: UIViewRepresentable {
 
     final class Probe: UIView, UIGestureRecognizerDelegate {
         var canBegin = true
-        var onTouchDown: (() -> Void)?
-        var onTap: (() -> Void)?
-        var onBegin: (() -> Void)?
+        var onPress: (() -> Void)?
         var onMove: ((CGPoint, CGFloat) -> Void)?
-        var onRelease: (() -> Void)?
+        var onLift: (() -> Void)?
         var onCancel: (() -> Void)?
         private var origin = CGPoint.zero
-        private lazy var hold = UILongPressGestureRecognizer(target: self, action: #selector(holdChanged(_:)))
-        private lazy var tap = UITapGestureRecognizer(target: self, action: #selector(tapRecognized(_:)))
+        private lazy var press = UILongPressGestureRecognizer(target: self, action: #selector(pressChanged(_:)))
 
         override init(frame: CGRect) {
             super.init(frame: frame)
             isUserInteractionEnabled = false
             isAccessibilityElement = false
-            hold.minimumPressDuration = 0.35
-            hold.allowableMovement = Theme.Size.minimumTouchTarget
-            hold.delegate = self
-            tap.delegate = self
-            tap.require(toFail: hold)
+            press.minimumPressDuration = 0
+            press.delegate = self
         }
 
         required init?(coder: NSCoder) { nil }
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
-            guard hold.view !== window else { return }
+            guard press.view !== window else { return }
             detach()
-            guard let window else { return }
-            window.addGestureRecognizer(hold)
-            window.addGestureRecognizer(tap)
+            window?.addGestureRecognizer(press)
         }
 
         func detach() {
-            hold.view?.removeGestureRecognizer(hold)
-            tap.view?.removeGestureRecognizer(tap)
+            if press.state == .began || press.state == .changed, let onCancel {
+                DispatchQueue.main.async(execute: onCancel)
+            }
+            press.view?.removeGestureRecognizer(press)
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
             guard canBegin, window != nil, bounds.contains(touch.location(in: self)),
                   let controller = owningViewController, let touchedView = touch.view else { return false }
-            let receivesTouch = touchedView.isDescendant(of: controller.view)
-            if receivesTouch, gestureRecognizer === hold { onTouchDown?() }
-            return receivesTouch
+            return touchedView.isDescendant(of: controller.view)
         }
 
         private var owningViewController: UIViewController? {
@@ -88,25 +76,20 @@ struct HoldToTalkArea: UIViewRepresentable {
             true
         }
 
-        @objc private func holdChanged(_ gesture: UILongPressGestureRecognizer) {
+        @objc private func pressChanged(_ gesture: UILongPressGestureRecognizer) {
             let point = gesture.location(in: window)
             switch gesture.state {
             case .began:
                 origin = point
-                onBegin?()
+                onPress?()
             case .changed:
                 onMove?(point, hypot(point.x - origin.x, point.y - origin.y))
             case .ended:
                 onMove?(point, hypot(point.x - origin.x, point.y - origin.y))
-                onRelease?()
+                onLift?()
             case .cancelled: onCancel?()
             default: break
             }
-        }
-
-        @objc private func tapRecognized(_ gesture: UITapGestureRecognizer) {
-            guard gesture.state == .ended else { return }
-            onTap?()
         }
     }
 }
@@ -134,11 +117,11 @@ struct HoldToTalkWaveform: View {
         .accessibilityElement()
         .accessibilityLabel(speech.status)
         .accessibilityIdentifier(A11yID.ConversationControls.speechStatus)
-        .accessibilityAction(named: Text("Stop and send")) { speech.release(action: .send) }
+        .accessibilityAction(named: Text("Stop and send")) { speech.finish() }
         .accessibilityAction(named: Text("Cancel")) { speech.cancel(reason: "accessibilityCancel") }
         .accessibilityAction(.escape) { speech.cancel(reason: "accessibilityEscape") }
         .onAppear {
-            if speech.usesAccessibleControls {
+            if speech.isHandsFree {
                 UIAccessibility.post(notification: .screenChanged, argument: nil)
             }
         }
@@ -165,12 +148,17 @@ struct HoldToTalkWaveform: View {
 
 private extension ConversationSpeechInput {
     var status: LocalizedStringKey {
-        switch state {
-        case .idle: ""
-        case .preparing, .starting: "Preparing speech…"
-        case .finalizing: "Transcribing and sending…"
-        case .recording(.cancel): "Release to cancel"
-        case .recording(.send): "Release to send"
+        switch (state, destination) {
+        case (.idle, _): ""
+        case (.preparing, _), (.starting, _): "Preparing speech…"
+        case (.downloading(let percent), _): "Downloading speech model… \(percent)%"
+        case (.finalizing, .send): "Transcribing and sending…"
+        case (.finalizing, .draft): "Transcribing…"
+        case (.recording(.hold(.cancel)), _): "Release to cancel"
+        case (.recording(.hold(.send)), .send): "Release to send"
+        case (.recording(.hold(.send)), .draft): "Release to add to draft"
+        case (.recording(.tap), .send): "Tap to send"
+        case (.recording(.tap), .draft): "Tap to add to draft"
         }
     }
 }
@@ -185,7 +173,7 @@ struct HoldToTalkStatus: View {
         HStack(spacing: Theme.Spacing.sm) {
             Text(speech.status)
                 .foregroundStyle((isCancelling ? Theme.Colors.error : Theme.Colors.onSurface).color(for: colorScheme))
-            if speech.state == .recording(.send) {
+            if speech.state == .recording(.hold(.send)) {
                 Text("Slide up to cancel", comment: "Hint shown next to Release to send while holding to talk.")
                     .foregroundStyle(.secondary)
             }
@@ -203,12 +191,22 @@ struct HoldToTalkStatus: View {
 }
 
 struct HoldToTalkTranscript: View {
-    let speech: ConversationSpeechInput
+    let draft: String
+    let transcript: String
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var text: AttributedString {
+        var existing = AttributedString(draft)
+        existing.foregroundColor = Theme.Colors.onSurfaceMuted.color(for: colorScheme)
+        let separator = draft.isEmpty || transcript.isEmpty || draft.last?.isWhitespace == true ? "" : " "
+        var spoken = AttributedString(separator + transcript)
+        spoken.foregroundColor = Theme.Colors.onSurface.color(for: colorScheme)
+        return existing + spoken
+    }
 
     var body: some View {
-        Text(speech.transcript)
+        Text(text)
             .font(Theme.Fonts.bodyMd)
-            .foregroundStyle(Theme.Colors.onSurface)
             .lineLimit(3)
             .truncationMode(.head)
             .frame(maxWidth: .infinity, alignment: .leading)
