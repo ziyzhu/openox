@@ -13,6 +13,9 @@ on:
           - tag
           - announce
         default: dry-run
+      version:
+        type: string
+        required: false
 
 permissions: {}
 
@@ -36,9 +39,10 @@ jobs:
           bun-version-file: .bun-version
 
       - name: Announce
-        run: bun .agents/skills/release/scripts/appstore-announce.ts --mode "$MODE"
+        run: bun .agents/skills/release/scripts/appstore-announce.ts --mode "$MODE" ${VERSION:+--version "$VERSION"}
         env:
           MODE: ${{ inputs.mode || 'announce' }}
+          VERSION: ${{ inputs.version }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
