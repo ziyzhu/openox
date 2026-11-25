@@ -410,7 +410,7 @@ struct ConversationPage: View {
             speechInput.notice = nil
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { speechInput.interrupt() }
+            if phase != .active { speechInput.interrupt(reason: "scenePhase") }
         }
         .onChange(of: reviewRequestMilestone, initial: true) { _, milestone in
             guard let milestone, reviewRequestMilestone == milestone,
@@ -436,17 +436,19 @@ struct ConversationPage: View {
                 ClientAutomation.setEditDraft = { editDraft = AttributedString($0) }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { _ in
-            speechInput.interrupt()
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { notification in
+            guard let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  AVAudioSession.InterruptionType(rawValue: raw) == .began else { return }
+            speechInput.interrupt(reason: "audioInterruption")
         }
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.mediaServicesWereResetNotification)) { _ in
-            speechInput.interrupt()
+            speechInput.interrupt(reason: "mediaServicesReset")
         }
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)) { notification in
             guard let raw = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
                   let reason = AVAudioSession.RouteChangeReason(rawValue: raw),
                   reason == .oldDeviceUnavailable || reason == .newDeviceAvailable else { return }
-            speechInput.interrupt()
+            speechInput.interrupt(reason: reason == .newDeviceAvailable ? "routeNewDevice" : "routeOldDeviceUnavailable")
         }
         .onAppear {
             ClientAutomation.composer = composer

@@ -192,13 +192,13 @@ struct HoldToTalkStatus: View {
 
 struct HoldToTalkTranscript: View {
     let draft: String
+    let separator: String
     let transcript: String
     @Environment(\.colorScheme) private var colorScheme
 
     private var text: AttributedString {
         var existing = AttributedString(draft)
         existing.foregroundColor = Theme.Colors.onSurfaceMuted.color(for: colorScheme)
-        let separator = draft.isEmpty || transcript.isEmpty || draft.last?.isWhitespace == true ? "" : " "
         var spoken = AttributedString(separator + transcript)
         spoken.foregroundColor = Theme.Colors.onSurface.color(for: colorScheme)
         return existing + spoken

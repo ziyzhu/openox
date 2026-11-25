@@ -174,9 +174,13 @@ final class ConversationComposerModel {
     }
 
     func appendDictation(_ text: String) {
-        let separator = draft.isEmpty || draft.last?.isWhitespace == true ? "" : " "
-        attributedDraft.append(AttributedString(separator + text))
+        attributedDraft.append(AttributedString(dictationSeparator(before: text) + text))
         caretEndRequest += 1
+    }
+
+    func dictationSeparator(before text: String) -> String {
+        guard let last = draft.last, let first = text.first, !last.isWhitespace else { return "" }
+        return last.joinsWithoutSpace || first.joinsWithoutSpace ? "" : " "
     }
 
     func finishMention() {
@@ -330,4 +334,15 @@ enum AttachmentChoice {
     case photos
     case files
     case service(Service)
+}
+
+private extension Character {
+    var joinsWithoutSpace: Bool {
+        unicodeScalars.contains { scalar in
+            switch scalar.value {
+            case 0x0E00...0x0EFF, 0x2E80...0x9FFF, 0xF900...0xFAFF, 0xFE30...0xFE4F, 0xFF00...0xFFEF, 0x20000...0x2FA1F: true
+            default: false
+            }
+        }
+    }
 }

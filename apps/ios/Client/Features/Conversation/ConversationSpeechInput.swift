@@ -174,10 +174,14 @@ final class ConversationSpeechInput {
     func lift() {
         let held = pressedAt.duration(to: .now)
         switch state {
-        case .preparing(.some(.hold)):
+        case .preparing(.some(.hold)) where held < Self.tapDuration:
             state = .preparing(.tap)
-        case .starting(.hold):
+        case .starting(.hold) where held < Self.tapDuration:
             state = .starting(.tap)
+        case .preparing(.some(.hold)), .starting(.hold):
+            cancel(reason: "releasedBeforeStart")
+            notice = Toast(message: L10n.string("No speech detected. Nothing was sent.", comment: ""), duration: 5)
+            Haptics.impact(.speechCancelled)
         case .recording(.hold(.cancel)):
             cancel(reason: "slideCancel")
             Haptics.impact(.speechCancelled)
@@ -219,14 +223,15 @@ final class ConversationSpeechInput {
         }
     }
 
-    func interrupt() {
+    func interrupt(reason: String) {
         switch state {
         case .idle, .downloading:
             break
         case .preparing:
+            Log.ui.info("SpeechInput.interrupt reason=\(reason) state=preparing")
             state = .preparing(nil)
         case .starting, .recording, .finalizing:
-            stop(reason: "interrupted", notice: Toast(message: L10n.string("Recording interrupted. Nothing was sent.", comment: ""), duration: 5))
+            stop(reason: reason, notice: Toast(message: L10n.string("Recording interrupted. Nothing was sent.", comment: ""), duration: 5))
         }
     }
 

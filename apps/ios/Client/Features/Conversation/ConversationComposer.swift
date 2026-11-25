@@ -241,7 +241,7 @@ struct ConversationComposer: View, Equatable {
     @State private var textViewReference = ComposerTextViewReference()
     @State private var editorDraftID: UUID?
     @State private var hasShownImportMemory = false
-    @State private var speechLayoutState: LayoutState?
+    @State private var speechLayout: SpeechLayout?
     @State private var appState = AppStateStore.shared
     private var importMemoryIntentDisplays: Int { appState.value.memoryIntentDisplays }
 
@@ -327,7 +327,7 @@ struct ConversationComposer: View, Equatable {
                 Log.ui.info("ConversationComposer.importMemoryIntent shown conversation=\(sessionID) display=\(importMemoryIntentDisplays)")
             }
             .onChange(of: speech.isPresented) { _, isPresented in
-                if !isPresented { speechLayoutState = nil }
+                if !isPresented { speechLayout = nil }
             }
             .onDisappear { hasShownImportMemory = false }
     }
@@ -404,8 +404,13 @@ struct ConversationComposer: View, Equatable {
         case active
     }
 
+    private struct SpeechLayout {
+        let layoutState: LayoutState
+        let trailingControl: TrailingControl
+    }
+
     private var layoutState: LayoutState {
-        if speech.isPresented, let speechLayoutState { return speechLayoutState }
+        if speech.isPresented, let speechLayout { return speechLayout.layoutState }
         return isEmbedded || isFieldFocused || !empty ? .active : .resting
     }
 
@@ -475,7 +480,11 @@ struct ConversationComposer: View, Equatable {
                 composerDraftStrip
                 importMemoryStrip
                 if showsSpeechTranscript {
-                    HoldToTalkTranscript(draft: composer.draft, transcript: speech.transcript)
+                    HoldToTalkTranscript(
+                        draft: composer.draft,
+                        separator: composer.dictationSeparator(before: speech.transcript),
+                        transcript: speech.transcript
+                    )
                         .padding(.horizontal, Theme.Spacing.lg)
                         .padding(.top, Theme.Spacing.md)
                         .transition(.opacity)
@@ -729,7 +738,6 @@ struct ConversationComposer: View, Equatable {
                 .padding(.bottom, -textEditorVerticalInset - textEditorOpticalOffset)
                 .focused(fieldFocused)
                 .opacity(speech.isPresented ? 0 : 1)
-                .allowsHitTesting(!speech.isPresented)
                 .accessibilityHidden(speech.isPresented)
                 .accessibilityIdentifier(A11yID.ConversationControls.input)
                 .onGeometryChange(for: CGRect.self) {
@@ -808,6 +816,7 @@ struct ConversationComposer: View, Equatable {
     }
 
     private var trailingControlState: TrailingControl {
+        if speech.isPresented, let speechLayout { return speechLayout.trailingControl }
         if isEditingMessage { return canSubmit ? .send : .hidden }
         if composer.isImporting { return isBusy ? .stop : .attaching }
         if composer.canSubmit { return composer.websiteURL != nil ? .openWebsite : .send }
@@ -884,12 +893,11 @@ struct ConversationComposer: View, Equatable {
                             speech.finish()
                             return
                         }
-                        speechLayoutState = layoutState
-                        onSpeechBegin(.hold(.send))
+                        beginSpeech(.hold(.send))
                     },
                     onMove: { speech.move(to: $0, distance: $1) },
                     onLift: { speech.lift() },
-                    onCancel: { speech.interrupt() }
+                    onCancel: { speech.interrupt(reason: "gestureCancelled") }
                 )
                 .accessibilityHidden(true)
             }
@@ -899,8 +907,13 @@ struct ConversationComposer: View, Equatable {
             .accessibilityHint("Tap to start, or hold to talk and release to send.")
             .accessibilityIdentifier(A11yID.ConversationControls.speechHold)
             .accessibilityAction {
-                if speech.isPresented { speech.finish() } else { onSpeechBegin(.tap) }
+                if speech.isPresented { speech.finish() } else { beginSpeech(.tap) }
             }
+    }
+
+    private func beginSpeech(_ trigger: ConversationSpeechInput.Trigger) {
+        speechLayout = SpeechLayout(layoutState: layoutState, trailingControl: trailingControlState)
+        onSpeechBegin(trigger)
     }
 
     private func setMenu(_ visible: Bool) {
