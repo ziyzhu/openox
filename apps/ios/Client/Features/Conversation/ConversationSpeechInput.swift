@@ -65,6 +65,10 @@ final class ConversationSpeechInput {
     @ObservationIgnored private var deadline: Task<Void, Never>?
     @ObservationIgnored private var completion: ((Outcome) -> Void)?
 
+    init() {
+        OnDeviceSpeechRecording.warmUp(locale: SpeechLanguage.locale)
+    }
+
     var isPresented: Bool { state != .idle }
 
     var isRecording: Bool {

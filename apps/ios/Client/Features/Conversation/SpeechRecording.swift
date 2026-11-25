@@ -6,6 +6,44 @@ import Synchronization
 
 @MainActor
 final class OnDeviceSpeechRecording {
+    private enum Transcriber {
+        case speech(Locale)
+        case dictation(Locale)
+    }
+
+    private static var transcribers: [String: Task<Transcriber?, Never>] = [:]
+
+    static func warmUp(locale: Locale) {
+        _ = transcriber(for: locale)
+    }
+
+    private static func transcriber(for locale: Locale) -> Task<Transcriber?, Never> {
+        if let resolved = transcribers[locale.identifier] { return resolved }
+        let resolving = Task {
+            let started = ContinuousClock.now
+            let transcriber = await resolveTranscriber(for: locale)
+            let resolved = switch transcriber {
+            case .speech(let supported): "speech/\(supported.identifier)"
+            case .dictation(let supported): "dictation/\(supported.identifier)"
+            case nil: "unsupported"
+            }
+            Log.ui.info("SpeechInput.locale resolved locale=\(locale.identifier) transcriber=\(resolved) duration=\(started.duration(to: .now))")
+            return transcriber
+        }
+        transcribers[locale.identifier] = resolving
+        return resolving
+    }
+
+    private static func resolveTranscriber(for locale: Locale) async -> Transcriber? {
+        if SpeechTranscriber.isAvailable, let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) {
+            return .speech(supported)
+        }
+        if let supported = await DictationTranscriber.supportedLocale(equivalentTo: locale) {
+            return .dictation(supported)
+        }
+        return nil
+    }
+
     private let audioSessionID = UUID()
     private var analyzer: SpeechAnalyzer?
     private var module: (any SpeechModule)?
@@ -34,16 +72,16 @@ final class OnDeviceSpeechRecording {
             throw SpeechInputError.microphonePermission
         }
         try Task.checkCancellation()
-        if SpeechTranscriber.isAvailable,
-           let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) {
+        switch await Self.transcriber(for: locale).value {
+        case .speech(let supported):
             let transcriber = SpeechTranscriber(locale: supported, preset: .progressiveTranscription)
             module = transcriber
             resultsTask = transcriptionTask(transcriber.results, onTranscript: onTranscript) { $0.text }
-        } else if let supported = await DictationTranscriber.supportedLocale(equivalentTo: locale) {
+        case .dictation(let supported):
             let transcriber = DictationTranscriber(locale: supported, preset: .progressiveLongDictation)
             module = transcriber
             resultsTask = transcriptionTask(transcriber.results, onTranscript: onTranscript) { $0.text }
-        } else {
+        case nil:
             throw SpeechInputError.unsupportedLanguage
         }
         guard let module else { throw SpeechInputError.unavailable }
