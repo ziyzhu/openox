@@ -1080,17 +1080,18 @@ nonisolated struct ConversationDocument: Sendable {
             turnOffset: entryStart,
             ordinalOffset: blockStart
         )
+        let previousFiles = projection[blockStart...].flatMap(Self.files(in:))
         for block in projection[blockStart...] { sourceTurnIDs[RenderBlockID(block.id)] = nil }
         projection.replaceSubrange(blockStart..<projection.endIndex, with: projected.map(\.0))
         for (block, entry) in projected { sourceTurnIDs[RenderBlockID(block.id)] = turns[entry].id }
         nextBlockOrdinal = projection.count
-        fileReferencesRevision = UUID()
+        if projection[blockStart...].flatMap(Self.files(in:)) != previousFiles { fileReferencesRevision = UUID() }
     }
 
     private mutating func appendBlock(_ block: Block, entry: Int) {
         projection.append(block)
         sourceTurnIDs[RenderBlockID(block.id)] = turns[entry].id
-        fileReferencesRevision = UUID()
+        if !Self.files(in: block).isEmpty { fileReferencesRevision = UUID() }
     }
 
     private func validateIDs() {

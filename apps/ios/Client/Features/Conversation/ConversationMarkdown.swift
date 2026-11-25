@@ -43,8 +43,8 @@ struct StreamingMarkdownText: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: hasInteractiveCode ? .contain : .combine)
-        .accessibilityLabel(source, isEnabled: !isStreaming && !hasInteractiveCode)
+        .accessibilityElement(children: hasInteractiveCode ? .contain : .ignore)
+        .accessibilityLabel(source, isEnabled: !hasInteractiveCode)
         .environment(\.openURL, OpenURLAction { url in
             if let conversationLinkHandler { conversationLinkHandler(url) }
             else { LinkOpener.open(url: url, serviceManager: serviceManager) }

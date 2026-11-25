@@ -19,7 +19,7 @@ final class ProfileStore {
         }
     }
 
-    nonisolated struct ExternalRecord: Codable {
+    nonisolated struct ExternalRecord: Codable, Equatable {
         let id: UUID
         let bookmark: Data
         var name: String? = nil
@@ -40,9 +40,35 @@ final class ProfileStore {
         } ?? []
     }
 
-    func profiles(local: URL, cloud: URL?) -> [Profile] {
-        records = loadRecords()
-        unavailable = []
+    nonisolated private struct Discovery: Sendable {
+        var profiles: [Profile] = []
+        var unavailable: [ExternalRecord] = []
+        var records: [ExternalRecord]
+        var refreshed: [ExternalRecord] = []
+        var accessedURLs: Set<URL>
+    }
+
+    func profiles(local: URL, cloud: URL?) async -> [Profile] {
+        let known = records
+        let fileURL = fileURL
+        let accessed = accessedURLs
+        let discovery = await Task.detached(priority: .userInitiated) {
+            Self.discover(known: known, fileURL: fileURL, accessedURLs: accessed, local: local, cloud: cloud)
+        }.value
+        if records == known { records = discovery.records }
+        for record in discovery.refreshed where records.contains(where: { $0.id == record.id }) { upsert(record) }
+        accessedURLs.formUnion(discovery.accessedURLs)
+        unavailable = discovery.unavailable
+        if !discovery.refreshed.isEmpty {
+            do { try persist() }
+            catch { Log.app.warning("ProfileStore.bookmark refresh unsaved error=\(error.localizedDescription)") }
+        }
+        return discovery.profiles
+    }
+
+    nonisolated private static func discover(known: [ExternalRecord], fileURL: URL, accessedURLs: Set<URL>, local: URL, cloud: URL?) -> Discovery {
+        let stored = (try? Data(contentsOf: fileURL)).flatMap { try? JSONDecoder().decode([ExternalRecord].self, from: $0) }
+        var discovery = Discovery(records: stored ?? known, accessedURLs: accessedURLs)
         var profilesByID: [UUID: Profile] = [:]
         for profile in ProfileIO.registeredProfiles() + managedProfiles(in: local, location: .local) + managedProfiles(in: ProfileIO.publicProfiles, location: .local) + managedProfiles(in: cloud, location: .iCloud) {
             if let existing = profilesByID[profile.id] {
@@ -52,17 +78,17 @@ final class ProfileStore {
                 profilesByID[profile.id] = profile
             }
         }
-        for record in records {
-            guard let url = resolve(record, local: local, cloud: cloud) else {
+        for record in discovery.records {
+            guard let url = resolve(record, local: local, cloud: cloud, discovery: &discovery) else {
                 profilesByID.removeValue(forKey: record.id)
-                unavailable.append(record)
+                discovery.unavailable.append(record)
                 Log.app.warning("ProfileStore.unavailable external id=\(record.id)")
                 continue
             }
             guard let profile = ProfileIO.profile(at: url, location: managedLocation(for: url, local: local, cloud: cloud) ?? .external),
                   profile.id == record.id else {
                 profilesByID.removeValue(forKey: record.id)
-                unavailable.append(record)
+                discovery.unavailable.append(record)
                 Log.app.warning("ProfileStore.invalid external id=\(record.id)")
                 continue
             }
@@ -70,11 +96,12 @@ final class ProfileStore {
         }
         let profiles = Array(profilesByID.values)
         Log.app.info("ProfileStore.discover local=\(profiles.filter { $0.location == .local }.count) iCloud=\(profiles.filter { $0.location == .iCloud }.count) external=\(profiles.filter { $0.location == .external }.count)")
-        return profiles
+        discovery.profiles = profiles
+        return discovery
     }
 
     func open(_ url: URL, local: URL, cloud: URL?) throws -> Profile {
-        if let location = managedLocation(for: url, local: local, cloud: cloud) {
+        if let location = Self.managedLocation(for: url, local: local, cloud: cloud) {
             guard let profile = ProfileIO.profile(at: url, location: location) else { throw StoreError.invalidFolder }
             Log.app.info("ProfileStore.open managed id=\(profile.id) location=\(location.rawValue) name=\(profile.name)")
             return profile
@@ -105,6 +132,10 @@ final class ProfileStore {
     }
 
     private func access(_ url: URL) throws {
+        try Self.access(url, accessedURLs: &accessedURLs)
+    }
+
+    nonisolated private static func access(_ url: URL, accessedURLs: inout Set<URL>) throws {
         if accessedURLs.contains(url) { return }
         if url.startAccessingSecurityScopedResource() { accessedURLs.insert(url); return }
         guard canonical(url).pathComponents.starts(with: canonical(ProfileRepository.localDocuments()).pathComponents) else {
@@ -119,16 +150,15 @@ final class ProfileStore {
         Log.app.info("ProfileStore.remove id=\(profile.id) location=\(profile.location.rawValue)")
     }
 
-    private func resolve(_ record: ExternalRecord, local: URL, cloud: URL?) -> URL? {
+    nonisolated private static func resolve(_ record: ExternalRecord, local: URL, cloud: URL?, discovery: inout Discovery) -> URL? {
         var stale = false
         do {
             let url = try URL(resolvingBookmarkData: record.bookmark, bookmarkDataIsStale: &stale)
-            if managedLocation(for: url, local: local, cloud: cloud) == nil { try access(url) }
+            if managedLocation(for: url, local: local, cloud: cloud) == nil { try access(url, accessedURLs: &discovery.accessedURLs) }
             if stale {
                 let bookmark = try url.bookmarkData(options: .minimalBookmark,
                     includingResourceValuesForKeys: [.isDirectoryKey], relativeTo: nil)
-                upsert(ExternalRecord(id: record.id, bookmark: bookmark, name: record.name))
-                try persist()
+                discovery.refreshed.append(ExternalRecord(id: record.id, bookmark: bookmark, name: record.name))
             }
             return url
         } catch {
@@ -137,7 +167,7 @@ final class ProfileStore {
         }
     }
 
-    private func managedProfiles(in root: URL?, location: Profile.Location) -> [Profile] {
+    nonisolated private static func managedProfiles(in root: URL?, location: Profile.Location) -> [Profile] {
         guard let root else { return [] }
         do {
             return try FileManager.default.contentsOfDirectory(
@@ -154,14 +184,14 @@ final class ProfileStore {
         }
     }
 
-    private func managedLocation(for url: URL, local: URL, cloud: URL?) -> Profile.Location? {
+    nonisolated private static func managedLocation(for url: URL, local: URL, cloud: URL?) -> Profile.Location? {
         let parent = canonical(url.deletingLastPathComponent())
         if parent == canonical(local) || parent == canonical(ProfileIO.publicProfiles) { return .local }
         if let cloud, parent == canonical(cloud) { return .iCloud }
         return nil
     }
 
-    private func canonical(_ url: URL) -> URL {
+    nonisolated private static func canonical(_ url: URL) -> URL {
         url.standardizedFileURL.resolvingSymlinksInPath()
     }
 
@@ -182,9 +212,5 @@ final class ProfileStore {
         var data = try encoder.encode(records)
         data.append(0x0A)
         try data.write(to: fileURL, options: .atomic)
-    }
-
-    private func loadRecords() -> [ExternalRecord] {
-        (try? Data(contentsOf: fileURL)).flatMap { try? JSONDecoder().decode([ExternalRecord].self, from: $0) } ?? records
     }
 }

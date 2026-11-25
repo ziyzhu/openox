@@ -7,7 +7,10 @@ import os
 final class StorageRoot {
     static let shared = StorageRoot()
 
-    private(set) var profiles: [Profile] = []
+    private(set) var profiles: [Profile] = [] {
+        didSet { profilesRevision &+= 1 }
+    }
+    @ObservationIgnored private var profilesRevision = 0
     private(set) var unavailableProfiles: [ProfileStore.ExternalRecord] = []
     var unavailableActiveID: UUID? {
         guard let id = storedActiveId, !profiles.contains(where: { $0.id == id }) else { return nil }
@@ -74,10 +77,12 @@ final class StorageRoot {
 
     private func migrate(_ profile: Profile) async throws -> Profile {
         defer { migrationProgress = nil }
-        return try await ProfileMigrator.migrate(profile) { stage in
-            guard profile.version != ProfileSchema.current else { return }
-            await self.reportMigrationProgress(profile: profile, stage: stage)
-        }
+        return try await Task.detached(priority: .userInitiated) {
+            try await ProfileMigrator.migrate(profile) { stage in
+                guard profile.version != ProfileSchema.current else { return }
+                await self.reportMigrationProgress(profile: profile, stage: stage)
+            }
+        }.value
     }
 
     private func reportMigrationProgress(profile: Profile, stage: String) {
@@ -87,7 +92,7 @@ final class StorageRoot {
 
     func resolve() async throws {
         cloudDocs = await ProfileRepository.cloudDocuments()
-        loadSavedProfiles()
+        await loadSavedProfiles()
         if let id = unavailableActiveID {
             guard let record = unavailableProfiles.first(where: { $0.id == id }) else { throw StorageMigrationError.activeProfileUnavailable }
             throw StorageMigrationError.externalProfileUnavailable(record.name)
@@ -112,7 +117,7 @@ final class StorageRoot {
     func refreshAvailability() async {
         guard !isBusy else { return }
         cloudDocs = await ProfileRepository.cloudDocuments()
-        loadSavedProfiles()
+        await loadSavedProfiles()
         await reconcileActive()
         Log.app.info("StorageRoot.refreshAvailability profiles=\(self.profiles.count) iCloud=\(self.iCloudAvailable)")
     }
@@ -123,7 +128,7 @@ final class StorageRoot {
         let exists = FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory)
         guard !(exists && isDirectory.boolValue) else { return }
         Log.app.info("StorageRoot.activeFolderMissing root=\(self.root.path)")
-        loadSavedProfiles()
+        await loadSavedProfiles()
         await reconcileActive()
     }
 
@@ -210,7 +215,10 @@ final class StorageRoot {
         let profile = try profileStore.open(url, local: localDocs, cloud: cloudDocs)
         guard profile.id == expectedID else { throw RuntimeError.bridge("Choose the original folder for this Profile. The selected folder belongs to a different Profile.") }
         try profileStore.remember(profile)
-        loadSavedProfiles()
+        profiles.removeAll { $0.id == profile.id }
+        profiles.append(profile)
+        unavailableProfiles.removeAll { $0.id == profile.id }
+        sortProfiles()
     }
 
     func openProfile(at url: URL, expectedID: UUID? = nil) async throws -> Profile {
@@ -350,8 +358,14 @@ final class StorageRoot {
         ProfileRepository.cleanName(name)
     }
 
-    private func loadSavedProfiles() {
-        profiles = profileStore.profiles(local: localDocs, cloud: cloudDocs)
+    private func loadSavedProfiles() async {
+        var revision: Int
+        var discovered: [Profile]
+        repeat {
+            revision = profilesRevision
+            discovered = await profileStore.profiles(local: localDocs, cloud: cloudDocs)
+        } while revision != profilesRevision
+        profiles = discovered
         unavailableProfiles = profileStore.unavailable
         sortProfiles()
     }
