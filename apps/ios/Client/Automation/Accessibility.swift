@@ -37,9 +37,9 @@ nonisolated enum A11yID {
 
     enum Sidebar {
         static let panel = "sidebar.panel"
+        static let title = "sidebar.title"
         static let search = "sidebar.search"
         static let resizer = "sidebar.resizer"
-        static let close = "sidebar.close"
         static let newConversation = "sidebar.newConversation"
         static let settings = "sidebar.settings"
         static let services = "sidebar.services"
@@ -374,7 +374,6 @@ enum A11yLabel {
     static var widenSidebar: String { L10n.string("Widen conversation history", comment: "") }
     static var narrowSidebar: String { L10n.string("Narrow conversation history", comment: "") }
     static var searchConversations: String { L10n.string("Search conversations", comment: "") }
-    static var closeConversationHistory: String { L10n.string("Close conversation history", comment: "") }
     static var scrollToBottom: String { L10n.string("Scroll to bottom", comment: "") }
     static var copyMessage: String { L10n.string("Copy message", comment: "") }
     static var shareMessage: String { L10n.string("Share message", comment: "") }

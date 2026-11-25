@@ -2972,17 +2972,6 @@
         }
       }
     },
-    "Close conversation history" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭对话历史"
-          }
-        }
-      }
-    },
     "Close file" : {
       "localizations" : {
         "zh-Hans" : {

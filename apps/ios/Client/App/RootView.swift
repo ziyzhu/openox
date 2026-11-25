@@ -582,8 +582,6 @@ struct RootView: View {
             canLoadMore: conversations.summaryListing.hasMore,
             activities: conversations.activities,
             currentId: currentId,
-            showsCloseButton: !isSplitLayout,
-            onClose: { setSidebar(false) },
             onLoadMore: { await conversations.loadMoreSummaries() },
             onSearch: { await conversations.loadAllSummaries() },
             onNewConversation: {
@@ -1097,7 +1095,6 @@ extension ConversationSidebar: Equatable {
             && lhs.actionsEnabled == rhs.actionsEnabled
             && lhs.activities == rhs.activities
             && lhs.currentId == rhs.currentId
-            && lhs.showsCloseButton == rhs.showsCloseButton
     }
 }
 

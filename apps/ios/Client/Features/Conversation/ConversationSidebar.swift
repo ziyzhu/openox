@@ -13,8 +13,6 @@ struct ConversationSidebar: View {
     let canLoadMore: Bool
     let activities: [UUID: Conversation.Activity]
     let currentId: UUID?
-    let showsCloseButton: Bool
-    let onClose: () -> Void
     let onLoadMore: () async -> Void
     let onSearch: () async -> Void
     let onNewConversation: () -> Void
@@ -25,7 +23,6 @@ struct ConversationSidebar: View {
     let onSettings: () -> Void
 
     private let edgeInset = Theme.Spacing.lg
-    @ScaledMetric(relativeTo: .title3) private var iconButtonSize: CGFloat = 44
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var renaming: ConversationMeta?
@@ -120,45 +117,14 @@ struct ConversationSidebar: View {
     }
 
     private var header: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Text("Ox")
-                .font(Theme.Fonts.headline)
-                .foregroundStyle(Theme.Colors.onSurface)
-            previewChip
-            Spacer(minLength: Theme.Spacing.md)
-            if showsCloseButton {
-                closeButton
-            }
-        }
+        Text("Conversations")
+            .font(Theme.Fonts.headline)
+            .foregroundStyle(Theme.Colors.onSurface)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier(A11yID.Sidebar.title)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, edgeInset)
         .padding(.bottom, Theme.Spacing.sm)
-    }
-
-    private var closeButton: some View {
-        Button {
-            searchPresented = false
-            onClose()
-        } label: {
-            Image(systemName: "chevron.right")
-                .font(.system(.body, weight: .semibold))
-                .foregroundStyle(Theme.Colors.onSurface)
-                .frame(width: iconButtonSize, height: iconButtonSize)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Circle())
-        .accessibilityLabel(A11yLabel.closeConversationHistory)
-        .accessibilityIdentifier(A11yID.Sidebar.close)
-    }
-
-    private var previewChip: some View {
-        Text("Preview")
-            .font(Theme.Fonts.captionSm)
-            .foregroundStyle(Theme.Colors.primary)
-            .padding(.horizontal, Theme.Spacing.sm)
-            .padding(.vertical, 2)
-            .background(Theme.Colors.primary.opacity(0.12), in: Capsule())
     }
 
     private var list: some View {
