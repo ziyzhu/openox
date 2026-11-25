@@ -21,6 +21,7 @@ struct StreamingMarkdownText: View {
             return false
         }
         let blocks = MarkdownRenderBlock.group(snapshot.blocks)
+        let receivingIndex = snapshot.receivingBlockIndex(in: blocks)
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
                 MarkdownRenderBlockView(
@@ -31,6 +32,7 @@ struct StreamingMarkdownText: View {
                     accessibilityIdentifier: "\(accessibilityIdentifier).block.\(index)",
                     fadeKey: snapshot.fadeKey,
                     isStreaming: snapshot.input.isStreaming,
+                    isReceiving: index == receivingIndex,
                     streamingProse: buffer.prose(at: index)
                 )
                 .id(snapshot.generation)
@@ -73,6 +75,13 @@ struct StreamingMarkdownText: View {
             let blocks: [MarkdownBlock]
             let generation: Int
             let fadeKey: Int?
+            var inFence = false
+
+            func receivingBlockIndex(in blocks: [MarkdownRenderBlock]) -> Int? {
+                guard input.isStreaming, let last = blocks.last else { return nil }
+                if case .block(.code) = last, !inFence { return nil }
+                return blocks.count - 1
+            }
         }
 
         private(set) var snapshot = Snapshot(
@@ -125,7 +134,8 @@ struct StreamingMarkdownText: View {
                         Log.ui.debug("StreamingMarkdown.settled generation=\(generation) bytes=\(request.input.source.utf8.count) blocks=\(parsed.blocks.count)")
                     }
                     snapshot = Snapshot(input: request.input, blocks: parsed.blocks,
-                                        generation: request.generation, fadeKey: request.fadeKey)
+                                        generation: request.generation, fadeKey: request.fadeKey,
+                                        inFence: parsed.inFence)
                 }
                 scheduleIfNeeded()
             }
@@ -455,6 +465,7 @@ private struct MarkdownRenderBlockView: View {
     let accessibilityIdentifier: String
     var fadeKey: Int? = nil
     var isStreaming = false
+    var isReceiving = false
     var streamingProse: SelectableText.StreamingProse? = nil
 
     var body: some View {
@@ -485,7 +496,7 @@ private struct MarkdownRenderBlockView: View {
                 availableWidth: availableWidth,
                 accessibilityIdentifier: accessibilityIdentifier,
                 fadeKey: fadeKey,
-                isStreaming: isStreaming
+                isStreaming: isStreaming && isReceiving
             )
         }
     }
@@ -731,8 +742,8 @@ private actor MarkdownParser {
         source: String,
         isStreaming: Bool,
         settled: StreamingMarkdownText.Settled
-    ) throws -> (blocks: [MarkdownBlock], settled: StreamingMarkdownText.Settled) {
-        guard isStreaming else { return (try parse(source), settled) }
+    ) throws -> (blocks: [MarkdownBlock], settled: StreamingMarkdownText.Settled, inFence: Bool) {
+        guard isStreaming else { return (try parse(source), settled, false) }
         try Task.checkCancellation()
         var settled = settled
         let open = String(decoding: source.utf8.dropFirst(settled.utf8Count), as: UTF8.self)
@@ -743,7 +754,7 @@ private actor MarkdownParser {
             settled.utf8Count += consumed
         }
         let tail = split.inFence ? split.tail : StreamingMarkdownText.stableWords(split.tail)
-        return (settled.blocks + MarkdownBlock.parse(StreamingMarkdownTail.gate(tail)), settled)
+        return (settled.blocks + MarkdownBlock.parse(StreamingMarkdownTail.gate(tail)), settled, split.inFence)
     }
 
     func render(_ source: String) throws -> [MarkdownRenderBlock] {

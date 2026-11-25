@@ -20,7 +20,9 @@ struct MermaidDiagramView<Fallback: View>: View {
     var body: some View {
         content
             .task(id: Request(source: source, width: Int(maxWidth), colorScheme: colorScheme)) {
-                image = await MermaidDiagrams.image(source, maxWidth: maxWidth, colorScheme: colorScheme)
+                let rendered = await MermaidDiagrams.image(source, maxWidth: maxWidth, colorScheme: colorScheme)
+                guard !Task.isCancelled else { return }
+                image = rendered
             }
             .fullScreenCover(isPresented: $zoomed) {
                 if let image {
