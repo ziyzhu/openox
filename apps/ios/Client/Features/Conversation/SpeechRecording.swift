@@ -65,19 +65,28 @@ final class OnDeviceSpeechRecording {
             Log.ui.info("SpeechInput.assets prepared status=\(String(describing: installedStatus))")
         }
         try Task.checkCancellation()
-        analyzer = SpeechAnalyzer(modules: [module])
+        analyzer = SpeechAnalyzer(modules: [module], options: .init(priority: .userInitiated, modelRetention: .lingering))
         return needsAnotherPress
     }
 
     func start(onLevel: @escaping (Float) -> Void, onFailure: @escaping (Error) -> Void) async throws {
+        var phase = ContinuousClock.now
+        var phases: [String] = []
+        func mark(_ name: String) {
+            phases.append("\(name)=\(phase.duration(to: .now).formatted(.units(allowed: [.milliseconds])))")
+            phase = .now
+        }
         guard let module, let analyzer,
               let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [module]) else {
             throw SpeechInputError.unavailable
         }
-        try await analyzer.prepareToAnalyze(in: format)
-        try Task.checkCancellation()
-        try await AppAudioSession.activateRecording(owner: audioSessionID)
+        mark("format")
         audioSessionActive = true
+        async let audioSession: Void = AppAudioSession.activateRecording(owner: audioSessionID)
+        try await analyzer.prepareToAnalyze(in: format)
+        mark("prepareToAnalyze")
+        try await audioSession
+        mark("audioSession")
         try Task.checkCancellation()
         let engine = AVAudioEngine()
         let inputFormat = engine.inputNode.outputFormat(forBus: 0)
@@ -92,10 +101,13 @@ final class OnDeviceSpeechRecording {
             input.append(buffer)
         }
         self.engine = engine
+        mark("engineSetup")
         try await analyzer.start(inputSequence: input.stream)
+        mark("analyzerStart")
         try Task.checkCancellation()
         engine.prepare()
         try engine.start()
+        mark("engineStart")
         if let resultsTask {
             Task {
                 do { _ = try await resultsTask.value }
@@ -103,7 +115,7 @@ final class OnDeviceSpeechRecording {
                 catch {}
             }
         }
-        Log.ui.info("SpeechInput.capture started sampleRate=\(inputFormat.sampleRate) channels=\(inputFormat.channelCount)")
+        Log.ui.info("SpeechInput.capture started sampleRate=\(inputFormat.sampleRate) channels=\(inputFormat.channelCount) \(phases.joined(separator: " "))")
     }
 
     func stopCapture() {
