@@ -22,7 +22,8 @@ extension ServiceOperations {
               let baseURL = page.page.url else { throw Service.EvalError.offDomain }
         let qualified = service.definition.qualifiedActionName(actionID)
         let scheduled = Service.Action(service: service, definition: definition, baseURL: baseURL,
-                                       role: .blockingAction, scripts: service.resolutionState.resolved?.actions ?? "")
+                                       role: secrets != nil || actionID == WebSessionContract.loginAction ? .blockingAction : .standard,
+                                       scripts: service.resolutionState.resolved?.actions ?? "")
         let result = try await serviceManager.actionScheduler.schedule(scheduled, on: page, name: qualified) { page in
             try self.requireAttachedService(service)
             try await self.serviceManager.requireInvocationAccess(for: service)

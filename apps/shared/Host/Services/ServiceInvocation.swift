@@ -87,7 +87,7 @@ extension Service {
             service: self,
             definition: action,
             baseURL: destination,
-            role: role == .standard ? .blockingAction : role,
+            role: role == .standard && (secrets != nil || actionId == WebSessionContract.loginAction) ? .blockingAction : role,
             scripts: scripts,
             session: selectedSession,
             scopeID: scopeID
