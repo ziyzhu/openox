@@ -7,7 +7,7 @@ import type { Model, Tool, Api, ModelThinkingLevel } from "@earendil-works/pi-ai
 import { AgentDoc, defineExtension, defineTool, section, type EntryDraft, type UserInput, type ToolExecutionResult, type ToolExecutionMode } from "@earendil-works/pi-durable";
 import { openProfileRuntime, type ProfileRuntime, type ConversationReference, type ConversationHistoryCursor,
   type ConversationListCursor, type ConversationIndexCursor, type PresentationChange, installOxProfile, type NormalizedProfileDraft,
-  ApplicationPresentation, type ApplicationPresentationChange, LegacyProfileFile, ProfileFile, ProfileIndex, canonical, type TextFileMount,
+  ApplicationPresentation, type ApplicationPresentationChange, type ApplicationHistoryRequest, LegacyProfileFile, ProfileFile, ProfileIndex, canonical, type TextFileMount,
   ConversationApplicationMetadata, ConversationPresentation, type FilePayloadStore, type FileRecord } from "../../index";
 import type { CompactionCheckpoint, ConversationId, EntryId, GenerationCheckpoint, HarnessInspection, SubmissionId, TaskId, ToolExecutionApi, ToolTaskInput } from "@earendil-works/pi-durable";
 import { legacyFilePath, validateFileRecord } from "../../profile/file-payloads";
@@ -72,7 +72,8 @@ type Command = CommandScope & (
   | { action: "fileAdopt"; file: FileRecord & { binary: boolean; saved: boolean } }
   | { action: "fileSaved"; path: string; saved: boolean }
   | { action: "fileMove"; path: string; prefix: string }
-  | { action: "filesPrepare" | "publicFilesInventory" | "applicationLoad" | "applicationSummary" | "applicationDelete" | "conversationMetadata" | "conversationContext"
+  | { action: "applicationLoad"; history?: ApplicationHistoryRequest | null }
+  | { action: "filesPrepare" | "publicFilesInventory" | "applicationSummary" | "applicationDelete" | "conversationMetadata" | "conversationContext"
       | "profileExportCheck" | "observe" | "recoveryPlan" | "resume" | "abort" | "inspect" | "fileMounts" | "skillPackages" | "close" }
 );
 interface OpenedSession {
@@ -218,7 +219,7 @@ export class IOSAgentAdapter {
         return {};
       }
       case "conversationFork": return this.fork(required(), args.entryID, args.title);
-      case "applicationLoad": return application.load(required());
+      case "applicationLoad": return application.load(required(), args.history ?? undefined);
       case "applicationList": return application.list(args.limit, args.listCursor ?? undefined);
       case "applicationSummary": return application.find(required());
       case "applicationSave": await application.save(required(), args); return {};

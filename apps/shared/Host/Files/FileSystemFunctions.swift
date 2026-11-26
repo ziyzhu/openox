@@ -158,7 +158,7 @@ extension Conversation {
             let sizes = try await repository.virtualConversationFileSizes(
                 id,
                 in: scope,
-                snapshot: conversationManager?.readableConversationState(id, in: scope)
+                snapshot: await conversationManager?.readableConversationState(id, in: scope)
             )
             items = [
                 fileSystemItem(path: "conversations/\(id)/conversation.json", type: "file", size: sizes.metadata),
@@ -184,11 +184,11 @@ extension Conversation {
     }
 
     private func virtualConversationMetadata(_ id: ConversationID) async throws -> Data {
-        try await repository.virtualConversationMetadata(id, in: scope, snapshot: conversationManager?.readableConversationState(id, in: scope))
+        try await repository.virtualConversationMetadata(id, in: scope, snapshot: await conversationManager?.readableConversationState(id, in: scope))
     }
 
     private func virtualConversationTranscript(_ id: ConversationID) async throws -> Data {
-        try await repository.virtualConversationTranscript(id, in: scope, snapshot: conversationManager?.readableConversationState(id, in: scope))
+        try await repository.virtualConversationTranscript(id, in: scope, snapshot: await conversationManager?.readableConversationState(id, in: scope))
     }
 
     private func fileSystemConversationSummaries() async -> [ConversationMeta] {

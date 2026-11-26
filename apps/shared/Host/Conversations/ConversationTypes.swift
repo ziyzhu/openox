@@ -147,11 +147,13 @@ nonisolated struct ConversationLoadResult: Sendable {
     let state: ConversationState
     let needsPersistence: Bool
     let document: ConversationDocument?
+    let older: JSONValue?
 
-    init(state: ConversationState, needsPersistence: Bool, document: ConversationDocument? = nil) {
+    init(state: ConversationState, needsPersistence: Bool, document: ConversationDocument? = nil, older: JSONValue? = nil) {
         self.state = state
         self.needsPersistence = needsPersistence
         self.document = document
+        self.older = older
     }
 
     @concurrent
@@ -160,14 +162,15 @@ nonisolated struct ConversationLoadResult: Sendable {
         var meta = state.meta
         meta.lastMessageAt = document.lastMessageAt
         return Self(state: ConversationState(meta: meta, turns: state.turns, context: state.context),
-                    needsPersistence: needsPersistence, document: document)
+                    needsPersistence: needsPersistence, document: document, older: older)
     }
 
     func replacingMeta(_ meta: ConversationMeta) -> Self {
         Self(
             state: ConversationState(meta: meta, turns: state.turns, context: state.context),
             needsPersistence: needsPersistence,
-            document: document
+            document: document,
+            older: older
         )
     }
 }

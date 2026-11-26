@@ -101,6 +101,7 @@ final class ConversationManager {
     @ObservationIgnored private var hydrationGeneration: UInt64 = 0
     @ObservationIgnored private var recoveryPreparation: (scope: ProfileScope, task: Task<Void, Error>)?
     @ObservationIgnored private var hydrationTasks: [ConversationID: (generation: HydrationGeneration, task: Task<Conversation?, Never>)] = [:]
+    @ObservationIgnored private var pinnedPreload: Task<Void, Never>?
     @ObservationIgnored private let repository: ProfileRepository
     @ObservationIgnored private let storage: StorageRoot
     @ObservationIgnored private let providerRegistry: ProviderRegistry
@@ -217,6 +218,24 @@ final class ConversationManager {
         do { try await recoverConversations(in: scope) }
         catch { Log.session.error("ConversationManager.recovery blocked error=\(error.localizedDescription)") }
         if case .deferred(let id, _) = selection { open(id.rawValue) }
+        preloadPinnedConversations(in: scope)
+    }
+
+    private func preloadPinnedConversations(in scope: ProfileScope) {
+        guard repositoryScope == scope else { return }
+        pinnedPreload?.cancel()
+        let pinned = records.filter { $0.value.hydration.meta.isFavorite && $0.value.hydration.conversation == nil }
+            .sorted { ($0.value.hydration.meta.lastMessageAt ?? .distantPast) > ($1.value.hydration.meta.lastMessageAt ?? .distantPast) }
+            .map(\.key)
+        pinnedPreload = Task(priority: .utility) { [weak self] in
+            let startedAt = Date()
+            var loaded = 0
+            for id in pinned {
+                guard let self, !Task.isCancelled, self.repositoryScope == scope else { return }
+                if await self.hydrate(id) != nil { loaded += 1 }
+            }
+            Log.session.info("ConversationManager.preloadPinned pinned=\(pinned.count) loaded=\(loaded) durationMs=\(Self.elapsedMs(since: startedAt))")
+        }
     }
 
     @discardableResult
@@ -384,10 +403,11 @@ final class ConversationManager {
         return records[canonicalID(rawID)]?.hydration.meta
     }
 
-    func readableConversationState(_ id: ConversationID, in scope: ProfileScope) -> ConversationState? {
+    func readableConversationState(_ id: ConversationID, in scope: ProfileScope) async -> ConversationState? {
         guard scope == repositoryScope, scope == storage.scope, contains(id.rawValue),
               let conversation = records[id]?.hydration.conversation, !conversation.isTemporary else { return nil }
-        return conversation.state
+        guard let state = try? await conversation.completeState(), records[id]?.hydration.conversation === conversation else { return nil }
+        return state
     }
 
     func readableConversationSummaries(in scope: ProfileScope) -> [ConversationMeta] {
@@ -565,6 +585,9 @@ final class ConversationManager {
             throw RuntimeError.bridge("conversation unavailable: \(rawID)")
         }
         touch(id)
+        try await conversation.loadCompleteHistory()
+        guard records[id]?.hydration.conversation === conversation else { throw RuntimeError.bridge("conversation unavailable: \(rawID)") }
+        touch(id)
         trimHydrated()
         return conversation
     }
@@ -584,7 +607,7 @@ final class ConversationManager {
         records[id] = record
         Log.session.info("ConversationManager.hydrate id=\(id) generation=\(generation.rawValue)")
         let task = Task { [weak self, repository] () -> Conversation? in
-            let state = await repository.loadConversation(id, in: scope)
+            let state = await repository.loadConversation(id, in: scope, history: .latest)
             let loaded = await state?.preparingDocument()
             guard let self, self.repositoryScope == scope,
                   var record = self.records[id], self.contains(id.rawValue),
@@ -612,8 +635,9 @@ final class ConversationManager {
     }
 
     @discardableResult
-    func branch(from conversation: Conversation, atBlock blockID: UUID) -> Conversation? {
-        guard let result = conversation.branchSnapshot(at: blockID) else {
+    func branch(from conversation: Conversation, atBlock blockID: UUID) async -> Conversation? {
+        guard (try? await conversation.loadCompleteHistory()) != nil,
+              let result = conversation.branchSnapshot(at: blockID) else {
             Log.session.warning("ConversationManager.branch failed block=\(blockID)")
             return nil
         }
@@ -960,6 +984,7 @@ final class ConversationManager {
             feedback: feedback,
             serviceManager: serviceManager
         )
+        conversation.history = loaded.older.map { .partial(PartialHistory(older: $0, storedPreview: loaded.state.meta.preview)) } ?? .complete
         attachPersistence(conversation)
         return conversation
     }
@@ -1082,8 +1107,9 @@ final class ConversationManager {
               var record = records[id],
               case .saving(let inFlight, let pendingLatest, _) = record.persistence,
               inFlight.saveID == result.saveID else { return }
-        if result.succeeded, case .conversation(let state) = inFlight.payload {
-            record.hydration.conversation?.storedTurns = state.turns
+        if result.succeeded, case .conversation(let state) = inFlight.payload, let conversation = record.hydration.conversation {
+            let saved = Set(state.turns.map(\.id))
+            conversation.storedTurns = (conversation.storedTurns ?? []).filter { !saved.contains($0.id) } + state.turns
         }
         if let pendingLatest {
             launch(pendingLatest, in: &record)
@@ -1126,6 +1152,16 @@ final class ConversationManager {
         touch(id)
     }
 
+    private static func isPreloadedPin(_ conversation: Conversation) -> Bool {
+        guard conversation.isFavorite else { return false }
+        var users = 0
+        for case .user in conversation.turns {
+            users += 1
+            if users > ConversationHistory.userTurnsPerPage { return false }
+        }
+        return true
+    }
+
     private func touch(_ id: ConversationID) {
         guard records[id] != nil else { return }
         hydrationOrdinal &+= 1
@@ -1133,9 +1169,9 @@ final class ConversationManager {
     }
 
     private func trimHydrated() {
-        while records.values.compactMap({ $0.hydration.conversation }).count > Self.maxHydratedConversations {
+        while records.values.compactMap({ $0.hydration.conversation }).filter({ !Self.isPreloadedPin($0) }).count > Self.maxHydratedConversations {
             guard let candidate = records
-                .filter({ $0.key.rawValue != currentId && $0.value.hydration.conversation?.isBusy == false })
+                .filter({ $0.key.rawValue != currentId && $0.value.hydration.conversation.map { !$0.isBusy && !Self.isPreloadedPin($0) } == true })
                 .min(by: { (accessOrdinals[$0.key] ?? 0) < (accessOrdinals[$1.key] ?? 0) }) else {
                 Log.session.warning("ConversationManager.evict deferred loaded=\(records.values.compactMap { $0.hydration.conversation }.count)")
                 return

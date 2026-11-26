@@ -429,7 +429,7 @@ struct ConversationTranscriptProjection<Content: View>: View {
 
     private var projectionKey: ConversationTranscriptProjectionKey {
         let totalBlockCount = conversation.transcriptBlockCount
-        let requestedSourceRange = transcriptWindow.resolvedRange(total: totalBlockCount)
+        let requestedSourceRange = transcriptWindow.range(in: conversation.blockOrdinals)
         return ConversationTranscriptProjectionKey(
             conversationID: conversation.id,
             transcriptRevision: conversation.transcriptRevision,

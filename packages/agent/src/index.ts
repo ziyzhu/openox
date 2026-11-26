@@ -21,4 +21,4 @@ export { ProfileFileState, type ProfileFileBackend, type ProfileFileRecord } fro
 export { AgentFileSystem, type FileOperation, type FileRequest } from "./core/filesystem";
 export { filesystemContract, filesystemInputs } from "./core/filesystem-contract";
 export { installOxProfile, ConversationApplicationMetadata, type NormalizedProfileDraft, type ProfileInstallHost } from "./profile/install";
-export { ApplicationPresentation, type ApplicationPresentationChange, type ApplicationAgentChange } from "./profile/presentation";
+export { ApplicationPresentation, type ApplicationPresentationChange, type ApplicationAgentChange, type ApplicationHistoryRequest } from "./profile/presentation";

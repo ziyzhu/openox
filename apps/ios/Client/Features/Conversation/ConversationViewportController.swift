@@ -640,7 +640,7 @@ private final class ConversationViewportFrameProxy: NSObject {
     }
 }
 
-private extension ScrollPhase {
+extension ScrollPhase {
     var isUserDriven: Bool {
         switch self {
         case .tracking, .interacting, .decelerating: true

@@ -14,18 +14,19 @@ nonisolated struct ConversationPackageFiles: Sendable {
 }
 
 nonisolated struct ConversationPackageDocument: Transferable, Sendable {
-    let state: ConversationState
+    let state: @Sendable () async throws -> ConversationState
     let fileName: String
     let scope: ProfileScope? = StorageRoot.currentScope
 
     static var transferRepresentation: some TransferRepresentation {
         DataRepresentation(exportedContentType: .conversationPackage) { document in
             guard let scope = document.scope else { throw CocoaError(.fileNoSuchFile) }
-            let files = try await ProfileRepository.shared.conversationPackageFiles(document.state, in: scope)
+            let state = try await document.state()
+            let files = try await ProfileRepository.shared.conversationPackageFiles(state, in: scope)
             let data = try await Task.detached(priority: .userInitiated) {
-                try ConversationPackageCodec.encode(document.state, files: files.data, fileNames: files.names)
+                try ConversationPackageCodec.encode(state, files: files.data, fileNames: files.names)
             }.value
-            Log.ui.info("ConversationPackage.export conversation=\(document.state.meta.id) turns=\(document.state.turns.count) bytes=\(data.count)")
+            Log.ui.info("ConversationPackage.export conversation=\(state.meta.id) turns=\(state.turns.count) bytes=\(data.count)")
             return data
         }
         .suggestedFileName { "\($0.fileName).conversation" }

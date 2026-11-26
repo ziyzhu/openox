@@ -140,22 +140,31 @@ actor ProfileRepository {
         return meta
     }
 
-    func loadConversation(_ id: ConversationID, in scope: ProfileScope) async -> ConversationLoadResult? {
+    func loadConversation(_ id: ConversationID, in scope: ProfileScope, history: ConversationHistoryRequest? = nil,
+                          reserving reserved: Set<TurnID> = []) async -> ConversationLoadResult? {
         guard deleted[scope]?.contains(id) != true else { return nil }
-        do { return try await load(DurableProfileStore.shared.reference(for: id, in: scope), scope: scope) }
+        do { return try await load(DurableProfileStore.shared.reference(for: id, in: scope), scope: scope, history: history, reserved: reserved) }
         catch { Log.session.error("ProfileRepository.load conversation=\(id) failed=\(error.localizedDescription)"); return nil }
     }
 
-    private func load(_ reference: DurableConversationReference, scope: ProfileScope) async throws -> ConversationLoadResult {
-        let value = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationLoad"), "reference": reference.value]))
+    private func load(_ reference: DurableConversationReference, scope: ProfileScope, history: ConversationHistoryRequest?,
+                      reserved: Set<TurnID>) async throws -> ConversationLoadResult {
+        var command: [String: JSONValue] = ["action": .string("applicationLoad"), "reference": reference.value]
+        if let history { command["history"] = history.value }
+        let value = try await DurableProfileStore.shared.command(scope: scope, value: .object(command))
         let fields = value.objectValue ?? [:]
         let meta = try decodeMeta(fields, reference: reference, scope: scope)
-        let turns = try DurableConversationProjection.turns(from: fields["entries"]?.arrayValue ?? [], scope: scope, files: FileDirectoryListing(files: [:]))
+        let entries = fields["entries"]?.arrayValue ?? []
+        let turns = try DurableConversationProjection.turns(from: entries, scope: scope, files: FileDirectoryListing(files: [:]), reserving: reserved)
         let files = try await fileListing(for: turns, in: scope).files ?? [:]
         let resolved = turns.map { turn in
             turn.mappingFiles { files[$0.fileName] ?? files[$0.fileName.lowercased()] ?? $0 }
         }
-        return ConversationLoadResult(state: ConversationState(meta: meta, turns: resolved, context: nil), needsPersistence: false)
+        let older = fields["older"].flatMap { $0 == .null ? nil : $0 }
+        if let history {
+            Log.session.info("ProfileRepository.load conversation=\(reference.compatibilityID) page=\(history.userTurns.map(String.init) ?? "rest") entries=\(entries.count) turns=\(resolved.count) older=\(older != nil)")
+        }
+        return ConversationLoadResult(state: ConversationState(meta: meta, turns: resolved, context: nil), needsPersistence: false, older: older)
     }
 
     private func decodeMeta(_ fields: [String: JSONValue], reference: DurableConversationReference, scope: ProfileScope) throws -> ConversationMeta {
@@ -278,7 +287,7 @@ actor ProfileRepository {
             _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
                 "action": .string("conversationPopulate"), "reference": reference.value, "entries": .array(entries),
             ]))
-            return try await load(reference, scope: scope).state
+            return try await load(reference, scope: scope, history: nil, reserved: []).state
         } catch {
             do { try await deleteConversation(reference.compatibilityID, in: scope) }
             catch { Log.app.error("ProfileRepository.import cleanup failed conversation=\(reference.conversationID) error=\(error.localizedDescription)") }

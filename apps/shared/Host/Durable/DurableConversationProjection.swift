@@ -17,7 +17,8 @@ nonisolated enum DurableConversationProjection {
         }
     }
 
-    static func turns(from entries: [JSONValue], scope: ProfileScope, files: FileDirectoryListing? = nil) throws -> [Turn] {
+    static func turns(from entries: [JSONValue], scope: ProfileScope, files: FileDirectoryListing? = nil,
+                      reserving reserved: Set<TurnID> = []) throws -> [Turn] {
         let annotations = annotations(from: entries, scope: scope, files: files)
         let decorations = annotations.flatMap { turn -> [Decoration] in
             guard case .agent(let agent, let id) = turn else { return [] }
@@ -25,7 +26,7 @@ nonisolated enum DurableConversationProjection {
                 Decoration(turnID: id, generation: generation, steps: agent.steps.filter { $0.generation == generation.id })
             }
         }
-        var builder = Builder(annotations: annotations, decorations: decorations)
+        var builder = Builder(annotations: annotations, decorations: decorations, usedTurnIDs: reserved)
         var seen = Set<Int>()
         for entry in entries {
             guard let fields = entry.objectValue else { throw RuntimeError.bridge("Invalid Pi presentation entry") }
@@ -71,8 +72,8 @@ nonisolated enum DurableConversationProjection {
     private struct Builder {
         let annotations: [Turn]
         let decorations: [Decoration]
+        var usedTurnIDs: Set<TurnID>
         var turns: [Turn] = []
-        var usedTurnIDs = Set<TurnID>()
         var agent: AgentTurn?
         var agentID: TurnID?
         var toolDecorations: [StepID: [Step]] = [:]
@@ -139,7 +140,12 @@ nonisolated enum DurableConversationProjection {
                         || decoration.generation.assistantMessage?.content.toolCalls.contains(call) == true
                 }
             }
-            let rich = candidates.last
+            let rich = candidates.min { lhs, rhs in
+                func distance(_ decoration: Decoration) -> TimeInterval {
+                    abs((decoration.generation.assistantMessage?.timestamp ?? decoration.generation.at).timeIntervalSince(assistant.timestamp))
+                }
+                return distance(lhs) < distance(rhs)
+            }
             if agent == nil {
                 agent = AgentTurn(at: assistant.timestamp, generations: [], steps: [], outcome: .running)
                 agentID = unused(turnID) ?? unused(rich?.turnID) ?? derivedTurnID(namespace + ":agent")

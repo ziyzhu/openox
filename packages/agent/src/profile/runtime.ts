@@ -134,12 +134,12 @@ export class ProfileRuntime {
     let hasModel = false;
     let cursor;
     let newest: number | null = null;
-    do {
-      const page = await conversation.entries({}, 16, cursor, context);
-      newest ??= page.items[0]?.id ?? null;
+    scan: do {
+      const page = await conversation.entries({ order: "ascending" }, 16, cursor, context);
       for (const entry of page.items) {
         if (entry.kind === "ox.native.metadata") return;
-        hasModel ||= !!entry.model?.length;
+        newest = entry.id;
+        if (entry.model?.length) { hasModel = true; break scan; }
         if (["ox.native.conversation", "ox.native.transcript", "ox.native.context"].includes(entry.kind)) nativeEntries.push({ kind: entry.kind, data: entry.data });
       }
       cursor = page.next;

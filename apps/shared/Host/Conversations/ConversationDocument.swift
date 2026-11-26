@@ -42,6 +42,7 @@ nonisolated struct ConversationDocument: Sendable {
     private(set) var projection: [Block]
     private(set) var sourceTurnIDs: [RenderBlockID: TurnID]
     private(set) var fileReferencesRevision = UUID()
+    private(set) var firstBlockOrdinal = 0
     private var nextBlockOrdinal: Int
 
     init(turns: [Turn] = []) {
@@ -61,6 +62,24 @@ nonisolated struct ConversationDocument: Sendable {
         var document = ConversationDocument(turns: turns)
         document.apply(.sealAllTurns)
         return document
+    }
+
+    static func restoring(_ older: [Turn], before ordinal: Int) -> ConversationDocument {
+        var document = restoring(older)
+        document.firstBlockOrdinal = ordinal - document.projection.count
+        document.reproject()
+        return document
+    }
+
+    mutating func prepend(_ older: ConversationDocument) -> Bool {
+        guard older.firstBlockOrdinal + older.projection.count == firstBlockOrdinal else { return false }
+        turns = older.turns + turns
+        projection = older.projection + projection
+        sourceTurnIDs.merge(older.sourceTurnIDs) { current, _ in current }
+        firstBlockOrdinal = older.firstBlockOrdinal
+        fileReferencesRevision = UUID()
+        validateIDs()
+        return true
     }
 
     static func replaying(_ turns: [Turn]) -> ConversationDocument {
@@ -1052,12 +1071,12 @@ nonisolated struct ConversationDocument: Sendable {
     }
 
     private mutating func reproject() {
-        let projected = ConversationProjection.renderWithSource(turns)
+        let projected = ConversationProjection.renderWithSource(turns, ordinalOffset: firstBlockOrdinal)
         projection = projected.map(\.0)
         sourceTurnIDs = Dictionary(uniqueKeysWithValues: projected.map { block, entry in
             (RenderBlockID(block.id), turns[entry].id)
         })
-        nextBlockOrdinal = projection.count
+        nextBlockOrdinal = firstBlockOrdinal + projection.count
         fileReferencesRevision = UUID()
     }
 
@@ -1078,13 +1097,13 @@ nonisolated struct ConversationDocument: Sendable {
         let projected = ConversationProjection.renderWithSource(
             Array(turns[entryStart...]),
             turnOffset: entryStart,
-            ordinalOffset: blockStart
+            ordinalOffset: firstBlockOrdinal + blockStart
         )
         let previousFiles = projection[blockStart...].flatMap(Self.files(in:))
         for block in projection[blockStart...] { sourceTurnIDs[RenderBlockID(block.id)] = nil }
         projection.replaceSubrange(blockStart..<projection.endIndex, with: projected.map(\.0))
         for (block, entry) in projected { sourceTurnIDs[RenderBlockID(block.id)] = turns[entry].id }
-        nextBlockOrdinal = projection.count
+        nextBlockOrdinal = firstBlockOrdinal + projection.count
         if projection[blockStart...].flatMap(Self.files(in:)) != previousFiles { fileReferencesRevision = UUID() }
     }
 

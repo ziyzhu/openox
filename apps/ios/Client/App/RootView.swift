@@ -653,7 +653,7 @@ struct RootView: View {
                          onShowSidebar: { setSidebar(isSplitLayout ? !showSidebar : true) },
                          onToggleTemporary: { conversations.toggleTemporaryConversation() },
                          onDeleteConversation: { conversations.delete(conversation.id) },
-                         onBranch: { blockId in conversations.branch(from: conversation, atBlock: blockId) },
+                         onBranch: { blockId in Task { await conversations.branch(from: conversation, atBlock: blockId) } },
                          onOpenConversation: { id in
                              openConversation(id)
                          },

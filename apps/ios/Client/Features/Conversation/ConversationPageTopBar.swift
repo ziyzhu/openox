@@ -51,7 +51,7 @@ struct ConversationPageTopBar: View {
                 }
                 ShareLink(
                     item: ConversationPackageDocument(
-                        state: conversation.state,
+                        state: { [conversation] in try await conversation.completeState() },
                         fileName: FileStore.sanitizedFilename(conversation.title)
                     ),
                     preview: SharePreview(Text(verbatim: conversation.title))

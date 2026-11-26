@@ -559,7 +559,7 @@ struct ConversationPage: View {
                     primaryButton: .cancel(),
                     secondaryButton: .destructive(Text("Regenerate")) {
                         Log.ui.info("ConversationPage.retry conversation=\(conversation.id) atBlock=\(id)")
-                        latestSubmissionID = conversation.retry(at: id)?.id
+                        Task { latestSubmissionID = await conversation.retry(at: id)?.id }
                     }
                 )
             }
@@ -946,7 +946,7 @@ struct ConversationPage: View {
     ) -> some View {
         let measuresTail = recordsTail && sendHandoff == .idle
         let earlierAnchorID = scroller.earlierRevealAnchorID
-        let windowStart = transcriptWindow.range.lowerBound
+        let windowStart = transcriptWindow.firstOrdinal(in: conversation.blockOrdinals)
         let row = conversationBlockHost(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
             .padding(.top, block.spacingBefore)
             .onGeometryChange(for: CGFloat?.self) {
@@ -1123,13 +1123,16 @@ struct ConversationPage: View {
             }
             .onScrollPhaseChange { old, new in
                 scroller.phaseChanged(from: old, to: new)
-                guard new == .idle, transcriptWindow.hasEarlier,
-                      scroller.beginEarlierReveal(
-                        after: old,
-                        windowStart: max(0, transcriptWindow.range.lowerBound - TranscriptWindow.batchSize)
-                      ) else { return }
-                transcriptWindow.revealEarlier()
-                logTranscriptWindow(reason: "earlier", total: totalBlockCount)
+                guard new == .idle else { return }
+                if transcriptWindow.hasEarlier(in: conversation.blockOrdinals) {
+                    revealEarlier(after: old)
+                } else if old.isUserDriven, case .partial = conversation.history {
+                    Task {
+                        await conversation.loadOlderHistory()
+                        logTranscriptWindow(reason: "older", total: conversation.transcriptBlockCount)
+                        revealEarlier(after: old)
+                    }
+                }
             }
             .onScrollTargetVisibilityChange(idType: UUID.self, threshold: 0.01) {
                 scroller.visibleTargetsChanged($0)
@@ -1154,7 +1157,7 @@ struct ConversationPage: View {
                 }
             })
             .onChange(of: totalBlockCount) { _, total in
-                transcriptWindow.reconcile(total: total)
+                transcriptWindow.reconcile(conversation.blockOrdinals)
                 logTranscriptWindow(reason: "blocks", total: total)
             }
             .onChange(of: blocks.map(\.id)) { _, ids in
@@ -1165,14 +1168,15 @@ struct ConversationPage: View {
             }
             .onChange(of: latestSubmissionID) { _, new in
                 guard new != nil else { return }
-                transcriptWindow.reconcile(total: totalBlockCount)
+                transcriptWindow.reconcile(conversation.blockOrdinals)
             }
             .onChange(of: submissionAnchor) { old, new in
                 guard old != new, let new else { return }
                 transcriptWindow.anchor(
                     on: new.id,
                     in: sourceBlockIDs,
-                    startingAt: sourceRange.lowerBound
+                    startingAt: conversation.blockOrdinals.lowerBound + sourceRange.lowerBound,
+                    blocks: conversation.blockOrdinals
                 )
                 logTranscriptWindow(reason: "submissionAnchor", total: totalBlockCount)
             }
@@ -1223,8 +1227,9 @@ struct ConversationPage: View {
         hasOpenedTranscript = true
         latestSubmissionID = nil
         sendHandoff = .idle
-        transcriptWindow.open(total: total)
-        Log.ui.info("ConversationUX.lifecycle conversation=\(conversation.id) phase=viewportOpening target=bottom range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(total) anchor=\(submissionAnchor?.id.uuidString ?? "none") scale=\(displayScale) dynamicType=\(String(describing: dynamicTypeSize)) reduceMotion=\(reduceMotion) reduceTransparency=\(reduceTransparency)")
+        transcriptWindow.open(conversation.blockOrdinals)
+        let range = transcriptWindow.range(in: conversation.blockOrdinals)
+        Log.ui.info("ConversationUX.lifecycle conversation=\(conversation.id) phase=viewportOpening target=bottom range=\(range.lowerBound)..<\(range.upperBound) total=\(total) anchor=\(submissionAnchor?.id.uuidString ?? "none") scale=\(displayScale) dynamicType=\(String(describing: dynamicTypeSize)) reduceMotion=\(reduceMotion) reduceTransparency=\(reduceTransparency)")
         scroller.openAtBottom(conversationID: "\(conversation.id)", onSettled: onInitialTranscriptPresented)
     }
 
@@ -1354,7 +1359,9 @@ struct ConversationPage: View {
         let offset = reduceMotion ? 0 : max(0, sendStartTop(capture.origin) - anchorTop)
         sendHandoff = .positioned(capture, offset: offset, anchorTop: anchorTop)
         scroller.beginSendHandoff(anchorID)
-        if !capture.readingHistory, transcriptWindow.trim(above: submissionAnchor.id, in: sourceBlockIDs, startingAt: sourceStart) {
+        let blocks = conversation.blockOrdinals
+        if !capture.readingHistory,
+           transcriptWindow.trim(above: submissionAnchor.id, in: sourceBlockIDs, startingAt: blocks.lowerBound + sourceStart, blocks: blocks) {
             logTranscriptWindow(reason: "trim", total: total)
         }
     }
@@ -1396,19 +1403,32 @@ struct ConversationPage: View {
         if anyInputFocused { prepareComposerSubmission() }
     }
 
+    private var hasEarlierTranscript: Bool {
+        transcriptWindow.hasEarlier(in: conversation.blockOrdinals) || conversation.history.hasOlder
+    }
+
+    private func revealEarlier(after phase: ScrollPhase) {
+        let blocks = conversation.blockOrdinals
+        guard transcriptWindow.hasEarlier(in: blocks),
+              scroller.beginEarlierReveal(after: phase, windowStart: transcriptWindow.earlierStart(in: blocks)) else { return }
+        transcriptWindow.revealEarlier(in: blocks)
+        logTranscriptWindow(reason: "earlier", total: conversation.transcriptBlockCount)
+    }
+
     private var earlierWindowBoundary: some View {
         ZStack {
-            if transcriptWindow.hasEarlier {
+            if hasEarlierTranscript {
                 CellularAutomatonLoader.small
                     .accessibilityLabel("Loading earlier messages…")
             }
         }
             .frame(maxWidth: .infinity)
-            .frame(height: transcriptWindow.hasEarlier ? 44 : 0)
+            .frame(height: hasEarlierTranscript ? 44 : 0)
     }
 
     private func logTranscriptWindow(reason: String, total: Int) {
-        Log.ui.info("ConversationUX.content conversation=\(conversation.id) reason=\(reason) range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(total) anchor=\(submissionAnchor?.id.uuidString ?? "none") busy=\(conversation.isBusy)")
+        let range = transcriptWindow.range(in: conversation.blockOrdinals)
+        Log.ui.info("ConversationUX.content conversation=\(conversation.id) reason=\(reason) range=\(range.lowerBound)..<\(range.upperBound) total=\(total) anchor=\(submissionAnchor?.id.uuidString ?? "none") busy=\(conversation.isBusy)")
     }
 
     private func inputBar(
@@ -1713,7 +1733,7 @@ struct ConversationPage: View {
             editedBlockID = nil
             editDraft = AttributedString()
         } completion: {
-            latestSubmissionID = conversation.editAndRerun(at: blockID, newText: trimmed)?.id
+            Task { latestSubmissionID = await conversation.editAndRerun(at: blockID, newText: trimmed)?.id }
         }
     }
 

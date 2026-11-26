@@ -23,7 +23,7 @@ struct PrivateDataAccessContext {
 @MainActor
 protocol PrivateDataHost: AnyObject {
     var privateDataContext: PrivateDataAccessContext { get }
-    func privateDataContinuation() -> ConversationContinuation?
+    func privateDataContinuation() async -> ConversationContinuation?
     func choosePrivateDataOption(prompt: String, options: [String]) async -> String
     func continuePrivateDataTemporarily(_ continuation: ConversationContinuation)
 }
@@ -40,7 +40,7 @@ struct PrivateDataAccess {
     private func authorizeStorage(_ request: PrivateDataRequest) async throws {
         let current = host.privateDataContext
         guard current.conversationRetention == .persisted else { return }
-        guard let continuation = host.privateDataContinuation() else {
+        guard let continuation = await host.privateDataContinuation() else {
             throw RuntimeError.bridge("\(request.actionName): couldn't prepare a safe continuation for this request.")
         }
         let temporary = L10n.string("Start Temporary Conversation")

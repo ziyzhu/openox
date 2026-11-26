@@ -296,6 +296,7 @@ final class Conversation: Identifiable {
 
     var title: String {
         if let customTitle, !customTitle.isEmpty { return customTitle }
+        if history.hasOlder { return metadata.displayTitle }
         for block in transcript {
             if case let .userText(s, _) = block.kind {
                 let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -591,6 +592,7 @@ final class Conversation: Identifiable {
     var transcript: [Block] { document.projection }
     var turns: [Turn] { document.turns }
     var transcriptBlockCount: Int { document.blockCount }
+    var blockOrdinals: Range<Int> { document.firstBlockOrdinal..<document.firstBlockOrdinal + document.blockCount }
     var referencedFiles: [FileItem] {
         let key = ReferencedFilesCache.Key(references: document.fileReferencesRevision, files: filesRevision)
         if let cache = referencedFilesCache, cache.key == key { return cache.files }
@@ -615,6 +617,8 @@ final class Conversation: Identifiable {
             }
         }
     }
+
+    func prependOlder(_ older: ConversationDocument) -> Bool { document.prepend(older) }
 
     func blocksWithTurnID(in range: Range<Int>) -> (range: Range<Int>, blocks: [(block: Block, turnID: TurnID)]) {
         document.blocksWithTurnID(in: range)
@@ -642,6 +646,7 @@ final class Conversation: Identifiable {
     @ObservationIgnored weak var conversationManager: ConversationManager?
     @ObservationIgnored var onPersistableChange: (() -> Void)?
     @ObservationIgnored var storedTurns: [Turn]?
+    var history: ConversationHistory = .complete
     @ObservationIgnored var onPrivateDataTemporaryContinuation: ((ConversationContinuation) -> Void)?
 
     static let abortedAnswer = "The user stopped before answering."
@@ -898,7 +903,7 @@ final class Conversation: Identifiable {
             model: modelSelection,
             monoRepositoryHash: monoRepositoryHash,
             attachedServiceDomains: serviceAttachments.domains,
-            preview: transcriptPreview,
+            preview: history.partial.map(\.storedPreview) ?? transcriptPreview,
             hasUnreadResponse: hasUnreadResponse,
             scheduleID: scheduleID,
             parentID: parentID,
@@ -912,7 +917,8 @@ final class Conversation: Identifiable {
     }
 
     func exportTranscript() async throws -> Data {
-        try await repository.export(state)
+        try await loadCompleteHistory()
+        return try await repository.export(state)
     }
 
     @discardableResult
@@ -1256,17 +1262,18 @@ final class Conversation: Identifiable {
     }
 
     @discardableResult
-    func retry(at blockId: UUID) -> SubmissionReceipt? {
-        rerun(at: blockId, replacingText: nil)
+    func retry(at blockId: UUID) async -> SubmissionReceipt? {
+        await rerun(at: blockId, replacingText: nil)
     }
 
     @discardableResult
-    func editAndRerun(at blockId: UUID, newText: String) -> SubmissionReceipt? {
-        rerun(at: blockId, replacingText: newText)
+    func editAndRerun(at blockId: UUID, newText: String) async -> SubmissionReceipt? {
+        await rerun(at: blockId, replacingText: newText)
     }
 
-    private func rerun(at blockId: UUID, replacingText: String?) -> SubmissionReceipt? {
-        guard let target = document.turnIndex(containingBlock: blockId),
+    private func rerun(at blockId: UUID, replacingText: String?) async -> SubmissionReceipt? {
+        guard (try? await loadCompleteHistory()) != nil,
+              let target = document.turnIndex(containingBlock: blockId),
               let cut = document.lastUserTurn(through: target) else {
             Log.session.warning("Conversation.rerun no cut for block=\(blockId)")
             return nil
@@ -1973,8 +1980,6 @@ extension Conversation: PrivateDataHost {
             provider: .init(id: client.id, name: client.displayName, location: client.inferenceLocation)
         )
     }
-
-    func privateDataContinuation() -> ConversationContinuation? { latestContinuation() }
 
     func choosePrivateDataOption(prompt: String, options: [String]) async -> String {
         await awaitPrompt(

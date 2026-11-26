@@ -74,6 +74,79 @@ async function ledger(tx: Tx, conversationID: ConversationId) {
   } while (cursor);
   return entries.reverse();
 }
+export interface ApplicationHistoryCursor {
+  before: number;
+  deferred: number[];
+}
+export interface ApplicationHistoryRequest {
+  limit?: number;
+  older?: ApplicationHistoryCursor;
+}
+const referenceDateEpochMs = 978_307_200_000;
+const queuedTurnSlackMs = 60_000;
+const queuedTurnDepth = 2;
+const turnStartSlackMs = 60_000;
+function presentedAt(entry: EntryRecord): number | undefined {
+  const turn = presentedTurn(entry);
+  const type = turn && typeof turn === "object" && !Array.isArray(turn) ? turn.type : undefined;
+  const body = typeof type === "string" && turn && typeof turn === "object" && !Array.isArray(turn) ? turn[type] : undefined;
+  const at = body && typeof body === "object" && !Array.isArray(body) ? body.at : undefined;
+  return typeof at === "number" ? at * 1000 + referenceDateEpochMs : undefined;
+}
+function userTurns(entry: EntryRecord) {
+  if (entry.kind === "pi.reset" || entry.kind === "pi.compaction") return { count: 0, startsAt: undefined };
+  const messages = (entry.model ?? []).filter(message => message.role !== "system");
+  const first = messages[0];
+  return { count: messages.filter(message => message.role === "user").length, startsAt: first?.role === "user" ? first.timestamp : undefined };
+}
+function validHistory(request: ApplicationHistoryRequest) {
+  if (request.limit !== undefined && (!Number.isInteger(request.limit) || request.limit < 1)) throw new Error("History page size must be a positive integer");
+  const older = request.older;
+  if (older !== undefined && (!Number.isSafeInteger(older.before) || !Array.isArray(older.deferred) || older.deferred.some(id => !Number.isSafeInteger(id)))) throw new Error("Invalid history cursor");
+}
+async function historyPage(tx: Tx, conversationID: ConversationId, request: ApplicationHistoryRequest) {
+  const { limit, older } = request;
+  const query = { conversationId: conversationID, ...(older ? { maxEntryId: (older.before - 1) as EntryRecord["id"] } : {}) };
+  const page: EntryRecord[] = [];
+  const slack: EntryRecord[] = [];
+  let users = 0, start: { id: number; at: number } | undefined, previousAt: number | undefined, previousTurns = 0, hasOlder = false;
+  let cursor: Cursor | undefined;
+  scan: do {
+    const scanned = await tx.scanEntries(query, 16, cursor);
+    for (const entry of scanned.items) {
+      const turns = userTurns(entry);
+      if (!start) {
+        page.push(entry);
+        users += turns.count;
+        if (limit !== undefined && turns.startsAt !== undefined && users >= limit) start = { id: entry.id, at: turns.startsAt };
+        continue;
+      }
+      if (presentedTurn(entry)) { slack.push(entry); continue; }
+      if (entry.model?.length) hasOlder = true;
+      if (turns.startsAt === undefined) continue;
+      previousAt = turns.startsAt;
+      if (++previousTurns === queuedTurnDepth) break scan;
+    }
+    cursor = scanned.next;
+  } while (cursor);
+  const carried: EntryRecord[] = [];
+  for (const id of older?.deferred ?? []) {
+    const found = await tx.scanEntries({ conversationId: conversationID, minEntryId: id as EntryRecord["id"], maxEntryId: id as EntryRecord["id"] }, 1);
+    if (found.items[0]) carried.push(found.items[0]);
+  }
+  const candidates = new Map<number, EntryRecord>();
+  for (const entry of [...page, ...slack, ...carried]) candidates.set(entry.id, entry);
+  if (!start || !hasOlder) return { entries: withoutSupersededPresentation([...candidates.values()].sort((a, b) => a.id - b.id)), older: null };
+  const cut = (previousAt ?? start.at) - queuedTurnSlackMs;
+  const deferred: number[] = [];
+  const entries = [...candidates.values()].filter(entry => {
+    const at = presentedAt(entry);
+    if (at === undefined) return true;
+    if (at < start.at + turnStartSlackMs) deferred.push(entry.id);
+    return at >= cut;
+  }).sort((a, b) => a.id - b.id);
+  return { entries: withoutSupersededPresentation(entries), older: { before: start.id, deferred: deferred.sort((a, b) => a - b) } satisfies ApplicationHistoryCursor };
+}
 async function storedTurns(tx: Tx, conversationID: ConversationId, wanted: Set<string>) {
   const turns = new Map<string, JsonValue>();
   let latest: number | null = null;
@@ -195,17 +268,18 @@ export class ApplicationPresentation {
       await presentation(tx, id, { unread: false }, latest, true);
     }, context);
   }
-  async load(reference: ConversationReference) {
+  async load(reference: ConversationReference, history?: ApplicationHistoryRequest) {
+    if (history) validHistory(history);
     await this.runtime.prepareConversation(reference);
     const id = this.runtime.conversations.id(reference);
     const conversation = await this.runtime.harness.conversation(id, context);
     if (!conversation) throw new Error("Conversation not found");
-    const [state, metadata, entries] = await Promise.all([
+    const [state, metadata, loaded] = await Promise.all([
       this.runtime.conversations.metadata(reference),
       this.runtime.harness.snapshot(ConversationApplicationMetadata, id, context),
-      this.runtime.harness.commit(tx => ledger(tx, id), context),
+      this.runtime.harness.commit(async tx => history ? historyPage(tx, id, history) : { entries: withoutSupersededPresentation(await ledger(tx, id)) }, context),
     ]);
-    return { ...state, metadata: metadata?.fields ?? {}, entries: withoutSupersededPresentation(entries) };
+    return { ...state, metadata: metadata?.fields ?? {}, ...loaded };
   }
   async save(reference: ConversationReference, change: ApplicationPresentationChange) {
     validate(change);

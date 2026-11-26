@@ -3,51 +3,58 @@ import Foundation
 struct TranscriptWindow: Equatable {
     static let batchSize = 16
 
-    private(set) var range = 0..<0
+    private(set) var start: Int?
 
-    var hasEarlier: Bool { range.lowerBound > 0 }
-
-    func resolvedRange(total: Int) -> Range<Int> {
-        guard !range.isEmpty, range.lowerBound < total else { return Self.tailRange(total: total) }
-        return range.lowerBound..<total
+    func range(in blocks: Range<Int>) -> Range<Int> {
+        guard let start, start < blocks.upperBound else { return Self.tail(of: blocks) }
+        return max(start, blocks.lowerBound) - blocks.lowerBound..<blocks.count
     }
 
-    mutating func open(total: Int) {
-        range = Self.tailRange(total: total)
+    func firstOrdinal(in blocks: Range<Int>) -> Int {
+        blocks.lowerBound + range(in: blocks).lowerBound
     }
 
-    mutating func reconcile(total: Int) {
-        guard total > 0 else {
-            range = 0..<0
+    func hasEarlier(in blocks: Range<Int>) -> Bool {
+        start.map { $0 > blocks.lowerBound } ?? false
+    }
+
+    func earlierStart(in blocks: Range<Int>) -> Int {
+        max(blocks.lowerBound, (start ?? blocks.lowerBound) - Self.batchSize)
+    }
+
+    mutating func open(_ blocks: Range<Int>) {
+        start = blocks.isEmpty ? nil : blocks.lowerBound + Self.tail(of: blocks).lowerBound
+    }
+
+    mutating func reconcile(_ blocks: Range<Int>) {
+        guard !blocks.isEmpty else {
+            start = nil
             return
         }
-        guard range.lowerBound < total else {
-            range = Self.tailRange(total: total)
-            return
-        }
-        range = range.lowerBound..<total
+        let current = start ?? blocks.lowerBound
+        start = current < blocks.upperBound ? current : blocks.lowerBound + Self.tail(of: blocks).lowerBound
     }
 
     @discardableResult
-    mutating func anchor(on id: UUID, in blockIDs: [UUID], startingAt lowerBound: Int) -> Bool {
+    mutating func anchor(on id: UUID, in blockIDs: [UUID], startingAt ordinal: Int, blocks: Range<Int>) -> Bool {
         guard let index = blockIDs.firstIndex(of: id) else { return false }
-        range = min(range.lowerBound, lowerBound + index)..<max(range.upperBound, lowerBound + blockIDs.count)
+        start = min(start ?? blocks.lowerBound, ordinal + index)
         return true
     }
 
-    mutating func trim(above id: UUID, in blockIDs: [UUID], startingAt lowerBound: Int) -> Bool {
+    mutating func trim(above id: UUID, in blockIDs: [UUID], startingAt ordinal: Int, blocks: Range<Int>) -> Bool {
         guard let index = blockIDs.firstIndex(of: id) else { return false }
-        let anchor = lowerBound + index
-        guard anchor - range.lowerBound > Self.batchSize * 2 else { return false }
-        range = anchor - Self.batchSize..<range.upperBound
+        let anchor = ordinal + index
+        guard anchor - (start ?? blocks.lowerBound) > Self.batchSize * 2 else { return false }
+        start = anchor - Self.batchSize
         return true
     }
 
-    mutating func revealEarlier() {
-        range = max(0, range.lowerBound - Self.batchSize)..<range.upperBound
+    mutating func revealEarlier(in blocks: Range<Int>) {
+        start = earlierStart(in: blocks)
     }
 
-    private static func tailRange(total: Int) -> Range<Int> {
-        max(0, total - batchSize)..<total
+    private static func tail(of blocks: Range<Int>) -> Range<Int> {
+        max(0, blocks.count - batchSize)..<blocks.count
     }
 }
