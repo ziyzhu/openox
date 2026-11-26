@@ -1,0 +1,261 @@
+{
+  "domain": "openox.ai",
+  "name": "Ox Farm",
+  "description": "Browse reviewed Ox repositories and their services and skills without signing in.",
+  "baseUrl": "https://openox.ai/farm",
+  "faviconUrl": "https://openox.ai/assets/services/openox.ai/favicon.png",
+  "$defs": {
+    "searchItem": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "reviewedCommit": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "ownershipVerified": {
+          "type": "boolean"
+        },
+        "serviceCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skillCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "name",
+        "origin",
+        "reviewedCommit",
+        "author",
+        "ownershipVerified",
+        "serviceCount",
+        "skillCount"
+      ],
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "asksApproval": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "asksApproval"
+      ],
+      "additionalProperties": false
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "actions"
+      ],
+      "additionalProperties": false
+    },
+    "skill": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "searchRepositories",
+      "label": "Search repositories",
+      "description": "Search or list reviewed Farm repositories; follow nextCursor for more pages.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "default": ""
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/searchItem"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getRepository",
+      "label": "Get repository",
+      "description": "Read a reviewed repository, with paged services and skills (up to 20 entries per call). Connect is null for the repository included with Ox.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "minLength": 3
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 10
+          }
+        },
+        "required": [
+          "origin"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "reviewedCommit": {
+            "type": "string"
+          },
+          "connect": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "origin": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "commit": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "origin",
+                  "commit"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "serviceCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skillCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/service"
+            }
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/skill"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "origin",
+          "reviewedCommit",
+          "connect",
+          "serviceCount",
+          "skillCount",
+          "services",
+          "skills",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    }
+  ]
+}
