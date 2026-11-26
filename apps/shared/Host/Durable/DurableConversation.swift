@@ -81,14 +81,14 @@ extension Conversation {
         return reference
     }
 
-    func submit(_ input: ConversationInput, configuration: AgentConfiguration, continuing: Bool = false) async throws -> ConversationRunResult {
+    func submit(_ input: ConversationInput, submissionID: SubmissionID, configuration: AgentConfiguration, continuing: Bool = false) async throws -> ConversationRunResult {
         let content = input.messages.flatMap { message -> [JSONValue] in
             if case .user = message {
                 return DurableMessageCodec.message(message, provider: configuration.client.id, profileID: scope.profileID).objectValue?["content"]?.arrayValue ?? []
             }
             return []
         }
-        var fields: [String: JSONValue] = ["content": .array(content), "requestID": .string(input.turnID?.uuidString ?? UUID().uuidString)]
+        var fields: [String: JSONValue] = ["content": .array(content), "requestID": .string(submissionID.rawValue.uuidString)]
         if let turnState = input.turnState { fields["turnState"] = turnState }
         return try await executeSubmission(action: continuing ? "continue" : "run", fields: fields, configuration: configuration)
     }

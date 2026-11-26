@@ -2,26 +2,15 @@ import Foundation
 
 nonisolated public struct ConversationInput: Sendable {
     public let messages: [Message]
-    public let turnID: UUID?
     public let turnState: JSONValue?
 
-    public init(messages: [Message], turnID: UUID? = nil, turnState: JSONValue? = nil) {
+    public init(messages: [Message], turnState: JSONValue? = nil) {
         self.messages = messages
-        self.turnID = turnID
         self.turnState = turnState
     }
 
-    public init(
-        text: String,
-        attachments: [FileItem] = [],
-        turnState: JSONValue? = nil,
-        turnID: UUID? = nil
-    ) {
-        self.init(
-            messages: [.user(UserMessage(text: text, attachments: attachments))],
-            turnID: turnID,
-            turnState: turnState
-        )
+    public init(text: String, attachments: [FileItem] = [], turnState: JSONValue? = nil) {
+        self.init(messages: [.user(UserMessage(text: text, attachments: attachments))], turnState: turnState)
     }
 }
 

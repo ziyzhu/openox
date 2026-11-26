@@ -1864,9 +1864,8 @@ final class Conversation: Identifiable {
                         try await submit(ConversationInput(
                             text: submission.text,
                             attachments: submission.attachments,
-                            turnState: turnState,
-                            turnID: turnID
-                        ), configuration: configuration, continuing: continuing)
+                            turnState: turnState
+                        ), submissionID: submission.id, configuration: configuration, continuing: continuing)
                     }
                 }
             }
