@@ -5,7 +5,7 @@ nonisolated struct ConnectionSettings: Codable, Equatable, Sendable {
     var allowConnections = false
 
     static func url(for profileID: UUID) -> URL {
-        AppStoragePaths.profileConfiguration(profileID).appendingPathComponent("host.json", isDirectory: false)
+        AppStoragePaths.profileConfiguration(profileID).appendingPathComponent("connections.json", isDirectory: false)
     }
 
     static func load(for profileID: UUID) throws -> Self {
@@ -30,15 +30,5 @@ nonisolated struct ConnectionSettings: Codable, Equatable, Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try encoder.encode(self).write(to: url, options: .atomic)
-    }
-
-    static func adoptLegacy(into profileID: UUID) throws {
-        let legacy = AppStoragePaths.legacyHostConfiguration
-        guard FileManager.default.fileExists(atPath: legacy.path) else { return }
-        let value = try load(from: legacy)
-        try value.save(for: profileID)
-        guard try load(for: profileID) == value else { throw StorageMigrationError.invalidApplicationStorage("Connection settings publication") }
-        try FileManager.default.removeItem(at: legacy)
-        Log.app.info("StorageMigrator.connectionScope profile=\(profileID) allowConnections=\(value.allowConnections)")
     }
 }

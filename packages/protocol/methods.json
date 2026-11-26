@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "methods": {
     "profile.describe": {
       "params": {
@@ -9,15 +9,15 @@
         "$ref": "./schema.json#/definitions/ProfileDescription"
       }
     },
-    "profiles.inspect": {
+    "profile.inspect": {
       "params": {
-        "$ref": "./schema.json#/definitions/ProfileRequest"
+        "$ref": "./schema.json#/definitions/EmptyRequest"
       },
       "result": {
         "$ref": "./schema.json#/definitions/ProfileResult"
       }
     },
-    "profiles.update": {
+    "profile.update": {
       "params": {
         "$ref": "./schema.json#/definitions/UpdateProfileRequest"
       },
@@ -27,7 +27,7 @@
     },
     "files.list": {
       "params": {
-        "$ref": "./schema.json#/definitions/FolderProfileRequest"
+        "$ref": "./schema.json#/definitions/EmptyRequest"
       },
       "result": {
         "$ref": "./schema.json#/definitions/ListFolderGrantsResult"
@@ -35,7 +35,7 @@
     },
     "files.mount": {
       "params": {
-        "$ref": "./schema.json#/definitions/FolderProfileRequest"
+        "$ref": "./schema.json#/definitions/EmptyRequest"
       },
       "result": {
         "$ref": "./schema.json#/definitions/FolderGrantResult"

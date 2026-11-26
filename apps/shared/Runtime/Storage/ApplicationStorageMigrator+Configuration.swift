@@ -36,7 +36,6 @@ nonisolated extension ApplicationStorageMigrator {
 
     static func migrateStateAndServiceStorage(defaults: UserDefaults = .standard) throws {
         try migrateState(defaults: defaults)
-        try migrateLegacyHostPreference(defaults: defaults)
         try migrateServicePreferences(defaults: defaults)
     }
 
@@ -86,21 +85,25 @@ nonisolated extension ApplicationStorageMigrator {
         try removeMigratedPreferences(keys, defaults: defaults)
     }
 
-    private static func migrateLegacyHostPreference(defaults: UserDefaults) throws {
+    static func adoptLegacyConnections(into profileID: UUID, defaults: UserDefaults = .standard) throws {
+        let legacy = AppStoragePaths.legacyHostConfiguration
         let key = "host.allowConnections"
-        guard let preference = legacyPreference(key, defaults: defaults) else { return }
-        guard let value = preference as? Bool else { throw StorageMigrationError.invalidApplicationStorage("Connection access") }
-        let url = AppStoragePaths.legacyHostConfiguration
-        if FileManager.default.fileExists(atPath: url.path) {
-            guard try ConnectionSettings.load(from: url).allowConnections == value else { throw StorageMigrationError.collision("Connection settings") }
-        } else {
-            var next = ConnectionSettings()
-            next.allowConnections = value
-            try next.save(to: url)
-            guard try ConnectionSettings.load(from: url) == next else { throw StorageMigrationError.invalidApplicationStorage("Connection settings publication") }
-            Log.app.info("StorageMigrator.legacyHostPreference done format=1")
+        let file = FileManager.default.fileExists(atPath: legacy.path) ? try ConnectionSettings.load(from: legacy) : nil
+        let preference = legacyPreference(key, defaults: defaults)
+        guard file != nil || preference != nil else { return }
+        var value = file ?? ConnectionSettings()
+        if file == nil {
+            guard let enabled = preference as? Bool else { throw StorageMigrationError.invalidApplicationStorage("Connection access") }
+            value.allowConnections = enabled
         }
-        try removeMigratedPreferences([key], defaults: defaults)
+        try value.save(for: profileID)
+        guard try ConnectionSettings.load(for: profileID) == value else { throw StorageMigrationError.invalidApplicationStorage("Connection settings publication") }
+        if file != nil { try FileManager.default.removeItem(at: legacy) }
+        if preference != nil {
+            defaults.removeObject(forKey: key)
+            guard defaults.synchronize() else { throw StorageMigrationError.invalidApplicationStorage("Connection preference cleanup") }
+        }
+        Log.app.info("StorageMigrator.connectionScope profile=\(profileID) allowConnections=\(value.allowConnections) file=\(file != nil) preference=\(preference != nil)")
     }
 
     private static func migrateServicePreferences(defaults: UserDefaults) throws {

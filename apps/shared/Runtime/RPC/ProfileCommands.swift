@@ -27,11 +27,8 @@ enum ProfileCommands {
         }
     }
 
-    static func profile(_ id: String) throws -> Profile {
-        guard let uuid = UUID(uuidString: id), uuid == StorageRoot.shared.activeId,
-              let profile = StorageRoot.shared.active else {
-            throw RuntimeError.bridge("Only the Profile this connection opened is available: \(id)")
-        }
+    static func active() throws -> Profile {
+        guard let profile = StorageRoot.shared.active else { throw RuntimeError.bridge("Ox has no open Profile") }
         return profile
     }
 
@@ -66,9 +63,9 @@ enum ProfileCommands {
 
 extension ProfileProtocol {
     @MainActor
-    static func handleInspectProfile(_ command: ProfileRequest, runtime: any ProfileRuntime, reply: ProfileRPC.Reply) {
+    static func handleInspectProfile(_ command: EmptyRequest, runtime: any ProfileRuntime, reply: ProfileRPC.Reply) {
         ProfileCommands.perform("inspect", runtime: runtime, reply: reply) {
-            try await ProfileCommands.result(ProfileCommands.profile(command.profileId), contents: true)
+            try await ProfileCommands.result(ProfileCommands.active(), contents: true)
         }
     }
 
@@ -77,7 +74,7 @@ extension ProfileProtocol {
         ProfileCommands.perform("update", runtime: runtime, reply: reply, mutation: true) {
             try ProfileCommands.requireIdle(runtime)
             let storage = StorageRoot.shared
-            var profile = try ProfileCommands.profile(command.profileId)
+            var profile = try ProfileCommands.active()
             guard profile.version == ProfileSchema.current else {
                 throw RuntimeError.bridge("Select a supported local Profile before updating it")
             }
@@ -93,7 +90,7 @@ extension ProfileProtocol {
             }
             if let name = command.name {
                 try await storage.rename(profile, to: name)
-                profile = try ProfileCommands.profile(command.profileId)
+                profile = try ProfileCommands.active()
             }
             let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
             if let memory = command.memory { try await ProfileRepository.shared.writeTextFile(memory, named: "MEMORY.md", in: scope) }

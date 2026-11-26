@@ -74,7 +74,7 @@ nonisolated enum StorageMigrator {
     private static func migrateProfile(_ scope: ProfileScope, services: ServiceManager) async {
         if let profileID = scope.profileID {
             attempt("profile.credentialScope") { try CredentialMigrator.adoptIntoProfile(profileID) }
-            attempt("profile.connectionScope") { try ConnectionSettings.adoptLegacy(into: profileID) }
+            attempt("profile.connectionScope") { try ApplicationStorageMigrator.adoptLegacyConnections(into: profileID) }
             attempt("profile.configuration") {
                 try CredentialMigrator.adoptConfigurationIntoProfile(scope)
                 try AppStateStore.shared.update { $0.profileConfiguration = true }

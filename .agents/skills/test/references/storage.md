@@ -15,7 +15,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── Configuration/
 │   │   │   ├── settings.json               format-1 app language selection
 │   │   │   ├── profiles/<Profile UUID>/secrets.json  version-1 Secret metadata/bindings of that Profile; no secret values
-│   │   │   ├── profiles/<Profile UUID>/host.json     format-1 allowConnections of that Profile; defaults off
+│   │   │   ├── profiles/<Profile UUID>/connections.json format-1 allowConnections of that Profile; defaults off
 │   │   │   ├── mounted-repositories.json   version-1 bindings to Files grants
 │   │   │   ├── external-profiles.json      selected Profile bookmarks/display names
 │   │   │   └── device-folder-grants.json    Profile-bound native bookmarks
@@ -313,7 +313,7 @@ Language remains an app-wide JSON file under Application Support/Configuration a
 
 Startup adopts the legacy global policy, service preferences, provider catalog, and remote agent configuration into the active Profile's state directory. It verifies new copies before removing their sources; an existing Profile file takes precedence over its global predecessor. The optional app-state flag suppresses the old global policy, service preference, and provider migrations after adoption. A Profile without one of these files uses defaults: no providers or default model, ask-by-default policies, no service names, no remote agents. The service manager, provider registry and remote agent directory reload them after startup preparation and on every Profile switch. Profile packages include these four files. Older builds do not read them from Profile storage; downgrade is not configuration-compatible.
 
-The agent accesses one virtual `app/` mount. settings.json, providers.json, and services.json accept bounded validated edits through their owners, requiring current revisions, normal filesystem policy, and existing semantic Action approval. Provider definitions and default-model changes must be separate writes. policy.json is read-only. status.json and exact-action views under actions/ are generated on demand, not persisted copies. Secret metadata, bookmarks, installation identity, state.json, and host.json are not mounted; status exposes only Allow Connections. Logs are a separate redacted approval-gated JSONL view, readable/searchable only by explicitly naming app/logs.jsonl, never by directory-wide content searches. App files cannot be attached, deleted, moved, or copied; temporary conversations cannot mutate them. A preexisting physical Profile app path retains its user-file access and disables the virtual app mount for that Profile; no collision bytes are moved or hidden. The ox.app function namespace and its aliases are removed; historical Action identifiers remain policy keys for equivalent filesystem operations.
+The agent accesses one virtual `app/` mount. settings.json, providers.json, and services.json accept bounded validated edits through their owners, requiring current revisions, normal filesystem policy, and existing semantic Action approval. Provider definitions and default-model changes must be separate writes. policy.json is read-only. status.json and exact-action views under actions/ are generated on demand, not persisted copies. Secret metadata, bookmarks, installation identity, state.json, and connections.json are not mounted; status exposes only Allow Connections. Logs are a separate redacted approval-gated JSONL view, readable/searchable only by explicitly naming app/logs.jsonl, never by directory-wide content searches. App files cannot be attached, deleted, moved, or copied; temporary conversations cannot mutate them. A preexisting physical Profile app path retains its user-file access and disables the virtual app mount for that Profile; no collision bytes are moved or hidden. The ox.app function namespace and its aliases are removed; historical Action identifiers remain policy keys for equivalent filesystem operations.
 
 The predecessor preference behavior below describes migration sources.
 
@@ -895,14 +895,14 @@ its configuration folder. Older builds read only unprefixed accounts and the
 app-wide index, so after a downgrade credentials appear missing until they are
 entered again.
 
-Allow Connections belongs to each Profile: `Configuration/profiles/<Profile UUID>/host.json`
+Allow Connections belongs to each Profile: `Configuration/profiles/<Profile UUID>/connections.json`
 is format 1 with `format` and `allowConnections`, defaulting off when absent. Ox
-serves remote clients only while the active Profile allows it. `profile.connectionScope`
-moves the predecessor app-wide `Configuration/host.json` into the active Profile
-(write, verify, delete); its value replaces the Profile's. The legacy
-`host.allowConnections` preference migrates into that app-wide file only when
-present. The remote Host list and selection the predecessor stored there are
-dropped; nothing read them. Older builds recreate the app-wide file off, so a
+serves remote clients only while the active Profile allows it, and a connection reaches
+only that Profile. `profile.connectionScope` adopts the predecessor app-wide
+`Configuration/host.json`, or the older `host.allowConnections` preference when no file
+exists, into the active Profile in one step (write, verify, then delete both sources);
+its value replaces the Profile's. The remote Host list and selection the predecessor
+stored in `host.json` are dropped; nothing read them. Older builds recreate the app-wide file off, so a
 downgrade turns connections off until re-enabled; the next upgrade carries the
 older build's value into the active Profile.
 
@@ -1001,7 +1001,7 @@ user data needed for diagnosis but never credentials or reusable secrets.
 | Discovered models and model capabilities | Caches | Purgeable local cache | System eviction or refresh |
 | Secret values | Keychain | This device only | Sign out generated entry or delete any entry |
 | Secret metadata and bindings | Configuration/profiles/<Profile UUID>/secrets.json | Device backup policy | Sign out, delete entry, or delete the Profile |
-| Allow Connections | Configuration/profiles/<Profile UUID>/host.json | Device backup policy | Turn off, or delete the Profile |
+| Allow Connections | Configuration/profiles/<Profile UUID>/connections.json | Device backup policy | Turn off, or delete the Profile |
 | Managed provider OAuth | Keychain | System policy | Sign out |
 | Service website state | Domain website store | Local persistent state | Sign out service family |
 | Remote MCP endpoints and transports | <Profile>/repositories/Local | Profile policy | Disconnect the MCP server |

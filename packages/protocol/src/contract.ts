@@ -1,6 +1,6 @@
 import { Type, type Static, type TSchema } from "typebox";
 
-export const RPC_VERSION = 4;
+export const RPC_VERSION = 5;
 const S = Type.String;
 const B = Type.Boolean;
 const I = Type.Integer;
@@ -22,13 +22,11 @@ export const Schemas = {
   // Experimental DEBUG Simulator commands. Native controllers own bounded domain validation.
   DurableCommandParameters: object("DurableCommandParameters", { caseID: S(), action: S() }),
   DurableCommandResult: opaque("DurableCommandResult", "Experimental cache-only Pi Durable command result."),
-  ProfileRequest: object("ProfileRequest", { profileId: S({ minLength: 36, maxLength: 36 }) }),
   UpdateProfileRequest: object("UpdateProfileRequest", {
-    profileId: S({ minLength: 36, maxLength: 36 }), name: nullable(S({ minLength: 1, maxLength: 100 })),
+    name: nullable(S({ minLength: 1, maxLength: 100 })),
     memory: nullable(S({ maxLength: 524288 })), soul: nullable(S({ maxLength: 204800 })),
   }),
-  FolderProfileRequest: object("FolderProfileRequest", { profileId: nullable(S({ minLength: 36, maxLength: 36 })) }),
-  FolderGrantRequest: object("FolderGrantRequest", { grantId: S({ minLength: 1, maxLength: 100 }), profileId: nullable(S({ minLength: 36, maxLength: 36 })) }),
+  FolderGrantRequest: object("FolderGrantRequest", { grantId: S({ minLength: 1, maxLength: 100 }) }),
   DownloadFileRequest: object("DownloadFileRequest", {
     conversationId: nullable(S()), path: optional(S({ minLength: 1, maxLength: 4096 })),
     attachmentId: optional(S({ minLength: 1, maxLength: 240 })),
@@ -166,10 +164,10 @@ type SchemaName = keyof typeof Schemas;
 const method = (swiftCase: string, params: SchemaName, result: SchemaName) => ({ swiftCase, params, result });
 export const Methods = {
   "profile.describe": method("describe", "EmptyRequest", "ProfileDescription"),
-  "profiles.inspect": method("inspectProfile", "ProfileRequest", "ProfileResult"),
-  "profiles.update": method("updateProfile", "UpdateProfileRequest", "ProfileResult"),
-  "files.list": method("listFolderGrants", "FolderProfileRequest", "ListFolderGrantsResult"),
-  "files.mount": method("mountFolder", "FolderProfileRequest", "FolderGrantResult"),
+  "profile.inspect": method("inspectProfile", "EmptyRequest", "ProfileResult"),
+  "profile.update": method("updateProfile", "UpdateProfileRequest", "ProfileResult"),
+  "files.list": method("listFolderGrants", "EmptyRequest", "ListFolderGrantsResult"),
+  "files.mount": method("mountFolder", "EmptyRequest", "FolderGrantResult"),
   "files.assign": method("assignFolder", "FolderGrantRequest", "EmptyResult"),
   "files.unmount": method("unmountFolder", "FolderGrantRequest", "EmptyResult"),
   "files.download": method("downloadFile", "DownloadFileRequest", "DownloadFileResult"),

@@ -1,12 +1,12 @@
 import Foundation
 
 extension ProfileProtocol {
-    static let contractVersion = 4
+    static let contractVersion = 5
 
     enum Method: String, CaseIterable {
         case describe = "profile.describe"
-        case inspectProfile = "profiles.inspect"
-        case updateProfile = "profiles.update"
+        case inspectProfile = "profile.inspect"
+        case updateProfile = "profile.update"
         case listFolderGrants = "files.list"
         case mountFolder = "files.mount"
         case assignFolder = "files.assign"
@@ -59,24 +59,14 @@ extension ProfileProtocol {
 
     struct EmptyRequest: Decodable {}
 
-    struct ProfileRequest: Decodable {
-        let profileId: String
-    }
-
     struct UpdateProfileRequest: Decodable {
-        let profileId: String
         let name: String?
         let memory: String?
         let soul: String?
     }
 
-    struct FolderProfileRequest: Decodable {
-        let profileId: String?
-    }
-
     struct FolderGrantRequest: Decodable {
         let grantId: String
-        let profileId: String?
     }
 
     struct DownloadFileRequest: Decodable {

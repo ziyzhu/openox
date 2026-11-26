@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "urn:openox:host-rpc:4",
+  "$id": "urn:openox:profile-rpc:5",
   "title": "OpenOx Profile JSON-RPC messages",
   "anyOf": [
     {
@@ -44,31 +44,9 @@
       "additionalProperties": true,
       "description": "Experimental cache-only Pi Durable command result."
     },
-    "ProfileRequest": {
-      "type": "object",
-      "required": [
-        "profileId"
-      ],
-      "properties": {
-        "profileId": {
-          "type": "string",
-          "minLength": 36,
-          "maxLength": 36
-        }
-      },
-      "additionalProperties": true
-    },
     "UpdateProfileRequest": {
       "type": "object",
-      "required": [
-        "profileId"
-      ],
       "properties": {
-        "profileId": {
-          "type": "string",
-          "minLength": 36,
-          "maxLength": 36
-        },
         "name": {
           "anyOf": [
             {
@@ -106,24 +84,6 @@
       },
       "additionalProperties": true
     },
-    "FolderProfileRequest": {
-      "type": "object",
-      "properties": {
-        "profileId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "minLength": 36,
-              "maxLength": 36
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "additionalProperties": true
-    },
     "FolderGrantRequest": {
       "type": "object",
       "required": [
@@ -134,18 +94,6 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 100
-        },
-        "profileId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "minLength": 36,
-              "maxLength": 36
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       },
       "additionalProperties": true

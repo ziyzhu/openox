@@ -40,7 +40,7 @@ export function artifacts(): Record<string, string> {
   const definitions = { ...Schemas, Request: RequestSchema, Response: ResponseSchema, Error: ErrorSchema,
     RequestBatch: RequestBatchSchema, ResponseBatch: ResponseBatchSchema };
   const schema = {
-    $schema: "http://json-schema.org/draft-07/schema#", $id: `urn:openox:host-rpc:${RPC_VERSION}`,
+    $schema: "http://json-schema.org/draft-07/schema#", $id: `urn:openox:profile-rpc:${RPC_VERSION}`,
     title: "OpenOx Profile JSON-RPC messages",
     anyOf: ["Request", "Response", "RequestBatch", "ResponseBatch"].map(name => ({ $ref: `#/definitions/${name}` })),
     definitions: portable(definitions),

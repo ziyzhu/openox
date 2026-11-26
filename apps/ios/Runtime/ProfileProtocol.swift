@@ -34,10 +34,10 @@ enum ProfileProtocol {
         let conversations = runtime.conversations
         let services = runtime.services
         switch method {
-        case .inspectProfile: handleInspectProfile(try decode(ProfileRequest.self), runtime: runtime, reply: reply)
+        case .inspectProfile: handleInspectProfile(try decode(EmptyRequest.self), runtime: runtime, reply: reply)
         case .updateProfile: handleUpdateProfile(try decode(UpdateProfileRequest.self), runtime: runtime, reply: reply)
-        case .listFolderGrants: handleListFolderGrants(try decode(FolderProfileRequest.self), runtime: runtime, reply: reply)
-        case .mountFolder: handleMountFolder(try decode(FolderProfileRequest.self), runtime: runtime, reply: reply)
+        case .listFolderGrants: handleListFolderGrants(try decode(EmptyRequest.self), runtime: runtime, reply: reply)
+        case .mountFolder: handleMountFolder(try decode(EmptyRequest.self), runtime: runtime, reply: reply)
         case .assignFolder: handleAssignFolder(try decode(FolderGrantRequest.self), runtime: runtime, reply: reply)
         case .unmountFolder: handleUnmountFolder(try decode(FolderGrantRequest.self), runtime: runtime, reply: reply)
         case .downloadFile:
