@@ -133,8 +133,6 @@ export const AgentProfileRequests = {
   "tools.call": method("AgentToolCallRequest", "AgentToolCallResult"),
 } as const;
 
-export const AgentHostRequests = AgentProfileRequests;
-
 export const AgentRequiredMethods = [
   "agent.describe", "conversations.list", "conversations.new", "conversations.open", "conversations.send",
   "conversations.stop", "conversations.respond",

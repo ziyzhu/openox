@@ -8,9 +8,9 @@ const snapshot = {
   messages: [{ role: "assistant", content: [{ type: "text", text }] }], blocks: [], isBusy: false,
 };
 const results: Record<string, unknown> = {
-  "host.describe": {
+  "profile.describe": {
     implementation: { name: "Ox fixture", version: "1", build: "1" }, protocols: { rpc: [RPC_VERSION], repository: [3] },
-    methods: ["host.describe", "conversations.list", "conversations.new", "conversations.send", "conversations.get"],
+    methods: ["profile.describe", "conversations.list", "conversations.new", "conversations.send", "conversations.get"],
   },
   "conversations.list": { conversations: [{ id: conversationId, title: "Standalone smoke test", model: null,
     createdAt: "2026-09-22T00:00:00Z", lastActivity: null, active: false }] },

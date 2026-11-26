@@ -120,7 +120,7 @@ Conversation ──► AgentConnection
 
 ## Boundaries and roadmap
 
-Client → Profile (on a device) → Agent. Host is no longer a concept: what it owned folds into the Profile, and what is left is the Ox app's runtime on a device (`ProfileRuntime`, `apps/*/Runtime`) and the address a Client uses to reach the open Profile (`ox --profile <ws-url>`, `OX_PROFILE_ENDPOINT`, `profile.describe`). A connection reaches only the active Profile, and only while its Allow Connections is on. `host.describe`, `ox --host`, `ox host` and `OX_HOST_*` remain as hidden aliases for older Clients and scripts. The sections above keep their original Host wording as design history.
+Client → Profile (on a device) → Agent. Host is no longer a concept: what it owned folds into the Profile, and what is left is the Ox app's runtime on a device (`ProfileRuntime`, `apps/*/Runtime`) and the address a Client uses to reach the open Profile (`ox --profile <ws-url>`, `OX_PROFILE_ENDPOINT`, `profile.describe`). A connection reaches only the active Profile, and only while its Allow Connections is on. The sections above keep their original Host wording as design history.
 
 ```diff
   Role     owns

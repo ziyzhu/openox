@@ -15,13 +15,13 @@ async function command(args: string[]) {
 
 test("CLI help and service argument validation do not connect to a Profile", async () => {
   for (const args of [["vm", "inspect"], ["vm", "functions"], ["vm", "help"],
-    ["conversation", "open"], ["conversation", "respond"], ["profile", "discover"], ["profile", "describe"], ["host", "list"], ["service", "refresh-auth"],
+    ["conversation", "open"], ["conversation", "respond"], ["profile", "discover"], ["profile", "describe"], ["service", "refresh-auth"],
     ["service", "list"], ["service", "mcp"], ["files", "mount"], ["files", "list"],
     ["repository", "connect"], ["repository", "list"], ["repository", "disconnect"]]) {
     const result = await command([...args, "--help"]);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("Usage:");
-    if (args[1] === "discover" || args[0] === "host") expect(result.stdout).toContain("Usage: ox profile discover");
+    if (args[1] === "discover") expect(result.stdout).toContain("Usage: ox profile discover");
   }
   for (const args of [["service", "list", "--typo"], ["service", "reload", "example.com", "extra"],
     ["service", "invoke", "example.com:read", "--args", "{}", "--args-file", "-"],

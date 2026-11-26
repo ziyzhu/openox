@@ -166,7 +166,6 @@ type SchemaName = keyof typeof Schemas;
 const method = (swiftCase: string, params: SchemaName, result: SchemaName) => ({ swiftCase, params, result });
 export const Methods = {
   "profile.describe": method("describe", "EmptyRequest", "ProfileDescription"),
-  "host.describe": method("legacyDescribe", "EmptyRequest", "ProfileDescription"),
   "profiles.inspect": method("inspectProfile", "ProfileRequest", "ProfileResult"),
   "profiles.update": method("updateProfile", "UpdateProfileRequest", "ProfileResult"),
   "files.list": method("listFolderGrants", "FolderProfileRequest", "ListFolderGrantsResult"),
@@ -235,7 +234,5 @@ export const ResponseBatchSchema = A(ResponseSchema, { $id: "ResponseBatch", min
 export type MethodName = keyof typeof Methods;
 export type ProfileDescription = Static<typeof Schemas.ProfileDescription>;
 export type ConversationRow = Static<typeof Schemas.ConversationRow>;
-export type HostDescription = ProfileDescription;
-export type HostConversationRow = ConversationRow;
 export type SendConversationResult = Static<typeof Schemas.SendConversationResult>;
 export type ConversationOutcome = SendConversationResult["outcome"];

@@ -5,7 +5,6 @@ extension ProfileProtocol {
 
     enum Method: String, CaseIterable {
         case describe = "profile.describe"
-        case legacyDescribe = "host.describe"
         case inspectProfile = "profiles.inspect"
         case updateProfile = "profiles.update"
         case listFolderGrants = "files.list"

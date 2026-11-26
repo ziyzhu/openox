@@ -57,7 +57,7 @@ case "$workflow" in
     steps=(environment install lint build test drift standalone build:ios build:macos) ;;
 esac
 
-unset OX_PROFILE_ENDPOINT OX_HOST_ENDPOINT OX_DEBUG_ENDPOINT OX_SERVER_ROOT OX_QA_DEVICE
+unset OX_PROFILE_ENDPOINT OX_DEBUG_ENDPOINT OX_SERVER_ROOT OX_QA_DEVICE
 echo "CI workflow=$workflow environment=$environment steps=${steps[*]}"
 trap '
   code=$?

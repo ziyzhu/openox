@@ -38,7 +38,6 @@ export type CommandGroup = {
   fn: (args: string[], context: CliContext) => Promise<void> | void;
   desc: string;
   subs?: Record<string, { desc: string }>;
-  hidden?: boolean;
 };
 
 function printUsage(program: string, description: string, groups: Record<string, CommandGroup>): void {
@@ -46,7 +45,7 @@ function printUsage(program: string, description: string, groups: Record<string,
   console.log(`${description}\n`);
   console.log(`Usage: ${program} [--profile <ws-url-or-path>] [--conversation <conversation-id>] [--repository <path-or-url>] <command> [...flags] [...args]\n`);
   console.log("Commands:");
-  const rows = Object.entries(groups).filter(([, group]) => !group.hidden).flatMap(([name, group]) => {
+  const rows = Object.entries(groups).flatMap(([name, group]) => {
     const subs = Object.entries(group.subs ?? {});
     return subs.length
       ? subs.map(([sub, command]) => ({ command: `${name} ${sub}`, description: command.desc }))
@@ -74,7 +73,6 @@ function printUsage(program: string, description: string, groups: Record<string,
 
 export function parseGlobalOptions(args: string[]): { context: CliContext; rest: string[] } {
   const options = new Map<string, { key: keyof CliContext; requirement: string }>([
-    ["--host", { key: "endpoint", requirement: "a WebSocket URL" }],
     ["--profile", { key: "profile", requirement: "a WebSocket URL or a Profile path" }],
     ["--conversation", { key: "conversation", requirement: "a conversation id" }],
     ["--repository", { key: "repository", requirement: "a path or URL" }],
@@ -104,9 +102,7 @@ export function parseGlobalOptions(args: string[]): { context: CliContext; rest:
       throw new Error(`${flag} requires ${option.requirement}`);
     }
     const key = option.key === "profile" && /^wss?:\/\//i.test(value) ? "endpoint" : option.key;
-    if (seen.has(key)) throw new Error(`${flag} conflicts with another Profile address`);
     seen.add(option.key);
-    seen.add(key);
     context[key] = value;
   }
   return { context, rest };
@@ -184,7 +180,7 @@ function validateContext(command: string, subcommand: string | undefined, contex
   if (context.repository && command !== "repository") throw new Error("--repository applies only to ox repository");
   const profileRepositoryAction = command === "repository" && ["list", "connect", "disconnect"].includes(subcommand ?? "");
   if (context.repository && profileRepositoryAction) throw new Error(`--repository does not apply to ox repository ${subcommand}; use --profile <ws-url>`);
-  const usesEndpoint = ["host", "conversation", "vm", "profile", "files", "service"].includes(command) || profileRepositoryAction;
+  const usesEndpoint = ["conversation", "vm", "profile", "files", "service"].includes(command) || profileRepositoryAction;
   if (context.endpoint && !usesEndpoint) throw new Error("--profile <ws-url> applies only to ox profile, ox files, ox service, ox conversation, ox vm, and ox repository list|connect|disconnect");
 }
 

@@ -9,14 +9,6 @@
         "$ref": "./schema.json#/definitions/ProfileDescription"
       }
     },
-    "host.describe": {
-      "params": {
-        "$ref": "./schema.json#/definitions/EmptyRequest"
-      },
-      "result": {
-        "$ref": "./schema.json#/definitions/ProfileDescription"
-      }
-    },
     "profiles.inspect": {
       "params": {
         "$ref": "./schema.json#/definitions/ProfileRequest"

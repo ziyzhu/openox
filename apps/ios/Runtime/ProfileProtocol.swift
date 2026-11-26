@@ -48,7 +48,7 @@ enum ProfileProtocol {
         case .disconnectRepositoryFolder: handleDisconnectRepositoryFolder(try decode(RepositoryIDRequest.self), runtime: runtime, reply: reply)
         case .durableStorage, .durableConversation:
             try handleDurableExperiment(method, params: params, conversations: conversations, reply: reply)
-        case .describe, .legacyDescribe:
+        case .describe:
             _ = try decode(EmptyRequest.self)
             reply.success(ProfileRPC.description)
         case .invokeAction: handleInvokeAction(try decode(ActionRequest.self), conversationManager: conversations, serviceManager: services, reply: reply)

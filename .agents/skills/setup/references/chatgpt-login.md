@@ -6,7 +6,7 @@ iOS 26 simulators with Xcode 26.2, including a different destination bundle ID. 
 does not establish physical-device or cross-runtime portability.
 
 - Reserve both numbered simulators and preserve their boot state. Use explicit
-  `--host <endpoint>` selectors for all Ox commands. Before copying, read
+  `--profile <ws-url>` selectors for all Ox commands. Before copying, read
   `ox vm help ox.provider.list`, then call `ox.provider.list` with a short purpose
   through `ox vm call`. Confirm the source ChatGPT status is `authenticated`;
   provider/model listings alone do not prove login.

@@ -118,7 +118,7 @@ extension Conversation {
                 "app": info ?? .null, "profiles": profiles ?? .null,
                 "notifications": notifications ?? .null, "language": language ?? .null,
                 "defaultModel": model ?? .null, "repositories": repositories ?? .null,
-                "connections": connections, "host": connections,
+                "connections": connections,
             ]))
         case "app/logs.jsonl":
             try await requireApproval(action: Actions.appLogs, purpose: "Read Profile diagnostic logs")

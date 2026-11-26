@@ -1,9 +1,7 @@
 import { RPC_VERSION, validateParams, validateResult, type ProfileDescription, type ConversationRow } from "@openox/protocol";
-import { ProfileConnection, ProfileRPCError, isObject } from "./profile-connection.ts";
+import { ProfileConnection, isObject } from "./profile-connection.ts";
 
 export type { ProfileDescription, ConversationRow } from "@openox/protocol";
-
-const DESCRIBE_METHODS = new Set(["profile.describe", "host.describe"]);
 
 export class ProfileRPCClient {
   private readonly connection: ProfileConnection;
@@ -16,7 +14,7 @@ export class ProfileRPCClient {
   async call(method: string, timeoutMs: number, params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
     if (!validateParams(method, params)) throw new Error(`Invalid ${method} parameters; request not sent`);
     const deadline = Date.now() + timeoutMs;
-    if (!DESCRIBE_METHODS.has(method)) await this.checkVersion(timeoutMs);
+    if (method !== "profile.describe") await this.checkVersion(timeoutMs);
     const remaining = deadline - Date.now();
     if (remaining <= 0) throw new Error(`Timeout before ${method}; request not sent`);
     const result = await this.connection.request(method, params, remaining);
@@ -41,12 +39,7 @@ export class ProfileRPCClient {
   }
 
   async describe(timeoutMs: number): Promise<ProfileDescription> {
-    try {
-      return await this.call("profile.describe", timeoutMs) as ProfileDescription;
-    } catch (error) {
-      if (!(error instanceof ProfileRPCError) || error.code !== -32601) throw error;
-      return await this.call("host.describe", timeoutMs) as ProfileDescription;
-    }
+    return await this.call("profile.describe", timeoutMs) as ProfileDescription;
   }
 
   async listConversations(timeoutMs: number): Promise<ConversationRow[]> {

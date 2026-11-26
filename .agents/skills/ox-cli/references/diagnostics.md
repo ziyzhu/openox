@@ -15,7 +15,7 @@ ox --profile "$ENDPOINT" profile logs --cursor '<nextCursor>' --limit 100 --json
 
 1. Confirm Ox is running and Allow Connections is on.
 2. Run `ox vm inspect` or `ox service list` as the smallest probe.
-3. Check `--host`, `OX_PROFILE_ENDPOINT`, then the compatibility
+3. Check `--profile`, `OX_PROFILE_ENDPOINT`, then the compatibility
    `OX_DEBUG_ENDPOINT`.
 4. Run `ox profile logs --level warning` before widening to device logs.
 

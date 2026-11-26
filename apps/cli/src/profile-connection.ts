@@ -3,7 +3,7 @@ import { validateResponse } from "@openox/protocol";
 export const DEFAULT_PORT = 9876;
 const DEFAULT_ENDPOINT = `ws://127.0.0.1:${DEFAULT_PORT}`;
 
-export const ENVIRONMENT_ENDPOINT = process.env.OX_PROFILE_ENDPOINT ?? process.env.OX_HOST_ENDPOINT;
+export const ENVIRONMENT_ENDPOINT = process.env.OX_PROFILE_ENDPOINT;
 
 export function profileEndpoint(value = ENVIRONMENT_ENDPOINT ?? process.env.OX_DEBUG_ENDPOINT ?? DEFAULT_ENDPOINT): string {
   const url = new URL(value);

@@ -5,7 +5,7 @@ import Network
 final class ProfileServer {
     nonisolated static let configuredPort: NWEndpoint.Port? = {
         let environment = ProcessInfo.processInfo.environment
-        guard let raw = environment["OX_PROFILE_ENDPOINT"] ?? environment["OX_HOST_ENDPOINT"] ?? environment["OX_DEBUG_ENDPOINT"],
+        guard let raw = environment["OX_PROFILE_ENDPOINT"] ?? environment["OX_DEBUG_ENDPOINT"],
               let url = URL(string: raw), url.scheme == "ws",
               let value = url.port.flatMap(UInt16.init(exactly:)), value > 0 else { return nil }
         return NWEndpoint.Port(rawValue: value)

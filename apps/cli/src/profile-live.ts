@@ -13,8 +13,6 @@ export const LIVE_PROFILE_COMMANDS: Record<string, SubCommand> = {
   agents: { desc: "List, add or remove the Profile's remote agents (ox agent serve endpoints)", fn: agents },
 };
 
-export const LEGACY_HOST_COMMANDS: Record<string, SubCommand> = { ...LIVE_PROFILE_COMMANDS, list: LIVE_PROFILE_COMMANDS.discover! };
-
 async function describe(args: string[], context: CliContext): Promise<void> {
   let json = false;
   let timeoutMs = 30000;
