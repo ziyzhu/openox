@@ -10,6 +10,7 @@ nonisolated struct AppState: Codable, Equatable, Sendable {
     var region: String?
     var whatsNewSeenVersion: String?
     var websiteDataProfileID: UUID?
+    var profileConfiguration: Bool?
 
     func validate() throws {
         guard format == 1, (0...3).contains(memoryIntentDisplays),

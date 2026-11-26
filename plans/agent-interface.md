@@ -120,15 +120,18 @@ Conversation ──► AgentConnection
 
 ## Boundaries and roadmap
 
-Client shows, Host decides, Agent executes. Each machine owns what is tied to it; the Profile chooses what to use. Later the Host splits into the Profile (what the user owns) and an Environment (the device it runs on), and "Host" is renamed to Environment.
+Client → Profile (on a device) → Agent. Host is no longer a concept: what it owned folds into the Profile, and what is left is the Ox app's runtime on a device and the address a Client uses to reach it. Code keeps its Host names where they are plumbing; the `host.*` methods, `ox --host` and `OX_HOST_ENDPOINT` stay as "the address of an Ox app".
 
 ```diff
-  Role         owns
-  Client       UI state only; talks to the Host
-  Profile      memory, skills, conversations, files, policy, which agents and providers to use
-  Environment  secrets, folder grants, website logins, VM, ingress, push (today: the Host)
-  Agent        the loop and its machine's limits: authorized folders, tools, macOS permissions
+  Role     owns
+  Client   UI state only; any Ox UI or the ox CLI
+  Profile  memory, skills, conversations, files, policy, services, providers, remote agents;
+           device-bound values (secrets, website logins, folder grants) scoped to it but stored on the device
+  device   the app's runtime for the active Profile (VM, web views), ingress, push, "allow connections"
+  Agent    the loop and its machine's folders and macOS permissions
 ```
+
+A device serves one active Profile at a time, so a remote Client opens that Profile or asks before switching it. A Profile synced to several devices has one writer at a time.
 
 Agent machine limits:
 
@@ -166,8 +169,8 @@ Order:
 2. Dropped for now: agent-side tool permissions.
 3. Done: per-Profile secrets (prefixed Keychain accounts) and website logins (store per Profile), migrated to the Profile selected at upgrade.
 4. Website data export and import with `fetchData`/`restoreData`, after a device check of what restores.
-5. Move policy, services, providers and remote agents into the Profile (storage migration).
-6. Rename Host to Environment in code, protocol and copy (`ox --env`, "Profile on iPhone").
+5. Done: policy, services, providers and remote agents live in `<Profile>/.ox/`, migrated to the Profile selected at upgrade.
+6. Drop Host from the UI and docs: "Remote Hosts" become Profiles on other devices ("Work · MacBook"), Settings splits into Profile settings and a small "This device" section; README, onboarding and the website describe Profiles and agents. No code or protocol rename.
 
 ## Notifications
 

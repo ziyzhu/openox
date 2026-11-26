@@ -73,6 +73,12 @@ nonisolated enum StorageMigrator {
     @MainActor
     private static func migrateProfile(_ scope: ProfileScope, services: ServiceManager) async {
         if let profileID = scope.profileID { attempt("profile.credentialScope") { try CredentialMigrator.adoptIntoProfile(profileID) } }
+        if scope.profileID != nil {
+            attempt("profile.configuration") {
+                try CredentialMigrator.adoptConfigurationIntoProfile(scope)
+                try AppStateStore.shared.update { $0.profileConfiguration = true }
+            }
+        }
         attempt("profile.providerKeys") { try CredentialMigrator.migrateSecretProviderKeys() }
         attempt("profile.legacyProviderKeys") { try CredentialMigrator.removeVerifiedLegacyProviderKeys() }
         do { try await Task.detached(priority: .userInitiated) { try RepositoryMigrator.migrateIntoProfile(scope) }.value }

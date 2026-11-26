@@ -106,6 +106,7 @@ nonisolated extension ApplicationStorageMigrator {
     }
 
     private static func migrateServicePreferences(defaults: UserDefaults) throws {
+        guard !CredentialMigrator.configurationInProfiles else { return }
         let exists = FileManager.default.fileExists(atPath: AppStoragePaths.servicePreferences.path)
         let current = exists ? try ServicePreferences.load() : ServicePreferences()
         var next = current

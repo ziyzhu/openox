@@ -16,13 +16,19 @@ nonisolated enum AppStoragePaths {
     static let developmentRepositorySnapshot = applicationSupport.appendingPathComponent("service-repositories/development", isDirectory: true)
     static let configuration = applicationSupport.appendingPathComponent("Configuration", isDirectory: true)
     static let settings = configuration.appendingPathComponent("settings.json", isDirectory: false)
-    static let actionPolicies = configuration.appendingPathComponent("policy.json", isDirectory: false)
-    static let servicePreferences = configuration.appendingPathComponent("services.json", isDirectory: false)
+    static var actionPolicies: URL { profileState("policy.json") }
+    static var servicePreferences: URL { profileState("services.json") }
     static let hostConfiguration = configuration.appendingPathComponent("host.json", isDirectory: false)
-    static let remoteAgentConfiguration = configuration.appendingPathComponent("remote-agents.json", isDirectory: false)
+    static var remoteAgentConfiguration: URL { profileState("remote-agents.json") }
+    static let profileStateFiles = ["policy.json", "services.json", "providers.json", "remote-agents.json"]
     static let legacySecretIndex = configuration.appendingPathComponent("secrets.json", isDirectory: false)
     static var secretIndex: URL {
         StorageRoot.currentScope?.profileID.map { profileConfiguration($0).appendingPathComponent("secrets.json", isDirectory: false) } ?? legacySecretIndex
+    }
+
+    static func profileState(_ name: String) -> URL {
+        guard let scope = StorageRoot.currentScope, scope.profileID != nil else { return configuration.appendingPathComponent(name, isDirectory: false) }
+        return scope.stateRoot.appendingPathComponent(name, isDirectory: false)
     }
 
     static func profileConfiguration(_ profileID: UUID) -> URL {
@@ -35,7 +41,7 @@ nonisolated enum AppStoragePaths {
     static let deviceFolderGrants = configuration.appendingPathComponent("device-folder-grants.json", isDirectory: false)
     static let legacySchedules = applicationSupport.appendingPathComponent("scheduled-skills.json", isDirectory: false)
     static let serviceSearchVectors = caches.appendingPathComponent("ServiceSearchVectors.plist", isDirectory: false)
-    static let providersConfiguration = configuration.appendingPathComponent("providers.json", isDirectory: false)
+    static var providersConfiguration: URL { profileState("providers.json") }
     static let discoveredModels = caches.appendingPathComponent("DiscoveredModels.json", isDirectory: false)
     static let providerModelCatalog = caches.appendingPathComponent("ProviderModelCatalog.json", isDirectory: false)
 

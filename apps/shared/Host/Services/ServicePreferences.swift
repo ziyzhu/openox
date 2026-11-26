@@ -11,7 +11,9 @@ nonisolated struct ServicePreferences: Codable, Equatable, Sendable {
     }
 
     static func load() throws -> Self {
-        let value = try JSONDecoder().decode(Self.self, from: Data(contentsOf: AppStoragePaths.servicePreferences))
+        let url = AppStoragePaths.servicePreferences
+        guard FileManager.default.fileExists(atPath: url.path) else { return Self() }
+        let value = try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
         try value.validate()
         return value
     }
@@ -20,7 +22,8 @@ nonisolated struct ServicePreferences: Codable, Equatable, Sendable {
         try validate()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try FileManager.default.createDirectory(at: AppStoragePaths.configuration, withIntermediateDirectories: true)
-        try encoder.encode(self).write(to: AppStoragePaths.servicePreferences, options: .atomic)
+        let url = AppStoragePaths.servicePreferences
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try encoder.encode(self).write(to: url, options: .atomic)
     }
 }

@@ -111,7 +111,7 @@ nonisolated enum ProfilePackage {
                     enumerator.skipDescendants()
                     continue
                 }
-                if prefix == "state", !["state.sqlite", "service-repositories.json", "logs.jsonl", "payloads"].contains(relative), !relative.hasPrefix("payloads/") {
+                if prefix == "state", !(["state.sqlite", "service-repositories.json", "logs.jsonl", "payloads"] + AppStoragePaths.profileStateFiles).contains(relative), !relative.hasPrefix("payloads/") {
                     enumerator.skipDescendants()
                     continue
                 }
@@ -215,6 +215,7 @@ nonisolated enum ProfilePackage {
               parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else { return false }
         if parts.first == "content" { return true }
         return path == "state" || path == "state/state.sqlite" || path == "state/service-repositories.json" || path == "state/logs.jsonl" || path == "state/payloads" || path.hasPrefix("state/payloads/")
+            || AppStoragePaths.profileStateFiles.contains { path == "state/\($0)" }
     }
 
     private static func destination(_ path: String, content: URL, state: URL) -> URL {

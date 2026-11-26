@@ -95,7 +95,7 @@ final class ServiceManager {
         var id: String { rawValue }
     }
 
-    private var preferences: ServicePreferences
+    var preferences: ServicePreferences
     var serviceNames: [String: String] { preferences.names }
 
     func renameService(_ service: Service, to name: String) {
@@ -113,7 +113,7 @@ final class ServiceManager {
         preferences = next
     }
 
-    private(set) var actionPolicies: ActionPolicyConfiguration
+    var actionPolicies: ActionPolicyConfiguration
 
     @ObservationIgnored private var attachedServiceDomainsByConversation: [UUID: Set<String>] = [:]
     @ObservationIgnored var webConversations: [UUID: WebConversation] = [:]
@@ -195,7 +195,7 @@ final class ServiceManager {
         }
     }
 
-    private static func loadActionPolicies() -> ActionPolicyConfiguration {
+    static func loadActionPolicies() -> ActionPolicyConfiguration {
         do {
             return try ActionPolicyConfiguration.load()
         } catch {

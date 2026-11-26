@@ -36,7 +36,9 @@ nonisolated struct ActionPolicyConfiguration: Codable, Equatable, Sendable {
     }
 
     static func load() throws -> Self {
-        let value = try JSONDecoder().decode(Self.self, from: Data(contentsOf: AppStoragePaths.actionPolicies))
+        let url = AppStoragePaths.actionPolicies
+        guard FileManager.default.fileExists(atPath: url.path) else { return Self() }
+        let value = try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
         try value.validate()
         return value
     }
@@ -45,8 +47,9 @@ nonisolated struct ActionPolicyConfiguration: Codable, Equatable, Sendable {
         try validate()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try FileManager.default.createDirectory(at: AppStoragePaths.configuration, withIntermediateDirectories: true)
-        try encoder.encode(self).write(to: AppStoragePaths.actionPolicies, options: .atomic)
+        let url = AppStoragePaths.actionPolicies
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try encoder.encode(self).write(to: url, options: .atomic)
     }
 
     func policy(for action: String, default actionDefault: ActionPolicy) -> ActionPolicy {

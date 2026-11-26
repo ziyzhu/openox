@@ -75,8 +75,15 @@ final class HostRuntime: OxHost {
         profileSummaryLoad?.cancel()
     }
 
+    private static func reloadProfileConfiguration(services: ServiceManager) {
+        services.reloadProfileConfiguration()
+        ProviderRegistry.shared.reloadCatalog()
+        RemoteAgentDirectory.shared.reloadConfiguration()
+    }
+
     private func refreshProfile() async throws {
         let startedAt = Date()
+        Self.reloadProfileConfiguration(services: services)
         conversations.reset()
         UserMemory.shared.reload()
         await services.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region), reuseApplicationRepositories: true)
@@ -142,6 +149,7 @@ final class HostRuntime: OxHost {
         let storage = Task { @MainActor in
             do {
                 try await StorageMigrator.prepare(storage: .shared, services: services)
+                Self.reloadProfileConfiguration(services: services)
                 #if DEBUG && targetEnvironment(simulator)
                 try await DeviceTemplate.applyStorage(services: services)
                 #endif

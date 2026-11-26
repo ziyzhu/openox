@@ -52,8 +52,9 @@ nonisolated struct RemoteAgentConfiguration: Codable, Equatable, Sendable {
     func save() throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try FileManager.default.createDirectory(at: AppStoragePaths.configuration, withIntermediateDirectories: true)
-        try encoder.encode(self).write(to: AppStoragePaths.remoteAgentConfiguration, options: .atomic)
+        let url = AppStoragePaths.remoteAgentConfiguration
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try encoder.encode(self).write(to: url, options: .atomic)
     }
 }
 
@@ -141,6 +142,16 @@ final class RemoteAgentDirectory {
 
     func replace(_ next: RemoteAgentConfiguration) throws {
         try next.save()
+        adopt(next, reason: "replace")
+    }
+
+    func reloadConfiguration() {
+        let next = RemoteAgentConfiguration.load()
+        guard next != configuration else { return }
+        adopt(next, reason: "profile")
+    }
+
+    private func adopt(_ next: RemoteAgentConfiguration, reason: String) {
         let kept = Set(next.agents.map(\.endpoint))
         for endpoint in configuration.agents.map(\.endpoint) where !kept.contains(endpoint) {
             unregisterPush(endpoint)
@@ -149,7 +160,7 @@ final class RemoteAgentDirectory {
             clients[endpoint] = nil
         }
         configuration = next
-        Log.agent.info("RemoteAgentDirectory.replace count=\(next.agents.count) default=\(next.defaultEndpoint?.absoluteString ?? "local")")
+        Log.agent.info("RemoteAgentDirectory.\(reason) count=\(next.agents.count) default=\(next.defaultEndpoint?.absoluteString ?? "local")")
         Task { await refreshAll() }
     }
 

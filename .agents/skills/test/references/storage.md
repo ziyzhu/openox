@@ -14,17 +14,14 @@ types remain authoritative in their `Codable` implementations.
 │   ├── Application Support/
 │   │   ├── Configuration/
 │   │   │   ├── settings.json               format-1 app language selection
-│   │   │   ├── policy.json                 format-2 global/source/action approval overrides
-│   │   │   ├── services.json               format-1 service display names
 │   │   │   ├── host.json                   format-1 Host connection permission; defaults off
 │   │   │   ├── profiles/<Profile UUID>/secrets.json  version-1 Secret metadata/bindings of that Profile; no secret values
-│   │   │   ├── providers.json              format-2 provider overrides and optional defaultModel
 │   │   │   ├── mounted-repositories.json   version-1 bindings to Files grants
 │   │   │   ├── external-profiles.json      selected Profile bookmarks/display names
 │   │   │   └── device-folder-grants.json    Profile-bound native bookmarks
 │   │   ├── state.json                      format-1 onboarding, starter count, active Profile,
 │   │   │                                   cached region, ChatGPT agent Host identity,
-│   │   │                                   optional last seen What's New version
+│   │   │                                   optional What's New version and Profile configuration migration flag
 │   │   ├── service-repositories/development/ simulator development HEAD snapshot
 │   │   ├── RepositoryStaging/<Profile UUID>/ private repository downloads, recoverable snapshot backups, and mutation staging
 │   │   ├── RepositoryMigrationBackups/     retained predecessor repository-skill migration sources
@@ -55,6 +52,10 @@ types remain authoritative in their `Codable` implementations.
 │       ├── profile.json                 identity and portable storage milestone
 │       ├── .ox/state.sqlite             conversations, settings, indexes; DELETE journal
 │       ├── .ox/service-repositories.json    repository enablement, origins, conflict resolutions
+│       ├── .ox/policy.json                   format-2 global/source/action approval overrides within this Profile
+│       ├── .ox/services.json                 format-1 service display names
+│       ├── .ox/providers.json                format-2 provider overrides and optional defaultModel
+│       ├── .ox/remote-agents.json            remote agent connection configuration
 │       ├── repositories/Local/              complete editable Local repository
 │       ├── repositories/<repository name>/ installed remote snapshots; stable folder names
 │       ├── repositories/<name> Copy <uuid>/ interrupted-publication recovery copies
@@ -103,7 +104,7 @@ Service-inspector conversation content optionally stores `pageID`, a transient l
 - Host configuration file — owner: Platform/Models/HostAccess.swift; app-wide, retained across Profile switches, normal device backup eligibility, absent permission defaults off. Only trusted user controls can change it.
 - Language settings file — owners: Platform/Models/AppSettings.swift and AppLocale; persisted before publishing the observable language and nonisolated locale cache.
 - Service preferences and Action policy files — owner: Services/ServiceManager.swift; persist before publishing changes. Unavailable policy is Ask, and failed Always allow publication does not approve the pending operation.
-- Provider configuration and model caches — owner: Host/ModelProviders/ProviderRegistry.swift; configuration uses Application Support/providers.json and derived model caches use Caches; preference conversion belongs to ApplicationStorageMigrator
+- Provider configuration and model caches — owner: Host/ModelProviders/ProviderRegistry.swift; configuration uses the Profile state directory and derived model caches use Caches; preference conversion belongs to ApplicationStorageMigrator
 - Keychain credentials — owner: Host/Credentials/Credentials.swift
 - Retired read-aloud voice preference — retained in UserDefaults and ignored
 - iOS appearance — owner: Client/UI/Theme.swift; `appearance` in the app's standard UserDefaults domain stores `system`, `light`, or `dark` through SwiftUI AppStorage. Missing values follow System. App-wide across Profiles, eligible for normal device backup, retained until changed or app data is removed. OxApplicationView applies the override; SettingsSheet edits it.
@@ -308,7 +309,9 @@ MCP definitions that they cannot update.
 
 ## Shared preferences
 
-Language, Host access, service preferences, policy, provider configuration, and secret metadata are authoritative JSON files under Application Support/Configuration, with internal state in Application Support/state.json. ApplicationStorageMigrator verifies and moves the five predecessor top-level JSON catalogs, then converts app language, Host access, service display names, Action policies, onboarding, starter count, active Profile, cached region, and the actual `chatgpt.agentHostID` key. Ignored `chatgpt.installationId`, `api.url`, retired voice/theme keys, and framework preferences are not activated or swept. CredentialMigrator converts `secret.index` after legacy vault conversion and before credential consumers. Source preferences/files are removed only after publication verification; divergent coexisting representations and malformed/future files block preparation with both representations preserved. Subsequent launches do not recreate retired preference keys. Files remain device-wide, outside Profile exports, with normal backup eligibility; Keychain values and device-bound bookmark semantics are unchanged. Older writers do not understand the new locations; returning from a downgrade rejects divergent data rather than silently resetting configuration.
+Language and Host access remain app-wide JSON files under Application Support/Configuration, with internal state in Application Support/state.json. Secret metadata is device-local and scoped by Profile UUID; Keychain values and device-bound bookmarks are not exported. ApplicationStorageMigrator converts predecessor JSON catalogs and preferences, including the actual `chatgpt.agentHostID` key. Ignored `chatgpt.installationId`, `api.url`, retired voice/theme keys, and framework preferences are not activated or swept.
+
+Startup adopts the legacy global policy, service preferences, provider catalog, and remote agent configuration into the active Profile's state directory. It verifies new copies before removing their sources; an existing Profile file takes precedence over its global predecessor. The optional app-state flag suppresses the old global policy, service preference, and provider migrations after adoption. A Profile without one of these files uses defaults: no providers or default model, ask-by-default policies, no service names, no remote agents. The service manager, provider registry and remote agent directory reload them after startup preparation and on every Profile switch. Profile packages include these four files. Older builds do not read them from Profile storage; downgrade is not configuration-compatible.
 
 The agent accesses one virtual `app/` mount. settings.json, providers.json, and services.json accept bounded validated edits through their owners, requiring current revisions, normal filesystem policy, and existing semantic Action approval. Provider definitions and default-model changes must be separate writes. policy.json is read-only. status.json and exact-action views under actions/ are generated on demand, not persisted copies. Secret metadata, bookmarks, installation identity, state.json, and host.json are not mounted; status exposes only Host access. Logs are a separate redacted approval-gated JSONL view, readable/searchable only by explicitly naming app/logs.jsonl, never by directory-wide content searches. App files cannot be attached, deleted, moved, or copied; temporary conversations cannot mutate them. A preexisting physical Profile app path retains its user-file access and disables the virtual app mount for that Profile; no collision bytes are moved or hidden. The ox.app function namespace and its aliases are removed; historical Action identifiers remain policy keys for equivalent filesystem operations.
 

@@ -32,7 +32,8 @@ nonisolated enum ApplicationStorageMigrator {
             Log.app.error("StorageMigrator.appState deferred error=\(error.localizedDescription)")
             return
         }
-        if !FileManager.default.fileExists(atPath: AppStoragePaths.providersConfiguration.path) {
+        let inProfiles = CredentialMigrator.configurationInProfiles
+        if !inProfiles, !FileManager.default.fileExists(atPath: AppStoragePaths.providersConfiguration.path) {
             migrateCustomLLMProviders(defaults: .standard, key: ProviderRegistry.customProvidersKey)
             migrateDefaultModel(defaults: .standard, fallbackRegion: AppRegion.shared.region)
             do { try removeRetiredGemma() }
@@ -43,7 +44,7 @@ nonisolated enum ApplicationStorageMigrator {
         do { try migrateProviderStorage() }
         catch { Log.app.error("StorageMigrator.providerStorage failed source=preferences target=providers.json error=\(error.localizedDescription)") }
         migrateDiscoveredModels()
-        migrateActionApprovalPolicies()
+        if !inProfiles { migrateActionApprovalPolicies() }
         migrateFilesPolicies()
         migrateFolderOwnership()
         do {
@@ -58,6 +59,7 @@ nonisolated enum ApplicationStorageMigrator {
     }
 
     private static func migrateProviderStorage(defaults: UserDefaults = .standard) throws {
+        guard !CredentialMigrator.configurationInProfiles else { return }
         let exists = FileManager.default.fileExists(atPath: AppStoragePaths.providersConfiguration.path)
         let legacyCatalog = legacyPreference(ProviderRegistry.catalogKey, defaults: defaults)
         let legacySelection = legacyPreference(ProviderRegistry.defaultModelKey, defaults: defaults)
@@ -303,6 +305,7 @@ nonisolated enum ApplicationStorageMigrator {
     }
 
     private static func migratePolicyStorage(defaults: UserDefaults = .standard) throws {
+        guard !CredentialMigrator.configurationInProfiles else { return }
         let exists = FileManager.default.fileExists(atPath: AppStoragePaths.actionPolicies.path)
         let legacy = legacyPreference(ServiceManager.actionPoliciesKey, defaults: defaults)
         let source: ActionPolicyConfiguration?

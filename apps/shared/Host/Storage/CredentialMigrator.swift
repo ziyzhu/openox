@@ -73,6 +73,31 @@ nonisolated enum CredentialMigrator {
         Log.app.info("StorageMigrator.credentialScope profile=\(profileID) accounts=\(moved) entries=\(index.entries.count) conflictsKeptProfile=\(conflicts)")
     }
 
+    static func adoptConfigurationIntoProfile(_ scope: ProfileScope) throws {
+        let manager = FileManager.default
+        var moved: [String] = []
+        for name in AppStoragePaths.profileStateFiles {
+            let source = AppStoragePaths.configuration.appendingPathComponent(name, isDirectory: false)
+            guard manager.fileExists(atPath: source.path) else { continue }
+            let target = scope.stateRoot.appendingPathComponent(name, isDirectory: false)
+            let data = try Data(contentsOf: source)
+            if manager.fileExists(atPath: target.path) {
+                Log.app.info("StorageMigrator.profileConfiguration keptProfile file=\(name)")
+            } else {
+                try manager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try data.write(to: target, options: .atomic)
+                guard try Data(contentsOf: target) == data else { throw StorageMigrationError.invalidApplicationStorage(name) }
+                moved.append(name)
+            }
+            try manager.removeItem(at: source)
+        }
+        Log.app.info("StorageMigrator.profileConfiguration profile=\(scope.profileID?.uuidString ?? "none") moved=\(moved.joined(separator: ","))")
+    }
+
+    static var configurationInProfiles: Bool {
+        (try? AppState.load())?.profileConfiguration == true
+    }
+
     static func migrateSecretStorage(defaults: UserDefaults = .standard) throws {
         let exists = FileManager.default.fileExists(atPath: AppStoragePaths.secretIndex.path)
         let source = ApplicationStorageMigrator.legacyPreference(Secret.indexKey, defaults: defaults)

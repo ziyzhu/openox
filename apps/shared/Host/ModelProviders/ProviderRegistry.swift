@@ -7,7 +7,9 @@ nonisolated struct ProviderCatalog: Codable, Equatable, Sendable {
     var defaultModel: ModelSelection?
 
     static func load() throws -> Self {
-        let catalog = try JSONDecoder().decode(Self.self, from: Data(contentsOf: AppStoragePaths.providersConfiguration))
+        let url = AppStoragePaths.providersConfiguration
+        guard FileManager.default.fileExists(atPath: url.path) else { return Self() }
+        let catalog = try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
         try catalog.validate()
         return catalog
     }
@@ -16,8 +18,9 @@ nonisolated struct ProviderCatalog: Codable, Equatable, Sendable {
         try validate()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try FileManager.default.createDirectory(at: AppStoragePaths.configuration, withIntermediateDirectories: true)
-        try encoder.encode(self).write(to: AppStoragePaths.providersConfiguration, options: .atomic)
+        let url = AppStoragePaths.providersConfiguration
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try encoder.encode(self).write(to: url, options: .atomic)
     }
 
     func validate() throws {
@@ -75,6 +78,19 @@ final class ProviderRegistry {
         }
         rebuildClients()
         Log.agent.info("ProviderRegistry ready definitions=\(definitions.count) default=\(defaultModel?.providerID ?? "unconfigured")")
+    }
+
+    func reloadCatalog() {
+        do {
+            catalog = try ProviderCatalog.load()
+            catalogAvailable = true
+        } catch {
+            catalog = ProviderCatalog()
+            catalogAvailable = false
+            Log.agent.error("ProviderRegistry catalog unavailable error=\(error.localizedDescription)")
+        }
+        rebuildClients()
+        Log.agent.info("ProviderRegistry reloaded default=\(defaultModel?.providerID ?? "unconfigured")")
     }
 
     nonisolated static func bundledDefinitions() -> [BundledProviderDefinition] {
