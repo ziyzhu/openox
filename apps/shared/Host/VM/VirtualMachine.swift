@@ -423,12 +423,24 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
           const index = __oxSearchIndex;
           delete globalThis.__oxSearchIndex;
           const stop = new Set(['a', 'an', 'and', 'by', 'for', 'from', 'in', 'of', 'on', 'or', 'ox', 'the', 'to', 'with']);
-          const terms = text => new Set((text.normalize('NFC')
+          const terms = text => (text.normalize('NFC')
             .replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
             .toLowerCase().match(/[\\p{L}\\p{M}\\p{N}]+/gu) ?? [])
             .filter(word => !stop.has(word))
-            .map(word => word.length > 4 && word.endsWith('ies') ? word.slice(0, -3) + 'y'
-              : word.length > 3 && word.endsWith('s') && !word.endsWith('ss') ? word.slice(0, -1) : word));
+            .map(word => {
+              if (word.length > 4 && word.endsWith('ies')) return word.slice(0, -3) + 'y';
+              if (word.length > 4 && /(ches|shes|sses|xes|zes)$/.test(word)) return word.slice(0, -2);
+              return word.length > 3 && word.endsWith('s') && !word.endsWith('ss') ? word.slice(0, -1) : word;
+            });
+          const indexDocument = ({ name, description, text, namespaceText }) => {
+            const words = terms(text);
+            const counts = new Map();
+            for (const word of words) counts.set(word, (counts.get(word) ?? 0) + 1);
+            const localName = name.split('.').at(-1);
+            return { name, description, localName, localTerms: terms(localName), nameTerms: new Set(terms(name)),
+              namespaceTerms: new Set(terms(namespaceText)), counts, length: words.length };
+          };
+          let documents;
           Object.defineProperty(globalThis, 'searchTools', {
             value: async (query, options = {}) => {
               if (typeof query !== 'string' || query.length > 512) throw new TypeError('searchTools() expects a query string of at most 512 characters');
@@ -439,24 +451,34 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
               const scope = namespace?.trim();
               const prefix = !scope || scope === 'ox' || scope.startsWith('ox.') ? scope : 'ox.' + scope;
               const exactName = query.trim().toLowerCase();
-              const queryTerms = terms(query);
+              const queryTerms = new Set(terms(query));
               if (!queryTerms.size) return [];
+              documents ??= index.map(indexDocument);
+              const candidates = prefix ? documents.filter(tool => tool.name.startsWith(prefix + '.')) : documents;
+              if (!candidates.length) return [];
+              const averageLength = candidates.reduce((sum, tool) => sum + tool.length, 0) / candidates.length || 1;
+              const idf = [...queryTerms].map(term => {
+                const frequency = candidates.filter(tool => tool.nameTerms.has(term) || tool.counts.has(term) || tool.namespaceTerms.has(term)).length;
+                return [term, Math.log1p((candidates.length - frequency + 0.5) / (frequency + 0.5))];
+              });
+              const localNameBonus = idf.reduce((sum, [, weight]) => sum + weight, 0);
               const matches = [];
-              for (const { name, description } of index) {
-                if (prefix && !name.startsWith(prefix + '.')) continue;
-                const nameTerms = terms(name);
-                const descriptionTerms = terms(description);
-                let covered = 0, nameMatches = 0;
-                for (const term of queryTerms) {
-                  if (nameTerms.has(term)) { nameMatches++; covered++; }
-                  else if (descriptionTerms.has(term)) covered++;
+              for (const { name, description, localName, localTerms, nameTerms, namespaceTerms, counts, length } of candidates) {
+                const normalization = 1.2 * (0.25 + 0.75 * length / averageLength);
+                let covered = 0, score = 0;
+                for (const [term, weight] of idf) {
+                  const count = counts.get(term) ?? 0;
+                  const relevance = (nameTerms.has(term) ? 3 : 0) + (namespaceTerms.has(term) ? 0.5 : 0)
+                    + 2.2 * count / (count + normalization);
+                  if (relevance) { covered++; score += weight * relevance; }
                 }
                 if (covered) {
-                  const exact = exactName === name.toLowerCase() || exactName === name.split('.').at(-1).toLowerCase();
-                  matches.push({ name, description, covered, nameMatches, exact });
+                  if (localTerms.length && localTerms.every(term => queryTerms.has(term))) score += localNameBonus;
+                  const exact = exactName === name.toLowerCase() || exactName === localName.toLowerCase();
+                  matches.push({ name, description, covered, score, exact });
                 }
               }
-              return matches.sort((a, b) => b.exact - a.exact || b.covered - a.covered || b.nameMatches - a.nameMatches)
+              return matches.sort((a, b) => b.exact - a.exact || b.covered - a.covered || b.score - a.score)
                 .slice(0, limit).map(({ name, description }) => ({ name, description }));
             }, writable: false, configurable: false,
           });

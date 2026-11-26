@@ -43,9 +43,35 @@ nonisolated enum OxFunctionCatalog {
         compactDescription(schema).map { (name, $0) }
     }.sorted { $0.name < $1.name }
 
-    static let searchIndex = JSONValue.array(summaries.map {
-        .object(["name": .string($0.name), "description": .string($0.description)])
-    })
+    static let searchIndex: JSONValue = {
+        let namespaceText = Dictionary(uniqueKeysWithValues: namespaceDescriptions)
+        return .array(summaries.map { name, description in
+            let fields = catalog[name]?.objectValue
+            var text = [fields?["description"]?.stringValue ?? description]
+            if let input = fields?["inputSchema"] { appendSearchText(input, to: &text) }
+            let parts = name.split(separator: ".")
+            let namespace = parts.dropFirst().dropLast().joined(separator: ".")
+            let scope = parts.dropFirst().first.map(String.init).flatMap { namespaceText[$0] } ?? ""
+            return .object(["name": .string(name), "description": .string(description),
+                            "text": .string(text.joined(separator: " ")), "namespaceText": .string(namespace + " " + scope)])
+        })
+    }()
+
+    private static func appendSearchText(_ schema: JSONValue, to text: inout [String]) {
+        guard let fields = schema.objectValue else { return }
+        if let description = fields["description"]?.stringValue { text.append(description) }
+        if let properties = fields["properties"]?.objectValue {
+            for (name, property) in properties where name != "purpose" {
+                text.append(name)
+                appendSearchText(property, to: &text)
+            }
+        }
+        if let items = fields["items"] { appendSearchText(items, to: &text) }
+        if let additional = fields["additionalProperties"] { appendSearchText(additional, to: &text) }
+        for key in ["anyOf", "allOf", "oneOf"] {
+            for branch in fields[key]?.arrayValue ?? [] { appendSearchText(branch, to: &text) }
+        }
+    }
 
     private static func closeInputSchema(_ value: JSONValue) -> JSONValue {
         guard case .object(var entry) = value,
