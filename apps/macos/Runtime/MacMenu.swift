@@ -35,6 +35,7 @@ final class MacMenu: NSObject, NSMenuDelegate {
         heading.isEnabled = false
         menu.addItem(heading)
         menu.addItem(.separator())
+        menu.addItem(profilesItem())
         let connections = NSMenuItem(title: "Allow connections", action: #selector(toggleConnections), keyEquivalent: "")
         connections.target = self
         connections.state = access.allowsConnections ? .on : .off
@@ -60,6 +61,86 @@ final class MacMenu: NSObject, NSMenuDelegate {
         menu.addItem(inspect)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Ox", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+    }
+
+    private func profilesItem() -> NSMenuItem {
+        let storage = StorageRoot.shared
+        let profiles = NSMenu()
+        for profile in storage.profiles {
+            let entry = NSMenuItem(title: profile.name, action: #selector(selectProfile(_:)), keyEquivalent: "")
+            entry.target = self
+            entry.representedObject = profile.id
+            entry.state = profile.id == storage.activeId ? .on : .off
+            entry.isEnabled = !storage.isBusy
+            profiles.addItem(entry)
+        }
+        for missing in storage.unavailableProfiles {
+            let entry = NSMenuItem(title: "\(missing.name ?? "Profile") (unavailable)", action: nil, keyEquivalent: "")
+            entry.isEnabled = false
+            profiles.addItem(entry)
+        }
+        profiles.addItem(.separator())
+        for (title, action) in [("New Profile…", #selector(createProfile)), ("Open Existing…", #selector(openProfile))] {
+            let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            entry.target = self
+            entry.isEnabled = !storage.isBusy
+            profiles.addItem(entry)
+        }
+        let item = NSMenuItem(title: storage.active.map { "Profile: \($0.name)" } ?? "Profile", action: nil, keyEquivalent: "")
+        item.submenu = profiles
+        return item
+    }
+
+    @objc private func selectProfile(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID,
+              let profile = StorageRoot.shared.profiles.first(where: { $0.id == id }) else { return }
+        Log.ui.info("MacMenu.selectProfile id=\(id)")
+        runProfileOperation("Couldn't Switch Profile") { try await StorageRoot.shared.switchTo(profile) }
+    }
+
+    @objc private func createProfile() {
+        NSApplication.shared.activate()
+        let alert = NSAlert()
+        alert.messageText = "New Profile"
+        alert.informativeText = "Profiles hold conversations, files, and memory. The new Profile opens right away."
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        field.placeholderString = "Name"
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Create")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        Log.ui.info("MacMenu.createProfile")
+        runProfileOperation("Couldn't Create Profile") { try await StorageRoot.shared.createProfile(name: name) }
+    }
+
+    @objc private func openProfile() {
+        NSApplication.shared.activate()
+        let panel = NSOpenPanel()
+        panel.title = "Open Profile — Ox"
+        panel.message = "Choose a Profile folder, such as one in iCloud Drive or exported from another device."
+        panel.prompt = "Open Profile"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Log.ui.info("MacMenu.openProfile name=\(url.lastPathComponent)")
+        runProfileOperation("Couldn't Open Profile") { _ = try await StorageRoot.shared.openProfile(at: url) }
+    }
+
+    private func runProfileOperation(_ title: String, _ operation: @escaping @MainActor () async throws -> Void) {
+        Task {
+            do { try await operation() } catch {
+                Log.ui.error("MacMenu.profile failed title=\(title) error=\(error.localizedDescription)")
+                NSApplication.shared.activate()
+                let alert = NSAlert()
+                alert.messageText = title
+                alert.informativeText = error.localizedDescription
+                alert.runModal()
+            }
+        }
     }
 
     @objc private func toggleConnections() {

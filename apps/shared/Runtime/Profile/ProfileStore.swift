@@ -117,8 +117,7 @@ final class ProfileStore {
         let previous = records
         records.removeAll { $0.id == profile.id }
         do {
-            let bookmark = try profile.url.bookmarkData(options: .minimalBookmark,
-                includingResourceValuesForKeys: [.isDirectoryKey], relativeTo: nil)
+            let bookmark = try FolderBookmarks.make(profile.url)
             records.append(ExternalRecord(id: profile.id, bookmark: bookmark, name: profile.name))
             try persist()
         }
@@ -153,11 +152,10 @@ final class ProfileStore {
     nonisolated private static func resolve(_ record: ExternalRecord, local: URL, cloud: URL?, discovery: inout Discovery) -> URL? {
         var stale = false
         do {
-            let url = try URL(resolvingBookmarkData: record.bookmark, bookmarkDataIsStale: &stale)
+            let url = try FolderBookmarks.resolve(record.bookmark, stale: &stale)
             if managedLocation(for: url, local: local, cloud: cloud) == nil { try access(url, accessedURLs: &discovery.accessedURLs) }
             if stale {
-                let bookmark = try url.bookmarkData(options: .minimalBookmark,
-                    includingResourceValuesForKeys: [.isDirectoryKey], relativeTo: nil)
+                let bookmark = try FolderBookmarks.make(url)
                 discovery.refreshed.append(ExternalRecord(id: record.id, bookmark: bookmark, name: record.name))
             }
             return url
