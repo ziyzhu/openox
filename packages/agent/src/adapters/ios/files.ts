@@ -34,6 +34,7 @@ export function nativeFiles(): ProfileFileBackend {
     verify: record => fileRequest<void>("filesVerify", record),
     sweep: () => fileRequest<void>("filesSweep"),
     stage: bytes => stageFile(bytes),
+    duplicate: record => fileRequest<FileRecord>("filesDuplicate", { path: record.path, size: record.size, sha256: record.sha256 }),
     apply: operations => fileRequest<void | { conflict: boolean }>("filesApply", { operations }),
     snapshot: (files, prefix) => fileRequest<{ files: FileObservation[]; directories: string[] }>("filesInventory", { prefix, files: files.map(({ path, sha256, binary, stamp }) => ({ path, sha256, binary, stamp })) }),
     validate: operations => fileRequest<void>("filesValidate", { operations }),

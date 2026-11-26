@@ -11,6 +11,15 @@ nonisolated enum FileStaging {
         return url
     }
 
+    static func cleanupStale(in parent: URL, prefix: String, olderThan age: TimeInterval) {
+        let entries = (try? FileManager.default.contentsOfDirectory(at: parent, includingPropertiesForKeys: [.creationDateKey])) ?? []
+        for entry in entries where entry.lastPathComponent.hasPrefix(".\(prefix)-") {
+            guard let created = try? entry.resourceValues(forKeys: [.creationDateKey]).creationDate,
+                  Date().timeIntervalSince(created) > age else { continue }
+            cleanup(entry, operation: prefix)
+        }
+    }
+
     static func cleanup(_ url: URL, operation: String) {
         let manager = FileManager.default
         guard manager.fileExists(atPath: url.path) else { return }

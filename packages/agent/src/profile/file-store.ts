@@ -14,6 +14,7 @@ export type FileMutation =
   | { op: "trash"; path: string; directory: boolean; recursive: boolean };
 export interface ProfileFileBackend {
   stage(bytes: Uint8Array): Promise<FileRecord>;
+  duplicate(record: FileRecord): Promise<FileRecord>;
   apply(operations: FileMutation[]): Promise<void | { conflict: boolean }>;
   snapshot(files: ProfileFileRecord[], prefix?: string): Promise<{ files: FileObservation[]; directories: string[] }>;
   validate(operations: FileMutation[]): Promise<void>;
@@ -502,8 +503,9 @@ export class ProfileFileStore {
       if (this.findPath(state, target)) throw new FileError("invalid", "Destination already exists", target);
       const file = Object.values(state.files).find(file => file.path === source);
       if (file && !file.hidden) {
-        const bytes = await this.readWhole(file);
-        return this.writeLocked(target, file.binary ? bytes : new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+        const directories = this.parents(state, target, true);
+        if (Object.keys(state.files).length + state.directories.length + directories.length + 1 > 10_000) throw new FileError("invalid", "Profile file entry limit reached");
+        return this.publishLocked(target, await this.backend.duplicate(file), file.binary, state, undefined, directories, await this.identifier(target));
       }
       if (!state.directories.includes(source)) throw new FileError("not_found", "Source not found", source);
       const copied = Object.values(state.files).filter(file => beneath(file.path, source));
@@ -512,7 +514,7 @@ export class ProfileFileStore {
         ...state.directories.filter(path => beneath(path, source)).map(path => target + path.slice(source.length)).sort((a, b) => a.length - b.length)];
       const files = { ...state.files }, operations: FileMutation[] = directories.map(path => ({ op: "mkdir", path }));
       for (const file of copied) {
-        const path = target + file.path.slice(source.length), staged = await this.backend.stage(await this.readWhole(file)), id = await this.identifier(path);
+        const path = target + file.path.slice(source.length), staged = await this.backend.duplicate(file), id = await this.identifier(path);
         files[id] = { ...staged, id, path, binary: file.binary, saved: false, mtime: Date.now(), owner: owner(path) };
         operations.push({ op: "replace", path, source: staged.path, size: staged.size, sha256: staged.sha256, previous: null });
       }

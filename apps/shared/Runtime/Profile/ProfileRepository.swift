@@ -271,8 +271,11 @@ actor ProfileRepository {
         let reference = try decodeReference(value, scope: scope)
         do {
             var names: [String: String] = [:], dependencies: [String: String] = [:]
-            for (name, data) in prepared.files {
-                let file = try await importFile(data: data, suggestedName: name, in: scope, conversation: reference)
+            for (name, source) in prepared.files {
+                let file = switch source {
+                case .data(let data): try await importFile(data: data, suggestedName: name, in: scope, conversation: reference)
+                case .file(let url): try await importFile(contentsOf: url, suggestedName: name, in: scope, conversation: reference)
+                }
                 names[name.lowercased()] = file.fileName
                 dependencies[name.lowercased()] = file.displayName
             }

@@ -9,8 +9,19 @@ extension UTType {
 }
 
 nonisolated struct ConversationPackageFiles: Sendable {
-    let data: [String: Data]
+    let files: [String: ZipArchiveSource]
     let names: [String: String]
+    let scratch: PackageScratch
+}
+
+nonisolated final class PackageScratch: Sendable {
+    let directory: URL
+
+    init() throws {
+        directory = try FileStaging.createDirectory(in: FileManager.default.temporaryDirectory, prefix: "conversation-package-files")
+    }
+
+    deinit { FileStaging.cleanup(directory, operation: "conversation-package-files") }
 }
 
 nonisolated struct ConversationPackageDocument: Transferable, Sendable {
@@ -19,15 +30,19 @@ nonisolated struct ConversationPackageDocument: Transferable, Sendable {
     let scope: ProfileScope? = StorageRoot.currentScope
 
     static var transferRepresentation: some TransferRepresentation {
-        DataRepresentation(exportedContentType: .conversationPackage) { document in
+        FileRepresentation(exportedContentType: .conversationPackage) { document in
             guard let scope = document.scope else { throw CocoaError(.fileNoSuchFile) }
             let state = try await document.state()
             let files = try await ProfileRepository.shared.conversationPackageFiles(state, in: scope)
-            let data = try await Task.detached(priority: .userInitiated) {
-                try ConversationPackageCodec.encode(state, files: files.data, fileNames: files.names)
+            FileStaging.cleanupStale(in: FileManager.default.temporaryDirectory, prefix: "conversation-export", olderThan: 600)
+            let directory = try FileStaging.createDirectory(in: FileManager.default.temporaryDirectory, prefix: "conversation-export")
+            let url = directory.appendingPathComponent("\(document.fileName).conversation", isDirectory: false)
+            try await Task.detached(priority: .userInitiated) {
+                try ConversationPackageCodec.encode(state, files: files.files, fileNames: files.names, to: url)
             }.value
-            Log.ui.info("ConversationPackage.export conversation=\(state.meta.id) turns=\(state.turns.count) bytes=\(data.count)")
-            return data
+            let bytes = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+            Log.ui.info("ConversationPackage.export conversation=\(state.meta.id) turns=\(state.turns.count) bytes=\(bytes)")
+            return SentTransferredFile(url)
         }
         .suggestedFileName { "\($0.fileName).conversation" }
     }
@@ -58,7 +73,8 @@ nonisolated struct ConversationPackagePayload: Sendable {
     let header: ConversationPackageHeader
     let turns: Data
     let context: Data?
-    let files: [String: Data]
+    let files: [String: ZipArchiveSource]
+    let scratch: PackageScratch
 }
 
 nonisolated struct PreparedConversationPackage: Sendable {
@@ -66,7 +82,8 @@ nonisolated struct PreparedConversationPackage: Sendable {
     let turns: [Turn]
     let context: AgentContextCheckpoint?
     let contextBoundary: Int?
-    let files: [String: Data]
+    let files: [String: ZipArchiveSource]
+    let scratch: PackageScratch
 }
 
 nonisolated struct MaterializedConversationPackage: Sendable {
@@ -96,7 +113,8 @@ nonisolated extension PreparedConversationPackage {
             updatedContext = nil
         }
         var updatedFiles: [String: Data] = [:]
-        for (source, data) in files {
+        for (source, content) in files {
+            guard case .data(let data) = content else { continue }
             let destination = fileNames[source.lowercased()] ?? source
             var rewritten = data
             if var text = String(data: data, encoding: .utf8) {
@@ -160,8 +178,8 @@ nonisolated enum ConversationPackageError: LocalizedError, Sendable {
 }
 
 nonisolated enum ConversationPackageCodec {
-    static let maximumPackageBytes = 128 * 1024 * 1024
-    static let maximumEntryBytes = 32 * 1024 * 1024
+    static let maximumPackageBytes = Int(UInt32.max)
+    static let maximumEntryBytes = FileLimits.storedBytes
     private static let maximumHeaderBytes = 1024 * 1024
     static let maximumEntries = 256
     private static let packageVersion = 1
@@ -171,7 +189,7 @@ nonisolated enum ConversationPackageCodec {
     private static let contextPath = "context.json"
     private static let artifactsPrefix = "artifacts/"
 
-    static func encode(_ state: ConversationState, files: [String: Data]? = nil, fileNames: [String: String] = [:]) throws -> Data {
+    static func encode(_ state: ConversationState, files: [String: ZipArchiveSource], fileNames: [String: String], to url: URL) throws {
         guard !state.turns.isEmpty else { throw ConversationPackageError.invalidTranscript }
         var prepared = try validate(turns: state.turns, context: state.context)
         if !fileNames.isEmpty {
@@ -185,58 +203,52 @@ nonisolated enum ConversationPackageCodec {
             } else { context = nil }
             prepared = try validate(turns: turns, context: context)
         }
-        let turns = try encodeTurns(prepared.turns)
-        let context = try prepared.context.map { try JSONEncoder().encode($0) }
-        let packagedFiles: [String: Data]
-        if let files { packagedFiles = files }
-        else {
-            let directFiles = try fileData(turns: prepared.turns, context: prepared.context)
-            packagedFiles = try includingFileDependencies(directFiles.data, directory: directFiles.directory)
-        }
-
-        var bodyFiles = [ZipArchiveCodec.File(path: turnsPath, data: turns)]
-        if let context { bodyFiles.append(.init(path: contextPath, data: context)) }
-        bodyFiles += packagedFiles.sorted { $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending }.map {
-            ZipArchiveCodec.File(path: artifactsPrefix + $0.key, data: $0.value)
-        }
-        let records = bodyFiles.map {
-            ConversationPackageHeader.FileRecord(path: $0.path, bytes: $0.data.count, sha256: sha256($0.data))
-        }
-        let title = state.meta.displayTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        let header = ConversationPackageHeader(
-            packageVersion: packageVersion,
-            transcriptSchemaVersion: ConversationFormat.currentSchemaVersion,
-            title: title.isEmpty ? "Conversation" : String(title.prefix(120)),
-            createdAt: state.meta.createdAt,
-            lastActivity: state.meta.lastActivity,
-            exportedAt: Date(),
-            turnCount: prepared.turns.count,
-            artifactCount: packagedFiles.count,
-            hasContext: context != nil,
-            hasCompactedContext: prepared.turns.requiresContextCheckpoint,
-            serviceDomains: Array(Set(state.meta.attachedServiceDomains)).sorted(),
-            files: records
-        )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        bodyFiles.insert(.init(path: headerPath, data: try encoder.encode(header)), at: 0)
-        return try zip {
-            try ZipArchiveCodec.encode(bodyFiles, maximumArchiveBytes: maximumPackageBytes)
+        var bodyFiles: [(path: String, source: ZipArchiveSource)] = [(turnsPath, .data(try encodeTurns(prepared.turns)))]
+        if let context = try prepared.context.map({ try JSONEncoder().encode($0) }) { bodyFiles.append((contextPath, .data(context))) }
+        bodyFiles += files.sorted { $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending }.map { (artifactsPrefix + $0.key, $0.value) }
+        try zip {
+            let writer = try ZipArchiveWriter(url: url, maximumBytes: maximumPackageBytes)
+            let records = try bodyFiles.map { file in
+                let written = try writer.append(path: file.path, source: file.source)
+                return ConversationPackageHeader.FileRecord(path: file.path, bytes: written.bytes, sha256: written.sha256)
+            }
+            let title = state.meta.displayTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            let header = ConversationPackageHeader(
+                packageVersion: packageVersion,
+                transcriptSchemaVersion: ConversationFormat.currentSchemaVersion,
+                title: title.isEmpty ? "Conversation" : String(title.prefix(120)),
+                createdAt: state.meta.createdAt,
+                lastActivity: state.meta.lastActivity,
+                exportedAt: Date(),
+                turnCount: prepared.turns.count,
+                artifactCount: files.count,
+                hasContext: prepared.context != nil,
+                hasCompactedContext: prepared.turns.requiresContextCheckpoint,
+                serviceDomains: Array(Set(state.meta.attachedServiceDomains)).sorted(),
+                files: records
+            )
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            _ = try writer.append(path: headerPath, source: .data(try encoder.encode(header)))
+            try writer.finish()
         }
     }
 
     static func decode(_ data: Data, sourceName: String) throws -> ConversationImportProposal {
+        let scratch = try PackageScratch()
         let files = try zip {
-            try ZipArchiveCodec.decode(
+            try ZipArchiveCodec.decodeSources(
                 data,
                 maximumArchiveBytes: maximumPackageBytes,
                 maximumEntryBytes: maximumEntryBytes,
-                maximumEntries: maximumEntries
+                maximumEntries: maximumEntries,
+                spillAbove: FileLimits.fileBytes,
+                into: scratch.directory
             )
         }
-        let byPath = Dictionary(uniqueKeysWithValues: files.map { ($0.path, $0.data) })
+        let byPath = Dictionary(uniqueKeysWithValues: files.map { ($0.path, $0.source) })
         let headerKey = byPath[headerPath] == nil ? legacyHeaderPath : headerPath
-        guard let headerData = byPath[headerKey], headerData.count <= maximumHeaderBytes else {
+        guard case .data(let headerData)? = byPath[headerKey], headerData.count <= maximumHeaderBytes else {
             throw ConversationPackageError.invalidHeader
         }
         let header: ConversationPackageHeader
@@ -262,17 +274,21 @@ nonisolated enum ConversationPackageCodec {
             throw ConversationPackageError.invalidHeader
         }
         for record in header.files {
-            guard let body = byPath[record.path],
-                  body.count == record.bytes,
-                  sha256(body) == record.sha256 else {
+            guard let body = byPath[record.path], try digest(body) == (record.bytes, record.sha256) else {
                 throw ConversationPackageError.checksumMismatch
             }
         }
-        guard let turns = byPath[turnsPath],
+        guard case .data(let turns)? = byPath[turnsPath],
               header.hasContext == (byPath[contextPath] != nil) else {
             throw ConversationPackageError.invalidHeader
         }
-        var packagedFiles: [String: Data] = [:]
+        let context: Data?
+        switch byPath[contextPath] {
+        case .data(let value)?: context = value
+        case nil: context = nil
+        case .file?: throw ConversationPackageError.invalidContext
+        }
+        var packagedFiles: [String: ZipArchiveSource] = [:]
         for (path, body) in byPath where path.hasPrefix(artifactsPrefix) {
             let name = String(path.dropFirst(artifactsPrefix.count))
             guard !name.isEmpty,
@@ -290,8 +306,9 @@ nonisolated enum ConversationPackageCodec {
         let payload = ConversationPackagePayload(
             header: header,
             turns: turns,
-            context: byPath[contextPath],
-            files: packagedFiles
+            context: context,
+            files: packagedFiles,
+            scratch: scratch
         )
         _ = try prepare(payload)
         return ConversationImportProposal(sourceName: sourceName, payload: payload)
@@ -305,8 +322,12 @@ nonisolated enum ConversationPackageCodec {
         let directory = root.appendingPathComponent("artifacts", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { FileStaging.cleanup(root, operation: "conversation-package") }
-        for (name, data) in payload.files {
-            try data.write(to: directory.appendingPathComponent(name, isDirectory: false), options: .atomic)
+        for (name, source) in payload.files {
+            let destination = directory.appendingPathComponent(name, isDirectory: false)
+            switch source {
+            case .data(let data): try data.write(to: destination, options: .atomic)
+            case .file(let url): try FileManager.default.copyItem(at: url, to: destination)
+            }
         }
         let scope = ProfileScope(profileID: UUID(), root: root, location: .local)
         let decoder = JSONDecoder()
@@ -340,7 +361,8 @@ nonisolated enum ConversationPackageCodec {
             turns: prepared.turns,
             context: prepared.context,
             contextBoundary: prepared.contextBoundary,
-            files: payload.files
+            files: payload.files,
+            scratch: payload.scratch
         )
     }
 
@@ -368,46 +390,6 @@ nonisolated enum ConversationPackageCodec {
             data.append(try encoder.encode(turn))
             data.append(0x0A)
         }
-    }
-
-    private static func fileData(
-        turns: [Turn],
-        context: AgentContextCheckpoint?
-    ) throws -> (data: [String: Data], directory: URL?) {
-        var result: [String: Data] = [:]
-        let referenced = referencedFiles(turns: turns, context: context)
-        for file in referenced {
-            let key = file.fileName.lowercased()
-            guard !result.keys.contains(where: { $0.lowercased() == key }) else { continue }
-            guard file.exists else { throw ConversationPackageError.missingFile(file.fileName) }
-            let data = try Data(contentsOf: file.fileURL, options: .mappedIfSafe)
-            guard data.count <= maximumEntryBytes else { throw ConversationPackageError.tooLarge }
-            result[file.fileName] = data
-        }
-        return (result, referenced.first?.fileURL.deletingLastPathComponent())
-    }
-
-    private static func includingFileDependencies(_ direct: [String: Data], directory: URL?) throws -> [String: Data] {
-        guard let directory else { return direct }
-        let candidates = FileStore.list(in: directory).filter { file in
-            let type = UTType(filenameExtension: file.fileURL.pathExtension) ?? .data
-            return type.conforms(to: .image) || type.conforms(to: .audio) || type.conforms(to: .movie)
-        }
-        var result = direct
-        var changed = true
-        while changed {
-            changed = false
-            let sources = result.values.compactMap { String(data: $0, encoding: .utf8) }
-            for candidate in candidates where !result.keys.contains(where: { $0.caseInsensitiveCompare(candidate.fileName) == .orderedSame }) {
-                let encoded = candidate.fileName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? candidate.fileName
-                guard sources.contains(where: { $0.contains(candidate.fileName) || $0.contains(encoded) }) else { continue }
-                let data = try Data(contentsOf: candidate.fileURL, options: .mappedIfSafe)
-                guard data.count <= maximumEntryBytes else { throw ConversationPackageError.tooLarge }
-                result[candidate.fileName] = data
-                changed = true
-            }
-        }
-        return result
     }
 
     static func referencedFiles(turns: [Turn], context: AgentContextCheckpoint?) -> [FileItem] {
@@ -440,8 +422,22 @@ nonisolated enum ConversationPackageCodec {
         return result.filter { seen.insert($0.fileName.lowercased()).inserted }
     }
 
-    private static func sha256(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    private static func digest(_ source: ZipArchiveSource) throws -> (Int, String) {
+        var hash = SHA256()
+        var bytes = 0
+        switch source {
+        case .data(let data):
+            hash.update(data: data)
+            bytes = data.count
+        case .file(let url):
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            while let chunk = try handle.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+                hash.update(data: chunk)
+                bytes += chunk.count
+            }
+        }
+        return (bytes, hash.finalize().map { String(format: "%02x", $0) }.joined())
     }
 
     private static func zip<T>(_ operation: () throws -> T) throws -> T {
@@ -472,7 +468,8 @@ extension ProfileRepository {
             names[referenced.fileName.lowercased()] = Self.packageFileName(file)
             if !pending.contains(where: { $0.reference == file.reference }) { pending.append(file) }
         }
-        var result: [String: Data] = [:]
+        let scratch = try PackageScratch()
+        var result: [String: ZipArchiveSource] = [:]
         var total = 0
         while !pending.isEmpty {
             let file = pending.removeFirst(), name = Self.packageFileName(file)
@@ -480,9 +477,14 @@ extension ProfileRepository {
             guard result.count < ConversationPackageCodec.maximumEntries - 3,
                   file.size <= ConversationPackageCodec.maximumEntryBytes, file.size <= ConversationPackageCodec.maximumPackageBytes - total else { throw ConversationPackageError.tooLarge }
             let descriptor = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(file))
+            total += file.size
+            if file.size > FileLimits.fileBytes {
+                let copy = scratch.directory.appendingPathComponent(UUID().uuidString, isDirectory: false)
+                try await DurableProfileStore.shared.copyFile(scope: scope, file: descriptor, to: copy)
+                result[name] = .file(copy)
+                continue
+            }
             let data = try await DurableProfileStore.shared.readFile(scope: scope, file: descriptor)
-            total += data.count
-            guard total <= ConversationPackageCodec.maximumPackageBytes else { throw ConversationPackageError.tooLarge }
             if var text = String(data: data, encoding: .utf8), data.count <= FileLimits.textBytes {
                 for candidate in inventory where candidate.path != file.path {
                     let relative = Self.relativeFilePath(from: file.path, to: candidate.path)
@@ -494,11 +496,11 @@ extension ProfileRepository {
                     if result[destination] == nil && !pending.contains(where: { $0.reference == candidate.reference }) { pending.append(candidate) }
                     guard pending.count + result.count < ConversationPackageCodec.maximumEntries - 3 else { throw ConversationPackageError.tooLarge }
                 }
-                result[name] = Data(text.utf8)
-            } else { result[name] = data }
+                result[name] = .data(Data(text.utf8))
+            } else { result[name] = .data(data) }
         }
         Log.app.info("ConversationPackage.files profile=\(scope.profileID?.uuidString ?? "temporary") files=\(result.count) bytes=\(total)")
-        return ConversationPackageFiles(data: result, names: names)
+        return ConversationPackageFiles(files: result, names: names, scratch: scratch)
     }
 
     nonisolated private static func packageFileName(_ file: DurableProfileFile) -> String {
@@ -603,7 +605,7 @@ final class ConversationImportCoordinator {
                        size > ConversationPackageCodec.maximumPackageBytes {
                         throw ConversationPackageError.tooLarge
                     }
-                    let data = try Data(contentsOf: url, options: .mappedIfSafe)
+                    let data = try Data(contentsOf: url, options: .alwaysMapped)
                     return try ConversationPackageCodec.decode(data, sourceName: url.lastPathComponent)
                 }.value
                 guard !Task.isCancelled else { return }

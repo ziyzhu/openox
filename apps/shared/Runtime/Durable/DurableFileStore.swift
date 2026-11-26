@@ -121,6 +121,24 @@ nonisolated final class DurableFileStore {
             let token = UUID().uuidString
             handles[token] = Handle(fd: fd, name: path, stage: nil, size: size)
             return token
+        case "filesDuplicate":
+            guard let path = params["path"] as? String, let size = params["size"] as? Int, (0...FileLimits.storedBytes).contains(size),
+                  let digest = params["sha256"] as? String else { throw failure("Invalid file duplicate") }
+            let source = try publicFiles.openFile(path)
+            defer { Darwin.close(source) }
+            let name = ".stage-" + UUID().uuidString
+            try duplicate(source, named: name)
+            do {
+                let copy = try openFile(privateDirectory, name, flags: O_RDONLY)
+                defer { Darwin.close(copy) }
+                try DurablePayloadWriter.verify(copy, size: size, digest: digest)
+                try durable(copy); try durable(privateDirectory)
+            } catch {
+                unlinkat(privateDirectory, name, 0)
+                throw error
+            }
+            Log.agent.info("Filesystem.duplicate bytes=\(size)")
+            return ["path": "\(usesPayloadDirectory ? "staging" : ".files")/\(name)", "size": size, "sha256": digest]
         case "filesReadRange", "payloadVerify":
             guard let path = params["path"] as? String, let size = params["size"] as? Int, size >= 0,
                   let digest = params["sha256"] as? String else { throw failure("Invalid file range") }
@@ -283,6 +301,18 @@ nonisolated final class DurableFileStore {
         guard usesPayloadDirectory, path.hasPrefix("artifacts/payload-"), path.hasSuffix(".json"),
               path.dropFirst(18).dropLast(5).count == 64, path.dropFirst(18).dropLast(5).allSatisfy({ "0123456789abcdef".contains($0) }) else { return nil }
         return "payloads/" + path.dropFirst(10)
+    }
+
+    private func duplicate(_ source: Int32, named name: String) throws {
+        if fclonefileat(source, privateDirectory, name, 0) == 0 { return }
+        guard errno == ENOTSUP || errno == EXDEV else { throw posix("Clone file") }
+        let copy = openat(privateDirectory, name, O_CREAT | O_EXCL | O_WRONLY | O_NOFOLLOW | O_CLOEXEC, 0o600)
+        guard copy >= 0 else { throw posix("Stage file copy") }
+        defer { Darwin.close(copy) }
+        guard fcopyfile(source, copy, nil, copyfile_flags_t(COPYFILE_DATA)) == 0 else {
+            unlinkat(privateDirectory, name, 0)
+            throw posix("Copy file")
+        }
     }
 
     private func checkSize(_ fd: Int32, size: Int) throws {

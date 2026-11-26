@@ -1,4 +1,5 @@
 import Compression
+import CryptoKit
 import Foundation
 
 nonisolated enum ZipArchiveError: Error, Sendable {
@@ -8,6 +9,11 @@ nonisolated enum ZipArchiveError: Error, Sendable {
     case unsupportedCompression
     case unsafePath
     case checksumMismatch
+}
+
+nonisolated enum ZipArchiveSource: Sendable {
+    case data(Data)
+    case file(URL)
 }
 
 nonisolated enum ZipArchiveCodec {
@@ -106,6 +112,22 @@ nonisolated enum ZipArchiveCodec {
         maximumEntries: Int,
         maximumTotalBytes: Int = .max
     ) throws -> [File] {
+        try decodeSources(data, maximumArchiveBytes: maximumArchiveBytes, maximumEntryBytes: maximumEntryBytes,
+                          maximumEntries: maximumEntries, maximumTotalBytes: maximumTotalBytes).map { path, source in
+            guard case .data(let body) = source else { throw ZipArchiveError.tooLarge }
+            return File(path: path, data: body)
+        }
+    }
+
+    static func decodeSources(
+        _ data: Data,
+        maximumArchiveBytes: Int,
+        maximumEntryBytes: Int,
+        maximumEntries: Int,
+        maximumTotalBytes: Int = .max,
+        spillAbove spillBytes: Int = .max,
+        into spillDirectory: URL? = nil
+    ) throws -> [(path: String, source: ZipArchiveSource)] {
         guard data.count <= maximumArchiveBytes else { throw ZipArchiveError.tooLarge }
         let end = try endRecord(in: data)
         let entryCount = Int(try readUInt16(data, at: end + 10))
@@ -171,7 +193,10 @@ nonisolated enum ZipArchiveCodec {
 
         return try entries.compactMap { entry in
             guard !isDirectory(entry) else { return nil }
-            return File(path: entry.path, data: try extract(entry, from: data, before: centralOffset))
+            if entry.uncompressedSize > spillBytes, let spillDirectory {
+                return (entry.path, .file(try spill(entry, from: data, before: centralOffset, into: spillDirectory)))
+            }
+            return (entry.path, .data(try extract(entry, from: data, before: centralOffset)))
         }
     }
 
@@ -219,7 +244,26 @@ nonisolated enum ZipArchiveCodec {
         entry.path.hasSuffix("/") || entry.externalAttributes & 0x10 != 0
     }
 
-    private static func extract(_ entry: Entry, from data: Data, before centralOffset: Int) throws -> Data {
+    private static func spill(_ entry: Entry, from data: Data, before centralOffset: Int, into directory: URL) throws -> URL {
+        guard entry.method == 0 else { throw ZipArchiveError.tooLarge }
+        let body = try bodyRange(entry, in: data, before: centralOffset)
+        guard body.count == entry.uncompressedSize else { throw ZipArchiveError.invalidArchive }
+        let url = directory.appendingPathComponent(UUID().uuidString, isDirectory: false)
+        guard FileManager.default.createFile(atPath: url.path, contents: nil) else { throw ZipArchiveError.invalidArchive }
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        var checksum = UInt32.max
+        for start in stride(from: body.lowerBound, to: body.upperBound, by: 1024 * 1024) {
+            try Task.checkCancellation()
+            let chunk = data.subdata(in: start..<min(start + 1024 * 1024, body.upperBound))
+            checksum = crc32Update(checksum, chunk)
+            try handle.write(contentsOf: chunk)
+        }
+        guard ~checksum == entry.checksum else { throw ZipArchiveError.checksumMismatch }
+        return url
+    }
+
+    private static func bodyRange(_ entry: Entry, in data: Data, before centralOffset: Int) throws -> Range<Int> {
         guard entry.flags & 0x0001 == 0 else { throw ZipArchiveError.encrypted }
         guard entry.method == 0 || entry.method == 8 else { throw ZipArchiveError.unsupportedCompression }
         guard entry.localOffset >= 0,
@@ -243,7 +287,11 @@ nonisolated enum ZipArchiveCodec {
               end <= centralOffset else {
             throw ZipArchiveError.invalidArchive
         }
-        let compressed = data.subdata(in: start..<end)
+        return start..<end
+    }
+
+    private static func extract(_ entry: Entry, from data: Data, before centralOffset: Int) throws -> Data {
+        let compressed = data.subdata(in: try bodyRange(entry, in: data, before: centralOffset))
         let body: Data
         if entry.method == 0 {
             guard entry.compressedSize == entry.uncompressedSize else { throw ZipArchiveError.invalidArchive }
@@ -298,15 +346,103 @@ nonisolated enum ZipArchiveCodec {
         return value
     }
 
-    private static func crc32(_ data: Data) -> UInt32 {
-        var checksum = UInt32.max
-        for byte in data {
-            checksum ^= UInt32(byte)
-            for _ in 0..<8 {
-                let mask = UInt32(bitPattern: -Int32(checksum & 1))
-                checksum = checksum >> 1 ^ (0xedb88320 & mask)
-            }
+    private static let crcTable: [UInt32] = (0..<256).map { index in
+        (0..<8).reduce(UInt32(index)) { checksum, _ in checksum & 1 == 1 ? 0xedb88320 ^ (checksum >> 1) : checksum >> 1 }
+    }
+
+    static func crc32Update(_ checksum: UInt32, _ data: Data) -> UInt32 {
+        data.withUnsafeBytes { bytes in
+            bytes.reduce(checksum) { crcTable[Int(($0 ^ UInt32($1)) & 0xff)] ^ ($0 >> 8) }
         }
-        return ~checksum
+    }
+
+    private static func crc32(_ data: Data) -> UInt32 {
+        ~crc32Update(UInt32.max, data)
+    }
+}
+
+nonisolated final class ZipArchiveWriter {
+    private let handle: FileHandle
+    private let maximumBytes: Int
+    private var central = Data()
+    private var offset = 0
+    private var paths = Set<String>()
+
+    init(url: URL, maximumBytes: Int) throws {
+        guard FileManager.default.createFile(atPath: url.path, contents: nil) else { throw ZipArchiveError.invalidArchive }
+        handle = try FileHandle(forWritingTo: url)
+        self.maximumBytes = maximumBytes
+    }
+
+    deinit { try? handle.close() }
+
+    func append(path: String, source: ZipArchiveSource) throws -> (bytes: Int, sha256: String) {
+        try Task.checkCancellation()
+        guard !path.isEmpty, !path.hasPrefix("/"), !path.hasSuffix("/"), !path.contains("\\"),
+              path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
+            throw ZipArchiveError.unsafePath
+        }
+        let name = Data(path.utf8)
+        guard paths.insert(path.lowercased()).inserted, paths.count < Int(UInt16.max), name.count <= Int(UInt16.max) else {
+            throw ZipArchiveError.invalidArchive
+        }
+        let reader: FileHandle?
+        let size: Int
+        switch source {
+        case .data(let data): reader = nil; size = data.count
+        case .file(let url): reader = try FileHandle(forReadingFrom: url); size = Int(try reader!.seekToEnd()); try reader!.seek(toOffset: 0)
+        }
+        defer { try? reader?.close() }
+        guard let size32 = UInt32(exactly: size), let offset32 = UInt32(exactly: offset),
+              offset + 30 + name.count + size + central.count + 46 + name.count + 22 <= maximumBytes else { throw ZipArchiveError.tooLarge }
+        var header = Data()
+        Self.append([UInt32(0x04034b50)], [UInt16(20), 0x0800, 0, 0, 33], to: &header)
+        Self.append([UInt32(0), size32, size32], [UInt16(name.count), 0], to: &header)
+        header.append(name)
+        try handle.write(contentsOf: header)
+        var checksum = UInt32.max
+        var hash = SHA256()
+        var written = 0
+        while written < size {
+            let chunk: Data
+            switch source {
+            case .data(let data): chunk = data.subdata(in: written..<min(written + 1024 * 1024, size))
+            case .file: chunk = try reader!.read(upToCount: min(1024 * 1024, size - written)) ?? Data()
+            }
+            guard !chunk.isEmpty else { throw ZipArchiveError.invalidArchive }
+            checksum = ZipArchiveCodec.crc32Update(checksum, chunk)
+            hash.update(data: chunk)
+            try handle.write(contentsOf: chunk)
+            written += chunk.count
+        }
+        checksum = ~checksum
+        let end = try handle.offset()
+        try handle.seek(toOffset: UInt64(offset + 14))
+        var crc = Data()
+        Self.append([checksum], [], to: &crc)
+        try handle.write(contentsOf: crc)
+        try handle.seek(toOffset: end)
+        Self.append([UInt32(0x02014b50)], [UInt16(20), 20, 0x0800, 0, 0, 33], to: &central)
+        Self.append([checksum, size32, size32], [UInt16(name.count), 0, 0, 0, 0], to: &central)
+        Self.append([UInt32(0), offset32], [], to: &central)
+        central.append(name)
+        offset = Int(end)
+        return (size, hash.finalize().map { String(format: "%02x", $0) }.joined())
+    }
+
+    func finish() throws {
+        guard !paths.isEmpty, let centralOffset = UInt32(exactly: offset), let centralSize = UInt32(exactly: central.count) else {
+            throw ZipArchiveError.invalidArchive
+        }
+        var end = central
+        Self.append([UInt32(0x06054b50)], [UInt16(0), 0, UInt16(paths.count), UInt16(paths.count)], to: &end)
+        Self.append([centralSize, centralOffset], [UInt16(0)], to: &end)
+        try handle.write(contentsOf: end)
+        try handle.close()
+    }
+
+    private static func append(_ words: [UInt32], _ halves: [UInt16], to data: inout Data) {
+        for var value in words.map(\.littleEndian) { withUnsafeBytes(of: &value) { data.append(contentsOf: $0) } }
+        for var value in halves.map(\.littleEndian) { withUnsafeBytes(of: &value) { data.append(contentsOf: $0) } }
     }
 }

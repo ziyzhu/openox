@@ -69,6 +69,9 @@ function stagedFiles(content: string, staging: string): ProfileFileBackend {
       await writeFile(source(path), data, { flag: "wx", mode: 0o600 });
       return { path, size: data.length, sha256: digest(data) };
     },
+    async duplicate(record) {
+      return this.stage(await bytes(record));
+    },
     validate,
     async apply(operations) {
       await validate(operations);
