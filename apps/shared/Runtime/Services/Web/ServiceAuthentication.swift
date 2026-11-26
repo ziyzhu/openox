@@ -36,13 +36,14 @@ extension Service {
     }
 
     func readAccess() async throws -> Auth {
-        if let iOS = iOSService { return await iOS.checkAccess() }
-        if let apiService { return try await apiService.authorization.checkAccess(previous: auth.observation) }
-        if let mcp = remoteMCPService {
+        switch implementation {
+        case .iOS(let iOS): return await iOS.checkAccess()
+        case .api(let api): return try await api.authorization.checkAccess(previous: auth.observation)
+        case .mcp(let mcp):
             _ = try await mcp.resolve(refresh: true)
             return mcp.auth
+        case .web: return .notRequired
         }
-        return .notRequired
     }
 
     var accessActionLabel: String {
@@ -98,13 +99,13 @@ extension Service {
 
     private func performAccessRequest(source: AuthLoginSource) async throws -> AccessRequestOutcome {
         let policy: AccessPolicy = source == .conversationCard ? .cached : .current
-        if let iOS = iOSService {
+        switch implementation {
+        case .iOS(let iOS):
             let current = await iOS.permissionState()
             _ = await iOS.updatePermission(from: current)
             setAuth(await iOS.checkAccess())
             return loginState.isAuthenticated ? .completed : .incomplete
-        }
-        if let mcp = remoteMCPService {
+        case .mcp(let mcp):
             await checkAccess(policy: policy, reason: .modelLogin)
             if source != .serviceDetail, loginState.isAuthenticated { return .completed }
             let descriptor = try await mcp.authorize()
@@ -112,10 +113,14 @@ extension Service {
             try resolved.validateStandardServiceActions()
             applyResolvedDefinition(resolved, reason: .serviceDetail)
             return loginState.isAuthenticated ? .completed : .incomplete
-        }
-        guard let apiService else {
+        case .api(let apiService):
+            return try await performAPIAccessRequest(apiService, policy: policy)
+        case .web:
             throw RuntimeError.bridge("Website authentication uses the service login action, followed by listSessions")
         }
+    }
+
+    private func performAPIAccessRequest(_ apiService: APIService, policy: AccessPolicy) async throws -> AccessRequestOutcome {
         await checkAccess(policy: policy, reason: .modelLogin)
         guard !Task.isCancelled else { return .incomplete }
         guard !loginState.isAuthenticated, auth != .notRequired else { return .completed }
@@ -135,12 +140,13 @@ extension Service {
     }
 
     func signOut() async {
-        if let apiService {
+        switch implementation {
+        case .api(let apiService):
             apiService.authorization.clear()
             await checkAccess(policy: .current, reason: .clearWebsiteData)
-            return
+        case .web, .iOS, .mcp:
+            await clearWebData()
         }
-        await clearWebData()
     }
 
     func clearWebData() async {

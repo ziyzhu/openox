@@ -119,11 +119,11 @@ extension ProfileProtocol {
                     return .failure(RuntimeError.bridge("service capabilities unavailable"))
                 }
             }
-            if let apiService = svc.apiService {
+            switch svc.implementation {
+            case .api(let apiService):
                 return await apiService.invoke(service: svc, actionID: action, args: args,
                     approve: approve)
-            }
-            if let iOSService = svc.iOSService {
+            case .iOS(let iOSService):
                 guard let session = conversationManager.current else {
                     return .failure(RuntimeError.bridge("session unavailable"))
                 }
@@ -137,19 +137,19 @@ extension ProfileProtocol {
                         try await session.debugInvokeIOSService(serviceID, actionID: actionID, args: args, purpose: purpose)
                     }
                 )
-            }
-            if let mcpService = svc.remoteMCPService {
+            case .mcp(let mcpService):
                 return await mcpService.invoke(
                     service: svc,
                     actionID: action,
                     args: args,
                     approve: approve
                 )
+            case .web:
+                if WebSessionContract.isEnabled(svc.definition), action == WebSessionContract.loginAction {
+                    return .failure(RuntimeError.bridge("Login requires a user interaction. Invoke the service login action through a conversation VM so Ox can present and await its live page."))
+                }
+                return await svc.invokeAction(action, args: args, session: command.session, pageURL: command.pageUrl, approve: approve)
             }
-            if WebSessionContract.isEnabled(svc.definition), action == WebSessionContract.loginAction {
-                return .failure(RuntimeError.bridge("Login requires a user interaction. Invoke the service login action through a conversation VM so Ox can present and await its live page."))
-            }
-            return await svc.invokeAction(action, args: args, session: command.session, pageURL: command.pageUrl, approve: approve)
         }
     }
 

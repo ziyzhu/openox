@@ -655,9 +655,11 @@ final class ServiceOperations {
                 throw OxFunctionError(code: "permission_denied", message: "Status inspection is blocked by the existing access-check policy.", recovery: "Stop. Do not bypass the policy through another action.")
             }
             let auth: Service.Auth
-            if let api = service.apiService { auth = try api.authorization.configuredAccess() }
-            else if let mcp = service.remoteMCPService { auth = try await mcp.checkAccess() }
-            else { auth = try await service.readAccess() }
+            switch service.implementation {
+            case .api(let api): auth = try api.authorization.configuredAccess()
+            case .mcp(let mcp): auth = try await mcp.checkAccess()
+            case .web, .iOS: auth = try await service.readAccess()
+            }
             try Task.checkCancellation()
             service.setAuth(auth)
             let state: String

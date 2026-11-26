@@ -12,10 +12,20 @@ final class Service: NSObject, Identifiable {
     nonisolated let tintHex: UInt32
     private(set) var definition: ServiceDefinition
     @ObservationIgnored var sourceVersion: String?
-    let webService: WebService?
-    let iOSService: IOSService?
-    let remoteMCPService: RemoteMCPService?
-    private(set) var apiService: APIService?
+
+    enum Implementation {
+        case web(WebService)
+        case api(APIService)
+        case iOS(IOSService)
+        case mcp(RemoteMCPService)
+    }
+
+    private(set) var implementation: Implementation
+
+    var webService: WebService? { if case .web(let service) = implementation { service } else { nil } }
+    var apiService: APIService? { if case .api(let service) = implementation { service } else { nil } }
+    var iOSService: IOSService? { if case .iOS(let service) = implementation { service } else { nil } }
+    var remoteMCPService: RemoteMCPService? { if case .mcp(let service) = implementation { service } else { nil } }
 
     var title: String { manager.serviceNames[domain] ?? definition.name }
     private(set) var summary: String
@@ -25,14 +35,21 @@ final class Service: NSObject, Identifiable {
     var isAPIService: Bool { apiService != nil }
     var isMCPService: Bool { remoteMCPService != nil }
     var isLocalService: Bool { definition.repositoryID == Repository.localID }
-    var hasWebRuntime: Bool { webService != nil || iOSService?.hasBrowserRuntime == true }
+    var hasWebRuntime: Bool {
+        switch implementation {
+        case .web: true
+        case .iOS(let service): service.hasBrowserRuntime
+        case .api, .mcp: false
+        }
+    }
     var icon: ServiceIcon? { definition.icon }
     var detailCapabilities: ServiceDetailCapabilities {
-        if let apiService { return apiService.detailCapabilities }
-        if let remoteMCPService { return remoteMCPService.detailCapabilities }
-        if let iOSService { return iOSService.detailCapabilities }
-        guard let webService else { preconditionFailure("service has no implementation") }
-        return webService.detailCapabilities
+        switch implementation {
+        case .web(let service): service.detailCapabilities
+        case .api(let service): service.detailCapabilities
+        case .iOS(let service): service.detailCapabilities
+        case .mcp(let service): service.detailCapabilities
+        }
     }
     var accessAuthorizationTitle: String? { remoteMCPService?.authorizationTitle }
 
@@ -284,21 +301,22 @@ final class Service: NSObject, Identifiable {
 
     var resolutionState: ResolutionState {
         get {
-            if let webService { return webService.state }
-            guard let browserState = iOSService?.browserState else {
-                preconditionFailure("service has no web runtime")
+            switch implementation {
+            case .web(let service): return service.state
+            case .iOS(let service):
+                guard let browserState = service.browserState else { preconditionFailure("service has no web runtime") }
+                return browserState
+            case .api, .mcp: preconditionFailure("service has no web runtime")
             }
-            return browserState
         }
         set {
-            if let webService {
-                webService.state = newValue
-                return
+            switch implementation {
+            case .web(let service): service.state = newValue
+            case .iOS(let service):
+                guard service.browserState != nil else { preconditionFailure("service has no web runtime") }
+                service.browserState = newValue
+            case .api, .mcp: preconditionFailure("service has no web runtime")
             }
-            guard iOSService?.browserState != nil else {
-                preconditionFailure("service has no web runtime")
-            }
-            iOSService?.browserState = newValue
         }
     }
 
@@ -398,26 +416,21 @@ final class Service: NSObject, Identifiable {
         self.tintHex = tint
         self.summary = definition.description
         self.definition = definition
-        let implementations = Self.makeImplementations(for: definition)
-        self.apiService = definition.isAPI ? try! APIService(definition: definition) : nil
-        self.webService = implementations.web
-        self.iOSService = implementations.iOS
-        self.remoteMCPService = implementations.remoteMCP
+        self.implementation = Self.makeImplementation(for: definition)
         self.manager = manager
         super.init()
-        if definition.isAPI {
-            if let authorization = apiService?.authorization, authorization.auth.requiresCredentials {
-                auth = .unknown
-            } else {
-                auth = .notRequired
-            }
+        switch implementation {
+        case .api(let service):
+            auth = service.authorization.auth.requiresCredentials ? .unknown : .notRequired
             capabilityState = .ready
-        } else if definition.isIOS {
-            auth = iOSService?.requiresPermission == true ? .unknown : .notRequired
+        case .iOS(let service):
+            auth = service.requiresPermission ? .unknown : .notRequired
             capabilityState = .ready
-        } else if definition.isMCP {
+        case .mcp:
             auth = .unknown
             capabilityState = definition.actions.isEmpty ? .unloaded : .ready
+        case .web:
+            break
         }
         access.didUpdate(auth)
     }
@@ -427,17 +440,15 @@ final class Service: NSObject, Identifiable {
     }
     nonisolated override var hash: Int { id.hashValue }
 
-    private static func makeImplementations(
-        for definition: ServiceDefinition
-    ) -> (web: WebService?, iOS: IOSService?, remoteMCP: RemoteMCPService?) {
-        if definition.isAPI { return (nil, nil, nil) }
+    private static func makeImplementation(for definition: ServiceDefinition) -> Implementation {
+        if definition.isAPI { return .api(try! APIService(definition: definition)) }
         if let endpoint = definition.mcpEndpoint {
-            return (nil, nil, RemoteMCPService(endpoint: endpoint, transport: definition.mcpTransport))
+            return .mcp(RemoteMCPService(endpoint: endpoint, transport: definition.mcpTransport))
         }
         if definition.isIOS {
-            return (nil, IOSService(domain: definition.domain, permission: definition.iOSPermission), nil)
+            return .iOS(IOSService(domain: definition.domain, permission: definition.iOSPermission))
         }
-        return (WebService(), nil, nil)
+        return .web(WebService())
     }
 
     // MARK: - State mutators
@@ -600,11 +611,15 @@ final class Service: NSObject, Identifiable {
         if let invalidationTask { await invalidationTask.value; return }
         let task = Task { @MainActor in
             self.sourceVersion = nil
-            if let apiService = self.apiService {
-                apiService.source = nil
+            switch self.implementation {
+            case .api(let service):
+                service.source = nil
                 return
+            case .iOS, .mcp:
+                return
+            case .web:
+                break
             }
-            guard self.webService != nil else { return }
             self.debugSession?.close()
             self.debugSession = nil
             await self.closeOwnedPagesAfterRunning(error: EvalError.contextInvalidated)
@@ -702,8 +717,10 @@ extension Service {
         manager: ServiceManager
     ) {
         self.init(definition: definition, manager: manager)
-        if let apiService { apiService.source = Resolved(actions: actions) }
-        else { resolutionState = .idle(Resolved(actions: actions)) }
+        switch implementation {
+        case .api(let service): service.source = Resolved(actions: actions)
+        case .web, .iOS, .mcp: resolutionState = .idle(Resolved(actions: actions))
+        }
         capabilityState = .ready
     }
 
@@ -723,9 +740,9 @@ extension Service {
         } else {
             definition
         }
-        if localized.isAPI {
-            if sourceChanged { apiService = try! APIService(definition: localized) }
-            else { apiService?.definition = localized }
+        if case .api(let service) = implementation {
+            if sourceChanged { implementation = .api(try! APIService(definition: localized)) }
+            else { service.definition = localized }
         }
         self.definition = localized
         summary = localized.description

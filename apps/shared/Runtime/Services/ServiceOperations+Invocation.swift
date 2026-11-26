@@ -134,9 +134,10 @@ extension ServiceOperations {
                 return try await serviceManager.invokeConversation(service: service, args: input, owner: conversationOwner, attachments: attachments, session: session, pageURL: pageURL, approve: approve)
             }
             let result: Result<JSONValue, Error>
-            if let implementation = service.apiService {
+            switch service.implementation {
+            case .api(let implementation):
                 result = await implementation.invoke(service: service, actionID: actionID, args: input, secrets: secrets, approve: approve)
-            } else if let implementation = service.iOSService {
+            case .iOS(let implementation):
                 let dispatched = try await secrets?.substitute(input, caller: service.definition.actionNamespace) ?? input
                 result = await implementation.invoke(
                     service: service, actionID: actionID, args: dispatched, purpose: purpose,
@@ -145,13 +146,13 @@ extension ServiceOperations {
                         try await self.native.invoke(service: service, actionID: id, args: args, purpose: purpose)
                     }
                 )
-            } else if let implementation = service.remoteMCPService {
+            case .mcp(let implementation):
                 let dispatched = try await secrets?.substitute(input, caller: service.definition.actionNamespace) ?? input
                 result = await implementation.invoke(
                     service: service, actionID: actionID, args: dispatched,
                     approve: approve, readFile: { try await self.readMCPFile($0, purpose) }, receiveFiles: receiveFiles
                 )
-            } else {
+            case .web:
                 result = await service.invokeAction(
                     actionID,
                     args: input,
