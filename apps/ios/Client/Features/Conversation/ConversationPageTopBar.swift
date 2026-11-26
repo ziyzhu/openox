@@ -16,8 +16,8 @@ struct ConversationPageTopBar: View {
     var body: some View {
         ConversationHeader(
             modelTitle: showsModelPicker && blockCount == 0 && (conversation.canChangeRetention || !conversation.isTemporary)
-                ? conversation.remoteAgent.map { _ in conversation.remoteModelName ?? conversation.remoteAgentName ?? "" } ?? conversation.model.displayName : nil,
-            agentTitle: conversation.remoteAgentName,
+                ? conversation.remoteAgent.map { _ in conversation.remoteModelName ?? String(localized: "Agent default") } ?? conversation.model.displayName : nil,
+            agentTitle: conversation.remoteAgentName ?? "Ox",
             iconButtonSize: iconButtonSize,
             onShowSidebar: onShowSidebar,
             onPickModel: onPickModel
