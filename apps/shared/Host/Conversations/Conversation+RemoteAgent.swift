@@ -354,3 +354,50 @@ nonisolated struct RemoteSession: Sendable {
     let tools: JSONValue
     let seq: Int?
 }
+
+extension Conversation {
+    func remoteAppModel(_ binding: RemoteAgentBinding) async -> JSONValue {
+        let directory = RemoteAgentDirectory.shared
+        await directory.refreshUnknown()
+        let reference = binding.model ?? directory.defaultModels[binding.endpoint]
+        let online = directory.statuses[binding.endpoint]?.isOnline == true
+        return .object([
+            "agent": .object([
+                "name": .string(directory.displayName(for: binding.endpoint)),
+                "address": .string(binding.endpoint.absoluteString),
+                "machine": directory.machine(for: binding.endpoint).map(JSONValue.string) ?? .null,
+                "folder": (binding.folder ?? directory.folders(for: binding.endpoint).first).map(JSONValue.string) ?? .null,
+            ]),
+            "provider": .object(["id": .string(reference?.provider ?? "agent"), "name": .string(reference?.provider ?? directory.displayName(for: binding.endpoint))]),
+            "model": .object(["id": .string(reference?.id ?? "default"), "name": .string(reference.flatMap { directory.modelName($0, endpoint: binding.endpoint) } ?? reference?.id ?? "Agent default")]),
+            "agentDefault": .bool(binding.model == nil),
+            "supportsTools": .bool(true),
+            "thinkingLevel": binding.thinkingLevel.map(JSONValue.string) ?? .null,
+            "change": .null,
+            "authentication": .object([
+                "method": .string("agent"), "status": .string(online ? "ready" : "unavailable"),
+                "settingsPath": .string("Settings > Agents"),
+            ]),
+        ])
+    }
+
+    func setRemoteAppModel(_ options: JSONValue, binding: RemoteAgentBinding) throws -> JSONValue {
+        let directory = RemoteAgentDirectory.shared
+        let fields = options.objectValue?["selection"]?.objectValue ?? [:]
+        let available = directory.models[binding.endpoint] ?? []
+        guard let provider = fields["provider"]?.stringValue, let modelID = fields["model"]?.stringValue,
+              let model = available.first(where: { $0.reference == AgentModelReference(provider: provider, id: modelID) }) else {
+            let examples = available.prefix(20).map { "\($0.reference.provider)/\($0.reference.id)" }.joined(separator: ", ")
+            throw OxFunctionError(code: "invalid_argument",
+                message: "ox.conversation.setModel: this conversation runs on the agent \(directory.displayName(for: binding.endpoint)), which has no model \(fields["provider"]?.stringValue ?? "?")/\(fields["model"]?.stringValue ?? "?").",
+                recovery: available.isEmpty ? "The agent's models are unavailable; check that it is reachable in app/status.json." : "Use a provider and model from the agent, for example: \(examples).")
+        }
+        let changed = binding.model != model.reference
+        selectRemoteModel(model)
+        return .object([
+            "status": .string("applied"),
+            "selection": .object(["provider": .string(provider), "model": .string(modelID)]),
+            "changed": .bool(changed),
+        ])
+    }
+}

@@ -176,8 +176,8 @@ nonisolated enum OxConversations {
         "name": string,
     ], required: ["id", "name"])
     static let authenticationInformation = object([
-        "method": enumeration(["apiKey", "subscriptionKey", "bearerToken", "subscription", "none"]),
-        "status": enumeration(["ready", "missingCredential", "signedOut", "notRequired"]),
+        "method": enumeration(["apiKey", "subscriptionKey", "bearerToken", "subscription", "none", "agent"]),
+        "status": enumeration(["ready", "missingCredential", "signedOut", "notRequired", "unavailable"]),
         "settingsPath": string,
     ], required: ["method", "status", "settingsPath"])
     static let modelSelection = object([
@@ -196,6 +196,13 @@ nonisolated enum OxConversations {
             "error": nullable(string),
         ], required: ["status", "selection", "error"])),
         "authentication": authenticationInformation,
+        "agent": nullable(object([
+            "name": string,
+            "address": string,
+            "machine": nullable(string),
+            "folder": nullable(string),
+        ], required: ["name", "address", "machine", "folder"])),
+        "agentDefault": boolean,
     ], required: ["provider", "model", "supportsTools", "authentication"])
 
     private static func nullable(_ value: JSONValue) -> JSONValue {

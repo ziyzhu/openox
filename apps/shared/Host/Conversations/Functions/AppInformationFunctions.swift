@@ -77,6 +77,7 @@ extension Conversation {
 
     public func setAppModel(options: JSONValue, purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.appSetModel, options, purpose: purpose) {
+            if let binding = self.remoteAgent { return try self.setRemoteAppModel(options, binding: binding) }
             let previous = self.modelSelection
             let previousChange = self.modelSelectionChange
             guard let selection = options.objectValue?["selection"], selection != .null else {
@@ -119,7 +120,8 @@ extension Conversation {
 
     public func appModel(purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.appModel, .object([:]), purpose: purpose) {
-            .object([
+            if let binding = remoteAgent { return await remoteAppModel(binding) }
+            return .object([
                 "provider": .object([
                     "id": .string(client.id),
                     "name": .string(client.displayName),
