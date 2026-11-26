@@ -100,7 +100,8 @@ final class OnDeviceSpeechRecording {
             defer { reporting.cancel() }
             try await request.downloadAndInstall()
             let installedStatus = await AssetInventory.status(forModules: [module])
-            Log.ui.info("SpeechInput.assets prepared status=\(String(describing: installedStatus)) duration=\(installStarted.duration(to: .now))")
+            let reserved = await AssetInventory.reservedLocales.map(\.identifier)
+            Log.ui.info("SpeechInput.assets prepared status=\(String(describing: installedStatus)) duration=\(installStarted.duration(to: .now)) reserved=\(reserved) maxReserved=\(AssetInventory.maximumReservedLocales)")
         }
         try Task.checkCancellation()
         analyzer = SpeechAnalyzer(modules: [module], options: .init(priority: .userInitiated, modelRetention: .lingering))
