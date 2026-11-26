@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { stat, realpath } from "node:fs/promises";
+import { mkdir, stat, realpath } from "node:fs/promises";
 import { hostname } from "node:os";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import type { ServerWebSocket } from "bun";
 import { Value } from "typebox/value";
 import {
@@ -19,6 +19,7 @@ import {
 } from "@openox/protocol/agent";
 import { DEFAULT_EVENT_LIMITS, EventLog, type EventLimits } from "./agent-events.ts";
 import { agentLog } from "./agent-log.ts";
+import { FolderAccessError, FolderStore } from "./agent-folders.ts";
 import { BRIDGE_ENVIRONMENT, writePiExtension } from "./agent-pi-extension.ts";
 import { approvalArguments, exitMessage, PiProcess, piVersion, type Approval, type PiExit, type PiRecord } from "./agent-pi.ts";
 import type { PushKind } from "@openox/protocol/push";
@@ -29,7 +30,7 @@ import { ToolBridge } from "./agent-tools.ts";
 
 export type AgentSocket = ServerWebSocket<{ id: string; conversations: Set<string>; via: "loopback" | "tailnet" }>;
 export type AgentServeOptions = {
-  roots: string[];
+  folders: string[];
   approval: Approval;
   executable: string;
   stateDirectory: string;
@@ -129,6 +130,9 @@ export class AgentServer {
     "conversations.setThinking": (params: { id: string; level: string }) => this.command(params.id, "set_thinking_level", { level: params.level }),
     "conversations.compact": (params: { id: string }) => this.command(params.id, "compact"),
     "conversations.rename": (params: { id: string; title: string }) => this.rename(params.id, params.title),
+    "folders.list": () => this.listFolders(),
+    "folders.add": (params: { path: string }) => this.addFolder(params.path),
+    "folders.remove": (params: { path: string }) => this.removeFolder(params.path),
     "notifications.register": (params: AgentPushRegistration) => this.push.register(params).then(() => ({})),
     "notifications.unregister": (params: { token: string }) => this.push.unregister(params.token).then(() => ({})),
   };
@@ -136,17 +140,21 @@ export class AgentServer {
   private readonly options: AgentServeOptions;
   private readonly version: string;
   private readonly extensionPath: string;
+  private readonly folders: FolderStore;
+  private readonly workspaces: string;
 
-  private constructor(options: AgentServeOptions, version: string, extensionPath: string, origins: OriginStore, push: PushRegistry) {
+  private constructor(options: AgentServeOptions, version: string, extensionPath: string, origins: OriginStore, push: PushRegistry, folders: FolderStore, workspaces: string) {
     this.options = options;
     this.version = version;
     this.extensionPath = extensionPath;
     this.origins = origins;
     this.push = push;
-    this.sessions = new SessionIndex(options.roots);
+    this.folders = folders;
+    this.workspaces = workspaces;
+    this.sessions = new SessionIndex(() => this.roots());
     this.bridge = new ToolBridge((token) => {
       const conversation = this.conversations.get(this.tokens.get(token) ?? "");
-      return conversation && { id: conversation.id, context: conversation.context, tools: conversation.tools, host: () => [...conversation.subscribers].at(-1) };
+      return conversation && { id: conversation.id, context: this.context(conversation), tools: conversation.tools, host: () => [...conversation.subscribers].at(-1) };
     });
     this.bridgeURL = this.bridge.start();
     this.server = Bun.serve({
@@ -179,9 +187,13 @@ export class AgentServer {
   static async start(options: AgentServeOptions): Promise<AgentServer> {
     const origins = new OriginStore(options.stateDirectory);
     const push = new PushRegistry(options.stateDirectory);
-    const [version, extensionPath] = await Promise.all([piVersion(options.executable), writePiExtension(options.stateDirectory), origins.load(), push.load()]);
-    const server = new AgentServer(options, version, extensionPath, origins, push);
-    agentLog("serve.start", { url: server.url, folders: options.roots.length, tailnet: options.tailnet !== undefined, pi: version, approval: options.approval });
+    const folders = new FolderStore(options.stateDirectory);
+    const [version, extensionPath] = await Promise.all([piVersion(options.executable), writePiExtension(options.stateDirectory), origins.load(), push.load(), folders.load()]);
+    for (const folder of options.folders) await folders.add(folder);
+    const workspaces = join(options.stateDirectory, "conversations");
+    await mkdir(workspaces, { recursive: true });
+    const server = new AgentServer(options, version, extensionPath, origins, push, folders, await realpath(workspaces));
+    agentLog("serve.start", { url: server.url, folders: folders.list().length, tailnet: options.tailnet !== undefined, pi: version, approval: options.approval });
     return server;
   }
 
@@ -275,8 +287,8 @@ export class AgentServer {
     return {
       implementation: { name: "pi", version: this.version },
       machine: hostname(),
-      folder: this.options.roots[0]!,
-      folders: this.options.roots,
+      folder: this.workspaces,
+      folders: this.folders.list(),
       protocols: { agent: [AGENT_PROTOCOL_VERSION] },
       methods: Object.keys(this.handlers),
     };
@@ -292,7 +304,7 @@ export class AgentServer {
   }
 
   private async fetchModels(): Promise<{ models: AgentModel[]; current: AgentModelRef | null; thinkingLevel: string | null }> {
-    const pi = new PiProcess(this.options.executable, ["--no-session", ...approvalArguments(this.options.approval)], { cwd: this.options.roots[0]!, label: "models" }, () => {});
+    const pi = new PiProcess(this.options.executable, ["--no-session", ...approvalArguments(this.options.approval)], { cwd: this.workspaces, label: "models" }, () => {});
     try {
       const [available, state] = await withTimeout(
         Promise.all([pi.command<{ models: Record<string, unknown>[] }>("get_available_models"), pi.command<PiState>("get_state")]),
@@ -329,8 +341,8 @@ export class AgentServer {
   }
 
   private async create(params: NewParams, socket: AgentSocket) {
-    const cwd = await this.folder(params.cwd);
     const id = Bun.randomUUIDv7();
+    const cwd = params.cwd ? await this.folder(params.cwd) : await this.workspace(id);
     const conversation = this.register(id, cwd, params.context, params.tools, null);
     this.subscribe(conversation, socket);
     try {
@@ -356,7 +368,7 @@ export class AgentServer {
       conversation.tools = params.tools;
     } else {
       const file = await this.sessions.find(params.id);
-      if (!file) throw new RPCError(UNKNOWN_CONVERSATION, `Unknown conversation ${params.id} in the allowed folders`);
+      if (!file) throw new RPCError(UNKNOWN_CONVERSATION, `Unknown conversation ${params.id} in the authorized folders`);
       conversation = this.register(params.id, file.cwd, params.context, params.tools, file.title || null);
     }
     const opened = conversation;
@@ -385,14 +397,49 @@ export class AgentServer {
     });
   }
 
-  private async folder(requested: string | null | undefined): Promise<string> {
-    const [first] = this.options.roots;
-    if (!requested) return first!;
-    const path = await realpath(resolve(first!, requested)).catch(() => undefined);
+  private async folder(requested: string): Promise<string> {
+    const path = await realpath(resolve(this.folders.list()[0] ?? this.workspaces, requested)).catch(() => undefined);
     const directory = path && await stat(path).then((info) => info.isDirectory(), () => false);
     if (!path || !directory) throw new RPCError(-32602, "folder does not exist");
-    if (!within(this.options.roots, path)) throw new RPCError(-32602, "folder outside allowed roots");
+    if (!within(this.folders.list(), path)) throw new RPCError(-32602, "folder outside authorized folders");
     return path;
+  }
+
+  private async workspace(id: string): Promise<string> {
+    const path = join(this.workspaces, id);
+    await mkdir(path, { recursive: true });
+    return path;
+  }
+
+  private roots(): string[] {
+    return [...this.folders.list(), this.workspaces];
+  }
+
+  private context(conversation: Conversation): AgentContext {
+    const folders = this.folders.list();
+    const authorized = folders.length ? folders.map((folder) => `- ${folder}`).join("\n") : "- none";
+    const workspace = [
+      `Working folder on ${hostname()}: ${conversation.cwd}. Create files here unless the user names another place.`,
+      `Folders the user authorized on this machine:\n${authorized}`,
+      "Ask before reading or changing files outside these folders. macOS may block protected folders such as Desktop, Documents and Downloads until the user allows access on this Mac; if a read stalls or is denied there, ask the user to authorize the folder with `ox agent folders add <path>` on this Mac.",
+    ].join("\n\n");
+    return { sections: { ...conversation.context.sections, ox_agent_workspace: workspace } };
+  }
+
+  private async listFolders() {
+    return { folders: this.folders.list() };
+  }
+
+  private async addFolder(path: string) {
+    try { await this.folders.add(path); }
+    catch (error) { throw error instanceof FolderAccessError ? new RPCError(-32602, error.message) : error; }
+    return this.listFolders();
+  }
+
+  private async removeFolder(path: string) {
+    try { await this.folders.remove(path); }
+    catch (error) { throw error instanceof FolderAccessError ? new RPCError(-32602, error.message) : error; }
+    return this.listFolders();
   }
 
   private async close(id: string, socket: AgentSocket) {

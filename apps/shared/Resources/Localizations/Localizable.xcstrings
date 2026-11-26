@@ -86,6 +86,17 @@
         }
       }
     },
+    "A new folder for this conversation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为此对话新建的文件夹"
+          }
+        }
+      }
+    },
     "Allow microphone access to use voice input." : {
       "localizations" : {
         "zh-Hans" : {
@@ -187,6 +198,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未发送任何内容，你说的话已保留在草稿中。"
+          }
+        }
+      }
+    },
+    "Own folder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "独立文件夹"
           }
         }
       }

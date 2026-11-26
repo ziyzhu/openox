@@ -47,20 +47,21 @@ type Cached = { mtimeMs: number; size: number; summary: SessionSummary | undefin
 
 export class SessionIndex {
   private readonly cache = new Map<string, Cached>();
-  private readonly roots: readonly string[];
+  private readonly roots: () => readonly string[];
 
-  constructor(roots: readonly string[]) {
+  constructor(roots: () => readonly string[]) {
     this.roots = roots;
   }
 
   async list(): Promise<SessionSummary[]> {
-    const directories = await sessionDirectories(this.roots);
+    const roots = this.roots();
+    const directories = await sessionDirectories(roots);
     const paths = (await Promise.all(directories.map(async (directory) => {
       const names = await readdir(directory).catch(() => [] as string[]);
       return names.filter((name) => name.endsWith(".jsonl")).map((name) => join(directory, name));
     }))).flat();
     const summaries = await Promise.all(paths.map((path) => this.summary(path)));
-    return summaries.filter((summary): summary is SessionSummary => summary !== undefined && within(this.roots, summary.cwd));
+    return summaries.filter((summary): summary is SessionSummary => summary !== undefined && within(roots, summary.cwd));
   }
 
   async find(id: string): Promise<SessionSummary | undefined> {

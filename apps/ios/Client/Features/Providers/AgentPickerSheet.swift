@@ -152,16 +152,21 @@ struct RemoteAgentModelPicker<Header: View>: View {
                             }
                         } label: {
                             SettingsDisclosureRow(title: "Thinking level",
-                                                  value: Text(verbatim: conversation.remoteThinkingLevel.map(ModelPickerContent.thinkingLevelName) ?? String(localized: "Agent default")),
+                                                  value: Text(verbatim: conversation.remoteThinkingLevel.map { ModelPickerContent.thinkingLevelName($0) } ?? String(localized: "Agent default")),
                                                   indicator: "chevron.up.chevron.down")
                         }
                         .accessibilityIdentifier(A11yID.ConversationControls.modelThinkingLevel)
                     }
                 }
                 .settingsSurface()
-                if agents.folders(for: endpoint).count > 1 || conversation.remoteAgent?.folder != nil {
+                if !agents.folders(for: endpoint).isEmpty || conversation.remoteAgent?.folder != nil {
                     VStack(spacing: 0) {
                         Menu {
+                            Button { conversation.selectRemoteFolder(nil) } label: {
+                                Label { Text("Own folder"); Text("A new folder for this conversation") } icon: {
+                                    if selectedFolder == nil { Image(systemName: "checkmark") }
+                                }
+                            }
                             ForEach(agents.folders(for: endpoint), id: \.self) { folder in
                                 Button { conversation.selectRemoteFolder(folder) } label: {
                                     Label { Text(verbatim: URL(fileURLWithPath: folder).lastPathComponent); Text(verbatim: folder) } icon: {
@@ -170,7 +175,7 @@ struct RemoteAgentModelPicker<Header: View>: View {
                                 }
                             }
                         } label: {
-                            SettingsDisclosureRow(title: "Folder", value: Text(verbatim: selectedFolder.map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""),
+                            SettingsDisclosureRow(title: "Folder", value: selectedFolder.map { Text(verbatim: URL(fileURLWithPath: $0).lastPathComponent) } ?? Text("Own folder"),
                                                   indicator: conversation.canChangeAgent ? "chevron.up.chevron.down" : nil)
                         }
                         .disabled(!conversation.canChangeAgent)
@@ -197,7 +202,7 @@ struct RemoteAgentModelPicker<Header: View>: View {
     }
 
     private var selectedFolder: String? {
-        conversation.remoteAgent?.folder ?? agents.folders(for: endpoint).first
+        conversation.remoteAgent?.folder
     }
 
     private var selectedModel: RemoteAgentModel? {

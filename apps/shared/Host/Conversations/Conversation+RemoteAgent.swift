@@ -29,11 +29,11 @@ extension Conversation {
         updateRemoteSelection(model: model, thinking: nil)
     }
 
-    func selectRemoteFolder(_ folder: String) {
+    func selectRemoteFolder(_ folder: String?) {
         guard canChangeAgent, var binding = remoteAgent, binding.conversationID == nil else { return }
         binding.folder = folder
         remoteAgent = binding
-        Log.session.info("Conversation.agent folder id=\(id) chars=\(folder.count)")
+        Log.session.info("Conversation.agent folder id=\(id) own=\(folder == nil) chars=\(folder?.count ?? 0)")
     }
 
     func selectRemoteThinking(_ level: String) {
@@ -429,7 +429,7 @@ extension Conversation {
                 "name": .string(directory.displayName(for: binding.endpoint)),
                 "address": .string(binding.endpoint.absoluteString),
                 "machine": directory.machine(for: binding.endpoint).map(JSONValue.string) ?? .null,
-                "folder": (binding.folder ?? directory.folders(for: binding.endpoint).first).map(JSONValue.string) ?? .null,
+                "folder": binding.folder.map(JSONValue.string) ?? .null,
             ]),
             "provider": .object(["id": .string(reference?.provider ?? "agent"), "name": .string(reference?.provider ?? directory.displayName(for: binding.endpoint))]),
             "model": .object(["id": .string(reference?.id ?? "default"), "name": .string(reference.flatMap { directory.modelName($0, endpoint: binding.endpoint) } ?? reference?.id ?? "Agent default")]),

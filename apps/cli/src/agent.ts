@@ -14,14 +14,19 @@ import { fail, type SubCommand } from "./lib.ts";
 const SERVE_USAGE = `Usage: ox agent serve [--port ${AGENT_DEFAULT_PORT}] [--directory <folder>]... [--local] [--allow-sleep] [--approve | --no-approve]
 
 Publishes wss://<this machine>.ts.net:<port> through Tailscale Serve to this machine's owner by default.
-  --directory <folder>  Workspace root for conversations (repeatable; --cwd is an alias; default: current folder)
+  --directory <folder>  Authorize a folder for conversations (repeatable; --cwd is an alias); authorized folders persist
+  Conversations started without a folder get their own working folder in the agent's state directory.
   --local               Loopback only at ws://127.0.0.1:<port>; do not publish through Tailscale
   --allow-sleep         Let macOS idle-sleep while serving`;
 const DESCRIBE_USAGE = `Usage: ox agent describe [--endpoint ws://127.0.0.1:${AGENT_DEFAULT_PORT}] [--json]`;
+const FOLDERS_USAGE = `Usage: ox agent folders [list | add <folder> | remove <folder>] [--endpoint ws://127.0.0.1:${AGENT_DEFAULT_PORT}]
+
+Changes the folders a running ox agent serve authorizes; new and resumed pi processes use the updated list.`;
 
 export const AGENT_COMMANDS: Record<string, SubCommand> = {
   serve: { desc: "Serve pi on this machine to Ox Hosts over WebSocket JSON-RPC, published through Tailscale Serve", fn: serve },
   describe: { desc: "Show an agent endpoint's implementation, folders and methods (--endpoint, --json)", fn: describe },
+  folders: { desc: "List, add or remove the folders an agent endpoint authorizes (--endpoint)", fn: folders },
 };
 
 type Publication = { kind: "local" } | { kind: "tailscale"; binary: string; tailnet: Tailnet };
@@ -46,12 +51,12 @@ async function serve(args: string[]): Promise<void> {
   if (!Number.isInteger(port) || port < 0 || port > 65535) fail("--port must be an integer from 0 to 65535");
   if (port === 0 && !values.local) fail("--port 0 needs --local; Tailscale Serve publishes a fixed port");
   const requested = [...(values.directory ?? []), ...(values.cwd ? [values.cwd] : [])];
-  const roots = [...new Set(await Promise.all((requested.length ? requested : [process.cwd()]).map(workspaceRoot)))];
+  const folders = [...new Set(await Promise.all(requested.map(workspaceRoot)))];
   const approval: Approval = values.approve ? "approve" : values["no-approve"] ? "no-approve" : "default";
   const publication = await preparePublication(values.local === true, port);
   const awake = values["allow-sleep"] ? undefined : keepAwake();
   const server = await AgentServer.start({
-    roots,
+    folders,
     approval,
     executable: piExecutable(),
     stateDirectory: process.env.OX_AGENT_STATE_DIR ?? join(homedir(), ".ox", "agent-serve"),
@@ -131,9 +136,34 @@ async function describe(args: string[]): Promise<void> {
   }
 }
 
-function parse<T extends NonNullable<ParseArgsConfig["options"]>>(args: string[], options: T, usage: string) {
+async function folders(args: string[]): Promise<void> {
+  const { values, positionals } = parse(args, {
+    endpoint: { type: "string" },
+    help: { type: "boolean", short: "h" },
+  }, FOLDERS_USAGE, true);
+  const [action = "list", path, ...extra] = positionals;
+  if (values.help) {
+    console.log(FOLDERS_USAGE);
+    return;
+  }
+  const valid = action === "list" ? path === undefined : (action === "add" || action === "remove") && path !== undefined;
+  if (!valid || extra.length) fail(FOLDERS_USAGE);
+  const endpoint = agentEndpoint(values.endpoint ? String(values.endpoint) : undefined);
+  const client = await AgentClient.connect(endpoint).catch((error: Error) => fail(error.message));
   try {
-    return parseArgs({ args, options, strict: true, allowPositionals: false });
+    const params = path === undefined ? {} : { path: resolve(path) };
+    const result = await client.request<{ folders: string[] }>(`folders.${action}`, params);
+    for (const folder of result.folders) console.log(folder);
+  } catch (error) {
+    fail((error as Error).message);
+  } finally {
+    client.close();
+  }
+}
+
+function parse<T extends NonNullable<ParseArgsConfig["options"]>>(args: string[], options: T, usage: string, allowPositionals = false) {
+  try {
+    return parseArgs({ args, options, strict: true, allowPositionals });
   } catch (error) {
     return fail(`${(error as Error).message}\n${usage}`);
   }

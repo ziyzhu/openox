@@ -25,7 +25,9 @@ export const AgentSchemas = {
   AgentTool: object("AgentTool", { name: S(), description: S(), parameters: json() }),
   AgentDescription: object("AgentDescription", {
     implementation: Type.Object({ name: S(), version: S() }),
-    machine: S(), folder: S(), folders: A(S(), { description: "Allowed workspace roots; new conversations may use any of them or a descendant." }),
+    machine: S(),
+    folder: S({ description: "Parent of the working folders the agent creates for conversations started without a cwd." }),
+    folders: A(S(), { description: "Authorized folders; a new conversation may use any of them or a descendant as its cwd." }),
     protocols: Type.Record(S(), A(I({ minimum: 1 }))), methods: A(S()),
   }),
   AgentModel: object("AgentModel", {
@@ -43,7 +45,7 @@ export const AgentSchemas = {
   }),
   AgentConversationsResult: object("AgentConversationsResult", { conversations: A(R("AgentConversationRow")) }),
   AgentNewRequest: object("AgentNewRequest", {
-    cwd: nullable(S({ minLength: 1, maxLength: 4096 })), model: nullable(R("AgentModelRef")), thinkingLevel: nullable(S()), context: R("AgentContext"), tools: A(R("AgentTool")),
+    cwd: nullable(S({ minLength: 1, maxLength: 4096, description: "An authorized folder or a descendant; omitted, the conversation gets its own working folder." })), model: nullable(R("AgentModelRef")), thinkingLevel: nullable(S()), context: R("AgentContext"), tools: A(R("AgentTool")),
   }),
   AgentNewResult: object("AgentNewResult", { id: conversationId(), model: nullable(R("AgentModelRef")) }),
   AgentOpenRequest: object("AgentOpenRequest", {
@@ -56,6 +58,8 @@ export const AgentSchemas = {
     thinkingLevel: nullable(S()), title: nullable(S()), seq: I({ minimum: 0, description: "Latest event seq for this conversation." }),
     replay: optional(Type.Union([Type.Literal("complete"), Type.Literal("gap")], { description: "Whether every event after since was still buffered." })),
   }),
+  AgentFolderRequest: object("AgentFolderRequest", { path: S({ minLength: 1, maxLength: 4096 }) }),
+  AgentFoldersResult: object("AgentFoldersResult", { folders: A(S()) }),
   AgentConversationRequest: object("AgentConversationRequest", { id: conversationId() }),
   AgentSendRequest: object("AgentSendRequest", {
     id: conversationId(), text: S(), images: optional(A(Type.Object({ data: S(), mimeType: S() }))),
@@ -115,6 +119,9 @@ export const AgentMethods = {
   "conversations.setThinking": method("AgentSetThinkingRequest", "AgentEmptyResult"),
   "conversations.compact": method("AgentConversationRequest", "AgentEmptyResult"),
   "conversations.rename": method("AgentRenameRequest", "AgentEmptyResult"),
+  "folders.list": method("AgentEmptyRequest", "AgentFoldersResult"),
+  "folders.add": method("AgentFolderRequest", "AgentFoldersResult"),
+  "folders.remove": method("AgentFolderRequest", "AgentFoldersResult"),
   "notifications.register": method("AgentPushRegistration", "AgentEmptyResult"),
   "notifications.unregister": method("AgentPushUnregistration", "AgentEmptyResult"),
 } as const;
