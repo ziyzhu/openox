@@ -1061,6 +1061,34 @@
             }
           }
         },
+        "device": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "description": "The device this Ox app runs on."
+        },
+        "profile": {
+          "type": "object",
+          "required": [
+            "id",
+            "name"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "description": "The Profile active on this device; Clients open it."
+        },
         "protocols": {
           "type": "object",
           "patternProperties": {

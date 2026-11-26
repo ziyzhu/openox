@@ -9,6 +9,8 @@ enum OxHostRPC {
                 "version": .string(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"),
                 "build": .string(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"),
             ]),
+            "device": .object(["name": .string(Device.name)]),
+            "profile": StorageRoot.shared.active.map { .object(["id": .string($0.id.uuidString), "name": .string($0.name)]) } ?? .null,
             "protocols": .object([
                 "rpc": versions([OxHostProtocol.contractVersion]),
                 "repository": versions(HostProtocols.repository),

@@ -89,7 +89,7 @@ final class LocationProvider: NSObject, CLLocationManagerDelegate {
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         if manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted {
-            complete(.failure(RuntimeError.bridge("Location access is denied or restricted. Enable Ox Host in System Settings > Privacy & Security > Location Services.")))
+            complete(.failure(RuntimeError.bridge("Location access is denied or restricted. Enable Ox in System Settings > Privacy & Security > Location Services.")))
         }
     }
 

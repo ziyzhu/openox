@@ -6,12 +6,12 @@ import { providers } from "./providers.ts";
 import { agents } from "./host-agents.ts";
 
 export const HOST_COMMANDS: Record<string, SubCommand> = {
-  describe: { desc: "Show Host identity, supported protocol versions and methods (--json)", fn: describe },
-  list: { desc: "List reachable Ox Hosts (--all includes unavailable candidates)", fn: discover },
+  describe: { desc: "Show the Ox app's device, active Profile, protocol versions and methods (--json)", fn: describe },
+  list: { desc: "List reachable devices running Ox (--all includes unavailable candidates)", fn: discover },
   discover: { desc: "Alias for host list", fn: discover },
-  logs: { desc: "Read or follow structured Host logs", fn: logs },
-  providers: { desc: "List the Host's model providers and their models", fn: providers },
-  agents: { desc: "List, add or remove the Host's remote agents (ox agent serve endpoints)", fn: agents },
+  logs: { desc: "Read or follow the active Profile's structured logs", fn: logs },
+  providers: { desc: "List the active Profile's model providers and their models", fn: providers },
+  agents: { desc: "List, add or remove the active Profile's remote agents (ox agent serve endpoints)", fn: agents },
 };
 
 async function describe(args: string[], context: CliContext): Promise<void> {
@@ -35,6 +35,8 @@ async function describe(args: string[], context: CliContext): Promise<void> {
     else {
       const { name, version, build } = description.implementation;
       console.log(`${name} ${version} (${build})`);
+      if (description.device) console.log(`device: ${description.device.name}`);
+      if (description.profile) console.log(`profile: ${description.profile.name} (${description.profile.id})`);
       for (const [name, versions] of Object.entries(description.protocols).sort(([a], [b]) => a.localeCompare(b))) console.log(`${name}: ${versions.join(", ")}`);
       for (const method of description.methods) console.log(method);
     }

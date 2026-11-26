@@ -58,7 +58,7 @@ function printUsage(program: string, description: string, groups: Record<string,
   }
   console.log("\nFlags:");
   const flags = [
-    ["--host <ws-url>", "Ox Host WebSocket endpoint"],
+    ["--host <ws-url>", "WebSocket address of a device running Ox"],
     ["--conversation <conversation-id>", "Conversation-bound VM on the Host"],
     ["--profile <id-or-path>", "Host Profile ID with --host, or directory for disk inspection"],
     ["--repository <origin>", "Repository path or Git URL"],

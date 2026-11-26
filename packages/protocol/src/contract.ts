@@ -93,6 +93,8 @@ export const Schemas = {
   EmptyResult: object("EmptyResult", {}),
   HostDescription: object("HostDescription", {
     implementation: Type.Object({ name: S(), version: S(), build: S() }),
+    device: Type.Optional(Type.Object({ name: S() }, { description: "The device this Ox app runs on." })),
+    profile: Type.Optional(Type.Object({ id: S(), name: S() }, { description: "The Profile active on this device; Clients open it." })),
     protocols: Type.Record(S({ pattern: "^(.*)$" }), A(I({ minimum: 1 }))), methods: A(S()),
   }),
   ConversationRow: object("ConversationRow", {

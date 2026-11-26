@@ -3,13 +3,17 @@ import UIKit
 
 enum RemoteHostStatus: Equatable {
     case checking
-    case reachable(name: String, version: String)
+    case reachable(name: String, version: String, profile: String?)
     case unreachable
+
+    var profile: String? {
+        if case .reachable(_, _, let profile) = self { profile } else { nil }
+    }
 
     var subtitle: String {
         switch self {
         case .checking: L10n.string("Checking…")
-        case .reachable(let name, let version): L10n.string("Reachable · \(name) \(version)")
+        case .reachable(let name, let version, _): L10n.string("Reachable · \(name) \(version)")
         case .unreachable: L10n.string("Unavailable")
         }
     }
@@ -35,7 +39,7 @@ enum RemoteHostProbe {
             "params": .object([:]),
         ])
         do {
-            let (name, version) = try await withThrowingTaskGroup(of: (String, String).self) { group in
+            let (name, version, profile) = try await withThrowingTaskGroup(of: (String, String, String?).self) { group in
                 group.addTask {
                     try await task.send(.data(await request.encoded()))
                     let message = try await task.receive()
@@ -47,12 +51,13 @@ enum RemoteHostProbe {
                     }
                     let response = try await JSONValue.decode(data)
                     guard let fields = response.objectValue, fields["id"] == .string(id),
-                          let implementation = fields["result"]?.objectValue?["implementation"]?.objectValue,
+                          let result = fields["result"]?.objectValue,
+                          let implementation = result["implementation"]?.objectValue,
                           let name = implementation["name"]?.stringValue,
                           let version = implementation["version"]?.stringValue else {
                         throw URLError(.cannotParseResponse)
                     }
-                    return (name, version)
+                    return (name, version, result["profile"]?.objectValue?["name"]?.stringValue)
                 }
                 group.addTask {
                     try await Task.sleep(for: .seconds(timeout))
@@ -62,8 +67,8 @@ enum RemoteHostProbe {
                 guard let result = try await group.next() else { throw URLError(.cannotParseResponse) }
                 return result
             }
-            Log.app.info("RemoteHostProbe reachable name=\(name) version=\(version)")
-            return .reachable(name: name, version: version)
+            Log.app.info("RemoteHostProbe reachable name=\(name) version=\(version) profile=\(profile != nil)")
+            return .reachable(name: name, version: version, profile: profile)
         } catch {
             Log.app.info("RemoteHostProbe unavailable error=\(LogPrivacy.text(error.localizedDescription))")
             return .unreachable
@@ -98,12 +103,12 @@ struct HostPickerView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 SettingsSection(
-                    footer: "Ox uses the Host on this device by default. Add a remote Host by its Tailscale address, such as ws://my-mac.tailnet.ts.net:9876. Long-press a remote Host to remove it.",
+                    footer: "Ox opens the Profile on this device by default. To use the Profile active on another device running Ox, add that device by its Tailscale address, such as ws://my-mac.tailnet.ts.net:9876. Long-press a device to remove it.",
                     layout: .group
                 ) {
                     VStack(spacing: 0) {
                         Button { access.selection = .local } label: {
-                            row(title: Text(Self.localTitle), subtitle: nil, selected: access.selection == .local)
+                            row(title: Text(Self.localTitle), subtitle: StorageRoot.shared.active?.name, selected: access.selection == .local)
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier(A11yID.Settings.hostLocal)
@@ -119,7 +124,7 @@ struct HostPickerView: View {
                         Button { addingHost = true } label: {
                             HStack(spacing: Theme.Spacing.xs) {
                                 Image(systemName: "plus").foregroundStyle(Theme.Colors.primary)
-                                Text("Add Remote Host")
+                                Text("Add Device")
                                     .font(Theme.Fonts.bodyMd)
                                     .foregroundStyle(Theme.Colors.primary)
                                 Spacer(minLength: 0)
@@ -136,7 +141,7 @@ struct HostPickerView: View {
         }
         .scrollIndicators(.hidden)
         .background(Theme.Colors.background, ignoresSafeAreaEdges: .all)
-        .navigationTitle("Ox Host")
+        .navigationTitle("Device")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await probeAll() }
         .task(id: access.remoteHosts.map(\.id)) { await probeAll() }
@@ -144,7 +149,7 @@ struct HostPickerView: View {
             RemoteHostCreationSheet()
         }
         .confirmationDialog(
-            "Remove this Host?",
+            "Remove this device?",
             isPresented: Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }),
             titleVisibility: .visible,
             presenting: pendingRemoval
@@ -165,7 +170,7 @@ struct HostPickerView: View {
         let status = statuses[host.id] ?? .checking
         return Button { access.selection = .remote(endpoint: host.endpoint) } label: {
             row(
-                title: Text(verbatim: host.name),
+                title: Text(verbatim: status.profile.map { "\($0) · \(host.name)" } ?? host.name),
                 subtitle: "\(status.subtitle) · \(host.endpoint.absoluteString)",
                 selected: selected
             )
@@ -255,7 +260,7 @@ private struct RemoteHostCreationSheet: View {
                 .settingsPagePadding()
             }
             .background(Theme.Colors.background)
-            .navigationTitle("Add Remote Host")
+            .navigationTitle("Add Device")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -268,7 +273,7 @@ private struct RemoteHostCreationSheet: View {
                         .accessibilityIdentifier(A11yID.Settings.hostAddConfirm)
                 }
             }
-            .errorAlert("Couldn't Add Host", message: $errorMessage)
+            .errorAlert("Couldn't Add Device", message: $errorMessage)
         }
     }
 
@@ -277,7 +282,7 @@ private struct RemoteHostCreationSheet: View {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let host = RemoteHost(name: trimmed.isEmpty ? endpoint.host() ?? endpoint.absoluteString : trimmed, endpoint: endpoint)
         guard access.addRemoteHost(host) else {
-            errorMessage = L10n.string("This Host is already added, or the configuration couldn't be saved.")
+            errorMessage = L10n.string("This device is already added, or the configuration couldn't be saved.")
             return
         }
         dismiss()

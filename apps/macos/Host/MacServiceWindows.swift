@@ -29,7 +29,7 @@ final class MacServiceWindows: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "\(selection.service.title) — Ox Host"
+        window.title = "\(selection.service.title) — Ox"
         window.identifier = NSUserInterfaceItemIdentifier(id.uuidString)
         window.minSize = NSSize(width: 640, height: 400)
         window.isReleasedWhenClosed = false
@@ -80,7 +80,7 @@ private struct ServicePageView: View {
                         .disabled(!interactive)
                         .accessibilityIdentifier("mac-host-service-page")
                 } else {
-                    ContentUnavailableView("Service page ended", systemImage: "globe", description: Text("Choose another active page from the Ox Host menu."))
+                    ContentUnavailableView("Service page ended", systemImage: "globe", description: Text("Choose another active page from the Ox menu."))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }

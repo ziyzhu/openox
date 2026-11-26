@@ -20,10 +20,10 @@ const groups: Record<string, CommandGroup> = {
   }),
   files: group("files", "Manage Host folder access or download conversation files (--host <ws-url>).", FILE_COMMANDS),
   service: group("service", "Exercise live services through the selected Host (--host <ws-url>).", SERVICE_COMMANDS),
-  host: group("host", "Inspect and operate an Ox Host (--host <ws-url>).", HOST_COMMANDS),
+  host: group("host", "Inspect and operate Ox on a device (--host <ws-url>).", HOST_COMMANDS),
   conversation: group("conversation", "Drive and inspect conversations on the Host (--conversation <conversation-id>).", conversationCommands),
   vm: group("vm", "Use a conversation-bound VM on the Host (--conversation <conversation-id>).", vmCommands),
-  agent: group("agent", "Serve pi on this machine to Ox Hosts, or inspect an agent endpoint.", AGENT_COMMANDS),
+  agent: group("agent", "Serve pi on this machine to Ox, or inspect an agent endpoint.", AGENT_COMMANDS),
 };
 
 await runCli("ox", packageMetadata.version, "Use Ox Profiles, repositories, files, services, Hosts, conversations, and VMs", groups, process.argv.slice(2));

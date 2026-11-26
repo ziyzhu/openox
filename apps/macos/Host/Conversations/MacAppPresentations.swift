@@ -18,7 +18,7 @@ final class MacAppPresentations: ServiceHandoffPresenting, ProviderAuthenticatin
                     let entry = try await MacCredentialPrompt.enter(
                         title: spec.type == .account ? "Save login for \(target)" : "Save secret for \(target)",
                         username: spec.type == .account,
-                        message: "Ox stores this in this Host's Keychain and uses it only for \(target). It never enters the conversation.",
+                        message: "Ox stores this in this Mac's Keychain and uses it only for \(target). It never enters the conversation.",
                         prefill: spec.prefill.isEmpty ? nil : (spec.prefill["username"] ?? "", spec.prefill["password"] ?? "")
                     )
                     try Task.checkCancellation()
@@ -46,7 +46,7 @@ final class MacAppPresentations: ServiceHandoffPresenting, ProviderAuthenticatin
 
     func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
         let owner = MacInteractionWindow(
-            title: "\(session.navigationTitle) — Ox Host",
+            title: "\(session.navigationTitle) — Ox",
             view: WebView(session.page).accessibilityIdentifier("mac-host-service-handoff-page")
         ) { session.dismissPresentation() }
         defer { owner.dismiss() }
@@ -60,7 +60,7 @@ final class MacAppPresentations: ServiceHandoffPresenting, ProviderAuthenticatin
             var useAccount = client.subscriptionAccount != nil
             if useAccount && client.acceptsAPIKey {
                 let choice = try await MacCredentialPrompt.choose(
-                    title: client.displayName, message: "Choose how to authenticate on this Host.",
+                    title: client.displayName, message: "Choose how to authenticate on this Mac.",
                     buttons: ["Log in", "Enter credential", "Cancel"]
                 )
                 guard choice != 2 else { throw CancellationError() }

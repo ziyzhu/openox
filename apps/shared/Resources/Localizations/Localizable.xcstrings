@@ -97,6 +97,17 @@
         }
       }
     },
+    "Add Device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加设备"
+          }
+        }
+      }
+    },
     "Agent and Model" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -160,6 +171,17 @@
         }
       }
     },
+    "Couldn't Add Device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法添加设备"
+          }
+        }
+      }
+    },
     "Deleted conversation" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -167,6 +189,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已删除的对话"
+          }
+        }
+      }
+    },
+    "Device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备"
           }
         }
       }
@@ -268,6 +301,17 @@
         }
       }
     },
+    "Ox opens the Profile on this device by default. To use the Profile active on another device running Ox, add that device by its Tailscale address, such as ws://my-mac.tailnet.ts.net:9876. Long-press a device to remove it." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox 默认打开此设备上的配置档案。要使用另一台运行 Ox 的设备上当前的配置档案，请通过 Tailscale 地址添加该设备，例如 ws://my-mac.tailnet.ts.net:9876。长按设备可将其移除。"
+          }
+        }
+      }
+    },
     "Parent was deleted" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -305,6 +349,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "松开添加到草稿"
+          }
+        }
+      }
+    },
+    "Remove this device?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要移除此设备吗？"
           }
         }
       }
@@ -356,6 +411,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "轻点开始，或按住说话，松开发送。"
+          }
+        }
+      }
+    },
+    "This device is already added, or the configuration couldn't be saved." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此设备已添加，或无法保存配置。"
           }
         }
       }
@@ -1277,17 +1343,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加提醒事项"
-          }
-        }
-      }
-    },
-    "Add Remote Host" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加远程主机"
           }
         }
       }
@@ -3658,17 +3713,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法添加文件"
-          }
-        }
-      }
-    },
-    "Couldn't Add Host" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法添加主机"
           }
         }
       }
@@ -6339,16 +6383,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "高"
-          }
-        }
-      }
-    },
-    "Host" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "主机"
           }
         }
       }
@@ -9252,17 +9286,6 @@
         }
       }
     },
-    "Ox Host" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ox 主机"
-          }
-        }
-      }
-    },
     "Ox is a self-evolving agent\nthat lives on your mobile device." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9485,17 +9508,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ox 已停止"
-          }
-        }
-      }
-    },
-    "Ox uses the Host on this device by default. Add a remote Host by its Tailscale address, such as ws://my-mac.tailnet.ts.net:9876. Long-press a remote Host to remove it." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ox 默认使用此设备上的主机。可通过 Tailscale 地址添加远程主机，例如 ws://my-mac.tailnet.ts.net:9876。长按远程主机可将其移除。"
           }
         }
       }
@@ -10946,17 +10958,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "移除原文件夹？"
-          }
-        }
-      }
-    },
-    "Remove this Host?" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要移除此主机吗？"
           }
         }
       }
@@ -13302,17 +13303,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此文件已移除。"
-          }
-        }
-      }
-    },
-    "This Host is already added, or the configuration couldn't be saved." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此主机已添加，或无法保存配置。"
           }
         }
       }

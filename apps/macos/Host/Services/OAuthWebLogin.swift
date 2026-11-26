@@ -55,7 +55,7 @@ private final class MacOAuthSession: NSObject, ASWebAuthenticationPresentationCo
         return await withCheckedContinuation { continuation in
             self.continuation = continuation
             owner = MacInteractionWindow(
-                title: "Log in — Ox Host",
+                title: "Log in — Ox",
                 size: NSSize(width: 540, height: 220),
                 view: Text("Complete login in your browser. Close this window to cancel.").padding(24)
             ) { [weak self] in self?.finish(nil) }
@@ -143,7 +143,7 @@ private final class MacOAuthSession: NSObject, ASWebAuthenticationPresentationCo
                     return
                 }
                 let url = self.callback(text, redirect: redirect)
-                let body = url != nil ? "Return to Ox Host to continue." : "Invalid callback."
+                let body = url != nil ? "Return to Ox to continue." : "Invalid callback."
                 let response = "HTTP/1.1 \(url != nil ? "200 OK" : "400 Bad Request")\r\nContent-Type: text/plain\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
                 connection.send(content: Data(response.utf8), completion: .contentProcessed { [weak self] _ in
                     Task { @MainActor [weak self] in

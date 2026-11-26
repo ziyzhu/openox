@@ -5,7 +5,7 @@ const DEFAULT_ENDPOINT = `ws://127.0.0.1:${DEFAULT_HOST_PORT}`;
 
 export function hostEndpoint(value = process.env.OX_HOST_ENDPOINT ?? process.env.OX_DEBUG_ENDPOINT ?? DEFAULT_ENDPOINT): string {
   const url = new URL(value);
-  if (!["ws:", "wss:"].includes(url.protocol)) throw new Error("Ox Host endpoint must be a ws:// or wss:// URL");
+  if (!["ws:", "wss:"].includes(url.protocol)) throw new Error("Ox endpoint must be a ws:// or wss:// URL");
   if (url.protocol === "ws:" && !url.port) url.port = String(DEFAULT_HOST_PORT);
   return url.toString();
 }
@@ -141,7 +141,7 @@ export class HostConnection {
 function requestFailure(message: string, sent: boolean): Error {
   return new Error(`${message}. ${sent
     ? "Request outcome unknown; reconnect and inspect state before retrying. This request was not automatically resent."
-    : "Host unavailable; start Ox Host or open Ox, enable Host connections, and check the endpoint and access configuration (Tailscale or opt-in Debug loopback)."}`);
+    : "Ox unavailable; open Ox on that device, turn on Allow connections, and check the endpoint and access configuration (Tailscale or opt-in Debug loopback)."}`);
 }
 
 export function isObject(value: unknown): value is Record<string, unknown> {

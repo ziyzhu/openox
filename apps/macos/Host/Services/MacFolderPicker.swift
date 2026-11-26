@@ -14,7 +14,7 @@ nonisolated enum FolderBookmarks {
 enum HostFolderPicker {
     static func choose() async throws -> URL {
         let panel = NSOpenPanel()
-        panel.title = "Mount folder — Ox Host"
+        panel.title = "Mount folder — Ox"
         panel.message = "Allow Ox to access this folder from the current Profile."
         panel.prompt = "Mount Folder"
         panel.canChooseDirectories = true

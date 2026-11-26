@@ -11,6 +11,7 @@ enum Device {
     }
     static let id = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
     static var hostID: String { "ios:\(id)" }
+    @MainActor static var name: String { UIDevice.current.name }
 
     static let internalIDs: Set<String> = [
         "A73FE0BD-73EA-4916-AF12-BCD55D7A0F2D", // ox-qa simulator

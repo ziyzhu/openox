@@ -170,7 +170,7 @@ Order:
 3. Done: per-Profile secrets (prefixed Keychain accounts) and website logins (store per Profile), migrated to the Profile selected at upgrade.
 4. Website data export and import with `fetchData`/`restoreData`, after a device check of what restores.
 5. Done: policy, services, providers and remote agents live in `<Profile>/.ox/`, migrated to the Profile selected at upgrade.
-6. Drop Host from the UI and docs: "Remote Hosts" become Profiles on other devices ("Work · MacBook"), Settings splits into Profile settings and a small "This device" section; README, onboarding and the website describe Profiles and agents. No code or protocol rename.
+6. Done: drop Host from the UI and docs. Settings has a Device row (this device or another device running Ox, shown as "<active Profile> · <device>" from host.describe's new device and profile fields) and Allow connections; the Mac app is "Ox"; CLI help, README and the website's privacy and support pages describe devices and Profiles. No code or protocol rename.
 
 ## Notifications
 

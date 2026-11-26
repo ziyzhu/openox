@@ -24,7 +24,7 @@ const FOLDERS_USAGE = `Usage: ox agent folders [list | add <folder> | remove <fo
 Changes the folders a running ox agent serve authorizes; new and resumed pi processes use the updated list.`;
 
 export const AGENT_COMMANDS: Record<string, SubCommand> = {
-  serve: { desc: "Serve pi on this machine to Ox Hosts over WebSocket JSON-RPC, published through Tailscale Serve", fn: serve },
+  serve: { desc: "Serve pi on this machine to Ox over WebSocket JSON-RPC, published through Tailscale Serve", fn: serve },
   describe: { desc: "Show an agent endpoint's implementation, folders and methods (--endpoint, --json)", fn: describe },
   folders: { desc: "List, add or remove the folders an agent endpoint authorizes (--endpoint)", fn: folders },
 };

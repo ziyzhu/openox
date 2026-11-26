@@ -39,11 +39,10 @@ To build and run your own Ox from this repository, follow the [setup guide](.age
 ## How it works
 
 - **Ox** is malleable. Change settings by chatting with it.
-- **Ox Client** is where you chat with Ox. Connect to a Host on the same device or another device.
-- **Ox Host** runs your agent and tools. Use a macOS Host from your iOS Client for long-running tasks.
+- **Ox Client** is where you chat with Ox: the app or the `ox` CLI. Open the Profile on your device, or the one active on another device such as your Mac for long-running tasks.
 - **Ox VM** provides a persistent execution environment with a common interface across supported devices.
-- **Ox Agent** builds on [Pi Durable](https://earendil.com/posts/pi-durable/) and uses Code Mode to interact with the Ox VM.
-- **Ox Profile** keeps your memory and conversations in a plain folder that you can move between devices.
+- **Ox Agent** builds on [Pi Durable](https://earendil.com/posts/pi-durable/) and uses Code Mode to interact with the Ox VM. A conversation can also run on pi on another machine with `ox agent serve`.
+- **Ox Profile** keeps your memory, conversations and settings in a plain folder that you can move between devices. Secrets and website logins stay on each device, separate for each Profile.
 - **Ox Repository** packages services and skills in Git, so you can share capabilities with other Ox users.
 
 ## A random sketch

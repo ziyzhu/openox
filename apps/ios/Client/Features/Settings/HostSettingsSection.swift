@@ -18,14 +18,14 @@ struct HostSettingsSection: View {
                 NavigationLink {
                     HostPickerView()
                 } label: {
-                    SettingsDisclosureRow(title: "Ox Host", value: selectedHostName)
+                    SettingsDisclosureRow(title: "Device", value: selectedHostName)
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier(A11yID.Settings.hostPicker)
 
                 Divider().settingsContentInset()
 
-                Toggle("Host", isOn: Binding(get: { access.enabled }, set: { access.enabled = $0 }))
+                Toggle("Allow connections", isOn: Binding(get: { access.enabled }, set: { access.enabled = $0 }))
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
                     .tint(Theme.Colors.primary)

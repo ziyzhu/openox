@@ -15,8 +15,8 @@ final class MacHostMenu: NSObject, NSMenuDelegate {
         icon?.size = NSSize(width: 18, height: 18)
         icon?.isTemplate = true
         item.button?.image = icon
-        item.button?.toolTip = "Ox Host"
-        item.button?.setAccessibilityLabel("Ox Host")
+        item.button?.toolTip = "Ox"
+        item.button?.setAccessibilityLabel("Ox")
         let menu = NSMenu()
         menu.delegate = self
         item.menu = menu
@@ -26,10 +26,10 @@ final class MacHostMenu: NSObject, NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         menu.removeAllItems()
         let status = switch host.state {
-        case .stopped: "Host stopped"
-        case .preparing: "Host preparing…"
-        case .running: "Host running"
-        case .failed(let message): "Host failed: \(message)"
+        case .stopped: "Ox stopped"
+        case .preparing: "Ox preparing…"
+        case .running: "Ox running"
+        case .failed(let message): "Ox failed: \(message)"
         }
         let heading = NSMenuItem(title: status, action: nil, keyEquivalent: "")
         heading.isEnabled = false
@@ -59,7 +59,7 @@ final class MacHostMenu: NSObject, NSMenuDelegate {
         inspect.submenu = pages
         menu.addItem(inspect)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit Ox Host", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: "Quit Ox", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
 
     @objc private func toggleConnections() {
@@ -75,7 +75,7 @@ final class MacHostMenu: NSObject, NSMenuDelegate {
         let menu = NSMenu()
         let application = NSMenuItem()
         let actions = NSMenu()
-        actions.addItem(NSMenuItem(title: "Quit Ox Host", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        actions.addItem(NSMenuItem(title: "Quit Ox", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         application.submenu = actions
         menu.addItem(application)
         let edit = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
