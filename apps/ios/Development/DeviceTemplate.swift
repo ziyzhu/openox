@@ -151,9 +151,9 @@ enum DeviceTemplate {
                 }
                 if let region = settings.region, let value = LLMRegion(rawValue: region) { AppRegion.shared.setForTesting(value) }
                 if let enabled = settings.allowHostConnections {
-                    var value = try HostConfiguration.load()
+                    var value = HostConfiguration()
                     value.allowConnections = enabled
-                    try value.save()
+                    try value.save(to: AppStoragePaths.legacyHostConfiguration)
                 }
                 if let value = settings.defaultModel {
                     let selection = value == .null ? nil : try model(value)
@@ -228,6 +228,11 @@ enum DeviceTemplate {
                 try await DurableProfileStore.shared.close(in: scope)
             }
             if let selection = request.selection, let profile = profiles[selection.profile] {
+                if let enabled = request.settings?.allowHostConnections {
+                    var value = HostConfiguration()
+                    value.allowConnections = enabled
+                    try value.save(for: profile.id)
+                }
                 try StorageRoot.shared.prefer(profile)
                 try await StorageRoot.shared.resolve()
             }

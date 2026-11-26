@@ -6,7 +6,7 @@ artifact; `bun run sim:bootstrap --device ox-N --template <json>` applies to the
 installed artifact and relaunches it. Reserve the target first. Setup uses a local
 startup file, not Host access or a model call; Release and physical builds cannot
 apply templates. `--loopback` only opts into Debug localhost ingress and does not
-enable Host connections.
+turn on Allow Connections; `settings.allowHostConnections` sets it on the selected Profile, or the startup Profile without a selection.
 
 The TypeScript contract is [`scripts/template-schema.ts`](../scripts/template-schema.ts); [`templates/basic.json`](../templates/basic.json)
 is a runnable example. `--schema` prints JSON Schema directly from that contract.

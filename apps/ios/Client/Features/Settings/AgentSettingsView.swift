@@ -5,18 +5,23 @@ struct AgentSettingsView: View {
     @State private var pendingRemoval: RemoteAgent?
     @State private var errorMessage: String?
     private var directory: RemoteAgentDirectory { .shared }
+    private var registry: ProviderRegistry { .shared }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 SettingsSection(
-                    footer: "Ox runs conversations on this device by default. Add pi running on another computer with `ox agent serve`, using its Tailscale name such as my-mac.tailnet.ts.net. It keeps Ox's tools and context. Long-press an agent to remove it.",
+                    footer: "New conversations use the default agent. Current Device runs Ox on this device. Add pi running on another computer with `ox agent serve`, using its Tailscale name such as my-mac.tailnet.ts.net. It keeps Ox's tools and context. Long-press an agent to remove it.",
                     layout: .group
                 ) {
                     VStack(spacing: 0) {
-                        row(title: Text("Ox"), subtitle: L10n.string("Built in"))
-                            .accessibilityElement(children: .combine)
-                            .accessibilityIdentifier(A11yID.Settings.agentRow("local"))
+                        Button { setDefault(nil) } label: {
+                            row(title: Text("Current Device"), subtitle: L10n.string("Built in"), selected: directory.defaultEndpoint == nil)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(directory.defaultEndpoint == nil ? .isSelected : [])
+                        .accessibilityIdentifier(A11yID.Settings.agentRow("local"))
                         ForEach(directory.agents) { agent in
                             Divider().settingsContentInset()
                             remoteRow(agent)
@@ -37,12 +42,33 @@ struct AgentSettingsView: View {
                         .accessibilityIdentifier(A11yID.Settings.agentAdd)
                     }
                 }
+                if directory.defaultEndpoint == nil {
+                    SettingsSection(
+                        footer: "Used for new conversations on this device. Existing conversations keep their model.",
+                        layout: .row
+                    ) {
+                        NavigationLink {
+                            ModelPickerContent(
+                                title: "Default model",
+                                activeSelection: registry.sessionModel,
+                                scopeDescription: "Changes apply immediately to new conversations. Existing conversations keep their model."
+                            ) { client, model, selection in
+                                Log.ui.info("Settings.defaultModel client=\(client.id) model=\(model.id) region=\(selection.region.rawValue)")
+                                registry.select(model, in: client.id, region: selection.region)
+                            }
+                        } label: {
+                            SettingsDisclosureRow(title: "Model", value: DefaultAgentValue.model(registry))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier(A11yID.Settings.defaultModel)
+                    }
+                }
             }
             .settingsPagePadding()
         }
         .scrollIndicators(.hidden)
         .background(Theme.Colors.background, ignoresSafeAreaEdges: .all)
-        .navigationTitle("Agents")
+        .navigationTitle("Default Agent")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await directory.refreshAll() }
         .task(id: directory.agents.map(\.id)) { await directory.refreshAll() }
@@ -61,20 +87,36 @@ struct AgentSettingsView: View {
         } message: { agent in
             Text("Conversations that use it stay in Ox but can't continue until it's added again.\n\(agent.endpoint.absoluteString)")
         }
-        .errorAlert("Couldn't Remove Agent", message: $errorMessage)
+        .errorAlert("Couldn't Change Agents", message: $errorMessage)
+    }
+
+    private func setDefault(_ endpoint: URL?) {
+        guard endpoint != directory.defaultEndpoint else { return }
+        do {
+            try directory.setDefault(endpoint)
+            Log.ui.info("Settings.defaultAgent endpoint=\(endpoint.map { LogPrivacy.url($0.absoluteString) } ?? "local")")
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func remoteRow(_ agent: RemoteAgent) -> some View {
-        row(title: Text(verbatim: agent.name), subtitle: "\(subtitle(directory.statuses[agent.endpoint])) · \(agent.endpoint.absoluteString)")
-            .accessibilityElement(children: .combine)
-            .contextMenu {
-                Button(role: .destructive) { pendingRemoval = agent } label: {
-                    Label("Remove", systemImage: "trash")
-                }
-                .accessibilityIdentifier(A11yID.Settings.agentRemove(agent.endpoint.absoluteString))
+        Button { setDefault(agent.endpoint) } label: {
+            row(title: Text(verbatim: agent.name),
+                subtitle: "\(subtitle(directory.statuses[agent.endpoint])) · \(agent.endpoint.absoluteString)",
+                selected: directory.defaultEndpoint == agent.endpoint)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(directory.defaultEndpoint == agent.endpoint ? .isSelected : [])
+        .contextMenu {
+            Button(role: .destructive) { pendingRemoval = agent } label: {
+                Label("Remove", systemImage: "trash")
             }
-            .accessibilityIdentifier(A11yID.Settings.agentRow(agent.endpoint.absoluteString))
-            .accessibilityAction(named: Text("Remove")) { pendingRemoval = agent }
+            .accessibilityIdentifier(A11yID.Settings.agentRemove(agent.endpoint.absoluteString))
+        }
+        .accessibilityIdentifier(A11yID.Settings.agentRow(agent.endpoint.absoluteString))
+        .accessibilityAction(named: Text("Remove")) { pendingRemoval = agent }
     }
 
     private func subtitle(_ status: RemoteAgentStatus?) -> String {
@@ -87,7 +129,7 @@ struct AgentSettingsView: View {
         }
     }
 
-    private func row(title: Text, subtitle: String) -> some View {
+    private func row(title: Text, subtitle: String, selected: Bool) -> some View {
         HStack(spacing: SettingsLayout.horizontalInset) {
             VStack(alignment: .leading, spacing: 2) {
                 title
@@ -100,6 +142,11 @@ struct AgentSettingsView: View {
                     .truncationMode(.tail)
             }
             Spacer(minLength: 0)
+            if selected {
+                Image(systemName: "checkmark")
+                    .font(.system(.subheadline, weight: .semibold))
+                    .foregroundStyle(Theme.Colors.primary)
+            }
         }
         .padding(.horizontal, SettingsLayout.horizontalInset)
         .padding(.vertical, SettingsLayout.rowVerticalInset)
@@ -172,38 +219,31 @@ struct RemoteAgentCreationSheet: View {
     }
 }
 
-struct AgentSettingsSection: View {
-    @State private var errorMessage: String?
-    private var directory: RemoteAgentDirectory { .shared }
+enum DefaultAgentValue {
+    @MainActor
+    static func model(_ registry: ProviderRegistry) -> Text {
+        guard let selection = registry.defaultModel else { return Text("Not configured") }
+        let client = registry.client(for: selection)
+        return Text(verbatim: registry.model(for: selection, client: client).displayName)
+    }
+}
 
-    var body: some View {
-        SettingsSection(footer: "Run conversations on pi on another computer. New conversations use the default agent.", layout: .group) {
-            VStack(spacing: 0) {
-                NavigationLink { AgentSettingsView() } label: {
-                    SettingsDisclosureRow(title: "Agents", value: Text(directory.agents.isEmpty ? "Ox" : "\(directory.agents.count + 1) agents"))
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier(A11yID.Settings.agents)
-                if !directory.agents.isEmpty {
-                    Divider().settingsContentInset()
-                    Menu {
-                        Button("Ox") { setDefault(nil) }
-                        ForEach(directory.agents) { agent in
-                            Button { setDefault(agent.endpoint) } label: { Text(verbatim: agent.name) }
-                        }
-                    } label: {
-                        SettingsDisclosureRow(title: "Default agent",
-                                              value: Text(verbatim: directory.defaultEndpoint.map(directory.displayName(for:)) ?? "Ox"),
-                                              indicator: "chevron.up.chevron.down")
-                    }
-                    .accessibilityIdentifier(A11yID.Settings.defaultAgent)
-                }
-            }
-        }
-        .errorAlert("Couldn't Change Default Agent", message: $errorMessage)
+struct DefaultAgentSettingsSection: View {
+    private var directory: RemoteAgentDirectory { .shared }
+    private var registry: ProviderRegistry { .shared }
+
+    private var value: Text {
+        if let endpoint = directory.defaultEndpoint { return Text(verbatim: directory.displayName(for: endpoint)) }
+        return Text("Current Device · \(DefaultAgentValue.model(registry))")
     }
 
-    private func setDefault(_ endpoint: URL?) {
-        do { try directory.setDefault(endpoint) } catch { errorMessage = error.localizedDescription }
+    var body: some View {
+        SettingsSection(footer: "Used for new conversations. Existing conversations keep their agent and model.", layout: .row) {
+            NavigationLink { AgentSettingsView() } label: {
+                SettingsDisclosureRow(title: "Default agent", value: value)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(A11yID.Settings.defaultAgent)
+        }
     }
 }

@@ -4,73 +4,76 @@ import Observation
 @MainActor
 @Observable
 final class HostAccess {
-    static let preferenceKey = "host.allowConnections"
+    nonisolated static let preferenceKey = "host.allowConnections"
 
-    private var configuration: HostConfiguration
+    private var profileID: UUID?
+    private var configuration = HostConfiguration()
 
     var enabled: Bool {
         get { configuration.allowConnections }
         set {
-            guard newValue != configuration.allowConnections else { return }
-            guard update({ $0.allowConnections = newValue }) else { return }
-            Log.app.info("HostAccess enabled=\(newValue)")
-            onEnabledChange?(newValue)
+            guard let profileID = StorageRoot.shared.activeId else { return }
+            setAllowsConnections(newValue, for: profileID)
         }
     }
     @ObservationIgnored var onEnabledChange: ((Bool) -> Void)?
 
-    var remoteHosts: [RemoteHost] { configuration.remoteHosts }
-
-    var selection: HostSelection {
-        get { configuration.selection }
-        set {
-            guard newValue != configuration.selection else { return }
-            if case .remote(let endpoint) = newValue, !configuration.remoteHosts.contains(where: { $0.endpoint == endpoint }) { return }
-            guard update({ $0.selection = newValue }) else { return }
-            Log.app.info("HostAccess.select host=\(Self.logName(newValue))")
-        }
-    }
-
     init() {
-        configuration = (try? HostConfiguration.load()) ?? HostConfiguration()
+        observeActiveProfile()
     }
 
-    @discardableResult
-    func addRemoteHost(_ host: RemoteHost) -> Bool {
-        guard !configuration.remoteHosts.contains(where: { $0.endpoint == host.endpoint }) else { return false }
-        guard update({ $0.remoteHosts.append(host) }) else { return false }
-        Log.app.info("HostAccess.addRemote endpoint=\(LogPrivacy.url(host.endpoint.absoluteString)) count=\(configuration.remoteHosts.count)")
-        return true
-    }
-
-    func removeRemoteHost(_ endpoint: URL) {
-        guard update({ next in
-            next.remoteHosts.removeAll { $0.endpoint == endpoint }
-            if next.selection == .remote(endpoint: endpoint) { next.selection = .local }
-        }) else { return }
-        Log.app.info("HostAccess.removeRemote endpoint=\(LogPrivacy.url(endpoint.absoluteString)) count=\(configuration.remoteHosts.count)")
-    }
-
-    private func update(_ change: (inout HostConfiguration) -> Void) -> Bool {
+    func allowsConnections(for profileID: UUID) -> Bool {
+        if profileID == self.profileID { return configuration.allowConnections }
         do {
-            guard try HostConfiguration.load() == configuration else {
-                throw StorageMigrationError.collision("Host configuration changed externally")
-            }
-            var next = configuration
-            change(&next)
-            try next.save()
-            configuration = next
-            return true
+            return try HostConfiguration.load(for: profileID).allowConnections
         } catch {
-            Log.app.error("HostAccess.save failed error=\(error.localizedDescription)")
+            Log.app.error("HostAccess.load failed profile=\(profileID) error=\(error.localizedDescription)")
             return false
         }
     }
 
-    private static func logName(_ selection: HostSelection) -> String {
-        switch selection {
-        case .local: "local"
-        case .remote(let endpoint): "remote:\(LogPrivacy.url(endpoint.absoluteString))"
+    @discardableResult
+    func setAllowsConnections(_ value: Bool, for profileID: UUID) -> Bool {
+        do {
+            var next = try HostConfiguration.load(for: profileID)
+            if profileID == self.profileID, next != configuration {
+                throw StorageMigrationError.collision("Host configuration changed externally")
+            }
+            guard next.allowConnections != value else { return true }
+            next.allowConnections = value
+            try next.save(for: profileID)
+        } catch {
+            Log.app.error("HostAccess.save failed profile=\(profileID) error=\(error.localizedDescription)")
+            return false
         }
+        Log.app.info("HostAccess allowConnections=\(value) profile=\(profileID) active=\(profileID == self.profileID)")
+        if profileID == self.profileID { reload() }
+        return true
+    }
+
+    private func observeActiveProfile() {
+        withObservationTracking {
+            _ = StorageRoot.shared.activeId
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in self?.observeActiveProfile() }
+        }
+        reload()
+    }
+
+    private func reload() {
+        let id = StorageRoot.shared.activeId
+        let next: HostConfiguration
+        do {
+            next = try id.map(HostConfiguration.load(for:)) ?? HostConfiguration()
+        } catch {
+            Log.app.error("HostAccess.load failed profile=\(id?.uuidString ?? "none") error=\(error.localizedDescription)")
+            next = HostConfiguration()
+        }
+        guard id != profileID || next != configuration else { return }
+        let wasEnabled = configuration.allowConnections
+        profileID = id
+        configuration = next
+        Log.app.info("HostAccess.activeProfile profile=\(id?.uuidString ?? "none") enabled=\(next.allowConnections)")
+        if wasEnabled != next.allowConnections { onEnabledChange?(next.allowConnections) }
     }
 }

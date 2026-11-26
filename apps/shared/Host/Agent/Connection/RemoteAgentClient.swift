@@ -70,7 +70,7 @@ final class RemoteAgentClient {
         let token = UUID()
         let (stream, continuation) = AsyncStream<RemoteAgentInbound>.makeStream()
         listeners[conversationID, default: [:]][token] = { continuation.yield($0) }
-        continuation.onTermination = { _ in
+        continuation.onTermination = { [weak self] _ in
             Task { @MainActor [weak self] in self?.listeners[conversationID]?[token] = nil }
         }
         return stream

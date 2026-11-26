@@ -71,7 +71,7 @@ export async function discover(args: string[], context: CliContext): Promise<voi
     return;
   }
   hosts.forEach(host => console.log(`${host.endpoint}  ${host.label} · ${host.kind} · ${host.reachable ? "reachable" : "unavailable"}`));
-  if (!hosts.length) console.log("(no reachable Hosts; connect Tailscale and keep Ox open with Host connections enabled)");
+  if (!hosts.length) console.log("(no reachable Hosts; connect Tailscale and keep Ox open with Allow Connections on in its active Profile)");
   if (warning) process.stderr.write(`${warning}\n`);
 }
 

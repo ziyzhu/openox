@@ -14,8 +14,8 @@ types remain authoritative in their `Codable` implementations.
 │   ├── Application Support/
 │   │   ├── Configuration/
 │   │   │   ├── settings.json               format-1 app language selection
-│   │   │   ├── host.json                   format-1 Host connection permission; defaults off
 │   │   │   ├── profiles/<Profile UUID>/secrets.json  version-1 Secret metadata/bindings of that Profile; no secret values
+│   │   │   ├── profiles/<Profile UUID>/host.json     format-1 allowConnections of that Profile; defaults off
 │   │   │   ├── mounted-repositories.json   version-1 bindings to Files grants
 │   │   │   ├── external-profiles.json      selected Profile bookmarks/display names
 │   │   │   └── device-folder-grants.json    Profile-bound native bookmarks
@@ -895,6 +895,17 @@ its configuration folder. Older builds read only unprefixed accounts and the
 app-wide index, so after a downgrade credentials appear missing until they are
 entered again.
 
+Allow Connections belongs to each Profile: `Configuration/profiles/<Profile UUID>/host.json`
+is format 1 with `format` and `allowConnections`, defaulting off when absent. The Host
+serves remote clients only while the active Profile allows it. `profile.hostScope`
+moves the predecessor app-wide `Configuration/host.json` into the active Profile
+(write, verify, delete); its value replaces the Profile's. The legacy
+`host.allowConnections` preference migrates into that app-wide file only when
+present. The remote Host list and selection the predecessor stored there are
+dropped; nothing read them. Older builds recreate the app-wide file off, so a
+downgrade turns connections off until re-enabled; the next upgrade carries the
+older build's value into the active Profile.
+
 Reusable credentials use generic-password Keychain accounts `secret:<key>` under
 the bundle-derived `<application bundle identifier>.llm` service. Each item is a
 validated flat UTF-8 JSON object of string fields (16 KiB maximum). New items use After First Unlock
@@ -990,6 +1001,7 @@ user data needed for diagnosis but never credentials or reusable secrets.
 | Discovered models and model capabilities | Caches | Purgeable local cache | System eviction or refresh |
 | Secret values | Keychain | This device only | Sign out generated entry or delete any entry |
 | Secret metadata and bindings | Configuration/profiles/<Profile UUID>/secrets.json | Device backup policy | Sign out, delete entry, or delete the Profile |
+| Allow Connections | Configuration/profiles/<Profile UUID>/host.json | Device backup policy | Turn off, or delete the Profile |
 | Managed provider OAuth | Keychain | System policy | Sign out |
 | Service website state | Domain website store | Local persistent state | Sign out service family |
 | Remote MCP endpoints and transports | <Profile>/repositories/Local | Profile policy | Disconnect the MCP server |

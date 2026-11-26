@@ -117,7 +117,7 @@ extension Conversation {
                 "app": info ?? .null, "profiles": profiles ?? .null,
                 "notifications": notifications ?? .null, "language": language ?? .null,
                 "defaultModel": model ?? .null, "repositories": repositories ?? .null,
-                "host": .object(["allowConnections": .bool(try HostConfiguration.load().allowConnections)]),
+                "host": .object(["allowConnections": .bool(try scope.profileID.map(HostConfiguration.load(for:))?.allowConnections ?? false)]),
             ]))
         case "app/logs.jsonl":
             try await requireApproval(action: Actions.appLogs, purpose: "Read Profile diagnostic logs")

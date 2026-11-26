@@ -18,7 +18,7 @@ nonisolated enum AppStoragePaths {
     static let settings = configuration.appendingPathComponent("settings.json", isDirectory: false)
     static var actionPolicies: URL { profileState("policy.json") }
     static var servicePreferences: URL { profileState("services.json") }
-    static let hostConfiguration = configuration.appendingPathComponent("host.json", isDirectory: false)
+    static let legacyHostConfiguration = configuration.appendingPathComponent("host.json", isDirectory: false)
     static var remoteAgentConfiguration: URL { profileState("remote-agents.json") }
     static let profileStateFiles = ["policy.json", "services.json", "providers.json", "remote-agents.json"]
     static let legacySecretIndex = configuration.appendingPathComponent("secrets.json", isDirectory: false)

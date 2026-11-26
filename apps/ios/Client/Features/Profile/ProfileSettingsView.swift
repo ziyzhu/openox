@@ -18,6 +18,8 @@ struct ProfileSettingsView: View {
     let initialSkillDraft: SkillDraft?
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(HostAccess.self) private var hostAccess
+    @State private var allowsConnections = false
     @State private var renaming = false
     @State private var nameDraft = ""
     @State private var operationErrorMessage: String?
@@ -78,6 +80,7 @@ struct ProfileSettingsView: View {
                         ProfileContentsView(profile: profile, initialSkillDraft: initialSkillDraft)
                             .id(profile.url.path)
                         detailsSection(for: profile)
+                        connectionsSection(for: profile)
                         exportSection(for: profile)
                         deleteSection(for: profile)
                     } else {
@@ -247,6 +250,27 @@ struct ProfileSettingsView: View {
                 .disabled(storage.isBusy)
                 .accessibilityIdentifier(A11yID.Settings.profileMove(profile.id.uuidString))
             }
+        }
+    }
+
+    private func connectionsSection(for profile: Profile) -> some View {
+        SettingsSection(footer: "Off by default. While this Profile is in use, other devices on your Tailscale network can connect to Ox, manage conversations, and run tools. Keep Ox open while connected. Only enable this on a trusted network.", layout: .row) {
+            Toggle("Allow Connections", isOn: Binding(
+                get: { allowsConnections },
+                set: { value in
+                    guard hostAccess.setAllowsConnections(value, for: profile.id) else {
+                        operationErrorMessage = String(localized: "The connection setting couldn't be saved.")
+                        return
+                    }
+                    allowsConnections = value
+                }
+            ))
+            .font(Theme.Fonts.bodyMd)
+            .foregroundStyle(Theme.Colors.onSurface)
+            .tint(Theme.Colors.primary)
+            .settingsRowPadding()
+            .accessibilityIdentifier(A11yID.Settings.profileAllowConnections)
+            .task(id: profile.id) { allowsConnections = hostAccess.allowsConnections(for: profile.id) }
         }
     }
 

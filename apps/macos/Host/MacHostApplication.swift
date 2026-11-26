@@ -37,8 +37,6 @@ final class MacHostApplication: NSObject, NSApplicationDelegate {
         )
         ScheduleScheduler.shared.configure(host: host)
         let access = HostAccess()
-        if ProcessInfo.processInfo.arguments.contains("--allow-connections") { access.enabled = true }
-        if ProcessInfo.processInfo.arguments.contains("--disable-connections") { access.enabled = false }
         let transport = WebSocketOxHostTransport(host: host, access: access)
         self.host = host
         self.transport = transport
@@ -59,6 +57,8 @@ final class MacHostApplication: NSObject, NSApplicationDelegate {
             do {
                 try await host.prepare()
                 try Task.checkCancellation()
+                if ProcessInfo.processInfo.arguments.contains("--allow-connections") { access.enabled = true }
+                if ProcessInfo.processInfo.arguments.contains("--disable-connections") { access.enabled = false }
                 transport.reconcile()
                 Log.app.info("MacHost prepared connectionsEnabled=\(access.enabled)")
             } catch {

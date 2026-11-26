@@ -87,19 +87,17 @@ nonisolated extension ApplicationStorageMigrator {
     }
 
     private static func migrateHostConfiguration(defaults: UserDefaults) throws {
-        let exists = FileManager.default.fileExists(atPath: AppStoragePaths.hostConfiguration.path)
-        let current = exists ? try HostConfiguration.load() : HostConfiguration()
-        var next = current
-        let key = "host.allowConnections"
-        if let value = legacyPreference(key, defaults: defaults) {
-            guard let value = value as? Bool else { throw StorageMigrationError.invalidApplicationStorage("Host access") }
-            next.allowConnections = value
-        }
-        if exists {
-            guard next == current else { throw StorageMigrationError.collision("Host configuration") }
+        let key = HostAccess.preferenceKey
+        guard let preference = legacyPreference(key, defaults: defaults) else { return }
+        guard let value = preference as? Bool else { throw StorageMigrationError.invalidApplicationStorage("Host access") }
+        let url = AppStoragePaths.legacyHostConfiguration
+        if FileManager.default.fileExists(atPath: url.path) {
+            guard try HostConfiguration.load(from: url).allowConnections == value else { throw StorageMigrationError.collision("Host configuration") }
         } else {
-            try next.save()
-            guard try HostConfiguration.load() == next else { throw StorageMigrationError.invalidApplicationStorage("Host configuration publication") }
+            var next = HostConfiguration()
+            next.allowConnections = value
+            try next.save(to: url)
+            guard try HostConfiguration.load(from: url) == next else { throw StorageMigrationError.invalidApplicationStorage("Host configuration publication") }
             Log.app.info("StorageMigrator.hostConfiguration done format=1")
         }
         try removeMigratedPreferences([key], defaults: defaults)

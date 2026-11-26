@@ -141,7 +141,7 @@ export class HostConnection {
 function requestFailure(message: string, sent: boolean): Error {
   return new Error(`${message}. ${sent
     ? "Request outcome unknown; reconnect and inspect state before retrying. This request was not automatically resent."
-    : "Ox unavailable; open Ox on that device, turn on Allow connections, and check the endpoint and access configuration (Tailscale or opt-in Debug loopback)."}`);
+    : "Ox unavailable; open Ox on that device, turn on Allow connections in the active Profile, and check the endpoint and access configuration (Tailscale or opt-in Debug loopback)."}`);
 }
 
 export function isObject(value: unknown): value is Record<string, unknown> {

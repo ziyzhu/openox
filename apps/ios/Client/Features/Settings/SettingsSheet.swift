@@ -19,7 +19,6 @@ struct SettingsSheet: View {
     @State private var profileOpenErrorMessage: String?
     private let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
     private let appBuild = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
-    private var registry: ProviderRegistry { ProviderRegistry.shared }
     private var appLocale: AppLocale { AppLocale.shared }
     private var storage: StorageRoot { .shared }
 
@@ -45,13 +44,6 @@ struct SettingsSheet: View {
 
     private var speechLanguageValue: Text {
         speechLanguage.isEmpty ? Text("App language") : Text(verbatim: speechLanguageName(speechLanguage))
-    }
-
-    private var defaultModelValue: Text {
-        guard let selection = registry.defaultModel else { return Text("Not configured") }
-        let client = registry.client(for: selection)
-        let model = registry.model(for: selection, client: client)
-        return Text(verbatim: model.displayName)
     }
 
     var body: some View {
@@ -128,34 +120,9 @@ struct SettingsSheet: View {
                         }
                     }
 
-                    SettingsSection(
-                        footer: "Used for new conversations. Existing conversations keep their model.",
-                        layout: .group
-                    ) {
-                        NavigationLink {
-                            ModelPickerContent(
-                                title: "Default model",
-                                activeSelection: registry.sessionModel,
-                                scopeDescription: "Changes apply immediately to new conversations. Existing conversations keep their model."
-                            ) { client, model, selection in
-                                Log.ui.info("Settings.defaultModel client=\(client.id) model=\(model.id) region=\(selection.region.rawValue)")
-                                registry.select(model, in: client.id, region: selection.region)
-                            }
-                        } label: {
-                            SettingsDisclosureRow(
-                                title: "Default model",
-                                value: defaultModelValue
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier(A11yID.Settings.defaultModel)
-                    }
-
-                    AgentSettingsSection()
+                    DefaultAgentSettingsSection()
 
                     capabilitiesSettingsSection
-
-                    HostSettingsSection()
 
                     SettingsSection(layout: .group) {
                         VStack(spacing: 0) {
