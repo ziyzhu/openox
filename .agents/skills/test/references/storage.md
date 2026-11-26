@@ -804,7 +804,7 @@ WebKit's same-origin policy separates origin storage, while cookies follow
 normal browser domain rules. Signing out enumerates WebKit records and cookies,
 then removes only entries mapped to that website's Public Suffix List-aware
 registrable domain. The list is shipped in `PublicSuffixList.bundle` and looked
-up by [WebsitePublicSuffixList](../../../../apps/shared/Host/Services/Web/WebsitePublicSuffixList.swift)
+up by [WebsitePublicSuffixList](../../../../apps/shared/Runtime/Services/Web/WebsitePublicSuffixList.swift)
 using [the bundled rules](../../../../apps/shared/Resources/PublicSuffixList.bundle/public_suffix_list.dat).
 Interactive login and throwaway browsing use separate
 pages with the same persistent store but separate DOM, history, and
@@ -950,7 +950,7 @@ never copied to the PAT account, and provider credentials remain separate.
 Deletion is retryable; the PAT flow never reads the legacy item, even if cleanup
 is deferred by Keychain availability. Local deletion does not revoke GitHub grants.
 
-Built-in provider keys in `apps/shared/Host/ModelProviders/Secrets.swift` are compile-time binary
+Built-in provider keys in `apps/shared/Runtime/ModelProviders/Secrets.swift` are compile-time binary
 contents rather than device storage.
 
 ## Logs

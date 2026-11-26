@@ -2,28 +2,28 @@ import Foundation
 
 @MainActor
 final class OxClient {
-    static let shared = OxClient(host: IOSHost.shared)
+    static let shared = OxClient(runtime: IOSProfileRuntime.shared)
 
-    private let host: any OxHost
-    let conversationReader: any HostConversationReading
-    let conversationController: any HostConversationControlling
+    private let runtime: any ProfileRuntime
+    let conversationReader: any ConversationReading
+    let conversationController: any ConversationControlling
 
-    var conversations: ConversationManager { host.conversations }
-    var services: ServiceManager { host.services }
+    var conversations: ConversationManager { runtime.conversations }
+    var services: ServiceManager { runtime.services }
 
-    func listConversations() async throws -> [HostConversationSummary] {
+    func listConversations() async throws -> [ConversationSummary] {
         try await conversationReader.listConversations()
     }
 
-    func readConversation(_ id: UUID) async throws -> HostConversationState {
+    func readConversation(_ id: UUID) async throws -> ConversationReadState {
         try await conversationReader.readConversation(id)
     }
 
-    func sendText(_ text: String, to id: UUID, mode: HostConversationSendMode) async throws -> HostConversationSendResult {
+    func sendText(_ text: String, to id: UUID, mode: ConversationSendMode) async throws -> ConversationSendResult {
         try await conversationController.sendText(text, to: id, mode: mode)
     }
 
-    func stopConversation(_ id: UUID) async throws -> HostConversationStopResult {
+    func stopConversation(_ id: UUID) async throws -> ConversationStopResult {
         try await conversationController.stopConversation(id)
     }
 
@@ -32,37 +32,37 @@ final class OxClient {
     }
 
     init(
-        host: any OxHost,
-        conversationReader: (any HostConversationReading)? = nil,
-        conversationController: (any HostConversationControlling)? = nil
+        runtime: any ProfileRuntime,
+        conversationReader: (any ConversationReading)? = nil,
+        conversationController: (any ConversationControlling)? = nil
     ) {
-        self.host = host
-        self.conversationReader = conversationReader ?? EmbeddedHostConversationReader(host: host)
-        self.conversationController = conversationController ?? EmbeddedHostConversationController(host: host)
+        self.runtime = runtime
+        self.conversationReader = conversationReader ?? EmbeddedConversationReader(runtime: runtime)
+        self.conversationController = conversationController ?? EmbeddedConversationController(runtime: runtime)
     }
 
     func updateSchedule(id: UUID, name: String, prompt: String, condition: String?, deadline: Date?, recurrence: ScheduleRecurrence) async throws {
-        try await host.updateSchedule(id: id, name: name, prompt: prompt, condition: condition, deadline: deadline, recurrence: recurrence)
+        try await runtime.updateSchedule(id: id, name: name, prompt: prompt, condition: condition, deadline: deadline, recurrence: recurrence)
     }
 
     func setScheduleEnabled(_ enabled: Bool, id: UUID) async throws {
-        try await host.setScheduleEnabled(enabled, id: id)
+        try await runtime.setScheduleEnabled(enabled, id: id)
     }
 
     func deleteSchedule(_ id: UUID) async throws {
-        try await host.deleteSchedule(id)
+        try await runtime.deleteSchedule(id)
     }
 
     func prepareStorage() async throws {
-        try await host.prepareStorage()
+        try await runtime.prepareStorage()
     }
 
     func prepare() async throws {
-        try await host.prepare()
+        try await runtime.prepare()
     }
 
     static func preview(serviceManager: ServiceManager) -> OxClient {
-        OxClient(host: IOSHost(
+        OxClient(runtime: IOSProfileRuntime(
             serviceManager: serviceManager,
             presentations: .unavailable
         ))

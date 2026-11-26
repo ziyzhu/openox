@@ -48,8 +48,8 @@ struct ProfileFilesPage: View {
                         }
                         if !mounts.isEmpty { Divider().settingsContentInset() }
                         Button { perform("mount") { profileId in
-                            let url = try await HostFolderPicker.choose()
-                            _ = try HostProfileCommands.profile(profileId.uuidString)
+                            let url = try await FolderPicker.choose()
+                            _ = try ProfileCommands.profile(profileId.uuidString)
                             try await store.add(url, profileId: profileId)
                         } } label: {
                             HStack(spacing: Theme.Spacing.md) {

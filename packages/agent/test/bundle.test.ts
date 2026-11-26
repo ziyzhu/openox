@@ -42,7 +42,7 @@ it("ships a standalone prompt renderer without a Profile, native bridge, or sepa
     const source = await Bun.file(new URL(`../skills/${skill.name}/${path}`, import.meta.url)).text();
     expect(text).toBe(source);
   }
-  const nativeSource = await Bun.file(new URL("../../../apps/shared/Host/Agent/ModelGuidance.generated.swift", import.meta.url)).text();
+  const nativeSource = await Bun.file(new URL("../../../apps/shared/Runtime/Agent/ModelGuidance.generated.swift", import.meta.url)).text();
   expect(nativeSource).toBe(nativeGuidanceSource());
   expect(await Bun.file(new URL("default-soul.md", directory)).exists()).toBe(false);
   const manifest = await Bun.file(new URL("manifest.json", directory)).json();

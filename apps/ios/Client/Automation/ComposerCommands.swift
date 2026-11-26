@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 extension ClientAutomation {
     @MainActor
-    static func handleSetComposerDraft(_ command: PromptRequest, reply: OxHostRPC.Reply) {
+    static func handleSetComposerDraft(_ command: PromptRequest, reply: ProfileRPC.Reply) {
         guard let composer else {
             reply.failure("composer unavailable")
             return
@@ -16,7 +16,7 @@ extension ClientAutomation {
     @MainActor
     static func handleSetComposerMarkedText(
         _ command: PromptRequest,
-        reply: OxHostRPC.Reply
+        reply: ProfileRPC.Reply
     ) {
         guard let textView = visibleComposerTextViews().first else {
             reply.failure("composer text view unavailable")
@@ -30,7 +30,7 @@ extension ClientAutomation {
     }
 
     @MainActor
-    static func handleGetComposerFormatting(_ command: EmptyRequest, reply: OxHostRPC.Reply) {
+    static func handleGetComposerFormatting(_ command: EmptyRequest, reply: ProfileRPC.Reply) {
         let draft = composer?.attributedDraft ?? AttributedString()
         let textViews = visibleComposerTextViews()
             .filter { $0.window != nil && !$0.isHidden && $0.alpha > 0 && $0.text == String(draft.characters) }
@@ -101,7 +101,7 @@ extension ClientAutomation {
     }
 
     @MainActor
-    static func handleSetPasteboardImage(_ command: EmptyRequest, reply: OxHostRPC.Reply) {
+    static func handleSetPasteboardImage(_ command: EmptyRequest, reply: ProfileRPC.Reply) {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 12))
         let image = renderer.image { context in
             UIColor.systemOrange.setFill()
@@ -116,7 +116,7 @@ extension ClientAutomation {
     }
 
     @MainActor
-    static func handleSetPasteboardRichText(_ command: PromptRequest, reply: OxHostRPC.Reply) {
+    static func handleSetPasteboardRichText(_ command: PromptRequest, reply: ProfileRPC.Reply) {
         let source = NSAttributedString(
             string: command.prompt,
             attributes: [.foregroundColor: UIColor.systemOrange]
@@ -136,7 +136,7 @@ extension ClientAutomation {
     }
 
     @MainActor
-    static func handleStageSharedNote(_ command: PromptRequest, reply: OxHostRPC.Reply) {
+    static func handleStageSharedNote(_ command: PromptRequest, reply: ProfileRPC.Reply) {
         do {
             try SharedNoteInbox.stageForTesting(title: "Shared Note Test", text: command.prompt)
             reply.success()
@@ -146,7 +146,7 @@ extension ClientAutomation {
     }
 
     @MainActor
-    static func handleSetEditDraft(_ command: PromptRequest, reply: OxHostRPC.Reply) {
+    static func handleSetEditDraft(_ command: PromptRequest, reply: ProfileRPC.Reply) {
         guard let setEditDraft else {
             reply.failure("editor unavailable")
             return

@@ -103,7 +103,7 @@ Gate: demonstrate that external links open correctly, not merely that Browser ca
 
 ## 4. Audit navigation and website compatibility
 
-Review `apps/shared/Host/Services/Web/ServiceWebKit.swift` and its navigation collaborators.
+Review `apps/shared/Runtime/Services/Web/ServiceWebKit.swift` and its navigation collaborators.
 
 - [x] Confirm ordinary `ServiceBrowserSession` browsing supports HTTP independently of the restricted agent-controlled browser policy; keep that policy intact.
 - [x] Enable HTTP only for WebKit content using `NSAllowsArbitraryLoadsInWebContent`; keep URLSession ATS unchanged. Verify a local HTTP page and redirect.

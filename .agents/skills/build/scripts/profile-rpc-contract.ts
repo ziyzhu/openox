@@ -1,0 +1,73 @@
+import { Type, type TSchema } from "typebox";
+import {
+  Methods, Schemas, RPC_VERSION, RequestSchema, ResponseSchema, ErrorSchema, RequestBatchSchema, ResponseBatchSchema,
+} from "../../../../packages/protocol/src/contract.ts";
+import { checkGenerated, writeGenerated, runCheck } from "../../../lib.ts";
+
+function portable(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(portable);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).filter(([key]) => key !== "$id" && !key.startsWith("x-swift-")).map(([key, child]) => [
+      key, key === "$ref" ? `#/definitions/${child}` : portable(child),
+    ]));
+  }
+  return value;
+}
+
+function swiftType(schema: TSchema): string {
+  if ("x-swift-type" in schema && typeof schema["x-swift-type"] === "string") return schema["x-swift-type"];
+  if (Type.IsRef(schema)) return schema.$ref;
+  if (Type.IsUnion(schema)) {
+    const member = schema.anyOf.find(item => !Type.IsNull(item));
+    if (member) return swiftType(member);
+  }
+  if (Type.IsArray(schema)) return `[${swiftType(schema.items)}]`;
+  const types: Record<string, string> = { string: "String", boolean: "Bool", integer: "Int", number: "Double" };
+  const type = "type" in schema && typeof schema.type === "string" ? types[schema.type] : undefined;
+  if (!type) throw new Error(`Unsupported Swift schema ${JSON.stringify(schema)}`);
+  return type;
+}
+
+function swiftStruct(name: string): string {
+  const schema = Schemas[name as keyof typeof Schemas];
+  const required: readonly string[] = schema.required ?? [];
+  const fields = Object.entries<TSchema>(schema.properties).map(([field, value]) =>
+    `        let ${field}: ${swiftType(value)}${required.includes(field) ? "" : "?"}`);
+  return `    struct ${name}: Decodable {${fields.length ? `\n${fields.join("\n")}\n    ` : ""}}`;
+}
+
+export function artifacts(): Record<string, string> {
+  const definitions = { ...Schemas, Request: RequestSchema, Response: ResponseSchema, Error: ErrorSchema,
+    RequestBatch: RequestBatchSchema, ResponseBatch: ResponseBatchSchema };
+  const schema = {
+    $schema: "http://json-schema.org/draft-07/schema#", $id: `urn:openox:host-rpc:${RPC_VERSION}`,
+    title: "OpenOx Host JSON-RPC messages",
+    anyOf: ["Request", "Response", "RequestBatch", "ResponseBatch"].map(name => ({ $ref: `#/definitions/${name}` })),
+    definitions: portable(definitions),
+  };
+  const methods = {
+    version: RPC_VERSION,
+    methods: Object.fromEntries(Object.entries(Methods).map(([name, entry]) => [name, {
+      params: { $ref: `./schema.json#/definitions/${entry.params}` },
+      result: { $ref: `./schema.json#/definitions/${entry.result}` },
+    }])),
+  };
+  const requestNames = [...new Set(Object.values(Methods).map(entry => entry.params))];
+  requestNames.push("BootstrapFileInput");
+  const swift = `import Foundation\n\nextension ProfileProtocol {\n    static let contractVersion = ${RPC_VERSION}\n\n    enum Method: String, CaseIterable {\n${Object.entries(Methods).map(([name, entry]) => `        case ${entry.swiftCase} = "${name}"`).join("\n")}\n    }\n\n${requestNames.map(swiftStruct).join("\n\n")}\n}\n`;
+  return {
+    "packages/protocol/schema.json": JSON.stringify(schema, null, 2) + "\n",
+    "packages/protocol/methods.json": JSON.stringify(methods, null, 2) + "\n",
+    "apps/shared/Runtime/RPC/ProfileRPCRequests.swift": swift,
+  };
+}
+
+export async function check(): Promise<string> {
+  await checkGenerated(artifacts(), "build:profile-schema");
+  return `Host RPC schema v${RPC_VERSION}: ${Object.keys(Methods).length} methods, JSON Schema and Swift requests synchronized`;
+}
+
+if (import.meta.main) {
+  if (process.argv.includes("--write")) await writeGenerated(artifacts());
+  else await runCheck(check);
+}

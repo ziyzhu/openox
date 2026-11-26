@@ -11,7 +11,7 @@ struct OxApp: App {
         #if DEBUG
         guard !OxDemoLaunch.enabled && !OxAppStoreScreenshotLaunch.enabled else { return }
         #endif
-        _ = IOSHost.shared
+        _ = IOSProfileRuntime.shared
         ScheduleScheduler.shared.register()
     }
 
@@ -62,18 +62,18 @@ private struct OxApplicationView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var skillImports = SkillImportCoordinator()
     @State private var conversationImports = ConversationImportCoordinator()
-    @State private var serviceImports = ServiceImportCoordinator(manager: IOSHost.shared.services)
+    @State private var serviceImports = ServiceImportCoordinator(manager: IOSProfileRuntime.shared.services)
     @State private var presentations = AppPresentationCoordinator.shared
     @State private var connectionAccess: ConnectionAccess
     private let client: OxClient
-    @State private var webSocketTransport: WebSocketOxHostTransport
+    @State private var profileServer: ProfileServer
 
     init() {
-        let host = IOSHost.shared
+        let runtime = IOSProfileRuntime.shared
         let access = ConnectionAccess()
         _connectionAccess = State(initialValue: access)
-        client = OxClient(host: host)
-        _webSocketTransport = State(initialValue: WebSocketOxHostTransport(host: host, access: access))
+        client = OxClient(runtime: runtime)
+        _profileServer = State(initialValue: ProfileServer(runtime: runtime, access: access))
         AppRegion.shared.start()
         Log.app.info("Device.launch id=\(Device.id) internal=\(Device.isInternal)")
         PerfMonitor.shared.start()
@@ -177,15 +177,15 @@ private struct OxApplicationView: View {
             }
             .task { await AppRegion.shared.refresh() }
             .onChange(of: scenePhase, initial: true) { _, phase in
-                webSocketTransport.reconcile()
+                profileServer.reconcile()
                 guard phase == .active else { return }
                 appearance.apply()
                 Task {
                     do {
                         try await client.prepare()
-                        webSocketTransport.reconcile()
+                        profileServer.reconcile()
                     } catch {
-                        Log.app.warning("OxHost transport unavailable: preparation failed")
+                        Log.app.warning("ProfileRuntime transport unavailable: preparation failed")
                     }
                     await AppRegion.shared.refresh()
                     await ScheduleScheduler.shared.refresh()

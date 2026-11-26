@@ -172,7 +172,7 @@ nonisolated enum OxDemoLaunch {
     static var time: TimeInterval { Double(ProcessInfo.processInfo.environment["OX_DEMO_TIME"] ?? "") ?? 0 }
 }
 
-/// In-memory presentation fixtures. Never prepares a Host, checks service access, or calls a model.
+/// In-memory presentation fixtures. Never prepares a runtime, checks service access, or calls a model.
 @MainActor
 @Observable
 final class OxDemoPlayback {

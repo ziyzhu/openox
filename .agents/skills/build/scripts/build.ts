@@ -1,5 +1,5 @@
 import { run, runCheck } from "../../../lib.ts";
-import { check as hostSchema } from "./host-rpc-contract.ts";
+import { check as hostSchema } from "./profile-rpc-contract.ts";
 import { check as repositoryContract } from "./repository-contract.ts";
 import { check as providerSchema } from "./provider-definitions.ts";
 

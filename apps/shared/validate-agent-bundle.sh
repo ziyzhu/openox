@@ -11,7 +11,7 @@ for resource in harness.js harness-storage.js prompts.js web-extraction.js servi
   fi
 done
 
-if [ ! -s "$shared/Host/Agent/ModelGuidance.generated.swift" ]; then
+if [ ! -s "$shared/Runtime/Agent/ModelGuidance.generated.swift" ]; then
   echo "error: Missing Host/Agent/ModelGuidance.generated.swift. Run bun run build:agent before building Ox." >&2
   exit 1
 fi

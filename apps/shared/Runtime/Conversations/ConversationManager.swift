@@ -1,0 +1,1207 @@
+import Foundation
+import Observation
+
+@MainActor
+@Observable
+final class ConversationManager {
+    private struct Record {
+        enum HydrationState {
+            case unloaded(ConversationMeta)
+            case loading(ConversationMeta, HydrationGeneration)
+            case loaded(Conversation)
+
+            var meta: ConversationMeta {
+                switch self {
+                case .unloaded(let meta), .loading(let meta, _): meta
+                case .loaded(let conversation): conversation.metadata
+                }
+            }
+
+            var conversation: Conversation? {
+                if case .loaded(let conversation) = self { conversation } else { nil }
+            }
+
+            func replacingMeta(_ meta: ConversationMeta) -> Self {
+                switch self {
+                case .unloaded:
+                    .unloaded(meta)
+                case .loading(_, let generation):
+                    .loading(meta, generation)
+                case .loaded:
+                    self
+                }
+            }
+        }
+
+        enum PersistenceState {
+            case clean
+            case debouncing(ConversationSaveRequest, Task<Void, Never>)
+            case saving(ConversationSaveRequest, ConversationSaveRequest?, Task<ConversationSaveReceipt, Never>)
+            case deleting
+            case deleted
+
+            var isDirty: Bool {
+                switch self {
+                case .debouncing, .saving: true
+                case .clean, .deleting, .deleted: false
+                }
+            }
+
+            var preservesLocalRecordDuringReload: Bool {
+                switch self {
+                case .clean: false
+                case .debouncing, .saving, .deleting, .deleted: true
+                }
+            }
+        }
+
+        var hydration: HydrationState
+        var persistence: PersistenceState
+        var metadataRevision: UInt64
+
+        init(meta: ConversationMeta) {
+            hydration = .unloaded(meta)
+            persistence = .clean
+            metadataRevision = 0
+        }
+
+        init(conversation: Conversation) {
+            hydration = .loaded(conversation)
+            persistence = .clean
+            metadataRevision = 0
+        }
+    }
+
+    private enum Selection {
+        case empty
+        case deferred(ConversationID, previous: Conversation?)
+        case opening(ConversationID, HydrationGeneration, previous: Conversation?)
+        case active(Conversation)
+    }
+
+    enum SummaryListing {
+        case pending
+        case partial(next: JSONValue)
+        case paging(Task<Bool, Never>)
+        case complete
+
+        var hasMore: Bool {
+            switch self {
+            case .partial, .paging: true
+            case .pending, .complete: false
+            }
+        }
+    }
+
+    private var records: [ConversationID: Record] = [:]
+    private var selection: Selection = .empty
+    private(set) var summaryListing = SummaryListing.pending
+    @ObservationIgnored private var accessOrdinals: [ConversationID: UInt64] = [:]
+    @ObservationIgnored private var hydrationOrdinal: UInt64 = 0
+    @ObservationIgnored private var hydrationGeneration: UInt64 = 0
+    @ObservationIgnored private var recoveryPreparation: (scope: ProfileScope, task: Task<Void, Error>)?
+    @ObservationIgnored private var hydrationTasks: [ConversationID: (generation: HydrationGeneration, task: Task<Conversation?, Never>)] = [:]
+    @ObservationIgnored private var pinnedPreload: Task<Void, Never>?
+    @ObservationIgnored private let repository: ProfileRepository
+    @ObservationIgnored private let storage: StorageRoot
+    @ObservationIgnored private let providerRegistry: ProviderRegistry
+    @ObservationIgnored private let serviceManager: ServiceManager
+    @ObservationIgnored private var repositoryScope: ProfileScope
+    @ObservationIgnored private let execution: any ConversationExecution
+    @ObservationIgnored private let feedback: any ConversationFeedback
+    @ObservationIgnored private let presentations: AppPresentations
+    @ObservationIgnored var profilePreparation: @MainActor () async -> Void = {}
+    @ObservationIgnored private let debugRepositorySaveGate: ProfileRepositorySaveGate
+    private static let saveDebounceNs: UInt64 = 1_000_000_000
+    private static let maxHydratedConversations = 5
+    private static let firstSummaryPageSize = 20
+    private static let summaryPageSize = 50
+
+    init(
+        repository: ProfileRepository,
+        storage: StorageRoot,
+        providerRegistry: ProviderRegistry,
+        serviceManager: ServiceManager,
+        presentations: AppPresentations,
+        execution: any ConversationExecution,
+        feedback: any ConversationFeedback
+    ) {
+        repositoryScope = storage.scope
+        self.repository = repository
+        self.storage = storage
+        self.providerRegistry = providerRegistry
+        self.serviceManager = serviceManager
+        debugRepositorySaveGate = repository.debugSaveGate
+        self.presentations = presentations
+        self.execution = execution
+        self.feedback = feedback
+    }
+
+    var summaries: [ConversationMeta] {
+        records.values.compactMap { record in
+            switch record.persistence {
+            case .deleting, .deleted:
+                return nil
+            case .clean, .debouncing, .saving:
+                break
+            }
+            if record.hydration.conversation?.isTemporary == true { return nil }
+            if record.hydration.conversation?.hasTranscript == false { return nil }
+            return record.hydration.meta
+        }
+    }
+
+    var orderedSummaries: [ConversationMeta] {
+        summaries.sorted { $0.activityDate > $1.activityDate }
+    }
+
+    var activities: [UUID: Conversation.Activity] {
+        Dictionary(uniqueKeysWithValues: records.map { id, record in
+            let activity = record.hydration.conversation?.activity
+                ?? .idle(record.hydration.meta.hasUnreadResponse ? .unread : .read)
+            return (id.rawValue, activity)
+        })
+    }
+
+    var currentId: UUID? {
+        switch selection {
+        case .empty: nil
+        case .deferred(_, let previous), .opening(_, _, let previous): previous?.id
+        case .active(let conversation): conversation.id
+        }
+    }
+
+    var openingId: UUID? {
+        if case .opening(let id, _, _) = selection { id.rawValue } else { nil }
+    }
+
+    var current: Conversation? {
+        switch selection {
+        case .empty: nil
+        case .deferred(_, let previous), .opening(_, _, let previous): previous
+        case .active(let conversation): conversation
+        }
+    }
+
+    private func canonicalID(_ rawID: UUID) -> ConversationID {
+        (try? DurableProfileStore.shared.reference(for: ConversationID(rawID), in: repositoryScope).compatibilityID) ?? ConversationID(rawID)
+    }
+
+    func contains(_ rawID: UUID) -> Bool {
+        guard let record = records[canonicalID(rawID)] else { return false }
+        switch record.persistence {
+        case .deleting, .deleted: return false
+        case .clean, .debouncing, .saving: return true
+        }
+    }
+
+    func loadSummaries() {
+        Task { [weak self] in await self?.loadSummariesNow() }
+    }
+
+    func loadSummariesNow() async {
+        ensureRepositoryScope()
+        let scope = repositoryScope
+        let startedAt = Date()
+        let baseline = reloadBaseline
+        do {
+            let page = try await repository.conversationSummaryPage(in: scope, limit: Self.firstSummaryPageSize, after: .null)
+            guard repositoryScope == scope else { return }
+            let added = merge(page.summaries, since: baseline)
+            if case .pending = summaryListing { summaryListing = page.next == .null ? .complete : .partial(next: page.next) }
+            Log.session.info("ConversationManager.loadSummaries count=\(page.summaries.count) added=\(added) more=\(summaryListing.hasMore) durationMs=\(Self.elapsedMs(since: startedAt)) generation=\(scope.generation)")
+        } catch {
+            guard repositoryScope == scope else { return }
+            if case .pending = summaryListing { summaryListing = .complete }
+            Log.session.error("ConversationManager.loadSummaries failed error=\(error.localizedDescription)")
+        }
+        do { try await recoverConversations(in: scope) }
+        catch { Log.session.error("ConversationManager.recovery blocked error=\(error.localizedDescription)") }
+        if case .deferred(let id, _) = selection { open(id.rawValue) }
+        preloadPinnedConversations(in: scope)
+    }
+
+    private func preloadPinnedConversations(in scope: ProfileScope) {
+        guard repositoryScope == scope else { return }
+        pinnedPreload?.cancel()
+        let pinned = records.filter { $0.value.hydration.meta.isFavorite && $0.value.hydration.conversation == nil }
+            .sorted { ($0.value.hydration.meta.lastMessageAt ?? .distantPast) > ($1.value.hydration.meta.lastMessageAt ?? .distantPast) }
+            .map(\.key)
+        pinnedPreload = Task(priority: .utility) { [weak self] in
+            let startedAt = Date()
+            var loaded = 0
+            for id in pinned {
+                guard let self, !Task.isCancelled, self.repositoryScope == scope else { return }
+                if await self.hydrate(id) != nil { loaded += 1 }
+            }
+            Log.session.info("ConversationManager.preloadPinned pinned=\(pinned.count) loaded=\(loaded) durationMs=\(Self.elapsedMs(since: startedAt))")
+        }
+    }
+
+    @discardableResult
+    func loadMoreSummaries() async -> Bool {
+        switch summaryListing {
+        case .pending, .complete:
+            return false
+        case .paging(let task):
+            return await task.value
+        case .partial(let next):
+            let scope = repositoryScope
+            let task = Task { [weak self] in await self?.loadSummaryPages(after: next, in: scope) ?? false }
+            summaryListing = .paging(task)
+            return await task.value
+        }
+    }
+
+    func loadAllSummaries() async {
+        if case .pending = summaryListing { await loadSummariesNow() }
+        while summaryListing.hasMore, await loadMoreSummaries() {}
+    }
+
+    private func loadSummaryPages(after cursor: JSONValue, in scope: ProfileScope) async -> Bool {
+        let startedAt = Date()
+        var cursor = cursor
+        var added = 0
+        do {
+            repeat {
+                let baseline = reloadBaseline
+                let page = try await repository.conversationSummaryPage(in: scope, limit: Self.summaryPageSize, after: cursor)
+                guard repositoryScope == scope else { return false }
+                added += merge(page.summaries, since: baseline)
+                cursor = page.next
+            } while added == 0 && cursor != .null
+        } catch {
+            guard repositoryScope == scope else { return false }
+            summaryListing = .partial(next: cursor)
+            Log.session.error("ConversationManager.page failed error=\(error.localizedDescription)")
+            return false
+        }
+        summaryListing = cursor == .null ? .complete : .partial(next: cursor)
+        Log.session.info("ConversationManager.page added=\(added) more=\(summaryListing.hasMore) durationMs=\(Self.elapsedMs(since: startedAt)) generation=\(scope.generation)")
+        return true
+    }
+
+    private var reloadBaseline: [ConversationID: UInt64?] {
+        records.mapValues { $0.persistence.preservesLocalRecordDuringReload ? nil : $0.metadataRevision }
+    }
+
+    private func merge(_ page: [ConversationMeta], since baseline: [ConversationID: UInt64?]) -> Int {
+        var added = 0
+        for meta in page {
+            let id = ConversationID(meta.id)
+            guard var record = records[id] else {
+                records[id] = Record(meta: meta)
+                added += 1
+                continue
+            }
+            guard record.hydration.conversation == nil, !record.persistence.preservesLocalRecordDuringReload,
+                  let revision = baseline[id] ?? nil, revision == record.metadataRevision else { continue }
+            record.hydration = record.hydration.replacingMeta(meta)
+            records[id] = record
+        }
+        return added
+    }
+
+    private func locate(_ id: ConversationID) async -> Bool {
+        let scope = repositoryScope
+        let meta = await repository.conversationSummary(id, in: scope)
+        Log.session.info("ConversationManager.locate id=\(id) found=\(meta != nil)")
+        guard let meta, repositoryScope == scope else { return false }
+        if records[id] == nil { records[id] = Record(meta: meta) }
+        return true
+    }
+
+    private static func elapsedMs(since start: Date) -> Int {
+        Int(Date().timeIntervalSince(start) * 1_000)
+    }
+
+    private func recoverConversations(in scope: ProfileScope) async throws {
+        if let pending = recoveryPreparation, pending.scope == scope { return try await pending.task.value }
+        let task = Task<Void, Error> { @MainActor [weak self] in
+            guard let self else { throw CancellationError() }
+            do { try await Schedules.shared.load() }
+            catch {
+                Log.session.warning("ConversationManager.scheduleRecovery unavailable error=\(error.localizedDescription)")
+                _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("schedulesRecover")]))
+            }
+            let plan = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("recoveryPlan")]))
+            let pending = (plan.objectValue?["tasks"]?.arrayValue ?? []) + (plan.objectValue?["submissions"]?.arrayValue ?? [])
+            var conversations: [Int: Conversation] = [:]
+            for item in pending {
+                guard let value = item.objectValue?["reference"] else { throw RuntimeError.bridge("Missing recovery conversation scope") }
+                let reference = try JSONDecoder().decode(DurableConversationReference.self, from: Data(value.jsonString().utf8))
+                guard reference.profileID == scope.profileID, repositoryScope == scope else { throw CancellationError() }
+                if conversations[reference.conversationID] != nil { continue }
+                let conversation: Conversation
+                if let hydrated = await hydrate(reference.compatibilityID) { conversation = hydrated }
+                else {
+                    guard let loaded = await repository.loadConversation(reference.compatibilityID, in: scope) else {
+                        throw RuntimeError.bridge("Recovered conversation is unavailable; Profile progress remains paused")
+                    }
+                    let prepared = await loaded.preparingDocument()
+                    guard repositoryScope == scope else { throw CancellationError() }
+                    conversation = restoredConversation(from: prepared, in: scope)
+                    conversation.storedTurns = loaded.state.turns
+                    register(conversation, as: reference.compatibilityID)
+                }
+                try await conversation.prepareDurableRecovery()
+                conversations[reference.conversationID] = conversation
+            }
+            let admission = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("recoveryPlan")]))
+            guard admission.objectValue?["unconfigured"]?.arrayValue?.isEmpty == true else {
+                throw RuntimeError.bridge("Recovered native configuration is unavailable; no tasks were resumed")
+            }
+            var submissions: [Int: (id: Int, requestID: String?)] = [:]
+            for item in admission.objectValue?["submissions"]?.arrayValue ?? [] {
+                guard let fields = item.objectValue, let id = fields["submissionID"]?.intValue,
+                      let conversationID = fields["reference"]?.objectValue?["conversationID"]?.intValue else { continue }
+                if id > (submissions[conversationID]?.id ?? -1) { submissions[conversationID] = (id, fields["requestID"]?.stringValue) }
+            }
+            for (conversationID, submission) in submissions {
+                conversations[conversationID]?.resumeDurableSubmission(submission.id, requestID: submission.requestID)
+            }
+            if submissions.isEmpty, let conversation = conversations.values.first, let reference = conversation.conversationReference {
+                _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("resume"), "reference": reference.value]))
+            }
+            Log.session.info("ConversationManager.recovery attached=\(conversations.count) submissions=\(submissions.count)")
+        }
+        recoveryPreparation = (scope, task)
+        try await task.value
+    }
+
+    @discardableResult
+    func startNewConversation(reusingEmpty: Bool = true) -> Conversation {
+        ensureRepositoryScope()
+        if reusingEmpty, let current, current.transcript.isEmpty, !current.isTemporary { return current }
+        let conversation = makeConversation()
+        register(conversation, as: ConversationID(conversation.id))
+        setCurrent(conversation)
+        return conversation
+    }
+
+    func makeChildConversation(parentID: UUID, in scope: ProfileScope) async throws -> Conversation {
+        ensureRepositoryScope()
+        guard scope == repositoryScope, scope == storage.scope, contains(parentID) else {
+            throw RuntimeError.bridge("ox.conversation.start: the calling conversation must belong to the active Profile.")
+        }
+        let conversation = makeConversation(parentID: parentID)
+        register(conversation, as: ConversationID(conversation.id))
+        try await conversation.durablePreparation?.value
+        guard scope == repositoryScope, contains(conversation.id) else {
+            throw RuntimeError.bridge("ox.conversation.start: the active Profile changed.")
+        }
+        trimHydrated()
+        return conversation
+    }
+
+    func loadedConversation(_ rawID: UUID) -> Conversation? {
+        records[canonicalID(rawID)]?.hydration.conversation
+    }
+
+    func summary(_ rawID: UUID) -> ConversationMeta? {
+        guard contains(rawID) else { return nil }
+        return records[canonicalID(rawID)]?.hydration.meta
+    }
+
+    func readableConversationState(_ id: ConversationID, in scope: ProfileScope) async -> ConversationState? {
+        guard scope == repositoryScope, scope == storage.scope, contains(id.rawValue),
+              let conversation = records[id]?.hydration.conversation, !conversation.isTemporary else { return nil }
+        guard let state = try? await conversation.completeState(), records[id]?.hydration.conversation === conversation else { return nil }
+        return state
+    }
+
+    func readableConversationSummaries(in scope: ProfileScope) -> [ConversationMeta] {
+        guard scope == repositoryScope, scope == storage.scope else { return [] }
+        return summaries.filter { records[ConversationID($0.id)]?.hydration.conversation != nil }
+    }
+
+    func importPackage(_ payload: ConversationPackagePayload) async throws -> Conversation {
+        ensureRepositoryScope()
+        let scope = repositoryScope
+        let state = try await repository.importConversationPackage(payload, in: scope)
+        let prepared = await ConversationLoadResult(state: state, needsPersistence: false).preparingDocument()
+        guard repositoryScope == scope else { throw ConversationPackageError.invalidArchive }
+        let conversation = restoredConversation(
+            from: prepared,
+            in: scope
+        )
+        register(conversation, as: state.conversationID)
+        persist(conversation)
+        setCurrent(conversation)
+        Log.session.info("ConversationManager.import conversation=\(conversation.id) turns=\(state.turns.count)")
+        return conversation
+    }
+
+    func runSchedule(
+        _ schedule: Schedule,
+        token: UUID,
+        executionLease: Conversation.ExecutionLease
+    ) async -> (ConversationSubmissionOutcome, UUID?) {
+        ensureRepositoryScope()
+        guard repositoryScope.profileID == schedule.profileID else {
+            return (.failed("The schedule's Profile is not active."), nil)
+        }
+        let services: [Service]
+        do {
+            services = try await serviceManager.prepareServices(
+                domains: schedule.services,
+                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+            )
+        } catch is CancellationError {
+            return (.cancelled, nil)
+        } catch {
+            Log.session.error("ConversationManager.scheduled preparation failed schedule=\(schedule.id) error=\(error.localizedDescription)")
+            return (.failed(error.localizedDescription), nil)
+        }
+        ensureRepositoryScope()
+        guard repositoryScope.profileID == schedule.profileID else {
+            return (.failed("The schedule's Profile is not active."), nil)
+        }
+        let conversation: Conversation
+        if let targetID = schedule.conversationID {
+            do { conversation = try await loadForClient(targetID) }
+            catch { return (.failed("The schedule's conversation is unavailable."), nil) }
+            guard !conversation.isBusy, Schedules.shared.run(in: conversation.id) == nil else {
+                return (.failed("The schedule's conversation is busy. Resume the schedule when it is ready."), targetID)
+            }
+        } else {
+            conversation = makeConversation(executionLease: executionLease, scheduleID: schedule.id)
+            conversation.rename(to: schedule.name)
+            register(conversation, as: ConversationID(conversation.id))
+        }
+        do { try await conversation.durablePreparation?.value }
+        catch { return (.failed(error.localizedDescription), nil) }
+        guard !Task.isCancelled, Schedules.shared.schedule(id: schedule.id)?.state == .running(token),
+              StorageRoot.shared.activeId == schedule.profileID else { return (.cancelled, nil) }
+        let attachedDomains = Set(conversation.attachedServices.map(\.domain))
+        conversation.setAttachedServices(conversation.attachedServices + services.filter { !attachedDomains.contains($0.domain) })
+        do { try await Schedules.shared.bind(id: schedule.id, token: token, conversationID: conversation.id) }
+        catch { return (.failed(error.localizedDescription), conversation.id) }
+        defer { Schedules.shared.unbind(conversationID: conversation.id, token: token) }
+        let outcome = await withTaskCancellationHandler {
+            await conversation.submitUntilAttention(schedule.expandedIntent, skillInvocation: schedule.legacyInvocation, scheduleName: schedule.name)
+        } onCancel: {
+            Task { @MainActor in
+                if Schedules.shared.run(in: conversation.id)?.token == token { conversation.cancelAll() }
+            }
+        }
+        if Task.isCancelled {
+            conversation.cancelAll()
+            await conversation.waitForRun()
+        } else if case .cancelled = outcome {
+            conversation.cancelAll()
+            await conversation.waitForRun()
+        }
+        _ = await flushAllNow()
+        Log.session.info("ConversationManager.scheduled finished schedule=\(schedule.id) conversation=\(conversation.id) outcome=\(outcome.logLabel)")
+        return (outcome, conversation.id)
+    }
+
+    func toggleTemporaryConversation() {
+        guard let previous = current, previous.transcript.isEmpty, previous.queuedMessages.isEmpty, !previous.isBusy else { return }
+        let conversation = makeConversation(retention: previous.isTemporary ? .persisted : .temporary)
+        register(conversation, as: ConversationID(conversation.id))
+        setCurrent(conversation)
+        Log.session.info("ConversationManager.retention conversation=\(conversation.id) temporary=\(conversation.isTemporary)")
+    }
+
+    private func startTemporaryConversation(continuing continuation: ConversationContinuation) {
+        let selection = continuation.meta.model ?? providerRegistry.sessionModel
+        let client = providerRegistry.client(for: selection)
+        let model = providerRegistry.model(for: selection, client: client)
+        let conversation = Conversation(
+            meta: continuation.meta,
+            turns: continuation.turns,
+            client: client,
+            model: model,
+            selection: selection,
+            repository: repository,
+            scope: repositoryScope,
+            virtualMachine: VirtualMachine(),
+            presentations: presentations,
+            execution: execution,
+            feedback: feedback,
+            serviceManager: serviceManager,
+            retention: .temporary
+        )
+        attachPersistence(conversation)
+        register(conversation, as: ConversationID(conversation.id))
+        setCurrent(conversation)
+        conversation.enqueue(
+            continuation.intent,
+            attachments: continuation.attachments,
+            skillInvocation: continuation.skillInvocation
+        )
+        Log.session.info("ConversationManager.temporary started conversation=\(conversation.id) turns=\(continuation.turns.count)")
+    }
+
+    private func discardTemporary(_ id: ConversationID) {
+        guard let conversation = records[id]?.hydration.conversation, conversation.isTemporary else { return }
+        conversation.release()
+        records[id] = nil
+        accessOrdinals[id] = nil
+        if currentId == id.rawValue { selection = .empty }
+        Log.session.info("ConversationManager.temporary discarded conversation=\(id)")
+    }
+
+    func open(_ rawID: UUID) {
+        let id = canonicalID(rawID)
+        if let conversation = records[id]?.hydration.conversation {
+            touch(id)
+            setCurrent(conversation)
+            return
+        }
+        if case .pending = summaryListing, records[id] == nil {
+            selection = .deferred(id, previous: current)
+            Log.session.info("ConversationManager.open deferred id=\(id)")
+            return
+        }
+        hydrationGeneration &+= 1
+        let generation = HydrationGeneration(rawValue: hydrationGeneration)
+        selection = .opening(id, generation, previous: current)
+        Task { [weak self] in
+            guard let self else { return }
+            let conversation = await self.hydrate(id)
+            guard case .opening(let openingID, let openingGeneration, _) = self.selection,
+                  openingID == id, openingGeneration == generation else { return }
+            if let conversation { self.setCurrent(conversation) }
+            else { self.selection = self.current.map(Selection.active) ?? .empty }
+        }
+    }
+
+    func openForClient(_ rawID: UUID) async throws -> Conversation {
+        let conversation = try await loadForClient(rawID)
+        setCurrent(conversation)
+        return conversation
+    }
+
+    func loadForClient(_ rawID: UUID) async throws -> Conversation {
+        ensureRepositoryScope()
+        let scope = repositoryScope
+        let storageScope = storage.scope
+        let id = canonicalID(rawID)
+        guard let conversation = await hydrate(id),
+              scope == repositoryScope, storageScope == storage.scope, contains(rawID) else {
+            throw RuntimeError.bridge("conversation unavailable: \(rawID)")
+        }
+        touch(id)
+        try await conversation.loadCompleteHistory()
+        guard records[id]?.hydration.conversation === conversation else { throw RuntimeError.bridge("conversation unavailable: \(rawID)") }
+        touch(id)
+        trimHydrated()
+        return conversation
+    }
+
+    private func hydrate(_ id: ConversationID) async -> Conversation? {
+        if let conversation = records[id]?.hydration.conversation { return conversation }
+        if let pending = hydrationTasks[id] { return await pending.task.value }
+        if records[id] == nil {
+            guard await locate(id) else { return nil }
+            return await hydrate(id)
+        }
+        guard var record = records[id], contains(id.rawValue) else { return nil }
+        hydrationGeneration &+= 1
+        let generation = HydrationGeneration(rawValue: hydrationGeneration)
+        let scope = repositoryScope
+        record.hydration = .loading(record.hydration.meta, generation)
+        records[id] = record
+        Log.session.info("ConversationManager.hydrate id=\(id) generation=\(generation.rawValue)")
+        let task = Task { [weak self, repository] () -> Conversation? in
+            let state = await repository.loadConversation(id, in: scope, history: .latest)
+            let loaded = await state?.preparingDocument()
+            guard let self, self.repositoryScope == scope,
+                  var record = self.records[id], self.contains(id.rawValue),
+                  case .loading(_, let activeGeneration) = record.hydration,
+                  activeGeneration == generation else { return nil }
+            guard let loaded else {
+                record.hydration = .unloaded(record.hydration.meta)
+                self.records[id] = record
+                Log.session.error("ConversationManager.hydrate unavailable id=\(id)")
+                return nil
+            }
+            let restored = record.persistence.isDirty ? loaded.replacingMeta(record.hydration.meta) : loaded
+            let conversation = self.restoredConversation(from: restored, in: scope)
+            conversation.storedTurns = loaded.state.turns
+            record.hydration = .loaded(conversation)
+            self.records[id] = record
+            self.touch(id)
+            if loaded.needsPersistence || conversation.state != loaded.state { self.persist(conversation) }
+            return conversation
+        }
+        hydrationTasks[id] = (generation, task)
+        let conversation = await task.value
+        if hydrationTasks[id]?.generation == generation { hydrationTasks[id] = nil }
+        return conversation
+    }
+
+    @discardableResult
+    func branch(from conversation: Conversation, atBlock blockID: UUID) async -> Conversation? {
+        guard (try? await conversation.loadCompleteHistory()) != nil,
+              let result = conversation.branchSnapshot(at: blockID) else {
+            Log.session.warning("ConversationManager.branch failed block=\(blockID)")
+            return nil
+        }
+        return branch(from: conversation, snapshot: result)
+    }
+
+    private func branch(from conversation: Conversation, snapshot result: ConversationContinuation) -> Conversation? {
+        guard let branched = makeFork(from: conversation, snapshot: result) else { return nil }
+        attachPersistence(branched)
+        setCurrent(branched)
+        return branched
+    }
+
+    func replaceForRerun(from conversation: Conversation, snapshot result: ConversationContinuation) -> Conversation? {
+        guard let replacement = makeFork(from: conversation, snapshot: result) else { return nil }
+        attachPersistence(replacement) { [weak self, weak conversation, weak replacement] in
+            guard let self, let conversation, let replacement else { throw CancellationError() }
+            try await finishRerunReplacement(replacement, from: conversation)
+        }
+        return replacement
+    }
+
+    private func finishRerunReplacement(_ replacement: Conversation, from source: Conversation) async throws {
+        try Task.checkCancellation()
+        guard repositoryScope == replacement.scope,
+              let reference = source.conversationReference,
+              let target = replacement.conversationReference else { throw CancellationError() }
+        do {
+            _ = try await DurableProfileStore.shared.command(scope: replacement.scope, value: .object([
+                "action": .string("conversationPresent"), "reference": reference.value,
+                "presentation": .object(["visible": .bool(false)])
+            ]))
+        } catch {
+            Log.session.error("ConversationManager.rerun replacement failed source=\(source.id) target=\(replacement.id) error=\(error.localizedDescription)")
+            throw error
+        }
+        guard repositoryScope == replacement.scope else { throw CancellationError() }
+        let sourceID = reference.compatibilityID
+        if case .debouncing(_, let task) = records[sourceID]?.persistence { task.cancel() }
+        records.removeValue(forKey: sourceID)
+        accessOrdinals.removeValue(forKey: sourceID)
+        if current === source { setCurrent(replacement) }
+        Log.session.info("ConversationManager.rerun replaced source=\(sourceID.rawValue) target=\(target.compatibilityID.rawValue)")
+    }
+
+    private func makeFork(from conversation: Conversation, snapshot result: ConversationContinuation) -> Conversation? {
+        guard let reference = conversation.conversationReference else { Log.session.error("ConversationManager.fork requires a qualified persisted conversation"); return nil }
+        let selection = result.meta.model ?? providerRegistry.sessionModel
+        let client = providerRegistry.client(for: selection)
+        let model = providerRegistry.model(for: selection, client: client)
+        let branched = Conversation(
+            meta: result.meta,
+            turns: result.turns,
+            client: client,
+            model: model,
+            selection: selection,
+            repository: repository,
+            scope: repositoryScope,
+            virtualMachine: VirtualMachine(),
+            presentations: presentations,
+            execution: execution,
+            feedback: feedback,
+            serviceManager: serviceManager
+        )
+        branched.durableForkSource = (reference, result.turns.filter { if case .user = $0 { return true }; return false }.count)
+        register(branched, as: ConversationID(branched.id))
+        return branched
+    }
+
+    func rename(_ rawID: UUID, to title: String) {
+        let id = ConversationID(rawID)
+        guard var record = records[id] else { return }
+        if let conversation = record.hydration.conversation {
+            record.metadataRevision &+= 1
+            records[id] = record
+            conversation.rename(to: title)
+            return
+        }
+        var meta = record.hydration.meta
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        meta.title = trimmed.isEmpty ? nil : String(trimmed.prefix(60))
+        record.hydration = record.hydration.replacingMeta(meta)
+        record.metadataRevision &+= 1
+        records[id] = record
+        persist(meta)
+    }
+
+    func renameFile(_ file: FileItem, to newFilename: String) async throws -> FileItem {
+        ensureRepositoryScope()
+        let scope = repositoryScope
+        let renamed = try await repository.renameFile(named: file.fileName, to: newFilename, in: scope)
+        guard repositoryScope == scope else { return renamed }
+        let directory = renamed.fileURL.deletingLastPathComponent()
+        for conversation in records.values.compactMap({ $0.hydration.conversation }) {
+            conversation.renameFileReferences(from: file.fileName, to: renamed.fileName, directory: directory)
+        }
+        Log.session.info("ConversationManager.renameFile from=\(file.fileName) to=\(renamed.fileName)")
+        return renamed
+    }
+
+    func deleteFile(_ file: FileItem) async throws {
+        ensureRepositoryScope()
+        let scope = repositoryScope
+        _ = try await repository.deleteFile(named: file.fileName, in: scope)
+        filesChanged()
+        Log.session.info("ConversationManager.deleteFile file=\(file.fileName)")
+    }
+
+    func filesChanged() {
+        for conversation in records.values.compactMap({ $0.hydration.conversation }) {
+            conversation.filesChanged()
+        }
+    }
+
+    func toggleFavorite(_ rawID: UUID) {
+        let id = ConversationID(rawID)
+        guard var record = records[id] else { return }
+        if let conversation = record.hydration.conversation {
+            record.metadataRevision &+= 1
+            records[id] = record
+            conversation.setFavorite(!conversation.isFavorite)
+            return
+        }
+        var meta = record.hydration.meta
+        meta.isFavorite.toggle()
+        record.hydration = record.hydration.replacingMeta(meta)
+        record.metadataRevision &+= 1
+        records[id] = record
+        persist(meta)
+        Log.session.info("ConversationManager.toggleFavorite id=\(id) favorite=\(meta.isFavorite) hydration=summary")
+    }
+
+    @discardableResult
+    func delete(_ rawID: UUID) -> Task<Void, Error>? {
+        let id = ConversationID(rawID)
+        guard var record = records[id] else { return nil }
+        let wasCurrent = currentId == rawID
+        if let parentID = record.hydration.meta.parentID {
+            Log.session.info("delegation.delete parent=\(parentID) child=\(rawID) wasRunning=\(record.hydration.conversation?.isBusy == true)")
+            forgetDeletedChild(rawID, parentID: parentID)
+        }
+        if record.hydration.conversation?.isTemporary == true {
+            discardTemporary(id)
+            if wasCurrent { startNewConversation() }
+            return nil
+        }
+        let inFlight: Task<ConversationSaveReceipt, Never>?
+        switch record.persistence {
+        case .debouncing(_, let task):
+            task.cancel()
+            inFlight = nil
+        case .saving(_, _, let task):
+            inFlight = task
+        case .clean:
+            inFlight = nil
+        case .deleting, .deleted:
+            return nil
+        }
+        record.persistence = .deleting
+        record.hydration.conversation?.release()
+        records[id] = record
+        let scopedRepository = repository
+        let storageScope = repositoryScope
+        let deletion = Task { [weak self] in
+            _ = await inFlight?.value
+            do {
+                try await scopedRepository.deleteConversation(id, in: storageScope)
+            } catch {
+                if let self, self.repositoryScope == storageScope {
+                    record.persistence = .clean
+                    self.records[id] = record
+                    if let conversation = record.hydration.conversation {
+                        self.attachPersistence(conversation)
+                        self.persist(conversation)
+                    }
+                }
+                Log.session.error("ConversationManager.delete failed id=\(id) error=\(error.localizedDescription)")
+                throw error
+            }
+            guard let self, self.repositoryScope == storageScope else { return }
+            if var deleting = self.records[id] {
+                deleting.persistence = .deleted
+                self.records[id] = deleting
+            }
+            self.records[id] = nil
+            self.accessOrdinals[id] = nil
+        }
+        if wasCurrent {
+            selection = .empty
+            startNewConversation()
+        }
+        return deletion
+    }
+
+    func deletionTarget(_ id: UUID, requestedBy conversation: Conversation) async throws -> ConversationMeta {
+        let unavailable = RuntimeError.bridge("ox.conversation.delete: choose another existing conversation in the active Profile.")
+        guard conversation.scope == repositoryScope, conversation.scope.profileID == storage.scope.profileID,
+              conversation.scope.root == storage.scope.root, conversation.scope.location == storage.scope.location,
+              id != conversation.id else { throw unavailable }
+        if records[ConversationID(id)] == nil, !(await locate(ConversationID(id))) { throw unavailable }
+        guard conversation.scope == repositoryScope, let record = records[ConversationID(id)],
+              record.hydration.conversation?.isTemporary != true else { throw unavailable }
+        switch record.persistence {
+        case .deleting, .deleted: throw unavailable
+        case .clean, .debouncing, .saving: return record.hydration.meta
+        }
+    }
+
+    private var conversationsForLifecycle: [Conversation] {
+        var conversations = records.values.compactMap { $0.hydration.conversation }
+        if let current, !conversations.contains(where: { $0 === current }) { conversations.append(current) }
+        return conversations
+    }
+
+    func suspendModelPreparation() {
+        for conversation in conversationsForLifecycle { conversation.suspendModelPreparation() }
+    }
+
+    func resumeAfterForeground() {
+        for conversation in conversationsForLifecycle { conversation.resumeAfterForeground() }
+    }
+
+    func notifyPendingInteractions() {
+        for record in records.values { record.hydration.conversation?.notifyPendingInteraction() }
+        current?.notifyPendingInteraction()
+    }
+
+    func flushAll() {
+        execution.protectPersistence { [weak self] in
+            guard let self else { return }
+            _ = await self.flushAllNow()
+            Log.session.info("ConversationManager.flushAll remaining=\(self.records.values.filter { $0.persistence.isDirty }.count)")
+        }
+    }
+
+    func stopAllAndFlush() async -> Bool {
+        let conversations = records.values.compactMap { $0.hydration.conversation }
+        for conversation in conversations { conversation.cancelAll() }
+        for conversation in conversations { await conversation.waitForRun() }
+        return await flushAllNow()
+    }
+
+    func flushAllNow() async -> Bool {
+        flushDebounced()
+        while true {
+            let tasks = records.values.compactMap { record -> Task<ConversationSaveReceipt, Never>? in
+                if case .saving(_, _, let task) = record.persistence { task } else { nil }
+            }
+            guard !tasks.isEmpty else { break }
+            for task in tasks { _ = await task.value }
+            await Task.yield()
+        }
+        return !records.values.contains { $0.persistence.isDirty }
+    }
+
+    func reset() {
+        for record in records.values {
+            switch record.persistence {
+            case .debouncing(_, let task): task.cancel()
+            case .saving(_, _, let task): task.cancel()
+            case .clean, .deleting, .deleted: break
+            }
+            record.hydration.conversation?.release()
+        }
+        hydrationTasks.values.forEach { $0.task.cancel() }
+        hydrationTasks.removeAll()
+        records.removeAll()
+        summaryListing = .pending
+        accessOrdinals.removeAll()
+        selection = .empty
+        ensureRepositoryScope()
+        Log.session.info("ConversationManager.reset generation=\(repositoryScope.generation)")
+    }
+
+    func debugSession(matching needle: String) -> Conversation? {
+        let lower = needle.lowercased()
+        return records.values.compactMap { $0.hydration.conversation }.first {
+            $0.id.uuidString.lowercased().hasPrefix(lower)
+        }
+    }
+
+    func debugControlRepositorySaveGate(_ action: String) -> Bool? {
+        switch action {
+        case "hold":
+            debugRepositorySaveGate.hold()
+            return false
+        case "release":
+            debugRepositorySaveGate.release()
+            return false
+        case "status":
+            return debugRepositorySaveGate.isEntered
+        default:
+            return nil
+        }
+    }
+
+
+    private func makeConversation(
+        retention: ConversationRetention = .persisted,
+        executionLease: Conversation.ExecutionLease = .userInitiated,
+        scheduleID: UUID? = nil,
+        parentID: UUID? = nil
+    ) -> Conversation {
+        let client = providerRegistry.newSessionClient
+        let selection = providerRegistry.sessionModel
+        let conversation = Conversation(
+            client: client,
+            model: providerRegistry.model(for: selection, client: client),
+            selection: selection,
+            repository: repository,
+            scope: repositoryScope,
+            virtualMachine: VirtualMachine(),
+            presentations: presentations,
+            execution: execution,
+            feedback: feedback,
+            serviceManager: serviceManager,
+            retention: retention,
+            executionLease: executionLease,
+            scheduleID: scheduleID,
+            parentID: parentID
+        )
+        attachPersistence(conversation)
+        Log.session.info("ConversationManager created conversation=\(conversation.id) retention=\(String(describing: retention))")
+        return conversation
+    }
+
+    private func restoredConversation(from loaded: ConversationLoadResult, in scope: ProfileScope) -> Conversation {
+        let selection = loaded.state.meta.model ?? providerRegistry.sessionModel
+        let client = providerRegistry.client(for: selection)
+        let model = providerRegistry.model(for: selection, client: client)
+        let conversation = Conversation(
+            meta: loaded.state.meta,
+            turns: loaded.state.turns,
+            context: loaded.state.context,
+            restoredDocument: loaded.document,
+            client: client,
+            model: model,
+            selection: selection,
+            repository: repository,
+            scope: scope,
+            virtualMachine: VirtualMachine(),
+            presentations: presentations,
+            execution: execution,
+            feedback: feedback,
+            serviceManager: serviceManager
+        )
+        conversation.history = loaded.older.map { .partial(PartialHistory(older: $0, storedPreview: loaded.state.meta.preview)) } ?? .complete
+        attachPersistence(conversation)
+        return conversation
+    }
+
+    private func ensureRepositoryScope() {
+        let scope = storage.scope
+        guard repositoryScope != scope else { return }
+        repositoryScope = scope
+        Log.session.info("ConversationManager.repository root=\(scope.root.path) generation=\(scope.generation)")
+    }
+
+    private func attachPersistence(_ conversation: Conversation, afterPreparation: (@MainActor () async throws -> Void)? = nil) {
+        conversation.conversationManager = self
+        conversation.durablePreparation = Task { @MainActor [weak self, weak conversation] in
+            guard let self, let conversation else { throw CancellationError() }
+            if conversation.isTemporary {
+                try await ProfileProtocol.prepareDurableTemporaryConversation(conversation, caseID: ProfileProtocol.durableTemporarySessionID ?? UUID())
+            } else {
+                let oldID = ConversationID(conversation.id)
+                let existing = try? DurableProfileStore.shared.reference(for: oldID, in: conversation.scope)
+                let reference: DurableConversationReference
+                if let existing { reference = existing }
+                else if let origin = conversation.durableForkSource {
+                    reference = try await DurableProfileStore.shared.fork(in: conversation.scope, from: origin.reference,
+                        beforeUser: origin.users, title: conversation.metadata.title)
+                    conversation.durableForkSource = nil
+                } else { reference = try await DurableProfileStore.shared.create(in: conversation.scope) }
+                try Task.checkCancellation()
+                let session = try await DurableProfileStore.shared.session(in: conversation.scope)
+                try conversation.installDurableRoute(DurableConversationRoute(session: session,
+                    conversationID: reference.conversationID, profileID: reference.profileID,
+                    fileScope: conversation.scope, reference: reference))
+                if oldID != reference.compatibilityID, var record = records.removeValue(forKey: oldID) {
+                    if case .debouncing(_, let task) = record.persistence { task.cancel() }
+                    record.persistence = .clean
+                    records[reference.compatibilityID] = record
+                    accessOrdinals[reference.compatibilityID] = accessOrdinals.removeValue(forKey: oldID)
+                }
+                if existing == nil { persist(conversation) }
+            }
+            try await afterPreparation?()
+            conversation.durablePreparation = nil
+        }
+        if !conversation.isTemporary {
+            conversation.onPersistableChange = { [weak self, weak conversation] in
+                guard let self, let conversation else { return }
+                self.persist(conversation)
+            }
+        } else {
+            conversation.onPersistableChange = nil
+        }
+        conversation.onPrivateDataTemporaryContinuation = { [weak self, weak conversation] continuation in
+            guard let self, let conversation else { return }
+            Task { @MainActor [weak self, weak conversation] in
+                await Task.yield()
+                guard let self, let conversation, self.current === conversation else { return }
+                conversation.stopCurrentTurn()
+                self.startTemporaryConversation(continuing: continuation)
+            }
+        }
+    }
+
+    private func persist(_ conversation: Conversation) {
+        guard !conversation.isTemporary, conversation.conversationReference != nil, !conversation.transcript.isEmpty else { return }
+        enqueue(ConversationSaveRequest(payload: .conversation(conversation.state)))
+    }
+
+    private func persist(_ meta: ConversationMeta) {
+        enqueue(ConversationSaveRequest(payload: .metadata(meta)))
+    }
+
+    private func enqueue(_ request: ConversationSaveRequest) {
+        let id = request.conversationID
+        guard var record = records[id] else { return }
+        switch record.persistence {
+        case .clean:
+            let task = debounce(id, request)
+            record.persistence = .debouncing(request, task)
+        case .debouncing(_, let task):
+            task.cancel()
+            record.persistence = .debouncing(request, debounce(id, request))
+        case .saving(let inFlight, _, let task):
+            record.persistence = .saving(inFlight, request, task)
+        case .deleting, .deleted:
+            return
+        }
+        records[id] = record
+    }
+
+    private func debounce(_ id: ConversationID, _ request: ConversationSaveRequest) -> Task<Void, Never> {
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.saveDebounceNs)
+            guard !Task.isCancelled else { return }
+            self?.beginSave(id, expected: request.saveID)
+        }
+    }
+
+    private func beginSave(_ id: ConversationID, expected saveID: SaveID) {
+        guard var record = records[id],
+              case .debouncing(let request, _) = record.persistence,
+              request.saveID == saveID else { return }
+        launch(request, in: &record)
+        records[id] = record
+    }
+
+    private func launch(_ request: ConversationSaveRequest, in record: inout Record) {
+        let scopedRepository = repository
+        let storageScope = repositoryScope
+        let storedTurns = record.hydration.conversation?.storedTurns
+        let worker = Task { await scopedRepository.saveConversation(request, storedTurns: storedTurns, in: storageScope) }
+        record.persistence = .saving(request, nil, worker)
+        Task { [weak self] in
+            let result = await worker.value
+            self?.complete(request.conversationID, result: result, storageScope: storageScope)
+        }
+    }
+
+    private func complete(_ id: ConversationID, result: ConversationSaveReceipt, storageScope: ProfileScope) {
+        guard repositoryScope == storageScope,
+              var record = records[id],
+              case .saving(let inFlight, let pendingLatest, _) = record.persistence,
+              inFlight.saveID == result.saveID else { return }
+        if result.succeeded, case .conversation(let state) = inFlight.payload, let conversation = record.hydration.conversation {
+            let saved = Set(state.turns.map(\.id))
+            conversation.storedTurns = (conversation.storedTurns ?? []).filter { !saved.contains($0.id) } + state.turns
+        }
+        if let pendingLatest {
+            launch(pendingLatest, in: &record)
+        } else if result.succeeded {
+            record.persistence = .clean
+        } else {
+            record.persistence = .debouncing(inFlight, debounce(id, inFlight))
+        }
+        records[id] = record
+        trimHydrated()
+    }
+
+    private func flushDebounced() {
+        let pending = records.compactMap { id, record -> (ConversationID, SaveID)? in
+            if case .debouncing(let request, let task) = record.persistence {
+                task.cancel()
+                return (id, request.saveID)
+            }
+            return nil
+        }
+        for (id, saveID) in pending { beginSave(id, expected: saveID) }
+    }
+
+    private func setCurrent(_ conversation: Conversation) {
+        let id = ConversationID(conversation.id)
+        touch(id)
+        if case .active(let current) = selection, current === conversation { return }
+        let outgoing = current
+        selection = .active(conversation)
+        conversation.select()
+        outgoing?.deselect()
+        if let outgoing, outgoing.isTemporary {
+            discardTemporary(ConversationID(outgoing.id))
+        }
+        trimHydrated()
+    }
+
+    private func register(_ conversation: Conversation, as id: ConversationID) {
+        records[id] = Record(conversation: conversation)
+        touch(id)
+    }
+
+    private static func isPreloadedPin(_ conversation: Conversation) -> Bool {
+        guard conversation.isFavorite else { return false }
+        var users = 0
+        for case .user in conversation.turns {
+            users += 1
+            if users > ConversationHistory.userTurnsPerPage { return false }
+        }
+        return true
+    }
+
+    private func touch(_ id: ConversationID) {
+        guard records[id] != nil else { return }
+        hydrationOrdinal &+= 1
+        accessOrdinals[id] = hydrationOrdinal
+    }
+
+    private func trimHydrated() {
+        while records.values.compactMap({ $0.hydration.conversation }).filter({ !Self.isPreloadedPin($0) }).count > Self.maxHydratedConversations {
+            guard let candidate = records
+                .filter({ $0.key.rawValue != currentId && $0.value.hydration.conversation.map { !$0.isBusy && !Self.isPreloadedPin($0) } == true })
+                .min(by: { (accessOrdinals[$0.key] ?? 0) < (accessOrdinals[$1.key] ?? 0) }) else {
+                Log.session.warning("ConversationManager.evict deferred loaded=\(records.values.compactMap { $0.hydration.conversation }.count)")
+                return
+            }
+            guard evict(candidate.key) else { return }
+        }
+    }
+
+    func releaseInactive() {
+        let inactive = records.filter { $0.key.rawValue != currentId && $0.value.hydration.conversation.map { !$0.isBusy && !$0.isTemporary } == true }.map(\.key)
+        let released = inactive.filter { evict($0) }.count
+        Log.session.info("ConversationManager.releaseInactive released=\(released) deferred=\(inactive.count - released) loaded=\(records.values.compactMap { $0.hydration.conversation }.count)")
+    }
+
+    private func evict(_ id: ConversationID) -> Bool {
+        guard var record = records[id] else { return false }
+        guard !record.persistence.isDirty, let conversation = record.hydration.conversation else {
+            if case .debouncing(let request, let task) = record.persistence {
+                task.cancel()
+                beginSave(id, expected: request.saveID)
+            }
+            return false
+        }
+        let meta = conversation.metadata
+        conversation.release(cancelling: false)
+        record.hydration = .unloaded(meta)
+        records[id] = record
+        accessOrdinals[id] = nil
+        Log.session.info("ConversationManager.evict id=\(id)")
+        return true
+    }
+
+}

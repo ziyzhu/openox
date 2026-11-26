@@ -20,7 +20,7 @@
     "sim:launch": "bun .agents/skills/setup/scripts/template.ts",
     "sim:website-export": "bun .agents/skills/setup/scripts/website-export.ts",
     "build:provider-schema": "bun .agents/skills/build/scripts/provider-definitions.ts",
-    "build:host-schema": "bun .agents/skills/build/scripts/host-rpc-contract.ts --write",
+    "build:profile-schema": "bun .agents/skills/build/scripts/profile-rpc-contract.ts --write",
     "build:repository-schema": "bun .agents/skills/build/scripts/repository-contract.ts --write"
   },
   "dependencies": {

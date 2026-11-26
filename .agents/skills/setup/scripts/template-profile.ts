@@ -114,7 +114,7 @@ function decoded(data: string): string | Uint8Array {
 
 export async function materializeProfiles(template: PreparedTemplate, parent: string) {
   if (template.profiles?.some(profile => profile.conversations?.some(conversation => conversation.packageData))) throw new Error("Desktop conversation-package materialization is not yet supported");
-  const schemaSource = await Bun.file(new URL("../../../../apps/shared/Host/Storage/ProfileMigrator.swift", import.meta.url)).text();
+  const schemaSource = await Bun.file(new URL("../../../../apps/shared/Runtime/Storage/ProfileMigrator.swift", import.meta.url)).text();
   const milestones = /enum ProfileSchema\s*\{\s*static let versions = \[([^\]]+)\]/.exec(schemaSource)?.[1];
   const version = milestones && [...milestones.matchAll(/"([^"]+)"/g)].at(-1)?.[1];
   if (!version) throw new Error("Cannot resolve the native current Profile schema");

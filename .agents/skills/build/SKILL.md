@@ -21,7 +21,7 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | `bun run ci --native-only` | Generate the agent bundle and build unsigned iOS and macOS apps. |
 | `bun run ci --ios-only` | Validate the native toolchain, install frozen dependencies, generate the agent, and build unsigned iOS only. |
 | `bun run ci --macos-only` | Validate the native toolchain, install frozen dependencies, generate the agent, and build unsigned macOS only. |
-| `bun run build:host-schema` | Regenerate Host RPC JSON/Swift artifacts. |
+| `bun run build:profile-schema` | Regenerate Host RPC JSON/Swift artifacts. |
 | `bun run build:repository-schema` | Regenerate repository JSON/Swift artifacts. |
 | `bun run build:provider-schema` | Regenerate provider definitions schema. |
 | `bun run build:services` | Rebuild bundled services and model-action resources. |
@@ -52,9 +52,9 @@ focused output diff. Do not change contract schemas merely to make checks pass;
 service manifest changes require maintainer approval.
 
 Provider definitions and discovery settings live in
-`apps/shared/Host/ModelProviders/providers.json`; integration and account references
+`apps/shared/Runtime/ModelProviders/providers.json`; integration and account references
 live alongside it in `references/`, starting with
-[native integrations](../../../apps/shared/Host/ModelProviders/references/native-integrations.md).
+[native integrations](../../../apps/shared/Runtime/ModelProviders/references/native-integrations.md).
 New models arrive through runtime discovery; do not pin models merely because they
 are new. Preserve existing picker IDs, aliases, variants, intentional token caps,
 and regional/subscription boundaries. Change discovery formats, catalogs, rules,

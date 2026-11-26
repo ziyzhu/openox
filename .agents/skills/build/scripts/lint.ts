@@ -1,7 +1,7 @@
 import { run, runCheck } from "../../../lib.ts";
 import { check as publicBoundary } from "./public-boundary-check.ts";
-import { check as hostPlatforms } from "./host-platform-boundary-check.ts";
-import { check as hostContract } from "./ios-host-contract-check.ts";
+import { check as hostPlatforms } from "./platform-boundary-check.ts";
+import { check as hostContract } from "./ios-runtime-contract-check.ts";
 import { check as filesystemPaths } from "./filesystem-path-check.ts";
 import { check as skills } from "./skills-check.ts";
 import { check as localizations } from "./localization-check.ts";

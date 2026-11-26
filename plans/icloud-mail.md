@@ -12,11 +12,11 @@ Second milestone: compose and send plain-text messages and replies, including se
 
 ## Existing integration points
 
-- `apps/shared/Host/Services/Native/NativeServiceOperations.swift` dispatches native actions. Add mail operations through the existing service invocation and approval path, using shared implementation rather than platform duplicates.
-- `apps/shared/Host/Services/Native/NativeServiceCatalog.swift` and platform catalogs resolve bundled native definitions. `apps/macos/Host/Services/MacNativeServiceCatalog.swift` currently allowlists supported services; both platforms need registration.
+- `apps/shared/Runtime/Services/Native/NativeServiceOperations.swift` dispatches native actions. Add mail operations through the existing service invocation and approval path, using shared implementation rather than platform duplicates.
+- `apps/shared/Runtime/Services/Native/NativeServiceCatalog.swift` and platform catalogs resolve bundled native definitions. `apps/macos/Runtime/Services/MacNativeServiceCatalog.swift` currently allowlists supported services; both platforms need registration.
 - `apps/shared/Resources/OxServices.bundle/ios/*/service.json` contains existing native action contracts. Follow the existing source/build pipeline rather than editing generated resources blindly. Native definitions currently use `ios:` identities even for shared functionality; settle mail naming before adding an identity.
-- `apps/shared/Host/Credentials/Secret.swift` provides secret entries and consumer bindings; `Credentials.swift` provides checked Keychain operations. Existing consumer kinds do not include native mail, so credential integration is a real implementation decision, not a drop-in HTTP basic-auth configuration.
-- `apps/ios/Host/Services/ServiceImplementations.swift` and its macOS counterpart own service authentication/capabilities. Native permission-only UI is insufficient for an email/password connection; extend the existing account-entry and service-detail flow narrowly.
+- `apps/shared/Runtime/Credentials/Secret.swift` provides secret entries and consumer bindings; `Credentials.swift` provides checked Keychain operations. Existing consumer kinds do not include native mail, so credential integration is a real implementation decision, not a drop-in HTTP basic-auth configuration.
+- `apps/ios/Runtime/Services/ServiceImplementations.swift` and its macOS counterpart own service authentication/capabilities. Native permission-only UI is insufficient for an email/password connection; extend the existing account-entry and service-detail flow narrowly.
 - Keep agent-facing guidance and any bundled workflow in `packages/agent`. Do not introduce a general mail-provider framework, new service kind, or generic socket tool for this feature without approval.
 
 ## Phase 1: feasibility and decisions

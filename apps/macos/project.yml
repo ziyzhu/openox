@@ -21,10 +21,10 @@ targets:
         script: sh "$SRCROOT/../shared/validate-agent-bundle.sh"
         basedOnDependencyAnalysis: false
     sources:
-      - path: Host
+      - path: Runtime
       - path: Resources
       - path: Diagnostics
-      - path: ../shared/Host
+      - path: ../shared/Runtime
       - path: ../shared/Platform/Models
       - path: ../shared/Diagnostics
       - path: ../shared/Resources/OxServices.bundle

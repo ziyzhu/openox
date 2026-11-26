@@ -132,13 +132,13 @@ targets:
         type: syncedFolder
       - path: Diagnostics
         type: syncedFolder
-      - path: Host
+      - path: Runtime
         type: syncedFolder
       - path: Platform
         type: syncedFolder
       - path: Resources
         type: syncedFolder
-      - path: ../shared/Host
+      - path: ../shared/Runtime
         type: syncedFolder
       - path: ../shared/Platform
         type: syncedFolder

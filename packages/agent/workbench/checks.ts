@@ -13,7 +13,7 @@ const alternativeGroups = ["storage.", "replies.", "language.", "runtime.login."
 const catalogNames =new Set(["ox", ...namespaces.map(name => `ox.${name}`), "ox.web.browser", ...Object.keys(contracts)]);
 
 function hostNames() {
-  const source = readFileSync(join(repo, "apps/shared/Host/VM/Actions.swift"), "utf8");
+  const source = readFileSync(join(repo, "apps/shared/Runtime/VM/Actions.swift"), "utf8");
   return new Set([...source.matchAll(/"(ox(?:\.[A-Za-z][A-Za-z0-9]*)+)"/g)].map(match => match[1]!));
 }
 

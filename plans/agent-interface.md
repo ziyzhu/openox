@@ -216,22 +216,22 @@ The Host notifies locally while it runs. `ox agent serve` sends a push when no H
 ## File tree
 
 ```diff
-  apps/shared/Host/Agent/
+  apps/shared/Runtime/Agent/
 +   Connection/AgentConnection.swift
 +   Connection/LocalAgent.swift
 +   Connection/RemoteAgent.swift
-  apps/shared/Host/Notifications/
+  apps/shared/Runtime/Notifications/
 +   PushNotifier.swift                   phase change + no watcher → relay
   apps/shared/Platform/Models/
 +   AgentConfiguration.swift
-  apps/shared/Host/Durable/
+  apps/shared/Runtime/Durable/
     DurableConversation.swift            ~ agent calls move to LocalAgent
     DurableAgentHost.swift               ~ pi event names, agent_settled, entryId
-  apps/shared/Host/Conversations/
+  apps/shared/Runtime/Conversations/
     Conversation.swift                   ~ holds AgentConnection
     ConversationManager.swift            ~ creates with agent selection
     ConversationExecution.swift          ~ phase titles use agent name
-  apps/shared/Host/RPC/
+  apps/shared/Runtime/RPC/
     ConversationCommands.swift           ~ new/open/respond route to the agent
     ConversationSnapshot.swift           ~ conversations.open messages
 +   AgentCommands.swift

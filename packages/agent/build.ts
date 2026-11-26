@@ -79,7 +79,7 @@ for (const generated of [result, promptResult, extractionResult, validationResul
   bundles[name] = { bytes: file.contents.length, sha256: new Bun.CryptoHasher("sha256").update(file.text).digest("hex") };
   console.log(`PASS ${name} audit: ${inputs.length} inputs, ${file.contents.length} bytes, no external imports or Node runtime`);
 }
-const guidancePath = `${root}apps/shared/Host/Agent/ModelGuidance.generated.swift`;
+const guidancePath = `${root}apps/shared/Runtime/Agent/ModelGuidance.generated.swift`;
 const guidanceSource = nativeGuidanceSource();
 if (!await Bun.file(guidancePath).exists() || await Bun.file(guidancePath).text() !== guidanceSource) {
   const temporary = `${guidancePath}.${process.pid}.tmp`;

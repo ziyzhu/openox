@@ -1,0 +1,174 @@
+import Foundation
+import Observation
+
+enum MessageDisposition: String {
+    case sent
+    case cancelled
+    case failed
+}
+
+enum MessageComposeError: LocalizedError {
+    case unavailable
+    case noPresenter
+
+    var errorDescription: String? {
+        switch self {
+        case .unavailable:
+            return "Ox on this device cannot present a text-message composer. Ask the user to compose the message in their messaging app."
+        case .noPresenter:
+            return "Couldn't open the message composer — no active window to present from."
+        }
+    }
+}
+
+@MainActor
+protocol ServiceHandoffPresenting {
+    func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome
+}
+
+@MainActor
+protocol MessageComposing {
+    var canSend: Bool { get }
+    func present(recipients: [String], body: String?) async throws -> MessageDisposition
+}
+
+@MainActor
+protocol ProviderAuthenticating {
+    func present(session: ProviderAuthenticationSession) async -> ProviderAuthenticationSession.Outcome
+}
+
+@MainActor
+struct AppPresentations {
+    let serviceHandoff: any ServiceHandoffPresenting
+    let messages: any MessageComposing
+    var providerAuthentication: (any ProviderAuthenticating)? = nil
+    var browser: (@MainActor (Service, BrowserSession) -> Void)? = nil
+    var secretEntry: (@MainActor (SecretEntrySpec) async throws -> Bool)? = nil
+    var serviceControl: (@MainActor (Conversation, ServiceControl) async -> JSONValue?)? = nil
+
+    static let unavailable = AppPresentations(
+        serviceHandoff: UnavailableServiceHandoffPresenter(),
+        messages: UnavailableMessageComposer()
+    )
+}
+
+@MainActor
+@Observable
+final class AppPresentationCoordinator {
+    enum Content {
+        case browser(ServiceBrowserSession)
+        case serviceHandoff(ServiceHandoffSession)
+        case providerAuthentication(ProviderAuthenticationSession)
+    }
+
+    struct Presented: Identifiable {
+        let id = UUID()
+        let content: Content
+    }
+
+    static let shared = AppPresentationCoordinator()
+
+    private(set) var presented: Presented?
+    private var sceneActive = false
+    private var browserBlockers: Set<UUID> = []
+
+    func blockBrowser(owner: UUID) {
+        browserBlockers.insert(owner)
+    }
+
+    func unblockBrowser(owner: UUID) {
+        browserBlockers.remove(owner)
+    }
+
+    var canOpenBrowser: Bool {
+        guard sceneActive, browserBlockers.isEmpty else { return false }
+        guard let presented else { return true }
+        if case .browser = presented.content { return true }
+        return false
+    }
+
+    func setSceneActive(_ active: Bool) {
+        sceneActive = active
+    }
+
+    func detachScene() {
+        sceneActive = false
+        dismissPresented()
+    }
+
+    @discardableResult
+    func presentBrowser(_ session: ServiceBrowserSession) -> Bool {
+        present(.browser(session), label: "browser") != nil
+    }
+
+    func presentServiceHandoff(_ session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
+        guard let id = present(.serviceHandoff(session), label: "service-handoff") else {
+            session.presentationFailed()
+            return .failed
+        }
+        Log.ui.info("ServiceHandoffSheet present domain=\(session.serviceDomain)")
+        let outcome = await session.run()
+        dismiss(id: id)
+        return outcome
+    }
+
+    func dismissPresented() {
+        guard let presented else { return }
+        switch presented.content {
+        case .browser(let session): session.stop()
+        case .serviceHandoff(let session): session.cancel()
+        case .providerAuthentication(let session): session.complete(.cancelled)
+        }
+        self.presented = nil
+    }
+
+    private func present(_ content: Content, label: String) -> UUID? {
+        guard sceneActive, presented == nil else {
+            Log.ui.warning("AppPresentation.rejected kind=\(label) sceneActive=\(sceneActive) occupied=\(presented != nil)")
+            return nil
+        }
+        let presented = Presented(content: content)
+        self.presented = presented
+        return presented.id
+    }
+
+    private func dismiss(id: UUID) {
+        guard presented?.id == id else { return }
+        presented = nil
+    }
+}
+
+extension AppPresentationCoordinator: ProviderAuthenticating {
+    func present(session: ProviderAuthenticationSession) async -> ProviderAuthenticationSession.Outcome {
+        guard let id = present(.providerAuthentication(session), label: "provider-auth") else {
+            session.complete(.failed)
+            return .failed
+        }
+        let outcome = await session.run()
+        dismiss(id: id)
+        return outcome
+    }
+}
+
+extension AppPresentationCoordinator: ServiceHandoffPresenting {
+    func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
+        await presentServiceHandoff(session)
+    }
+}
+
+@MainActor
+private struct UnavailableServiceHandoffPresenter: ServiceHandoffPresenting {
+    func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
+        session.presentationFailed()
+        return .failed
+    }
+}
+
+@MainActor
+private struct UnavailableMessageComposer: MessageComposing {
+    var canSend: Bool { false }
+
+    func present(recipients: [String], body: String?) async throws -> MessageDisposition {
+        throw MessageComposeError.unavailable
+    }
+}

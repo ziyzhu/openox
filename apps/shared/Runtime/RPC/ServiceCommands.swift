@@ -1,0 +1,310 @@
+import Foundation
+import WebKit
+
+extension ProfileProtocol {
+    @MainActor
+    static func handleSetAttachedService(
+        _ command: SetAttachedServiceRequest,
+        conversationManager: ConversationManager,
+        serviceManager: ServiceManager,
+        reply: ProfileRPC.Reply
+    ) {
+        guard let session = conversationManager.current else {
+            reply.failure("session unavailable")
+            return
+        }
+        let domains = command.domains ?? command.domain.map { [$0] } ?? []
+        guard !domains.isEmpty else {
+            session.setAttachedServices([])
+            reply.success()
+            return
+        }
+        let services = domains.compactMap { serviceManager.service(domain: $0) }
+        guard services.count == domains.count else {
+            let missing = domains.filter { domain in !services.contains { $0.domain == domain } }
+            reply.failure("unknown service: \(missing.joined(separator: ", "))")
+            return
+        }
+        session.setAttachedServices(services)
+        reply.success()
+    }
+
+    struct SyncServicesResult: Encodable {
+        let head: JSONValue
+        let changed: [String]
+        let services: Int
+    }
+
+    struct PageRow: Encodable {
+        let url: JSONValue
+        let title: JSONValue
+        let isLoading: Bool
+        let progress: Double
+        let canGoBack: Bool
+        let canGoForward: Bool
+    }
+
+    struct ServiceRow: Encodable {
+        let domain: String
+        let title: String
+        let phase: String
+        let navigation: String
+        let activeInvocations: Int
+        let queuedInvocations: Int
+        let pendingEvaluations: Int
+        let pageCount: Int
+        let login: String
+        let page: PageRow?
+        let manifest: JSONValue?
+        let actions: [JSONValue]?
+        let favicon: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case domain, title, phase, navigation, activeInvocations, queuedInvocations, pendingEvaluations, pageCount, page, manifest, actions, favicon
+            case login = "signIn"
+        }
+    }
+
+    struct ListServicesResult: Encodable {
+        let services: [ServiceRow]
+    }
+
+    @MainActor
+
+    static func handleInvokeAction(
+        _ command: ActionRequest,
+        conversationManager: ConversationManager,
+        serviceManager: ServiceManager,
+        reply: ProfileRPC.Reply
+    ) {
+        let domain = command.domain
+        let action = command.action
+        let args = command.args ?? .object([:])
+
+        guard !domain.isEmpty, !action.isEmpty else {
+            reply.failure("missing id/domain/action")
+            return
+        }
+        Log.agent.debug("ProfileRPC.services.invoke id=\(reply.id) \(domain):\(action)")
+        withService(domain: domain, serviceManager: serviceManager, reply: reply) { svc in
+            guard let conversation = conversationManager.current else {
+                return .failure(RuntimeError.bridge("session unavailable"))
+            }
+            if command.session != nil || command.pageUrl != nil {
+                guard svc.isWebService else {
+                    return .failure(RuntimeError.bridge("Session routing is supported only for web services"))
+                }
+            }
+            if conversation.attachedService(domain: svc.domain) == nil {
+                let policy = serviceManager.actionPolicy(for: Actions.serviceAttach, default: Actions.defaultPolicy(for: Actions.serviceAttach))
+                guard policy == .allow && command.approve != false || policy == .ask && command.approve == true else {
+                    return .failure(Service.InvokeError.denied(Actions.serviceAttach))
+                }
+                _ = conversation.attachService(svc)
+                Log.session.info("ProfileRPC.services.invoke attached conversation=\(conversation.id) domain=\(svc.domain)")
+            }
+            let approve: @MainActor (String, Any?) async -> Bool = { invokedName, _ in
+                guard conversation.attachedService(domain: svc.domain) != nil else { return false }
+                let invokedAction = invokedName.split(separator: ":").last.map(String.init) ?? action
+                let name = svc.definition.qualifiedActionName(invokedAction)
+                let actionDefault: ActionPolicy = svc.definition.action(invokedAction, includingStandard: true)?.requireApproval == false ? .allow : .ask
+                switch serviceManager.actionPolicy(for: name, default: actionDefault) {
+                case .allow: return command.approve != false
+                case .block: return false
+                case .ask: return command.approve == true
+                }
+            }
+            if svc.isMCPService {
+                guard await svc.loadManifest(reason: .debug) != nil else {
+                    return .failure(RuntimeError.bridge("service capabilities unavailable"))
+                }
+            }
+            if let apiService = svc.apiService {
+                return await apiService.invoke(service: svc, actionID: action, args: args,
+                    approve: approve)
+            }
+            if let iOSService = svc.iOSService {
+                guard let session = conversationManager.current else {
+                    return .failure(RuntimeError.bridge("session unavailable"))
+                }
+                return await iOSService.invoke(
+                    service: svc,
+                    actionID: action,
+                    args: args,
+                    purpose: "Ox Client invocation",
+                    approve: approve,
+                    nativeInvocation: { serviceID, actionID, args, purpose in
+                        try await session.debugInvokeIOSService(serviceID, actionID: actionID, args: args, purpose: purpose)
+                    }
+                )
+            }
+            if let mcpService = svc.remoteMCPService {
+                return await mcpService.invoke(
+                    service: svc,
+                    actionID: action,
+                    args: args,
+                    approve: approve
+                )
+            }
+            if WebSessionContract.isEnabled(svc.definition), action == WebSessionContract.loginAction {
+                return .failure(RuntimeError.bridge("Login requires a user interaction. Invoke the service login action through a conversation VM so Ox can present and await its live page."))
+            }
+            return await svc.invokeAction(action, args: args, session: command.session, pageURL: command.pageUrl, approve: approve)
+        }
+    }
+
+    @MainActor
+    static func handleEvaluate(
+        _ command: EvaluateRequest,
+        serviceManager: ServiceManager,
+        reply: ProfileRPC.Reply
+    ) {
+        let domain = command.domain
+        let script = command.script
+
+        guard !domain.isEmpty, !script.isEmpty else {
+            reply.failure("missing id/domain/script")
+            return
+        }
+        Log.agent.debug("ProfileRPC.services.evaluate id=\(reply.id) domain=\(domain) bytes=\(script.utf8.count)")
+        withService(domain: domain, serviceManager: serviceManager, reply: reply) { svc in
+            await svc.debugEvaluate(script)
+        }
+    }
+
+    @MainActor
+    static func handleReloadService(
+        _ command: ServiceRequest,
+        serviceManager: ServiceManager,
+        reply: ProfileRPC.Reply
+    ) {
+        guard !command.domain.isEmpty else {
+            reply.failure("missing id/domain")
+            return
+        }
+        Log.agent.debug("ProfileRPC.services.reload id=\(reply.id) domain=\(command.domain)")
+        withService(domain: command.domain, serviceManager: serviceManager, reply: reply) { svc in
+            let url = await svc.reload()
+            guard let url else {
+                return .failure(RuntimeError.bridge("service reload failed"))
+            }
+            return .success(.string(url.absoluteString))
+        }
+    }
+
+    @MainActor
+    static func handleRefreshServiceAuth(
+        _ command: ServiceRequest,
+        serviceManager: ServiceManager,
+        reply: ProfileRPC.Reply
+    ) {
+        guard !command.domain.isEmpty else {
+            reply.failure("missing id/domain")
+            return
+        }
+        Log.agent.debug("ProfileRPC.services.refreshAuth id=\(reply.id) domain=\(command.domain)")
+        withService(domain: command.domain, serviceManager: serviceManager, reply: reply) { service in
+            await service.checkAccess(policy: .current, reason: .debug)
+            return .success(.string(service.loginState.rawValue))
+        }
+    }
+
+    @MainActor
+
+    static func handleSyncServices(
+        _ command: EmptyRequest,
+        serviceManager: ServiceManager,
+        reply: ProfileRPC.Reply
+    ) {
+        Log.agent.debug("ProfileRPC.services.sync id=\(reply.id)")
+        Task { @MainActor in
+            let locale = AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+            let manager = serviceManager
+            let changed = if manager.repositories.contains(where: { $0.id == "development" }) {
+                await manager.updateRepository("development", locale: locale)
+            } else {
+                await manager.refreshServices(locale: locale)
+            }
+            let failure: String? = { if case .failed(let m) = manager.repositoryState { return m }; return nil }()
+            Log.agent.debug("ProfileRPC.services.sync id=\(reply.id) monoRepository=\(manager.monoRepositoryHash ?? "nil") changed=\(changed)")
+            reply.complete(SyncServicesResult(
+                head: manager.monoRepositoryHash.map(JSONValue.string) ?? .null,
+                changed: changed,
+                services: manager.services.count
+            ), error: failure)
+        }
+    }
+
+    @MainActor
+    static func handleListServices(
+        _ command: EmptyRequest,
+        serviceManager: ServiceManager,
+        reply: ProfileRPC.Reply
+    ) {
+        Log.agent.debug("ProfileRPC.services.list id=\(reply.id)")
+
+        Task { @MainActor in
+            let mgr = serviceManager
+            if mgr.services.isEmpty {
+                let locale = AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+                await mgr.refreshServices(locale: locale)
+            }
+            var services: [ServiceRow] = []
+            for svc in mgr.services {
+                let snapshot = svc.debugSnapshot
+                let page = snapshot.page.map {
+                    PageRow(
+                        url: $0.url.map(JSONValue.string) ?? .null,
+                        title: $0.title.map(JSONValue.string) ?? .null,
+                        isLoading: $0.isLoading,
+                        progress: $0.progress,
+                        canGoBack: $0.canGoBack,
+                        canGoForward: $0.canGoForward
+                    )
+                }
+                let favicon = await mgr.faviconImage(for: svc.domain).map {
+                    "data:image/png;base64,\($0.base64EncodedString())"
+                }
+                services.append(ServiceRow(
+                    domain: svc.domain,
+                    title: svc.title,
+                    phase: snapshot.phase,
+                    navigation: snapshot.navigation,
+                    activeInvocations: snapshot.activeInvocations,
+                    queuedInvocations: snapshot.queuedInvocations,
+                    pendingEvaluations: snapshot.pendingEvaluations,
+                    pageCount: snapshot.pageCount,
+                    login: snapshot.login,
+                    page: page,
+                    manifest: snapshot.manifest,
+                    actions: svc.definition.exposedActions.map { .object($0.raw) },
+                    favicon: favicon
+                ))
+            }
+            Log.agent.debug("ProfileRPC.services.list id=\(reply.id) count=\(services.count)")
+            reply.success(ListServicesResult(services: services))
+        }
+    }
+
+    @MainActor
+    static func withService(
+        domain: String,
+        serviceManager: ServiceManager,
+        reply: ProfileRPC.Reply,
+        body: @escaping @MainActor (Service) async -> Result<JSONValue, Error>
+    ) {
+        Task { @MainActor in
+            let mgr = serviceManager
+            if mgr.service(domain: domain) == nil {
+                let locale = AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+                await mgr.refreshServices(locale: locale)
+            }
+            guard let svc = mgr.service(domain: domain) else {
+                reply.failure("unknown service: \(domain)")
+                return
+            }
+            reply.complete(await body(svc))
+        }
+    }
+
+}

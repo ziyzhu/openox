@@ -17,10 +17,10 @@ export function artifacts(): Record<string, string> {
       MCPCatalogManifest: MCPCatalogManifestSchema,
     },
   };
-  const swift = `nonisolated extension HostProtocols {\n    static let repository = [${REPOSITORY_VERSIONS.join(", ")}]\n}\n`;
+  const swift = `nonisolated extension RuntimeProtocols {\n    static let repository = [${REPOSITORY_VERSIONS.join(", ")}]\n}\n`;
   return {
     "packages/protocol/repository.schema.json": JSON.stringify(schema, null, 2) + "\n",
-    "apps/shared/Host/HostRepositoryContract.swift": swift,
+    "apps/shared/Runtime/RepositoryContract.swift": swift,
   };
 }
 

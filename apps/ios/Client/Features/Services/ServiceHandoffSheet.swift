@@ -85,10 +85,10 @@ private struct AppPresentationModifier: ViewModifier {
             .modifier(AppFullScreenPresentationModifier(coordinator: coordinator))
             .modifier(AppProviderAuthenticationPresentationModifier(coordinator: coordinator))
             .onChange(of: scenePhase, initial: true) { _, phase in
-                coordinator.setHostActive(phase == .active)
+                coordinator.setSceneActive(phase == .active)
             }
             .onDisappear {
-                coordinator.detachHost()
+                coordinator.detachScene()
             }
     }
 }

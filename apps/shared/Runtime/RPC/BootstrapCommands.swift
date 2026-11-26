@@ -1,0 +1,175 @@
+import Foundation
+import UniformTypeIdentifiers
+
+extension ProfileProtocol {
+    @MainActor
+    static func handleSetRegion(_ command: SetRegionRequest, reply: ProfileRPC.Reply) {
+        guard let region = LLMRegion(rawValue: command.region) else {
+            reply.failure("invalid region: \(command.region)")
+            return
+        }
+        AppRegion.shared.setForTesting(region)
+        reply.success()
+    }
+
+    @MainActor
+    static func handleSetKey(_ command: SetKeyRequest, reply: ProfileRPC.Reply) {
+        guard !command.providerId.isEmpty else {
+            reply.failure("missing providerId")
+            return
+        }
+        let providerId = command.providerId
+        guard let client = ProviderRegistry.shared.client(id: providerId, in: command.region ?? ProviderRegistry.shared.defaultRegion) else {
+            reply.failure("unknown provider: \(providerId)")
+            return
+        }
+        let credentialID = client.credentialID
+        let key = command.key ?? ""
+        do {
+            if key.isEmpty {
+                try Secret.unbind(.provider, id: credentialID)
+            } else {
+                let definition = try ProviderRegistry.shared.definition(id: providerId)
+                try Secret.saveProviderKey(key, definition: definition)
+            }
+        } catch {
+            reply.failure(error.localizedDescription)
+            return
+        }
+        Log.agent.info("ProfileRPC.debug.providers.setKey provider=\(providerId) credential=\(credentialID) chars=\(key.count)")
+        reply.success()
+    }
+
+    @MainActor
+    static func handleBootstrapFiles(
+        _ command: BootstrapFilesRequest,
+        reply: ProfileRPC.Reply
+    ) {
+        guard !command.artifacts.isEmpty else {
+            reply.failure("no artifacts")
+            return
+        }
+        guard let scope = StorageRoot.currentScope else {
+            reply.failure("active Profile unavailable")
+            return
+        }
+        Task { @MainActor in
+            var installed: [FileItem] = []
+            var created: [FileItem] = []
+            do {
+                for file in command.artifacts {
+                    let existing = try await ProfileRepository.shared.files(in: scope)
+                    let imported = try await FileImporter.importDataAsync(
+                        file.data,
+                        suggestedName: file.name,
+                        in: scope
+                    )
+                    if let duplicate = existing.first(where: { sameBootstrapFile($0, imported) }) {
+                        _ = try await ProfileRepository.shared.deleteFile(named: imported.fileName, in: scope)
+                        installed.append(duplicate)
+                    } else {
+                        installed.append(imported)
+                        created.append(imported)
+                    }
+                }
+                let names = installed.map(\.fileName)
+                Log.app.info("ProfileRPC.debug.artifacts.bootstrap count=\(names.count) files=\(names.joined(separator: ","))")
+                reply.success(BootstrapFilesResult(artifacts: names))
+            } catch {
+                for file in created.reversed() {
+                    _ = try? await ProfileRepository.shared.deleteFile(named: file.fileName, in: scope)
+                }
+                Log.app.error("ProfileRPC.debug.artifacts.bootstrap imported=\(created.count) failed=\(error.localizedDescription)")
+                reply.failure(error.localizedDescription)
+            }
+        }
+    }
+
+    @MainActor
+    static func handleWriteFile(
+        _ command: WriteFileRequest,
+        reply: ProfileRPC.Reply
+    ) {
+        guard let scope = StorageRoot.currentScope else {
+            reply.failure("active Profile unavailable")
+            return
+        }
+        Task { @MainActor in
+            do {
+                let file = try await ProfileRepository.shared.writeFile(
+                    data: command.data,
+                    named: command.name,
+                    in: scope
+                )
+                Log.app.info("ProfileRPC.debug.artifacts.write file=\(file.fileName) bytes=\(command.data.count)")
+                reply.success()
+            } catch {
+                reply.failure(error.localizedDescription)
+            }
+        }
+    }
+
+    @MainActor
+    static func handleExportWebsiteData(
+        _ command: EmptyRequest,
+        serviceManager: ServiceManager,
+        reply: ProfileRPC.Reply
+    ) {
+        Task { @MainActor in
+            do {
+                let data = try await serviceManager.exportWebsiteData()
+                guard data.count <= 64 * 1024 * 1024 else {
+                    reply.failure("website data exceeds 67108864 bytes")
+                    return
+                }
+                reply.success(WebsiteDataResult(data: data, bytes: data.count))
+            } catch {
+                Log.service.error("ProfileProtocol.websiteData export failed scope=global error=\(error.localizedDescription)")
+                reply.failure(error.localizedDescription)
+            }
+        }
+    }
+
+    @MainActor
+    static func handleRestoreWebsiteData(
+        _ command: RestoreWebsiteDataRequest,
+        serviceManager: ServiceManager,
+        reply: ProfileRPC.Reply
+    ) {
+        guard !command.data.isEmpty else {
+            reply.failure("invalid data")
+            return
+        }
+        guard command.data.count <= 64 * 1024 * 1024 else {
+            reply.failure("website data exceeds 67108864 bytes")
+            return
+        }
+        Task { @MainActor in
+            do {
+                try await serviceManager.restoreWebsiteData(command.data)
+                reply.success(WebsiteDataResult(data: nil, bytes: command.data.count))
+            } catch {
+                Log.service.error("ProfileProtocol.websiteData restore failed scope=global error=\(error.localizedDescription)")
+                reply.failure(error.localizedDescription)
+            }
+        }
+    }
+
+    static func sameBootstrapFile(_ existing: FileItem, _ imported: FileItem) -> Bool {
+        guard bootstrapFileFamily(existing.fileName) == bootstrapFileFamily(imported.fileName),
+              existing.size == imported.size,
+              let existingData = try? Data(contentsOf: existing.fileURL),
+              let importedData = try? Data(contentsOf: imported.fileURL) else { return false }
+        return existingData == importedData
+    }
+
+    static func bootstrapFileFamily(_ fileName: String) -> String {
+        let url = URL(fileURLWithPath: fileName)
+        var stem = url.deletingPathExtension().lastPathComponent
+        if let space = stem.lastIndex(of: " "), Int(stem[stem.index(after: space)...]) != nil {
+            stem = String(stem[..<space])
+        }
+        return "\(stem.lowercased()).\(url.pathExtension.lowercased())"
+    }
+
+}

@@ -29,11 +29,11 @@ const commonFunctions = ["ox.fs.read", "ox.fs.edit", "ox.fs.write", "ox.web.sear
 const catalogNamespaces = ["conversation", "provider", "repository", "secret", "service", "user", "web", "fs", "output", "skill", "schedule", "vision"];
 const catalogSentinel = "\u0000CATALOG\u0000";
 const nativeFacts = [
-  ["timeoutSeconds", "apps/shared/Host/VM/VirtualMachine.swift", /defaultTimeout: TimeInterval = ([\d_]+)/],
-  ["maxLines", "apps/shared/Host/Conversations/JavaScriptOutputStore.swift", /static let maxLines = ([\d_]+)/],
-  ["maxKiB", "apps/shared/Host/Conversations/JavaScriptOutputStore.swift", /static let maxBytes = ([\d_]+) \* 1024/],
-  ["maxFetches", "apps/shared/Host/Services/Web/WebFunctions.swift", /static let maxFetches = ([\d_]+)/],
-  ["maxTransientAttachments", "apps/shared/Host/Services/Web/WebFunctions.swift", /static let maxTransientAttachments = ([\d_]+)/],
+  ["timeoutSeconds", "apps/shared/Runtime/VM/VirtualMachine.swift", /defaultTimeout: TimeInterval = ([\d_]+)/],
+  ["maxLines", "apps/shared/Runtime/Conversations/JavaScriptOutputStore.swift", /static let maxLines = ([\d_]+)/],
+  ["maxKiB", "apps/shared/Runtime/Conversations/JavaScriptOutputStore.swift", /static let maxBytes = ([\d_]+) \* 1024/],
+  ["maxFetches", "apps/shared/Runtime/Services/Web/WebFunctions.swift", /static let maxFetches = ([\d_]+)/],
+  ["maxTransientAttachments", "apps/shared/Runtime/Services/Web/WebFunctions.swift", /static let maxTransientAttachments = ([\d_]+)/],
 ] as const;
 const limits = Object.fromEntries(nativeFacts.map(([key, file, pattern]) => {
   const match = readFileSync(join(repo, file), "utf8").match(pattern);
