@@ -42,6 +42,8 @@ if (import.meta.main) {
       'await import("@openox/protocol/catalog");',
       'await import("@openox/protocol/model-actions");',
       'await import("@openox/protocol/skills");',
+      'const { parsePushRelayRequest } = await import("@openox/protocol/push");',
+      'if (!parsePushRelayRequest({token:"ab".repeat(32),environment:"production",sealed:"x",thread:"0".repeat(32)}) || parsePushRelayRequest({token:"x"})) throw new Error("push API failed");',
       'if (RPC_VERSION !== 4 || !validateParams("host.describe", {})) throw new Error("RPC API failed");',
       'const repository = validateRepositoryPackage({version:3,name:"Example",services:["web:example.com"],skills:[]});',
       'if ("error" in repository) throw new Error(repository.error);',

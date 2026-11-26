@@ -84,6 +84,12 @@ final class RemoteAgentDirectory {
     private(set) var models: [URL: [RemoteAgentModel]] = [:]
     private(set) var defaultModels: [URL: AgentModelReference] = [:]
     @ObservationIgnored private var clients: [URL: RemoteAgentClient] = [:]
+    @ObservationIgnored var pushDevice: JSONValue? {
+        didSet {
+            guard pushDevice != oldValue else { return }
+            for agent in configuration.agents { Task { await registerPush(agent.endpoint) } }
+        }
+    }
 
     init(configuration: RemoteAgentConfiguration = .load()) {
         self.configuration = configuration
@@ -135,6 +141,7 @@ final class RemoteAgentDirectory {
         try next.save()
         let kept = Set(next.agents.map(\.endpoint))
         for endpoint in configuration.agents.map(\.endpoint) where !kept.contains(endpoint) {
+            unregisterPush(endpoint)
             statuses[endpoint] = nil
             models[endpoint] = nil
             clients[endpoint] = nil
@@ -180,6 +187,7 @@ final class RemoteAgentDirectory {
         next.agents.removeAll { $0.endpoint == endpoint }
         try next.save()
         configuration = next
+        unregisterPush(endpoint)
         statuses[endpoint] = nil
         models[endpoint] = nil
         clients[endpoint] = nil
@@ -210,9 +218,33 @@ final class RemoteAgentDirectory {
             models[endpoint] = (listing["models"]?.arrayValue ?? []).compactMap(Self.model)
             defaultModels[endpoint] = listing["current"].flatMap(Self.reference)
             Log.agent.info("RemoteAgentDirectory.refresh endpoint=\(endpoint.absoluteString) online=true models=\(models[endpoint]?.count ?? 0)")
+            await registerPush(endpoint)
         } catch {
             statuses[endpoint] = .offline(error.localizedDescription)
             Log.agent.info("RemoteAgentDirectory.refresh endpoint=\(endpoint.absoluteString) online=false error=\(LogPrivacy.text(error.localizedDescription, limit: 200))")
+        }
+    }
+
+    private func registerPush(_ endpoint: URL) async {
+        guard let device = pushDevice else { return }
+        do {
+            _ = try await client(for: endpoint).call("notifications.register", device, timeout: .seconds(10))
+            Log.agent.info("RemoteAgentDirectory.push registered endpoint=\(endpoint.absoluteString)")
+        } catch {
+            Log.agent.warning("RemoteAgentDirectory.push register failed endpoint=\(endpoint.absoluteString) error=\(LogPrivacy.text(error.localizedDescription, limit: 200))")
+        }
+    }
+
+    private func unregisterPush(_ endpoint: URL) {
+        guard let token = pushDevice?.objectValue?["token"] else { return }
+        let client = client(for: endpoint)
+        Task {
+            do {
+                _ = try await client.call("notifications.unregister", .object(["token": token]), timeout: .seconds(5))
+                Log.agent.info("RemoteAgentDirectory.push unregistered endpoint=\(endpoint.absoluteString)")
+            } catch {
+                Log.agent.warning("RemoteAgentDirectory.push unregister failed endpoint=\(endpoint.absoluteString) error=\(LogPrivacy.text(error.localizedDescription, limit: 200))")
+            }
         }
     }
 

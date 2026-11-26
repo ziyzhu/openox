@@ -166,6 +166,8 @@ targets:
       - package: SwiftGitX
       - target: ShareExtension
         embed: true
+      - target: NotificationService
+        embed: true
   ShareExtension:
     type: app-extension
     platform: iOS
@@ -200,6 +202,41 @@ targets:
         TARGETED_DEVICE_FAMILY: 1,2
     sources:
       - path: ShareExtension
+        type: syncedFolder
+  NotificationService:
+    type: app-extension
+    platform: iOS
+    configFiles:
+      Debug: Local.xcconfig
+      Release: Local.xcconfig
+    settings:
+      base:
+        APPLICATION_EXTENSION_API_ONLY: "YES"
+        CODE_SIGN_ENTITLEMENTS: NotificationService.entitlements
+        CODE_SIGN_STYLE: Automatic
+        CURRENT_PROJECT_VERSION: "1"
+        DEVELOPMENT_TEAM: $(OX_DEVELOPMENT_TEAM)
+        GENERATE_INFOPLIST_FILE: "NO"
+        INFOPLIST_FILE: NotificationService-Info.plist
+        IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+        LD_RUNPATH_SEARCH_PATHS:
+          - $(inherited)
+          - "@executable_path/../../Frameworks"
+        LM_SKIP_METADATA_EXTRACTION: "YES"
+        MARKETING_VERSION: 1.1.7
+        PRODUCT_BUNDLE_IDENTIFIER: $(OX_BUNDLE_IDENTIFIER).NotificationService
+        PRODUCT_NAME: NotificationService
+        SKIP_INSTALL: "YES"
+        STRING_CATALOG_GENERATE_SYMBOLS: "YES"
+        SUPPORTS_MACCATALYST: "NO"
+        SWIFT_APPROACHABLE_CONCURRENCY: "YES"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_EMIT_LOC_STRINGS: "YES"
+        SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: "YES"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: 1,2
+    sources:
+      - path: NotificationService
         type: syncedFolder
 schemes:
   ios:

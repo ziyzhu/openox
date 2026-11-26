@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct OxApp: App {
+    @UIApplicationDelegateAdaptor private var delegate: OxAppDelegate
+
     init() {
         #if DEBUG && targetEnvironment(simulator)
         DeviceTemplate.preparePreferences()
@@ -248,5 +250,20 @@ private struct OxApplicationView: View {
                 catch { Log.app.error("Onboarding.save failed error=\(error.localizedDescription)") }
             }
         }
+    }
+}
+
+final class OxAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        PushRegistration.shared.start()
+        return true
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        PushRegistration.shared.received(token: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        PushRegistration.shared.failed(error)
     }
 }

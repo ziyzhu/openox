@@ -13,6 +13,7 @@ import {
   type AgentModel,
   type AgentModelRef,
   type AgentPromptNotification,
+  type AgentPushRegistration,
   type AgentRespondRequest,
   type AgentTool,
 } from "@openox/protocol/agent";
@@ -20,6 +21,8 @@ import { DEFAULT_EVENT_LIMITS, EventLog, type EventLimits } from "./agent-events
 import { agentLog } from "./agent-log.ts";
 import { BRIDGE_ENVIRONMENT, writePiExtension } from "./agent-pi-extension.ts";
 import { approvalArguments, exitMessage, PiProcess, piVersion, type Approval, type PiExit, type PiRecord } from "./agent-pi.ts";
+import type { PushKind } from "@openox/protocol/push";
+import { PushRegistry } from "./agent-push.ts";
 import { OriginStore, SessionIndex, within } from "./agent-sessions.ts";
 import { admission, HEALTH_NAME, type Tailnet } from "./agent-tailscale.ts";
 import { ToolBridge } from "./agent-tools.ts";
@@ -52,6 +55,7 @@ type Conversation = {
   prompts: Map<string, AgentPromptNotification>;
   activeTools: Set<string>;
   events: EventLog;
+  reply: string;
   idleTimer?: ReturnType<typeof setTimeout>;
 };
 type PiState = {
@@ -74,6 +78,7 @@ type SendParams = {
 
 const DIALOG_METHODS = new Set(["select", "confirm", "input", "editor"]);
 const IDLE_CLOSE_MS = 10 * 60 * 1000;
+const SOCKET_IDLE_SECONDS = 30;
 const STARTUP_TIMEOUT_MS = 120 * 1000;
 const MODELS_CACHE_MS = 60 * 1000;
 const PI_FAILURE = -32000;
@@ -103,6 +108,7 @@ export class AgentServer {
   private readonly tokens = new Map<string, string>();
   private readonly sessions: SessionIndex;
   private readonly origins: OriginStore;
+  private readonly push: PushRegistry;
   private readonly bridge: ToolBridge;
   private readonly bridgeURL: string;
   private readonly server: ReturnType<typeof Bun.serve>;
@@ -123,17 +129,20 @@ export class AgentServer {
     "conversations.setThinking": (params: { id: string; level: string }) => this.command(params.id, "set_thinking_level", { level: params.level }),
     "conversations.compact": (params: { id: string }) => this.command(params.id, "compact"),
     "conversations.rename": (params: { id: string; title: string }) => this.rename(params.id, params.title),
+    "notifications.register": (params: AgentPushRegistration) => this.push.register(params).then(() => ({})),
+    "notifications.unregister": (params: { token: string }) => this.push.unregister(params.token).then(() => ({})),
   };
 
   private readonly options: AgentServeOptions;
   private readonly version: string;
   private readonly extensionPath: string;
 
-  private constructor(options: AgentServeOptions, version: string, extensionPath: string, origins: OriginStore) {
+  private constructor(options: AgentServeOptions, version: string, extensionPath: string, origins: OriginStore, push: PushRegistry) {
     this.options = options;
     this.version = version;
     this.extensionPath = extensionPath;
     this.origins = origins;
+    this.push = push;
     this.sessions = new SessionIndex(options.roots);
     this.bridge = new ToolBridge((token) => {
       const conversation = this.conversations.get(this.tokens.get(token) ?? "");
@@ -158,6 +167,7 @@ export class AgentServer {
       },
       websocket: {
         data: {} as AgentSocket["data"],
+        idleTimeout: SOCKET_IDLE_SECONDS,
         open: (socket) => agentLog("connection.open", { connection: socket.data.id, via: socket.data.via }),
         message: (socket, message) => this.receive(socket, typeof message === "string" ? message : new TextDecoder().decode(message)),
         close: (socket, code) => this.disconnect(socket, code),
@@ -168,8 +178,9 @@ export class AgentServer {
 
   static async start(options: AgentServeOptions): Promise<AgentServer> {
     const origins = new OriginStore(options.stateDirectory);
-    const [version, extensionPath] = await Promise.all([piVersion(options.executable), writePiExtension(options.stateDirectory), origins.load()]);
-    const server = new AgentServer(options, version, extensionPath, origins);
+    const push = new PushRegistry(options.stateDirectory);
+    const [version, extensionPath] = await Promise.all([piVersion(options.executable), writePiExtension(options.stateDirectory), origins.load(), push.load()]);
+    const server = new AgentServer(options, version, extensionPath, origins, push);
     agentLog("serve.start", { url: server.url, folders: options.roots.length, tailnet: options.tailnet !== undefined, pi: version, approval: options.approval });
     return server;
   }
@@ -441,7 +452,7 @@ export class AgentServer {
   private register(id: string, cwd: string, context: AgentContext, tools: AgentTool[], title: string | null): Conversation {
     const conversation: Conversation = {
       id, cwd, context, tools, title, subscribers: new Set(), process: { kind: "stopped" }, prompts: new Map(), activeTools: new Set(),
-      events: new EventLog(this.options.eventLimits ?? DEFAULT_EVENT_LIMITS),
+      events: new EventLog(this.options.eventLimits ?? DEFAULT_EVENT_LIMITS), reply: "",
     };
     this.conversations.set(id, conversation);
     return conversation;
@@ -523,6 +534,7 @@ export class AgentServer {
     conversation.activeTools.clear();
     const error = exit.requested ? undefined : exitMessage(exit);
     this.notify(conversation, "conversations.changed", { id: conversation.id, state: "exited", title: conversation.title, error });
+    if (error) this.pushUnwatched(conversation, "failed", error);
   }
 
   private receivePi(conversation: Conversation, pi: PiProcess, record: PiRecord): void {
@@ -537,6 +549,7 @@ export class AgentServer {
     else if (record.type === "session_info_changed") this.retitle(conversation, typeof record.name === "string" ? record.name : null);
     else if (record.type === "tool_execution_start") conversation.activeTools.add(String(record.toolCallId));
     else if (record.type === "tool_execution_end") conversation.activeTools.delete(String(record.toolCallId));
+    else if (record.type === "message_end") conversation.reply = assistantText(record) ?? conversation.reply;
   }
 
   private setRun(conversation: Conversation, pi: PiProcess, run: RunState): void {
@@ -544,6 +557,8 @@ export class AgentServer {
     if (process.kind !== "live" || process.pi !== pi || process.run === run) return;
     process.run = run;
     this.notify(conversation, "conversations.changed", { id: conversation.id, state: run, title: conversation.title });
+    if (run === "running") conversation.reply = "";
+    else this.pushUnwatched(conversation, "completed", conversation.reply || "Finished");
     this.scheduleIdleClose(conversation);
   }
 
@@ -578,7 +593,24 @@ export class AgentServer {
     if (timeout) setTimeout(() => conversation.prompts.delete(promptId), timeout);
     agentLog("pi.prompt", { conversation: conversation.id, method, toolCall: toolCallId !== undefined });
     this.notify(conversation, "conversations.prompt", prompt);
+    this.pushUnwatched(conversation, "needsAttention", optionalString(record.title) || optionalString(record.message) || "Waiting for your answer");
   }
+
+  private pushUnwatched(conversation: Conversation, kind: PushKind, body: string): void {
+    if (conversation.subscribers.size > 0) return;
+    this.push.send({ kind, conversation: conversation.id, title: conversation.title ?? "Ox", body });
+  }
+}
+
+function assistantText(record: PiRecord): string | undefined {
+  const message = record.message as { role?: unknown; content?: unknown } | undefined;
+  if (message?.role !== "assistant" || !Array.isArray(message.content)) return undefined;
+  const text = message.content
+    .flatMap((block: { type?: unknown; text?: unknown }) => block.type === "text" && typeof block.text === "string" ? [block.text] : [])
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text || undefined;
 }
 
 function optionalString(value: unknown): string | undefined {

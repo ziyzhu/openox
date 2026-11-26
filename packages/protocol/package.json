@@ -18,7 +18,8 @@
     "./action": "./src/action.ts",
     "./model-actions": "./src/model-actions.ts",
     "./skills": "./src/skills.ts",
-    "./agent": "./src/agent-contract.ts"
+    "./agent": "./src/agent-contract.ts",
+    "./push": "./src/push.ts"
   },
   "scripts": { "package:check": "bun package-check.ts" },
   "repository": {

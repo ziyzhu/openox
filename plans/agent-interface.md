@@ -120,15 +120,15 @@ Conversation ──► AgentConnection
 
 ## Notifications
 
-The Host is the only sender. pi and `ox agent serve` know nothing about notifications.
+The Host notifies locally while it runs. `ox agent serve` sends a push when no Host is subscribed to a conversation, because an iPhone Host is suspended while the app is closed.
 
-- Trigger: a conversation enters `.permissionNeeded`, `.inputNeeded`, `.loginNeeded`, `.paymentNeeded`, `.failed` or completes, and no connected Client has it open.
-- Delivery: Host → OpenOx push relay → APNs for iOS, FCM later for Android. The relay holds the APNs key, forwards ciphertext, and keeps no payloads.
-- Each Client registers with each Host it uses: `notifications.register {pushToken, platform, environment, key, kinds[]}`, again on every launch, and `notifications.unregister` on removal.
-- Payloads are encrypted with the Client's key. An iOS Notification Service Extension decrypts them with the key from an app-group Keychain item, and falls back to "Ox needs your attention".
-- Approval notifications carry Approve and Deny actions that answer through `conversations.respond`. They show a shortened command, never full tool arguments.
-- One thread per conversation; a collapse ID makes a newer state replace an older one.
-- An iPhone Host is suspended while the app is closed, so it keeps today's local notifications only. Closed-app pushes need an always-on Host such as the Mac.
+- Trigger: an unwatched remote conversation completes (body is the last reply), raises a prompt, or its pi process exits with an error.
+- Delivery: `ox agent serve` → push relay → APNs. The relay is one Lambda behind a Function URL in the private deploy repo; it holds the APNs key in Secrets Manager, forwards ciphertext, and stores nothing.
+- The iOS Host registers its device token and key with each remote agent: `notifications.register {token, environment, key, kinds[]}` after each successful refresh, and `notifications.unregister` when the agent is removed. The agent keeps them in `push.json` (mode 0600).
+- Payloads are sealed with AES-256-GCM using the device key. The Notification Service Extension opens them with the key from the app-group Keychain and falls back to "Ox needs your attention".
+- One thread and collapse ID per conversation, so a newer state replaces an older one.
+- A suspended Host stops answering WebSocket pings; serve drops it after 30 s of silence, and pushes start from then.
+- Later: Approve and Deny actions, tap-to-open, App Attest for the relay.
 
 ## Client↔Host endpoints
 
@@ -143,8 +143,6 @@ The Host is the only sender. pi and `ox agent serve` know nothing about notifica
 + agents.add                 {name, endpoint}
 + agents.remove              {endpoint}
 + agents.conversations       {endpoint} → pi sessions not yet in the Host
-+ notifications.register     {pushToken, platform, environment, key, kinds[]}
-+ notifications.unregister   {pushToken}
 ```
 
 ## UX
@@ -272,7 +270,7 @@ Later, if wanted: let the built-in agent use a remote machine's pi providers (fo
 - Children: `ox.conversation.start({ agent, folder })` runs a child conversation on a remote agent, so an Ox conversation (or a remote pi) can delegate to pi on another machine.
 - Catch-up: events carry `seq`; when the socket drops mid-run the Host retries for up to 10 minutes and reopens with `since`, replaying missed events. A gap on an idle conversation, or a serve restart, ends the run with a notice.
 - Keep-awake: serve holds `caffeinate -i -w <pid>` on macOS unless `--allow-sleep`.
-- Open: push notifications (needs the relay and an APNs key), agent names in background phase titles, opening or forking a terminal-started pi session as a Host conversation (listing works through `agents.conversations`), terminal presence, reading agent-side files from the Client, a `tools.cancel` notification, catch-up after the Host app is relaunched mid-run, and README/onboarding/website copy.
+- Open: agent names in background phase titles, opening or forking a terminal-started pi session as a Host conversation (listing works through `agents.conversations`), terminal presence, reading agent-side files from the Client, a `tools.cancel` notification, catch-up after the Host app is relaunched mid-run, and README/onboarding/website copy.
 
 ## Retiring pi-manager
 

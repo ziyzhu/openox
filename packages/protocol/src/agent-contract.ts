@@ -1,4 +1,5 @@
 import { Type, type Static, type TSchema } from "typebox";
+import { PUSH_TOKEN_PATTERN, PushEnvironment, PushKind } from "./push.ts";
 
 export const AGENT_PROTOCOL_VERSION = 1;
 export const AGENT_DEFAULT_PORT = 9878;
@@ -84,6 +85,13 @@ export const AgentSchemas = {
     isError: B(),
   }),
   AgentToolProgressNotification: object("AgentToolProgressNotification", { id: conversationId(), toolCallId: S(), message: S() }),
+  AgentPushRegistration: object("AgentPushRegistration", {
+    token: S({ pattern: PUSH_TOKEN_PATTERN, description: "APNs device token, lowercase hex." }),
+    environment: PushEnvironment,
+    key: S({ minLength: 44, maxLength: 44, description: "Base64 AES-256-GCM key; the device decrypts notification text with it." }),
+    kinds: A(PushKind),
+  }, { description: "Push a notification to this device when a conversation changes while no Host is subscribed to it." }),
+  AgentPushUnregistration: object("AgentPushUnregistration", { token: S() }),
 };
 
 type AgentSchemaName = keyof typeof AgentSchemas;
@@ -104,6 +112,8 @@ export const AgentMethods = {
   "conversations.setThinking": method("AgentSetThinkingRequest", "AgentEmptyResult"),
   "conversations.compact": method("AgentConversationRequest", "AgentEmptyResult"),
   "conversations.rename": method("AgentRenameRequest", "AgentEmptyResult"),
+  "notifications.register": method("AgentPushRegistration", "AgentEmptyResult"),
+  "notifications.unregister": method("AgentPushUnregistration", "AgentEmptyResult"),
 } as const;
 
 export const AgentNotifications = {
@@ -138,3 +148,4 @@ export type AgentPromptNotification = Static<typeof AgentSchemas.AgentPromptNoti
 export type AgentChangedNotification = Static<typeof AgentSchemas.AgentChangedNotification>;
 export type AgentToolCallRequest = Static<typeof AgentSchemas.AgentToolCallRequest>;
 export type AgentToolCallResult = Static<typeof AgentSchemas.AgentToolCallResult>;
+export type AgentPushRegistration = Static<typeof AgentSchemas.AgentPushRegistration>;
