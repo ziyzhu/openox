@@ -299,7 +299,7 @@ export class AgentServer {
         STARTUP_TIMEOUT_MS,
         "pi did not report its models in time",
       );
-      return { models: available.models.map(toAgentModel), current: modelRef(state.model), thinkingLevel: state.thinkingLevel ?? null };
+      return { models: withSnapshotNames(available.models.map(toAgentModel)), current: modelRef(state.model), thinkingLevel: state.thinkingLevel ?? null };
     } finally {
       void pi.shutdown();
     }
@@ -619,6 +619,17 @@ function optionalString(value: unknown): string | undefined {
 
 function modelRef(model: { provider?: unknown; id?: unknown } | undefined): AgentModelRef | null {
   return model && typeof model.provider === "string" && typeof model.id === "string" ? { provider: model.provider, id: model.id } : null;
+}
+
+function withSnapshotNames(models: AgentModel[]): AgentModel[] {
+  const aliases = new Set(models.map((model) => `${model.provider}/${model.id}`));
+  return models.map((model) => {
+    const name = model.name.replace(/ \(latest\)$/, "");
+    const snapshot = /^(.+)-(\d{4})(\d{2})(\d{2})$/.exec(model.id);
+    return snapshot && aliases.has(`${model.provider}/${snapshot[1]}`)
+      ? { ...model, name: `${name} (${snapshot[2]}-${snapshot[3]}-${snapshot[4]})` }
+      : { ...model, name };
+  });
 }
 
 function toAgentModel(model: Record<string, unknown>): AgentModel {
