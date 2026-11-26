@@ -123,7 +123,7 @@ actor DurableProfileStore {
         Log.agent.info("PiDurable Profile closed profile=\(scope.profileID?.uuidString ?? "nil")")
     }
 
-    func exportProfile(_ profile: Profile, progress: @escaping @Sendable (Double) -> Void) async throws -> Data {
+    func exportProfile(_ profile: Profile, to destination: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
         let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
         let session = try await session(in: scope)
         let root = scope.root.standardizedFileURL
@@ -133,7 +133,7 @@ actor DurableProfileStore {
         try await close(in: scope)
         try await ProfileMigrator.validateProfileSnapshot(content: scope.root, state: scope.stateRoot, identity: profile.id)
         progress(0.2)
-        return try ProfilePackage.encode(profile, scope: scope, progress: progress)
+        try ProfilePackage.export(profile, scope: scope, to: destination, progress: progress)
     }
 
     func create(in scope: ProfileScope, metadata: JSONValue = .object([:])) async throws -> DurableConversationReference {

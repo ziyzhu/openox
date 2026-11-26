@@ -176,7 +176,7 @@ final class StorageRoot {
         }
     }
 
-    func exportProfile(_ profile: Profile) async throws -> Data {
+    func exportProfile(_ profile: Profile, named name: String) async throws -> URL {
         guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
         isBusy = true
         defer { isBusy = false }
@@ -186,30 +186,27 @@ final class StorageRoot {
         do {
             if active { try await beforeProfileChange?() }
             LogFile.shared.synchronize()
-            let data = try await DurableProfileStore.shared.exportProfile(profile) { progress in
-                Task { @MainActor in
-                    guard let current = self.exportProgress else { return }
-                    self.exportProgress = max(current, progress)
+            FileStaging.cleanupStale(in: FileManager.default.temporaryDirectory, prefix: "profile-export", olderThan: 3600)
+            let parent = try FileStaging.createDirectory(in: FileManager.default.temporaryDirectory, prefix: "profile-export")
+            let folder = parent.appendingPathComponent(FileStore.sanitizedFilename(name), isDirectory: true)
+            do {
+                try await DurableProfileStore.shared.exportProfile(profile, to: folder) { progress in
+                    Task { @MainActor in
+                        guard let current = self.exportProgress else { return }
+                        self.exportProgress = max(current, progress)
+                    }
                 }
+            } catch {
+                FileStaging.cleanup(parent, operation: "profile-export")
+                throw error
             }
             if active { try await profileDidChange?() }
-            return data
+            return folder
         } catch {
             if active { try? await profileDidChange?() }
             Log.app.error("StorageRoot.export failed profile=\(profile.id) error=\(error.localizedDescription)")
             throw error
         }
-    }
-
-    func importProfile(_ backup: ProfilePackage.Backup, name: String) async throws -> Profile {
-        guard !isBusy else { throw RuntimeError.bridge("A Profile operation is already in progress") }
-        guard !nameTaken(name) else { throw ProfileError.nameExists(name) }
-        isBusy = true
-        defer { isBusy = false }
-        let profile = try await ProfileMigrator.importProfile(backup, name: name)
-        profiles.append(profile)
-        sortProfiles()
-        return profile
     }
 
     func locateProfile(at url: URL, expectedID: UUID) throws {

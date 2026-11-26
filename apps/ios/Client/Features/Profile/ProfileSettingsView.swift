@@ -1,18 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-private struct ProfileFolderDocument: FileDocument, @unchecked Sendable {
-    static var readableContentTypes: [UTType] { [.folder] }
-    let folder: FileWrapper
-
-    init(data: Data) throws { folder = try ProfilePackage.folder(data) }
-
-    init(configuration: ReadConfiguration) throws { folder = configuration.file }
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { folder }
-
-
-}
-
 struct ProfileSettingsView: View {
     let profileID: UUID
     let initialSkillDraft: SkillDraft?
@@ -24,7 +12,7 @@ struct ProfileSettingsView: View {
     @State private var nameDraft = ""
     @State private var operationErrorMessage: String?
     @State private var confirmingDelete = false
-    @State private var exportDocument: ProfileFolderDocument?
+    @State private var exportFolder: URL?
     @State private var presentingExport = false
     @State private var showingFiles = false
     @State private var choosingMoveLocation = false
@@ -94,17 +82,16 @@ struct ProfileSettingsView: View {
         .background(Theme.Colors.background)
         .navigationTitle(Text(verbatim: profile?.name ?? "Profile"))
         .navigationBarTitleDisplayMode(.inline)
-        .fileExporter(isPresented: $presentingExport, document: exportDocument, contentType: .folder,
-            defaultFilename: "\(profile?.name ?? "Profile")-\(Date().formatted(.iso8601.year().month().day().dateSeparator(.dash)))") { result in
+        .fileMover(isPresented: $presentingExport, file: exportFolder) { result in
             if case .failure(let error) = result { operationErrorMessage = error.localizedDescription }
             if case .success(let url) = result,
                url.standardizedFileURL.resolvingSymlinksInPath().pathComponents.starts(with: ProfileRepository.localDocuments().standardizedFileURL.resolvingSymlinksInPath().pathComponents) {
                 operationErrorMessage = String(localized: "This backup is saved inside Ox and will be removed if you delete the app. Export another copy to iCloud Drive or a location outside Ox.")
             }
-            exportDocument = nil
+            discardExportFolder()
         }
         .onChange(of: presentingExport) { _, presented in
-            if !presented { exportDocument = nil }
+            if !presented { discardExportFolder() }
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -274,12 +261,19 @@ struct ProfileSettingsView: View {
         }
     }
 
+    private func discardExportFolder() {
+        guard let folder = exportFolder else { return }
+        exportFolder = nil
+        FileStaging.cleanup(folder.deletingLastPathComponent(), operation: "profile-export")
+    }
+
     private func exportSection(for profile: Profile) -> some View {
         SettingsSection(footer: "Export to iCloud Drive or another location outside Ox to keep a copy after deleting the app. Credentials and device permissions aren't included.", layout: .row) {
             Button {
                 Task {
                     do {
-                        exportDocument = try ProfileFolderDocument(data: try await storage.exportProfile(profile))
+                        let name = "\(profile.name)-\(Date().formatted(.iso8601.year().month().day().dateSeparator(.dash)))"
+                        exportFolder = try await storage.exportProfile(profile, named: name)
                         presentingExport = true
                     } catch {
                         operationErrorMessage = error.localizedDescription

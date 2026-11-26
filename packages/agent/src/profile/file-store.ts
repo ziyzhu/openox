@@ -180,7 +180,7 @@ export class ProfileFileStore {
     const state = await this.state();
     for (const id of state.deletedConversations) {
       await (await this.harness.conversation(id as ConversationId, context))?.abort(context);
-      if (state.directories.includes(`conversations/${id}`) || Object.values(state.files).some(file => file.owner === id)) await this.deleteConversation(id as ConversationId);
+      await this.deleteConversation(id as ConversationId);
     }
     if (!(await this.state()).initialized) throw new Error("Profile files require StorageMigrator preparation");
     await this.backend.sweep();
@@ -462,8 +462,8 @@ export class ProfileFileStore {
       await this.removeLocked(state, file.path);
     }, undefined, [reference], true);
   }
-  private async removeLocked(state: Awaited<ReturnType<ProfileFileStore["state"]>>, path: string, conversation?: number) {
-    const removed = Object.values(state.files).filter(file => beneath(file.path, path) || (conversation !== undefined && file.owner === conversation));
+  private async removeLocked(state: Awaited<ReturnType<ProfileFileStore["state"]>>, path: string) {
+    const removed = Object.values(state.files).filter(file => beneath(file.path, path));
     const ids = new Set(removed.map(file => file.id));
     const directories = state.directories.filter(directory => beneath(directory, path)).sort((a, b) => b.length - a.length);
     await this.commit(Object.fromEntries(Object.entries(state.files).filter(([id]) => !ids.has(id))), state.directories.filter(directory => !beneath(directory, path)), [
@@ -580,7 +580,20 @@ export class ProfileFileStore {
         const state = await tx.doc(ProfileFileState);
         if (!state.deletedConversations.includes(id)) state.deletedConversations.push(id);
       }, context);
-      await this.removeLocked(await this.state(), `conversations/${id}`, id);
+      await this.purgeConversation(id);
     }, undefined, [`conversations/${id}`]);
+  }
+  private async purgeConversation(id: number) {
+    const path = `conversations/${id}`, state = await this.state();
+    const observed = await this.backend.snapshot([], path);
+    const tracked = Object.values(state.files).filter(file => beneath(file.path, path) || file.owner === id);
+    const ids = new Set(tracked.map(file => file.id));
+    const files = [...new Set([...tracked.map(file => file.path), ...observed.files.map(file => file.path).filter(file => beneath(file, path))])];
+    const directories = [...new Set([...state.directories, ...observed.directories].filter(directory => beneath(directory, path)))].sort((a, b) => b.length - a.length);
+    if (!files.length && !directories.length) return;
+    await this.commit(Object.fromEntries(Object.entries(state.files).filter(([id]) => !ids.has(id))), state.directories.filter(directory => !beneath(directory, path)), [
+      ...files.map(file => ({ op: "remove" as const, path: file, directory: false })),
+      ...directories.map(directory => ({ op: "remove" as const, path: directory, directory: true })),
+    ]);
   }
 }

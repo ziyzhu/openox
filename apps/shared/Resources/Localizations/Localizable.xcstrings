@@ -10202,12 +10202,12 @@
         }
       }
     },
-    "Profile backups must be smaller than 128 MB and contain fewer than 10,000 files." : {
+    "Profile copies must contain fewer than 10,000 files." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "档案备份必须小于 128 MB，且文件数量少于 10,000 个。"
+            "value" : "档案副本中的文件数量必须少于 10,000 个。"
           }
         }
       }

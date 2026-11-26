@@ -2,6 +2,7 @@ import CoreTransferable
 import CryptoKit
 import Foundation
 import Observation
+import Synchronization
 import UniformTypeIdentifiers
 
 extension UTType {
@@ -28,23 +29,47 @@ nonisolated struct ConversationPackageDocument: Transferable, Sendable {
     let state: @Sendable () async throws -> ConversationState
     let fileName: String
     let scope: ProfileScope? = StorageRoot.currentScope
+    let export = ConversationPackageExport()
 
     static var transferRepresentation: some TransferRepresentation {
         FileRepresentation(exportedContentType: .conversationPackage) { document in
-            guard let scope = document.scope else { throw CocoaError(.fileNoSuchFile) }
-            let state = try await document.state()
-            let files = try await ProfileRepository.shared.conversationPackageFiles(state, in: scope)
-            FileStaging.cleanupStale(in: FileManager.default.temporaryDirectory, prefix: "conversation-export", olderThan: 600)
-            let directory = try FileStaging.createDirectory(in: FileManager.default.temporaryDirectory, prefix: "conversation-export")
-            let url = directory.appendingPathComponent("\(document.fileName).conversation", isDirectory: false)
-            try await Task.detached(priority: .userInitiated) {
-                try ConversationPackageCodec.encode(state, files: files.files, fileNames: files.names, to: url)
-            }.value
-            let bytes = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-            Log.ui.info("ConversationPackage.export conversation=\(state.meta.id) turns=\(state.turns.count) bytes=\(bytes)")
-            return SentTransferredFile(url)
+            SentTransferredFile(try await document.export.url { try await document.write() })
         }
         .suggestedFileName { "\($0.fileName).conversation" }
+    }
+
+    private func write() async throws -> URL {
+        guard let scope else { throw CocoaError(.fileNoSuchFile) }
+        let state = try await self.state()
+        let files = try await ProfileRepository.shared.conversationPackageFiles(state, in: scope)
+        FileStaging.cleanupStale(in: FileManager.default.temporaryDirectory, prefix: "conversation-export", olderThan: 600)
+        let directory = try FileStaging.createDirectory(in: FileManager.default.temporaryDirectory, prefix: "conversation-export")
+        let url = directory.appendingPathComponent("\(fileName).conversation", isDirectory: false)
+        try await Task.detached(priority: .userInitiated) {
+            try ConversationPackageCodec.encode(state, files: files.files, fileNames: files.names, to: url)
+        }.value
+        let bytes = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        Log.ui.info("ConversationPackage.export conversation=\(state.meta.id) turns=\(state.turns.count) bytes=\(bytes)")
+        return url
+    }
+}
+
+nonisolated final class ConversationPackageExport: Sendable {
+    private let task = Mutex<Task<URL, any Error>?>(nil)
+
+    func url(_ make: @escaping @Sendable () async throws -> URL) async throws -> URL {
+        let (task, reused) = self.task.withLock { current in
+            if let current { return (current, true) }
+            let created = Task { try await make() }
+            current = created
+            return (created, false)
+        }
+        if reused { Log.ui.info("ConversationPackage.export reused") }
+        do { return try await task.value }
+        catch {
+            self.task.withLock { if $0 == task { $0 = nil } }
+            throw error
+        }
     }
 }
 
