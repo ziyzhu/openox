@@ -3,6 +3,9 @@ import { PUSH_TOKEN_PATTERN, PushEnvironment, PushKind } from "./push.ts";
 
 export const AGENT_PROTOCOL_VERSION = 1;
 export const AGENT_DEFAULT_PORT = 9878;
+export const AGENT_FILE_BYTES = 32 * 1024 * 1024;
+export const AGENT_FILE_CHUNK_BYTES = 4 * 1024 * 1024;
+const AGENT_FILE_CHUNK_BASE64 = Math.ceil(AGENT_FILE_CHUNK_BYTES / 3) * 4;
 
 const S = Type.String;
 const B = Type.Boolean;
@@ -66,6 +69,15 @@ export const AgentSchemas = {
     context: optional(R("AgentContext")),
   }),
   AgentSendResult: object("AgentSendResult", { disposition: S() }),
+  AgentFileWriteRequest: object("AgentFileWriteRequest", {
+    id: conversationId(), name: S({ minLength: 1, maxLength: 240, description: "Plain file name; the file lands in the conversation's attachment folder on the agent's machine." }),
+    size: I({ minimum: 0, maximum: AGENT_FILE_BYTES, description: "Total bytes of the file." }),
+    offset: I({ minimum: 0, description: "Byte offset of this chunk; 0 starts a new upload." }),
+    data: S({ maxLength: AGENT_FILE_CHUNK_BASE64, description: "Base64 chunk." }),
+  }),
+  AgentFileWriteResult: object("AgentFileWriteResult", {
+    path: optional(S({ description: "Absolute path on the agent's machine, set once the last chunk is written." })),
+  }),
   AgentRespondRequest: object("AgentRespondRequest", {
     id: conversationId(), promptId: S(), value: optional(S()), confirmed: optional(B()), cancelled: optional(B()),
   }),
@@ -118,6 +130,7 @@ export const AgentMethods = {
   "conversations.setThinking": method("AgentSetThinkingRequest", "AgentEmptyResult"),
   "conversations.compact": method("AgentConversationRequest", "AgentEmptyResult"),
   "conversations.rename": method("AgentRenameRequest", "AgentEmptyResult"),
+  "files.write": method("AgentFileWriteRequest", "AgentFileWriteResult"),
   "notifications.register": method("AgentPushRegistration", "AgentEmptyResult"),
   "notifications.unregister": method("AgentPushUnregistration", "AgentEmptyResult"),
 } as const;
@@ -149,6 +162,7 @@ export type AgentNewRequest = Static<typeof AgentSchemas.AgentNewRequest>;
 export type AgentOpenRequest = Static<typeof AgentSchemas.AgentOpenRequest>;
 export type AgentOpenResult = Static<typeof AgentSchemas.AgentOpenResult>;
 export type AgentSendRequest = Static<typeof AgentSchemas.AgentSendRequest>;
+export type AgentFileWriteRequest = Static<typeof AgentSchemas.AgentFileWriteRequest>;
 export type AgentRespondRequest = Static<typeof AgentSchemas.AgentRespondRequest>;
 export type AgentPromptNotification = Static<typeof AgentSchemas.AgentPromptNotification>;
 export type AgentChangedNotification = Static<typeof AgentSchemas.AgentChangedNotification>;

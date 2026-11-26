@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { stat, realpath } from "node:fs/promises";
+import { mkdir, open, realpath, rename, stat } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
-import { resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import type { ServerWebSocket } from "bun";
 import { Value } from "typebox/value";
 import {
@@ -9,6 +9,7 @@ import {
   AgentMethods,
   AgentSchemas,
   type AgentContext,
+  type AgentFileWriteRequest,
   type AgentMethodName,
   type AgentModel,
   type AgentModelRef,
@@ -128,6 +129,7 @@ export class AgentServer {
     "conversations.setThinking": (params: { id: string; level: string }) => this.command(params.id, "set_thinking_level", { level: params.level }),
     "conversations.compact": (params: { id: string }) => this.command(params.id, "compact"),
     "conversations.rename": (params: { id: string; title: string }) => this.rename(params.id, params.title),
+    "files.write": (params: AgentFileWriteRequest) => this.writeFile(params),
     "notifications.register": (params: AgentPushRegistration) => this.push.register(params).then(() => ({})),
     "notifications.unregister": (params: { token: string }) => this.push.unregister(params.token).then(() => ({})),
   };
@@ -410,6 +412,32 @@ export class AgentServer {
     const command = params.delivery === "steer" ? "steer" : params.delivery === "followUp" ? "follow_up" : "prompt";
     const data = await pi.command<{ disposition?: string } | undefined>(command, { message: params.text, images });
     return { disposition: data?.disposition ?? "queued" };
+  }
+
+  private async writeFile(params: AgentFileWriteRequest) {
+    this.known(params.id);
+    if (basename(params.id) !== params.id || basename(params.name) !== params.name || params.name.startsWith(".")) {
+      throw new RPCError(-32602, "files.write needs a plain conversation id and file name");
+    }
+    const chunk = Buffer.from(params.data, "base64");
+    const end = params.offset + chunk.length;
+    if (end > params.size) throw new RPCError(-32602, "files.write chunk ends past size");
+    const directory = join(this.options.stateDirectory, "conversations", params.id);
+    const path = join(directory, params.name);
+    const partial = `${path}.part`;
+    await mkdir(directory, { recursive: true });
+    const written = params.offset === 0 ? 0 : await stat(partial).then((info) => info.size, () => -1);
+    if (written !== params.offset) throw new RPCError(-32602, "files.write chunk is out of order; restart at offset 0");
+    const handle = await open(partial, params.offset === 0 ? "w" : "r+");
+    try {
+      await handle.write(chunk, 0, chunk.length, params.offset);
+    } finally {
+      await handle.close();
+    }
+    if (end < params.size) return {};
+    await rename(partial, path);
+    agentLog("files.write", { conversation: params.id, bytes: params.size });
+    return { path };
   }
 
   private async abort(id: string) {

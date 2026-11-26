@@ -13,10 +13,15 @@ nonisolated struct RemoteAgentEvents {
     private var assistant: AssistantMessage?
     private var results: [ToolResultMessage] = []
     private var calls: [String: ToolCall] = [:]
+    private var files: [String: FileItem] = [:]
 
     init(scope: ProfileScope, model: String) {
         self.scope = scope
         self.model = model
+    }
+
+    mutating func adopt(_ file: FileItem) {
+        files[file.fileName] = file
     }
 
     mutating func receive(_ event: JSONValue) -> (events: [AgentEvent], progress: Progress) {
@@ -110,7 +115,7 @@ nonisolated struct RemoteAgentEvents {
     }
 
     func decodeMessage(_ value: JSONValue) -> Message? {
-        do { return try DurableMessageCodec.decode(Self.portable(value), scope: scope) }
+        do { return try DurableMessageCodec.decode(Self.portable(value), scope: scope, files: files.isEmpty ? nil : FileDirectoryListing(files: files)) }
         catch {
             Log.agent.debug("RemoteAgentEvents.message skipped error=\(error.localizedDescription)")
             return nil

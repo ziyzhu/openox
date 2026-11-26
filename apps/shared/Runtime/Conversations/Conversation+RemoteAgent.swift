@@ -84,10 +84,10 @@ extension Conversation {
             if let startSeq, remoteAgent?.conversationID == conversationID { remoteAgent?.lastSeq = startSeq }
             let inbound = client.inbound(for: conversationID)
             client.setToolHandler({ [weak self] params in
-                await self?.callRemoteTool(params, tools: configuration.tools) ?? Self.remoteToolFailure("Ox conversation closed")
+                await self?.callRemoteTool(params, tools: configuration.tools, client: client) ?? Self.remoteToolFailure("Ox conversation closed")
             }, for: conversationID)
             defer { client.setToolHandler(nil, for: conversationID) }
-            var request = try await remoteMessage(input)
+            var request = try await remoteMessage(input, client: client, conversationID: conversationID)
             request["id"] = .string(conversationID)
             request["context"] = context
             Log.session.info("Conversation.remote send id=\(id) agent=\(binding.endpoint.absoluteString) conversation=\(conversationID)")
@@ -154,7 +154,7 @@ extension Conversation {
                 result = ConversationRunResult(outcome: .failed(message: String(localized: "This message didn't reach the agent. Send it again."), kind: .provider))
             } else {
                 client.setToolHandler({ [weak self] params in
-                    await self?.callRemoteTool(params, tools: configuration.tools) ?? Self.remoteToolFailure("Ox conversation closed")
+                    await self?.callRemoteTool(params, tools: configuration.tools, client: client) ?? Self.remoteToolFailure("Ox conversation closed")
                 }, for: conversationID)
                 defer { client.setToolHandler(nil, for: conversationID) }
                 let events = RemoteAgentEvents(scope: scope, model: binding.model?.id ?? model.id)
@@ -245,7 +245,7 @@ extension Conversation {
         return .object(["sections": .object(sections)])
     }
 
-    private func remoteMessage(_ input: ConversationInput) async throws -> [String: JSONValue] {
+    private func remoteMessage(_ input: ConversationInput, client: RemoteAgentClient, conversationID: String) async throws -> [String: JSONValue] {
         var texts: [String] = []
         var images: [JSONValue] = []
         for case .user(let message) in input.messages {
@@ -255,6 +255,8 @@ extension Conversation {
                 case .attachment(let file):
                     if UTType(file.typeIdentifier)?.conforms(to: .image) == true, let data = try? Data(contentsOf: file.fileURL) {
                         images.append(.object(["data": .string(data.base64EncodedString()), "mimeType": .string(file.mimeType)]))
+                    } else if let path = await uploadRemote(file, client: client, conversationID: conversationID) {
+                        texts.append("[Attached file: \(file.userFacingName), copied to \(path)]")
                     } else {
                         texts.append("[Attached file: \(file.userFacingName)]")
                     }
@@ -282,7 +284,8 @@ extension Conversation {
                     guard seq > (lastSeq ?? 0) else { continue }
                     lastSeq = seq
                 }
-                let (agentEvents, progress) = events.receive(value)
+                let adopted = await adoptRemoteImages(value, into: &events)
+                let (agentEvents, progress) = events.receive(adopted)
                 for event in agentEvents {
                     presentRemoteTool(event, invocations: &invocations)
                     await receiveAgentEvent(event)
@@ -323,6 +326,7 @@ extension Conversation {
         case .toolExecutionEnd(let call, let result):
             guard let invocation = invocations.removeValue(forKey: call.id) else { return }
             let text = result.content.compactMap { if case .text(let text) = $0 { text.text } else { nil } }.joined(separator: "\n")
+            for case .attachment(let file) in result.content { embedFile(file) }
             resolveInvocation(invocationID: invocation, outcome: result.isError ? .failed(text) : .succeeded(.string(text)))
             finishExecution(output: text, isError: result.isError)
         default:
@@ -407,7 +411,7 @@ extension Conversation {
         return detail.map { "\(call.name) \($0)" } ?? call.name
     }
 
-    private func callRemoteTool(_ params: JSONValue, tools: [any AgentTool]) async -> JSONValue {
+    private func callRemoteTool(_ params: JSONValue, tools: [any AgentTool], client: RemoteAgentClient) async -> JSONValue {
         let fields = params.objectValue ?? [:]
         guard let name = fields["name"]?.stringValue, let tool = tools.first(where: { $0.name == name }) else {
             return Self.remoteToolFailure("Unknown Ox tool")
@@ -417,25 +421,102 @@ extension Conversation {
         do {
             let result = try await tool.execute(toolCallId: callID, args: fields["args"] ?? .object([:]))
             Log.session.info("Conversation.remote tool id=\(id) name=\(name) isError=\(result.isError) durationMs=\(TurnLatencyTrace.milliseconds(startedAt.duration(to: .now)))")
-            return Self.remoteToolContent(result)
+            return await remoteToolContent(result, client: client, conversationID: fields["id"]?.stringValue ?? "")
         } catch {
             Log.session.error("Conversation.remote tool failed id=\(id) name=\(name) error=\(error.localizedDescription)")
             return Self.remoteToolFailure(error.localizedDescription)
         }
     }
 
-    private static func remoteToolContent(_ result: ToolResult) -> JSONValue {
-        var content: [JSONValue] = result.content.compactMap { block in
+    private func remoteToolContent(_ result: ToolResult, client: RemoteAgentClient, conversationID: String) async -> JSONValue {
+        var content: [JSONValue] = []
+        for block in result.content {
             switch block {
-            case .text(let text): .object(["type": .string("text"), "text": .string(text.text)])
-            case .attachment(let file): .object(["type": .string("text"), "text": .string("[Ox file: \(file.virtualPath ?? file.userFacingName)]")])
-            case .thinking, .toolCall: nil
+            case .text(let text):
+                content.append(Self.remoteText(text.text))
+            case .attachment(let file):
+                let name = file.virtualPath ?? file.userFacingName
+                let path = await uploadRemote(file, client: client, conversationID: conversationID)
+                content.append(Self.remoteText(path.map { "[Ox file: \(name), copied to \($0)]" } ?? "[Ox file: \(name)]"))
+            case .thinking, .toolCall:
+                continue
             }
         }
-        for attachment in result.transientAttachments where attachment.kind == .image {
-            content.append(.object(["type": .string("image"), "data": .string(attachment.data.base64EncodedString()), "mimeType": .string(attachment.mimeType)]))
+        for attachment in result.transientAttachments {
+            if attachment.kind == .image {
+                content.append(.object(["type": .string("image"), "data": .string(attachment.data.base64EncodedString()), "mimeType": .string(attachment.mimeType)]))
+            } else if let path = await uploadRemote(attachment.data, name: attachment.displayName, client: client, conversationID: conversationID) {
+                content.append(Self.remoteText("[Ox file: \(attachment.displayName), copied to \(path)]"))
+            } else {
+                content.append(Self.remoteText("[Ox file: \(attachment.displayName) could not be copied to this machine]"))
+            }
         }
         return .object(["content": .array(content), "isError": .bool(result.isError)])
+    }
+
+    private static func remoteText(_ text: String) -> JSONValue {
+        .object(["type": .string("text"), "text": .string(text)])
+    }
+
+    private func uploadRemote(_ file: FileItem, client: RemoteAgentClient, conversationID: String) async -> String? {
+        do {
+            let data = try Data(contentsOf: file.fileURL)
+            return await uploadRemote(data, name: file.displayName, client: client, conversationID: conversationID)
+        } catch {
+            Log.session.error("Conversation.remote upload unreadable id=\(id) file=\(file.fileName) error=\(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func uploadRemote(_ data: Data, name: String, client: RemoteAgentClient, conversationID: String) async -> String? {
+        let startedAt = ContinuousClock.now
+        let chunkBytes = 4 * 1024 * 1024
+        var offset = 0
+        do {
+            repeat {
+                let end = min(offset + chunkBytes, data.count)
+                let written = try await client.call("files.write", .object([
+                    "id": .string(conversationID), "name": .string(FileStore.sanitizedFilename(name)),
+                    "size": .int(data.count), "offset": .int(offset), "data": .string(data[offset..<end].base64EncodedString()),
+                ]))
+                offset = end
+                if let path = written.objectValue?["path"]?.stringValue {
+                    Log.session.info("Conversation.remote upload id=\(id) bytes=\(data.count) durationMs=\(TurnLatencyTrace.milliseconds(startedAt.duration(to: .now)))")
+                    return path
+                }
+            } while offset < data.count
+            Log.session.error("Conversation.remote upload incomplete id=\(id) bytes=\(data.count)")
+        } catch {
+            Log.session.error("Conversation.remote upload failed id=\(id) bytes=\(data.count) offset=\(offset) error=\(LogPrivacy.text(error.localizedDescription, limit: 200))")
+        }
+        return nil
+    }
+
+    private func adoptRemoteImages(_ event: JSONValue, into events: inout RemoteAgentEvents) async -> JSONValue {
+        guard var fields = event.objectValue, fields["type"]?.stringValue == "tool_execution_end",
+              var result = fields["result"]?.objectValue, let content = result["content"]?.arrayValue,
+              content.contains(where: { $0.objectValue?["type"]?.stringValue == "image" }) else { return event }
+        var adopted: [JSONValue] = []
+        for block in content {
+            guard let image = block.objectValue, image["type"]?.stringValue == "image",
+                  let data = image["data"]?.stringValue.flatMap({ Data(base64Encoded: $0) }) else {
+                adopted.append(block)
+                continue
+            }
+            let suffix = image["mimeType"]?.stringValue.flatMap { UTType(mimeType: $0)?.preferredFilenameExtension } ?? "png"
+            do {
+                let file = try await importAttachment(data: data, suggestedName: "Agent image.\(suffix)")
+                events.adopt(file)
+                adopted += DurableMessageCodec.blocks([.attachment(file)])
+                Log.session.info("Conversation.remote image adopted id=\(id) file=\(file.fileName) bytes=\(data.count)")
+            } catch {
+                Log.session.error("Conversation.remote image failed id=\(id) bytes=\(data.count) error=\(error.localizedDescription)")
+                adopted.append(block)
+            }
+        }
+        result["content"] = .array(adopted)
+        fields["result"] = .object(result)
+        return .object(fields)
     }
 
     private static func remoteToolFailure(_ message: String) -> JSONValue {
