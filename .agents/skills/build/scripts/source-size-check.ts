@@ -6,7 +6,7 @@ const maximumLines = 2_000;
 const maximumBytes = 50_000;
 const oversized: Record<string, number> = {
   "apps/shared/Host/Conversations/Conversation.swift": 87_177,
-  "apps/ios/Client/Features/Conversation/ConversationPage.swift": 83_818,
+  "apps/ios/Client/Features/Conversation/ConversationPage.swift": 83_691,
   "apps/shared/Host/Conversations/ConversationManager.swift": 55_708,
   "packages/agent/src/adapters/ios/agent.ts": 52_501,
   "apps/shared/Host/Services/ServiceManager.swift": 51_682,

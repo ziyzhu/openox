@@ -48,24 +48,27 @@ extension Conversation {
         if let model, let level = binding.thinkingLevel, !model.thinkingLevels.contains(level) {
             binding.thinkingLevel = Self.clampedThinkingLevel(level, to: model.thinkingLevels)
         }
-        let modelChanged = binding.model != previous.model
-        guard modelChanged || binding.thinkingLevel != previous.thinkingLevel else { return }
+        guard binding.model != previous.model || binding.thinkingLevel != previous.thinkingLevel else { return }
         remoteAgent = binding
         Log.session.info("Conversation.agent selection id=\(id) model=\(binding.model?.id ?? "default") thinking=\(binding.thinkingLevel ?? "default")")
-        guard let conversationID = binding.conversationID else { return }
-        let client = RemoteAgentDirectory.shared.client(for: binding.endpoint)
-        Task {
-            do {
-                if modelChanged, let model = binding.model {
-                    _ = try await client.call("conversations.setModel", .object([
-                        "id": .string(conversationID), "provider": .string(model.provider), "model": .string(model.id),
-                    ]))
-                }
-                if let level = binding.thinkingLevel {
-                    _ = try await client.call("conversations.setThinking", .object(["id": .string(conversationID), "level": .string(level)]))
-                }
-            } catch { Log.session.error("Conversation.agent selection failed id=\(self.id) error=\(error.localizedDescription)") }
+    }
+
+    private func applyRemoteSelection(client: RemoteAgentClient, conversationID: String) async throws {
+        guard let binding = remoteAgent else { return }
+        let wanted = RemoteAgentSelection(model: binding.model, thinking: binding.thinkingLevel)
+        let current = client.appliedSelection(conversationID)
+        guard current != wanted else { return }
+        client.markApplied(nil, for: conversationID)
+        if let model = binding.model, current?.model != model || binding.thinkingLevel != nil {
+            _ = try await client.call("conversations.setModel", .object([
+                "id": .string(conversationID), "provider": .string(model.provider), "model": .string(model.id),
+            ]))
         }
+        if let level = binding.thinkingLevel {
+            _ = try await client.call("conversations.setThinking", .object(["id": .string(conversationID), "level": .string(level)]))
+        }
+        client.markApplied(wanted, for: conversationID)
+        Log.session.info("Conversation.remote applied id=\(id) model=\(binding.model?.id ?? "default") thinking=\(binding.thinkingLevel ?? "default")")
     }
 
     static func clampedThinkingLevel(_ level: String, to levels: [String]) -> String? {
@@ -84,6 +87,7 @@ extension Conversation {
                 .object(["name": .string($0.name), "description": .string($0.description), "parameters": $0.parameters])
             })
             let (conversationID, openedSeq) = try await openRemote(binding, client: client, context: context, tools: tools)
+            try await applyRemoteSelection(client: client, conversationID: conversationID)
             let inbound = client.inbound(for: conversationID)
             client.setToolHandler({ [weak self] params in
                 await self?.callRemoteTool(params, tools: configuration.tools) ?? Self.remoteToolFailure("Ox conversation closed")
@@ -158,6 +162,7 @@ extension Conversation {
         let created = try await client.call("conversations.new", .object(request)).objectValue ?? [:]
         guard let conversationID = created["id"]?.stringValue else { throw RemoteAgentError.invalidResponse("conversations.new") }
         client.markOpen(conversationID)
+        client.markApplied(RemoteAgentSelection(model: binding.model, thinking: binding.thinkingLevel), for: conversationID)
         var next = binding
         next.conversationID = conversationID
         if next.model == nil, let model = created["model"]?.objectValue, let provider = model["provider"]?.stringValue, let id = model["id"]?.stringValue {
@@ -224,7 +229,7 @@ extension Conversation {
                 if case .settled(let aborted) = progress {
                     if aborted { return ConversationRunResult(outcome: .aborted) }
                     if let assistant = events.lastAssistant, assistant.stopReason == .error {
-                        return ConversationRunResult(outcome: .failed(message: assistant.errorMessage ?? "The agent failed", kind: .provider))
+                        return remoteModelFailure(assistant)
                     }
                     return ConversationRunResult(outcome: .completed)
                 }
@@ -294,6 +299,34 @@ extension Conversation {
             }
         }
         return .unreachable
+    }
+
+    var localSubscriptionAccount: (any SubscriptionAccount)? {
+        remoteAgent == nil ? ProviderRegistry.shared.client(id: modelSelection.providerID)?.subscriptionAccount : nil
+    }
+
+    private func remoteModelFailure(_ assistant: AssistantMessage) -> ConversationRunResult {
+        let raw = assistant.errorMessage ?? String(localized: "The agent's model request failed")
+        let status = raw.prefix(while: \.isNumber).count == 3 ? Int(raw.prefix(3)) : nil
+        let detail = Self.providerErrorDetail(raw)
+        let kind = llmFailureKind(statusCode: status, message: raw)
+        let agent = remoteAgentName ?? String(localized: "The agent")
+        let provider = remoteAgent?.model?.provider ?? String(localized: "its provider")
+        Log.session.error("Conversation.remote model failed id=\(id) kind=\(kind.rawValue) status=\(status ?? 0) error=\(LogPrivacy.text(raw, limit: 300))")
+        let message = switch kind {
+        case .authentication: String(localized: "\(agent) couldn't sign in to \(provider): \(detail). Log in again on that computer (run pi, then /login), then retry.")
+        case .rateLimited, .network: raw
+        case .contextOverflow: String(localized: "This conversation is too long for \(assistant.model) on \(agent): \(detail)")
+        case .unsupportedInput, .provider: String(localized: "\(provider) error on \(agent): \(detail)")
+        }
+        return ConversationRunResult(outcome: .failed(message: message, kind: kind))
+    }
+
+    private static func providerErrorDetail(_ raw: String) -> String {
+        guard let start = raw.firstIndex(of: "{"), let data = String(raw[start...]).data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return raw }
+        let error = object["error"] as? [String: Any]
+        return (error?["message"] as? String) ?? (object["message"] as? String) ?? raw
     }
 
     private func remoteFailure(_ error: Error) -> ConversationRunResult {
@@ -430,7 +463,7 @@ extension Conversation {
         let changed = binding.model != model.reference || (fields["thinkingLevel"]?.stringValue).map { $0 != remoteThinkingLevel } == true
         updateRemoteSelection(model: model, thinking: fields["thinkingLevel"]?.stringValue)
         return .object([
-            "status": .string("applied"),
+            "status": .string(binding.conversationID == nil || !isBusy ? "applied" : "pending"),
             "selection": .object(["provider": .string(provider), "model": .string(modelID)]),
             "changed": .bool(changed),
         ])

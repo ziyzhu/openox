@@ -1022,9 +1022,7 @@ struct ConversationPage: View {
     }
 
     private var failedTurnLogin: (() -> Void)? {
-        guard case .failed = conversation.turnEnding,
-              let account = providerRegistry.client(id: conversation.modelSelection.providerID)?.subscriptionAccount,
-              !account.isSignedIn else { return nil }
+        guard case .failed = conversation.turnEnding, let account = conversation.localSubscriptionAccount, !account.isSignedIn else { return nil }
         return {
             Log.ui.info("ConversationPage.loginFailed conversation=\(conversation.id) provider=\(conversation.modelSelection.providerID)")
             modalPresentation = .modelPicker

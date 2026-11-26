@@ -16,6 +16,11 @@ nonisolated enum RemoteAgentError: LocalizedError {
     }
 }
 
+nonisolated struct RemoteAgentSelection: Equatable, Sendable {
+    let model: AgentModelReference?
+    let thinking: String?
+}
+
 nonisolated enum RemoteAgentInbound: Sendable {
     case event(JSONValue, seq: Int?)
     case prompt(JSONValue)
@@ -35,6 +40,7 @@ final class RemoteAgentClient {
     private var listeners: [String: [UUID: @Sendable (RemoteAgentInbound) -> Void]] = [:]
     private var toolHandlers: [String: ToolHandler] = [:]
     private var opened: Set<String> = []
+    private var applied: [String: RemoteAgentSelection] = [:]
 
     init(endpoint: URL) {
         self.endpoint = endpoint
@@ -77,6 +83,10 @@ final class RemoteAgentClient {
     func isOpen(_ conversationID: String) -> Bool { opened.contains(conversationID) }
 
     var isConnected: Bool { socket != nil }
+
+    func appliedSelection(_ conversationID: String) -> RemoteAgentSelection? { applied[conversationID] }
+
+    func markApplied(_ selection: RemoteAgentSelection?, for conversationID: String) { applied[conversationID] = selection }
 
     func markOpen(_ conversationID: String) { opened.insert(conversationID) }
 
@@ -134,7 +144,10 @@ final class RemoteAgentClient {
         case "conversations.event": inbound = .event(params.objectValue?["event"] ?? .null, seq: params.objectValue?["seq"]?.intValue)
         case "conversations.prompt": inbound = .prompt(params)
         case "conversations.changed":
-            if params.objectValue?["state"]?.stringValue == "exited" { opened.remove(conversationID) }
+            if params.objectValue?["state"]?.stringValue == "exited" {
+                opened.remove(conversationID)
+                applied[conversationID] = nil
+            }
             inbound = .changed(params)
         default: return
         }
@@ -166,6 +179,7 @@ final class RemoteAgentClient {
         guard socket === task else { return }
         socket = nil
         opened.removeAll()
+        applied.removeAll()
         Log.agent.warning("RemoteAgent.disconnect endpoint=\(endpoint.absoluteString) reason=\(LogPrivacy.text(reason, limit: 200))")
         let failed = pending
         pending.removeAll()
