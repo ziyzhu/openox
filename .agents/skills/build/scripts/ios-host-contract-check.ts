@@ -130,7 +130,7 @@ export async function check(): Promise<string> {
   if (app.includes("WebSocketOxHostTransport.configuredPort != nil")) {
     failures.push("Foreground Host access must not require launch configuration");
   }
-  if (!webSocketTransport.includes("access.enabled && host.state == .running && host.executionAvailable") || !webSocketTransport.includes("if available { start() } else if monitor != nil { stop() }") || !webSocketTransport.includes("access.onEnabledChange")) {
+  if (!webSocketTransport.includes("access.allowsConnections && host.state == .running && host.executionAvailable") || !webSocketTransport.includes("if available { start() } else if monitor != nil { stop() }") || !webSocketTransport.includes("access.onChange")) {
     failures.push("Host access must be opt-in and stop immediately when disabled");
   }
   const ingress = await readFile(join(ROOT, "apps/shared/Host/TailscaleHostIngress.swift"), "utf8");

@@ -36,7 +36,7 @@ nonisolated extension ApplicationStorageMigrator {
 
     static func migrateStateAndServiceStorage(defaults: UserDefaults = .standard) throws {
         try migrateState(defaults: defaults)
-        try migrateHostConfiguration(defaults: defaults)
+        try migrateLegacyHostPreference(defaults: defaults)
         try migrateServicePreferences(defaults: defaults)
     }
 
@@ -86,19 +86,19 @@ nonisolated extension ApplicationStorageMigrator {
         try removeMigratedPreferences(keys, defaults: defaults)
     }
 
-    private static func migrateHostConfiguration(defaults: UserDefaults) throws {
-        let key = HostAccess.preferenceKey
+    private static func migrateLegacyHostPreference(defaults: UserDefaults) throws {
+        let key = "host.allowConnections"
         guard let preference = legacyPreference(key, defaults: defaults) else { return }
         guard let value = preference as? Bool else { throw StorageMigrationError.invalidApplicationStorage("Host access") }
         let url = AppStoragePaths.legacyHostConfiguration
         if FileManager.default.fileExists(atPath: url.path) {
-            guard try HostConfiguration.load(from: url).allowConnections == value else { throw StorageMigrationError.collision("Host configuration") }
+            guard try ConnectionSettings.load(from: url).allowConnections == value else { throw StorageMigrationError.collision("Connection settings") }
         } else {
-            var next = HostConfiguration()
+            var next = ConnectionSettings()
             next.allowConnections = value
             try next.save(to: url)
-            guard try HostConfiguration.load(from: url) == next else { throw StorageMigrationError.invalidApplicationStorage("Host configuration publication") }
-            Log.app.info("StorageMigrator.hostConfiguration done format=1")
+            guard try ConnectionSettings.load(from: url) == next else { throw StorageMigrationError.invalidApplicationStorage("Connection settings publication") }
+            Log.app.info("StorageMigrator.legacyHostPreference done format=1")
         }
         try removeMigratedPreferences([key], defaults: defaults)
     }

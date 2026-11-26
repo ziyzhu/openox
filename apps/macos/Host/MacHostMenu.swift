@@ -3,11 +3,11 @@ import AppKit
 @MainActor
 final class MacHostMenu: NSObject, NSMenuDelegate {
     private let host: HostRuntime
-    private let access: HostAccess
+    private let access: ConnectionAccess
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let windows = MacServiceWindows()
 
-    init(host: HostRuntime, access: HostAccess) {
+    init(host: HostRuntime, access: ConnectionAccess) {
         self.host = host
         self.access = access
         super.init()
@@ -37,7 +37,7 @@ final class MacHostMenu: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
         let connections = NSMenuItem(title: "Allow connections", action: #selector(toggleConnections), keyEquivalent: "")
         connections.target = self
-        connections.state = access.enabled ? .on : .off
+        connections.state = access.allowsConnections ? .on : .off
         menu.addItem(connections)
         let pages = NSMenu()
         for service in host.services.services.sorted(by: { $0.title < $1.title }) {
@@ -63,7 +63,7 @@ final class MacHostMenu: NSObject, NSMenuDelegate {
     }
 
     @objc private func toggleConnections() {
-        access.enabled.toggle()
+        access.allowsConnections.toggle()
     }
 
     @objc private func openPage(_ sender: NSMenuItem) {

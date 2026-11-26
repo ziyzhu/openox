@@ -101,7 +101,7 @@ User turns optionally retain `scheduleName` in native presentation annotations. 
 Service-inspector conversation content optionally stores `pageID`, a transient live service-page UUID. Older links omit it and keep their existing inspector behavior. Service-page cards resolve only the matching resident page; after closure or restart they show unavailable rather than creating a replacement or repeating an action. The optional field requires no migration and contains no website data.
 
 - App state file — owners: Platform/Models/AppState.swift and its concrete AppStateStore; UI onboarding/starter count/What's New seen version, StorageRoot, AppRegion, and ChatGPTSubscriptionAccount use the same serialized MainActor writer.
-- Host configuration file — owner: Platform/Models/HostAccess.swift; app-wide, retained across Profile switches, normal device backup eligibility, absent permission defaults off. Only trusted user controls can change it.
+- Connection settings files — owner: Platform/Models/ConnectionAccess.swift; one per Profile, kept when switching Profiles, normal device backup eligibility, absent permission defaults off. Only trusted user controls can change them.
 - Language settings file — owners: Platform/Models/AppSettings.swift and AppLocale; persisted before publishing the observable language and nonisolated locale cache.
 - Service preferences and Action policy files — owner: Services/ServiceManager.swift; persist before publishing changes. Unavailable policy is Ask, and failed Always allow publication does not approve the pending operation.
 - Provider configuration and model caches — owner: Host/ModelProviders/ProviderRegistry.swift; configuration uses the Profile state directory and derived model caches use Caches; preference conversion belongs to ApplicationStorageMigrator
@@ -897,7 +897,7 @@ entered again.
 
 Allow Connections belongs to each Profile: `Configuration/profiles/<Profile UUID>/host.json`
 is format 1 with `format` and `allowConnections`, defaulting off when absent. The Host
-serves remote clients only while the active Profile allows it. `profile.hostScope`
+serves remote clients only while the active Profile allows it. `profile.connectionScope`
 moves the predecessor app-wide `Configuration/host.json` into the active Profile
 (write, verify, delete); its value replaces the Profile's. The legacy
 `host.allowConnections` preference migrates into that app-wide file only when

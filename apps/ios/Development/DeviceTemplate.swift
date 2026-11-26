@@ -121,7 +121,6 @@ enum DeviceTemplate {
                 if settings.onboardingCompleted != nil { appKeys.append("app.hasCompletedOnboarding") }
                 if settings.region != nil { appKeys.append("app.region") }
                 if settings.defaultModel != nil { appKeys.append(ProviderRegistry.defaultModelKey) }
-                if settings.allowHostConnections != nil { appKeys.append(HostAccess.preferenceKey) }
             }
             let previous: [String: Any] = ["app": originalDefaults(appKeys, from: .standard), "appGroup": originalDefaults(groupKeys, from: group)]
             try PropertyListSerialization.data(fromPropertyList: previous, format: .binary, options: 0)
@@ -151,7 +150,7 @@ enum DeviceTemplate {
                 }
                 if let region = settings.region, let value = LLMRegion(rawValue: region) { AppRegion.shared.setForTesting(value) }
                 if let enabled = settings.allowHostConnections {
-                    var value = HostConfiguration()
+                    var value = ConnectionSettings()
                     value.allowConnections = enabled
                     try value.save(to: AppStoragePaths.legacyHostConfiguration)
                 }
@@ -229,7 +228,7 @@ enum DeviceTemplate {
             }
             if let selection = request.selection, let profile = profiles[selection.profile] {
                 if let enabled = request.settings?.allowHostConnections {
-                    var value = HostConfiguration()
+                    var value = ConnectionSettings()
                     value.allowConnections = enabled
                     try value.save(for: profile.id)
                 }

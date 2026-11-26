@@ -64,14 +64,14 @@ private struct OxApplicationView: View {
     @State private var conversationImports = ConversationImportCoordinator()
     @State private var serviceImports = ServiceImportCoordinator(manager: IOSHost.shared.services)
     @State private var presentations = AppPresentationCoordinator.shared
-    @State private var hostAccess: HostAccess
+    @State private var connectionAccess: ConnectionAccess
     private let client: OxClient
     @State private var webSocketTransport: WebSocketOxHostTransport
 
     init() {
         let host = IOSHost.shared
-        let access = HostAccess()
-        _hostAccess = State(initialValue: access)
+        let access = ConnectionAccess()
+        _connectionAccess = State(initialValue: access)
         client = OxClient(host: host)
         _webSocketTransport = State(initialValue: WebSocketOxHostTransport(host: host, access: access))
         AppRegion.shared.start()
@@ -86,7 +86,7 @@ private struct OxApplicationView: View {
                 value.apply()
             }
             .environment(client.services)
-            .environment(hostAccess)
+            .environment(connectionAccess)
             .onOpenURL { url in
                 if case .web = ConversationLinkDestination(url) {
                     incomingWebLink = .pending(url)

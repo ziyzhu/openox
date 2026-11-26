@@ -18,7 +18,7 @@ struct ProfileSettingsView: View {
     let initialSkillDraft: SkillDraft?
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(HostAccess.self) private var hostAccess
+    @Environment(ConnectionAccess.self) private var connectionAccess
     @State private var allowsConnections = false
     @State private var renaming = false
     @State private var nameDraft = ""
@@ -258,7 +258,7 @@ struct ProfileSettingsView: View {
             Toggle("Allow Connections", isOn: Binding(
                 get: { allowsConnections },
                 set: { value in
-                    guard hostAccess.setAllowsConnections(value, for: profile.id) else {
+                    guard connectionAccess.setAllowsConnections(value, for: profile.id) else {
                         operationErrorMessage = String(localized: "The connection setting couldn't be saved.")
                         return
                     }
@@ -270,7 +270,7 @@ struct ProfileSettingsView: View {
             .tint(Theme.Colors.primary)
             .settingsRowPadding()
             .accessibilityIdentifier(A11yID.Settings.profileAllowConnections)
-            .task(id: profile.id) { allowsConnections = hostAccess.allowsConnections(for: profile.id) }
+            .task(id: profile.id) { allowsConnections = connectionAccess.allowsConnections(for: profile.id) }
         }
     }
 

@@ -97,6 +97,16 @@
         }
       }
     },
+    "Add Remote Agent" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加远程智能体"
+          }
+        }
+      }
+    },
     "Add Device" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -130,6 +140,16 @@
         }
       }
     },
+    "Allow Connections" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许连接"
+          }
+        }
+      }
+    },
     "Allow microphone access to use voice input." : {
       "localizations" : {
         "zh-Hans" : {
@@ -146,6 +166,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "应用语言"
+          }
+        }
+      }
+    },
+    "Built in" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内置"
           }
         }
       }
@@ -167,6 +197,76 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "查看对话"
+          }
+        }
+      }
+    },
+    "Conversations that use it stay in Ox but can't continue until it's added again.\n%@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用它的对话会保留在 Ox 中，但在重新添加前无法继续。\n%@"
+          }
+        }
+      }
+    },
+    "Couldn't Add Agent" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法添加智能体"
+          }
+        }
+      }
+    },
+    "Couldn't Change Agents" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法更改智能体"
+          }
+        }
+      }
+    },
+    "Current Device" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前设备"
+          }
+        }
+      }
+    },
+    "Current Device · %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前设备 · %@"
+          }
+        }
+      }
+    },
+    "Default agent" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认智能体"
+          }
+        }
+      }
+    },
+    "Default Agent" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认智能体"
           }
         }
       }
@@ -247,6 +347,9 @@
         }
       }
     },
+    "my-mac.tailnet.ts.net" : {
+      "shouldTranslate" : false
+    },
     "Needs you" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -258,12 +361,32 @@
         }
       }
     },
+    "New conversations use the default agent. Current Device runs Ox on this device. Add pi running on another computer with `ox agent serve`, using its Tailscale name such as my-mac.tailnet.ts.net. It keeps Ox's tools and context. Long-press an agent to remove it." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新对话使用默认智能体。当前设备在本机运行 Ox。可通过 `ox agent serve` 添加在另一台电脑上运行的 pi，并使用其 Tailscale 名称，例如 my-mac.tailnet.ts.net。它会保留 Ox 的工具和上下文。长按智能体可将其移除。"
+          }
+        }
+      }
+    },
     "Nothing was sent. Your words are in the draft." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "未发送任何内容，你说的话已保留在草稿中。"
+          }
+        }
+      }
+    },
+    "Off by default. While this Profile is in use, other devices on your Tailscale network can connect to Ox, manage conversations, and run tools. Keep Ox open while connected. Only enable this on a trusted network." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认关闭。使用此资料库时，你的 Tailscale 网络中的其他设备可以连接到 Ox、管理对话并运行工具。连接期间请保持 Ox 打开。仅在可信网络中启用。"
           }
         }
       }
@@ -323,6 +446,16 @@
         }
       }
     },
+    "Reachable · %@ %@ · %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可连接 · %@ %@ · %@"
+          }
+        }
+      }
+    },
     "Recording reached the five-minute limit. Nothing was sent." : {
       "localizations" : {
         "zh-Hans" : {
@@ -349,6 +482,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "松开添加到草稿"
+          }
+        }
+      }
+    },
+    "Remove this agent?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除此智能体？"
+          }
+        }
+      }
+    },
+    "Run `ox agent serve` on the computer, then enter the address it prints, or just its Tailscale name. Tailscale names use wss:// and port 9878 by default." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在电脑上运行 `ox agent serve`，然后输入它显示的地址，或直接输入其 Tailscale 名称。Tailscale 名称默认使用 wss:// 和端口 9878。"
           }
         }
       }
@@ -415,6 +568,16 @@
         }
       }
     },
+    "The connection setting couldn't be saved." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法保存连接设置。"
+          }
+        }
+      }
+    },
     "This device is already added, or the configuration couldn't be saved." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -432,6 +595,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在转文字…"
+          }
+        }
+      }
+    },
+    "Used for new conversations on this device. Existing conversations keep their model." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用于本设备上的新对话。现有对话会保留各自的模型。"
+          }
+        }
+      }
+    },
+    "Used for new conversations. Existing conversations keep their agent and model." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用于新对话。现有对话会保留各自的智能体和模型。"
           }
         }
       }
@@ -8733,16 +8916,6 @@
         }
       }
     },
-    "Off by default. Allow other devices on your Tailscale network to connect to Ox, manage conversations, and run tools. Keep Ox open while connected. Only enable this on a trusted network." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "默认关闭。允许 Tailscale 网络中的其他设备连接到 Ox、管理对话并运行工具。连接期间请保持 Ox 打开。仅在可信网络中启用。"
-          }
-        }
-      }
-    },
     "OK" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14155,16 +14328,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用此密钥"
-          }
-        }
-      }
-    },
-    "Used for new conversations. Existing conversations keep their model." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用于新对话。现有对话会保留各自的模型。"
           }
         }
       }

@@ -10,7 +10,7 @@ final class WebSocketOxHostTransport {
               let value = url.port.flatMap(UInt16.init(exactly:)), value > 0 else { return nil }
         return NWEndpoint.Port(rawValue: value)
     }()
-    nonisolated static let defaultPort = configuredPort ?? NWEndpoint.Port(rawValue: HostConfiguration.defaultPort)!
+    nonisolated static let defaultPort = configuredPort ?? NWEndpoint.Port(rawValue: 9876)!
 
     private struct Client {
         let connection: NWConnection
@@ -22,7 +22,7 @@ final class WebSocketOxHostTransport {
     }
 
     private let host: any OxHost
-    private let access: HostAccess
+    private let access: ConnectionAccess
     let port: NWEndpoint.Port
     private let queue = DispatchQueue(label: "ox-host-websocket")
     private var monitor: NWPathMonitor?
@@ -34,17 +34,17 @@ final class WebSocketOxHostTransport {
     private var listenerRetryDelay: TimeInterval = 1
     private var connections: [ObjectIdentifier: Client] = [:]
 
-    init(host: any OxHost, access: HostAccess, port: NWEndpoint.Port = defaultPort) {
+    init(host: any OxHost, access: ConnectionAccess, port: NWEndpoint.Port = defaultPort) {
         self.host = host
         self.access = access
         self.port = port
-        access.onEnabledChange = { [weak self] _ in
+        access.onChange = { [weak self] in
             self?.reconcile()
         }
     }
 
     private var available: Bool {
-        access.enabled && host.state == .running && host.executionAvailable
+        access.allowsConnections && host.state == .running && host.executionAvailable
     }
 
     func reconcile() {

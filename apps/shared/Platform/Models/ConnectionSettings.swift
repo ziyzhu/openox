@@ -1,8 +1,6 @@
 import Foundation
 
-nonisolated struct HostConfiguration: Codable, Equatable, Sendable {
-    static let defaultPort: UInt16 = 9876
-
+nonisolated struct ConnectionSettings: Codable, Equatable, Sendable {
     var format = 1
     var allowConnections = false
 
@@ -18,7 +16,7 @@ nonisolated struct HostConfiguration: Codable, Equatable, Sendable {
 
     static func load(from url: URL) throws -> Self {
         let value = try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
-        guard value.format == 1 else { throw StorageMigrationError.invalidApplicationStorage("Host configuration") }
+        guard value.format == 1 else { throw StorageMigrationError.invalidApplicationStorage("Connection settings") }
         return value
     }
 
@@ -27,7 +25,7 @@ nonisolated struct HostConfiguration: Codable, Equatable, Sendable {
     }
 
     func save(to url: URL) throws {
-        guard format == 1 else { throw StorageMigrationError.invalidApplicationStorage("Host configuration") }
+        guard format == 1 else { throw StorageMigrationError.invalidApplicationStorage("Connection settings") }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -39,8 +37,8 @@ nonisolated struct HostConfiguration: Codable, Equatable, Sendable {
         guard FileManager.default.fileExists(atPath: legacy.path) else { return }
         let value = try load(from: legacy)
         try value.save(for: profileID)
-        guard try load(for: profileID) == value else { throw StorageMigrationError.invalidApplicationStorage("Host configuration publication") }
+        guard try load(for: profileID) == value else { throw StorageMigrationError.invalidApplicationStorage("Connection settings publication") }
         try FileManager.default.removeItem(at: legacy)
-        Log.app.info("StorageMigrator.hostScope profile=\(profileID) allowConnections=\(value.allowConnections)")
+        Log.app.info("StorageMigrator.connectionScope profile=\(profileID) allowConnections=\(value.allowConnections)")
     }
 }
