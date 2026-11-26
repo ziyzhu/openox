@@ -1,4 +1,4 @@
-name: OxHost
+name: Ox
 options:
   deploymentTarget:
     macOS: "26.0"
@@ -13,7 +13,7 @@ settings:
     SWIFT_APPROACHABLE_CONCURRENCY: YES
     SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
 targets:
-  host:
+  mac:
     type: application
     platform: macOS
     preBuildScripts:
@@ -49,10 +49,10 @@ targets:
         NSRemindersFullAccessUsageDescription: Ox adds reminders when you request them.
         NSLocationUsageDescription: Ox uses your location for nearby places and routes.
         NSLocationWhenInUseUsageDescription: Ox uses your location for nearby places and routes.
-        OXAppGroupIdentifier: group.ai.openox.host.local
-        OXICloudContainerIdentifier: iCloud.ai.openox.host.local
-        OXKeychainService: ai.openox.host.local.llm
-        OXWebsiteDataNamespace: ai.openox.host.local.web-profile
+        OXAppGroupIdentifier: group.ai.openox.mac.local
+        OXICloudContainerIdentifier: iCloud.ai.openox.mac.local
+        OXKeychainService: ai.openox.mac.local.llm
+        OXWebsiteDataNamespace: ai.openox.mac.local.web-profile
         OXAgentSkillTypeIdentifier: ai.openox.agent-skill
         OXConversationTypeIdentifier: ai.openox.conversation
         OXServiceTypeIdentifier: ai.openox.service
@@ -60,13 +60,13 @@ targets:
       - package: SwiftGitX
     settings:
       base:
-        PRODUCT_NAME: OxHost
+        PRODUCT_NAME: Ox
         MARKETING_VERSION: "1.0.1"
         CURRENT_PROJECT_VERSION: 1
-        PRODUCT_BUNDLE_IDENTIFIER: ai.openox.host.local
+        PRODUCT_BUNDLE_IDENTIFIER: ai.openox.mac.local
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES
         LM_SKIP_METADATA_EXTRACTION: YES
         CODE_SIGN_STYLE: Automatic
-        CODE_SIGN_ENTITLEMENTS: host.entitlements
+        CODE_SIGN_ENTITLEMENTS: mac.entitlements
         ENABLE_HARDENED_RUNTIME: YES

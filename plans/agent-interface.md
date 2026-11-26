@@ -43,7 +43,7 @@ Non-goals for v1: Claude Code or Codex as agents that run their own loop; live m
 | `OX_HOST_ENDPOINT`, `ox host list` | `OX_AGENT_ENDPOINT`, `ox agent list` |
 | Tailscale, trusted network only | same |
 
-An agent on the same Mac is remote at `ws://127.0.0.1:9877`. The macOS Host is sandboxed (`apps/macos/host.entitlements`), so only `ox agent serve` spawns processes.
+An agent on the same Mac is remote at `ws://127.0.0.1:9877`. The macOS Host is sandboxed (`apps/macos/mac.entitlements`), so only `ox agent serve` spawns processes.
 
 ## Protocol
 

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { run } from "../../../lib.ts";
 
 const targets = {
-  macos: ["-project", "apps/macos/OxHost.xcodeproj", "-scheme", "host", "-destination", "platform=macOS"],
+  macos: ["-project", "apps/macos/Ox.xcodeproj", "-scheme", "mac", "-destination", "platform=macOS"],
   ios: ["-project", "apps/ios/Ox.xcodeproj", "-scheme", "ios", "-destination", "generic/platform=iOS Simulator"],
 } as const;
 

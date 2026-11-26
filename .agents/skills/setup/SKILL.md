@@ -34,7 +34,7 @@ bun run build:services
 bun run build:agent
 DERIVED_DATA=$(mktemp -d)
 bun run build:macos -derivedDataPath "$DERIVED_DATA"
-"$DERIVED_DATA/Build/Products/Debug/OxHost.app/Contents/MacOS/OxHost"
+"$DERIVED_DATA/Build/Products/Debug/Ox.app/Contents/MacOS/Ox"
 ```
 
 Stop an existing Host before launching another. Verify its status in the menu bar; the Host has no chat UI. Use `--allow-connections` to enable remote access and `--disable-connections` to turn it off. Normal connections require Tailscale; `OX_HOST_ENDPOINT` selects the port, not the interface. For Debug-only local verification, launch with `OX_HOST_LOOPBACK=1 OX_HOST_ENDPOINT=ws://127.0.0.1:19876`. Do not reuse an iOS container for the Mac Host.
