@@ -174,6 +174,7 @@ nonisolated enum A11yID {
         static let delete = "conversation.delete"
         static let export = "conversation.export"
         static let agentPicker = "conversation.agentPicker"
+        static let agentStatus = "conversation.agentStatus"
         static let modelMenuItem = "conversation.modelMenuItem"
         static let agentMenu = "conversation.agentMenu"
         static let agentAdd = "conversation.agentAdd"

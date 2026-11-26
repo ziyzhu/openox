@@ -50,6 +50,7 @@ enum Theme {
         static let onSurfaceMuted  = DynamicColor(light: 0x666666, dark: 0x9A9A9A)
         static let onPrimary       = DynamicColor(light: 0xFFFFFF, dark: 0xFFFFFF)
         static let error           = DynamicColor(light: 0xB8422E, dark: 0xE25A45)
+        static let success         = DynamicColor(light: 0x2E9E4F, dark: 0x3CC468)
         static let route           = DynamicColor(light: 0x1A7CF5, dark: 0x3D9BFF)
         static let routeOutline    = DynamicColor(light: 0x0B4FB3, dark: 0x0A3D8F)
         static let routeAlternate  = DynamicColor(light: 0xA9CBF7, dark: 0x5B7FB0)

@@ -8,6 +8,7 @@ struct ConversationAgentButton: View {
 
     let title: String
     let agent: String?
+    var agentStatus: RemoteAgentStatus?
     var parent: Parent?
     let size: CGFloat
     let action: () -> Void
@@ -37,6 +38,7 @@ struct ConversationAgentButton: View {
         .glassEffect(.regular.interactive(), in: Capsule())
         .animation(.smooth, value: title)
         .animation(.smooth, value: subtitle)
+        .animation(.smooth, value: agentStatus)
         .accessibilityShowsLargeContentViewer {
             Text(verbatim: title)
         }
@@ -57,6 +59,13 @@ struct ConversationAgentButton: View {
                 HStack(spacing: Theme.Spacing.xs) {
                     if parent != nil {
                         Image(systemName: "arrow.turn.up.left")
+                    }
+                    if agent != nil {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 6))
+                            .foregroundStyle(statusColor)
+                            .symbolEffect(.pulse, options: .repeating, isActive: isCheckingAgent)
+                            .accessibilityIdentifier(A11yID.ConversationControls.agentStatus)
                     }
                     Text(verbatim: subtitle)
                         .contentTransition(.opacity)
@@ -82,8 +91,31 @@ struct ConversationAgentButton: View {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
+    private var statusColor: Color {
+        switch agentStatus {
+        case .online: Theme.Colors.success.dynamic
+        case .offline: Theme.Colors.error.dynamic
+        case .checking, nil: Theme.Colors.onSurfaceMuted.dynamic
+        }
+    }
+
+    private var isCheckingAgent: Bool {
+        switch agentStatus {
+        case .online, .offline: false
+        case .checking, nil: true
+        }
+    }
+
+    private var statusLabel: String? {
+        switch agentStatus {
+        case .online: String(localized: "Online")
+        case .offline: String(localized: "Offline")
+        case .checking, nil: agent == nil ? nil : String(localized: "Checking…")
+        }
+    }
+
     private var accessibilityValue: String {
-        [parentTitle.map { String(localized: "From \($0)") }, agent.map { String(localized: "Agent: \($0)") }]
+        [parentTitle.map { String(localized: "From \($0)") }, agent.map { String(localized: "Agent: \($0)") }, statusLabel]
             .compactMap(\.self)
             .joined(separator: ", ")
     }

@@ -17,6 +17,7 @@ struct ConversationPageTopBar: View {
         ConversationHeader(
             title: conversation.title,
             agentTitle: conversation.remoteAgentName,
+            agentStatus: conversation.remoteAgent.flatMap { RemoteAgentDirectory.shared.statuses[$0.endpoint] },
             parent: parent,
             iconButtonSize: iconButtonSize,
             onShowSidebar: onShowSidebar,
@@ -27,6 +28,10 @@ struct ConversationPageTopBar: View {
             } else {
                 overflowMenu(conversation: conversation)
             }
+        }
+        .task(id: conversation.remoteAgent?.endpoint) {
+            guard let endpoint = conversation.remoteAgent?.endpoint else { return }
+            await RemoteAgentDirectory.shared.refresh(endpoint)
         }
     }
 

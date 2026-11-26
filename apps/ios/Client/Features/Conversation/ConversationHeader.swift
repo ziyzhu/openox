@@ -3,6 +3,7 @@ import SwiftUI
 struct ConversationHeader<Trailing: View>: View {
     let title: String
     var agentTitle: String?
+    var agentStatus: RemoteAgentStatus?
     var parent: ConversationAgentButton.Parent?
     let iconButtonSize: CGFloat
     let onShowSidebar: () -> Void
@@ -12,7 +13,7 @@ struct ConversationHeader<Trailing: View>: View {
     var body: some View {
         HStack(spacing: 8) {
             SidebarMenuButton(action: onShowSidebar)
-            ConversationAgentButton(title: title, agent: agentTitle, parent: parent, size: iconButtonSize, action: onPickModel)
+            ConversationAgentButton(title: title, agent: agentTitle, agentStatus: agentStatus, parent: parent, size: iconButtonSize, action: onPickModel)
                 .frame(maxWidth: .infinity)
             trailing()
         }
