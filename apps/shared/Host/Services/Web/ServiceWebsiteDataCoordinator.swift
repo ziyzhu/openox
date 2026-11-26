@@ -56,7 +56,7 @@ final class ServiceWebsiteDataCoordinator {
         }
     }
 
-    private var sharedDataStore: WKWebsiteDataStore?
+    private var profileDataStore: (profileID: UUID?, store: WKWebsiteDataStore)?
 
     func makePageConfiguration() -> WebPage.Configuration {
         var configuration = WebPage.Configuration()
@@ -108,7 +108,7 @@ final class ServiceWebsiteDataCoordinator {
             let encoder = PropertyListEncoder()
             encoder.outputFormat = .binary
             let data = try encoder.encode(snapshot)
-            Log.service.info("ServiceManager.websiteData exported scope=global bytes=\(data.count) cookies=\(cookies.count)")
+            Log.service.info("ServiceManager.websiteData exported profile=\(StorageRoot.shared.activeId?.uuidString ?? "none") bytes=\(data.count) cookies=\(cookies.count)")
             return data
         } catch {
             throw error
@@ -131,7 +131,7 @@ final class ServiceWebsiteDataCoordinator {
                 }
             }
             await setCookies(cookies, in: store)
-            Log.service.info("ServiceManager.websiteData restored scope=global bytes=\(data.count) cookies=\(cookies.count)")
+            Log.service.info("ServiceManager.websiteData restored profile=\(StorageRoot.shared.activeId?.uuidString ?? "none") bytes=\(data.count) cookies=\(cookies.count)")
         } catch {
             throw error
         }
@@ -172,13 +172,38 @@ final class ServiceWebsiteDataCoordinator {
         return applicable
     }
 
+    func switchProfile(services: [Service]) {
+        quiesce(services)
+        profileDataStore = nil
+    }
+
+    func removeData(for profileID: UUID) async {
+        let identifier = Self.dataStoreID(for: profileID)
+        if profileDataStore?.profileID == profileID { profileDataStore = nil }
+        if AppStateStore.shared.value.websiteDataProfileID == profileID { try? AppStateStore.shared.update { $0.websiteDataProfileID = nil } }
+        do {
+            try await WKWebsiteDataStore.remove(forIdentifier: identifier)
+            Log.service.info("ServiceManager.dataStore removed profile=\(profileID)")
+        } catch {
+            Log.service.error("ServiceManager.dataStore remove failed profile=\(profileID) error=\(error.localizedDescription)")
+        }
+    }
+
     private func dataStore() -> WKWebsiteDataStore {
-        if let sharedDataStore { return sharedDataStore }
-        let identifier = Self.dataStoreID
+        let profileID = StorageRoot.shared.activeId
+        if let profileDataStore, profileDataStore.profileID == profileID { return profileDataStore.store }
+        if let profileID, AppStateStore.shared.value.websiteDataProfileID == nil {
+            try? AppStateStore.shared.update { $0.websiteDataProfileID = profileID }
+        }
+        let identifier = profileID.map(Self.dataStoreID(for:)) ?? Self.legacyDataStoreID
         let store = WKWebsiteDataStore(forIdentifier: identifier)
-        sharedDataStore = store
-        Log.service.info("ServiceManager.dataStore created scope=global id=\(identifier)")
+        profileDataStore = (profileID, store)
+        Log.service.info("ServiceManager.dataStore created profile=\(profileID?.uuidString ?? "none") legacy=\(identifier == Self.legacyDataStoreID)")
         return store
+    }
+
+    private static func dataStoreID(for profileID: UUID) -> UUID {
+        AppStateStore.shared.value.websiteDataProfileID == profileID ? legacyDataStoreID : namespacedID(AppConfiguration.websiteDataNamespace + "/" + profileID.uuidString)
     }
 
     nonisolated private static func isIPAddress(_ domain: String) -> Bool {
@@ -190,8 +215,10 @@ final class ServiceWebsiteDataCoordinator {
         }
     }
 
-    nonisolated private static var dataStoreID: UUID {
-        let digest = SHA256.hash(data: Data(AppConfiguration.websiteDataNamespace.utf8))
+    private static var legacyDataStoreID: UUID { namespacedID(AppConfiguration.websiteDataNamespace) }
+
+    nonisolated private static func namespacedID(_ namespace: String) -> UUID {
+        let digest = SHA256.hash(data: Data(namespace.utf8))
         var bytes = Array(digest.prefix(16))
         bytes[6] = (bytes[6] & 0x0F) | 0x50
         bytes[8] = (bytes[8] & 0x3F) | 0x80

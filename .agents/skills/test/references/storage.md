@@ -17,7 +17,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   │   ├── policy.json                 format-2 global/source/action approval overrides
 │   │   │   ├── services.json               format-1 service display names
 │   │   │   ├── host.json                   format-1 Host connection permission; defaults off
-│   │   │   ├── secrets.json                version-1 Secret metadata/bindings; no secret values
+│   │   │   ├── profiles/<Profile UUID>/secrets.json  version-1 Secret metadata/bindings of that Profile; no secret values
 │   │   │   ├── providers.json              format-2 provider overrides and optional defaultModel
 │   │   │   ├── mounted-repositories.json   version-1 bindings to Files grants
 │   │   │   ├── external-profiles.json      selected Profile bookmarks/display names
@@ -65,8 +65,8 @@ types remain authoritative in their `Codable` implementations.
 │       ├── conversations/<Pi-ID>/...        mutable conversation-owned files and directories
 │       ├── <shared folders>/...             mutable Profile-owned files; no required hierarchy
 │       └── artifacts/<filename>             retained ordinary predecessor files only
-├── Keychain                                 provider and service credentials
-└── WKWebsiteDataStore(forIdentifier:)       shared app-wide website state
+├── Keychain                                 provider and service credentials, accounts prefixed `<Profile UUID>/`
+└── WKWebsiteDataStore(forIdentifier:)       website state per Profile
 
 <configured iCloud container>/
 └── Documents/<ProfileName>/              predecessor Profiles; live Pi activation refused
@@ -790,7 +790,13 @@ repository.
 
 ## Website state
 
-The iOS service page pool uses one persistent app-wide `WKWebsiteDataStore`.
+The iOS service page pool uses one persistent `WKWebsiteDataStore` per Profile.
+The Profile active when this build first opens a store adopts the predecessor
+app-wide store (its identifier is recorded as `websiteDataProfileID` in
+`state.json`); other Profiles use identifiers derived from the website-data
+namespace and the Profile UUID. Changing Profiles discards service pages before
+the next store is opened. Deleting a local or iCloud Profile removes its store;
+closing an external Profile keeps it.
 WebKit's same-origin policy separates origin storage, while cookies follow
 normal browser domain rules. Signing out enumerates WebKit records and cookies,
 then removes only entries mapped to that website's Public Suffix List-aware
@@ -872,6 +878,19 @@ Older builds ignore the file and can recreate empty or divergent provider prefer
 Downgrade is not configuration-compatible; downgrade testing and approval are not
 release gates. Returning to the changed build
 rejects divergent legacy preferences instead of silently discarding either side.
+
+Credential accounts belong to the active Profile: `Credentials` prefixes every
+account with `<Profile UUID>/` once a Profile is active, except the device-wide
+`remote-agent-push-key`. Application-wide migrations run before a Profile is
+active and see unprefixed accounts. The first Profile step,
+`profile.credentialScope`, moves every unprefixed account into the active Profile
+(copy, verify, delete) and merges `Configuration/secrets.json` into
+`Configuration/profiles/<Profile UUID>/secrets.json`, keeping the Profile's entry
+when keys collide. Later launches find nothing to move. Other Profiles start
+without credentials. Deleting a local or iCloud Profile removes its accounts and
+its configuration folder. Older builds read only unprefixed accounts and the
+app-wide index, so after a downgrade credentials appear missing until they are
+entered again.
 
 Reusable credentials use generic-password Keychain accounts `secret:<key>` under
 the bundle-derived `<application bundle identifier>.llm` service. Each item is a
@@ -967,7 +986,7 @@ user data needed for diagnosis but never credentials or reusable secrets.
 | Provider overrides and default selection | Application Support/providers.json | Device backup policy | Delete provider, reset default, or delete app |
 | Discovered models and model capabilities | Caches | Purgeable local cache | System eviction or refresh |
 | Secret values | Keychain | This device only | Sign out generated entry or delete any entry |
-| Secret metadata and bindings | Configuration/secrets.json | Device backup policy | Sign out or delete entry |
+| Secret metadata and bindings | Configuration/profiles/<Profile UUID>/secrets.json | Device backup policy | Sign out, delete entry, or delete the Profile |
 | Managed provider OAuth | Keychain | System policy | Sign out |
 | Service website state | Domain website store | Local persistent state | Sign out service family |
 | Remote MCP endpoints and transports | <Profile>/repositories/Local | Profile policy | Disconnect the MCP server |

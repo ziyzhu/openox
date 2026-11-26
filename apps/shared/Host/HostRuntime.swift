@@ -55,9 +55,19 @@ final class HostRuntime: OxHost {
             profileSummaryLoad?.cancel()
             await profileSummaryLoad?.value
             profileSummaryLoad = nil
+            services.websiteData.switchProfile(services: services.services)
         }
         StorageRoot.shared.profileDidChange = { [weak self] in
             try await self?.refreshProfile()
+        }
+        StorageRoot.shared.profileDeleted = { [weak self] profileID in
+            do {
+                try Credentials.removeAccounts(of: profileID)
+                try? FileManager.default.removeItem(at: AppStoragePaths.profileConfiguration(profileID))
+            } catch {
+                Log.app.error("HostRuntime.profileDeleted credentials failed profile=\(profileID) error=\(error.localizedDescription)")
+            }
+            await self?.services.websiteData.removeData(for: profileID)
         }
     }
 

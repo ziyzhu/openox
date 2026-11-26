@@ -58,6 +58,21 @@ nonisolated enum CredentialMigrator {
         Log.app.info("StorageMigrator.secretsRenamed items=\(legacyAccounts.count) index=\(legacyData != nil)")
     }
 
+    static func adoptIntoProfile(_ profileID: UUID) throws {
+        let moved = try Credentials.adoptUnscopedAccounts(into: profileID)
+        let legacy = AppStoragePaths.legacySecretIndex
+        guard FileManager.default.fileExists(atPath: legacy.path) else {
+            Log.app.info("StorageMigrator.credentialScope profile=\(profileID) accounts=\(moved) index=none")
+            return
+        }
+        let destination = AppStoragePaths.profileConfiguration(profileID).appendingPathComponent("secrets.json", isDirectory: false)
+        var index = try SecretIndex.load(from: destination)
+        let conflicts = index.adopt(try SecretIndex.load(from: legacy))
+        try index.save(to: destination)
+        try FileManager.default.removeItem(at: legacy)
+        Log.app.info("StorageMigrator.credentialScope profile=\(profileID) accounts=\(moved) entries=\(index.entries.count) conflictsKeptProfile=\(conflicts)")
+    }
+
     static func migrateSecretStorage(defaults: UserDefaults = .standard) throws {
         let exists = FileManager.default.fileExists(atPath: AppStoragePaths.secretIndex.path)
         let source = ApplicationStorageMigrator.legacyPreference(Secret.indexKey, defaults: defaults)
@@ -74,8 +89,7 @@ nonisolated enum CredentialMigrator {
             if let migrated, try encoder.encode(current) != encoder.encode(migrated) {
                 throw StorageMigrationError.collision("secret index")
             }
-        } else {
-            let next = migrated ?? SecretIndex()
+        } else if let next = migrated {
             try next.save()
             guard try encoder.encode(SecretIndex.load()) == encoder.encode(next) else {
                 throw StorageMigrationError.invalidApplicationStorage("secret index publication")

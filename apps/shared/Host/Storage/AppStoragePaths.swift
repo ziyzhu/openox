@@ -20,7 +20,14 @@ nonisolated enum AppStoragePaths {
     static let servicePreferences = configuration.appendingPathComponent("services.json", isDirectory: false)
     static let hostConfiguration = configuration.appendingPathComponent("host.json", isDirectory: false)
     static let remoteAgentConfiguration = configuration.appendingPathComponent("remote-agents.json", isDirectory: false)
-    static let secretIndex = configuration.appendingPathComponent("secrets.json", isDirectory: false)
+    static let legacySecretIndex = configuration.appendingPathComponent("secrets.json", isDirectory: false)
+    static var secretIndex: URL {
+        StorageRoot.currentScope?.profileID.map { profileConfiguration($0).appendingPathComponent("secrets.json", isDirectory: false) } ?? legacySecretIndex
+    }
+
+    static func profileConfiguration(_ profileID: UUID) -> URL {
+        configuration.appendingPathComponent("profiles", isDirectory: true).appendingPathComponent(profileID.uuidString, isDirectory: true)
+    }
     static let state = applicationSupport.appendingPathComponent("state.json", isDirectory: false)
     static let repositoriesConfiguration = configuration.appendingPathComponent("service-repositories.json", isDirectory: false)
     static let mountedRepositories = configuration.appendingPathComponent("mounted-repositories.json", isDirectory: false)

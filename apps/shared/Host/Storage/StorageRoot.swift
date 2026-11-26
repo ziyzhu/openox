@@ -43,6 +43,7 @@ final class StorageRoot {
     private var cloudDocs: URL?
     var beforeProfileChange: (@MainActor () async throws -> Void)?
     var profileDidChange: (@MainActor () async throws -> Void)?
+    var profileDeleted: (@MainActor (UUID) async -> Void)?
 
     private static let defaultName = "Default"
 
@@ -340,6 +341,7 @@ final class StorageRoot {
         do {
             if profile.location != .external {
                 try await repository.deleteProfile(profile)
+                await profileDeleted?(profile.id)
             } else {
                 if profile.id == activeId { try await beforeProfileChange?() }
                 try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))

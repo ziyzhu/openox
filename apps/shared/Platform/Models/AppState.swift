@@ -9,6 +9,7 @@ nonisolated struct AppState: Codable, Equatable, Sendable {
     var chatGPTAgentHostID: String?
     var region: String?
     var whatsNewSeenVersion: String?
+    var websiteDataProfileID: UUID?
 
     func validate() throws {
         guard format == 1, (0...3).contains(memoryIntentDisplays),

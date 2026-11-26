@@ -167,7 +167,7 @@ Order:
 
 1. Done: folders writable only over loopback; `cwd` in `conversations.new`.
 2. Done: tool limit, `agentTools` and `confirmTools` in context, Shell picker.
-3. Per-Profile secrets (prefixed Keychain accounts) and website logins (store per Profile), migrated to the Profile selected at upgrade.
+3. Done: per-Profile secrets (prefixed Keychain accounts) and website logins (store per Profile), migrated to the Profile selected at upgrade.
 4. Website data export and import with `fetchData`/`restoreData`, after a device check of what restores.
 5. Move policy, services, providers and remote agents into the Profile (storage migration).
 6. Rename Host to Environment in code, protocol and copy (`ox --env`, "Profile on iPhone").

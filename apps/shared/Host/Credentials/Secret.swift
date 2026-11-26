@@ -78,17 +78,37 @@ nonisolated struct SecretIndex: Codable, Sendable {
     var neverRemember: [String]?
 
     static func load() throws -> Self {
-        let value = try JSONDecoder().decode(Self.self, from: Data(contentsOf: AppStoragePaths.secretIndex))
+        try load(from: AppStoragePaths.secretIndex)
+    }
+
+    static func load(from url: URL) throws -> Self {
+        guard FileManager.default.fileExists(atPath: url.path) else { return Self() }
+        let value = try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
         try value.validate()
         return value
     }
 
     func save() throws {
+        try save(to: AppStoragePaths.secretIndex)
+    }
+
+    func save(to url: URL) throws {
         try validate()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try FileManager.default.createDirectory(at: AppStoragePaths.configuration, withIntermediateDirectories: true)
-        try encoder.encode(self).write(to: AppStoragePaths.secretIndex, options: .atomic)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try encoder.encode(self).write(to: url, options: .atomic)
+    }
+
+    mutating func adopt(_ other: SecretIndex) -> Int {
+        let keys = Set(entries.map(\.key))
+        let consumers = Set(bindings.map { "\($0.consumerKind.rawValue):\($0.consumerID)" })
+        let added = other.entries.filter { !keys.contains($0.key) }
+        entries += added
+        bindings += other.bindings.filter { !consumers.contains("\($0.consumerKind.rawValue):\($0.consumerID)") }
+        let remembered = Set((neverRemember ?? []) + (other.neverRemember ?? [])).sorted()
+        neverRemember = remembered.isEmpty ? nil : remembered
+        return other.entries.count - added.count
     }
 
     func validate() throws {

@@ -74,7 +74,7 @@ final class ServiceManager {
     @ObservationIgnored let actionScheduler = ServiceActionScheduler()
     @ObservationIgnored let browserActionSessions = ServiceBrowserActionSessionCoordinator()
     @ObservationIgnored private var intrinsicBrowserService: Service?
-    @ObservationIgnored private let websiteData = ServiceWebsiteDataCoordinator()
+    @ObservationIgnored let websiteData = ServiceWebsiteDataCoordinator()
     private(set) var repositoryState: RepositoryState = .idle
     private(set) var monoRepositoryState: MonoRepositoryState = .idle
     private(set) var monoRepositoryHash: String?
