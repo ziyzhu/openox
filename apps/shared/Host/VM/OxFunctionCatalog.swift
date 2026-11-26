@@ -39,6 +39,14 @@ nonisolated enum OxFunctionCatalog {
 
     private static let catalog = Dictionary(uniqueKeysWithValues: catalogEntries)
 
+    private static let summaries: [(name: String, description: String)] = catalogEntries.compactMap { name, schema in
+        compactDescription(schema).map { (name, $0) }
+    }.sorted { $0.name < $1.name }
+
+    static let searchIndex = JSONValue.array(summaries.map {
+        .object(["name": .string($0.name), "description": .string($0.description)])
+    })
+
     private static func closeInputSchema(_ value: JSONValue) -> JSONValue {
         guard case .object(var entry) = value,
               case .object(var input)? = entry["inputSchema"],
@@ -113,10 +121,7 @@ nonisolated enum OxFunctionCatalog {
 
     static func descriptions() -> String {
         let namespaces = namespaceDescriptions.map { "ox.\($0.0) — \($0.1)" }
-        let functions = catalogEntries.compactMap { name, schema -> String? in
-            guard let description = compactDescription(schema) else { return nil }
-            return "\(name) — \(description)"
-        }.sorted()
+        let functions = summaries.map { "\($0.name) — \($0.description)" }
         return (namespaces + [""] + functions).joined(separator: "\n")
     }
 

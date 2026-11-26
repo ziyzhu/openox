@@ -256,6 +256,7 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
         ctx.setObject(helpCatalog.toAny(), forKeyedSubscript: "__oxHelpCatalog" as NSString)
         ctx.setObject(helpTextCatalog.toAny(), forKeyedSubscript: "__oxHelpTextCatalog" as NSString)
         ctx.setObject(namespaceHelpTextCatalog.toAny(), forKeyedSubscript: "__oxNamespaceHelpTextCatalog" as NSString)
+        ctx.setObject(OxFunctionCatalog.searchIndex.toAny(), forKeyedSubscript: "__oxSearchIndex" as NSString)
         let helpTextCharacters = helpTextCatalog.objectValue?.values.reduce(0) { $0 + ($1.stringValue?.count ?? 0) } ?? 0
         Log.agent.debug("virtual machine help jsonChars=\(helpCatalog.jsonString().count) textChars=\(helpTextCharacters)")
 
@@ -418,6 +419,48 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
         };
         __oxAttachHelp(ox);
         Object.defineProperty(globalThis, 'ox', { value: ox, writable: false, configurable: false });
+        (() => {
+          const index = __oxSearchIndex;
+          delete globalThis.__oxSearchIndex;
+          const stop = new Set(['a', 'an', 'and', 'by', 'for', 'from', 'in', 'of', 'on', 'or', 'ox', 'the', 'to', 'with']);
+          const terms = text => new Set((text.normalize('NFC')
+            .replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+            .toLowerCase().match(/[\\p{L}\\p{M}\\p{N}]+/gu) ?? [])
+            .filter(word => !stop.has(word))
+            .map(word => word.length > 4 && word.endsWith('ies') ? word.slice(0, -3) + 'y'
+              : word.length > 3 && word.endsWith('s') && !word.endsWith('ss') ? word.slice(0, -1) : word));
+          Object.defineProperty(globalThis, 'searchTools', {
+            value: async (query, options = {}) => {
+              if (typeof query !== 'string' || query.length > 512) throw new TypeError('searchTools() expects a query string of at most 512 characters');
+              if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('searchTools() expects an options object');
+              const { limit = 8, namespace } = options;
+              if (!Number.isSafeInteger(limit) || limit < 1) throw new TypeError('searchTools() limit must be a positive integer');
+              if (namespace !== undefined && typeof namespace !== 'string') throw new TypeError('searchTools() namespace must be a string');
+              const scope = namespace?.trim();
+              const prefix = !scope || scope === 'ox' || scope.startsWith('ox.') ? scope : 'ox.' + scope;
+              const exactName = query.trim().toLowerCase();
+              const queryTerms = terms(query);
+              if (!queryTerms.size) return [];
+              const matches = [];
+              for (const { name, description } of index) {
+                if (prefix && !name.startsWith(prefix + '.')) continue;
+                const nameTerms = terms(name);
+                const descriptionTerms = terms(description);
+                let covered = 0, nameMatches = 0;
+                for (const term of queryTerms) {
+                  if (nameTerms.has(term)) { nameMatches++; covered++; }
+                  else if (descriptionTerms.has(term)) covered++;
+                }
+                if (covered) {
+                  const exact = exactName === name.toLowerCase() || exactName === name.split('.').at(-1).toLowerCase();
+                  matches.push({ name, description, covered, nameMatches, exact });
+                }
+              }
+              return matches.sort((a, b) => b.exact - a.exact || b.covered - a.covered || b.nameMatches - a.nameMatches)
+                .slice(0, limit).map(({ name, description }) => ({ name, description }));
+            }, writable: false, configurable: false,
+          });
+        })();
         """)
         if let exception = ctx.exception?.toString() {
             Log.agent.error("virtual machine bridge install failed: \(exception)")
