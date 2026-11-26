@@ -10,6 +10,10 @@ extension Conversation {
         remoteAgent.flatMap { RemoteAgentDirectory.shared.modelName($0.model, endpoint: $0.endpoint) }
     }
 
+    var remoteThinkingLevel: String? {
+        remoteAgent.flatMap { $0.thinkingLevel ?? RemoteAgentDirectory.shared.defaultThinkingLevels[$0.endpoint] }
+    }
+
     var canChangeAgent: Bool { transcript.isEmpty && queuedMessages.isEmpty && !isBusy && !isTemporary }
 
     @discardableResult
@@ -22,19 +26,7 @@ extension Conversation {
     }
 
     func selectRemoteModel(_ model: RemoteAgentModel) {
-        guard var binding = remoteAgent else { return }
-        binding.model = model.reference
-        remoteAgent = binding
-        Log.session.info("Conversation.agent model id=\(id) provider=\(model.reference.provider) model=\(model.reference.id)")
-        guard let conversationID = binding.conversationID else { return }
-        let client = RemoteAgentDirectory.shared.client(for: binding.endpoint)
-        Task {
-            do {
-                _ = try await client.call("conversations.setModel", .object([
-                    "id": .string(conversationID), "provider": .string(model.reference.provider), "model": .string(model.reference.id),
-                ]))
-            } catch { Log.session.error("Conversation.agent setModel failed id=\(self.id) error=\(error.localizedDescription)") }
-        }
+        updateRemoteSelection(model: model, thinking: nil)
     }
 
     func selectRemoteFolder(_ folder: String) {
@@ -42,6 +34,44 @@ extension Conversation {
         binding.folder = folder
         remoteAgent = binding
         Log.session.info("Conversation.agent folder id=\(id) chars=\(folder.count)")
+    }
+
+    func selectRemoteThinking(_ level: String) {
+        updateRemoteSelection(model: nil, thinking: level)
+    }
+
+    private func updateRemoteSelection(model: RemoteAgentModel?, thinking: String?) {
+        guard let previous = remoteAgent else { return }
+        var binding = previous
+        if let model { binding.model = model.reference }
+        if let thinking { binding.thinkingLevel = thinking }
+        if let model, let level = binding.thinkingLevel, !model.thinkingLevels.contains(level) {
+            binding.thinkingLevel = Self.clampedThinkingLevel(level, to: model.thinkingLevels)
+        }
+        let modelChanged = binding.model != previous.model
+        guard modelChanged || binding.thinkingLevel != previous.thinkingLevel else { return }
+        remoteAgent = binding
+        Log.session.info("Conversation.agent selection id=\(id) model=\(binding.model?.id ?? "default") thinking=\(binding.thinkingLevel ?? "default")")
+        guard let conversationID = binding.conversationID else { return }
+        let client = RemoteAgentDirectory.shared.client(for: binding.endpoint)
+        Task {
+            do {
+                if modelChanged, let model = binding.model {
+                    _ = try await client.call("conversations.setModel", .object([
+                        "id": .string(conversationID), "provider": .string(model.provider), "model": .string(model.id),
+                    ]))
+                }
+                if let level = binding.thinkingLevel {
+                    _ = try await client.call("conversations.setThinking", .object(["id": .string(conversationID), "level": .string(level)]))
+                }
+            } catch { Log.session.error("Conversation.agent selection failed id=\(self.id) error=\(error.localizedDescription)") }
+        }
+    }
+
+    static func clampedThinkingLevel(_ level: String, to levels: [String]) -> String? {
+        let order = ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
+        guard let requested = order.firstIndex(of: level) else { return levels.first }
+        return order[requested...].first(where: levels.contains) ?? order[..<requested].last(where: levels.contains)
     }
 
     func submitRemote(_ input: ConversationInput, configuration: AgentConfiguration, binding: RemoteAgentBinding) async throws -> ConversationRunResult {
@@ -372,7 +402,7 @@ extension Conversation {
             "model": .object(["id": .string(reference?.id ?? "default"), "name": .string(reference.flatMap { directory.modelName($0, endpoint: binding.endpoint) } ?? reference?.id ?? "Agent default")]),
             "agentDefault": .bool(binding.model == nil),
             "supportsTools": .bool(true),
-            "thinkingLevel": binding.thinkingLevel.map(JSONValue.string) ?? .null,
+            "thinkingLevel": remoteThinkingLevel.map(JSONValue.string) ?? .null,
             "change": .null,
             "authentication": .object([
                 "method": .string("agent"), "status": .string(online ? "ready" : "unavailable"),
@@ -381,8 +411,9 @@ extension Conversation {
         ])
     }
 
-    func setRemoteAppModel(_ options: JSONValue, binding: RemoteAgentBinding) throws -> JSONValue {
+    func setRemoteAppModel(_ options: JSONValue, binding: RemoteAgentBinding) async throws -> JSONValue {
         let directory = RemoteAgentDirectory.shared
+        if directory.models[binding.endpoint]?.isEmpty ?? true { await directory.refresh(binding.endpoint) }
         let fields = options.objectValue?["selection"]?.objectValue ?? [:]
         let available = directory.models[binding.endpoint] ?? []
         guard let provider = fields["provider"]?.stringValue, let modelID = fields["model"]?.stringValue,
@@ -392,8 +423,12 @@ extension Conversation {
                 message: "ox.conversation.setModel: this conversation runs on the agent \(directory.displayName(for: binding.endpoint)), which has no model \(fields["provider"]?.stringValue ?? "?")/\(fields["model"]?.stringValue ?? "?").",
                 recovery: available.isEmpty ? "The agent's models are unavailable; check that it is reachable in app/status.json." : "Use a provider and model from the agent, for example: \(examples).")
         }
-        let changed = binding.model != model.reference
-        selectRemoteModel(model)
+        if let level = fields["thinkingLevel"]?.stringValue, !model.thinkingLevels.contains(level) {
+            throw OxFunctionError(code: "invalid_argument", message: "ox.conversation.setModel: \(model.name) does not support thinking level \(level).",
+                recovery: "Use one of: \(model.thinkingLevels.joined(separator: ", ")).")
+        }
+        let changed = binding.model != model.reference || (fields["thinkingLevel"]?.stringValue).map { $0 != remoteThinkingLevel } == true
+        updateRemoteSelection(model: model, thinking: fields["thinkingLevel"]?.stringValue)
         return .object([
             "status": .string("applied"),
             "selection": .object(["provider": .string(provider), "model": .string(modelID)]),

@@ -77,7 +77,7 @@ extension Conversation {
 
     public func setAppModel(options: JSONValue, purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.appSetModel, options, purpose: purpose) {
-            if let binding = self.remoteAgent { return try self.setRemoteAppModel(options, binding: binding) }
+            if let binding = self.remoteAgent { return try await self.setRemoteAppModel(options, binding: binding) }
             let previous = self.modelSelection
             let previousChange = self.modelSelectionChange
             guard let selection = options.objectValue?["selection"], selection != .null else {

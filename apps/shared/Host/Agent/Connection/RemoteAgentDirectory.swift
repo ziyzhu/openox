@@ -61,6 +61,7 @@ nonisolated struct RemoteAgentModel: Equatable, Hashable, Identifiable, Sendable
     let reference: AgentModelReference
     let name: String
     let reasoning: Bool
+    var thinkingLevels: [String] = ["off"]
 
     var id: String { "\(reference.provider)/\(reference.id)" }
 }
@@ -83,6 +84,7 @@ final class RemoteAgentDirectory {
     private(set) var statuses: [URL: RemoteAgentStatus] = [:]
     private(set) var models: [URL: [RemoteAgentModel]] = [:]
     private(set) var defaultModels: [URL: AgentModelReference] = [:]
+    private(set) var defaultThinkingLevels: [URL: String] = [:]
     @ObservationIgnored private var clients: [URL: RemoteAgentClient] = [:]
     @ObservationIgnored var pushDevice: JSONValue? {
         didSet {
@@ -217,6 +219,7 @@ final class RemoteAgentDirectory {
             let listing = try await client.call("models.list", timeout: .seconds(30)).objectValue ?? [:]
             models[endpoint] = (listing["models"]?.arrayValue ?? []).compactMap(Self.model)
             defaultModels[endpoint] = listing["current"].flatMap(Self.reference)
+            defaultThinkingLevels[endpoint] = listing["thinkingLevel"]?.stringValue
             Log.agent.info("RemoteAgentDirectory.refresh endpoint=\(endpoint.absoluteString) online=true models=\(models[endpoint]?.count ?? 0)")
             await registerPush(endpoint)
         } catch {
@@ -291,7 +294,14 @@ final class RemoteAgentDirectory {
     private static func model(_ value: JSONValue) -> RemoteAgentModel? {
         guard let reference = reference(value) else { return nil }
         let fields = value.objectValue ?? [:]
-        return RemoteAgentModel(reference: reference, name: fields["name"]?.stringValue ?? reference.id,
-                                reasoning: fields["reasoning"]?.boolValue ?? false)
+        let reasoning = fields["reasoning"]?.boolValue ?? false
+        let levels = fields["thinkingLevels"]?.arrayValue?.compactMap(\.stringValue)
+        return RemoteAgentModel(reference: reference, name: fields["name"]?.stringValue ?? reference.id, reasoning: reasoning,
+                                thinkingLevels: levels ?? (reasoning ? ["off", "minimal", "low", "medium", "high"] : ["off"]))
+    }
+
+    func model(_ reference: AgentModelReference?, endpoint: URL) -> RemoteAgentModel? {
+        guard let reference = reference ?? defaultModels[endpoint] else { return nil }
+        return models[endpoint]?.first { $0.reference == reference }
     }
 }

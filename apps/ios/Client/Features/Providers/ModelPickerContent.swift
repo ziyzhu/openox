@@ -575,7 +575,12 @@ struct ModelPickerContent: View {
     }
 
     private func reasoningEffortName(_ effort: String) -> String {
+        Self.thinkingLevelName(effort)
+    }
+
+    static func thinkingLevelName(_ effort: String) -> String {
         switch effort {
+        case "off": L10n.string("Off")
         case "none": L10n.string("None")
         case "minimal": L10n.string("Minimal")
         case "low": L10n.string("Low")

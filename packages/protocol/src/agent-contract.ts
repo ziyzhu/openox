@@ -30,8 +30,11 @@ export const AgentSchemas = {
   }),
   AgentModel: object("AgentModel", {
     provider: S(), id: S(), name: S(), reasoning: B(), contextWindow: optional(I()), maxTokens: optional(I()),
+    thinkingLevels: optional(A(S(), { description: "Thinking levels this model supports, in pi's order; [\"off\"] when it has no reasoning." })),
   }),
-  AgentModelsResult: object("AgentModelsResult", { models: A(R("AgentModel")), current: nullable(R("AgentModelRef")) }),
+  AgentModelsResult: object("AgentModelsResult", {
+    models: A(R("AgentModel")), current: nullable(R("AgentModelRef")), thinkingLevel: nullable(S({ description: "pi's default thinking level for new conversations." })),
+  }),
   AgentModelRef: object("AgentModelRef", { provider: S(), id: S() }),
   AgentConversationRow: object("AgentConversationRow", {
     id: conversationId(), title: S(), cwd: S(),

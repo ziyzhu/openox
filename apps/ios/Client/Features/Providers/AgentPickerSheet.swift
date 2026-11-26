@@ -139,6 +139,24 @@ struct RemoteAgentModelPicker<Header: View>: View {
                     .buttonStyle(.plain)
                     .disabled(models.isEmpty)
                     .accessibilityIdentifier(A11yID.ConversationControls.agentModelMenu)
+                    if let levels = selectedModel?.thinkingLevels, levels.count > 1 {
+                        Divider().settingsContentInset()
+                        Menu {
+                            ForEach(levels, id: \.self) { level in
+                                Button { conversation.selectRemoteThinking(level) } label: {
+                                    Label { Text(verbatim: ModelPickerContent.thinkingLevelName(level)) } icon: {
+                                        if level == conversation.remoteThinkingLevel { Image(systemName: "checkmark") }
+                                    }
+                                }
+                                .accessibilityIdentifier(A11yID.ConversationControls.modelThinkingLevelOption(level))
+                            }
+                        } label: {
+                            SettingsDisclosureRow(title: "Thinking level",
+                                                  value: Text(verbatim: conversation.remoteThinkingLevel.map(ModelPickerContent.thinkingLevelName) ?? String(localized: "Agent default")),
+                                                  indicator: "chevron.up.chevron.down")
+                        }
+                        .accessibilityIdentifier(A11yID.ConversationControls.modelThinkingLevel)
+                    }
                 }
                 .settingsSurface()
                 if agents.folders(for: endpoint).count > 1 || conversation.remoteAgent?.folder != nil {
@@ -180,6 +198,10 @@ struct RemoteAgentModelPicker<Header: View>: View {
 
     private var selectedFolder: String? {
         conversation.remoteAgent?.folder ?? agents.folders(for: endpoint).first
+    }
+
+    private var selectedModel: RemoteAgentModel? {
+        agents.model(selected, endpoint: endpoint)
     }
 
     private var selected: AgentModelReference? {

@@ -112,7 +112,7 @@ export class AgentServer {
   private readonly bridge: ToolBridge;
   private readonly bridgeURL: string;
   private readonly server: ReturnType<typeof Bun.serve>;
-  private models?: { at: number; value: Promise<{ models: AgentModel[]; current: AgentModelRef | null }> };
+  private models?: { at: number; value: Promise<{ models: AgentModel[]; current: AgentModelRef | null; thinkingLevel: string | null }> };
 
   private readonly handlers: Record<AgentMethodName, Handler> = {
     "agent.describe": () => this.describe(),
@@ -291,7 +291,7 @@ export class AgentServer {
     return this.models.value;
   }
 
-  private async fetchModels(): Promise<{ models: AgentModel[]; current: AgentModelRef | null }> {
+  private async fetchModels(): Promise<{ models: AgentModel[]; current: AgentModelRef | null; thinkingLevel: string | null }> {
     const pi = new PiProcess(this.options.executable, ["--no-session", ...approvalArguments(this.options.approval)], { cwd: this.options.roots[0]!, label: "models" }, () => {});
     try {
       const [available, state] = await withTimeout(
@@ -299,7 +299,7 @@ export class AgentServer {
         STARTUP_TIMEOUT_MS,
         "pi did not report its models in time",
       );
-      return { models: available.models.map(toAgentModel), current: modelRef(state.model) };
+      return { models: available.models.map(toAgentModel), current: modelRef(state.model), thinkingLevel: state.thinkingLevel ?? null };
     } finally {
       void pi.shutdown();
     }
@@ -629,7 +629,16 @@ function toAgentModel(model: Record<string, unknown>): AgentModel {
     reasoning: model.reasoning === true,
     contextWindow: Number.isInteger(model.contextWindow) ? model.contextWindow as number : undefined,
     maxTokens: Number.isInteger(model.maxTokens) ? model.maxTokens as number : undefined,
+    thinkingLevels: supportedThinkingLevels(model),
   };
+}
+
+const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
+function supportedThinkingLevels(model: Record<string, unknown>): string[] {
+  if (model.reasoning !== true) return ["off"];
+  const map = model.thinkingLevelMap && typeof model.thinkingLevelMap === "object" ? model.thinkingLevelMap as Record<string, unknown> : {};
+  return THINKING_LEVELS.filter((level) => map[level] !== null && (level === "xhigh" || level === "max" ? map[level] !== undefined : true));
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
