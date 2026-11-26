@@ -1,6 +1,6 @@
 ---
 name: authentication
-description: "Use to establish or recover service access: website sign-in and accounts, API credentials, MCP authorization, and iOS permissions, including missing or defective authentication support. Model-provider credentials use the native provider authentication flow instead."
+description: "Use to establish or recover service access: website sign-in, new website accounts, API credentials, MCP authorization, and iOS permissions, including missing or defective authentication support. Model-provider credentials use the native provider authentication flow instead."
 ---
 
 # Authentication
@@ -83,6 +83,10 @@ Repairing automatic login does not authorize using a real account as a test fixt
 Discover fresh destination frames and invoke destination listSessions. Verify the intended account and tenant, then pass its real descriptor as session when resuming protected actions. Provider authentication, cookie presence, remembered accounts, URLs, and cached service login fields do not prove destination access. Never fabricate a session descriptor or silently substitute another account.
 
 After successful sign-in, continue the original task without an extra proposal checkpoint. Inspect current task state before retrying an interrupted mutation; login does not authorize repeating completed effects, payment, or unrelated account changes. If authentication remains unverified, report the concrete blocker without claiming success or repeatedly reopening sign-in.
+
+## Create a website account
+
+When the request needs a new website account, including a developer or trial account for API access, read `references/registration.md`. Registration is a one-time handoff on the site's own sign-up page; it evolves the website service for later sign-in but adds no registration action.
 
 ## Model-provider credentials
 
