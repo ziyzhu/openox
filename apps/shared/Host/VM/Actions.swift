@@ -30,6 +30,8 @@ nonisolated enum Actions {
     static let appModel = "ox.app.model"
     static let appDefaultModel = "ox.app.defaultModel"
     static let appSetDefaultModel = "ox.app.setDefaultModel"
+    static let appAgents = "ox.app.agents"
+    static let appSetAgents = "ox.app.setAgents"
     static let appSetModel = "ox.app.setModel"
     static let appActionPolicies = "ox.app.actionPolicies"
     static let appRepositories = "ox.app.repositories"
@@ -99,7 +101,7 @@ nonisolated enum Actions {
         conversationDelete, providerDefault, providerList, providerGet, providerModels, providerGenerate, providerValidate, providerSave, providerDelete,
         providerAuthenticate, providerDeauthenticate, secretList, secretAdd, secretDelete,
         appInfo, appProfile, appProfiles, appNotifications, appLanguage, appSetLanguage,
-        appModel, appDefaultModel, appSetModel, appSetDefaultModel, appActionPolicies, appRepositories,
+        appModel, appDefaultModel, appSetModel, appSetDefaultModel, appAgents, appSetAgents, appActionPolicies, appRepositories,
         appLogs, appRenameConversation,
         webSearch, webFetch,
         fsStat, fsList, fsRead, fsAttach, fsWrite, fsEdit, fsRm, fsMkdir, fsMove, fsCopy, fsGlob, fsGrep,
@@ -125,7 +127,7 @@ nonisolated enum Actions {
     static func defaultPolicy(for action: String) -> ActionPolicy {
         guard builtIn.contains(action) else { return .ask }
         let asking = [
-            fsRm, providerGenerate, providerDeauthenticate, appLogs,
+            fsRm, providerGenerate, providerDeauthenticate, appLogs, appSetAgents,
             repositoryConnect, repositoryDisconnect,
             scheduleCreate, scheduleEnable, scheduleRun,
         ]
@@ -161,6 +163,7 @@ nonisolated enum Actions {
         case appLanguage, appSetLanguage: L10n.string("Language")
         case appModel, appSetModel: L10n.string("Model")
         case appDefaultModel, appSetDefaultModel: L10n.string("Default model")
+        case appAgents, appSetAgents: L10n.string("Agents")
         case appActionPolicies: L10n.string("Actions")
         case appRepositories: L10n.string("Repositories")
         case appLogs: L10n.string("Logs")

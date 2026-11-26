@@ -50,7 +50,7 @@ export function responseDirective(language: ResponseLanguage | null) {
 export interface RootEntry { name: string; directory: boolean }
 const rootNotes = new Map([
   ["MEMORY.md", "saved memory"],
-  ["app", "app settings, providers, services, status, and logs"],
+  ["app", "app settings, providers, services, remote agents (agents.json: name plus endpoint written as the bare Tailscale name, e.g. my-mac.tailnet.ts.net; defaultEndpoint or null), status, and logs"],
   ["artifacts", "legacy files"],
   ["conversations", "conversation working folders"],
   ["mounts", "folders the user granted on the Profile's Files page"],

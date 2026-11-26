@@ -12,7 +12,7 @@ extension Conversation {
               path.split(separator: "/").allSatisfy({ $0 != "." && $0 != ".." }) else {
             throw RuntimeError.bridge("The app mount is unavailable or its path is invalid")
         }
-        let files = ["settings.json", "providers.json", "services.json", "policy.json", "status.json", "logs.jsonl"]
+        let files = ["settings.json", "providers.json", "services.json", "agents.json", "policy.json", "status.json", "logs.jsonl"]
         let directory = path == "app" || path == "app/actions"
         let action = try appFileAction(path)
         guard directory || files.contains(String(path.dropFirst(4))) || action != nil else {
@@ -42,14 +42,14 @@ extension Conversation {
             }
             let text = try await appFileText(path: path, action: action)
             guard text.utf8.count <= 32 * 1024 * 1024 else { throw RuntimeError.bridge("App file exceeds the read safety limit") }
-            if ["app/settings.json", "app/providers.json", "app/services.json"].contains(path), requestedOperation == "read" {
+            if ["app/settings.json", "app/providers.json", "app/services.json", "app/agents.json"].contains(path), requestedOperation == "read" {
                 appFileRevisions[path] = text
             }
             value = .object(["text": .string(text), "truncated": .bool(false), "unsupported": .null])
         case "write":
             try requireProfileMutation(requestedOperation == "edit" ? Actions.fsEdit : Actions.fsWrite)
             guard ["write", "edit"].contains(requestedOperation),
-                  ["app/settings.json", "app/providers.json", "app/services.json"].contains(path) else {
+                  ["app/settings.json", "app/providers.json", "app/services.json", "app/agents.json"].contains(path) else {
                 throw OxFunctionError(code: "permission_denied", message: "This app file is read-only.", recovery: "Inspect its current contents; use trusted Settings controls for protected preferences. Do not bypass file permissions.")
             }
             guard let content = arguments.objectValue?["content"]?.stringValue else {
@@ -101,6 +101,9 @@ extension Conversation {
             return try Self.appConfigurationText(ProviderCatalog.load())
         case "app/services.json":
             return try Self.appConfigurationText(ServicePreferences.load())
+        case "app/agents.json":
+            try await requireApproval(action: Actions.appAgents, purpose: purpose)
+            return try Self.appConfigurationText(RemoteAgentDirectory.shared.configuration)
         case "app/status.json":
             let info = try await appInfo(purpose: purpose)
             let profiles = try await appProfiles(purpose: purpose)
@@ -108,7 +111,9 @@ extension Conversation {
             let language = try await appLanguage(purpose: purpose)
             let model = try await appDefaultModel(purpose: purpose)
             let repositories = try await appRepositories(purpose: purpose)
+            await RemoteAgentDirectory.shared.refreshUnknown()
             return try Self.appConfigurationText(JSONValue.object([
+                "agents": RemoteAgentDirectory.shared.appInformation,
                 "app": info ?? .null, "profiles": profiles ?? .null,
                 "notifications": notifications ?? .null, "language": language ?? .null,
                 "defaultModel": model ?? .null, "repositories": repositories ?? .null,
@@ -141,7 +146,7 @@ extension Conversation {
 
     private static func appConfigurationText<T: Encodable>(_ value: T) throws -> String {
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         return String(decoding: try encoder.encode(value), as: UTF8.self) + "\n"
     }
 
@@ -184,6 +189,25 @@ extension Conversation {
             }
             try Task.checkCancellation()
             try serviceManager.replaceServicePreferences(next)
+        case "app/agents.json":
+            guard Set(fields.keys).isSubset(of: ["format", "agents", "defaultEndpoint"]) else { throw RuntimeError.bridge("Unsupported agent configuration fields") }
+            let next = try JSONDecoder().decode(RemoteAgentConfiguration.self, from: Data(content.utf8)).validated()
+            let current = RemoteAgentDirectory.shared.configuration
+            guard next != current else { return }
+            let added = next.agents.filter { !current.agents.contains($0) }
+            let removed = current.agents.filter { !next.agents.contains($0) }
+            let defaultName = next.defaultEndpoint.map { endpoint in next.agents.first { $0.endpoint == endpoint }?.name ?? endpoint.absoluteString } ?? L10n.string("Current Device")
+            let summary = (added.map { L10n.string("Add \($0.name) at \($0.endpoint.absoluteString)") }
+                + removed.map { L10n.string("Remove \($0.name)") }
+                + (next.defaultEndpoint != current.defaultEndpoint ? [L10n.string("Default: \(defaultName)")] : []))
+            try await requireApproval(action: Actions.appSetAgents, args: [
+                "added": added.map { "\($0.name) — \($0.endpoint.absoluteString)" },
+                "removed": removed.map { "\($0.name) — \($0.endpoint.absoluteString)" },
+                "default": defaultName,
+            ], purpose: summary.isEmpty ? L10n.string("Rename agents") : summary.joined(separator: "\n"))
+            guard try Self.appConfigurationText(RemoteAgentDirectory.shared.configuration) == expected else { throw RuntimeError.bridge("Agent configuration changed during approval") }
+            try Task.checkCancellation()
+            try RemoteAgentDirectory.shared.replace(next)
         default:
             throw RuntimeError.bridge("App file is read-only")
         }

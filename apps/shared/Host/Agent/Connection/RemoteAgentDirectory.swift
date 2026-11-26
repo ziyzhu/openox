@@ -25,6 +25,30 @@ nonisolated struct RemoteAgentConfiguration: Codable, Equatable, Sendable {
         }
     }
 
+    func validated() throws -> Self {
+        guard format == 1, agents.count <= 20 else { throw RuntimeError.bridge("Agent configuration needs format 1 and at most 20 agents") }
+        var next = self
+        next.agents = try agents.map { agent in
+            let name = agent.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, name.count <= 100 else { throw RuntimeError.bridge("Each agent needs a name of 1–100 characters") }
+            guard let endpoint = RemoteAgentDirectory.endpoint(from: agent.endpoint.absoluteString) else {
+                throw RuntimeError.bridge("Agent \(name) has an invalid address; use a Tailscale name such as my-mac.tailnet.ts.net or a ws:// or wss:// URL")
+            }
+            return RemoteAgent(name: name, endpoint: endpoint)
+        }
+        guard Set(next.agents.map { $0.name.lowercased() }).count == next.agents.count,
+              Set(next.agents.map(\.endpoint)).count == next.agents.count else {
+            throw RuntimeError.bridge("Agent names and addresses must be unique")
+        }
+        if let endpoint = defaultEndpoint {
+            guard let normalized = RemoteAgentDirectory.endpoint(from: endpoint.absoluteString), next.agents.contains(where: { $0.endpoint == normalized }) else {
+                throw RuntimeError.bridge("defaultEndpoint must be the address of a listed agent, or null for this device")
+            }
+            next.defaultEndpoint = normalized
+        }
+        return next
+    }
+
     func save() throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -53,7 +77,7 @@ nonisolated enum RemoteAgentStatus: Equatable, Sendable {
 @Observable
 final class RemoteAgentDirectory {
     static let shared = RemoteAgentDirectory()
-    static let defaultPort = 9878
+    nonisolated static let defaultPort = 9878
 
     private(set) var configuration: RemoteAgentConfiguration
     private(set) var statuses: [URL: RemoteAgentStatus] = [:]
@@ -105,6 +129,50 @@ final class RemoteAgentDirectory {
         Log.agent.info("RemoteAgentDirectory.add endpoint=\(endpoint.absoluteString) count=\(next.agents.count)")
         Task { await refresh(endpoint) }
         return agent
+    }
+
+    func replace(_ next: RemoteAgentConfiguration) throws {
+        try next.save()
+        let kept = Set(next.agents.map(\.endpoint))
+        for endpoint in configuration.agents.map(\.endpoint) where !kept.contains(endpoint) {
+            statuses[endpoint] = nil
+            models[endpoint] = nil
+            clients[endpoint] = nil
+        }
+        configuration = next
+        Log.agent.info("RemoteAgentDirectory.replace count=\(next.agents.count) default=\(next.defaultEndpoint?.absoluteString ?? "local")")
+        Task { await refreshAll() }
+    }
+
+    func refreshUnknown() async {
+        await withTaskGroup(of: Void.self) { group in
+            for agent in configuration.agents where statuses[agent.endpoint].map({ $0 == .checking }) ?? true {
+                group.addTask { await self.refresh(agent.endpoint) }
+            }
+        }
+    }
+
+    var appInformation: JSONValue {
+        .array(configuration.agents.map { agent in
+            var fields: [String: JSONValue] = [
+                "name": .string(agent.name), "address": .string(agent.endpoint.absoluteString),
+                "default": .bool(configuration.defaultEndpoint == agent.endpoint),
+                "models": .int(models[agent.endpoint]?.count ?? 0),
+            ]
+            switch statuses[agent.endpoint] {
+            case .online(let implementation, let version, let machine, let folders):
+                fields["status"] = .string("online")
+                fields["agent"] = .string("\(implementation) \(version)")
+                fields["machine"] = .string(machine)
+                fields["folders"] = .array(folders.map(JSONValue.string))
+            case .offline(let error):
+                fields["status"] = .string("offline")
+                fields["error"] = .string(String(error.prefix(200)))
+            case .checking, nil:
+                fields["status"] = .string("checking")
+            }
+            return .object(fields)
+        })
     }
 
     func remove(_ endpoint: URL) throws {
@@ -170,13 +238,14 @@ final class RemoteAgentDirectory {
         return models[endpoint]?.first { $0.reference == reference }?.name ?? reference.id
     }
 
-    static func endpoint(from input: String) -> URL? {
+    nonisolated static func endpoint(from input: String) -> URL? {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         let bare = !trimmed.contains("://")
         let text = bare ? "\(trimmed.hasSuffix(".ts.net") || trimmed.contains(".ts.net:") ? "wss" : "ws")://\(trimmed)" : trimmed
         guard var components = URLComponents(string: text), let scheme = components.scheme?.lowercased(),
-              ["ws", "wss"].contains(scheme), let host = components.host, !host.isEmpty else { return nil }
+              ["ws", "wss"].contains(scheme), let host = components.host?.lowercased(), !host.isEmpty else { return nil }
+        if host.hasSuffix(".ts.net") { components.scheme = "wss" }
         if components.port == nil, scheme == "ws" || host.hasSuffix(".ts.net") { components.port = defaultPort }
         if components.path == "/" { components.path = "" }
         return components.url
