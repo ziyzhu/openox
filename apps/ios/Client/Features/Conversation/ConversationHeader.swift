@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ConversationHeader<Trailing: View>: View {
     let modelTitle: String?
-    var agentTitle = "Ox"
+    var agentTitle = String(localized: "Current Device")
     let iconButtonSize: CGFloat
     let onShowSidebar: () -> Void
     let onPickModel: () -> Void
