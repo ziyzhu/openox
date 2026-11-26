@@ -1,0 +1,419 @@
+{
+  "apps/cli/src/logs.ts": [
+    "// Sequence numbers are snapshot-relative in a compacting file. Match",
+    "// record content instead, counting identical records to preserve repeats."
+  ],
+  "apps/ios/Client/Features/Conversation/ComposerKeyboardDiagnostics.swift": [
+    "// Focus can move from a web field to a native field without a keyboard frame change."
+  ],
+  "apps/ios/Client/Features/Conversation/ConversationTranscriptViews.swift": [
+    "// Body font metrics add vertical whitespace around glyphs, so 12 pt reads like 14 pt horizontally."
+  ],
+  "apps/ios/Client/Features/Conversation/SelectableText.swift": [
+    "// SwiftUI's `.textSelection(.enabled)` only copies a whole Text at once on iOS",
+    "// (no loupe, no partial range) and is unreliable inside a ScrollView on iOS 18.",
+    "// A non-editable UITextView gives real cursor/range selection and owns its own",
+    "// selection gestures, so the conversation ScrollView and sidebar drag don't steal them."
+  ],
+  "apps/ios/Client/Features/Services/ActionSettingsView.swift": [
+    "// Group by user-facing feature, not by permission policy or storage source."
+  ],
+  "apps/ios/Client/Features/Services/ServiceDetailView.swift": [
+    "// MARK: - Actions",
+    "// MARK: - Manage"
+  ],
+  "apps/ios/Client/UI/LocalDomainArtwork.swift": [
+    "/// Optional in-memory artwork for previews and other network-independent presentations."
+  ],
+  "apps/ios/Development/OxDemoPlayback.swift": [
+    "/// In-memory presentation fixtures. Never prepares a runtime, checks service access, or calls a model.",
+    "// Present existing messages immediately; no simulated radio switch or offline generation."
+  ],
+  "apps/ios/Development/OxDemoSceneView.swift": [
+    "/// Uses production components only. Playback configuration lives outside the rendered UI."
+  ],
+  "apps/ios/Platform/Device.swift": [
+    "// ox-qa simulator",
+    "// Zi's iPhone 17 Pro Max"
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/americanexpress.com/actions.js": [
+    "// Booking results are a separate application. Use its observed public route,",
+    "// not reconstructed OAuth payloads or the legacy prebooking redirect.",
+    "// The newer booking origin cannot use the legacy functions/apigw",
+    "// discovery calls (CORS). Confirm its own live session instead."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/chatgpt.com/actions.js": [
+    "// Observed signed in: HTTP 200 with a user object and nonempty string id.",
+    "// Observed without a session: HTTP 200 with only WARNING_BANNER and no user.",
+    "// Unknown shapes fail closed instead of guessing.",
+    "// Never automatically retry a submission.",
+    "// Observe only the page-owned Dot profile listing. ChatGPT adds its own request",
+    "// authentication; credentials and headers are neither copied nor retained.",
+    "// Observe only search responses while this service owns a search session.",
+    "// Request credentials and headers are neither copied nor retained."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/claude.ai/actions.js": [
+    "// Some fresh Claude pages use XHR rather than fetch for completion.",
+    "// JSON escapes multiline system instructions; compare parsed messages, not source substrings.",
+    "// One submission only. An uncertain outcome is never retried.",
+    "// The website-default is always available; other picker entries are deliberately not advertised.",
+    "// One bootstrap request per generation, never per read."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/developer.apple.com/actions.js": [
+    "// \"/documentation/foundation/unitconverter.json\" from any of:",
+    "// full URL, \"/documentation/foo\", \"documentation/foo\", or a bare \"foundation/foo\".",
+    "// DocC content is a tree of block nodes, each holding inline runs. `refs` is the",
+    "// page's references map, used to resolve reference identifiers to their titles."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/docs.google.com/actions.js": [
+    "// Google Forms declares its own global ox function after document-start installation.",
+    "// Retain that function and restore only missing Ox runtime properties on it."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/doubao.com/actions.js": [
+    "// Doubao's code block stores its original fenced code verbatim.",
+    "// The actual tool stdout is a separate website artifact, not an Ox Action result.",
+    "// Initial notification may contain the whole code; subsequent patches",
+    "// may carry either cumulative code or only a new suffix. Never guess",
+    "// whether a repeated prefix is a replacement or a legitimate suffix.",
+    "// If a later block is introduced, the separator changes the previous suffix;",
+    "// publish only after its structure is known. A replacement is never emitted.",
+    "// Normalize CRLF after concatenation, so split CR/LF pairs are safe.",
+    "// A trailing CR remains pending until the next chunk supplies LF.",
+    "// SSE_ACK plus exact user echo and terminal stream markers are authoritative.",
+    "// The SPA route can update later; never block a finished stream on it.",
+    "// Native local break delegates to Doubao's active chat request/store.",
+    "// Do not wait for its asynchronous network path before returning to Ox."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/drive.google.com/actions.js": [
+    "// Folder snapshot transport: observed Drive initial HTML data, not a private API guess."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/gemini.google.com/actions.js": [
+    "// Gemini can finish a partial answer with a normal-looking terminal",
+    "// candidate after Stop. Do not publish it as a completed answer.",
+    "// Gemini's length counts the JSON line plus its surrounding line",
+    "// delimiters. XHR responseText is already decoded, so use complete",
+    "// newline-delimited rows, never slice a partial UTF-16 character.",
+    "// Prefix accounting varies with escaped and non-ASCII payloads.",
+    "// Require a bounded plausible size, but trust the complete JSON line.",
+    "// The site may take seconds to finish its stream. Never hold the Host's",
+    "// short cancellation budget while waiting for that remote confirmation."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/github.com/actions.js": [
+    "// GitHub's React data router returns clean JSON only when these headers are present."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/instagram.com/actions.js": [
+    "// Instagram's web client app id — the same constant shipped in Polaris'",
+    "// bundle and required on every /api/v1 call. It identifies the web app, not",
+    "// the user (user auth = sessionid cookie + csrftoken CSRF header), and has",
+    "// been stable for years, so it's safe to bake in.",
+    "//",
+    "// Everything here hits the REST /api/v1 surface rather than /api/graphql:",
+    "// the GraphQL POST endpoints gate on the page's comet session params",
+    "// (fb_dtsg/jazoest/__spin_*/__hs) which can't be replayed without scraping",
+    "// the whole bootstrap blob, whereas /api/v1 only needs the app id + cookies.",
+    "// csrftoken is a JS-readable cookie on instagram.com (not httpOnly) and is",
+    "// echoed back as the x-csrftoken header on every authed request.",
+    "// Resolve an Instagram shortcode (the /p/<code>/ token) to its numeric media",
+    "// pk via base64 bignum decode — /api/v1/media/<pk>/ needs the pk.",
+    "// The posts/reels feeds key off the numeric user pk, not the handle.",
+    "// Explore's grid nests media unpredictably (one_by_two_item.clips.items[],",
+    "// fill_items[], layout_content.medias[]). Rather than track every layout,",
+    "// walk the tree and collect anything that looks like a media node."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/linkedin.com/actions.js": [
+    "// LinkedIn's CSRF token is the JSESSIONID cookie value with its surrounding",
+    "// quotes stripped (e.g. cookie `\"ajax:123\"` -> header `ajax:123`). The cookie",
+    "// is JS-readable; li_at (the real session credential) is httpOnly and never",
+    "// touched here — the WebView forwards it automatically via credentials.",
+    "// The two Voyager surfaces disagree only on the Accept type: the classic",
+    "// /voyager/api/* endpoints answer in normalized+json, the messaging GraphQL",
+    "// gateway answers in plain graphql json.",
+    "// Voyager variable strings keep their structural (key:value,...) syntax",
+    "// literal while percent-encoding each URN value; the whole queryId+variables",
+    "// pair is assembled by hand so URLSearchParams can't re-encode the parens.",
+    "// The conversation URN is urn:li:msg_conversation:(<mailbox>,<threadId>); the",
+    "// classic REST events endpoint keys off just the <threadId> tail.",
+    "// A profile picture is a VectorImage: rootUrl + the path segment of whichever",
+    "// rendered artifact is closest to the requested width. /me exposes it as a",
+    "// bare VectorImage; the dash profile wraps it in displayImageReference.",
+    "// Both conversation participants and message senders are MessagingParticipant",
+    "// objects: a member, an organization, or an agent, each carrying its own name",
+    "// shape under participantType.",
+    "// A message's `sender` is a thin participant (only hostIdentityUrn) in the",
+    "// inbox preview but a fully-named one in the thread view. Build a",
+    "// hostIdentityUrn -> name map from whatever named participants are at hand so",
+    "// the thin senders resolve too.",
+    "// A thread's events come back normalized: data[\"*elements\"] are Event URNs",
+    "// resolved out of `included`, and each Event's `*from` points to a",
+    "// MessagingMember (miniProfile) or MessagingCompany (alternateName) there too.",
+    "// A search hit's kind is encoded in its tracking URN (urn:li:company:..,",
+    "// urn:li:member:.., urn:li:group:.., urn:li:fsd_jobPosting:..).",
+    "// Engagement lives two pointers away: UpdateV2.*socialDetail -> SocialDetail",
+    "// .*totalSocialActivityCounts -> SocialActivityCounts.",
+    "// Voyager query strings (q=..,query=(..)) keep their structural punctuation",
+    "// literal, so they're spliced into the URL raw rather than via URLSearchParams."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/mail.google.com/actions.js": [
+    "// Ignore anonymous inline images and tracking pixels. Named inline images",
+    "// remain useful attachments and are retained.",
+    "// Printable Gmail often renders attachments as plain text at the end of a",
+    "// message instead of attachment cards. Recover conservative filename + size",
+    "// pairs without mistaking prose or signature images for attachments."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/muse.ai/actions.js": [
+    "// WebKit suspends animation frames on hidden service pages. Muse waits on",
+    "// these frames before mounting its chat. Race only hidden-page frames with",
+    "// a timer, preserving cancellation and exactly-once callback delivery."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/resy.com/actions.js": [
+    "// Wait for AngularJS injector or initial DOM readiness"
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/taobao.com/actions.js": [
+    "// Taobao signs every mtop request with a `sign` (md5 over the _m_h5_tk token)",
+    "// *and* a `bx-ua` anti-bot token minted by Alibaba's obfuscated baxia JS, which",
+    "// we can't reproduce. The page's own mtop SDK (`window.lib.mtop`) generates",
+    "// both, so we delegate to it rather than forging the request. Detail APIs are",
+    "// gated behind the anti-crawl handshake, hence `antiCreepRequest`."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/www.kimi.com/actions.js": [
+    "// Kimi's request client owns authentication and transport. No credentials are read or copied.",
+    "// The page-owned client performs a fresh server request and returns the decoded response.",
+    "// This avoids racing a global fetch interceptor while preserving the website's own transport.",
+    "// Exactly once. Never retry a submission."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/x.com/actions.js": [
+    "// X's public app-level bearer for the official web client — the same",
+    "// constant shipped in x.com's own main.<hash>.js, required on every",
+    "// /i/api/graphql call even for cookie-authed sessions. It identifies the",
+    "// app, not the user (user auth = auth_token cookie + ct0 CSRF header), and",
+    "// has been stable since ~2019, so unlike the queryIds below it is safe to",
+    "// bake in rather than scrape from the live bundle.",
+    "// Every queryId is read live from the current x.com bundle (see",
+    "// `scrapeOperationFromBundle`) — they rotate on each Twitter deploy, so a",
+    "// baked snapshot would silently go stale. These feature sets are the only",
+    "// baked fallback, used when a scraped op module omits its `featureSwitches`.",
+    "// Every op is emitted into the bundle as a webpack module of the shape",
+    "// {queryId:\"..\",operationName:\"..\",operationType:\"..\",metadata:{",
+    "// featureSwitches:[..],fieldToggles:[..]}}. One pass harvests them all, so a",
+    "// single fetch of main.<hash>.js (which carries ~150 ops) resolves nearly",
+    "// everything in one shot and the rest come from their named lazy chunks.",
+    "// The service worker precaches every split chunk, so /sw.js is the",
+    "// authoritative manifest of the current build — it lists chunks the page",
+    "// hasn't lazily loaded (Bookmarks/Notifications) which document.scripts and",
+    "// resource timing miss. Fetched once per service lifetime.",
+    "// main.<hash>.js carries ~150 ops; the rest live in lazily-split chunks.",
+    "// Rank so the entry bundle is scanned first, then chunks whose filename",
+    "// hints at the operation, then the timeline loaders/shared chunks where",
+    "// queries like Bookmarks hide (clustered in *card*/*timeline* loaders), then",
+    "// everything else — so even the worst-case op is found in a few batches.",
+    "// Top-of-page story cells are not trends; skip them and promos."
+  ],
+  "apps/shared/Resources/OxServices.bundle/web/xiaohongshu.com/actions.js": [
+    "// xhs mounts under #app. If a future build relocates the root we'll see the",
+    "// action fail loudly instead of paying for a full-DOM probe on every read.",
+    "// SPA-internal navigation. The throwaway `_=` defeats Vue Router's",
+    "// same-URL no-op detection so the route handler always re-fires.",
+    "// Both `nickname` and `nickName` are real Pinia field variants on xhs",
+    "// (per opencli's feed.js); not a snake-case alternate.",
+    "// Scroll a container (or window) to its bottom and wait for new rows via a",
+    "// MutationObserver. Stops at the target, or after two consecutive plateaus,",
+    "// or after maxRounds.",
+    "// A rendered note card (search results, a profile's note grid). xhs renders",
+    "// ~4 anchors per card: the bare `/explore/<id>` one has no query string; the",
+    "// cover/title anchors carry `xsec_token`. Pick whichever anchor has the token,",
+    "// since downstream getNote requires it. On a profile the cover anchor is",
+    "// `/user/profile/<uid>/<noteid>?xsec_token=` — noteIdOf handles that shape too.",
+    "// Navigate to a profile and wait for *its* data to land. The user store keeps",
+    "// the previously-viewed profile's basicInfo/notes until the next fetch",
+    "// resolves, and nothing in the payload carries the uid — so when we actually",
+    "// navigate we null those fields first and gate on basicInfo repopulating,",
+    "// otherwise a back-to-back call reads the prior profile.",
+    "// Fail fast with a useful message instead of letting the caller's later",
+    "// waits compound toward the 30s debug-WS timeout.",
+    "// The profile grid is virtualized (the DOM holds ~1 card), so read the",
+    "// store. Its entries share the home-feed shape, so buildFeedItem applies.",
+    "// The first page lands shortly after basicInfo and more pages lazy-load",
+    "// on scroll, so poll the store (scrolling to nudge it) until we hit the",
+    "// target or it plateaus — scrollUntil keys off DOM growth a virtualized",
+    "// grid never produces.",
+    "// user.notes is row-grouped (an array of rows, each holding the note",
+    "// entries in that masonry row), so flatten to the home-feed entry shape.",
+    "// First page lands a beat after basicInfo; wait for it before",
+    "// plateau-detecting (a genuinely empty profile just times out to []).",
+    "// Trending/suggested queries ride the search store's queryTrendingInfo, which",
+    "// the explore search box populates. No dedicated navigation if it's already",
+    "// loaded; otherwise nudge /explore and wait for it.",
+    "// xhs's note APIs are gated by an xsec_token. Without it the SPA falls",
+    "// through to /404 (error_code=300031) before any signed POST fires, so the",
+    "// only useful failure mode is to reject the input up front. Pass the full",
+    "// URL from listFeed/listSearchResults/listComments output — those carry the",
+    "// token in the query string.",
+    "// Title/body/counts come from the DOM — opencli's note.js proves this is",
+    "// the stable signal for note details.",
+    "// Media is the one place the store beats DOM: imageList preserves carousel",
+    "// order, and video.media.stream exposes per-codec master URLs the DOM lacks.",
+    "// Parses xhs like-count text: \"1,234\", \"1.2w\" (10k), \"2.5万\", \"123+\".",
+    "// Comments lazy-load into an inner overflow container; window-level",
+    "// scrolling does nothing on a note page."
+  ],
+  "apps/shared/Runtime/Agent/LLM/Auth/SubscriptionAccount.swift": [
+    "// A provider-neutral seam for clients authenticated by an existing consumer",
+    "// subscription (OAuth) rather than a pasted API key. The generic LLM layer",
+    "// stays ignorant of any specific provider; concrete accounts encapsulate the",
+    "// flow and token lifecycle."
+  ],
+  "apps/shared/Runtime/Agent/LLM/LLMStreaming.swift": [
+    "// Iterates \"data:\" lines, parses each JSON payload, and hands it to body.",
+    "// Handles the \"[DONE]\" sentinel and skips malformed chunks with a warning.",
+    "// body returns false to stop early. Returns the number of lines consumed.",
+    "// Accumulates streamed deltas into an AssistantMessage and emits the",
+    "// matching AssistantEvents, so clients only translate provider JSON.",
+    "// Some models (e.g. qwen via OpenRouter) stream reasoning after content has",
+    "// already begun. Emitting those deltas live would interleave a thinking block",
+    "// into the middle of streamed text downstream, so late reasoning is buffered",
+    "// silently and merged into the leading thinking block at finish.",
+    "// The call arrives complete in a single chunk (Gemini style).",
+    "// The call accretes across chunks (OpenAI style): open a slot, update it",
+    "// as fragments arrive, then close it once the stream ends.",
+    "// Some models (e.g. qwen via OpenRouter) stream reasoning after content,",
+    "// so thinking blocks can land out of order. Merge them into one block at",
+    "// the front, where a turn's reasoning belongs.",
+    "// Splits a UserMessage into provider-neutral parts: all text (with text-file",
+    "// attachments inlined as fenced code blocks) plus loaded binary attachments."
+  ],
+  "apps/shared/Runtime/Agent/LLM/PromptCacheKey.swift": [
+    "// Cache backends route requests by a caller-supplied affinity key (OpenAI's",
+    "// prompt_cache_key / session-id, OpenRouter's x-session-id); the key must be",
+    "// identical across requests sharing a prompt prefix or every request lands on",
+    "// a cold machine and never reads the cache."
+  ],
+  "apps/shared/Runtime/Agent/LLM/Providers/GeminiProvider.swift": [
+    "// MARK: - Explicit context caching"
+  ],
+  "apps/shared/Runtime/Durable/DurableDatabase.swift": [
+    "/// Connection owned by one trusted runtime. Called exclusively on its native queue, never the UI/JS queue.",
+    "// Close follows the facade's settled transaction queue. Failed-open disposal",
+    "// may still own an uncommitted initialization transaction; never publish it."
+  ],
+  "apps/shared/Runtime/Durable/DurableMessageCodec.swift": [
+    "/// Provider-neutral boundary. Ox-only signatures/references stay in strict JSON; no credentials or host paths enter Pi.",
+    "// Historical native details retain ancillary fields, not a competing",
+    "// attachment authority. Use the already-validated qualified content.",
+    "// Existing UUID-bound cache/legacy codec compatibility."
+  ],
+  "apps/shared/Runtime/Durable/DurableRuntime.swift": [
+    "/// Separate trusted context, never reachable through model-authored snippet execution.",
+    "/// Apple: JSContext / JSVirtualMachine; native callbacks must not retain their owning context.",
+    "/// Only after Harness.close() has joined all invocations and closed its connection."
+  ],
+  "apps/shared/Runtime/RPC/DebugDurableStorage.swift": [
+    "/// Published upstream storage workloads only. Never opens a Harness or a real Profile.",
+    "// Reserve before any await; never overlap storage workloads.",
+    "// The upstream runner has already closed SQLite."
+  ],
+  "apps/shared/Runtime/RPC/DurableExperimentCommands.swift": [
+    "/// The public contract is platform-independent; experimental cache execution",
+    "/// remains unavailable outside explicitly opted-in DEBUG Simulator campaigns."
+  ],
+  "apps/shared/Runtime/Services/Repository/ServiceSearchIndex.swift": [
+    "// nil = no standalone semantic fallback: sentence-embedding cosines are too compressed to threshold (gibberish outscores real queries).",
+    "// MARK: - Search"
+  ],
+  "apps/shared/Runtime/Services/Service.swift": [
+    "// MARK: - State",
+    "// MARK: - State mutators",
+    "// MARK: - Tier 1: manifest",
+    "// MARK: - Browser"
+  ],
+  "apps/shared/Runtime/Services/ServiceInvocation.swift": [
+    "// MARK: - Auth"
+  ],
+  "apps/shared/Runtime/Services/ServiceManifest.swift": [
+    "// Overlay the locale's strings (name/description/action label+description) onto",
+    "// the base manifest and drop the `locales` blob. The published manifest ships",
+    "// every overlay so the device localizes offline; the locale comes from AppLocale."
+  ],
+  "apps/shared/Runtime/Services/Web/WebConversation.swift": [
+    "/// One owner, one source, one page. Handles are process-local, never recovery checkpoints.",
+    "// Reserve before any await, so scope/source cleanup also invalidates pending opens.",
+    "// A throw can follow a remote side effect. Invalidate, never retry on this page."
+  ],
+  "apps/shared/Runtime/Services/Web/WebConversationContract.swift": [
+    "/// Shared website submission protocol. This does not change the service manifest format."
+  ],
+  "apps/shared/Runtime/Services/Web/WebsitePublicSuffixList.swift": [
+    "/// Registrable-domain lookup using the bundled ICANN and PRIVATE PSL rules.",
+    "/// Callers supply lowercase, IDNA-encoded hostnames, as with the former package.",
+    "// Foundation handles IDNA, so the Unicode source list needs no Punycode package.",
+    "// The implicit '*' rule covers unknown suffixes.",
+    "// An exception removes its leftmost label from the public suffix,",
+    "// making the exception itself the registrable domain."
+  ],
+  "apps/shared/Runtime/TailscaleIngress.swift": [
+    "/// Finds the device's locally configured Tailscale VPN, not the identity of a peer.",
+    "/// Authentication and grants are enforced by that VPN; source IPs are never credentials.",
+    "// Require both Tailscale address families on one VPN, and fail closed on ambiguity."
+  ],
+  "packages/agent/src/adapters/ios/bridge.ts": [
+    "// Native cancellation completion or an expired generation."
+  ],
+  "packages/agent/src/adapters/ios/encoding.ts": [
+    "// Loaded before whatwg-url (which uses encoding during module initialization)."
+  ],
+  "packages/agent/src/adapters/ios/index.ts": [
+    "/** Explicit iOS entry: initialize JSC host APIs before opening native adapters. */"
+  ],
+  "packages/agent/src/adapters/ios/storage-diagnostics.ts": [
+    "/** DEBUG storage diagnostics: published Pi conformance and benchmark workloads only. */"
+  ],
+  "packages/agent/src/profile/conversations.ts": [
+    "/** Pi IDs are database-local. Application references always include their owning Profile. */",
+    "// Presentation is current application state, not rewindable transcript state. Forks inherit the",
+    "// current title/visibility, but start unfavorited and unread. Internal conversations create none",
+    "// of these documents. Every 32nd ordinary change checkpoints the bounded latest-only delta tail.",
+    "/** Application semantics over Pi's existing Session APIs; no registry, transcript or model copy. */",
+    "// Scope rejection is deliberately before readiness, handle acquisition, or any Pi lookup.",
+    "/** A page scans at most `limit` Pi records. Hidden records can yield an empty page with `next`. */",
+    "/** Full immutable, newest-first, fork-aware history, including entries excluded by reset/compaction.\n   * Round-trip only this page's scoped cursor. This is NOT Conversation.context() or an active snapshot.\n   */"
+  ],
+  "packages/agent/src/profile/files.ts": [
+    "/** Immutable publication metadata remains addressable after logical removal. */",
+    "/** One mutation owner. Native publications precede Pi references; historical files are retained.\n * SQL blobs remain only for explicitly selected legacy cache/integration fixtures.\n */",
+    "/** Historical attachment access does not depend on membership in the visible file index. */",
+    "// Bounded bridge chunks: do not turn a 32 MB blob into one enormous JSON number array."
+  ],
+  "packages/agent/src/profile/filesystem.ts": [
+    "/* directories are implicit; write validates the writable namespace */",
+    "// Native artifact durability, or an already committed Pi document."
+  ],
+  "packages/agent/src/profile/runtime.ts": [
+    "/** Only for the explicitly retained, purgeable SQLite-blob fixtures. */",
+    "/** Numeric IDs remain the low-level Pi/UUID-adapter compatibility path, not application references. */",
+    "/** Diagnostic `messages` retains its active-context compatibility contract, not full scrollback. */"
+  ],
+  "packages/agent/src/sqlite.ts": [
+    "/** One facade/connection per immutable native scope. All disk work is native and asynchronous. */",
+    "// Observe even a detached rejection; drain all admitted statements before settlement."
+  ],
+  "packages/agent/src/storage-benchmark-types.ts": [
+    "/** JSON diagnostics ABI only; importing it must not pull Pi/provider SDKs into CLI tooling. */"
+  ],
+  "packages/agent/src/storage-benchmark.ts": [
+    "/** Runner only: workload definitions, seeds and expected values come from pinned Pi Durable. */"
+  ],
+  "packages/agent/src/storage-check.ts": [
+    "/** Runs one upstream case on a fresh native-bound cache fixture, without opening a Harness. */"
+  ],
+  "packages/protocol/src/contract.ts": [
+    "// Swift decodeIfPresent accepts both omission and explicit null.",
+    "// Domain payloads remain owned by their existing codecs, not a new persisted format.",
+    "// Experimental DEBUG Simulator commands. Native controllers own bounded domain validation."
+  ],
+  "packages/protocol/src/index.ts": [
+    "// Unknown methods remain available to newer or extended Hosts; discovery is separate.",
+    "// Unknown methods remain available to newer or extended Ox apps; discovery is separate."
+  ],
+  "packages/protocol/src/model-actions.ts": [
+    "/** One website interaction contract for provider and ordinary service callers. */"
+  ]
+}

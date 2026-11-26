@@ -36,8 +36,11 @@ is not enough. Append xcodebuild arguments such as `-derivedDataPath <dir>` to e
 For changes confined to `apps/shared`, `build:macos` compiles the same shared sources without
 a Simulator; use it as the first compile check, then `build:ios` before iOS verification.
 
-`lint` validates public/private-content boundaries, iOS Client-runtime layering,
-platform source ownership, unsafe absolute-path slicing, bundled skill packages and links,
+`lint` rejects code comments and unit tests in Swift, TypeScript, and JavaScript.
+Keep existing build and integration checks; do not add to the comment baseline
+or the allowlist of existing checks. `lint` also validates public/private-content
+boundaries, iOS Client-runtime layering, platform source ownership, unsafe absolute-path
+slicing, bundled skill packages and links,
 translations, provider models, and bundled service manifests/installers. It runs the explicit check list in `scripts/lint.ts`
 against the full repository, then checks TypeScript without generating or fixing files. Keep cross-file and resource checks here rather than forcing them into
 per-file JavaScript lint rules. `build` checks schema consistency before generating
